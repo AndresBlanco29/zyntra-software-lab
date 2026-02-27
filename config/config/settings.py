@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'reportes',
     'usuarios',
     'vendedores',
+    'clientes',
 
 ]
 
@@ -88,7 +89,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'tortilla_db',
         'USER': 'root',
-        'PASSWORD': '010409',
+        'PASSWORD': '030624',
         'HOST': 'localhost',
         'PORT': '3306',
     }
@@ -131,3 +132,6 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'

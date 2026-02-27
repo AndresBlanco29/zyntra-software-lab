@@ -1,0 +1,19 @@
+<h1>Catálogo</h1>
+
+{% for producto in productos %}
+
+    <div>
+
+        <h3>{{ producto.nombre }}</h3>
+
+        {% if producto.imagen %}
+            <img src="{{ producto.imagen.url }}" width="200">
+        {% endif %}
+
+        <p>{{ producto.descripcion }}</p>
+
+        <p>$ {{ producto.precio_base }}</p>
+
+    </div>
+
+{% endfor %}

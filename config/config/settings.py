@@ -88,7 +88,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'tortilla_db',
         'USER': 'root',
-        'PASSWORD': '030624',
+        'PASSWORD': '010409',
         'HOST': 'localhost',
         'PORT': '3306',
     }

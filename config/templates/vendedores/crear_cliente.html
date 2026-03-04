@@ -1,0 +1,291 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+
+<!-- 🔥 MUY IMPORTANTE PARA RESPONSIVE -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Crear Cliente</title>
+
+<link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
+<script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+
+<style>
+body { background:#f4f6f9; }
+
+/* NAVBAR */
+.navbar-custom {
+    background: linear-gradient(90deg, #023B82, #0C64CF, #3F89DA);
+}
+
+/* SIDEBAR */
+.sidebar {
+    background:#fff;
+    min-height:100vh;
+    border-right:1px solid #e3e3e3;
+}
+
+.sidebar .active {
+    background:#1f4fa3 !important;
+    color:white !important;
+    border-left:4px solid #ffd400;
+}
+
+/* CARD */
+.custom-card {
+    border-radius:14px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.08);
+    border:none;
+}
+
+.card-header-custom {
+    background:#dcdcdc;
+    font-weight:600;
+}
+
+/* STEP BAR */
+.step-bar {
+    height:6px;
+    background:#e9ecef;
+    border-radius:5px;
+}
+
+.step-progress {
+    height:100%;
+    background:#1f4fa3;
+}
+
+/* BOTÓN */
+.btn-yellow {
+    background:#ffd400;
+    border:none;
+    font-weight:600;
+    border-radius:8px;
+}
+.btn-yellow:hover {
+    background:#e6c200;
+}
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
+<div class="container-fluid">
+
+<a class="navbar-brand fw-bold">La Tortilla Grocery</a>
+
+<!-- BOTÓN HAMBURGUESA PARA MOBILE -->
+<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu">
+<span class="navbar-toggler-icon"></span>
+</button>
+
+</div>
+</nav>
+
+<div class="container-fluid">
+<div class="row">
+
+<!-- SIDEBAR RESPONSIVE -->
+<div class="col-lg-2 col-md-3 collapse d-lg-block sidebar p-0" id="sidebarMenu">
+
+<div class="p-4">
+<h5 class="fw-bold text-primary">Vendedor Andrés</h5>
+</div>
+
+<div class="list-group list-group-flush">
+
+<a href="{% url 'crear_cliente' %}"
+class="list-group-item list-group-item-action {% if 'crear-cliente' in request.path %}active{% endif %}">
+Crear Cliente
+</a>
+
+<a href="{% url 'clientes' %}"
+class="list-group-item list-group-item-action {% if 'clientes' in request.path %}active{% endif %}">
+Clientes
+</a>
+
+<a href="{% url 'tomar_pedido' %}"
+class="list-group-item list-group-item-action {% if 'tomar-pedido' in request.path %}active{% endif %}">
+Tomar Pedido
+</a>
+
+</div>
+</div>
+
+<!-- CONTENIDO -->
+<div class="col-lg-10 col-md-9 col-12 p-3 p-md-4">
+
+<h4 class="fw-bold">Solicitud de Creación de Cliente</h4>
+<p class="text-muted">Llene todos los campos para la solicitud</p>
+<hr>
+
+<div class="row justify-content-center">
+<div class="col-xl-8 col-lg-10 col-12">
+
+<div class="card custom-card">
+
+<div class="card-header card-header-custom">
+Datos Básicos
+</div>
+
+<div class="card-body p-3 p-md-5">
+
+<!-- STEP -->
+<div class="text-center mb-4">
+<div class="fw-semibold text-primary mb-2" id="stepText">
+Paso 1 de 2
+</div>
+
+<div class="step-bar mx-auto w-75">
+<div class="step-progress" style="width:50%;" id="progressBar"></div>
+</div>
+</div>
+
+<!-- PASO 1 -->
+<div id="step1">
+
+<div class="row g-3">
+
+<div class="col-12 col-md-6">
+<label class="form-label">Nombre</label>
+<input type="text" class="form-control">
+</div>
+
+<div class="col-12 col-md-6">
+<label class="form-label">Apellido</label>
+<input type="text" class="form-control">
+</div>
+
+<div class="col-12 col-md-6">
+<label class="form-label">Documento</label>
+<input type="text" class="form-control">
+</div>
+
+<div class="col-12 col-md-6">
+<label class="form-label">Teléfono</label>
+<input type="text" class="form-control">
+</div>
+
+<div class="col-12 col-md-6">
+<label class="form-label">Correo Electrónico</label>
+<input type="email" class="form-control">
+</div>
+
+</div>
+
+<hr class="my-4">
+
+<h5 class="fw-bold mb-3">Datos de la Empresa</h5>
+
+<div class="row g-3">
+
+<div class="col-12 col-md-6">
+<label class="form-label">Nombre legal *</label>
+<input type="text" class="form-control">
+</div>
+
+<div class="col-12 col-md-6">
+<label class="form-label">Número de impuestos *</label>
+<input type="text" class="form-control">
+</div>
+
+<div class="col-12 col-md-6">
+<label class="form-label">Teléfono Comercial *</label>
+<input type="text" class="form-control">
+</div>
+
+<div class="col-12 col-md-6">
+<label class="form-label">Correo Comercial *</label>
+<input type="email" class="form-control">
+</div>
+
+</div>
+
+<div class="text-center mt-4">
+<button type="button" class="btn btn-yellow px-4 px-md-5" onclick="nextStep()">
+Continuar
+</button>
+</div>
+
+</div>
+
+<!-- PASO 2 -->
+<div id="step2" style="display:none;">
+
+<div class="row g-3">
+
+<div class="col-12 col-md-6">
+<label>Dirección Línea 1 *</label>
+<input type="text" class="form-control">
+</div>
+
+<div class="col-12 col-md-6">
+<label>Dirección Línea 2</label>
+<input type="text" class="form-control">
+</div>
+
+<div class="col-12 col-md-6">
+<label>Ciudad *</label>
+<input type="text" class="form-control">
+</div>
+
+<div class="col-12 col-md-6">
+<label>Estado *</label>
+<input type="text" class="form-control">
+</div>
+
+<div class="col-12 col-md-6">
+<label>Código Postal *</label>
+<input type="text" class="form-control">
+</div>
+
+<div class="col-12 col-md-6">
+<label>País *</label>
+<input type="text" class="form-control">
+</div>
+
+</div>
+
+<hr class="my-4">
+
+<div class="border rounded p-4 text-center bg-light">
+Arrastra tu certificado aquí o haz clic para subir
+</div>
+
+<div class="form-check my-4">
+<input class="form-check-input" type="checkbox">
+<label class="form-check-label">
+Confirmo que la información es correcta
+</label>
+</div>
+
+<div class="text-center">
+<button type="submit" class="btn btn-yellow px-4 px-md-5">
+Enviar Solicitud
+</button>
+</div>
+
+</div>
+
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<script>
+function nextStep(){
+document.getElementById("step1").style.display="none";
+document.getElementById("step2").style.display="block";
+document.getElementById("progressBar").style.width="100%";
+document.getElementById("stepText").innerText="Paso 2 de 2";
+}
+</script>
+
+</body>
+</html>

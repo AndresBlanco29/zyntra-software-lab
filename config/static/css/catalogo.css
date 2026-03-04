@@ -1,0 +1,407 @@
+body {
+    background-color: #f4f6f9;
+}
+
+/* Desktop: restaurar layout original (titulo izquierda, buscador+selects a la derecha) */
+@media (min-width: 993px) {
+    .catalog-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .catalog-header .top-row {
+        display: block;
+    }
+
+    .catalog-header .selects-row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        width: auto;
+    }
+
+    .catalog-header .selects-row > #buscador {
+        width: 300px;
+        min-width: 220px;
+    }
+
+    .catalog-header .selects-row select {
+        width: auto;
+    }
+}
+
+/* NAVBAR */
+.navbar-custom {
+    background: linear-gradient(90deg, #0b3d91, #1f4fa3, #3f89da);
+    padding: 15px;
+}
+
+.navbar-brand {
+    font-size: 22px;
+    letter-spacing: 0.5px;
+}
+
+/* SIDEBAR */
+.sidebar {
+    background: #fff;
+    height: 100vh;
+    border-right: 1px solid #e5e5e5;
+}
+
+        /* HEADER USUARIO CON DEGRADADO */
+/* HEADER USUARIO CON DEGRADADO */
+.sidebar-user {
+    background: linear-gradient(90deg, #023B82, #0C64CF, #3F89DA);
+    color: white;
+    text-align: center;
+    padding: 17px 10px;
+    margin-top: 30px;
+    margin-bottom: 30px;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+        /* BOTONES GENERALES */
+/* BOTONES GENERALES */
+.sidebar .list-group-item {
+    border: none;
+    background: transparent;
+    font-weight: 500;
+    text-align: center; /* 🔥 centra los no activos */
+    padding: 14px 10px;
+    transition: 0.3s;
+}
+
+.sidebar .active {
+    position: relative;
+    background: linear-gradient(90deg, #0b3d91, #2353a5, #3f89da);
+    color: white !important;
+    text-align: center;
+    font-weight: bold;
+    padding: 12px;
+    font-size: 18px;
+}
+
+.sidebar .active::before {
+    content: "";
+    position: absolute;
+    left: 40px; /* 🔥 mueve la barra hacia la derecha */
+    top: 50%;
+    transform: translateY(-50%);
+    width: 7px; /* grosor */
+    height: 70%;
+    background-color: #ffd400;
+    border-radius: 10px;
+}
+
+        /* TITULOS */
+/* TITULOS */
+.page-title {
+    font-weight: 700;
+}
+
+.subtitle {
+    color: #6c757d;
+}
+
+        /* CARD PRODUCTO */
+/* CARD PRODUCTO */
+.producto-card {
+    background: white;
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    padding: 20px;
+    transition: 0.2s;
+}
+
+.producto-card:hover {
+    transform: translateY(-3px);
+}
+
+        /* IMAGEN */
+/* IMAGEN */
+.producto-img {
+    height: 160px;
+    object-fit: contain;
+}
+
+        /* NOMBRE PRODUCTO */
+/* NOMBRE PRODUCTO */
+.product-name {
+    color: #1f4fa3;
+    font-weight: 700;
+    font-size: 18px;
+}
+
+        /* TEXTO UNIDADES */
+/* TEXTO UNIDADES */
+.units-text {
+    font-size: 13px;
+    color: #6c757d;
+}
+
+        /* BOTONES CANTIDAD */
+/* BOTONES CANTIDAD */
+.qty-btn {
+    background: #1f4fa3;
+    color: white;
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    font-weight: bold;
+}
+
+        /* BOTON AMARILLO */
+/* BOTON AMARILLO */
+.btn-yellow {
+    background: #ffd400;
+    font-weight: 600;
+    border: none;
+}
+
+.btn-yellow:hover {
+    background: #e6c200;
+}
+
+        /* SIDEBAR MOBILE */
+
+@media (max-width: 768px) {
+    .sidebar {
+        display: none;
+    }
+
+    /* organiza filtros y buscador en columna */
+    .d-flex.gap-2 {
+        flex-direction: column;
+        gap: 10px !important;
+    }
+
+    #buscador {
+        width: 100%;
+        min-width: unset !important;
+        margin-bottom: 6px;
+    }
+
+    .presentacion-select {
+        min-width: 100% !important;
+    }
+
+    .agregar-btn {
+        padding: 12px 14px;
+        font-size: 15px;
+    }
+
+    .qty-btn {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+    }
+
+    .producto-card {
+        padding: 14px;
+        text-align: left;
+    }
+
+    .product-name {
+        font-size: 17px;
+        text-align: left;
+    }
+
+    .info-presentacion {
+        text-align: left;
+    }
+
+    /* Apilar y centrar título + controles en móviles */
+    .catalog-header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .catalog-header .top-row {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .catalog-header .page-title {
+        text-align: center;
+        margin: 0;
+    }
+
+    .catalog-header .selects-row {
+        width: 100%;
+    }
+
+    .catalog-header .selects-row > #buscador {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .catalog-header .selects-row {
+        width: 100%;
+        display: flex;
+        gap: 10px;
+        flex-direction: column;
+    }
+
+    .catalog-header .selects-row select {
+        width: 100%;
+    }
+}
+
+        @media (max-width:768px){
+
+        .d-flex.gap-2{
+        flex-direction:column;
+        gap:10px !important;
+        }
+
+        #buscador{
+        width:100%;
+        min-width:unset !important;
+        }
+
+        }
+
+        @media (max-width:576px){
+
+        .producto-img{
+        height:120px;
+        }
+
+        .product-name{
+        font-size:16px;
+        }
+
+        .units-text{
+        font-size:12px;
+        }
+
+        .producto-card{
+        padding:15px;
+        }
+
+        }
+
+        /* Ajustes adicionales para pantallas muy pequeñas */
+        @media (max-width:420px){
+
+        .producto-img{
+        height:100px;
+        }
+
+        .qty-btn{
+        width:40px;
+        height:40px;
+        }
+
+        .agregar-btn{
+        font-size:14px;
+        padding:10px 12px;
+        }
+
+        #buscador{
+        font-size:14px;
+        }
+
+        }
+
+        /* ========================= */
+        /* TABLET RESPONSIVE (768px - 992px) */
+        /* Mantener sidebar vertical y mejorar touch targets */
+        /* ========================= */
+
+        @media (min-width: 768px) and (max-width: 992px){
+
+        .sidebar{
+        height: calc(100vh - 72px);
+        border-right:1px solid #e5e5e5;
+        border-bottom:none;
+        position:sticky;
+        top:72px;
+        background:#fff;
+        z-index:10;
+        max-width:230px;
+        }
+
+        /* usuario */
+        .sidebar-user{
+        margin:18px 12px;
+        padding:12px;
+        font-size:16px;
+        border-radius:8px;
+        }
+
+        /* botones en vertical con mayor área táctil */
+        .sidebar .list-group{
+        display:block;
+        padding:8px 0;
+        }
+
+        .sidebar .list-group-item{
+        width:100%;
+        text-align:left;
+        padding:10px 18px;
+        font-size:15px;
+        margin:6px 10px;
+        border-radius:8px;
+        }
+
+        /* mantiene barra amarilla pero más cerca del borde */
+        .sidebar .active::before{
+        display:block;
+        left:8px;
+        height:60%;
+        }
+
+        /* filtros más cómodos en tablet */
+        .d-flex.gap-2{
+        flex-wrap:nowrap;
+        gap:10px !important;
+        }
+
+        #buscador{
+        flex:1;
+        min-width:220px !important;
+        }
+
+        /* Posicionar buscador a la derecha en la fila superior; selects debajo */
+        .catalog-header .top-row{
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        width:100%;
+        }
+
+        .catalog-header .top-row > div:first-child{
+        flex:1 1 auto;
+        min-width:200px;
+        }
+
+        /* Buscador arriba a la derecha (agrupado dentro de selects-row), tamaño fijo razonable */
+        .catalog-header .selects-row > #buscador{
+        width:260px;
+        max-width:40vw;
+        }
+
+        /* Selects en la línea inferior: categoria izquierda, marca derecha */
+        .catalog-header .selects-row{
+        display:flex;
+        justify-content:space-between;
+        gap:12px;
+        width:100%;
+        margin-top:8px;
+        }
+
+        .catalog-header .selects-row select{
+        width:48%;
+        min-width:140px;
+        }
+
+        }

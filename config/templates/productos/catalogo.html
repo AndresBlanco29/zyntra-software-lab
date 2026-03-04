@@ -1,19 +1,246 @@
-<h1>Catálogo</h1>
+{% load static %}
 
-{% for producto in productos %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Catálogo</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <div>
+    <!-- Bootstrap -->
+    <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/catalogo.css' %}">
+    <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'js/catalogo.js' %}"></script>
 
-        <h3>{{ producto.nombre }}</h3>
+<body>
+</head>
 
-        {% if producto.imagen %}
-            <img src="{{ producto.imagen.url }}" width="200">
-        {% endif %}
+<body data-agregar-url="{% url 'agregar_carrito' %}" data-csrf="{{ csrf_token }}">
 
-        <p>{{ producto.descripcion }}</p>
+    <!-- NAVBAR -->
+    <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
 
-        <p>$ {{ producto.precio_base }}</p>
+        <div class="container-fluid">
+
+            <!-- BOTON HAMBURGUESA (solo móvil) -->
+            <button class="btn btn-light d-md-none me-2"
+                    type="button"
+                    data-bs-toggle="offcanvas"
+                    data-bs-target="#mobileMenu">
+
+                ☰
+
+            </button>
+
+            <a class="navbar-brand fw-bold" href="#">
+                La Tortilla Grocery
+            </a>
+
+            <div class="ms-auto">
+                <a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">
+                    Cotización (<span id="contadorCarrito">{{ carrito|length }}</span>)
+                </a>
+            </div>
+
+        </div>
+
+    </nav>
+
+    <!-- MENU MOVIL -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="mobileMenu">
+
+        <div class="offcanvas-header">
+
+            <h5 class="fw-bold">Menú</h5>
+
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="offcanvas">
+            </button>
+
+        </div>
+
+        <div class="offcanvas-body">
+
+            <div class="list-group">
+
+                <a href="{% url 'catalogo' %}"
+                class="list-group-item list-group-item-action">
+
+                    Catálogo
+
+                </a>
+
+                <a href="{% url 'ver_cotizacion' %}"
+                class="list-group-item list-group-item-action">
+
+                    Mi Cotización
+
+                </a>
+
+            </div>
+
+        </div>
 
     </div>
 
-{% endfor %}
+    <div class="container-fluid">
+        <div class="row">
+
+            <!-- SIDEBAR -->
+            <div class="col-md-2 sidebar p-0">
+
+                <div class="sidebar-user">
+                    Tienda Suprema
+                </div>
+
+                <div class="list-group list-group-flush">
+                    <a href="{% url 'catalogo' %}" class="list-group-item active">
+                        Catálogo
+                    </a>
+                    <a href="{% url 'ver_cotizacion' %}" class="list-group-item">
+                        Mi Cotización
+                    </a>
+                </div>
+
+            </div>
+
+            <!-- CONTENIDO -->
+            <div class="col-md-10 p-4">
+
+                <!-- Header catálogo -->
+                <div class="catalog-header mb-3">
+
+                    <div class="top-row d-flex w-100 justify-content-between align-items-center">
+
+                        <div>
+                            <h3 class="page-title">
+                                Catálogo de Productos
+                            </h3>
+                            <p class="subtitle">
+                                Explore nuestro inventario mayorista
+                            </p>
+                        </div>
+
+                    </div>
+
+                    <div class="selects-row d-flex w-100 gap-2 mt-2">
+
+                        <input
+                            type="search"
+                            id="buscador"
+                            class="form-control"
+                            style="min-width: 260px;"
+                            placeholder="Buscar Productos"
+                        >
+
+                        <select class="form-select" id="filtroCategoria">
+                            <option value="">Categoría</option>
+                            {% for c in categorias %}
+                                <option value="{{c.id}}">{{ c.nombre }}</option>
+                            {% endfor %}
+                        </select>
+
+                        <select class="form-select" id="filtroMarca">
+
+                            <option value="">Marca</option>
+
+                            {% for m in marcas %}
+                                <option 
+                                    value="{{ m.id }}"
+                                    data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
+                                >
+                                    {{ m.nombre }}
+                                </option>
+                            {% endfor %}
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+                <hr>
+
+                <!-- Productos -->
+                <div class="row g-4">
+
+                    {% for producto in productos %}
+
+                        <div class="col-12 col-sm-6 col-md-4 col-lg-3">
+
+                            <div class="producto-card text-center"
+                                data-producto-id="{{ producto.id }}"
+                                data-nombre="{{ producto.nombre }}"
+                                data-categoria="{{ producto.categoria.id|default:'' }}"
+                                data-marca="{{ producto.marca.id }}">
+
+                                {% if producto.imagen %}
+                                    <img
+                                        src="{{ producto.imagen.url }}"
+                                        class="producto-img mb-3"
+                                        alt="{{ producto.nombre }}"
+                                    >
+                                {% endif %}
+
+                                <div class="product-name">
+                                    {{ producto.nombre }}
+                                </div>
+
+                                <div class="units-text mb-2 info-presentacion">
+                                    {% if producto.presentaciones.first %}
+                                        {{ producto.presentaciones.first.unidades }}
+                                        {{ producto.presentaciones.first.tipo_contenido }}
+                                        por {{ producto.presentaciones.first.nombre|lower }}
+                                    {% endif %}
+                                </div>
+
+                                <div class="mb-2">
+                                    <label class="fw-bold small">
+                                        Presentación:
+                                    </label>
+
+                                    <select class="form-select form-select-sm presentacion-select">
+                                        {% for p in producto.presentaciones.all %}
+                                            <option 
+                                                value="{{ p.id }}"
+                                                data-unidades="{{ p.unidades }}"
+                                                data-tipo="{{ p.tipo_contenido }}"
+                                            >
+                                                {{ p.nombre }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="fw-bold small">
+                                        Cantidad:
+                                    </label>
+
+                                    <div class="d-flex justify-content-center align-items-center gap-2 mt-1">
+                                        <button class="qty-btn restar">-</button>
+                                        <span class="cantidad">1</span>
+                                        <button class="qty-btn sumar">+</button>
+                                    </div>
+                                </div>
+
+                                <button class="btn btn-yellow w-100 agregar-btn">
+                                    Añadir a cotización
+                                </button>
+
+                            </div>
+
+                        </div>
+
+                    {% endfor %}
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

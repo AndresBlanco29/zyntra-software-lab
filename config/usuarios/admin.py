@@ -8,20 +8,13 @@ class UsuarioAdmin(UserAdmin):
     list_display = (
         'username',
         'email',
-        'role',
+        'get_grupos',
         'telefono',
         'documento',
         'is_active',
-        'is_staff'
     )
 
-    fieldsets = UserAdmin.fieldsets + (
-        ('Información adicional', {
-            'fields': (
-                'role',
-                'telefono',
-                'documento',
-            )
-        }
-         ),
-    )
+    def get_grupos(self, obj):
+        return ", ".join([g.name for g in obj.groups.all()])
+
+    get_grupos.short_description = "Roles"

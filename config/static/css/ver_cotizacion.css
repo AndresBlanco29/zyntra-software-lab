@@ -1,0 +1,96 @@
+body {
+    background-color: #f4f6f9;
+}
+
+/* NAVBAR */
+.navbar-custom {
+    background: linear-gradient(90deg, #0b3d91, #1f4fa3, #3f89da);
+    padding: 15px;
+}
+
+.sidebar {
+    background: #fff;
+    height: 100vh;
+    border-right: 1px solid #e5e5e5;
+}
+
+/* HEADER USUARIO CON DEGRADADO */
+.sidebar-user {
+    background: linear-gradient(90deg, #023B82, #0C64CF, #3F89DA);
+    color: white;
+    text-align: center;
+    padding: 17px 10px;
+    margin-top: 30px;
+    margin-bottom: 30px;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+/* BOTONES GENERALES */
+.sidebar .list-group-item {
+    border: none;
+    background: transparent;
+    font-weight: 500;
+    text-align: center; /* 🔥 centra los no activos */
+    padding: 14px 10px;
+    transition: 0.3s;
+}
+
+.sidebar .active {
+    position: relative;
+    background: linear-gradient(90deg, #0b3d91, #2353a5, #3f89da);
+    color: white !important;
+    text-align: center;
+    font-weight: bold;
+    padding: 12px;
+    font-size: 18px;
+}
+
+.sidebar .active::before {
+    content: "";
+    position: absolute;
+    left: 40px; /* 🔥 mueve la barra hacia la derecha */
+    top: 50%;
+    transform: translateY(-50%);
+    width: 7px; /* grosor */
+    height: 70%;
+    background-color: #ffd400;
+    border-radius: 10px;
+}
+
+
+/* CARD */
+.custom-card {
+    border-radius: 12px;
+    box-shadow: 0px 8px 25px rgba(0, 0, 0, 0.08);
+    border: none;
+}
+
+/* BOTÓN AMARILLO */
+.btn-yellow {
+    background-color: #ffd400;
+    border: none;
+    font-weight: 600;
+}
+
+.btn-yellow:hover {
+    background-color: #e6c200;
+}
+
+/* TABLA HEADER */
+.table thead {
+    background-color: #f1f1f1;
+}
+
+/* BOTONES CANTIDAD */
+.qty-btn {
+    background-color: #1f4fa3;
+    color: white;
+    border: none;
+    width: 32px;
+    height: 32px;
+}
+
+.qty-btn:hover {
+    background-color: #163c7a;
+}

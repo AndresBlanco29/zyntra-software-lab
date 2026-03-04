@@ -29,7 +29,7 @@ class CotizacionItemAdmin(admin.ModelAdmin):
 
     list_display = (
         'cotizacion',
-        'producto',
+        'presentacion',
         'cantidad',
         'precio',
         'subtotal'

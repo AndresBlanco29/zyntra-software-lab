@@ -1,0 +1,118 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Tomar Pedido</title>
+<link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
+<script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+
+<style>
+body { background:#f4f6f9; }
+
+.navbar-custom {
+    background: linear-gradient(90deg, #023B82, #0C64CF, #3F89DA);
+}
+
+.sidebar {
+    background:#fff;
+    height:100vh;
+    border-right:1px solid #e3e3e3;
+}
+
+.sidebar .active {
+    background:#1f4fa3 !important;
+    color:white !important;
+    border-left:4px solid #ffd400;
+}
+
+.custom-card {
+    border-radius:14px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.08);
+}
+
+.table thead {
+    background:#dcdcdc;
+}
+</style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark navbar-custom">
+<div class="container-fluid">
+<span class="navbar-brand fw-bold">La Tortilla Grocery</span>
+</div>
+</nav>
+
+<div class="container-fluid">
+<div class="row">
+
+<div class="col-md-2 sidebar p-0">
+<div class="p-4">
+<h5 class="fw-bold text-primary">Vendedor Andrés</h5>
+</div>
+
+    <div class="list-group list-group-flush">
+
+        <a href="{% url 'crear_cliente' %}" 
+        class="list-group-item list-group-item-action {% if 'crear-cliente' in request.path %}active{% endif %}">
+            Crear Cliente
+        </a>
+
+        <a href="{% url 'clientes' %}" 
+        class="list-group-item list-group-item-action {% if 'clientes' in request.path %}active{% endif %}">
+            Clientes
+        </a>
+
+        <a href="{% url 'tomar_pedido' %}" 
+        class="list-group-item list-group-item-action {% if 'tomar-pedido' in request.path %}active{% endif %}">
+            Tomar Pedido
+        </a>
+
+    </div>
+</div>
+
+<div class="col-md-10 p-4">
+
+<h3 class="fw-bold">Tomar Pedido</h3>
+
+<div class="card custom-card mt-4 p-4">
+
+<h5>Paso 1: Seleccionar Cliente</h5>
+
+<input type="search" class="form-control my-3"
+placeholder="Buscar por nombre, empresa o documento">
+
+<table class="table align-middle">
+<thead>
+<tr>
+<th>Cliente</th>
+<th>Empresa</th>
+<th>Acción</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="fw-bold">Juan Pérez</td>
+<td>Tienda Latina</td>
+<td>
+<a href="{% url 'tomar_pedido_catalogo' %}"
+class="btn btn-sm btn-primary">
+Seleccionar
+</a>
+</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+
+<div class="card custom-card mt-4 p-4">
+<strong>Cliente:</strong> Sin Seleccionar
+</div>
+
+</div>
+</div>
+</div>
+</body>
+</html>

@@ -1,13 +1,14 @@
 from django.db import models
 from clientes.models import Cliente
-from productos.models import Producto
+from productos.models import Producto, Presentacion
 from usuarios.models import Usuario
+
 
 class Cotizacion(models.Model):
 
     ESTADO_CHOICES = (
         ('BORRADOR', 'Borrador'),
-        ('ENVIADA','Enviada'),
+        ('ENVIADA', 'Enviada'),
         ('APROBADA', "Aprobada"),
         ('RECHAZADA', 'Rechazada'),
     )
@@ -15,8 +16,11 @@ class Cotizacion(models.Model):
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE)
 
     vendedor = models.ForeignKey(
-        Usuario, on_delete=models.CASCADE,
-        limit_choices_to={'role': 'VENDEDOR'}
+        Usuario,
+        on_delete=models.CASCADE,
+        limit_choices_to={'role': 'VENDEDOR'},
+        null=True,
+        blank=True
     )
 
     fecha = models.DateTimeField(auto_now_add=True)
@@ -45,7 +49,10 @@ class CotizacionItem(models.Model):
         related_name='items'
     )
 
-    producto = models.ForeignKey(Producto, on_delete=models.CASCADE)
+    presentacion = models.ForeignKey(
+        Presentacion,
+        on_delete=models.CASCADE
+    )
 
     cantidad = models.IntegerField()
 
@@ -60,4 +67,4 @@ class CotizacionItem(models.Model):
     )
 
     def __str__(self):
-        return f"{self.producto} x {self.cantidad}"
+        return f"{self.presentacion.producto.nombre} x {self.cantidad}"

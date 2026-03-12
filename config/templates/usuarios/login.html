@@ -1,137 +1,110 @@
 {% load static %}
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Login | La Tortilla Grocery</title>
 
     <!-- Bootstrap -->
-    <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
+    <link
+      rel="stylesheet"
+      href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}"
+    />
     <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
     <!-- Bootstrap Icons-->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{%static 'css/login.css'%}">
+    
+    
 
-    <style>
-        body {
-            background-color: #f4f4f4;
-        }
-
-        .login-card {
-            max-width: 500px;
-            border-radius: 20px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-        }
-
-        .btn-login {
-            background: linear-gradient(to right, #ffe600, #c7c700);
-            font-weight: bold;
-            border: none;
-        }
-
-        .btn-login:hover {
-            opacity: 0.9;
-        }
-
-        .logo-img {
-            width: 90px;
-        }
-    </style>
-</head>
-<body>
-
-<div class="container d-flex justify-content-center align-items-center min-vh-100">
-    <div class="card login-card p-4">
-
+  </head>
+  <body>
+    <div
+      class="container d-flex justify-content-center align-items-center min-vh-100"
+    >
+      <div class="card login-card p-4">
         <!-- Header -->
         <div class="text-center mb-4">
-            <img src="{% static 'img/logo.png' %}" class="logo-img mb-2" alt="Logo">
-            <h4 class="fw-bold text-secondary">La Tortilla Grocery</h4>
+          <img
+            src="{% static 'img/logo.png' %}"
+            class="logo-img mb-2"
+            alt="Logo"
+          />
+          <h3 class="fw-bold text-secondary">La Tortilla Grocery</h3>
         </div>
 
-        <hr>
+        <hr />
 
         <!-- Título -->
         <div class="text-center mb-4">
-            <h5 class="fw-bold text-primary">Acceso a Plataforma</h5>
-            <p class="text-muted small">Inicia sesión tu perfil asignado.</p>
+          <h4 class="fw-bold text-primary">Acceso a Plataforma</h4>
+          <h6 class="text-muted small">
+            Inicia sesión con tu perfil asignado.
+          </h6>
         </div>
 
         <!-- Formulario -->
+
+        {% if messages %} {% for message in messages %}
+        <div id="mensaje-error" class="alert alert-danger">{{ message }}</div>
+        {% endfor %} {% endif %}
+
         <form method="POST">
-            {% csrf_token %}
+          {% csrf_token %}
 
-            <!-- Email -->
-            <div class="mb-3">
-                <input 
-                    type="email" 
-                    name="username" 
-                    class="form-control form-control-lg" 
-                    placeholder="Correo Electrónico"
-                    required
-                >
-            </div>
-
-        <!-- Password -->
-        <div class="mb-3 position-relative">
+          <!-- Email -->
+          <div class="mb-3">
             <input
-                type="password"
-                name="password"
-                id="password"
-                class="form-control form-control-lg pe-5"
-                placeholder="Contraseña"
-                required
-            >
+              type="email"
+              name="username"
+              class="form-control form-control-lg"
+              placeholder="Correo Electrónico"
+              required
+            />
+          </div>
+
+          <!-- Password -->
+          <div class="mb-3 position-relative">
+            <input
+              type="password"
+              name="password"
+              id="password"
+              class="form-control form-control-lg pe-5"
+              placeholder="Contraseña"
+              required
+            />
 
             <!-- Icono -->
             <span
-                class="position-absolute top-50 end-0 translate-middle-y me-3"
-                style="cursor: pointer;"
-                onclick="togglePassword()"
+              class="position-absolute top-50 end-0 translate-middle-y me-3"
+              style="cursor: pointer"
+              onclick="togglePassword()"
             >
-                <i id="toggleIcon" class="bi bi-eye"></i>
+              <i id="toggleIcon" class="bi bi-eye"></i>
             </span>
-        </div>
+          </div>
 
-            <!-- Botón -->
-            <div class="d-grid">
-                <button type="submit" class="btn btn-login btn-lg">
-                    Iniciar Sesión
-                </button>
-            </div>
+          <!-- Botón -->
+          <div class="d-grid">
+            <button type="submit" class="btn btn-login btn-lg">
+              Iniciar Sesión
+            </button>
+          </div>
         </form>
 
         <!-- Registro -->
         <div class="text-center mt-3">
-            <small>
-                ¿No tienes cuenta?
-                <a href="#" class="fw-bold text-primary">Regístrate</a>
-            </small>
+          <small>
+            ¿No tienes cuenta?
+            <a href="#" class="fw-bold text-primary">Regístrate</a>
+          </small>
         </div>
-
+      </div>
     </div>
-</div>
-
-<script>
-function togglePassword() {
-    const passwordInput = document.getElementById("password");
-    const icon = document.getElementById("toggleIcon");
-
-    if (passwordInput.type === "password") {
-        passwordInput.type = "text";
-
-        // Mostrar contraseña → icono debe ser ojo normal
-        icon.classList.remove("bi-eye-slash");
-        icon.classList.add("bi-eye");
-
-    } else {
-        passwordInput.type = "password";
-
-        // Ocultar contraseña → icono debe ser ojo tachado
-        icon.classList.remove("bi-eye");
-        icon.classList.add("bi-eye-slash");
-    }
-}
-</script>
-
-</body>
+    <script src="{%static 'js/login.js'%}"></script>
+  </body>
 </html>

@@ -1,10 +1,10 @@
 const actualizarURL = document.body.dataset.actualizarUrl;
-const eliminarURL = document.body.dataset.eliminarUrl;
+const eliminarUrl = document.body.dataset.eliminarUrl;
 const presentacionURL = document.body.dataset.presentacionUrl;
 const csrf = document.body.dataset.csrf;
 
 console.log("URL actualizar:", actualizarURL);
-console.log("URL eliminar:", eliminarURL);
+console.log("URL eliminar:", eliminarUrl);
 console.log("URL presentación:", presentacionURL);
 
 document.getElementById("buscador").addEventListener("keyup", function() {
@@ -107,7 +107,7 @@ document.querySelectorAll(".eliminar-btn").forEach(btn => {
         let fila = this.closest("tr");
         let producto_id = fila.dataset.id;
 
-        fetch(eliminarURL, {
+        fetch(eliminarUrl, {
             method: "POST",
             headers: {
                 "X-CSRFToken": csrf,

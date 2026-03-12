@@ -1,0 +1,89 @@
+.layout{
+display:flex;
+height:100vh;
+}
+
+.navbar-custom{
+background: linear-gradient(90deg, #0b3d91, #1f4fa3, #3f89da);
+padding: 15px;
+
+position:fixed;
+top:0;
+left:0;
+right:0;
+z-index:1000;
+}
+
+.sidebar{
+position:fixed;
+top:70px;
+left:0;
+width:253px;
+height:calc(100vh - 70px);
+overflow-y:auto;
+}
+
+.content{
+margin-left:240px;
+margin-top:70px;
+padding:40px;
+
+height:calc(100vh - 70px);
+overflow-y:auto;
+
+width:100%;
+}
+
+
+.navbar-brand {
+    font-size: 22px;
+    letter-spacing: 0.5px;
+}
+
+/* sidebar estilos */
+
+
+/* HEADER USUARIO CON DEGRADADO */
+.sidebar-user {
+    background: linear-gradient(90deg, #023B82, #0C64CF, #3F89DA);
+    color: white;
+    text-align: center;
+    padding: 17px 10px;
+    margin-top: 30px;
+    margin-bottom: 30px;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+        /* BOTONES GENERALES */
+/* BOTONES GENERALES */
+.sidebar .list-group-item {
+    border: none;
+    background: transparent;
+    font-weight: 500;
+    text-align: center; /* 🔥 centra los no activos */
+    padding: 14px 10px;
+    transition: 0.3s;
+}
+
+.sidebar .active {
+    position: relative;
+    background: linear-gradient(90deg, #0b3d91, #2353a5, #3f89da);
+    color: white !important;
+    text-align: center;
+    font-weight: bold;
+    padding: 12px;
+    font-size: 18px;
+}
+
+.sidebar .active::before {
+    content: "";
+    position: absolute;
+    left: 40px; /* 🔥 mueve la barra hacia la derecha */
+    top: 50%;
+    transform: translateY(-50%);
+    width: 7px; /* grosor */
+    height: 70%;
+    background-color: #ffd400;
+    border-radius: 10px;
+}

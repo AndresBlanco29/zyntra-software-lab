@@ -1,7 +1,27 @@
+
 document.addEventListener('DOMContentLoaded', function() {
+    const lang = document.body.dataset.lang.slice(0,2);
     const agregarUrl = document.body.dataset.agregarUrl;
     const csrfToken = document.body.dataset.csrf;
 
+    const traducciones = {
+
+        unidad: { es: "unidad", en: "unit" },
+        unidades: { es: "unidades", en: "units" },
+
+        litro: { es: "litro", en: "liter" },
+        litros: { es: "litros", en: "liters" },
+
+        gramo: { es: "gramo", en: "gram" },
+        gramos: { es: "gramos", en: "grams" },
+
+        caja: { es: "caja", en: "box" },
+        cajas: { es: "cajas", en: "boxes" },
+
+        pallet: { es: "pallet", en: "pallet" },
+        pallets: { es: "pallets", en: "pallets" }
+
+    };
     function filtrarProductos() {
         let texto = document.getElementById("buscador").value.toLowerCase();
         let categoria = document.getElementById("filtroCategoria").value;
@@ -62,6 +82,8 @@ document.addEventListener('DOMContentLoaded', function() {
             let presentacion_id = card.querySelector(".presentacion-select").value;
             let cantidad = card.querySelector(".cantidad").textContent;
 
+            console.log("Presentacion enviada:", presentacion_id);
+
             fetch(agregarUrl, {
                 method: "POST",
                 headers: {
@@ -86,16 +108,27 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     /* CAMBIAR TEXTO SEGÚN PRESENTACIÓN */
+
     document.querySelectorAll(".producto-card").forEach(card => {
+
         const select = card.querySelector(".presentacion-select");
         const infoTexto = card.querySelector(".info-presentacion");
 
         select.addEventListener("change", function () {
-            let unidades = this.options[this.selectedIndex].dataset.unidades;
-            let tipo = this.options[this.selectedIndex].dataset.tipo;
-            let nombre = this.options[this.selectedIndex].text;
 
-            infoTexto.textContent = unidades + " " + tipo + " por " + nombre.toLowerCase();
+            let option = this.options[this.selectedIndex];
+
+            let unidades = option.dataset.unidades;
+            let tipo = (option.dataset.tipo || "").trim().toLowerCase();
+            let nombre = option.text.trim().toLowerCase();
+
+            let tipoTraducido = traducciones[tipo]?.[lang] || tipo;
+
+            let por = lang === "en" ? "per" : "por";
+
+            infoTexto.textContent = `${unidades} ${tipoTraducido} ${por} ${nombre}`;
+
         });
+
     });
 });

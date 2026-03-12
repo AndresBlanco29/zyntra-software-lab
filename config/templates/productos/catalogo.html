@@ -1,22 +1,23 @@
-{% load static %}
+{% load static i18n %}
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ LANGUAGE_CODE }}">
+
 <head>
     <meta charset="UTF-8">
-    <title>Catálogo</title>
+    <title> {% trans "Catálogo" %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!-- Bootstrap -->
     <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/catalogo.css' %}">
     <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
-    <script src="{% static 'js/catalogo.js' %}"></script>
-
-<body>
 </head>
 
-<body data-agregar-url="{% url 'agregar_carrito' %}" data-csrf="{{ csrf_token }}">
+<body 
+data-lang="{{ LANGUAGE_CODE }}"
+data-agregar-url="{% url 'agregar_a_cotizacion' %}"
+data-csrf="{{ csrf_token }}">
 
     <!-- NAVBAR -->
     <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
@@ -39,7 +40,7 @@
 
             <div class="ms-auto">
                 <a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">
-                    Cotización (<span id="contadorCarrito">{{ carrito|length }}</span>)
+                    {% trans "Cotización" %} (<span id="contadorCarrito">{{ carrito|length }}</span>)
                 </a>
             </div>
 
@@ -52,7 +53,7 @@
 
         <div class="offcanvas-header">
 
-            <h5 class="fw-bold">Menú</h5>
+            <h5 class="fw-bold">{% trans "Menú" %}</h5>
 
             <button type="button"
                     class="btn-close"
@@ -68,14 +69,14 @@
                 <a href="{% url 'catalogo' %}"
                 class="list-group-item list-group-item-action">
 
-                    Catálogo
+                    {% trans "Catálogo" %}
 
                 </a>
 
                 <a href="{% url 'ver_cotizacion' %}"
                 class="list-group-item list-group-item-action">
 
-                    Mi Cotización
+                    {% trans "Mi Cotización" %}
 
                 </a>
 
@@ -92,22 +93,22 @@
             <div class="col-md-2 sidebar p-0">
 
                 <div class="sidebar-user">
-                    Tienda Suprema
+                    {% trans "Tienda Suprema" %}
                 </div>
 
                 <div class="list-group list-group-flush">
                     <a href="{% url 'catalogo' %}" class="list-group-item active">
-                        Catálogo
+                        {% trans "Catálogo" %}
                     </a>
                     <a href="{% url 'ver_cotizacion' %}" class="list-group-item">
-                        Mi Cotización
+                        {% trans "Mi Cotización" %}
                     </a>
                 </div>
 
             </div>
 
             <!-- CONTENIDO -->
-            <div class="col-md-10 p-4">
+            <div class="main-content">
 
                 <!-- Header catálogo -->
                 <div class="catalog-header mb-3">
@@ -116,10 +117,10 @@
 
                         <div>
                             <h3 class="page-title">
-                                Catálogo de Productos
+                                {% trans "Catálogo de Productos" %}
                             </h3>
                             <p class="subtitle">
-                                Explore nuestro inventario mayorista
+                                {% trans "Explore nuestro inventario mayorista" %}
                             </p>
                         </div>
 
@@ -132,26 +133,26 @@
                             id="buscador"
                             class="form-control"
                             style="min-width: 260px;"
-                            placeholder="Buscar Productos"
+                            placeholder= {% trans "Buscar Productos" %}
                         >
 
                         <select class="form-select" id="filtroCategoria">
-                            <option value="">Categoría</option>
+                            <option value=""> {% trans "Categoría" %}</option>
                             {% for c in categorias %}
-                                <option value="{{c.id}}">{{ c.nombre }}</option>
+                                <option value="{{c.id}}">{{ c.nombre_traducido }}</option>
                             {% endfor %}
                         </select>
 
                         <select class="form-select" id="filtroMarca">
 
-                            <option value="">Marca</option>
+                            <option value="">{% trans "Marca" %}</option>
 
                             {% for m in marcas %}
                                 <option 
                                     value="{{ m.id }}"
                                     data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
                                 >
-                                    {{ m.nombre }}
+                                    {{ m.nombre_traducido }}
                                 </option>
                             {% endfor %}
 
@@ -172,7 +173,7 @@
 
                             <div class="producto-card text-center"
                                 data-producto-id="{{ producto.id }}"
-                                data-nombre="{{ producto.nombre }}"
+                                data-nombre="{{ producto.nombre_traducido }}"
                                 data-categoria="{{ producto.categoria.id|default:'' }}"
                                 data-marca="{{ producto.marca.id }}">
 
@@ -180,25 +181,26 @@
                                     <img
                                         src="{{ producto.imagen.url }}"
                                         class="producto-img mb-3"
-                                        alt="{{ producto.nombre }}"
+                                        alt="{{ producto.nombre_traducido  }}"
                                     >
                                 {% endif %}
 
                                 <div class="product-name">
-                                    {{ producto.nombre }}
+                                    {{ producto.nombre_traducido }}
                                 </div>
 
                                 <div class="units-text mb-2 info-presentacion">
-                                    {% if producto.presentaciones.first %}
-                                        {{ producto.presentaciones.first.unidades }}
-                                        {{ producto.presentaciones.first.tipo_contenido }}
-                                        por {{ producto.presentaciones.first.nombre|lower }}
-                                    {% endif %}
+                                {% if producto.presentaciones.first %}
+                                {{ producto.presentaciones.first.unidades }}
+                                {{ producto.presentaciones.first.tipo_contenido_traducido }}
+                                {% trans "por" %}
+                                {{ producto.presentaciones.first.nombre_traducido|lower }}
+                                {% endif %}
                                 </div>
 
                                 <div class="mb-2">
                                     <label class="fw-bold small">
-                                        Presentación:
+                                        {% trans "Presentación" %}:
                                     </label>
 
                                     <select class="form-select form-select-sm presentacion-select">
@@ -206,9 +208,9 @@
                                             <option 
                                                 value="{{ p.id }}"
                                                 data-unidades="{{ p.unidades }}"
-                                                data-tipo="{{ p.tipo_contenido }}"
+                                                data-tipo="{{ p.tipo_contenido_traducido|lower }}"
                                             >
-                                                {{ p.nombre }}
+                                                {{ p.nombre_traducido }}
                                             </option>
                                         {% endfor %}
                                     </select>
@@ -216,18 +218,18 @@
 
                                 <div class="mb-3">
                                     <label class="fw-bold small">
-                                        Cantidad:
+                                        {% trans "Cantidad" %}:
                                     </label>
 
                                     <div class="d-flex justify-content-center align-items-center gap-2 mt-1">
-                                        <button class="qty-btn restar">-</button>
+                                        <button type="button" class="qty-btn restar">-</button>
                                         <span class="cantidad">1</span>
-                                        <button class="qty-btn sumar">+</button>
+                                        <button type="button" class="qty-btn sumar">+</button>
                                     </div>
                                 </div>
 
                                 <button class="btn btn-yellow w-100 agregar-btn">
-                                    Añadir a cotización
+                                   {% trans "Añadir a cotización" %}
                                 </button>
 
                             </div>
@@ -242,5 +244,66 @@
 
         </div>
     </div>
+    <script src="{% static 'js/catalogo.js' %}"></script>
+
+    <script>
+
+        function toggleLanguageMenu(){
+
+        const menu = document.getElementById("languageMenu");
+
+        if(menu.style.display === "flex"){
+        menu.style.display = "none";
+        }else{
+        menu.style.display = "flex";
+        }
+
+        }
+
+    </script>
+
+   {% get_current_language as LANGUAGE_CODE %}
+
+<div class="language-widget">
+
+<button class="language-toggle" onclick="toggleLanguageMenu()">
+
+🌎
+
+<span class="language-current">
+
+{% if LANGUAGE_CODE == "es" %}
+ES
+{% else %}
+EN
+{% endif %}
+
+</span>
+
+</button>
+
+<div class="language-menu" id="languageMenu">
+
+<form action="{% url 'set_language' %}" method="post">
+
+{% csrf_token %}
+<input name="next" type="hidden" value="{{ request.path }}">
+
+<button name="language" value="es" class="language-option">
+🇪🇸 Español
+</button>
+
+<button name="language" value="en" class="language-option">
+🇺🇸 English
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+
+
 </body>
 </html>

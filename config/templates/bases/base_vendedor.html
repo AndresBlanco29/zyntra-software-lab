@@ -1,0 +1,89 @@
+{% load static i18n %}
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE }}">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>{% block title %}{% trans "Sistema" %}{% endblock %}</title>
+
+<link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
+<link rel="stylesheet" href="{% static 'css/layout_vendedor.css' %}">
+
+<script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
+
+<div class="container-fluid">
+
+<a class="navbar-brand fw-bold">
+La Tortilla Grocery
+</a>
+
+<div class="ms-auto">
+
+{% block navbar_right %}
+{% endblock %}
+
+</div>
+
+</div>
+
+</nav>
+
+
+<!-- LAYOUT PRINCIPAL -->
+
+<div class="layout">
+
+<!-- SIDEBAR -->
+
+<div class="sidebar">
+
+<div class="sidebar-user">
+{% trans "Vendedor" %} Andrés
+</div>
+
+<div class="list-group list-group-flush">
+
+<a href="{% url 'crear_cliente' %}"
+class="list-group-item list-group-item-action {% if 'crear-cliente' in request.path %}active{% endif %}">
+{% trans "Crear Cliente" %}
+</a>
+
+<a href="{% url 'vendedores_clientes' %}"
+class="list-group-item list-group-item-action {% if 'clientes' in request.path %}active{% endif %}">
+{% trans "Clientes" %}
+</a>
+
+<a href="{% url 'tomar_pedido' %}"
+class="list-group-item list-group-item-action {% if 'tomar-pedido' in request.path %}active{% endif %}">
+{% trans "Tomar Pedido" %}
+</a>
+
+</div>
+
+</div>
+
+
+<!-- CONTENIDO -->
+
+<div class="content">
+
+{% block content %}
+{% endblock %}
+
+</div>
+
+</div>
+
+</body>
+</html>

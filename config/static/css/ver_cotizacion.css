@@ -3,15 +3,45 @@ body {
 }
 
 /* NAVBAR */
-.navbar-custom {
+.navbar-custom{
     background: linear-gradient(90deg, #0b3d91, #1f4fa3, #3f89da);
     padding: 15px;
+
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
 }
 
-.sidebar {
-    background: #fff;
-    height: 100vh;
-    border-right: 1px solid #e5e5e5;
+.navbar-brand {
+    font-size: 22px;
+    letter-spacing: 0.5px;
+}
+
+.main-content{
+    margin-left:240px;
+    margin-top:70px;
+
+    width:calc(100% - 240px);
+
+    height:calc(100vh - 70px);
+    overflow-y:auto;
+
+    padding:40px;
+}
+
+.sidebar{
+    background:#fff;
+    box-shadow:4px 0 12px rgba(0,0,0,0.06);
+
+    position: fixed;
+    top: 70px; /* altura del navbar */
+    left: 0;
+    width: 253px;
+
+    height: calc(100vh - 70px);
+    overflow-y: auto;
 }
 
 /* HEADER USUARIO CON DEGRADADO */
@@ -58,6 +88,213 @@ body {
     border-radius: 10px;
 }
 
+.language-floating{
+
+position:fixed;
+
+bottom:25px;
+left:25px;
+
+z-index:9999;
+
+background:white;
+
+border-radius:50px;
+
+padding:6px;
+
+box-shadow:0 10px 25px rgba(0,0,0,.15);
+
+display:flex;
+gap:6px;
+
+}
+
+/* WIDGET IDIOMA */
+
+.language-widget{
+
+position:fixed;
+
+bottom:25px;
+left:25px;
+
+z-index:9999;
+
+}
+
+/* BOTON GLOBO */
+
+.language-toggle{
+
+width:50px;
+height:50px;
+
+border-radius:50%;
+
+border:none;
+
+background:#0b3d91;
+
+color:white;
+
+font-size:22px;
+
+cursor:pointer;
+
+box-shadow:0 10px 25px rgba(0,0,0,.2);
+
+transition:.2s;
+
+}
+
+.language-toggle:hover{
+
+transform:scale(1.1);
+
+}
+
+/* MENU */
+
+.language-menu{
+
+position:absolute;
+
+bottom:60px;
+left:0;
+
+background:white;
+
+border-radius:10px;
+
+box-shadow:0 10px 30px rgba(0,0,0,.2);
+
+overflow:hidden;
+
+display:none;
+
+flex-direction:column;
+
+}
+
+/* OPCIONES */
+
+.language-widget{
+
+position:fixed;
+
+bottom:25px;
+left:25px;
+
+z-index:9999;
+
+}
+
+/* BOTON */
+
+.language-toggle{
+
+display:flex;
+align-items:center;
+justify-content:center;
+gap:8px;
+
+min-width:80px;
+height:50px;
+
+border:none;
+
+background:#0b3d91;
+
+color:white;
+
+padding:0 16px;
+
+border-radius:40px;
+
+font-size:15px;
+font-weight:600;
+
+cursor:pointer;
+
+box-shadow:0 10px 25px rgba(0,0,0,.25);
+
+transition:.2s;
+
+}
+
+.language-toggle:hover{
+
+transform:scale(1.05);
+
+}
+
+.language-current{
+
+font-weight:600;
+
+}
+
+/* MENU */
+
+.language-menu{
+
+position:absolute;
+
+bottom:60px;
+left:0;
+
+background:white;
+
+border-radius:10px;
+
+box-shadow:0 10px 30px rgba(0,0,0,.2);
+
+overflow:hidden;
+
+display:none;
+
+flex-direction:column;
+
+}
+
+/* OPCIONES */
+
+.language-option{
+
+border:none;
+
+background:white;
+
+padding:10px 16px;
+
+font-size:14px;
+
+text-align:left;
+
+cursor:pointer;
+
+width:160px;
+
+transition:.2s;
+
+}
+
+.language-option:hover{
+
+background:#f3f4f6;
+
+}
+
+/* TITULOS */
+.page-title {
+    font-weight: 700;
+}
+
+.subtitle {
+    color: #6c757d;
+}
+
 
 /* CARD */
 .custom-card {
@@ -83,14 +320,61 @@ body {
 }
 
 /* BOTONES CANTIDAD */
-.qty-btn {
+.qty-btn{
     background-color: #1f4fa3;
     color: white;
     border: none;
-    width: 32px;
-    height: 32px;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    cursor: pointer;
 }
 
-.qty-btn:hover {
+.qty-btn:hover{
     background-color: #163c7a;
 }
+
+.cantidad-input{
+    width: 60px;
+    text-align: center;
+}
+
+.accion{
+    cursor: pointer;
+    font-size: 18px;
+    padding: 6px 8px;
+    border: none;
+    transition: all 0.2s ease;
+    background: none;
+    border-radius: 10px;
+}
+
+.accion.editar:hover{
+    background: #e9f2ff;
+}
+
+.accion.eliminar:hover{
+    background: #ffe9e9;
+}
+
+.toast-pedido{
+position: fixed;
+bottom: 30px;
+right: 30px;
+background: #28a745;
+color: white;
+padding: 14px 20px;
+border-radius: 8px;
+font-weight: 600;
+box-shadow: 0px 5px 15px rgba(0,0,0,0.2);
+opacity: 0;
+transform: translateY(20px);
+transition: all 0.3s ease;
+z-index: 9999;
+}
+
+.toast-pedido.show{
+opacity:1;
+transform:translateY(0);
+}
+

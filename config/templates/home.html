@@ -1,0 +1,1029 @@
+{% load static i18n %}
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE }}">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>La Tortilla Grocery</title>
+
+<link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
+<link rel="stylesheet" href="{% static 'css/home.css' %}">
+
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+
+</head>
+
+<body>
+
+
+<!-- HERO + NAVBAR -->
+
+<section class="hero-home">
+
+<div class="container">
+
+<!-- NAVBAR -->
+
+<nav class="navbar navbar-expand-lg navbar-dark navbar-home">
+
+<a class="navbar-brand fw-bold d-flex align-items-center" href="#">
+
+<img src="{% static 'img/logo.png' %}" class="logo-navbar">
+
+<span class="brand-text">
+La Tortilla Grocery
+</span>
+
+</a>
+
+<button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#menu">
+<span class="navbar-toggler-icon"></span>
+</button>
+
+<div class="collapse navbar-collapse justify-content-center" id="menu">
+
+<ul class="navbar-nav">
+
+<li class="nav-item">
+<a class="nav-link" href="#">{% trans "Inicio" %}</a>
+</li>
+
+<li class="nav-item">
+<a class="nav-link" href="#">{% trans "Quienes Somos" %}</a>
+</li>
+
+<li class="nav-item">
+<a class="nav-link" href="#">{% trans "Marcas" %}</a>
+</li>
+
+<li class="nav-item">
+<a class="nav-link" href="#">{% trans "Ofertas" %}</a>
+</li>
+
+<li class="nav-item">
+<a class="nav-link" href="#">{% trans "Contacto" %}</a>
+</li>
+
+<li class="nav-item">
+<a class="nav-link" href="#">{% trans "Catálogo" %}</a>
+</li>
+
+<li class="nav-item">
+<a class="nav-link login-btn" href="#">{% trans "Login" %}</a>
+</li>
+
+</ul>
+
+</div>
+
+
+
+</nav>
+
+<hr class="navbar-divider">
+
+
+
+<!-- HERO -->
+
+<div class="row hero-content align-items-center">
+
+<div class="col-lg-7">
+
+<h1 class="hero-title">
+
+{% blocktrans %}Tu Mayorista de{% endblocktrans %}
+
+<span class="text-yellow">
+{% trans "Productos Latinos" %}
+</span>
+
+{% blocktrans %}de Confianza{% endblocktrans %}
+
+</h1>
+
+<p class="hero-subtitle">
+{% trans "Haz tus pedidos de forma rápida y segura. Compras al por mayor." %}
+</p>
+
+<a href="#" class="btn btn-yellow hero-btn">
+{% trans "Ver Catálogo" %} →
+</a>
+
+</div>
+
+</div>
+
+
+
+
+</div>
+
+</div>
+
+</section>
+
+
+
+<!-- QUIENES SOMOS -->
+
+<section class="quienes-section">
+
+<div class="container">
+
+<div class="quienes-card">
+
+<div class="row align-items-center">
+
+<!-- TEXTO IZQUIERDA -->
+
+<div class="col-lg-6">
+
+<h4 class="quienes-title">
+{% trans "¿Quiénes Somos?" %}
+</h4>
+
+<hr>
+
+<p class="quienes-text">
+
+{% blocktrans %}
+En La Tortilla Grocery LLC, somos el aliado de confianza de los negocios latinos.
+Ofrecemos productos y servicios mayoristas de alta calidad, adaptados a sus necesidades.
+Nos enfocamos en brindar soluciones eficientes para que su negocio crezca y prospere
+en un mercado competitivo.
+{% endblocktrans %}
+
+</p>
+
+</div>
+
+<hr class="d-lg-none d-block my-4 linea-oscura">
+
+
+<!-- BENEFICIOS DERECHA -->
+
+<div class="col-lg-6">
+
+<div class="row g-3">
+
+<div class="col-md-6">
+
+<div class="beneficio-card">
+
+<div class="beneficio-icon">
+<i class="bi bi-box-seam"></i>
+</div>
+
+<div>
+
+<h6>{% trans "Abastecimiento Inteligente" %}</h6>
+<small>{% trans "Productos siempre disponibles" %}</small>
+
+</div>
+
+</div>
+
+</div>
+
+
+<div class="col-md-6">
+
+<div class="beneficio-card">
+
+<div class="beneficio-icon">
+<i class="bi bi-truck"></i>
+</div>
+
+<div>
+
+<h6>{% trans "Lógica Eficiente" %}</h6>
+<small>{% trans "Entrega rápida y segura" %}</small>
+
+</div>
+
+</div>
+
+</div>
+
+
+<div class="col-md-6">
+
+<div class="beneficio-card">
+
+<div class="beneficio-icon">
+<i class="bi bi-people"></i>
+</div>
+
+<div>
+
+<h6>{% trans "Relación a Largo Plazo" %}</h6>
+<small>{% trans "Compromiso y confianza" %}</small>
+
+</div>
+
+</div>
+
+</div>
+
+
+<div class="col-md-6">
+
+<div class="beneficio-card">
+
+<div class="beneficio-icon">
+<i class="bi bi-graph-up"></i>
+</div>
+
+<div>
+
+<h6>{% trans "Crecimiento Sostenible" %}</h6>
+<small>{% trans "Apoyo para tu expansión" %}</small>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+<!-- LINEA -->
+
+<hr class="quienes-line">
+
+
+<!-- ESTADISTICAS -->
+
+<div class="row text-center quienes-stats">
+
+<div class="col-md-4 stat-item">
+
+<h2 class="h2">+100</h2>
+<p>{% trans "Negocios Abastecidos" %}</p>
+
+</div>
+
+<div class="col-md-4 stat-item">
+
+<h2 class="h2">98%</h2>
+<p>{% trans "Pedidos Exitosos" %}</p>
+
+</div>
+
+<div class="col-md-4 stat-item">
+
+<h2 class="h2">+5 Años</h2>
+<p>{% trans "De Experiencia" %}</p>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+
+
+<!-- POR QUE ELEGIRNOS -->
+
+<section class="elegirnos-section">
+
+<div class="container">
+
+<div class="title-divider">
+<span>{% trans "¿Por Qué Elegirnos?" %}</span>
+</div>
+
+<div class="row g-4">
+
+<!-- TARJETA 1 -->
+
+<div class="col-lg-3 col-md-6">
+
+<div class="flip-box entrega-bg">
+
+<div class="flip-box">
+<div class="flip-box-inner">
+
+<div class="flip-box-front fs-1">
+<div class="inner">
+
+<i class="bi bi-truck"></i>
+
+<h6>{% trans "Amplio Catálogo" %}</h6>
+<p>{% trans "Productos latinos de alta rotación" %}</p>
+
+</div>
+</div>
+
+<div class="flip-box-back">
+<div class="inner">
+
+<p> {% trans "Entregas rápidas y seguras para mantener" %}
+{% trans "tu negocio siempre abastecido." %}
+</p>
+
+</div>
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+
+
+<!-- TARJETA 2 -->
+
+<div class="col-lg-3 col-md-6">
+
+<div class="flip-box catalogo-bg">
+
+<div class="flip-box">
+<div class="flip-box-inner">
+
+<div class="flip-box-front">
+<div class="inner">
+
+<i class="bi bi-collection fs-1"></i>
+
+<h6>{% trans "Amplio Catálogo" %}</h6>
+<p>{% trans "Productos latinos de alta rotación" %}</p>
+
+</div>
+</div>
+
+<div class="flip-box-back">
+<div class="inner">
+
+<p>
+{% trans "Gran variedad de productos latinos" %}
+{% trans "listos para tu negocio." %}
+</p>
+
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+</div>
+
+
+<!-- TARJETA 3 -->
+
+<div class="col-lg-3 col-md-6">
+
+<div class="flip-box precio-bg">
+
+<div class="flip-box">
+<div class="flip-box-inner">
+
+<div class="flip-box-front">
+<div class="inner">
+
+<i class="bi bi-currency-dollar fs-1"></i>
+
+<h6>{% trans "Precios Competitivos" %}</h6>
+<p>{% trans "Márgenes atractivos para tu negocio" %}</p>
+
+</div>
+</div>
+
+<div class="flip-box-back">
+<div class="inner">
+
+<p>
+{% trans "Precios al por mayor para maximizar" %}
+{% trans "las ganancias de tu tienda." %}
+</p>
+
+</div>
+</div>
+</div>
+
+</div>
+</div>
+
+</div>
+
+
+<!-- TARJETA 4 -->
+
+<div class="col-lg-3 col-md-6">
+
+<div class="flip-box atencion-bg">
+
+<div class="flip-box">
+<div class="flip-box-inner">
+
+<div class="flip-box-front">
+<div class="inner">
+
+<i class="bi bi-headset fs-1"></i>
+
+<h6>{% trans "Atención Personalizada" %}</h6>
+<p>{% trans "Soporte directo y confiable" %}</p>
+
+</div>
+</div>
+
+<div class="flip-box-back">
+<div class="inner">
+
+<p>
+{% trans "Asesoría y soporte directo para" %}
+{% trans "hacer crecer tu negocio." %}
+</p>
+
+</div>
+</div>
+
+</div>
+</div>
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</section>
+
+
+<!-- MARCAS -->
+
+<section class="marcas-section">
+
+<div class="container">
+
+<div class="title-divider">
+<span>{% trans "Marcas que distribuimos" %}</span>
+</div>
+
+<div class="marcas-slider">
+
+<div class="marcas-track" id="marcasTrack">
+
+{% for marca in marcas %}
+
+<div class="marca-card">
+
+{% if marca.logo %}
+<img src="{{ marca.logo.url }}" class="marca-logo">
+{% endif %}
+
+</div>
+
+{% endfor %}
+
+</div>
+
+</div>
+
+</section>
+
+
+<!-- OFERTAS DESTACADAS -->
+
+<section class="ofertas-section">
+
+<div class="container">
+
+<div class="title-divider">
+<span>{% trans "Ofertas Destacadas" %}</span>
+</div>
+
+
+{% if ofertas_chunks|length > 1 %}
+
+<div id="carouselOfertas" class="carousel slide" data-bs-ride="carousel" data-bs-interval="4000">
+
+<div class="carousel-inner">
+
+{% for grupo in ofertas_chunks %}
+
+<div class="carousel-item {% if forloop.first %}active{% endif %}">
+
+<div class="row g-2 justify-content-center">
+
+{% for producto in grupo %}
+
+<div class="col-lg-3 col-md-6">
+
+<div class="producto-oferta">
+
+{% if producto.descuento > 0 %}
+<div class="sale-badge">
+-{{ producto.descuento }}%
+</div>
+{% endif %}
+
+{% if producto.imagen %}
+<img src="{{ producto.imagen.url }}" class="producto-img">
+{% endif %}
+
+<h5>{{ producto.nombre }}</h5>
+
+{% with producto.presentaciones.first as presentacion %}
+{% if presentacion %}
+<p class="producto-info">
+({{ presentacion.unidades }} {{ presentacion.tipo_contenido }})
+</p>
+{% endif %}
+{% endwith %}
+
+<div class="producto-opcion">
+
+<label>Presentación:</label>
+
+<select class="form-select form-select-sm">
+
+{% for p in producto.presentaciones.all %}
+<option>
+{{ p.nombre }} ({{ p.unidades }} {{ p.tipo_contenido }})
+</option>
+{% endfor %}
+
+</select>
+
+</div>
+
+<div class="producto-opcion">
+
+<label>{% trans "Cantidad:" %}</label>
+
+<div class="cantidad-box">
+
+<button type="button" class="btn-menos">-</button>
+
+<input type="number" class="cantidad-input" value="1" min="1">
+
+<button type="button" class="btn-mas">+</button>
+
+</div>
+
+</div>
+
+<button class="btn btn-yellow btn-sm mt-2">{% trans "Añadir a cotización" %}</button>
+
+</div>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+
+<button class="carousel-control-prev" type="button" data-bs-target="#carouselOfertas" data-bs-slide="prev">
+<span class="carousel-control-prev-icon"></span>
+</button>
+
+<button class="carousel-control-next" type="button" data-bs-target="#carouselOfertas" data-bs-slide="next">
+<span class="carousel-control-next-icon"></span>
+</button>
+
+</div>
+
+{% else %}
+
+<div class="row g-4 justify-content-center">
+
+{% for producto in ofertas_chunks.0 %}
+
+<div class="col-lg-4 col-md-6">
+
+<div class="producto-oferta">
+
+{% if producto.imagen %}
+<img src="{{ producto.imagen.url }}" class="producto-img">
+{% endif %}
+
+<h5>{{ producto.nombre }}</h5>
+
+</div>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+{% endif %}
+
+</div>
+
+</section>
+
+<!-- TESTIMONIOS INFINITOS -->
+
+<section class="testimonios-section">
+
+<div class="container">
+
+<div class="title-divider">
+<span>{% trans "Que dicen nuestros clientes" %}</span>
+</div>
+
+<div class="testimonios-slider">
+
+<div class="testimonios-track" id="testimoniosTrack">
+
+
+<div class="testimonios-track" id="testimoniosTrack">
+
+{% for t in testimonios %}
+
+<div class="testimonio-card">
+
+<div class="testimonio-header">
+
+<div class="avatar">
+
+{% if t.foto %}
+<img src="{{ t.foto.url }}" class="avatar-img">
+{% else %}
+<i class="bi bi-person"></i>
+{% endif %}
+
+</div>
+
+<div>
+
+<h6>{{ t.nombre }}</h6>
+
+<small>{{ t.negocio }}</small>
+
+<div class="stars">
+{% for i in "12345"|slice:":t.estrellas" %}
+★
+{% endfor %}
+</div>
+
+</div>
+
+</div>
+
+<hr>
+
+<p>
+{{ t.comentario }}
+</p>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+
+<!-- CONTROLES -->
+
+<button class="carousel-control-prev" type="button" data-bs-target="#carouselTestimonios" data-bs-slide="prev">
+
+<span class="carousel-control-prev-icon"></span>
+
+</button>
+
+<button class="carousel-control-next" type="button" data-bs-target="#carouselTestimonios" data-bs-slide="next">
+
+<span class="carousel-control-next-icon"></span>
+
+</button>
+
+</div>
+
+</div>
+
+</section>
+
+
+
+<!-- CTA MAYORISTA -->
+
+<section class="cta-mayorista">
+
+<div class="container text-center">
+
+<h3 class="cta-title">
+{% trans "¿Tienes una tienda? Solicita tu cuenta mayorista hoy" %}
+</h3>
+
+<div class="cta-buttons">
+
+<a href="#" class="btn btn-yellow cta-btn">
+{% trans "Crear Cuenta" %}
+</a>
+
+<a href="#" class="btn btn-catalogo cta-btn">
+{% trans "Ver Catálogo" %}
+</a>
+
+</div>
+
+</div>
+
+</section>
+
+<div class="footer-divider-line"></div>
+
+
+<!-- FOOTER -->
+
+<footer class="footer-main">
+
+<div class="container">
+
+<div class="row footer-top">
+
+<!-- EMPRESA -->
+
+<div class="col-lg-4 footer-company">
+
+<div class="footer-brand">
+
+<img src="{% static 'img/logo.png' %}" class="footer-logo">
+
+<h5>{% trans "La Tortilla Grocery" %}</h5>
+
+</div>
+
+<hr class="footer-divider">
+
+<p> {% trans "La Tortilla Grocery LLC es un distribuidor mayorista de productos latinos de confianza." %}
+{% trans "Abastecemos tiendas, supermercados y restaurantes con calidad, precios competitivos" %}
+{% trans "y entregas eficientes." %}
+</p>
+
+</div>
+
+
+<!-- COMPAÑIA -->
+
+<div class="col-lg-2 footer-links footer-col-divider">
+
+<h6>{% trans "Compañía" %}</h6>
+
+<ul>
+<li><a href="#">{% trans "Inicio" %}</a></li>
+<li><a href="#">{% trans "Quienes Somos" %}</a></li>
+<li><a href="#">{% trans "Marcas" %}</a></li>
+<li><a href="#">{% trans "Ofertas" %}</a></li>
+<li><a href="#">{% trans "Testimonios" %}</a></li>
+</ul>
+
+</div>
+
+
+<!-- LEGAL -->
+
+<div class="col-lg-3 footer-links footer-col-divider">
+
+<h6>{% trans "Legal" %}</h6>
+
+<ul>
+<li><a href="#">{% trans "Política y Privacidad" %}</a></li>
+<li><a href="#">{% trans "Términos y Condiciones" %}</a></li>
+</ul>
+
+</div>
+
+
+<!-- CONTACTO -->
+
+<div class="col-lg-3 footer-contact footer-col-divider">
+
+<h6>{% trans "Contactanos" %}</h6>
+
+<p>
+{% trans "1666 Roswell Rd Bldg 100" %}<br>
+{% trans "Marietta, GA 30062-3639" %}
+</p>
+
+<p>
+{% trans "latortilla@gmail.com" %}
+</p>
+
+<p>
+{% trans "+1 (470) 967 2782" %}
+</p>
+
+<div class="footer-social">
+<i class="bi bi-facebook"></i>
+<i class="bi bi-instagram"></i>
+<i class="bi bi-whatsapp"></i>
+</div>
+
+</div>
+
+</div>
+
+
+<div class="footer-divider-line"></div>
+
+<div class="footer-bottom text-center">
+
+<p>
+{% trans "© 2025 La Tortilla Grocery LLC. Todos los derechos reservados." %}
+</p>
+
+<small>
+{% trans "Desarrollado por Solutions.com" %}
+</small>
+
+</div>
+
+</div>
+
+</footer>
+
+
+
+</script src="{% static 'js/home.js' %}"></script>
+<script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+
+<script>
+    
+
+
+
+const track = document.getElementById("testimoniosTrack");
+
+let cards = document.querySelectorAll(".testimonio-card");
+
+let index = 1; // el del centro
+
+function activarCentro(){
+
+cards.forEach(card => card.classList.remove("active"));
+
+cards[index].classList.add("active");
+
+}
+
+function moverCarrusel(){
+
+cards = document.querySelectorAll(".testimonio-card");
+
+const cardWidth = cards[0].offsetWidth + 40;
+
+track.style.transition = "transform .7s ease";
+track.style.transform = `translateX(-${cardWidth}px)`;
+
+setTimeout(()=>{
+
+track.appendChild(cards[0]);
+
+track.style.transition = "none";
+track.style.transform = "translateX(0)";
+
+cards = document.querySelectorAll(".testimonio-card");
+
+activarCentro();
+
+},700);
+
+}
+
+activarCentro();
+
+setInterval(moverCarrusel,3000);
+
+
+
+
+</script>
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function(){
+
+const marcasTrack = document.getElementById("marcasTrack");
+
+if(marcasTrack){
+
+const logos = marcasTrack.innerHTML;
+
+/* duplicar logos para loop infinito */
+for(let i = 0; i < 5; i++){
+marcasTrack.innerHTML += logos;
+}
+
+}
+
+});
+
+</script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function(){
+
+    document.querySelectorAll(".cantidad-box").forEach(function(box){
+
+    let input = box.querySelector(".cantidad-input");
+    let mas = box.querySelector(".btn-mas");
+    let menos = box.querySelector(".btn-menos");
+
+    mas.addEventListener("click", function(){
+
+    input.value = parseInt(input.value) + 1;
+
+    });
+
+    menos.addEventListener("click", function(){
+
+    if(parseInt(input.value) > 1){
+    input.value = parseInt(input.value) - 1;
+    }
+
+    });
+
+    });
+
+});
+</script>
+
+<script>
+
+
+
+function toggleLanguageMenu(){
+
+const menu = document.getElementById("languageMenu");
+
+if(menu.style.display === "flex"){
+menu.style.display = "none";
+}else{
+menu.style.display = "flex";
+}
+
+}
+
+</script>
+
+{% get_current_language as LANGUAGE_CODE %}
+
+<div class="language-widget">
+
+<button class="language-toggle" onclick="toggleLanguageMenu()">
+
+🌎
+
+<span class="language-current">
+
+{% if LANGUAGE_CODE == "es" %}
+ES
+{% else %}
+EN
+{% endif %}
+
+</span>
+
+</button>
+
+<div class="language-menu" id="languageMenu">
+
+<form action="{% url 'set_language' %}" method="post">
+
+{% csrf_token %}
+<input name="next" type="hidden" value="{{ request.path }}">
+
+<button name="language" value="es" class="language-option">
+🇪🇸 Español
+</button>
+
+<button name="language" value="en" class="language-option">
+🇺🇸 English
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+
+</body>

@@ -1,142 +1,401 @@
 {% load static %}
+{% load i18n %}
+
 <!DOCTYPE html>
-<html>
+
+<html lang="es">
+
 <head>
+
 <meta charset="UTF-8">
-<title>Resumen del Pedido</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="{{ csrf_token }}">
+
+<title>{% trans "Resumen del Pedido" %}</title>
+
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
+<link rel="stylesheet" href="{% static 'css/ver_cotizacion.css' %}">
+<link rel="stylesheet" href="{% static 'css/tomar_pedido_resumen.css' %}">
+
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
 
-<style>
-body { background:#f4f6f9; }
-
-.navbar-custom {
-    background: linear-gradient(90deg, #023B82, #0C64CF, #3F89DA);
-}
-
-.sidebar {
-    background:#fff;
-    height:100vh;
-    border-right:1px solid #e3e3e3;
-}
-
-.sidebar .active {
-    background:#1f4fa3 !important;
-    color:white !important;
-    border-left:4px solid #ffd400;
-}
-
-.custom-card {
-    border-radius:14px;
-    box-shadow:0 10px 30px rgba(0,0,0,0.08);
-}
-
-.table thead {
-    background:#dcdcdc;
-}
-
-.btn-yellow {
-    background:#ffd400;
-    border:none;
-    font-weight:600;
-}
-</style>
 </head>
-<body>
 
-<nav class="navbar navbar-dark navbar-custom">
+<body data-actualizar-url="{% url 'actualizar_cantidad_pedido' %}"
+data-eliminar-url="{% url 'eliminar_producto_pedido' %}"
+data-enviar-url="{% url 'enviar_pedido' %}"
+data-csrf="{{ csrf_token %}"
+style="margin: 0; padding: 0;">
+
+<!-- NAVBAR -->
+
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
+
 <div class="container-fluid">
-<span class="navbar-brand fw-bold">La Tortilla Grocery</span>
+
+<a class="navbar-brand fw-bold">
+La Tortilla Grocery
+</a>
+
+<div class="ms-auto d-flex align-items-center gap-2">
+
+<a href="#" class="btn btn-outline-light">
+{% trans "Pedido" %} (<span id="contadorPedido">{{ productos|length }}</span>)
+</a>
+
 </div>
+
+</div>
+
 </nav>
 
-<div class="container-fluid">
-<div class="row">
+<!-- SIDEBAR -->
 
-<div class="col-md-2 sidebar p-0">
-<div class="p-4">
-<h5 class="fw-bold text-primary">Vendedor Andrés</h5>
+<div class="sidebar p-0 bg-white">
+
+<div class="sidebar-user">
+{% trans "Vendedor" %} Andrés
 </div>
 
-    <div class="list-group list-group-flush">
+<div class="list-group list-group-flush">
 
-        <a href="{% url 'crear_cliente' %}" 
-        class="list-group-item list-group-item-action {% if 'crear-cliente' in request.path %}active{% endif %}">
-            Crear Cliente
-        </a>
+<a href="{% url 'crear_cliente' %}" class="list-group-item">
+{% trans "Crear Cliente" %}
+</a>
 
-        <a href="{% url 'clientes' %}" 
-        class="list-group-item list-group-item-action {% if 'clientes' in request.path %}active{% endif %}">
-            Clientes
-        </a>
+<a href="{% url 'vendedores_clientes' %}" class="list-group-item">
+{% trans "Clientes" %}
+</a>
 
-        <a href="{% url 'tomar_pedido' %}" 
-        class="list-group-item list-group-item-action {% if 'tomar-pedido' in request.path %}active{% endif %}">
-            Tomar Pedido
-        </a>
+<a href="{% url 'tomar_pedido' %}" class="list-group-item active">
+{% trans "Tomar Pedido" %}
+</a>
 
-    </div>
 </div>
 
-<div class="col-md-10 p-4">
+</div>
 
-<h3 class="fw-bold">Resumen del Pedido</h3>
+<div class="main-content">
 
-<div class="card custom-card p-4 mt-4">
+<!-- CONTENIDO -->
+
+<div class="card custom-card p-4">
+
+<h3 class="fw-bold mb-3">
+{% trans "Resumen del Pedido" %}
+</h3>
+
+<hr>
+
+<!-- CLIENTE -->
+
+<div class="cliente-box mb-4 d-flex justify-content-between align-items-center">
+
+<div>
+<strong>{% trans "Cliente Seleccionado" %}:</strong>
+{{ cliente.nombre_empresa }}
+</div>
+
+<a href="{% url 'tomar_pedido' %}" class="btn btn-sm btn-outline-primary">
+{% trans "Cambiar Cliente" %}
+</a>
+
+</div>
+
+<!-- TABLA -->
+
+
+
+<div class="tabla-productos mb-4">
 
 <table class="table align-middle">
+
 <thead>
-<tr>
-<th>Producto</th>
-<th>Presentación</th>
-<th>Cantidad</th>
-<th>Precio</th>
-<th>Subtotal</th>
-<th>Acción</th>
+
+<tr data-producto="{{ item.id }}">
+
+<th>{% trans "Producto" %}</th>
+<th>{% trans "Presentación" %}</th>
+<th>{% trans "Cantidad" %}</th>
+<th>{% trans "Precio" %}</th>
+<th>{% trans "Subtotal" %}</th>
+<th>{% trans "Acción" %}</th>
+
 </tr>
+
 </thead>
 
 <tbody>
+
+{% for item in productos %}
+
 <tr>
-<td class="fw-bold">Producto Uno</td>
-<td>Caja</td>
-<td>5</td>
-<td>$90</td>
-<td>$450</td>
-<td>✏ 🗑</td>
+
+<td class="fw-bold" data-label="{% trans "Producto" %}">
+{{ item.nombre }}
+</td>
+
+<td data-label="{% trans "Presentación" %}">
+
+<select class="presentacion-resumen" data-id="{{ item.id }}">
+
+{% for p in item.presentaciones %}
+
+<option 
+value="{{ p.id }}"
+
+data-precio1="{{ p.precio_1 }}"
+data-precio2="{{ p.precio_2 }}"
+data-precio3="{{ p.precio_3 }}"
+data-precio4="{{ p.precio_4 }}"
+data-precio5="{{ p.precio_5 }}"
+
+{% if p.id|stringformat:"s" == item.presentacion_id|stringformat:"s" %}
+selected
+{% endif %}
+
+>
+
+{% if p.nombre == "caja" %}{% trans "caja" %}{% else %}{{ p.nombre }}{% endif %}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+</td>
+
+<td data-label="{% trans "Cantidad" %}">
+
+<div class="d-flex align-items-center gap-2">
+
+<button class="qty-btn restar" data-id="{{ item.id }}">−</button>
+
+<input
+type="number"
+class="cantidad-input"
+data-id="{{ item.id }}"
+value="{{ item.cantidad }}"
+min="1"
+
+>
+
+<button class="qty-btn sumar" data-id="{{ item.id }}">+</button>
+
+</div>
+
+</td>
+
+<td data-label="{% trans "Precio" %}">
+
+<select class="precio-resumen" data-id="{{ item.id }}">
+
+{% for p in item.presentaciones %}
+{% if p.id|stringformat:"s" == item.presentacion_id|stringformat:"s" %}
+
+<option value="{{ p.precio_1 }}"
+{% if item.precio == p.precio_1 %}selected{% endif %}>
+{% trans "Precio" %} 1 - ${{ p.precio_1 }}
+</option>
+
+<option value="{{ p.precio_2 }}"
+{% if item.precio == p.precio_2 %}selected{% endif %}>
+{% trans "Precio" %} 2 - ${{ p.precio_2 }}
+</option>
+
+<option value="{{ p.precio_3 }}"
+{% if item.precio == p.precio_3 %}selected{% endif %}>
+{% trans "Precio" %} 3 - ${{ p.precio_3 }}
+</option>
+
+<option value="{{ p.precio_4 }}"
+{% if item.precio == p.precio_4 %}selected{% endif %}>
+{% trans "Precio" %} 4 - ${{ p.precio_4 }}
+</option>
+
+<option value="{{ p.precio_5 }}"
+{% if item.precio == p.precio_5 %}selected{% endif %}>
+{% trans "Precio" %} 5 - ${{ p.precio_5 }}
+</option>
+
+{% endif %}
+{% endfor %}
+
+</select>
+
+</td>
+
+<td data-label="{% trans "Subtotal" %}" id="subtotal-{{ item.id }}">
+${{ item.subtotal }}
+</td>
+
+<td data-label="{% trans "Acción" %}">
+
+<button class="accion eliminar" data-id="{{ item.id }}">🗑️</button>
+
+</td>
+
 </tr>
+
+{% endfor %}
+
 </tbody>
+
 </table>
 
-<div class="d-flex justify-content-end mt-4">
-<div style="width:300px;">
-<p class="d-flex justify-content-between">
-<span>Subtotal:</span> <strong>$630</strong>
-</p>
-<p class="d-flex justify-content-between">
-<span>Iva:</span> <strong>-</strong>
-</p>
+</div>
+
+<div class="row">
+
+<!-- OPCIONES -->
+
+<div class="col-12 col-lg-8">
+
 <hr>
-<p class="d-flex justify-content-between fs-5">
-<span>Total:</span> <strong>$630</strong>
-</p>
+
+<div class="form-check mb-2">
+
+<input class="form-check-input tipo-orden" type="radio" name="tipo_orden" value="personal">
+
+<label class="form-check-label">
+{% trans "Orden tomada en persona" %}
+</label>
+
 </div>
+
+<div class="form-check">
+
+<input class="form-check-input tipo-orden" type="radio" name="tipo_orden" value="telefono">
+
+<label class="form-check-label">
+{% trans "Orden telefónica" %}
+</label>
+
 </div>
+
+</div>
+
+<!-- TOTALES -->
+
+<div class="col-12 col-lg-4">
+
+<div class="totales-box">
+
+<div class="d-flex justify-content-between">
+
+<span>{% trans "Subtotal" %}:</span>
+
+<strong id="totalPedido">${{ total }}</strong>
+
+</div>
+
+<hr>
+
+<div class="d-flex justify-content-between">
+
+<span>{% trans "IVA" %}:</span>
+
+<strong>-</strong>
+
+</div>
+
+<hr>
+
+<div class="d-flex justify-content-between total-final">
+
+<span>{% trans "Total" %}:</span>
+
+<strong id="totalFinal">${{ total }}</strong>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<!-- BOTONES -->
 
 <div class="d-flex justify-content-between mt-4">
-<a href="{% url 'tomar_pedido_catalogo' %}" class="btn btn-secondary">
-Seguir Agregando Productos
+
+<a href="{% url 'catalogo_vendedor' cliente_id %}" class="btn-seguir">
+{% trans "Seguir Agregando Productos" %}
 </a>
 
-<button class="btn btn-yellow px-5">
-Enviar Pedido
+<button type="button" class="btn btn-yellow">
+{% trans "Enviar Pedido" %}
 </button>
-</div>
 
 </div>
 
 </div>
+
+
+<script src="{% static 'js/pedido_resumen.js' %}"></script>
+
+<div id="toastPedido" class="toast-pedido">
+{% trans "Pedido enviado correctamente" %} ✔
 </div>
+
+<script>
+
+
+
+function toggleLanguageMenu(){
+
+const menu = document.getElementById("languageMenu");
+
+if(menu.style.display === "flex"){
+menu.style.display = "none";
+}else{
+menu.style.display = "flex";
+}
+
+}
+
+</script>
+
+{% get_current_language as LANGUAGE_CODE %}
+
+<div class="language-widget">
+
+<button class="language-toggle" onclick="toggleLanguageMenu()">
+
+🌎
+
+<span class="language-current">
+
+{% if LANGUAGE_CODE == "es" %}
+ES
+{% else %}
+EN
+{% endif %}
+
+</span>
+
+</button>
+
+<div class="language-menu" id="languageMenu">
+
+<form action="{% url 'set_language' %}" method="post">
+
+{% csrf_token %}
+<input name="next" type="hidden" value="{{ request.path }}">
+
+<button name="language" value="es" class="language-option">
+🇪🇸 Español
+</button>
+
+<button name="language" value="en" class="language-option">
+🇺🇸 English
+</button>
+
+</form>
+
+</div>
+
 </div>
 
 </body>

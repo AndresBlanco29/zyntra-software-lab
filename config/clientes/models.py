@@ -37,6 +37,17 @@ class Cliente(models.Model):
         null=False
     )
 
+    codigo_postal = models.CharField(
+    max_length=20,
+    blank=True,
+    null=True
+    )
+
+    pais = models.CharField(
+        max_length=100,
+        default="USA"
+    )
+
     sales_tax_number = models.CharField(
         max_length=100,
         blank=False,
@@ -63,5 +74,3 @@ class Cliente(models.Model):
 
     def __str__(self):
         return self.nombre_empresa
-
-# Create your models here.

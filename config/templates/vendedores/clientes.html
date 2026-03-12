@@ -1,130 +1,135 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Clientes</title>
+{% extends "bases/base_vendedor.html" %}
+{% load static i18n %}
 
-    <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
-    <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+{% block title %}
+{% trans "Clientes" %}
+{% endblock %}
 
-    <style>
-        body { background-color: #f4f6f9; }
+{% block content %}
 
-        .navbar-custom {
-            background: linear-gradient(90deg, #023B82, #0C64CF, #3F89DA);
-        }
-
-        .sidebar {
-            background-color: #ffffff;
-            height: 100vh;
-            border-right: 1px solid #e3e3e3;
-        }
-
-        .sidebar .active {
-            background-color: #1f4fa3 !important;
-            color: white !important;
-            border-left: 4px solid #ffd400;
-        }
-
-        .custom-card {
-            border-radius: 14px;
-            box-shadow: 0px 10px 30px rgba(0,0,0,0.08);
-            border: none;
-        }
-
-        .table thead {
-            background-color: #e2e2e2;
-        }
-
-        .status-active {
-            background-color: #28a745;
-            color: white;
-            padding: 4px 14px;
-            border-radius: 20px;
-            font-size: 13px;
-        }
-    </style>
-</head>
-<body>
-
-<nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
-    <div class="container-fluid">
-        <a class="navbar-brand fw-bold">La Tortilla Grocery</a>
-        <div class="ms-auto text-white">Pedido (0)</div>
-    </div>
-</nav>
-
-<div class="container-fluid">
-<div class="row">
-
-<div class="col-md-2 sidebar p-0">
-    <div class="p-4">
-        <h5 class="fw-bold text-primary">Vendedor Andrés</h5>
-    </div>
-
-    <div class="list-group list-group-flush">
-
-        <a href="{% url 'crear_cliente' %}" 
-        class="list-group-item list-group-item-action {% if 'crear-cliente' in request.path %}active{% endif %}">
-            Crear Cliente
-        </a>
-
-        <a href="{% url 'clientes' %}" 
-        class="list-group-item list-group-item-action {% if 'clientes' in request.path %}active{% endif %}">
-            Clientes
-        </a>
-
-        <a href="{% url 'tomar_pedido' %}" 
-        class="list-group-item list-group-item-action {% if 'tomar-pedido' in request.path %}active{% endif %}">
-            Tomar Pedido
-        </a>
-
-    </div>
-</div>
-
-<div class="col-md-10 p-4">
+<link rel="stylesheet" href="{% static 'css/clientes.css' %}">
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-        <h3 class="fw-bold mb-0">Clientes</h3>
-        <small class="text-muted">Consulta datos del cliente</small>
-    </div>
+    
+<div>
 
-    <div style="width:350px;">
-        <input type="search" class="form-control" placeholder="Buscar por nombre, empresa o documento">
-    </div>
+<h3 class="fw-bold mb-0">{% trans "Clientes" %}</h3>
+
+<small class="text-muted">
+{% trans "Consulta datos del cliente" %}
+</small>
+
 </div>
 
-<hr>
+<div class="d-flex gap-2 mb-3">
+
+<input 
+type="search"
+id="buscadorClientes"
+class="form-control"
+placeholder="{% trans 'Buscar por nombre, empresa o documento' %}"
+>
+
+<select id="filtroEstado" class="form-select" style="max-width:180px;">
+
+<option value="">
+{% trans "Todos" %}
+</option>
+
+<option value="activo">
+{% trans "Activos" %}
+</option>
+
+<option value="inactivo">
+{% trans "Inactivos" %}
+</option>
+
+</select>
+
+</div>
+
+</div>
+
+<hr />
 
 <div class="d-flex justify-content-center">
 
-<div class="card custom-card w-75">
+<div class="card custom-card w-100">
+
 <div class="card-body p-0">
 
 <table class="table align-middle mb-0">
 
 <thead>
+
 <tr>
-    <th>Cliente</th>
-    <th>Empresa</th>
-    <th>Correo Electrónico</th>
-    <th>Teléfono</th>
-    <th>Estado</th>
-    <th>Acción</th>
+
+<th>{% trans "Cliente" %}</th>
+
+<th>{% trans "Empresa" %}</th>
+
+<th>{% trans "Correo Electrónico" %}</th>
+
+<th>{% trans "Teléfono" %}</th>
+
+<th>{% trans "Estado" %}</th>
+
+<th>{% trans "Acción" %}</th>
+
 </tr>
+
 </thead>
 
 <tbody>
-<tr>
-    <td class="fw-bold">Juan Pérez</td>
-    <td>Tienda Latina</td>
-    <td>latiendalatina@gmail.com</td>
-    <td>(+1) 555 - 123 - 332</td>
-    <td><span class="status-active">Activo</span></td>
-    <td><a href="#" class="text-primary fw-semibold">Editar ✏</a></td>
+
+{% for cliente in clientes %}
+
+<tr
+data-nombre="{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}"
+data-empresa="{{ cliente.nombre_empresa }}"
+data-correo="{{ cliente.usuario.email }}"
+data-telefono="{{ cliente.telefono }}"
+data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
+>
+
+<td>{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}</td>
+
+<td>{{ cliente.nombre_empresa }}</td>
+
+<td>{{ cliente.usuario.email }}</td>
+
+<td>{{ cliente.telefono }}</td>
+
+<td>
+
+{% if cliente.aprobado %}
+
+<span class="badge bg-success">
+{% trans "Activo" %}
+</span>
+
+{% else %}
+
+<span class="badge bg-danger">
+{% trans "Inactivo" %}
+</span>
+
+{% endif %}
+
+</td>
+
+<td>
+
+<a href="#" class="btn btn-primary btn-sm">
+{% trans "Editar" %}
+</a>
+
+</td>
+
 </tr>
+
+{% endfor %}
+
 </tbody>
 
 </table>
@@ -134,9 +139,65 @@
 
 </div>
 
-</div>
-</div>
+<script src="{% static 'js/clientes.js' %}"></script>
+
+<script>
+
+
+
+function toggleLanguageMenu(){
+
+const menu = document.getElementById("languageMenu");
+
+if(menu.style.display === "flex"){
+menu.style.display = "none";
+}else{
+menu.style.display = "flex";
+}
+
+}
+
+</script>
+
+{% get_current_language as LANGUAGE_CODE %}
+
+<div class="language-widget">
+
+<button class="language-toggle" onclick="toggleLanguageMenu()">
+
+🌎
+
+<span class="language-current">
+
+{% if LANGUAGE_CODE == "es" %}
+ES
+{% else %}
+EN
+{% endif %}
+
+</span>
+
+</button>
+
+<div class="language-menu" id="languageMenu">
+
+<form action="{% url 'set_language' %}" method="post">
+
+{% csrf_token %}
+<input name="next" type="hidden" value="{{ request.path }}">
+
+<button name="language" value="es" class="language-option">
+🇪🇸 Español
+</button>
+
+<button name="language" value="en" class="language-option">
+🇺🇸 English
+</button>
+
+</form>
+
 </div>
 
-</body>
-</html>
+</div>
+
+{% endblock %}

@@ -3,89 +3,120 @@ from .models import Cotizacion, CotizacionItem
 from clientes.models import Cliente
 from productos.models import Presentacion, Producto
 from decimal import Decimal
+from django.core.mail import send_mail, EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.http import JsonResponse
 
 
-def agregar_a_cotizacion(request, presentacion_id):
+def agregar_a_cotizacion(request):
 
-    presentacion = Presentacion.objects.get(id=presentacion_id)
+    if request.method == "POST":
 
-    carrito = request.session.get('carrito', {})
+        presentacion_id = request.POST.get("presentacion_id")
+        cantidad = int(request.POST.get("cantidad"))
 
-    if str(presentacion_id) in carrito:
+        presentacion = Presentacion.objects.get(id=presentacion_id)
+        producto = presentacion.producto
 
-        carrito[str(presentacion_id)]['cantidad'] += 1
+        carrito = request.session.get("carrito", {})
 
-    else:
+        key = str(presentacion_id)
 
-        carrito[str(presentacion_id)] = {
+        if key in carrito:
+            carrito[key]["cantidad"] += cantidad
+        else:
+            carrito[key] = {
+                "producto_id": producto.id,
+                "presentacion_id": presentacion.id,
+                "nombre": producto.nombre,
+                "cantidad": cantidad
+            }
 
-            'nombre': presentacion.producto.nombre,
-            'precio': float(presentacion.precio),
-            'cantidad': 1
-        }
+        request.session["carrito"] = carrito
 
-    request.session['carrito'] = carrito
+        total_items = sum(item["cantidad"] for item in carrito.values())
 
-    return redirect('catalogo')
+        return JsonResponse({
+            "success": True,
+            "total_items": total_items
+        })
 
 def ver_cotizacion(request):
 
     carrito_session = request.session.get("carrito", {})
     carrito = []
-    total = 0
 
-    for producto_id, item in carrito_session.items():
+    for presentacion_id, item in carrito_session.items():
 
         try:
-            producto = Producto.objects.get(id=producto_id)
-        except Producto.DoesNotExist:
+            presentacion = Presentacion.objects.get(id=presentacion_id)
+        except Presentacion.DoesNotExist:
             continue
 
-        subtotal = item["precio"] * item["cantidad"]
-        total += subtotal
+        producto = presentacion.producto
 
         carrito.append({
-            "id": producto_id,
+            "id": presentacion_id,
             "producto": producto,
-            "nombre": producto.nombre,
-            "presentacion_id": item.get("presentacion_id"),
-            "precio": item["precio"],
+            "presentacion": presentacion,
             "cantidad": item["cantidad"],
-            "subtotal": subtotal,
         })
 
-    context = {
-        "carrito": carrito,
-        "total": total,
-    }
+    return render(request, "cotizaciones/ver_cotizacion.html", {
+        "carrito": carrito
+    })
 
-    return render(request, "cotizaciones/ver_cotizacion.html", context)
+def eliminar_producto(request):
+
+    if request.method == "POST":
+
+        producto_id = request.POST.get("producto_id")
+
+        carrito = request.session.get("carrito", {})
+
+        if producto_id in carrito:
+            del carrito[producto_id]
+
+        request.session["carrito"] = carrito
+
+        total_items = sum(item["cantidad"] for item in carrito.values())
+
+        return JsonResponse({
+            "success": True,
+            "total_items": total_items
+        })
 
 def guardar_cotizacion(request):
 
     carrito = request.session.get('carrito', {})
 
-    cliente = Cliente.objects.get(usuario=request.user)
+    nota = request.POST.get("nota", "")
+
+    cliente = Cliente.objects.first()
 
     cotizacion = Cotizacion.objects.create(
         cliente=cliente,
-        vendedor=request.user if request.user.role == 'VENDEDOR' else None,
+        vendedor=request.user,
         total=0
     )
 
     total = 0
 
-    for presentacion_id, item in carrito.items():
+    for producto_id, item in carrito.items():
 
-        presentacion = Presentacion.objects.get(id=presentacion_id)
+        presentacion = Presentacion.objects.get(id=item["presentacion_id"])
 
-        subtotal = item['cantidad'] * presentacion.precio
+        cantidad = item["cantidad"]
+
+        precio = float(item.get("precio", 0))
+
+        subtotal = precio * cantidad
 
         CotizacionItem.objects.create(
             cotizacion=cotizacion,
             presentacion=presentacion,
-            cantidad=item['cantidad'],
-            precio=presentacion.precio,
+            cantidad=cantidad,
+            precio=precio,
             subtotal=subtotal
         )
 
@@ -94,6 +125,30 @@ def guardar_cotizacion(request):
     cotizacion.total = total
     cotizacion.save()
 
+    items = cotizacion.items.all()
+
+    html_content = render_to_string(
+        "emails/cotizacion_cliente.html",
+        {
+            "cliente": cliente,
+            "items": items,
+            "nota": nota
+        }
+    )
+
+    email = EmailMultiAlternatives(
+        subject=f"Nueva solicitud de cotización #{cotizacion.id}",
+        body="Se ha recibido una nueva solicitud de cotización.",
+        from_email=None,
+        to=["andresilloblanco29@gmail.com"]
+    )
+
+    email.attach_alternative(html_content, "text/html")
+    email.send()
+
     request.session['carrito'] = {}
 
     return redirect('catalogo')
+
+    
+

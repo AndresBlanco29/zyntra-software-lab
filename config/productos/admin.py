@@ -15,12 +15,15 @@ class ProductoAdmin(admin.ModelAdmin):
         "categoria",
         "marca",
         "activo",
+        "destacado",
+        "descuento"
     )
 
     list_filter = (
         "categoria",
         "marca",
         "activo",
+        "destacado",
     )
 
     search_fields = (

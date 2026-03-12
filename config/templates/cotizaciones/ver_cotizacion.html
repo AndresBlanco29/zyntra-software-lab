@@ -1,19 +1,17 @@
-{% load static %}
+{% load static i18n %}
 <!DOCTYPE html>
-<html lang="es">
+<html lang="{{ LANGUAGE_CODE }}">
 <head>
-    <meta charset="UTF-8">
-    <title>Mi Cotización</title>
+<meta charset="UTF-8">
+<title>{% trans "Mi Cotización" %}</title>
 
-    <!-- Bootstrap -->
-    <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
-    <link rel="stylesheet" href="{% static 'css/ver_cotizacion.css' %}">
-    <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
-    
+<link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
+<link rel="stylesheet" href="{% static 'css/ver_cotizacion.css' %}">
+<script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
 
 </head>
 
-<body 
+<body
 data-actualizar-url="{% url 'actualizar_cantidad' %}"
 data-eliminar-url="{% url 'eliminar_producto' %}"
 data-presentacion-url="{% url 'cambiar_presentacion' %}"
@@ -21,190 +19,304 @@ data-csrf="{{ csrf_token }}">
 
 <!-- NAVBAR -->
 <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
-    <div class="container-fluid">
+<div class="container-fluid">
 
-        <a class="navbar-brand fw-bold" href="#">
-            La Tortilla Grocery
-        </a>
+<a class="navbar-brand fw-bold">
+La Tortilla Grocery
+</a>
 
-        <div class="ms-auto">
-            <a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">
-                Cotización (<span id="contadorCarrito">{{ carrito|length }}</span>)
-            </a>
-        </div>
+<div class="ms-auto">
+<a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">
+{% trans "Cotización" %} (<span id="contadorCarrito">{{ carrito|length }}</span>)
+</a>
+</div>
 
-    </div>
+</div>
 </nav>
 
 <div class="container-fluid">
-    <div class="row">
 
-        <!-- SIDEBAR -->
-        <div class="col-md-2 sidebar p-0">
+<!-- SIDEBAR -->
+<div class="sidebar">
 
-            <div class="sidebar-user">
-                Tienda Suprema
-            </div>
-
-            <div class="list-group list-group-flush">
-                    <a href="{% url 'catalogo' %}" class="list-group-item ">
-                        Catálogo
-                    </a>
-                    <a href="{% url 'ver_cotizacion' %}" class="list-group-item active">
-                        Mi Cotización
-                    </a>
-                </div>
-        </div>
-
-        <!-- CONTENIDO CENTRAL -->
-        <div class="col-md-7 p-4">
-
-            <h3 class="fw-bold">
-                Mi Cotización
-            </h3>
-
-            <p class="text-muted">
-                Revisa los productos antes de enviar tu solicitud
-            </p>
-
-            <hr>
-
-            {% if carrito %}
-
-            <div class="card custom-card">
-                <div class="card-body">
-
-                    <table class="table align-middle" id="tablaProductos">
-
-                        <thead>
-                            <tr>
-                                <th>Producto</th>
-                                <th>Presentación</th>
-                                <th>Cantidad</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-
-                        <tbody>
-
-                            {% for item in carrito %}
-                            <tr data-id="{{ item.id }}">
-
-                                <!-- PRODUCTO CON IMAGEN -->
-                                <td>
-                                    <div class="d-flex align-items-center gap-3 nombre-producto">
-                                        {% if item.producto.imagen %}
-                                            <img src="{{ item.producto.imagen.url }}"
-                                                style="width:45px; height:45px; object-fit:contain;">
-                                        {% endif %}
-                                        <span class="fw-bold">{{ item.nombre }}</span>
-                                    </div>
-                                </td>
-
-                                <!-- PRESENTACIÓN -->
-                                <td>
-                                    <select class="form-select form-select-sm presentacion-select">
-                                        {% for p in item.producto.presentaciones.all %}
-                                            <option 
-                                                value="{{ p.id }}"
-                                                data-unidades="{{ p.unidades }}"
-                                                data-tipo="{{ p.tipo_contenido }}"
-                                                {% if p.id == item.presentacion_id %}selected{% endif %}>
-                                                {{ p.nombre }}
-                                            </option>
-                                        {% endfor %}
-                                    </select>
-
-                                    <!-- Texto informativo debajo -->
-                                    <small class="text-muted info-presentacion d-block mt-1">
-                                        {% for p in item.producto.presentaciones.all %}
-                                            {% if p.id == item.presentacion_id %}
-                                                {{ p.unidades }} {{ p.tipo_contenido }} por {{ p.nombre|lower }}
-                                            {% endif %}
-                                        {% endfor %}
-                                    </small>
-                                </td>
-
-                                <!-- CANTIDAD -->
-                                <td>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <button class="qty-btn restar">-</button>
-                                        <span class="cantidad">{{ item.cantidad }}</span>
-                                        <button class="qty-btn sumar">+</button>
-                                    </div>
-                                </td>
-
-                                <!-- ACCIONES -->
-                                <td>
-                                    <button class="btn btn-sm btn-danger eliminar-btn">
-                                        🗑
-                                    </button>
-                                </td>
-
-                            </tr>
-                            {% endfor %}
-
-                            </tbody>
-
-                    </table>
-
-                </div>
-            </div>
-
-            {% else %}
-
-            <div class="alert alert-info">
-                No hay productos en la cotización.
-            </div>
-
-            {% endif %}
-        </div>
-
-        <!-- PANEL DERECHO -->
-        <div class="col-md-3 p-4">
-
-            <!-- BUSCADOR ARRIBA -->
-            <div class="mb-4">
-                <input type="search"
-                       id="buscador"
-                       class="form-control"
-                       placeholder="Buscar Productos...">
-            </div>
-
-            <!-- CARD DERECHA -->
-            <div class="card custom-card">
-
-                <div class="card-body">
-
-                    <h6 class="text-muted">
-                        Total de productos: {{ carrito|length }}
-                    </h6>
-
-                    <hr>
-
-                    <div class="mb-3">
-                        <label class="form-label">Nota Opcional</label>
-                        <textarea rows="4" class="form-control"></textarea>
-                    </div>
-
-                    <div class="alert alert-info mt-3">
-                        La cotización será enviada para validación de precios.
-                    </div>
-
-                    <a href="{% url 'guardar_cotizacion' %}"
-                       class="btn btn-yellow w-100 mt-3">
-
-                        Enviar Solicitud de Cotización
-                    </a>
-
-                </div>
-            </div>
-
-        </div>
-
-    </div>
+<div class="sidebar-user">
+{% trans "Tienda Suprema" %}
 </div>
+
+<div class="list-group list-group-flush">
+
+<a href="{% url 'catalogo' %}" class="list-group-item">
+{% trans "Catálogo" %}
+</a>
+
+<a href="{% url 'ver_cotizacion' %}" class="list-group-item active">
+{% trans "Mi Cotización" %}
+</a>
+
+</div>
+
+</div>
+
+
+<!-- CONTENIDO -->
+<div class="main-content">
+
+<div class="container-fluid">
+
+<div class="row">
+
+<!-- COLUMNA IZQUIERDA (PRODUCTOS) -->
+<div class="col-md-9">
+
+<h3 class="fw-bold">{% trans "Mi Cotización" %}</h3>
+
+<p class="text-muted">
+{% trans "Revisa los productos antes de enviar tu solicitud" %}
+</p>
+
+<hr>
+
+{% if carrito %}
+
+<div class="card custom-card">
+
+<div class="card-body">
+
+<table class="table align-middle" id="tablaProductos">
+
+<thead>
+<tr>
+<th>{% trans "Producto" %}</th>
+<th>{% trans "Presentación" %}</th>
+<th>{% trans "Cantidad" %}</th>
+<th>{% trans "Acciones" %}</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for item in carrito %}
+<tr data-id="{{ item.id }}">
+
+<td>
+<div class="d-flex align-items-center gap-3 nombre-producto">
+
+{% if item.producto.imagen %}
+<img src="{{ item.producto.imagen.url }}"
+style="width:45px;height:45px;object-fit:contain;">
+{% endif %}
+
+<span class="fw-bold">{{ item.producto.nombre_traducido }}</span>
+
+</div>
+</td>
+
+
+<td>
+
+<select class="form-select form-select-sm presentacion-select">
+
+{% for p in item.producto.presentaciones.all %}
+
+<option
+value="{{ p.id }}"
+data-unidades="{{ p.unidades }}"
+data-tipo="{{ p.tipo_contenido_traducido|lower }}"
+{% if p.id == item.presentacion.id %}selected{% endif %}
+>
+
+{{ p.nombre_traducido }}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+
+<small class="text-muted info-presentacion d-block mt-1">
+
+{% for p in item.producto.presentaciones.all %}
+
+{% if p.id == item.presentacion_id %}
+
+{{ p.unidades }} {{ p.tipo_contenido_traducido }} {% trans "por" %} {{ p.nombre_traducido|lower }}
+
+{% endif %}
+
+{% endfor %}
+
+</small>
+
+</td>
+
+
+<td>
+
+<div class="d-flex align-items-center gap-2">
+
+<button class="qty-btn restar">-</button>
+
+<span class="cantidad">{{ item.cantidad }}</span>
+
+<button class="qty-btn sumar">+</button>
+
+</div>
+
+</td>
+
+
+<td>
+
+<button class="btn btn-sm btn-danger eliminar-btn">
+🗑
+</button>
+
+</td>
+
+</tr>
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+</div>
+
+{% else %}
+
+<div class="alert alert-info">
+ {% trans "No hay productos en la cotización." %}
+</div>
+
+{% endif %}
+
+</div>
+
+
+
+<!-- COLUMNA DERECHA (PANEL) -->
+<div class="col-md-3">
+
+<!-- BUSCADOR -->
+<div class="mb-4">
+
+<input
+type="search"
+id="buscador"
+class="form-control"
+placeholder="{% trans "Buscar Productos..." %}">
+
+</div>
+
+
+<!-- CARD -->
+<div class="card custom-card">
+
+<div class="card-body">
+
+<h6 class="text-muted">
+{% trans "Total de productos" %}: {{ carrito|length }}
+</h6>
+
+<hr>
+
+<form method="POST" action="{% url 'guardar_cotizacion' %}">
+{% csrf_token %}
+
+<div class="mb-3">
+
+<label class="form-label">{% trans "Nota Opcional" %}</label>
+
+<textarea name="nota" rows="4" class="form-control"></textarea>
+
+</div>
+
+
+<div class="alert alert-info mt-3">
+{% trans "La cotización será enviada para validación de precios." %}
+</div>
+
+
+<button type="submit" class="btn btn-yellow w-100 mt-3">
+{% trans "Enviar Solicitud de Cotización" %}
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+</div>
+
+</div>
+
 <script src="{% static 'js/ver_cotizacion.js' %}"></script>
+
+{% get_current_language as LANGUAGE_CODE %}
+
+<div class="language-widget">
+
+<button class="language-toggle" onclick="toggleLanguageMenu()">
+
+🌎
+
+<span class="language-current">
+
+{% if LANGUAGE_CODE == "es" %}
+ES
+{% else %}
+EN
+{% endif %}
+
+</span>
+
+</button>
+
+<div class="language-menu" id="languageMenu">
+
+<form action="{% url 'set_language' %}" method="post">
+
+{% csrf_token %}
+<input name="next" type="hidden" value="{{ request.path }}">
+
+<button name="language" value="es" class="language-option">
+🇪🇸 Español
+</button>
+
+<button name="language" value="en" class="language-option">
+🇺🇸 English
+</button>
+
+</form>
+
+</div>
+
+</div>
+
+<script>
+
+
+
+function toggleLanguageMenu(){
+
+const menu = document.getElementById("languageMenu");
+
+if(menu.style.display === "flex"){
+menu.style.display = "none";
+}else{
+menu.style.display = "flex";
+}
+
+}
+
+</script>
 
 </body>
 </html>

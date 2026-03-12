@@ -1,0 +1,697 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+msgid ""
+msgstr ""
+"Project-Id-Version: La Tortilla Grocery\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-03-12 16:13-0500\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: .\templates\bases\base_vendedor.html:10
+msgid "Sistema"
+msgstr "System"
+
+#: .\templates\bases\base_vendedor.html:52
+#: .\templates\vendedores\tomar_pedido_catalogo.html:61
+#: .\templates\vendedores\tomar_pedido_resumen.html:77
+msgid "Vendedor"
+msgstr "seller"
+
+#: .\templates\bases\base_vendedor.html:59
+#: .\templates\vendedores\crear_cliente.html:5
+#: .\templates\vendedores\tomar_pedido_catalogo.html:67
+#: .\templates\vendedores\tomar_pedido_resumen.html:83
+msgid "Crear Cliente"
+msgstr "Create Customer"
+
+#: .\templates\bases\base_vendedor.html:64
+#: .\templates\vendedores\clientes.html:5
+#: .\templates\vendedores\clientes.html:16
+#: .\templates\vendedores\tomar_pedido_catalogo.html:71
+#: .\templates\vendedores\tomar_pedido_resumen.html:87
+msgid "Clientes"
+msgstr "Customers"
+
+#: .\templates\bases\base_vendedor.html:69
+#: .\templates\vendedores\tomar_pedido.html:5
+#: .\templates\vendedores\tomar_pedido.html:12
+#: .\templates\vendedores\tomar_pedido_catalogo.html:10
+#: .\templates\vendedores\tomar_pedido_catalogo.html:75
+#: .\templates\vendedores\tomar_pedido_resumen.html:91
+msgid "Tomar Pedido"
+msgstr "Take Order"
+
+#: .\templates\cotizaciones\ver_cotizacion.html:6
+#: .\templates\cotizaciones\ver_cotizacion.html:53
+#: .\templates\cotizaciones\ver_cotizacion.html:71
+#: .\templates\productos\catalogo.html:79
+#: .\templates\productos\catalogo.html:104
+msgid "Mi Cotización"
+msgstr "My Quote"
+
+#: .\templates\cotizaciones\ver_cotizacion.html:30
+#: .\templates\productos\catalogo.html:43
+msgid "Cotización"
+msgstr "Quote"
+
+#: .\templates\cotizaciones\ver_cotizacion.html:43
+#: .\templates\productos\catalogo.html:96
+msgid "Tienda Suprema"
+msgstr "Supreme Store"
+
+#: .\templates\cotizaciones\ver_cotizacion.html:49 .\templates\home.html:72
+#: .\templates\productos\catalogo.html:8 .\templates\productos\catalogo.html:72
+#: .\templates\productos\catalogo.html:101
+msgid "Catálogo"
+msgstr "Catalog"
+
+#: .\templates\cotizaciones\ver_cotizacion.html:74
+msgid "Revisa los productos antes de enviar tu solicitud"
+msgstr "Review the products before sending your request"
+
+#: .\templates\cotizaciones\ver_cotizacion.html:89
+#: .\templates\vendedores\tomar_pedido_resumen.html:138
+msgid "Producto"
+msgstr "Product"
+
+#: .\templates\cotizaciones\ver_cotizacion.html:90
+#: .\templates\productos\catalogo.html:203
+#: .\templates\vendedores\tomar_pedido_resumen.html:139
+msgid "Presentación"
+msgstr "Packaging"
+
+#: .\templates\cotizaciones\ver_cotizacion.html:91
+#: .\templates\productos\catalogo.html:221
+#: .\templates\vendedores\tomar_pedido_resumen.html:140
+msgid "Cantidad"
+msgstr "Quantity"
+
+#: .\templates\cotizaciones\ver_cotizacion.html:92
+msgid "Acciones"
+msgstr "Actions"
+
+#: .\templates\cotizaciones\ver_cotizacion.html:143
+#: .\templates\productos\catalogo.html:196
+#: .\templates\vendedores\tomar_pedido_catalogo.html:229
+msgid "por"
+msgstr "by"
+
+#: .\templates\cotizaciones\ver_cotizacion.html:191
+msgid "No hay productos en la cotización."
+msgstr "There are no products in the quote."
+
+#: .\templates\cotizaciones\ver_cotizacion.html:210
+msgid "Buscar Productos..."
+msgstr "Search Products..."
+
+#: .\templates\cotizaciones\ver_cotizacion.html:221
+msgid "Total de productos"
+msgstr "Total Products"
+
+#: .\templates\cotizaciones\ver_cotizacion.html:231
+msgid "Nota Opcional"
+msgstr "Optional Note"
+
+#: .\templates\cotizaciones\ver_cotizacion.html:239
+msgid "La cotización será enviada para validación de precios."
+msgstr "The quote will be sent for price validation."
+
+#: .\templates\cotizaciones\ver_cotizacion.html:244
+msgid "Enviar Solicitud de Cotización"
+msgstr "Send Quote Request"
+
+#: .\templates\home.html:52 .\templates\home.html:791
+msgid "Inicio"
+msgstr "Home"
+
+#: .\templates\home.html:56 .\templates\home.html:792
+msgid "Quienes Somos"
+msgstr "About Us"
+
+#: .\templates\home.html:60 .\templates\home.html:793
+msgid "Marcas"
+msgstr "Brands"
+
+#: .\templates\home.html:64 .\templates\home.html:794
+msgid "Ofertas"
+msgstr "Offers"
+
+#: .\templates\home.html:68
+msgid "Contacto"
+msgstr "Contact"
+
+#: .\templates\home.html:76
+msgid "Login"
+msgstr "Login"
+
+#: .\templates\home.html:99
+msgid "Tu Mayorista de"
+msgstr "Your Wholesale Supplier of"
+
+#: .\templates\home.html:102
+msgid "Productos Latinos"
+msgstr "Latin Products"
+
+#: .\templates\home.html:105
+msgid "de Confianza"
+msgstr "You Can Trust"
+
+#: .\templates\home.html:110
+msgid "Haz tus pedidos de forma rápida y segura. Compras al por mayor."
+msgstr ""
+"Place your orders quickly and securely. Wholesale purchasing made easy."
+
+#: .\templates\home.html:114 .\templates\home.html:742
+msgid "Ver Catálogo"
+msgstr "View Catalog"
+
+#: .\templates\home.html:147
+msgid "¿Quiénes Somos?"
+msgstr "Who We Are"
+
+#: .\templates\home.html:154
+msgid ""
+"\n"
+"En La Tortilla Grocery LLC, somos el aliado de confianza de los negocios "
+"latinos.\n"
+"Ofrecemos productos y servicios mayoristas de alta calidad, adaptados a sus "
+"necesidades.\n"
+"Nos enfocamos en brindar soluciones eficientes para que su negocio crezca y "
+"prospere\n"
+"en un mercado competitivo.\n"
+msgstr ""
+"\n"
+"At La Tortilla Grocery LLC, we are the trusted partner for Latino "
+"businesses. We offer high-quality wholesale products and services tailored "
+"to your needs. We focus on providing efficient solutions to help your "
+"business grow and thrive in a competitive market.\n"
+
+#: .\templates\home.html:184
+msgid "Abastecimiento Inteligente"
+msgstr "Smart Supply"
+
+#: .\templates\home.html:185
+msgid "Productos siempre disponibles"
+msgstr "Products always available"
+
+#: .\templates\home.html:204
+msgid "Lógica Eficiente"
+msgstr "Efficient Logistics"
+
+#: .\templates\home.html:205
+msgid "Entrega rápida y segura"
+msgstr "Fast and secure delivery"
+
+#: .\templates\home.html:224
+msgid "Relación a Largo Plazo"
+msgstr "Long-Term Partnership"
+
+#: .\templates\home.html:225
+msgid "Compromiso y confianza"
+msgstr "Commitment and trust"
+
+#: .\templates\home.html:244
+msgid "Crecimiento Sostenible"
+msgstr "Sustainable Growth"
+
+#: .\templates\home.html:245
+msgid "Apoyo para tu expansión"
+msgstr "Support for your expansion"
+
+#: .\templates\home.html:272
+msgid "Negocios Abastecidos"
+msgstr "Businesses Supplied"
+
+#: .\templates\home.html:279
+msgid "Pedidos Exitosos"
+msgstr "Successful Orders"
+
+#: .\templates\home.html:286
+msgid "De Experiencia"
+msgstr "Years of Experience"
+
+#: .\templates\home.html:307
+msgid "¿Por Qué Elegirnos?"
+msgstr "Why Choose Us?"
+
+#: .\templates\home.html:326 .\templates\home.html:364
+msgid "Amplio Catálogo"
+msgstr "Wide Catalog"
+
+#: .\templates\home.html:327 .\templates\home.html:365
+msgid "Productos latinos de alta rotación"
+msgstr "High-demand Latin products"
+
+#: .\templates\home.html:335
+msgid "Entregas rápidas y seguras para mantener"
+msgstr "Fast and secure deliveries to keep"
+
+#: .\templates\home.html:336
+msgid "tu negocio siempre abastecido."
+msgstr "your business always stocked."
+
+#: .\templates\home.html:374
+msgid "Gran variedad de productos latinos"
+msgstr "A wide variety of Latin products"
+
+#: .\templates\home.html:375
+msgid "listos para tu negocio."
+msgstr "ready for your business."
+
+#: .\templates\home.html:402
+msgid "Precios Competitivos"
+msgstr "Competitive Prices"
+
+#: .\templates\home.html:403
+msgid "Márgenes atractivos para tu negocio"
+msgstr "Attractive margins for your business"
+
+#: .\templates\home.html:412
+msgid "Precios al por mayor para maximizar"
+msgstr "Wholesale prices to maximize"
+
+#: .\templates\home.html:413
+msgid "las ganancias de tu tienda."
+msgstr "your store’s profits."
+
+#: .\templates\home.html:440
+msgid "Atención Personalizada"
+msgstr "Personalized Service"
+
+#: .\templates\home.html:441
+msgid "Soporte directo y confiable"
+msgstr "Reliable direct support"
+
+#: .\templates\home.html:450
+msgid "Asesoría y soporte directo para"
+msgstr "Guidance and direct support to"
+
+#: .\templates\home.html:451
+msgid "hacer crecer tu negocio."
+msgstr "help your business grow."
+
+#: .\templates\home.html:477
+msgid "Marcas que distribuimos"
+msgstr "Brands We Distribute"
+
+#: .\templates\home.html:510
+msgid "Ofertas Destacadas"
+msgstr "Featured Offers"
+
+#: .\templates\home.html:570
+#: .\templates\vendedores\tomar_pedido_catalogo.html:314
+msgid "Cantidad:"
+msgstr "Quantity:"
+
+#: .\templates\home.html:584 .\templates\productos\catalogo.html:232
+msgid "Añadir a cotización"
+msgstr "Add to Quote"
+
+#: .\templates\home.html:648
+msgid "Que dicen nuestros clientes"
+msgstr "What Our Customers Say"
+
+#: .\templates\home.html:732
+msgid "¿Tienes una tienda? Solicita tu cuenta mayorista hoy"
+msgstr "Do you have a store? Request your wholesale account today"
+
+#: .\templates\home.html:738
+msgid "Crear Cuenta"
+msgstr "Create Account"
+
+#: .\templates\home.html:770
+msgid "La Tortilla Grocery"
+msgstr "La Toritlla Grocery"
+
+#: .\templates\home.html:776
+msgid ""
+"La Tortilla Grocery LLC es un distribuidor mayorista de productos latinos de "
+"confianza."
+msgstr ""
+"La Tortilla Grocery LLC is a trusted wholesale distributor of Latin products."
+
+#: .\templates\home.html:777
+msgid ""
+"Abastecemos tiendas, supermercados y restaurantes con calidad, precios "
+"competitivos"
+msgstr ""
+"We supply stores, supermarkets, and restaurants with quality products and "
+"competitive prices"
+
+#: .\templates\home.html:778
+msgid "y entregas eficientes."
+msgstr "and efficient deliveries."
+
+#: .\templates\home.html:788
+msgid "Compañía"
+msgstr "Company"
+
+#: .\templates\home.html:795
+msgid "Testimonios"
+msgstr "Testimonials"
+
+#: .\templates\home.html:805
+msgid "Legal"
+msgstr "Legal"
+
+#: .\templates\home.html:808
+msgid "Política y Privacidad"
+msgstr "Privacy Policy"
+
+#: .\templates\home.html:809
+msgid "Términos y Condiciones"
+msgstr "Terms and Conditions"
+
+#: .\templates\home.html:819
+msgid "Contactanos"
+msgstr "Contact Us"
+
+#: .\templates\home.html:822
+msgid "1666 Roswell Rd Bldg 100"
+msgstr "1666 Roswell Rd Bldg 100"
+
+#: .\templates\home.html:823
+msgid "Marietta, GA 30062-3639"
+msgstr "Marietta, GA 30062-3639"
+
+#: .\templates\home.html:827
+msgid "latortilla@gmail.com"
+msgstr "latortilla@gmail.com"
+
+#: .\templates\home.html:831
+msgid "+1 (470) 967 2782"
+msgstr "+1 (470) 967 2782"
+
+#: .\templates\home.html:850
+msgid "© 2025 La Tortilla Grocery LLC. Todos los derechos reservados."
+msgstr "© 2025 La Tortilla Grocery LLC. All rights reserved."
+
+#: .\templates\home.html:854
+msgid "Desarrollado por Solutions.com"
+msgstr "Developed by Solutions.com"
+
+#: .\templates\productos\catalogo.html:56
+msgid "Menú"
+msgstr "Menu"
+
+#: .\templates\productos\catalogo.html:120
+#: .\templates\vendedores\tomar_pedido_catalogo.html:122
+msgid "Catálogo de Productos"
+msgstr "Product Catalog"
+
+#: .\templates\productos\catalogo.html:123
+#: .\templates\vendedores\tomar_pedido_catalogo.html:126
+msgid "Explore nuestro inventario mayorista"
+msgstr "Explore our wholesale inventory"
+
+#: .\templates\productos\catalogo.html:136
+#: .\templates\vendedores\tomar_pedido_catalogo.html:140
+msgid "Buscar Productos"
+msgstr "Search Products"
+
+#: .\templates\productos\catalogo.html:140
+#: .\templates\vendedores\tomar_pedido_catalogo.html:147
+msgid "Categoría"
+msgstr "Category"
+
+#: .\templates\productos\catalogo.html:148
+#: .\templates\vendedores\tomar_pedido_catalogo.html:164
+msgid "Marca"
+msgstr "Brand"
+
+#: .\templates\vendedores\clientes.html:19
+msgid "Consulta datos del cliente"
+msgstr "View customer information"
+
+#: .\templates\vendedores\clientes.html:30
+#: .\templates\vendedores\tomar_pedido.html:22
+msgid "Buscar por nombre, empresa o documento"
+msgstr "Search by name, company or document"
+
+#: .\templates\vendedores\clientes.html:36
+msgid "Todos"
+msgstr "All"
+
+#: .\templates\vendedores\clientes.html:40
+msgid "Activos"
+msgstr "Active"
+
+#: .\templates\vendedores\clientes.html:44
+msgid "Inactivos"
+msgstr "Inactive"
+
+#: .\templates\vendedores\clientes.html:67
+#: .\templates\vendedores\tomar_pedido.html:30
+msgid "Cliente"
+msgstr "Customer"
+
+#: .\templates\vendedores\clientes.html:69
+#: .\templates\vendedores\tomar_pedido.html:31
+msgid "Empresa"
+msgstr "Company"
+
+#: .\templates\vendedores\clientes.html:71
+#: .\templates\vendedores\crear_cliente.html:72
+msgid "Correo Electrónico"
+msgstr "Email"
+
+#: .\templates\vendedores\clientes.html:73
+#: .\templates\vendedores\crear_cliente.html:67
+msgid "Teléfono"
+msgstr "Phone"
+
+#: .\templates\vendedores\clientes.html:75
+#: .\templates\vendedores\crear_cliente.html:139
+msgid "Estado"
+msgstr "State"
+
+#: .\templates\vendedores\clientes.html:77
+#: .\templates\vendedores\tomar_pedido.html:32
+#: .\templates\vendedores\tomar_pedido_resumen.html:143
+msgid "Acción"
+msgstr "Action"
+
+#: .\templates\vendedores\clientes.html:108
+msgid "Activo"
+msgstr "Active"
+
+#: .\templates\vendedores\clientes.html:114
+msgid "Inactivo"
+msgstr "Inactive"
+
+#: .\templates\vendedores\clientes.html:124
+msgid "Editar"
+msgstr "Edit"
+
+#: .\templates\vendedores\crear_cliente.html:12
+msgid "Solicitud de Creación de Cliente"
+msgstr "Customer Creation Request"
+
+#: .\templates\vendedores\crear_cliente.html:13
+msgid "Llene todos los campos para la solicitud"
+msgstr "Fill in all fields to submit the request"
+
+#: .\templates\vendedores\crear_cliente.html:23
+msgid "Datos Básicos"
+msgstr "Basic Information"
+
+#: .\templates\vendedores\crear_cliente.html:35
+msgid "Paso 1 de 2"
+msgstr "Step 1 of 2"
+
+#: .\templates\vendedores\crear_cliente.html:52
+msgid "Nombre"
+msgstr "First Name"
+
+#: .\templates\vendedores\crear_cliente.html:57
+msgid "Apellido"
+msgstr "Last Name"
+
+#: .\templates\vendedores\crear_cliente.html:62
+msgid "Documento"
+msgstr "Document"
+
+#: .\templates\vendedores\crear_cliente.html:80
+msgid "Datos de la Empresa"
+msgstr "Company Information"
+
+#: .\templates\vendedores\crear_cliente.html:85
+msgid "Nombre legal"
+msgstr "Legal Name"
+
+#: .\templates\vendedores\crear_cliente.html:90
+msgid "Número de impuestos"
+msgstr "Tax Number"
+
+#: .\templates\vendedores\crear_cliente.html:95
+msgid "Teléfono Comercial"
+msgstr "Business Phone"
+
+#: .\templates\vendedores\crear_cliente.html:100
+msgid "Correo Comercial"
+msgstr "Business Email"
+
+#: .\templates\vendedores\crear_cliente.html:109
+msgid "Continuar"
+msgstr "Continue"
+
+#: .\templates\vendedores\crear_cliente.html:124
+msgid "Dirección Línea 1"
+msgstr "Address Line 1"
+
+#: .\templates\vendedores\crear_cliente.html:129
+msgid "Dirección Línea 2"
+msgstr "Address Line 2"
+
+#: .\templates\vendedores\crear_cliente.html:134
+msgid "Ciudad"
+msgstr "City"
+
+#: .\templates\vendedores\crear_cliente.html:144
+msgid "Código Postal"
+msgstr "Postal Code"
+
+#: .\templates\vendedores\crear_cliente.html:149
+msgid "País"
+msgstr "Country"
+
+#: .\templates\vendedores\crear_cliente.html:157
+msgid "Subir Certificado de Impuesto"
+msgstr "Upload Tax Certificate"
+
+#: .\templates\vendedores\crear_cliente.html:172
+msgid "Confirmo que la información es correcta"
+msgstr "I confirm that the information provided is correct"
+
+#: .\templates\vendedores\crear_cliente.html:180
+msgid "Enviar Solicitud"
+msgstr "Send Request"
+
+#: .\templates\vendedores\tomar_pedido.html:16
+msgid "Paso 1: Seleccionar Cliente"
+msgstr "Step 1: Select Customer"
+
+#: .\templates\vendedores\tomar_pedido.html:59
+msgid "Seleccionar"
+msgstr "Select"
+
+#: .\templates\vendedores\tomar_pedido.html:78
+msgid "Cliente:"
+msgstr "Customer:"
+
+#: .\templates\vendedores\tomar_pedido.html:78
+msgid "Sin Seleccionar"
+msgstr "Not Selected"
+
+#: .\templates\vendedores\tomar_pedido_catalogo.html:40
+#: .\templates\vendedores\tomar_pedido_resumen.html:41
+msgid "Pedido"
+msgstr "Order"
+
+#: .\templates\vendedores\tomar_pedido_catalogo.html:96
+msgid "Cliente Seleccionado:"
+msgstr "Selected Customer:"
+
+#: .\templates\vendedores\tomar_pedido_catalogo.html:104
+#: .\templates\vendedores\tomar_pedido_resumen.html:121
+msgid "Cambiar Cliente"
+msgstr "Change Customer"
+
+#: .\templates\vendedores\tomar_pedido_catalogo.html:242
+msgid "Presentación:"
+msgstr "Packaging:"
+
+#: .\templates\vendedores\tomar_pedido_catalogo.html:276
+msgid "Precio:"
+msgstr "Price:"
+
+#: .\templates\vendedores\tomar_pedido_catalogo.html:283
+msgid "Seleccionar precio"
+msgstr "Select Price"
+
+#: .\templates\vendedores\tomar_pedido_catalogo.html:287
+#: .\templates\vendedores\tomar_pedido_catalogo.html:291
+#: .\templates\vendedores\tomar_pedido_catalogo.html:295
+#: .\templates\vendedores\tomar_pedido_catalogo.html:299
+#: .\templates\vendedores\tomar_pedido_catalogo.html:303
+#: .\templates\vendedores\tomar_pedido_resumen.html:141
+msgid "Precio"
+msgstr "Price"
+
+#: .\templates\vendedores\tomar_pedido_catalogo.html:332
+msgid "Agregar al Pedido"
+msgstr "Add to Order"
+
+#: .\templates\vendedores\tomar_pedido_catalogo.html:356
+#: .\templates\vendedores\tomar_pedido_resumen.html:13
+#: .\templates\vendedores\tomar_pedido_resumen.html:106
+msgid "Resumen del Pedido"
+msgstr "Order Summary"
+
+#: .\templates\vendedores\tomar_pedido_catalogo.html:358
+msgid "productos"
+msgstr "products"
+
+#: .\templates\vendedores\tomar_pedido_catalogo.html:374
+msgid "Ver Pedido"
+msgstr "View Order"
+
+#: .\templates\vendedores\tomar_pedido_resumen.html:116
+msgid "Cliente Seleccionado"
+msgstr "Selected Customer"
+
+#: .\templates\vendedores\tomar_pedido_resumen.html:142
+#: .\templates\vendedores\tomar_pedido_resumen.html:308
+msgid "Subtotal"
+msgstr "Subtotal"
+
+#: .\templates\vendedores\tomar_pedido_resumen.html:283
+msgid "Orden tomada en persona"
+msgstr "Order taken in person"
+
+#: .\templates\vendedores\tomar_pedido_resumen.html:293
+msgid "Orden telefónica"
+msgstr "Phone order"
+
+#: .\templates\vendedores\tomar_pedido_resumen.html:318
+msgid "IVA"
+msgstr "Tax"
+
+#: .\templates\vendedores\tomar_pedido_resumen.html:328
+msgid "Total"
+msgstr "Total"
+
+#: .\templates\vendedores\tomar_pedido_resumen.html:345
+msgid "Seguir Agregando Productos"
+msgstr "Continue Adding Products"
+
+#: .\templates\vendedores\tomar_pedido_resumen.html:349
+msgid "Enviar Pedido"
+msgstr "Send Order"
+
+#: .\templates\vendedores\tomar_pedido_resumen.html:368
+msgid "Pedido enviado correctamente"
+msgstr "Order sent successfully"
+
+#~ msgid ""
+#~ "Ofrecemos productos y servicios mayoristas de alta calidad, adaptados a "
+#~ "sus necesidades."
+#~ msgstr ""
+#~ "We provide high-quality wholesale products and services tailored to their "
+#~ "needs."
+
+#~ msgid ""
+#~ "Nos enfocamos en brindar soluciones eficientes para que su negocio crezca "
+#~ "y prospere"
+#~ msgstr ""
+#~ "Our focus is on delivering efficient solutions to help your business grow"
+
+#~ msgid "en un mercado competitivo."
+#~ msgstr "and thrive in a competitive market."
+msgid "caja"
+msgstr "box"

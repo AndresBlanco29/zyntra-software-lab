@@ -13,7 +13,8 @@ def ver_cotizacion(request):
 
         producto = Producto.objects.get(id=producto_id)
 
-        subtotal = item["precio"] * item["cantidad"]
+        precio = item.get("precio", 0)
+        subtotal = precio * item["cantidad"]
         total += subtotal
 
         carrito_items.append({
@@ -21,7 +22,7 @@ def ver_cotizacion(request):
             "producto": producto,
             "nombre": item["nombre"],
             "presentacion_id": item["presentacion_id"],
-            "precio": item["precio"],
+            "precio": precio,
             "cantidad": item["cantidad"],
             "subtotal": subtotal,
         })
@@ -35,6 +36,7 @@ def ver_cotizacion(request):
 
 @require_POST
 def actualizar_cantidad(request):
+
     producto_id = request.POST.get("producto_id")
     accion = request.POST.get("accion")
 
@@ -45,25 +47,31 @@ def actualizar_cantidad(request):
         if accion == "sumar":
             carrito[producto_id]["cantidad"] += 1
 
-        elif accion == "restar" and carrito[producto_id]["cantidad"] > 1:
-            carrito[producto_id]["cantidad"] -= 1
+        elif accion == "restar":
+            if carrito[producto_id]["cantidad"] > 1:
+                carrito[producto_id]["cantidad"] -= 1
 
-        precio = float(carrito[producto_id]["precio"])
+        presentacion_id = carrito[producto_id].get("presentacion_id")
+
+        if presentacion_id:
+            presentacion = Presentacion.objects.get(id=presentacion_id)
+
+        precio = carrito[producto_id].get("precio", 0)
         cantidad = carrito[producto_id]["cantidad"]
+
         subtotal = precio * cantidad
 
-        carrito[producto_id]["subtotal"] = subtotal
-        request.session["carrito"] = carrito
+    else:
+        subtotal = 0
+        cantidad = 0
 
-        total = sum(item["precio"] * item["cantidad"] for item in carrito.values())
+    request.session["carrito"] = carrito
 
-        return JsonResponse({
-            "cantidad": cantidad,
-            "subtotal": subtotal,
-            "total": total
-        })
-
-    return JsonResponse({"error": True})
+    return JsonResponse({
+        "success": True,
+        "cantidad": cantidad,
+        "subtotal": subtotal
+    })
 
 @require_POST
 def cambiar_presentacion(request):
@@ -78,21 +86,21 @@ def cambiar_presentacion(request):
         presentacion = Presentacion.objects.get(id=presentacion_id)
 
         carrito[producto_id]["presentacion_id"] = presentacion.id
-        carrito[producto_id]["precio"] = float(presentacion.precio)
+        carrito[producto_id]["precio"] = float(presentacion.precio_1)
 
         cantidad = carrito[producto_id]["cantidad"]
-        subtotal = float(presentacion.precio) * cantidad
+        subtotal = float(presentacion.precio_1) * cantidad
 
         carrito[producto_id]["subtotal"] = subtotal
         request.session["carrito"] = carrito
 
         total = sum(
-            item["precio"] * item["cantidad"]
+            item.get("precio", 0) * item["cantidad"]
             for item in carrito.values()
         )
 
         return JsonResponse({
-            "precio": presentacion.precio,
+            "precio": presentacion.precio_1,
             "subtotal": subtotal,
             "total": total
         })
@@ -101,20 +109,21 @@ def cambiar_presentacion(request):
 
 @require_POST
 def eliminar_producto(request):
+
     producto_id = request.POST.get("producto_id")
 
     carrito = request.session.get("carrito", {})
 
     if producto_id in carrito:
         del carrito[producto_id]
-        request.session["carrito"] = carrito
 
-    total = sum(item["precio"] * item["cantidad"] for item in carrito.values())
+    request.session["carrito"] = carrito
+
+    total_items = sum(item["cantidad"] for item in carrito.values())
 
     return JsonResponse({
         "success": True,
-        "total": total,
-        "total_items": sum(item["cantidad"] for item in carrito.values())
+        "total_items": total_items
     })
 
 @require_POST
@@ -139,7 +148,7 @@ def agregar_carrito(request):
             "nombre": producto.nombre,
             "presentacion_id": presentacion_id,
             "presentacion_nombre": presentacion.nombre,
-            "precio": float(presentacion.precio),
+            "precio": float(presentacion.precio_1),
             "cantidad": cantidad,
         }
 

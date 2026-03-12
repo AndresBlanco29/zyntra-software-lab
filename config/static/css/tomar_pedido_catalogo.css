@@ -1,0 +1,118 @@
+body { 
+    background:#f4f6f9;
+    padding-bottom: 120px; 
+}
+
+.navbar-custom{
+    position:fixed;
+    top:0;
+    left:0;
+    right:0;
+    z-index:1000;
+}
+
+.sidebar{
+
+    position:fixed;
+
+    top:70px; /* altura del navbar */
+    left:0;
+
+    width:250px;
+    height:calc(100vh - 70px);
+
+    overflow-y:auto;
+
+}
+
+.sidebar .active {
+    background:#1f4fa3 !important;
+    color:white !important;
+    border-left:4px solid #ffd400;
+}
+
+.custom-card {
+    border-radius:14px;
+    box-shadow:0 10px 30px rgba(0,0,0,0.08);
+}
+
+.table thead {
+    background:#dcdcdc;
+}
+
+.col-md-10{
+
+    margin-left:250px;
+    margin-top:70px;
+
+}
+
+.pedido-bar{
+
+position:fixed;
+
+bottom:25px;
+left:260px;
+right:40px;
+
+background:linear-gradient(90deg,#0b3d91,#1e63c6);
+
+color:white;
+
+display:flex;
+align-items:center;
+justify-content:space-between;
+
+padding:18px 30px;
+
+border-radius:12px;
+
+box-shadow:0 10px 30px rgba(0,0,0,0.25);
+
+z-index:999;
+
+transition:all .25s ease;
+
+}
+
+.pedido-bar:hover{
+
+transform:translateY(-2px);
+
+}
+
+.pedido-info{
+
+font-size:18px;
+font-weight:600;
+
+}
+
+.pedido-total{
+
+font-size:22px;
+font-weight:bold;
+
+}
+
+.pedido-bar .btn{
+
+background:#ffd400;
+border:none;
+
+font-weight:700;
+
+padding:10px 24px;
+
+border-radius:8px;
+
+transition:all .2s;
+
+}
+
+.pedido-bar .btn:hover{
+
+background:#f2c200;
+transform:scale(1.05);
+
+}

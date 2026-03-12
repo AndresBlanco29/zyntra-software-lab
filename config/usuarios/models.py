@@ -3,6 +3,17 @@ from django.db import models
 
 class Usuario(AbstractUser):
 
+    ROLE_CHOICES = (
+        ('vendedor', 'Vendedor'),
+        ('cliente', 'Cliente'),
+    )
+
+    role = models.CharField(
+        max_length=20,
+        choices=ROLE_CHOICES,
+        default='cliente'
+    )
+
     telefono = models.CharField(
         max_length=20,
         blank=True,
@@ -27,3 +38,4 @@ class Usuario(AbstractUser):
 
     def __str__(self):
         return self.username
+    

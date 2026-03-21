@@ -4,6 +4,7 @@ Django settings for config project.
 
 # PyMySQL shim for Django DB compatibility
 import pymysql
+pymysql.version_info = (2, 2, 1, 'final', 0)  # Fake version for Django compatibility check
 pymysql.install_as_MySQLdb()
 
 from pathlib import Path

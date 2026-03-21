@@ -139,11 +139,11 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # BASE DE DATOS
 # ========================
 
-mysql_name = os.environ.get('MYSQLDATABASE', 'railway')
-mysql_user = os.environ.get('MYSQLUSER', 'root')
-mysql_password = os.environ.get('MYSQLPASSWORD', 'riSbmjFMZydEmmlHSexVtKbZbGDDwPgp')
-mysql_host = os.environ.get('MYSQLHOST', 'ballast.proxy.rlwy.net')
-mysql_port = os.environ.get('MYSQLPORT', '52966')
+mysql_name = os.environ.get('MYSQLDATABASE', '')
+mysql_user = os.environ.get('MYSQLUSER', '')
+mysql_password = os.environ.get('MYSQLPASSWORD', '')
+mysql_host = os.environ.get('MYSQLHOST', '')
+mysql_port = os.environ.get('MYSQLPORT', '')
 db_conn_max_age = env_int('DB_CONN_MAX_AGE', 600)
 view_cache_timeout = env_int('VIEW_CACHE_TIMEOUT', 60)
 
@@ -277,5 +277,3 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-ALLOWED_HOSTS = ['*']

@@ -2,6 +2,10 @@
 Django settings for config project.
 """
 
+# PyMySQL shim for Django DB compatibility
+import pymysql
+pymysql.install_as_MySQLdb()
+
 from pathlib import Path
 import os
 

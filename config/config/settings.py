@@ -44,6 +44,10 @@ SERVE_MEDIA = env_bool('SERVE_MEDIA', True)
 allowed_hosts = os.environ.get('ALLOWED_HOSTS', '')
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts.split(',') if host.strip()]
 
+railway_domain = 'tortilla-erp-production.up.railway.app'
+if railway_domain not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(railway_domain)
+
 if DEBUG:
     for host in ('127.0.0.1', 'localhost'):
         if host not in ALLOWED_HOSTS:
@@ -54,6 +58,10 @@ if not ALLOWED_HOSTS:
 
 csrf_trusted_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
 CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_trusted_origins.split(',') if origin.strip()]
+
+railway_origin = f'https://{railway_domain}'
+if railway_origin not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(railway_origin)
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True

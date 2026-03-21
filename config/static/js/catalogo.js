@@ -52,8 +52,9 @@ document.addEventListener('DOMContentLoaded', function() {
         let marcas = document.querySelectorAll("#filtroMarca option");
 
         marcas.forEach(function (marca) {
-            let categoriaMarca = marca.dataset.categoria;
-            marca.style.display = (categoriaSeleccionada === "" || categoriaMarca === categoriaSeleccionada) ? "" : "none";
+            let categoriaMarca = (marca.dataset.categoria || "").trim();
+            let categoriasMarca = categoriaMarca ? categoriaMarca.split(/\s+/) : [];
+            marca.style.display = (categoriaSeleccionada === "" || categoriasMarca.includes(categoriaSeleccionada)) ? "" : "none";
         });
     });
 
@@ -76,6 +77,16 @@ document.addEventListener('DOMContentLoaded', function() {
     /* AGREGAR AL CARRITO */
     document.querySelectorAll(".agregar-btn").forEach(btn => {
         btn.addEventListener("click", function () {
+            // Verificar si el usuario está autenticado
+            const isAuthenticated = document.body.dataset.auth === 'true';
+            
+            if (!isAuthenticated) {
+                // Mostrar el modal de login si no está autenticado
+                const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+                loginModal.show();
+                return;
+            }
+
             let card = this.closest(".producto-card");
 
             let producto_id = card.dataset.productoId;
@@ -104,6 +115,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         }, 1200);
                     }
                 });
+        });
+    });
+
+    /* BOTÓN LOGIN PARA INVITADOS */
+    document.querySelectorAll(".agregar-btn-login").forEach(btn => {
+        btn.addEventListener("click", function () {
+            const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+            loginModal.show();
         });
     });
 

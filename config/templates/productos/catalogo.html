@@ -11,13 +11,15 @@
     <!-- Bootstrap -->
     <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/catalogo.css' %}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
 </head>
 
 <body 
 data-lang="{{ LANGUAGE_CODE }}"
 data-agregar-url="{% url 'agregar_a_cotizacion' %}"
-data-csrf="{{ csrf_token }}">
+data-csrf="{{ csrf_token }}"
+data-auth="{{ user.is_authenticated|yesno:'true,false' }}">
 
     <!-- NAVBAR -->
     <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
@@ -25,87 +27,72 @@ data-csrf="{{ csrf_token }}">
         <div class="container-fluid">
 
             <!-- BOTON HAMBURGUESA (solo móvil) -->
-            <button class="btn btn-light d-md-none me-2"
+            <button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn"
                     type="button"
-                    data-bs-toggle="offcanvas"
-                    data-bs-target="#mobileMenu">
+                    id="catalogSidebarToggle"
+                    aria-label="Abrir menu">
 
                 ☰
 
             </button>
 
-            <a class="navbar-brand fw-bold" href="#">
+            <a class="navbar-brand fw-bold" href="/?no_back=1">
                 La Tortilla Grocery
             </a>
 
-            <div class="ms-auto">
+            <div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">
+                {% if user.is_authenticated %}
                 <a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">
                     {% trans "Cotización" %} (<span id="contadorCarrito">{{ carrito|length }}</span>)
                 </a>
+                <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#logoutModal" style="font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
+                    <i class="bi bi-box-arrow-right"></i> {% trans "Cerrar Sesión" %}
+                </button>
+                {% else %}
+                <a href="/?no_back=1" class="btn btn-outline-light me-2">
+                    ← {% trans "Volver al Home" %}
+                </a>
+                {% endif %}
             </div>
 
         </div>
 
     </nav>
 
-    <!-- MENU MOVIL -->
-    <div class="offcanvas offcanvas-start" tabindex="-1" id="mobileMenu">
-
-        <div class="offcanvas-header">
-
-            <h5 class="fw-bold">{% trans "Menú" %}</h5>
-
-            <button type="button"
-                    class="btn-close"
-                    data-bs-dismiss="offcanvas">
-            </button>
-
-        </div>
-
-        <div class="offcanvas-body">
-
-            <div class="list-group">
-
-                <a href="{% url 'catalogo' %}"
-                class="list-group-item list-group-item-action">
-
-                    {% trans "Catálogo" %}
-
-                </a>
-
-                <a href="{% url 'ver_cotizacion' %}"
-                class="list-group-item list-group-item-action">
-
-                    {% trans "Mi Cotización" %}
-
-                </a>
-
-            </div>
-
-        </div>
-
-    </div>
-
     <div class="container-fluid">
         <div class="row">
 
             <!-- SIDEBAR -->
-            <div class="col-md-2 sidebar p-0">
+            <div class="col-md-2 sidebar p-0" id="catalogSidebar">
 
-                <div class="sidebar-user">
-                    {% trans "Tienda Suprema" %}
+                <div class="sidebar-user {% if not user.is_authenticated %}guest-mode{% endif %}">
+
+                {% if user.is_authenticated %}
+                    <i class="bi bi-person-check me-2"></i>{{ user.username }}
+                {% else %}
+                    <i class="bi bi-person-dash me-2"></i>{% trans "Modo Invitado" %}
+                {% endif %}
+
                 </div>
 
                 <div class="list-group list-group-flush">
                     <a href="{% url 'catalogo' %}" class="list-group-item active">
                         {% trans "Catálogo" %}
                     </a>
+                    {% if user.is_authenticated %}
                     <a href="{% url 'ver_cotizacion' %}" class="list-group-item">
                         {% trans "Mi Cotización" %}
                     </a>
+                    {% else %}
+                    <button type="button" class="list-group-item list-group-item-action text-start" onclick="new bootstrap.Modal(document.getElementById('loginModal')).show()">
+                        <i class="bi bi-lock me-2"></i>{% trans "Inicia sesión" %}
+                    </button>
+                    {% endif %}
                 </div>
 
             </div>
+
+            <div class="sidebar-backdrop" id="catalogSidebarBackdrop"></div>
 
             <!-- CONTENIDO -->
             <div class="main-content">
@@ -150,7 +137,7 @@ data-csrf="{{ csrf_token }}">
                             {% for m in marcas %}
                                 <option 
                                     value="{{ m.id }}"
-                                    data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
+                                data-categoria="{{ m.categorias_ids }}"
                                 >
                                     {{ m.nombre_traducido }}
                                 </option>
@@ -190,11 +177,11 @@ data-csrf="{{ csrf_token }}">
                                 </div>
 
                                 <div class="units-text mb-2 info-presentacion">
-                                {% if producto.presentaciones.first %}
-                                {{ producto.presentaciones.first.unidades }}
-                                {{ producto.presentaciones.first.tipo_contenido_traducido }}
+                                {% if producto.primera_presentacion %}
+                                {{ producto.primera_presentacion.unidades }}
+                                {{ producto.primera_presentacion.tipo_contenido_traducido }}
                                 {% trans "por" %}
-                                {{ producto.presentaciones.first.nombre_traducido|lower }}
+                                {{ producto.primera_presentacion.nombre_traducido|lower }}
                                 {% endif %}
                                 </div>
 
@@ -204,7 +191,7 @@ data-csrf="{{ csrf_token }}">
                                     </label>
 
                                     <select class="form-select form-select-sm presentacion-select">
-                                        {% for p in producto.presentaciones.all %}
+                                        {% for p in producto.presentaciones_prefetch %}
                                             <option 
                                                 value="{{ p.id }}"
                                                 data-unidades="{{ p.unidades }}"
@@ -228,9 +215,15 @@ data-csrf="{{ csrf_token }}">
                                     </div>
                                 </div>
 
+                                {% if user.is_authenticated %}
                                 <button class="btn btn-yellow w-100 agregar-btn">
                                    {% trans "Añadir a cotización" %}
                                 </button>
+                                {% else %}
+                                <button type="button" class="btn btn-outline-warning w-100 agregar-btn-login">
+                                   {% trans "Inicia sesión para cotizar" %}
+                                </button>
+                                {% endif %}
 
                             </div>
 
@@ -247,6 +240,38 @@ data-csrf="{{ csrf_token }}">
     <script src="{% static 'js/catalogo.js' %}"></script>
 
     <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var toggleBtn = document.getElementById('catalogSidebarToggle');
+      var sidebar = document.getElementById('catalogSidebar');
+      var backdrop = document.getElementById('catalogSidebarBackdrop');
+
+      if (!toggleBtn || !sidebar || !backdrop) return;
+
+      function closeSidebar() {
+        sidebar.classList.remove('show');
+        backdrop.classList.remove('show');
+      }
+
+      toggleBtn.addEventListener('click', function () {
+        sidebar.classList.toggle('show');
+        backdrop.classList.toggle('show');
+      });
+
+      backdrop.addEventListener('click', closeSidebar);
+
+      sidebar.querySelectorAll('a, button').forEach(function (item) {
+        item.addEventListener('click', closeSidebar);
+      });
+
+      window.addEventListener('resize', function () {
+        if (window.innerWidth > 992) {
+          closeSidebar();
+        }
+      });
+    });
+    </script>
+
+    <script>
 
         function toggleLanguageMenu(){
 
@@ -261,6 +286,37 @@ data-csrf="{{ csrf_token }}">
         }
 
     </script>
+
+<!-- MODAL LOGOUT -->
+<div class="modal fade" id="logoutModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);">
+      <div class="modal-body text-center" style="padding: 3rem 2rem; background: linear-gradient(135deg, #f8f9fa 0%, #e8ecf1 100%);">
+        <div style="font-size: 60px; margin-bottom: 1.5rem;">
+          👋
+        </div>
+        
+        <h5 class="modal-title mb-2" style="color: #0b3d91; font-weight: 700; font-size: 1.5rem;">
+          {% trans "¿Estás seguro de salir?" %}
+        </h5>
+        
+        <p class="text-muted mb-0" style="font-size: 1rem;">
+          {% trans "Se cerrará tu sesión en" %} <strong>La Tortilla Grocery</strong>
+        </p>
+      </div>
+      
+      <div class="modal-footer border-0" style="justify-content: center; gap: 1rem; padding: 1.5rem 2rem; background: #fff;">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="font-weight: 600; border-width: 2px;">
+          {% trans "Cancelar" %}
+        </button>
+        
+        <a href="{% url 'logout' %}" class="btn btn-danger" style="font-weight: 600; padding: 0.5rem 1.5rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
+          <i class="bi bi-box-arrow-right"></i> {% trans "Sí, salir" %}
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
 
    {% get_current_language as LANGUAGE_CODE %}
 
@@ -303,6 +359,439 @@ EN
 
 </div>
 
+<!-- MODAL LOGIN -->
+<div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background: white; border: none; border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);">
+      <button type="button" class="btn-close btn-close-dark position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close" style="z-index: 10;"></button>
+      <div id="loginFormContainer" style="padding: 2rem;">
+        <div class="text-center">
+          <div class="spinner-border" role="status">
+            <span class="visually-hidden">{% trans "Loading..." %}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ERROR DE LOGIN -->
+<div class="modal fade" id="loginErrorModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background: white; border: none; border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);">
+      <div style="padding: 2rem;">
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+          <div style="font-size: 60px; color: #d32f2f; margin-bottom: 1rem;">
+            <i class="bi bi-exclamation-circle"></i>
+          </div>
+          <h3 style="color: #0b3d91; font-weight: 700; margin-bottom: 0.5rem;">{% trans "Credenciales Incorrectas" %}</h3>
+          <p id="loginErrorMessage" style="color: #475569; margin-bottom: 1.5rem; line-height: 1.6;">
+            {% trans "Verifica tu usuario y contraseña. Intenta de nuevo." %}
+          </p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="btn w-100" onclick="cerrarErrorYReintentarCatalogo()" style="background: linear-gradient(to right, #ffe600, #c7c700); border: none; color: #1e293b; font-weight: 700; padding: 12px 20px; border-radius: 8px;">
+            {% trans "Intentar de Nuevo" %}
+          </button>
+          <button type="button" class="btn btn-outline-secondary w-100" data-bs-dismiss="modal" style="border: 2px solid #d4d8e2; color: #475569; font-weight: 600; padding: 12px 20px; border-radius: 8px;">
+            {% trans "Cerrar" %}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Función para cerrar el modal de error y reabrir el modal de login (Catálogo)
+function cerrarErrorYReintentarCatalogo() {
+  const errorModal = bootstrap.Modal.getInstance(document.getElementById('loginErrorModal'));
+  if (errorModal) {
+    errorModal.hide();
+  }
+  
+  // Esperar a que se cierre el modal de error y abrir el modal de login nuevamente
+  setTimeout(function() {
+    const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+    loginModal.show();
+  }, 300);
+}
+
+// Función global para toggle de contraseña
+function togglePassword() {
+  const passwordInput = document.getElementById('password');
+  const toggleIcon = document.getElementById('toggleIcon');
+  
+  if (passwordInput && toggleIcon) {
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      toggleIcon.classList.remove('bi-eye');
+      toggleIcon.classList.add('bi-eye-slash');
+    } else {
+      passwordInput.type = 'password';
+      toggleIcon.classList.remove('bi-eye-slash');
+      toggleIcon.classList.add('bi-eye');
+    }
+  }
+}
+
+// Cargar el formulario de login cuando se abre el modal
+document.getElementById('loginModal').addEventListener('show.bs.modal', function() {
+  const container = document.getElementById('loginFormContainer');
+  
+  if (!container) {
+    return;
+  }
+  
+  // Crear timeout
+  const timeoutId = setTimeout(function() {
+    container.innerHTML = '<div class="alert alert-warning">{% trans "El formulario está tardando mucho." %} <button onclick="location.reload()">{% trans "Recarga" %}</button></div>';
+  }, 8000);
+  
+  fetch('{% url "login" %}', {
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+    .then(function(response) {
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        throw new Error('Error ' + response.status);
+      }
+      return response.text();
+    })
+    .then(function(html) {
+      if (!html || html.trim().length === 0) {
+        throw new Error('Respuesta vacía');
+      }
+      container.innerHTML = html;
+      
+      // Interceptar submit
+      setTimeout(function() {
+        const form = container.querySelector('form');
+        if (form) {
+          form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(form);
+            fetch('{% url "login" %}', {
+              method: 'POST',
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+              },
+              body: formData
+            })
+            .then(async function(response) {
+              const contentType = response.headers.get('content-type') || '';
+
+              if (response.redirected) {
+                window.location.href = response.url;
+                return null;
+              }
+
+              if (contentType.includes('application/json')) {
+                const data = await response.json();
+
+                if (data.success && data.redirect) {
+                  window.location.href = data.redirect;
+                  return null;
+                }
+
+                // Mostrar modal de error con mensaje del backend
+                const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+                if (loginModal) {
+                  loginModal.hide();
+                }
+
+                if (data.message) {
+                  const msg = document.getElementById('loginErrorMessage');
+                  if (msg) {
+                    msg.textContent = data.message;
+                  }
+                }
+
+                const errorModal = new bootstrap.Modal(document.getElementById('loginErrorModal'));
+                errorModal.show();
+                return null;
+              }
+
+              return response.text();
+            })
+            .then(function(html) {
+              if (!html) {
+                return;
+              }
+
+              // Fallback para respuestas HTML (errores de validación)
+              if (html.includes('Credenciales incorrectas') || html.includes('Incorrect credentials')) {
+                const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+                if (loginModal) {
+                  loginModal.hide();
+                }
+                const errorModal = new bootstrap.Modal(document.getElementById('loginErrorModal'));
+                errorModal.show();
+              } else {
+                container.innerHTML = html;
+              }
+            })
+            .catch(function(err) { 
+              console.error(err); 
+            });
+          });
+        }
+      }, 100);
+    })
+    .catch(function(error) {
+      clearTimeout(timeoutId);
+      console.error('Error:', error);
+      container.innerHTML = '<div class="alert alert-danger">{% trans "Error al cargar el formulario de login" %}</div>';
+    });
+});
+
+// Función para cargar el formulario de registro
+function cargarRegistro() {
+  const container = document.getElementById('loginFormContainer');
+  
+  fetch('{% url "registro_modal" %}')
+    .then(response => response.text())
+    .then(html => {
+      container.innerHTML = html;
+      
+      // Interceptar el submit del formulario de registro
+      setTimeout(() => {
+        const form = container.querySelector('#registroForm');
+        if (form) {
+          form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Validar checkbox de términos
+            const checkbox = container.querySelector('input[name="confirmacion"]');
+            if (checkbox && !checkbox.checked) {
+              alert('{% trans "Debes marcar el checkbox para continuar con el registro" %}');
+              return;
+            }
+            
+            const formData = new FormData(form);
+            fetch('{% url "registro_usuario" %}', {
+              method: 'POST',
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+              },
+              body: formData
+            })
+            .then(function(response) {
+              const contentType = response.headers.get('content-type') || '';
+              if (contentType.includes('application/json')) {
+                return response.json().then(function(data) {
+                  return { kind: 'json', data: data };
+                });
+              }
+              return response.text().then(function(html) {
+                return { kind: 'html', html: html };
+              });
+            })
+            .then(function(result) {
+              if (result.kind === 'json') {
+                if (result.data.success) {
+                  mostrarExito();
+                } else if (result.data.error === 'username_exists') {
+                  mostrarErrorUsername(result.data.message);
+                } else {
+                  alert(result.data.message || '{% trans "Error al registrarse" %}');
+                }
+                return;
+              }
+
+              const html = result.html;
+              if (
+                html.includes('Tu solicitud fue enviada') ||
+                html.includes('Your request was submitted') ||
+                html.includes('administrator will review')
+              ) {
+                mostrarExito();
+              } else {
+                container.innerHTML = html;
+              }
+            })
+            .catch(error => {
+              console.error('Error:', error);
+              alert('{% trans "Error al registrarse" %}');
+            });
+          });
+        }
+      }, 100);
+      
+      // Manejo de carga de archivo
+      const fileInput = container.querySelector('#certificado');
+      if (fileInput) {
+        fileInput.addEventListener('change', function() {
+          const nombreDiv = document.getElementById('nombreArchivo');
+          if (nombreDiv) {
+            if (this.files.length > 0) {
+              nombreDiv.textContent = '✓ ' + this.files[0].name;
+              nombreDiv.style.display = 'block';
+              nombreDiv.style.color = '#28a745';
+            }
+          }
+        });
+      }
+    })
+    .catch(error => {
+      console.error('Error cargando formulario de registro:', error);
+      container.innerHTML = '<div class="alert alert-danger">{% trans "Error al cargar el formulario" %}</div>';
+    });
+}
+
+// Función para mostrar error de username existente
+function mostrarErrorUsername(customMessage) {
+  const container = document.getElementById('loginFormContainer');
+  
+  container.innerHTML = `
+    <div style="text-align: center; padding: 2rem;">
+      <div style="font-size: 60px; color: #dc3545; margin-bottom: 1.5rem;">
+        ⚠️
+      </div>
+      
+      <h3 style="color: #0b3d91; font-weight: 700; margin-bottom: 1rem;">
+        {% trans "Error en el Registro" %}
+      </h3>
+      
+      <div style="background: #fff5f5; border-left: 4px solid #dc3545; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; text-align: left;">
+        <p style="color: #dc3545; font-weight: 600; margin: 0 0 0.5rem 0;">
+          ❌ {% trans "Nombre de usuario no disponible" %}
+        </p>
+        <p style="color: #475569; font-size: 14px; margin: 0;">
+          ${customMessage || '{% trans "El nombre de usuario que ingresaste ya está registrado en el sistema. Por favor, intenta con otro nombre de usuario." %}'}
+        </p>
+      </div>
+      
+      <button onclick="cargarRegistro()" style="background: linear-gradient(to right, #ffe600, #c7c700); color: #1e293b; border: none; padding: 12px 32px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 16px;">
+        {% trans "Intentar Nuevamente" %}
+      </button>
+    </div>
+  `;
+}
+
+// Función para mostrar modal de éxito
+function mostrarExito() {
+  const container = document.getElementById('loginFormContainer');
+  
+  container.innerHTML = `
+    <div style="text-align: center; padding: 2rem;">
+      <div style="font-size: 60px; color: #0b3d91; margin-bottom: 1.5rem;">
+        ✓
+      </div>
+      
+      <h3 style="color: #0b3d91; font-weight: 700; margin-bottom: 1rem;">
+        {% trans "¡Solicitud Enviada!" %}
+      </h3>
+      
+      <p style="color: #475569; font-size: 16px; line-height: 1.6; margin-bottom: 1.5rem;">
+        {% trans "Tu solicitud de registro ha sido recibida exitosamente." %}
+      </p>
+      
+      <div style="background: #f0f7ff; border-left: 4px solid #ffd400; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; text-align: left;">
+        <p style="color: #1e4fa8; font-weight: 600; margin: 0 0 0.5rem 0;">
+          📋 {% trans "Información importante" %}
+        </p>
+        <p style="color: #475569; font-size: 14px; margin: 0;">
+          {% trans "Nuestro equipo de administración revisará tus datos y verificará tu información. Recibirás una confirmación en tu correo dentro de 24-48 horas." %}
+        </p>
+      </div>
+      
+      <button onclick="cerrarModal()" style="background: linear-gradient(to right, #ffe600, #c7c700); color: #1e293b; border: none; padding: 12px 32px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 16px;">
+        {% trans "Volver al Home" %}
+      </button>
+    </div>
+  `;
+}
+
+// Función para cerrar el modal
+function cerrarModal() {
+  const modal = document.getElementById('loginModal');
+  const bsModal = bootstrap.Modal.getInstance(modal) || new bootstrap.Modal(modal);
+  bsModal.hide();
+  
+  // Recargar la página después de cerrar el modal para actualizar el estado de autenticación
+  setTimeout(() => {
+    window.location.reload();
+  }, 500);
+}
+
+// Función para volver al login
+function cargarLogin() {
+  const container = document.getElementById('loginFormContainer');
+  
+  fetch('{% url "login" %}')
+    .then(response => response.text())
+    .then(html => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const cardContent = doc.querySelector('.login-card');
+      
+      if (cardContent) {
+        container.innerHTML = cardContent.innerHTML;
+        
+        const logo = container.querySelector('.logo-img');
+        if (logo) {
+          logo.style.width = '120px';
+        }
+        
+        const btn = container.querySelector('.btn-login');
+        if (btn) {
+          btn.style.background = 'linear-gradient(to right, #ffe600, #c7c700)';
+          btn.style.color = '#1e293b';
+          btn.style.fontWeight = 'bold';
+        }
+        
+        const scripts = cardContent.querySelectorAll('script');
+        scripts.forEach(script => {
+          const newScript = document.createElement('script');
+          newScript.textContent = script.textContent;
+          container.appendChild(newScript);
+        });
+        
+        const registerLink = container.querySelector('a[href="#"]');
+        if (registerLink) {
+          registerLink.addEventListener('click', function(e) {
+            e.preventDefault();
+            cargarRegistro();
+          });
+        }
+        
+        const form = container.querySelector('form');
+        if (form) {
+          form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(form);
+            fetch('{% url "login" %}', {
+              method: 'POST',
+              body: formData
+            })
+            .then(response => {
+              if (response.redirected) {
+                window.location.href = response.url;
+              } else {
+                return response.text();
+              }
+            })
+            .then(html => {
+              if (html) {
+                container.innerHTML = html;
+              }
+            })
+            .catch(error => console.error('Error:', error));
+          });
+        }
+      }
+    })
+    .catch(error => {
+      console.error('Error cargando formulario:', error);
+      container.innerHTML = '<div class="alert alert-danger">{% trans "Error al cargar el formulario" %}</div>';
+    });
+}
+</script>
 
 
 </body>

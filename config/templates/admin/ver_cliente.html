@@ -1,0 +1,93 @@
+{% extends "bases/base_vendedor.html" %}
+
+{% block title %}
+Detalle Cliente
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4">Detalle del Cliente</h2>
+
+<div class="card shadow-sm">
+
+<div class="card-body">
+
+<div class="row">
+
+<div class="col-md-6 mb-3">
+<strong>Empresa:</strong><br>
+{{ cliente.nombre_empresa }}
+</div>
+
+<div class="col-md-6 mb-3">
+<strong>Correo:</strong><br>
+{{ cliente.usuario.email }}
+</div>
+
+<div class="col-md-6 mb-3">
+<strong>Teléfono:</strong><br>
+{{ cliente.telefono }}
+</div>
+
+<div class="col-md-6 mb-3">
+<strong>Ciudad:</strong><br>
+{{ cliente.ciudad }}
+</div>
+
+<div class="col-md-6 mb-3">
+<strong>Estado:</strong><br>
+{{ cliente.estado }}
+</div>
+
+<div class="col-md-6 mb-3">
+<strong>Código Postal:</strong><br>
+{{ cliente.codigo_postal }}
+</div>
+
+<div class="col-md-6 mb-3">
+<strong>Sales Tax:</strong><br>
+{{ cliente.sales_tax_number }}
+</div>
+
+<div class="col-md-6 mb-3">
+<strong>País:</strong><br>
+{{ cliente.pais }}
+</div>
+
+</div>
+
+<hr>
+
+<h5 class="mb-3">Certificado de Impuesto</h5>
+
+{% if cliente.certificado_tax %}
+<a href="{{ cliente.certificado_tax.url }}" target="_blank" class="btn btn-info">
+Ver certificado
+</a>
+{% else %}
+<p>No se subió certificado</p>
+{% endif %}
+
+<hr>
+
+<div class="mt-3">
+
+<a href="{% url 'aprobar_cliente' cliente.id %}" class="btn btn-success">
+Aprobar cliente
+</a>
+
+<a href="{% url 'rechazar_cliente' cliente.id %}" class="btn btn-danger">
+Rechazar cliente
+</a>
+
+<a href="{% url 'clientes_pendientes' %}" class="btn btn-secondary">
+Volver
+</a>
+
+</div>
+
+</div>
+
+</div>
+
+{% endblock %}

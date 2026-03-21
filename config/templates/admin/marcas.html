@@ -1,0 +1,91 @@
+{% extends "bases/base_vendedor.html" %}
+
+{% block title %}
+Marcas
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4 admin-toolbar">
+<span>Marcas</span>
+</h2>
+
+<div class="d-flex gap-2 mb-3">
+<a href="{% url 'crear_marca' %}" class="btn btn-primary">
+Crear Marca
+</a>
+
+<a href="{% url 'lista_productos' %}" class="btn btn-secondary">
+Volver a Productos
+</a>
+</div>
+
+<div class="table-responsive">
+
+<table class="table table-striped">
+
+<thead>
+<tr>
+<th>Logo</th>
+<th>Nombre</th>
+<th>Nombre en ingles</th>
+<th>Categorias</th>
+<th>Estado</th>
+<th>Acciones</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for marca in marcas %}
+<tr>
+<td>
+{% if marca.logo %}
+<img src="{{ marca.logo.url }}" alt="{{ marca.nombre }}" style="width: 48px; height: 48px; object-fit: contain;">
+{% else %}
+<span class="text-muted">-</span>
+{% endif %}
+</td>
+
+<td>{{ marca.nombre }}</td>
+<td>{% if marca.nombre_en %}{{ marca.nombre_en }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+
+<td>
+{% for categoria in marca.categorias.all %}
+<span class="badge text-bg-light border me-1">{{ categoria.nombre }}</span>
+{% empty %}
+<span class="text-muted">Sin categorias</span>
+{% endfor %}
+</td>
+
+<td>
+{% if marca.activo %}
+<span class="badge bg-success">Activa</span>
+{% else %}
+<span class="badge bg-secondary">Inactiva</span>
+{% endif %}
+</td>
+
+<td>
+<a href="{% url 'editar_marca' marca.id %}" class="btn btn-sm btn-warning">Editar</a>
+
+{% if marca.activo %}
+<a href="{% url 'desactivar_marca' marca.id %}" class="btn btn-sm btn-danger">Inhabilitar</a>
+{% else %}
+<a href="{% url 'activar_marca' marca.id %}" class="btn btn-sm btn-success">Activar</a>
+{% endif %}
+</td>
+</tr>
+{% empty %}
+<tr>
+<td colspan="6" class="text-center text-muted py-4">No hay marcas registradas</td>
+</tr>
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+{% endblock %}

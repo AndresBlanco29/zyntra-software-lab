@@ -6,6 +6,9 @@ from decimal import Decimal
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.http import JsonResponse
+from django.conf import settings
+from django.utils import timezone
+import pytz
 
 
 def agregar_a_cotizacion(request):
@@ -92,7 +95,7 @@ def guardar_cotizacion(request):
 
     nota = request.POST.get("nota", "")
 
-    cliente = Cliente.objects.first()
+    cliente = Cliente.objects.get(usuario=request.user)
 
     cotizacion = Cotizacion.objects.create(
         cliente=cliente,

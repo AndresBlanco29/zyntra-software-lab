@@ -1,0 +1,80 @@
+body {
+  background-color: #f4f6f9;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 520px;
+  border-radius: 20px;
+  padding: 2rem;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 12px 30px rgba(0.5, 0.5, 0.5, 0.5);
+}
+
+.btn-login {
+  background: linear-gradient(to right, #ffe600, #c7c700);
+  font-weight: bold;
+  border: none;
+}
+
+.btn-login:hover {
+opacity: 0.9;
+}
+
+.logo-img {
+width: 200px;
+}
+
+.form-control{
+background-color:#eef2f7;
+border:1px solid #d9e0e7;
+}
+
+.form-control:focus{
+background-color:#eef2f7;
+border-color:#0d6efd;
+box-shadow:0 0 0 0.15rem rgba(13,110,253,.15);
+}
+
+/*RESPONSIVO TABLETS */
+@media (max-width: 992px) {
+.login-card {
+  max-width: 450px;
+  padding: 1.8rem;
+}
+
+.logo-img {
+  width: 170px;
+}
+}
+
+/* MOVILES */
+@media (max-width: 576px) {
+.login-card {
+  max-width: 100%;
+  padding: 1.5rem;
+  border-radius: 15px;
+}
+
+.logo-img {
+  width: 150px;
+}
+
+h3 {
+  font-size: 1.4rem;
+}
+
+h4 {
+  font-size: 1.2rem;
+}
+
+.form-control-lg {
+  font-size: 1rem;
+  padding: 0.6rem 0.9rem;
+}
+
+.btn-lg {
+  font-size: 1rem;
+  padding: 0.7rem;
+}
+}

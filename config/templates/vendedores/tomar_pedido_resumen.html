@@ -33,6 +33,10 @@ style="margin: 0; padding: 0;">
 
 <div class="container-fluid">
 
+<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="pedidoResumenSidebarToggle" aria-label="Abrir menu">
+☰
+</button>
+
 <a class="navbar-brand fw-bold">
 La Tortilla Grocery
 </a>
@@ -51,7 +55,7 @@ La Tortilla Grocery
 
 <!-- SIDEBAR -->
 
-<div class="sidebar p-0 bg-white">
+<div class="sidebar p-0 bg-white" id="pedidoResumenSidebar">
 
 <div class="sidebar-user">
 {% trans "Vendedor" %} Andrés
@@ -74,6 +78,8 @@ La Tortilla Grocery
 </div>
 
 </div>
+
+<div class="sidebar-backdrop" id="pedidoResumenSidebarBackdrop"></div>
 
 <div class="main-content">
 
@@ -106,7 +112,7 @@ La Tortilla Grocery
 
 
 
-<div class="tabla-productos mb-4">
+<div class="tabla-productos mb-4 table-responsive">
 
 <table class="table align-middle">
 
@@ -334,6 +340,39 @@ ${{ item.subtotal }}
 
 
 <script src="{% static 'js/pedido_resumen.js' %}"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+	const toggleBtn = document.getElementById('pedidoResumenSidebarToggle');
+	const sidebar = document.getElementById('pedidoResumenSidebar');
+	const backdrop = document.getElementById('pedidoResumenSidebarBackdrop');
+
+	if (!toggleBtn || !sidebar || !backdrop) {
+		return;
+	}
+
+	function closeSidebar() {
+		sidebar.classList.remove('show');
+		backdrop.classList.remove('show');
+	}
+
+	toggleBtn.addEventListener('click', function () {
+		sidebar.classList.toggle('show');
+		backdrop.classList.toggle('show');
+	});
+
+	backdrop.addEventListener('click', closeSidebar);
+	sidebar.querySelectorAll('a').forEach(function (link) {
+		link.addEventListener('click', closeSidebar);
+	});
+
+	window.addEventListener('resize', function () {
+		if (window.innerWidth > 992) {
+			closeSidebar();
+		}
+	});
+});
+</script>
 
 <div id="toastPedido" class="toast-pedido">
 {% trans "Pedido enviado correctamente" %} ✔

@@ -1,0 +1,49 @@
+{% extends "bases/base_vendedor.html" %}
+
+{% block title %}
+Crear Categoria
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4">Crear Categoria</h2>
+
+<div class="card shadow-sm">
+<div class="card-body">
+
+{% if error %}
+<div class="alert alert-danger">
+{{ error }}
+</div>
+{% endif %}
+
+<form method="POST">
+
+{% csrf_token %}
+
+<div class="mb-3">
+<label class="form-label">Nombre de la categoria</label>
+<input type="text" name="nombre" class="form-control" value="{{ nombre|default:'' }}" required>
+</div>
+
+<div class="mb-3">
+<label class="form-label">Nombre en ingles (opcional)</label>
+<input type="text" name="nombre_en" class="form-control" value="{{ nombre_en|default:'' }}">
+</div>
+
+<div class="d-flex gap-2">
+<button type="submit" class="btn btn-success">
+Guardar Categoria
+</button>
+
+<a href="{% url 'lista_productos' %}" class="btn btn-secondary">
+Volver a Productos
+</a>
+</div>
+
+</form>
+
+</div>
+</div>
+
+{% endblock %}

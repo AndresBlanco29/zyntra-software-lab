@@ -1,0 +1,116 @@
+{% extends "bases/base_vendedor.html" %}
+
+{% block title %}
+Editar Banner y Textos Home
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4">Editar Banner y Textos del Home</h2>
+
+{% if messages %}
+  {% for message in messages %}
+  <div class="alert alert-success">{{ message }}</div>
+  {% endfor %}
+{% endif %}
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="POST">
+      {% csrf_token %}
+
+      <h5 class="mb-3">Hero principal</h5>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Titulo principal (ES)</label>
+          <input type="text" name="hero_titulo_principal" class="form-control" value="{{ contenido.hero_titulo_principal }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Titulo resaltado (ES)</label>
+          <input type="text" name="hero_titulo_resaltado" class="form-control" value="{{ contenido.hero_titulo_resaltado }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Titulo final (ES)</label>
+          <input type="text" name="hero_titulo_final" class="form-control" value="{{ contenido.hero_titulo_final }}">
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label">Titulo principal (EN)</label>
+          <input type="text" name="hero_titulo_principal_en" class="form-control" value="{{ contenido.hero_titulo_principal_en|default:'' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Titulo resaltado (EN)</label>
+          <input type="text" name="hero_titulo_resaltado_en" class="form-control" value="{{ contenido.hero_titulo_resaltado_en|default:'' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Titulo final (EN)</label>
+          <input type="text" name="hero_titulo_final_en" class="form-control" value="{{ contenido.hero_titulo_final_en|default:'' }}">
+        </div>
+
+        <div class="col-md-8">
+          <label class="form-label">Subtitulo (ES)</label>
+          <input type="text" name="hero_subtitulo" class="form-control" value="{{ contenido.hero_subtitulo }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Boton hero (ES)</label>
+          <input type="text" name="hero_boton_texto" class="form-control" value="{{ contenido.hero_boton_texto }}">
+        </div>
+
+        <div class="col-md-8">
+          <label class="form-label">Subtitulo (EN)</label>
+          <input type="text" name="hero_subtitulo_en" class="form-control" value="{{ contenido.hero_subtitulo_en|default:'' }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Boton hero (EN)</label>
+          <input type="text" name="hero_boton_texto_en" class="form-control" value="{{ contenido.hero_boton_texto_en|default:'' }}">
+        </div>
+      </div>
+
+      <hr class="my-4">
+
+      <h5 class="mb-3">CTA mayorista</h5>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Titulo CTA (ES)</label>
+          <input type="text" name="cta_titulo" class="form-control" value="{{ contenido.cta_titulo }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Titulo CTA (EN)</label>
+          <input type="text" name="cta_titulo_en" class="form-control" value="{{ contenido.cta_titulo_en|default:'' }}">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Boton crear cuenta (ES)</label>
+          <input type="text" name="cta_boton_registro_texto" class="form-control" value="{{ contenido.cta_boton_registro_texto }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Boton crear cuenta (EN)</label>
+          <input type="text" name="cta_boton_registro_texto_en" class="form-control" value="{{ contenido.cta_boton_registro_texto_en|default:'' }}">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Boton catalogo (ES)</label>
+          <input type="text" name="cta_boton_catalogo_texto" class="form-control" value="{{ contenido.cta_boton_catalogo_texto }}">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Boton catalogo (EN)</label>
+          <input type="text" name="cta_boton_catalogo_texto_en" class="form-control" value="{{ contenido.cta_boton_catalogo_texto_en|default:'' }}">
+        </div>
+
+        <div class="col-12">
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" name="activo" id="activo" {% if contenido.activo %}checked{% endif %}>
+            <label class="form-check-label" for="activo">Contenido activo</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-success">Guardar cambios</button>
+        <a href="{% url 'contenido_home' %}" class="btn btn-secondary">Volver</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

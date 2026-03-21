@@ -2,19 +2,32 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from .models import Usuario
 
+
 @admin.register(Usuario)
 class UsuarioAdmin(UserAdmin):
 
     list_display = (
         'username',
         'email',
-        'get_grupos',
+        'get_role_display',
         'telefono',
         'documento',
         'is_active',
     )
 
-    def get_grupos(self, obj):
-        return ", ".join([g.name for g in obj.groups.all()])
+    fieldsets = UserAdmin.fieldsets + (
+        ('Información adicional', {
+            'fields': ('role', 'telefono', 'documento')
+        }),
+    )
 
-    get_grupos.short_description = "Roles"
+    add_fieldsets = UserAdmin.add_fieldsets + (
+        ('Información adicional', {
+            'fields': ('role', 'telefono', 'documento')
+        }),
+    )
+
+    def get_role_display(self, obj):
+        return obj.get_role_display()
+
+    get_role_display.short_description = "Rol"

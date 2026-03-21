@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.translation import get_language
 
 
 class Testimonio(models.Model):
@@ -11,7 +12,18 @@ class Testimonio(models.Model):
         null=True
     )
 
+    negocio_en = models.CharField(
+        max_length=150,
+        blank=True,
+        null=True
+    )
+
     comentario = models.TextField()
+
+    comentario_en = models.TextField(
+        blank=True,
+        null=True
+    )
 
     estrellas = models.IntegerField(
         default=5
@@ -38,5 +50,96 @@ class Testimonio(models.Model):
     class Meta:
         ordering = ["orden", "-creado"]
 
+    @property
+    def negocio_traducido(self):
+        if get_language().startswith("en") and self.negocio_en:
+            return self.negocio_en
+        return self.negocio
+
+    @property
+    def comentario_traducido(self):
+        if get_language().startswith("en") and self.comentario_en:
+            return self.comentario_en
+        return self.comentario
+
     def __str__(self):
         return f"{self.nombre} - {self.negocio}"
+
+
+class HomeContenido(models.Model):
+
+    hero_titulo_principal = models.CharField(max_length=120, default="Tu Mayorista de")
+    hero_titulo_principal_en = models.CharField(max_length=120, blank=True, null=True)
+
+    hero_titulo_resaltado = models.CharField(max_length=120, default="Productos Latinos")
+    hero_titulo_resaltado_en = models.CharField(max_length=120, blank=True, null=True)
+
+    hero_titulo_final = models.CharField(max_length=120, default="de Confianza")
+    hero_titulo_final_en = models.CharField(max_length=120, blank=True, null=True)
+
+    hero_subtitulo = models.CharField(
+        max_length=220,
+        default="Haz tus pedidos de forma rapida y segura. Compras al por mayor.",
+    )
+    hero_subtitulo_en = models.CharField(max_length=220, blank=True, null=True)
+
+    hero_boton_texto = models.CharField(max_length=80, default="Ver Catalogo")
+    hero_boton_texto_en = models.CharField(max_length=80, blank=True, null=True)
+
+    cta_titulo = models.CharField(
+        max_length=220,
+        default="Tienes una tienda? Solicita tu cuenta mayorista hoy",
+    )
+    cta_titulo_en = models.CharField(max_length=220, blank=True, null=True)
+
+    cta_boton_registro_texto = models.CharField(max_length=80, default="Crear Cuenta")
+    cta_boton_registro_texto_en = models.CharField(max_length=80, blank=True, null=True)
+
+    cta_boton_catalogo_texto = models.CharField(max_length=80, default="Ver Catalogo")
+    cta_boton_catalogo_texto_en = models.CharField(max_length=80, blank=True, null=True)
+
+    activo = models.BooleanField(default=True)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-actualizado"]
+
+    def _translated(self, es_value, en_value):
+        if get_language().startswith("en") and en_value:
+            return en_value
+        return es_value
+
+    @property
+    def hero_titulo_principal_traducido(self):
+        return self._translated(self.hero_titulo_principal, self.hero_titulo_principal_en)
+
+    @property
+    def hero_titulo_resaltado_traducido(self):
+        return self._translated(self.hero_titulo_resaltado, self.hero_titulo_resaltado_en)
+
+    @property
+    def hero_titulo_final_traducido(self):
+        return self._translated(self.hero_titulo_final, self.hero_titulo_final_en)
+
+    @property
+    def hero_subtitulo_traducido(self):
+        return self._translated(self.hero_subtitulo, self.hero_subtitulo_en)
+
+    @property
+    def hero_boton_texto_traducido(self):
+        return self._translated(self.hero_boton_texto, self.hero_boton_texto_en)
+
+    @property
+    def cta_titulo_traducido(self):
+        return self._translated(self.cta_titulo, self.cta_titulo_en)
+
+    @property
+    def cta_boton_registro_texto_traducido(self):
+        return self._translated(self.cta_boton_registro_texto, self.cta_boton_registro_texto_en)
+
+    @property
+    def cta_boton_catalogo_texto_traducido(self):
+        return self._translated(self.cta_boton_catalogo_texto, self.cta_boton_catalogo_texto_en)
+
+    def __str__(self):
+        return f"Home contenido ({'activo' if self.activo else 'inactivo'})"

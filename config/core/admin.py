@@ -5,6 +5,22 @@ from .models import Testimonio
 @admin.register(Testimonio)
 class TestimonioAdmin(admin.ModelAdmin):
 
+    fieldsets = (
+        (None, {
+            "fields": (
+                "nombre",
+                "negocio",
+                "negocio_en",
+                "comentario",
+                "comentario_en",
+                "estrellas",
+                "foto",
+                "activo",
+                "orden",
+            )
+        }),
+    )
+
     list_display = (
         "nombre",
         "negocio",
@@ -26,5 +42,7 @@ class TestimonioAdmin(admin.ModelAdmin):
     search_fields = (
         "nombre",
         "negocio",
-        "comentario"
+        "negocio_en",
+        "comentario",
+        "comentario_en"
     )

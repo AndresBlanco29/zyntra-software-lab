@@ -1,30 +1,627 @@
-from django.contrib.auth import authenticate, login
-from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login, logout
+from django.core.cache import cache
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.contrib.auth.models import Group
+from .models import Usuario
+from clientes.models import Cliente
+from core.models import Testimonio, HomeContenido
+from productos.models import Producto, Marca
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.hashers import make_password
+from django.http import JsonResponse
+from django.urls import reverse
+from django.utils.translation import gettext as _
+
+
+def _get_or_create_home_contenido():
+    contenido = HomeContenido.objects.order_by('-actualizado').first()
+    if contenido is None:
+        contenido = HomeContenido.objects.create(activo=True)
+    return contenido
+
+@login_required
+def panel_admin(request):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    clientes_pendientes = Cliente.objects.filter(aprobado=False).count()
+    clientes_aprobados = Cliente.objects.filter(aprobado=True).count()
+    vendedores = Usuario.objects.filter(role='vendedor').count()
+    productos = Producto.objects.count()
+
+    context = {
+        'clientes_pendientes': clientes_pendientes,
+        'clientes_aprobados': clientes_aprobados,
+        'vendedores': vendedores,
+        'productos': productos
+    }
+
+    return render(request, 'admin/dashboard.html', context)
+
+
+@login_required
+def contenido_home(request):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    context = {
+        'marcas_activas': Marca.objects.filter(activo=True).count(),
+        'marcas_inactivas': Marca.objects.filter(activo=False).count(),
+        'testimonios_activos': Testimonio.objects.filter(activo=True).count(),
+        'testimonios_inactivos': Testimonio.objects.filter(activo=False).count(),
+        'home_contenido': _get_or_create_home_contenido(),
+    }
+
+    return render(request, 'admin/contenido_home.html', context)
+
+
+@login_required
+def editar_home_contenido(request):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    contenido = _get_or_create_home_contenido()
+
+    if request.method == 'POST':
+        contenido.hero_titulo_principal = (request.POST.get('hero_titulo_principal') or '').strip() or contenido.hero_titulo_principal
+        contenido.hero_titulo_principal_en = (request.POST.get('hero_titulo_principal_en') or '').strip()
+
+        contenido.hero_titulo_resaltado = (request.POST.get('hero_titulo_resaltado') or '').strip() or contenido.hero_titulo_resaltado
+        contenido.hero_titulo_resaltado_en = (request.POST.get('hero_titulo_resaltado_en') or '').strip()
+
+        contenido.hero_titulo_final = (request.POST.get('hero_titulo_final') or '').strip() or contenido.hero_titulo_final
+        contenido.hero_titulo_final_en = (request.POST.get('hero_titulo_final_en') or '').strip()
+
+        contenido.hero_subtitulo = (request.POST.get('hero_subtitulo') or '').strip() or contenido.hero_subtitulo
+        contenido.hero_subtitulo_en = (request.POST.get('hero_subtitulo_en') or '').strip()
+
+        contenido.hero_boton_texto = (request.POST.get('hero_boton_texto') or '').strip() or contenido.hero_boton_texto
+        contenido.hero_boton_texto_en = (request.POST.get('hero_boton_texto_en') or '').strip()
+
+        contenido.cta_titulo = (request.POST.get('cta_titulo') or '').strip() or contenido.cta_titulo
+        contenido.cta_titulo_en = (request.POST.get('cta_titulo_en') or '').strip()
+
+        contenido.cta_boton_registro_texto = (request.POST.get('cta_boton_registro_texto') or '').strip() or contenido.cta_boton_registro_texto
+        contenido.cta_boton_registro_texto_en = (request.POST.get('cta_boton_registro_texto_en') or '').strip()
+
+        contenido.cta_boton_catalogo_texto = (request.POST.get('cta_boton_catalogo_texto') or '').strip() or contenido.cta_boton_catalogo_texto
+        contenido.cta_boton_catalogo_texto_en = (request.POST.get('cta_boton_catalogo_texto_en') or '').strip()
+
+        contenido.activo = True if request.POST.get('activo') else False
+        contenido.save()
+
+        cache.delete('home:contenido')
+        messages.success(request, 'Banners y textos del home actualizados correctamente')
+        return redirect('contenido_home')
+
+    return render(request, 'admin/editar_home_contenido.html', {
+        'contenido': contenido,
+    })
+
+
+@login_required
+def lista_testimonios(request):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    testimonios = Testimonio.objects.all()
+
+    return render(request, 'admin/testimonios.html', {
+        'testimonios': testimonios,
+    })
+
+
+@login_required
+def crear_testimonio(request):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    if request.method == 'POST':
+        nombre = (request.POST.get('nombre') or '').strip()
+        negocio = (request.POST.get('negocio') or '').strip()
+        negocio_en = (request.POST.get('negocio_en') or '').strip()
+        comentario = (request.POST.get('comentario') or '').strip()
+        comentario_en = (request.POST.get('comentario_en') or '').strip()
+        foto = request.FILES.get('foto')
+
+        try:
+            estrellas = int(request.POST.get('estrellas') or 5)
+        except ValueError:
+            estrellas = 5
+
+        try:
+            orden = int(request.POST.get('orden') or 0)
+        except ValueError:
+            orden = 0
+
+        if not nombre or not comentario:
+            return render(request, 'admin/crear_testimonio.html', {
+                'error': 'Nombre y comentario son obligatorios.',
+                'form_data': request.POST,
+            })
+
+        if estrellas < 1:
+            estrellas = 1
+        if estrellas > 5:
+            estrellas = 5
+
+        Testimonio.objects.create(
+            nombre=nombre,
+            negocio=negocio,
+            negocio_en=negocio_en,
+            comentario=comentario,
+            comentario_en=comentario_en,
+            estrellas=estrellas,
+            foto=foto,
+            orden=orden,
+            activo=True if request.POST.get('activo') else False,
+        )
+
+        cache.delete('home:testimonios_activos')
+
+        messages.success(request, 'Testimonio creado correctamente')
+        return redirect('lista_testimonios')
+
+    return render(request, 'admin/crear_testimonio.html')
+
+
+@login_required
+def editar_testimonio(request, testimonio_id):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    testimonio = get_object_or_404(Testimonio, id=testimonio_id)
+
+    if request.method == 'POST':
+        nombre = (request.POST.get('nombre') or '').strip()
+        negocio = (request.POST.get('negocio') or '').strip()
+        negocio_en = (request.POST.get('negocio_en') or '').strip()
+        comentario = (request.POST.get('comentario') or '').strip()
+        comentario_en = (request.POST.get('comentario_en') or '').strip()
+        foto = request.FILES.get('foto')
+
+        try:
+            estrellas = int(request.POST.get('estrellas') or 5)
+        except ValueError:
+            estrellas = 5
+
+        try:
+            orden = int(request.POST.get('orden') or 0)
+        except ValueError:
+            orden = 0
+
+        if not nombre or not comentario:
+            return render(request, 'admin/editar_testimonio.html', {
+                'error': 'Nombre y comentario son obligatorios.',
+                'testimonio': testimonio,
+            })
+
+        if estrellas < 1:
+            estrellas = 1
+        if estrellas > 5:
+            estrellas = 5
+
+        testimonio.nombre = nombre
+        testimonio.negocio = negocio
+        testimonio.negocio_en = negocio_en
+        testimonio.comentario = comentario
+        testimonio.comentario_en = comentario_en
+        testimonio.estrellas = estrellas
+        testimonio.orden = orden
+        testimonio.activo = True if request.POST.get('activo') else False
+        if foto:
+            testimonio.foto = foto
+        testimonio.save()
+
+        cache.delete('home:testimonios_activos')
+
+        messages.success(request, 'Testimonio actualizado correctamente')
+        return redirect('lista_testimonios')
+
+    return render(request, 'admin/editar_testimonio.html', {
+        'testimonio': testimonio,
+    })
+
+
+@login_required
+def desactivar_testimonio(request, testimonio_id):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    testimonio = get_object_or_404(Testimonio, id=testimonio_id)
+    testimonio.activo = False
+    testimonio.save(update_fields=['activo'])
+
+    cache.delete('home:testimonios_activos')
+
+    messages.success(request, 'Testimonio ocultado correctamente')
+    return redirect('lista_testimonios')
+
+
+@login_required
+def activar_testimonio(request, testimonio_id):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    testimonio = get_object_or_404(Testimonio, id=testimonio_id)
+    testimonio.activo = True
+    testimonio.save(update_fields=['activo'])
+
+    cache.delete('home:testimonios_activos')
+
+    messages.success(request, 'Testimonio activado correctamente')
+    return redirect('lista_testimonios')
+
+@login_required
+def crear_vendedor(request):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    if request.method == 'POST':
+
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password = request.POST.get('password')
+        nombre = request.POST.get('nombre')
+        apellido = request.POST.get('apellido')
+        telefono = request.POST.get('telefono')
+
+        if Usuario.objects.filter(username=username).exists():
+            messages.error(request, "El usuario ya existe")
+            return redirect('crear_vendedor')
+
+        Usuario.objects.create(
+            username=username,
+            email=email,
+            password=make_password(password),
+            first_name=nombre,
+            last_name=apellido,
+            telefono=telefono,
+            role='vendedor',
+            is_active=True
+        )
+
+        messages.success(request, "Vendedor creado correctamente")
+
+        return redirect('lista_vendedores')
+
+    return render(request, 'admin/crear_vendedor.html')
+
+@login_required
+def lista_vendedores(request):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    vendedores = Usuario.objects.filter(role='vendedor')
+
+    context = {
+        'vendedores': vendedores
+    }
+
+    return render(request, 'admin/vendedores.html', context)
+
+@login_required
+def editar_vendedor(request, vendedor_id):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    vendedor = get_object_or_404(Usuario, id=vendedor_id, role='vendedor')
+
+    if request.method == 'POST':
+
+        vendedor.first_name = request.POST.get('nombre')
+        vendedor.last_name = request.POST.get('apellido')
+        vendedor.email = request.POST.get('email')
+        vendedor.telefono = request.POST.get('telefono')
+        vendedor.save()
+
+        messages.success(request, "Vendedor actualizado correctamente")
+
+        return redirect('lista_vendedores')
+
+    context = {
+        'vendedor': vendedor
+    }
+
+    return render(request, 'admin/editar_vendedor.html', context)
+
+@login_required
+def desactivar_vendedor(request, vendedor_id):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    vendedor = get_object_or_404(Usuario, id=vendedor_id, role='vendedor')
+    vendedor.is_active = False
+    vendedor.save()
+
+    messages.success(request, f"Vendedor {vendedor.first_name} desactivado")
+
+    return redirect('lista_vendedores')
+
+@login_required
+def activar_vendedor(request, vendedor_id):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    vendedor = get_object_or_404(Usuario, id=vendedor_id, role='vendedor')
+    vendedor.is_active = True
+    vendedor.save()
+
+    messages.success(request, f"Vendedor {vendedor.first_name} activado")
+
+    return redirect('lista_vendedores')
+
+@login_required
+def clientes_pendientes(request):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    clientes = Cliente.objects.filter(aprobado=False)
+
+    context = {
+        'clientes': clientes
+    }
+
+    return render(request, 'admin/clientes_pendientes.html', context)
+
+@login_required
+def aprobar_cliente(request, cliente_id):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    cliente = get_object_or_404(Cliente, id=cliente_id)
+
+    cliente.aprobado = True
+    cliente.save()
+
+    # activar usuario
+    usuario = cliente.usuario
+    usuario.is_active = True
+    usuario.save()
+
+    return redirect('clientes_pendientes')
+
+@login_required
+def rechazar_cliente(request, cliente_id):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    cliente = get_object_or_404(Cliente, id=cliente_id)
+
+    usuario = cliente.usuario
+
+    cliente.delete()
+    usuario.delete()
+
+    return redirect('clientes_pendientes')
+
+@login_required
+def ver_cliente(request, cliente_id):
+
+    if request.user.role != 'admin':
+        return redirect('login')
+
+    cliente = get_object_or_404(Cliente, id=cliente_id)
+
+    context = {
+        'cliente': cliente
+    }
+
+    return render(request, 'admin/ver_cliente.html', context)
 
 #funcion del login
 def login_view(request):
+
     if request.method == 'POST':
+
         username = request.POST.get('username').lower()
         password = request.POST.get('password')
+        
+        # Detectar si es una petición AJAX (para cargar en modal)
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
-        user = authenticate(request, username=username, password=password)
-
-        if user is not None:
-            login(request, user)
+        # Verificar si el usuario existe
+        try:
+            user_exists = Usuario.objects.get(username=username)
+            # Usuario existe, verificar contraseña
+            user = authenticate(request, username=username, password=password)
             
-            if user.groups.filter(name='Cliente').exists():
-                return redirect('catalogo')
+            if user is not None:
+                login(request, user)
+
+                if is_ajax:
+                    # Retornar JSON con éxito y la URL de redirección
+                    if user.role == 'admin':
+                        return JsonResponse({'success': True, 'redirect': reverse('panel_admin')})
+                    elif user.role == 'vendedor':
+                        return JsonResponse({'success': True, 'redirect': reverse('vendedores_clientes')})
+                    elif user.role == 'cliente':
+                        return JsonResponse({'success': True, 'redirect': reverse('catalogo')})
+                    else:
+                        return JsonResponse({'success': True, 'redirect': '/'})
+                else:
+                    # Redirecciones normales
+                    if user.role == 'admin':
+                        return redirect('panel_admin')
+                    elif user.role == 'vendedor':
+                        return redirect('vendedores_clientes')
+                    elif user.role == 'cliente':
+                        return redirect('catalogo')
+                    else:
+                        return redirect('/')
             else:
-                return redirect('')
+                # Usuario existe pero contraseña es incorrecta
+                if is_ajax:
+                    return JsonResponse({'success': False, 'error': 'password_incorrect', 'message': _('Contraseña incorrecta')})
+                else:
+                    messages.error(request, _('Contraseña incorrecta'))
+        
+        except Usuario.DoesNotExist:
+            # Usuario no existe en la base de datos
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': 'user_not_found', 'message': _('El usuario no existe en la base de datos')})
+            else:
+                messages.error(request, _('Usuario no existe'))
 
-        else:
-            messages.error(request, 'Credenciales incorrectas')
+    # Detectar si es una petición AJAX (para cargar en modal)
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    
+    if is_ajax:
+        return render(request, 'usuarios/login_modal_form.html')
+    else:
+        return render(request, 'usuarios/login.html')
 
-    return render(request, 'usuarios/login.html')
+
+# Función de logout personalizada
+def logout_view(request):
+    logout(request)
+    return redirect(f"{reverse('home')}?no_back=1")
+
+
+# Verificar si el username existe
+def verificar_username(request):
+    if request.method == 'POST':
+        username = request.POST.get('username', '')
+        existe = Usuario.objects.filter(username=username).exists()
+        return JsonResponse({'existe': existe})
+    return JsonResponse({'error': _('Método no permitido')}, status=400)
 
 
 #funcion del registro
 def registro_view(request):
+
+    if request.method == 'POST':
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+        username = request.POST.get('username')
+        email = request.POST.get('email')
+        password = request.POST.get('password1')
+        password2 = request.POST.get('password2')
+
+        if Usuario.objects.filter(username=username).exists():
+            message = _("El nombre de usuario ya existe")
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': 'username_exists', 'message': message}, status=400)
+            messages.error(request, message)
+            return redirect('registro')
+
+        print("POST DATA:", request.POST)
+
+        if password != password2:
+            message = _("Las contraseñas no coinciden")
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': 'password_mismatch', 'message': message}, status=400)
+            messages.error(request, message)
+            return redirect('registro')
+
+        nombre = request.POST.get('nombre')
+        apellido = request.POST.get('apellido')
+        telefono = request.POST.get('telefono')
+        documento = request.POST.get('id_cliente')
+
+        
+
+        usuario = Usuario.objects.create_user(
+            username=username,
+            email=email,
+            password=password,
+            first_name=nombre,
+            last_name=apellido
+        )
+
+        usuario.telefono = telefono
+        usuario.documento = documento
+        usuario.role = 'cliente'
+        usuario.is_active = False
+        usuario.save()
+
+        Cliente.objects.create(
+            usuario=usuario,
+            nombre_empresa=request.POST.get('empresa'),
+            telefono=request.POST.get('telefono_comercial'),
+            direccion=request.POST.get('direccion'),
+            ciudad=request.POST.get('ciudad'),
+            estado=request.POST.get('estado'),
+            codigo_postal=request.POST.get('codigo_postal'),
+            pais=request.POST.get('pais'),
+            sales_tax_number=request.POST.get('sales_tax'),
+            certificado_tax=request.FILES.get('certificado')
+        )
+
+        # agregar al grupo cliente
+        grupo = Group.objects.get(name='Cliente')
+        usuario.groups.add(grupo)
+
+        messages.success(
+            request,
+            _("Tu solicitud fue enviada. Un administrador revisará tu cuenta.")
+        )
+
+        if is_ajax:
+            return JsonResponse({'success': True, 'message': _('Tu solicitud fue enviada. Un administrador revisará tu cuenta.')})
+
+        return redirect('login')
+
     return render(request, 'usuarios/registro.html')
+
+
+def login_form_modal(request):
+    """Devuelve solo el formulario de login para cargar en modal"""
+    from django.http import HttpResponse
+    
+    if request.method == 'POST':
+        username = request.POST.get('username', '').lower()
+        password = request.POST.get('password', '')
+        
+        user = authenticate(request, username=username, password=password)
+        
+        if user is not None:
+            login(request, user)
+            
+            # Devolver JSON con redirect
+            import json
+            redirect_url = '/'
+            if user.role == 'admin':
+                redirect_url = '/admin/dashboard/'
+            elif user.role == 'vendedor':
+                redirect_url = '/vendedores/clientes/'
+            elif user.role == 'cliente':
+                redirect_url = '/productos/catalogo/'
+            
+            return HttpResponse(
+                json.dumps({'success': True, 'redirect': redirect_url}),
+                content_type='application/json'
+            )
+        else:
+            import json
+            return HttpResponse(
+                json.dumps({'success': False, 'error': _('Credenciales incorrectas')}),
+                content_type='application/json'
+            )
+    
+    # GET - Devolver solo el formulario
+    return render(request, 'usuarios/login_modal.html')
+
+
+def registro_form_modal(request):
+    """Devuelve solo el formulario de registro para cargar en modal"""
+    # GET - Devolver solo el formulario de registro
+    return render(request, 'usuarios/registro_modal_form.html')
 

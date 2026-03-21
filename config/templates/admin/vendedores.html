@@ -1,0 +1,222 @@
+{% extends "bases/base_vendedor.html" %}
+
+{% block title %}
+Vendedores
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4 admin-toolbar">
+<span>Vendedores</span>
+<div class="admin-toolbar-filters admin-toolbar-filters-narrow">
+  <input 
+    type="text" 
+    id="buscador" 
+    class="form-control" 
+    placeholder="Buscar por nombre o email..."
+  >
+</div>
+</h2>
+
+<a href="{% url 'crear_vendedor' %}" class="btn btn-primary mb-3">
+Crear Vendedor
+</a>
+
+<div class="table-responsive">
+
+<table class="table table-striped">
+
+<thead>
+<tr>
+<th>Nombre</th>
+<th>Email</th>
+<th>Teléfono</th>
+<th>Acciones</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for vendedor in vendedores %}
+
+<tr class="vendedor-row" data-nombre="{{ vendedor.first_name|lower }} {{ vendedor.last_name|lower }}" data-email="{{ vendedor.email|lower }}">
+
+<td>{{ vendedor.first_name }} {{ vendedor.last_name }}</td>
+
+<td>{{ vendedor.email }}</td>
+
+<td>{{ vendedor.telefono }}</td>
+
+<td>
+{% if vendedor.is_active %}
+<a href="{% url 'editar_vendedor' vendedor.id %}" class="btn btn-sm btn-warning">
+Editar
+</a>
+<button type="button"
+class="btn btn-sm btn-danger"
+onclick="abrirConfirmacionVendedor('{{ vendedor.first_name|escapejs }} {{ vendedor.last_name|escapejs }}', '{% url 'desactivar_vendedor' vendedor.id %}', 'desactivar')">
+Desactivar
+</button>
+{% else %}
+<a href="{% url 'editar_vendedor' vendedor.id %}" class="btn btn-sm btn-warning">
+Editar
+</a>
+<button type="button"
+class="btn btn-sm btn-success"
+onclick="abrirConfirmacionVendedor('{{ vendedor.first_name|escapejs }} {{ vendedor.last_name|escapejs }}', '{% url 'activar_vendedor' vendedor.id %}', 'activar')">
+Activar
+</button>
+{% endif %}
+</td>
+
+</tr>
+
+{% empty %}
+
+<tr class="vendedor-row" id="noVendedores">
+<td colspan="4" class="text-center text-muted py-4">No hay vendedores registrados</td>
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+{% for message in messages %}
+{% if message.tags == 'success' %}
+<div id="vendedorSuccessMessage" data-message="{{ message|escapejs }}"></div>
+{% endif %}
+{% endfor %}
+
+<div class="modal fade" id="vendedorSuccessModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border: none; border-radius: 16px; box-shadow: 0 22px 50px rgba(0, 0, 0, 0.25); overflow: hidden;">
+      <div class="modal-body text-center" style="padding: 2.4rem 1.8rem; background: linear-gradient(135deg, #f7fbff 0%, #eaf2ff 100%);">
+        <div style="font-size: 54px; line-height: 1; margin-bottom: 0.9rem;">✅</div>
+        <h4 id="vendedorSuccessTitle" style="color: #0b3d91; font-weight: 700; margin-bottom: 0.55rem;">Operacion completada</h4>
+        <p id="vendedorSuccessText" style="color: #475569; margin: 0; font-size: 15px; line-height: 1.5;">
+          Se ha creado correctamente el vendedor.
+        </p>
+      </div>
+      <div class="modal-footer border-0" style="justify-content: center; background: #ffffff; padding: 1rem 1.4rem 1.4rem;">
+        <button type="button" class="btn" data-bs-dismiss="modal" style="background: linear-gradient(to right, #ffe600, #c7c700); color: #1e293b; border: none; font-weight: 700; padding: 9px 26px; border-radius: 10px;">
+          Continuar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="confirmarVendedorModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border: none; border-radius: 16px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.24); overflow: hidden;">
+      <div class="modal-body text-center" style="padding: 2.2rem 1.8rem; background: linear-gradient(135deg, #f8fbff 0%, #e9f0ff 100%);">
+        <div style="font-size: 52px; line-height: 1; margin-bottom: 0.85rem;">⚠️</div>
+        <h4 id="confirmarVendedorTitle" style="color: #0b3d91; font-weight: 700; margin-bottom: 0.5rem;">Confirmar acción</h4>
+        <p id="confirmarVendedorText" style="color: #475569; margin: 0; font-size: 15px; line-height: 1.5;"></p>
+      </div>
+      <div class="modal-footer border-0" style="justify-content: center; gap: 0.5rem; background: #ffffff; padding: 1rem 1.4rem 1.4rem;">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="font-weight: 600;">Cancelar</button>
+        <a id="confirmarVendedorAction" href="#" class="btn" style="color: white; border: none; font-weight: 700; padding: 9px 22px; border-radius: 10px; background: linear-gradient(to right, #dc2626, #b91c1c);">
+          Confirmar
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function abrirConfirmacionVendedor(nombreCompleto, actionUrl, accion) {
+  const titleNode = document.getElementById("confirmarVendedorTitle");
+  const textNode = document.getElementById("confirmarVendedorText");
+  const actionNode = document.getElementById("confirmarVendedorAction");
+
+  if (!titleNode || !textNode || !actionNode) {
+    return;
+  }
+
+  if (accion === "activar") {
+    titleNode.textContent = "Activar vendedor";
+    textNode.textContent = `¿Deseas activar a ${nombreCompleto}?`;
+    actionNode.textContent = "Si, activar";
+    actionNode.style.background = "linear-gradient(to right, #0b3d91, #1565c0)";
+  } else {
+    titleNode.textContent = "Desactivar vendedor";
+    textNode.textContent = `¿Deseas desactivar a ${nombreCompleto}?`;
+    actionNode.textContent = "Si, desactivar";
+    actionNode.style.background = "linear-gradient(to right, #dc2626, #b91c1c)";
+  }
+
+  actionNode.setAttribute("href", actionUrl);
+
+  const modal = new bootstrap.Modal(document.getElementById("confirmarVendedorModal"));
+  modal.show();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  function filtrarVendedores() {
+    let texto = document.getElementById("buscador").value.toLowerCase();
+    let vendedores = document.querySelectorAll(".vendedor-row:not(#noVendedores)");
+    let visibleCount = 0;
+
+    vendedores.forEach(function (vendedor) {
+      let nombre = vendedor.dataset.nombre;
+      let email = vendedor.dataset.email;
+
+      let coincideTexto = nombre.includes(texto) || email.includes(texto);
+
+      if (coincideTexto) {
+        vendedor.style.display = "";
+        visibleCount++;
+      } else {
+        vendedor.style.display = "none";
+      }
+    });
+
+    // Mostrar u ocultar mensaje de "No hay vendedores"
+    let noVendedoresRow = document.getElementById("noVendedores");
+    if (visibleCount === 0) {
+      noVendedoresRow.style.display = "";
+    } else {
+      noVendedoresRow.style.display = "none";
+    }
+  }
+
+  document.getElementById("buscador").addEventListener("keyup", filtrarVendedores);
+
+  const successNode = document.getElementById("vendedorSuccessMessage");
+  if (successNode) {
+    const titleNode = document.getElementById("vendedorSuccessTitle");
+    const textNode = document.getElementById("vendedorSuccessText");
+    const successMessage = successNode.dataset.message;
+    const normalized = (successMessage || "").toLowerCase();
+
+    if (titleNode) {
+      if (normalized.includes("desactiv")) {
+        titleNode.textContent = "Vendedor desactivado";
+      } else if (normalized.includes("activad")) {
+        titleNode.textContent = "Vendedor activado";
+      } else if (normalized.includes("actualiz")) {
+        titleNode.textContent = "Vendedor actualizado";
+      } else {
+        titleNode.textContent = "Vendedor creado";
+      }
+    }
+
+    if (textNode && successMessage) {
+      textNode.textContent = successMessage;
+    }
+
+    const successModalElement = document.getElementById("vendedorSuccessModal");
+    if (successModalElement) {
+      const successModal = new bootstrap.Modal(successModalElement);
+      successModal.show();
+    }
+  }
+});
+</script>
+
+{% endblock %}

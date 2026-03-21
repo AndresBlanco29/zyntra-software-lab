@@ -1,0 +1,283 @@
+{% extends "bases/base_vendedor.html" %}
+{% load cache %}
+
+{% block title %}
+Editar Producto
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4">Editar Producto</h2>
+
+<div class="card shadow-sm">
+<div class="card-body">
+
+<form method="POST" enctype="multipart/form-data">
+
+{% csrf_token %}
+
+<!-- NOMBRE -->
+
+<div class="mb-3">
+<label class="form-label">Nombre del producto</label>
+<input type="text" name="nombre" class="form-control" value="{{ producto.nombre }}" required>
+</div>
+
+<div class="mb-3">
+<label class="form-label">Nombre en inglés</label>
+<input type="text" name="nombre_en" class="form-control" value="{{ producto.nombre_en }}">
+</div>
+
+<!-- CODIGO DE BARRAS -->
+
+<div class="mb-3">
+<label class="form-label">Código de Barras <span class="text-danger">*</span></label>
+<input type="text" name="codigo_barras" class="form-control" value="{{ producto.codigo_barras }}" placeholder="Ej: 7501234567890" required>
+</div>
+
+<!-- DESCRIPCION -->
+
+<div class="mb-3">
+<label class="form-label">Descripción</label>
+<textarea name="descripcion" class="form-control">{{ producto.descripcion }}</textarea>
+</div>
+
+<div class="mb-3">
+<label class="form-label">Descripción en inglés</label>
+<textarea name="descripcion_en" class="form-control">{{ producto.descripcion_en }}</textarea>
+</div>
+
+<!-- CATEGORIA -->
+
+<div class="mb-3">
+<label class="form-label">Categoría</label>
+
+<select name="categoria" class="form-control">
+
+<option value="">Seleccionar categoría</option>
+
+{% for categoria in categorias %}
+
+<option value="{{ categoria.id }}"
+{% if producto.categoria.id == categoria.id %}selected{% endif %}>
+
+{{ categoria.nombre }}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+</div>
+
+<!-- MARCA -->
+
+<div class="mb-3">
+
+<label class="form-label">Marca</label>
+
+<select name="marca" class="form-control">
+
+<option value="">Seleccionar marca</option>
+
+{% for marca in marcas %}
+
+<option value="{{ marca.id }}"
+{% if producto.marca.id == marca.id %}selected{% endif %}>
+
+{{ marca.nombre }}
+
+</option>
+
+{% endfor %}
+
+</select>
+
+</div>
+
+<!-- IMAGEN -->
+
+<div class="mb-3">
+
+<label class="form-label">Imagen</label>
+
+{% if producto.imagen %}
+
+<div class="mb-2">
+<img src="{{ producto.imagen.url }}" width="100">
+</div>
+{% endif %}
+
+<input type="file" name="imagen" class="form-control">
+
+</div>
+
+<hr class="my-4">
+
+<h4>Presentaciones</h4>
+
+{% for p in presentaciones %}
+
+<div class="card mb-3">
+<div class="card-body">
+
+<input type="hidden" name="presentacion_id" value="{{ p.id }}">
+
+<div class="row">
+
+<div class="col-md-3 mb-3">
+<label class="form-label">Presentación</label>
+<input type="text" name="presentacion_nombre_{{p.id}}" class="form-control" value="{{ p.nombre }}">
+</div>
+
+<div class="col-md-3 mb-3">
+<label class="form-label">Tipo de contenido</label>
+<input type="text" name="tipo_contenido_{{p.id}}" class="form-control" value="{{ p.tipo_contenido }}">
+</div>
+
+<div class="col-md-2 mb-3">
+<label class="form-label">Unidades</label>
+<input type="number" name="unidades_{{p.id}}" class="form-control" value="{{ p.unidades }}">
+</div>
+
+</div>
+
+<div class="row">
+
+<div class="col-md-2 mb-3">
+<label class="form-label">Precio 1</label>
+<input type="number" step="0.01" name="precio1_{{p.id}}" class="form-control" value="{{p.precio_1|stringformat:'f'}}">
+</div>
+
+<div class="col-md-2 mb-3">
+<label class="form-label">Precio 2</label>
+<input type="number" step="0.01" name="precio2_{{p.id}}" class="form-control" value="{{p.precio_2|stringformat:'f'}}">
+</div>
+
+<div class="col-md-2 mb-3">
+<label class="form-label">Precio 3</label>
+<input type="number" step="0.01" name="precio3_{{p.id}}" class="form-control" value="{{p.precio_3|stringformat:'f'}}">
+</div>
+
+<div class="col-md-2 mb-3">
+<label class="form-label">Precio 4</label>
+<input type="number" step="0.01" name="precio4_{{p.id}}" class="form-control" value="{{p.precio_4|stringformat:'f'}}">
+</div>
+
+<div class="col-md-2 mb-3">
+<label class="form-label">Precio 5</label>
+<input type="number" step="0.01" name="precio5_{{p.id}}" class="form-control" value="{{p.precio_5|stringformat:'f'}}">
+</div>
+
+</div>
+
+</div>
+</div>
+
+{% empty %}
+
+<div class="alert alert-warning">
+Este producto no tiene presentaciones aun. Puedes crear la primera presentacion aqui.
+</div>
+
+<div class="card mb-3">
+<div class="card-body">
+
+<div class="row">
+
+<div class="col-md-3 mb-3">
+<label class="form-label">Presentación</label>
+<input type="text" name="presentacion_nueva" class="form-control" placeholder="Ej: Caja, Bolsa, Pack">
+</div>
+
+<div class="col-md-3 mb-3">
+<label class="form-label">Tipo de contenido</label>
+<input type="text" name="tipo_contenido_nuevo" class="form-control" value="unidades">
+</div>
+
+<div class="col-md-2 mb-3">
+<label class="form-label">Unidades</label>
+<input type="number" name="unidades_nuevo" class="form-control" value="1" min="1">
+</div>
+
+</div>
+
+<div class="row">
+
+<div class="col-md-2 mb-3">
+<label class="form-label">Precio 1</label>
+<input type="number" step="0.01" name="precio1_nuevo" class="form-control">
+</div>
+
+<div class="col-md-2 mb-3">
+<label class="form-label">Precio 2</label>
+<input type="number" step="0.01" name="precio2_nuevo" class="form-control">
+</div>
+
+<div class="col-md-2 mb-3">
+<label class="form-label">Precio 3</label>
+<input type="number" step="0.01" name="precio3_nuevo" class="form-control">
+</div>
+
+<div class="col-md-2 mb-3">
+<label class="form-label">Precio 4</label>
+<input type="number" step="0.01" name="precio4_nuevo" class="form-control">
+</div>
+
+<div class="col-md-2 mb-3">
+<label class="form-label">Precio 5</label>
+<input type="number" step="0.01" name="precio5_nuevo" class="form-control">
+</div>
+
+</div>
+
+</div>
+</div>
+
+{% endfor %}
+
+<!-- ESTADO -->
+
+<hr class="my-4">
+
+<div class="mb-3 form-check">
+
+<input type="checkbox" name="activo" class="form-check-input"
+{% if producto.activo %}checked{% endif %}>
+
+<label class="form-check-label">Producto activo</label>
+
+</div>
+
+<div class="mb-3 form-check">
+
+<input type="checkbox" name="destacado" class="form-check-input"
+{% if producto.destacado %}checked{% endif %}>
+
+<label class="form-check-label">Producto destacado</label>
+
+</div>
+
+<div class="mb-3">
+
+<label class="form-label">Descuento (%)</label>
+
+<input type="number" name="descuento" class="form-control" value="{{ producto.descuento }}">
+
+</div>
+
+<button type="submit" class="btn btn-success">
+Guardar cambios
+</button>
+
+<a href="{% url 'lista_productos' %}" class="btn btn-secondary">
+Cancelar
+</a>
+
+</form>
+
+</div>
+</div>
+
+{% endblock %}

@@ -247,6 +247,14 @@ msgstr "Wide Catalog"
 msgid "Productos latinos de alta rotación"
 msgstr "High-demand Latin products"
 
+#: .\templates\home.html:364
+msgid "Variedad Garantizada"
+msgstr "Guaranteed Variety"
+
+#: .\templates\home.html:365
+msgid "Marcas y presentaciones para surtir tu negocio"
+msgstr "Brands and package options to stock your business"
+
 #: .\templates\home.html:335
 msgid "Entregas rápidas y seguras para mantener"
 msgstr "Fast and secure deliveries to keep"
@@ -326,7 +334,7 @@ msgstr "Create Account"
 
 #: .\templates\home.html:770
 msgid "La Tortilla Grocery"
-msgstr "La Toritlla Grocery"
+msgstr "La Tortilla Grocery"
 
 #: .\templates\home.html:776
 msgid ""
@@ -695,3 +703,258 @@ msgstr "Order sent successfully"
 #~ msgstr "and thrive in a competitive market."
 msgid "caja"
 msgstr "box"
+
+msgid "Loading..."
+msgstr "Loading..."
+
+msgid "Acceso a Plataforma"
+msgstr "Platform Access"
+
+msgid "Inicia sesión con tu perfil asignado."
+msgstr "Sign in with your assigned profile."
+
+msgid "Usuario"
+msgstr "Username"
+
+msgid "Ingresa tu usuario"
+msgstr "Enter your username"
+
+msgid "Contraseña"
+msgstr "Password"
+
+msgid "Ingresa tu contraseña"
+msgstr "Enter your password"
+
+msgid "Iniciar Sesión"
+msgstr "Sign In"
+
+msgid "¿No tienes cuenta?"
+msgstr "Don't have an account?"
+
+msgid "Regístrate"
+msgstr "Sign up"
+
+msgid "Crear Cuenta Mayorista"
+msgstr "Create Wholesale Account"
+
+msgid "Estás a tres pasos de formar parte de nuestra red comercial"
+msgstr "You are three steps away from becoming part of our commercial network"
+
+msgid "Paso 1 de 3"
+msgstr "Step 1 of 3"
+
+msgid "Paso 2 de 3"
+msgstr "Step 2 of 3"
+
+msgid "Paso 3 de 3"
+msgstr "Step 3 of 3"
+
+msgid "Nombre*"
+msgstr "First Name*"
+
+msgid "Apellido*"
+msgstr "Last Name*"
+
+msgid "ID (9 Dígitos)*"
+msgstr "ID (9 Digits)*"
+
+msgid "Número de Contacto Móvil*"
+msgstr "Mobile Contact Number*"
+
+msgid "Crear acceso a la plataforma"
+msgstr "Create platform access"
+
+msgid "Usuario*"
+msgstr "Username*"
+
+msgid "Correo electrónico*"
+msgstr "Email*"
+
+msgid "Contraseña*"
+msgstr "Password*"
+
+msgid "Confirmar contraseña*"
+msgstr "Confirm password*"
+
+msgid "Volver"
+msgstr "Back"
+
+msgid "Información Fiscal y Comercial"
+msgstr "Tax and Commercial Information"
+
+msgid "Completa los siguientes datos para validar tu empresa"
+msgstr "Complete the following details to validate your business"
+
+msgid "Datos de la empresa"
+msgstr "Company details"
+
+msgid "Nombre legal de la empresa"
+msgstr "Legal company name"
+
+msgid "Número de impuesto sobre ventas"
+msgstr "Sales tax number"
+
+msgid "Dirección Comercial"
+msgstr "Business Address"
+
+msgid "Dirección Principal"
+msgstr "Primary Address"
+
+msgid "Dirección 2 (opcional)"
+msgstr "Address 2 (optional)"
+
+msgid "EEUU"
+msgstr "USA"
+
+msgid "Certificado de Impuesto sobre Ventas"
+msgstr "Sales Tax Certificate"
+
+msgid "Arrastra o haz clic para subir (PDF o imagen)"
+msgstr "Drag or click to upload (PDF or image)"
+
+msgid "Emitido por el Department of Revenue"
+msgstr "Issued by the Department of Revenue"
+
+msgid "Confirmo que la información es correcta y verificable."
+msgstr "I confirm that the information is correct and verifiable."
+
+msgid "Enviar para Aprobación"
+msgstr "Submit for Approval"
+
+msgid "Formulario o paso no encontrado"
+msgstr "Form or step not found"
+
+msgid "Campos de contraseña no encontrados"
+msgstr "Password fields not found"
+
+msgid "Las contraseñas no coinciden"
+msgstr "Passwords do not match"
+
+msgid "El usuario ya existe. Elige otro."
+msgstr "The username already exists. Choose another one."
+
+msgid "Error al verificar el usuario. Intenta de nuevo."
+msgstr "Error verifying username. Please try again."
+
+msgid "¡Solicitud Recibida!"
+msgstr "Request Received!"
+
+msgid "Tu solicitud de registro fue enviada correctamente."
+msgstr "Your registration request was sent successfully."
+
+msgid "Un administrador revisará tu documentación y te contactará pronto."
+msgstr "An administrator will review your documentation and contact you soon."
+
+msgid "Credenciales Incorrectas"
+msgstr "Incorrect Credentials"
+
+msgid "Verifica tu usuario y contraseña. Intenta de nuevo."
+msgstr "Check your username and password. Please try again."
+
+msgid "Intentar de Nuevo"
+msgstr "Try Again"
+
+msgid "Cerrar"
+msgstr "Close"
+
+msgid "El formulario está tardando mucho."
+msgstr "The form is taking too long."
+
+msgid "Recarga"
+msgstr "Reload"
+
+msgid "Credenciales incorrectas"
+msgstr "Incorrect credentials"
+
+msgid "El usuario no existe en la base de datos"
+msgstr "The user does not exist in the database"
+
+msgid "Contraseña incorrecta"
+msgstr "Incorrect password"
+
+msgid "Error al procesar. Intenta de nuevo."
+msgstr "Processing error. Please try again."
+
+msgid "Error al cargar"
+msgstr "Loading error"
+
+msgid "No se encontró el modal de login"
+msgstr "Login modal was not found"
+
+msgid "No se encontró el contenedor del formulario"
+msgstr "Form container was not found"
+
+msgid "Debes marcar el checkbox para continuar con el registro"
+msgstr "You must check the box to continue with registration"
+
+msgid "Error al registrarse. Intenta de nuevo."
+msgstr "Registration error. Please try again."
+
+msgid "Error al cargar el formulario de registro"
+msgstr "Error loading the registration form"
+
+msgid "Error al cargar el formulario de login"
+msgstr "Error loading the login form"
+
+msgid "Error al registrarse"
+msgstr "Registration error"
+
+msgid "Error al cargar el formulario"
+msgstr "Error loading form"
+
+msgid "Error en el Registro"
+msgstr "Registration Error"
+
+msgid "Nombre de usuario no disponible"
+msgstr "Username not available"
+
+msgid "El nombre de usuario que ingresaste ya está registrado en el sistema. Por favor, intenta con otro nombre de usuario."
+msgstr "The username you entered is already registered in the system. Please try another username."
+
+msgid "Intentar Nuevamente"
+msgstr "Try Again"
+
+msgid "¡Solicitud Enviada!"
+msgstr "Request Sent!"
+
+msgid "Tu solicitud de registro ha sido recibida exitosamente."
+msgstr "Your registration request has been received successfully."
+
+msgid "Información importante"
+msgstr "Important information"
+
+msgid "Nuestro equipo de administración revisará tus datos y verificará tu información. Recibirás una confirmación en tu correo dentro de 24-48 horas."
+msgstr "Our administration team will review your data and verify your information. You will receive a confirmation email within 24-48 hours."
+
+msgid "Volver al Home"
+msgstr "Back to Home"
+
+msgid "Método no permitido"
+msgstr "Method not allowed"
+
+msgid "Usuario no existe"
+msgstr "User does not exist"
+
+msgid "El nombre de usuario ya existe"
+msgstr "The username already exists"
+
+msgid "Tu solicitud fue enviada. Un administrador revisará tu cuenta."
+msgstr "Your request was submitted. An administrator will review your account."
+
+msgid "Cerrar Sesión"
+msgstr "Sign Out"
+
+msgid "Inicia sesión"
+msgstr "Sign in"
+
+msgid "Inicia sesión para cotizar"
+msgstr "Sign in to request a quote"
+
+msgid "Se cerrará tu sesión en"
+msgstr "Your session will be closed in"
+
+msgid "Cancelar"
+msgstr "Cancel"
+
+msgid "Sí, salir"
+msgstr "Yes, sign out"

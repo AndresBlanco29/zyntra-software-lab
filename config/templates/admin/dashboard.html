@@ -1,0 +1,51 @@
+{% extends "bases/base_vendedor.html" %}
+
+{% block title %}
+Dashboard
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4">Panel Administrador</h2>
+
+<div class="row">
+
+<div class="col-md-3">
+<div class="card shadow-sm">
+<div class="card-body text-center">
+<h3>{{ clientes_pendientes }}</h3>
+<p>Clientes Pendientes</p>
+</div>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card shadow-sm">
+<div class="card-body text-center">
+<h3>{{ clientes_aprobados }}</h3>
+<p>Clientes Aprobados</p>
+</div>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card shadow-sm">
+<div class="card-body text-center">
+<h3>{{ vendedores }}</h3>
+<p>Vendedores</p>
+</div>
+</div>
+</div>
+
+<div class="col-md-3">
+<div class="card shadow-sm">
+<div class="card-body text-center">
+<h3>{{ productos }}</h3>
+<p>Productos</p>
+</div>
+</div>
+</div>
+
+</div>
+
+{% endblock %}

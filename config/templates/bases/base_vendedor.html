@@ -24,6 +24,10 @@
 
 <div class="container-fluid">
 
+<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="sidebarToggleBtn" aria-label="Abrir menu">
+☰
+</button>
+
 <a class="navbar-brand fw-bold">
 La Tortilla Grocery
 </a>
@@ -31,6 +35,11 @@ La Tortilla Grocery
 <div class="ms-auto">
 
 {% block navbar_right %}
+
+<button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#logoutModal" style="font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
+<i class="bi bi-box-arrow-right"></i> Cerrar sesión
+</button>
+
 {% endblock %}
 
 </div>
@@ -39,6 +48,37 @@ La Tortilla Grocery
 
 </nav>
 
+<!-- Modal de confirmación de logout -->
+<div class="modal fade" id="logoutModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);">
+      <div class="modal-body text-center" style="padding: 3rem 2rem; background: linear-gradient(135deg, #f8f9fa 0%, #e8ecf1 100%);">
+        <div style="font-size: 60px; margin-bottom: 1.5rem;">
+          👋
+        </div>
+        
+        <h5 class="modal-title mb-2" style="color: #0b3d91; font-weight: 700; font-size: 1.5rem;">
+          ¿Estás seguro de salir?
+        </h5>
+        
+        <p class="text-muted mb-0" style="font-size: 1rem;">
+          Se cerrará tu sesión en <strong>La Tortilla Grocery</strong>
+        </p>
+      </div>
+      
+      <div class="modal-footer border-0" style="justify-content: center; gap: 1rem; padding: 1.5rem 2rem; background: #fff;">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="font-weight: 600; border-width: 2px;">
+          Cancelar
+        </button>
+        
+        <a href="{% url 'logout' %}" class="btn btn-danger" style="font-weight: 600; padding: 0.5rem 1.5rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
+          <i class="bi bi-box-arrow-right"></i> Sí, salir
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <!-- LAYOUT PRINCIPAL -->
 
@@ -46,32 +86,70 @@ La Tortilla Grocery
 
 <!-- SIDEBAR -->
 
-<div class="sidebar">
+<div class="sidebar" id="panelSidebar">
 
 <div class="sidebar-user">
-{% trans "Vendedor" %} Andrés
+{{ request.user.first_name }} {{ request.user.last_name }}
 </div>
 
 <div class="list-group list-group-flush">
 
+{% if request.user.role == "admin" %}
+
+<a href="{% url 'panel_admin' %}"
+class="list-group-item list-group-item-action
+{% if request.resolver_match.url_name == 'panel_admin' %}active{% endif %}">
+Dashboard
+</a>
+
+<a href="{% url 'clientes_pendientes' %}"
+class="list-group-item list-group-item-action
+{% if request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' %}active{% endif %}">
+Solicitudes
+</a>
+
+<a href="{% url 'lista_vendedores' %}"
+class="list-group-item list-group-item-action
+{% if request.resolver_match.url_name == 'lista_vendedores' or request.resolver_match.url_name == 'crear_vendedor' %}active{% endif %}">
+Vendedores
+</a>
+
+<a href="{% url 'lista_productos' %}"
+class="list-group-item list-group-item-action
+{% if request.resolver_match.url_name == 'lista_productos' or request.resolver_match.url_name == 'crear_producto' or request.resolver_match.url_name == 'crear_categoria' or request.resolver_match.url_name == 'crear_marca' or request.resolver_match.url_name == 'lista_marcas' or request.resolver_match.url_name == 'editar_marca' %}active{% endif %}">
+Productos
+</a>
+
+<a href="{% url 'contenido_home' %}"
+class="list-group-item list-group-item-action
+{% if request.resolver_match.url_name == 'contenido_home' or request.resolver_match.url_name == 'editar_home_contenido' or request.resolver_match.url_name == 'lista_testimonios' or request.resolver_match.url_name == 'crear_testimonio' or request.resolver_match.url_name == 'editar_testimonio' %}active{% endif %}">
+Contenido Home
+</a>
+
+{% elif request.user.role == "vendedor" %}
+
 <a href="{% url 'crear_cliente' %}"
 class="list-group-item list-group-item-action {% if 'crear-cliente' in request.path %}active{% endif %}">
-{% trans "Crear Cliente" %}
+Crear Cliente
 </a>
 
 <a href="{% url 'vendedores_clientes' %}"
 class="list-group-item list-group-item-action {% if 'clientes' in request.path %}active{% endif %}">
-{% trans "Clientes" %}
+Clientes
 </a>
 
 <a href="{% url 'tomar_pedido' %}"
 class="list-group-item list-group-item-action {% if 'tomar-pedido' in request.path %}active{% endif %}">
-{% trans "Tomar Pedido" %}
+Tomar Pedido
 </a>
 
+{% endif %}
+
 </div>
 
 </div>
+
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
 
 <!-- CONTENIDO -->
@@ -84,6 +162,40 @@ class="list-group-item list-group-item-action {% if 'tomar-pedido' in request.pa
 </div>
 
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const toggleBtn = document.getElementById('sidebarToggleBtn');
+  const sidebar = document.getElementById('panelSidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+
+  if (!toggleBtn || !sidebar || !backdrop) {
+    return;
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('show');
+    backdrop.classList.remove('show');
+  }
+
+  toggleBtn.addEventListener('click', function () {
+    sidebar.classList.toggle('show');
+    backdrop.classList.toggle('show');
+  });
+
+  backdrop.addEventListener('click', closeSidebar);
+
+  sidebar.querySelectorAll('a').forEach(function (link) {
+    link.addEventListener('click', closeSidebar);
+  });
+
+  window.addEventListener('resize', function () {
+    if (window.innerWidth > 992) {
+      closeSidebar();
+    }
+  });
+});
+</script>
 
 </body>
 </html>

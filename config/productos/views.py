@@ -1,14 +1,102 @@
-from django.shortcuts import render, redirect
-from .models import Producto, Categoria, Marca
+from django.core.cache import cache
+from django.db.models import Prefetch
+from django.shortcuts import render, redirect, get_object_or_404
+from .models import Producto, Categoria, Marca, Presentacion
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_http_methods
+from django.contrib import messages
+from decimal import Decimal, InvalidOperation
+
+
+CATALOGO_CACHE_TIMEOUT = 60
+
+
+def _parse_decimal(value, default="0"):
+    text = str(value or "").strip().replace(",", ".")
+    if not text:
+        text = str(default)
+    try:
+        return Decimal(text)
+    except (InvalidOperation, ValueError):
+        return Decimal(str(default))
+
+
+def _presentaciones_prefetch():
+    return Prefetch(
+        "presentaciones",
+        queryset=Presentacion.objects.only(
+            "id",
+            "producto_id",
+            "nombre",
+            "nombre_en",
+            "unidades",
+            "tipo_contenido",
+            "tipo_contenido_en",
+        ).order_by("id"),
+    )
+
+
+def _hydrate_productos(productos):
+    for producto in productos:
+        presentaciones = list(producto.presentaciones.all())
+        producto.presentaciones_prefetch = presentaciones
+        producto.primera_presentacion = presentaciones[0] if presentaciones else None
+    return productos
+
+
+def _get_cached_catalogo_productos():
+    cache_key = "catalogo:productos_activos"
+    productos = cache.get(cache_key)
+    if productos is None:
+        productos = _hydrate_productos(list(
+            Producto.objects.filter(activo=True).select_related("categoria", "marca").only(
+                "id",
+                "nombre",
+                "nombre_en",
+                "imagen",
+                "categoria_id",
+                "marca_id",
+            ).prefetch_related(_presentaciones_prefetch())
+        ))
+        cache.set(cache_key, productos, CATALOGO_CACHE_TIMEOUT)
+    return productos
+
+
+def _get_cached_catalogo_categorias():
+    cache_key = "catalogo:categorias"
+    categorias = cache.get(cache_key)
+    if categorias is None:
+        categorias = list(Categoria.objects.only("id", "nombre", "nombre_en"))
+        cache.set(cache_key, categorias, CATALOGO_CACHE_TIMEOUT)
+    return categorias
+
+
+def _get_cached_catalogo_marcas():
+    cache_key = "catalogo:marcas_activas"
+    marcas = cache.get(cache_key)
+    if marcas is None:
+        marcas = list(
+            Marca.objects.filter(activo=True).only(
+                "id",
+                "nombre",
+                "nombre_en",
+                "activo",
+                "logo",
+            ).prefetch_related("categorias")
+        )
+        for marca in marcas:
+            marca.categorias_ids = " ".join(str(categoria.id) for categoria in marca.categorias.all())
+        cache.set(cache_key, marcas, CATALOGO_CACHE_TIMEOUT)
+    return marcas
 
 
 def catalogo(request):
 
-    productos = Producto.objects.filter(activo=True).prefetch_related("presentaciones")
+    productos = _get_cached_catalogo_productos()
 
-    categorias = Categoria.objects.all()
+    categorias = _get_cached_catalogo_categorias()
 
-    marcas = Marca.objects.all()
+    marcas = _get_cached_catalogo_marcas()
 
     context = {
         'productos': productos,
@@ -16,6 +104,432 @@ def catalogo(request):
         'marcas': marcas
     }
 
-    return render(request, 'productos/catalogo.html', context)
+    response = render(request, 'productos/catalogo.html', context)
+    response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response["Pragma"] = "no-cache"
+    response["Expires"] = "0"
+    return response
+
+def lista_productos(request):
+
+    if not request.user.is_authenticated or request.user.role != "admin":
+        return redirect("login")
+
+    productos = Producto.objects.all()
+    categorias = Categoria.objects.all()
+    marcas = Marca.objects.all().prefetch_related('categorias')
+
+    return render(request, 'admin/productos.html', {
+        'productos': productos,
+        'categorias': categorias,
+        'marcas': marcas
+    })
+
+
+@login_required
+def lista_marcas(request):
+
+    if request.user.role != "admin":
+        return redirect("login")
+
+    marcas = Marca.objects.all().prefetch_related('categorias')
+
+    return render(request, 'admin/marcas.html', {
+        'marcas': marcas,
+    })
+
+@login_required
+def crear_producto(request):
+
+    if request.user.role != "admin":
+        return redirect("login")
+
+    if request.method == "POST":
+
+        nombre = request.POST.get("nombre")
+        nombre_en = request.POST.get("nombre_en")
+        codigo_barras = request.POST.get("codigo_barras")
+        descripcion = request.POST.get("descripcion")
+        descripcion_en = request.POST.get("descripcion_en")
+
+        categoria_id = request.POST.get("categoria")
+        marca_id = request.POST.get("marca")
+
+        imagen = request.FILES.get("imagen")
+
+        activo = True if request.POST.get("activo") else False
+        destacado = True if request.POST.get("destacado") else False
+
+        descuento = request.POST.get("descuento") or 0
+
+        categoria = None
+        marca = None
+
+        if categoria_id:
+            categoria = Categoria.objects.get(id=categoria_id)
+
+        if marca_id:
+            marca = Marca.objects.get(id=marca_id)
+
+        producto = Producto.objects.create(
+            nombre=nombre,
+            nombre_en=nombre_en,
+            codigo_barras=codigo_barras,
+            descripcion=descripcion,
+            descripcion_en=descripcion_en,
+            categoria=categoria,
+            marca=marca,
+            imagen=imagen,
+            activo=activo,
+            destacado=destacado,
+            descuento=descuento
+        )
+
+        # Guardar la presentacion inicial si el formulario trae datos.
+        presentacion_nombre = (request.POST.get("presentacion") or "").strip()
+        tipo_contenido = (request.POST.get("tipo_contenido") or "unidades").strip() or "unidades"
+        unidades_raw = (request.POST.get("unidades") or "").strip()
+
+        precio_1_raw = (request.POST.get("precio_1") or "").strip()
+        precio_2_raw = (request.POST.get("precio_2") or "").strip()
+        precio_3_raw = (request.POST.get("precio_3") or "").strip()
+        precio_4_raw = (request.POST.get("precio_4") or "").strip()
+        precio_5_raw = (request.POST.get("precio_5") or "").strip()
+
+        has_presentacion_data = any([
+            presentacion_nombre,
+            tipo_contenido,
+            unidades_raw,
+            precio_1_raw,
+            precio_2_raw,
+            precio_3_raw,
+            precio_4_raw,
+            precio_5_raw,
+        ])
+
+        if has_presentacion_data:
+            try:
+                unidades = int(unidades_raw) if unidades_raw else 1
+            except ValueError:
+                unidades = 1
+
+            if unidades < 1:
+                unidades = 1
+
+            Presentacion.objects.create(
+                producto=producto,
+                nombre=presentacion_nombre or "Presentacion 1",
+                tipo_contenido=tipo_contenido,
+                unidades=unidades,
+                precio_1=_parse_decimal(precio_1_raw),
+                precio_2=_parse_decimal(precio_2_raw),
+                precio_3=_parse_decimal(precio_3_raw),
+                precio_4=_parse_decimal(precio_4_raw),
+                precio_5=_parse_decimal(precio_5_raw),
+            )
+
+        return redirect("lista_productos")
+
+    context = {
+        "categorias": Categoria.objects.all(),
+        "marcas": Marca.objects.all()
+    }
+
+    return render(request, "admin/crear_producto.html", context)
+
+
+@login_required
+def crear_categoria(request):
+
+    if request.user.role != "admin":
+        return redirect("login")
+
+    if request.method == "POST":
+        nombre = (request.POST.get("nombre") or "").strip()
+        nombre_en = (request.POST.get("nombre_en") or "").strip()
+
+        if not nombre:
+            return render(request, "admin/crear_categoria.html", {
+                "error": "El nombre de la categoria es obligatorio.",
+                "nombre": nombre,
+                "nombre_en": nombre_en,
+            })
+
+        if Categoria.objects.filter(nombre__iexact=nombre).exists():
+            return render(request, "admin/crear_categoria.html", {
+                "error": "Ya existe una categoria con ese nombre.",
+                "nombre": nombre,
+                "nombre_en": nombre_en,
+            })
+
+        Categoria.objects.create(
+            nombre=nombre,
+            nombre_en=nombre_en,
+        )
+        messages.success(request, "Categoria creada correctamente")
+        return redirect("lista_productos")
+
+    return render(request, "admin/crear_categoria.html")
+
+
+@login_required
+def crear_marca(request):
+
+    if request.user.role != "admin":
+        return redirect("login")
+
+    categorias = Categoria.objects.all()
+
+    if request.method == "POST":
+        nombre = (request.POST.get("nombre") or "").strip()
+        nombre_en = (request.POST.get("nombre_en") or "").strip()
+        logo = request.FILES.get("logo")
+        categorias_ids = request.POST.getlist("categorias")
+
+        if not nombre:
+            return render(request, "admin/crear_marca.html", {
+                "error": "El nombre de la marca es obligatorio.",
+                "categorias": categorias,
+                "selected_categorias": [str(cid) for cid in categorias_ids],
+                "nombre": nombre,
+                "nombre_en": nombre_en,
+            })
+
+        if Marca.objects.filter(nombre__iexact=nombre).exists():
+            return render(request, "admin/crear_marca.html", {
+                "error": "Ya existe una marca con ese nombre.",
+                "categorias": categorias,
+                "selected_categorias": [str(cid) for cid in categorias_ids],
+                "nombre": nombre,
+                "nombre_en": nombre_en,
+            })
+
+        marca = Marca.objects.create(
+            nombre=nombre,
+            nombre_en=nombre_en,
+            logo=logo,
+        )
+
+        if categorias_ids:
+            marca.categorias.set(categorias_ids)
+
+        messages.success(request, "Marca creada correctamente")
+        return redirect("lista_marcas")
+
+    return render(request, "admin/crear_marca.html", {
+        "categorias": categorias,
+        "selected_categorias": [],
+    })
+
+
+@login_required
+def editar_marca(request, marca_id):
+
+    if request.user.role != "admin":
+        return redirect("login")
+
+    marca = get_object_or_404(Marca, id=marca_id)
+    categorias = Categoria.objects.all()
+
+    if request.method == "POST":
+        nombre = (request.POST.get("nombre") or "").strip()
+        nombre_en = (request.POST.get("nombre_en") or "").strip()
+        logo = request.FILES.get("logo")
+        categorias_ids = request.POST.getlist("categorias")
+
+        if not nombre:
+            return render(request, "admin/editar_marca.html", {
+                "error": "El nombre de la marca es obligatorio.",
+                "marca": marca,
+                "categorias": categorias,
+                "selected_categorias": [str(cid) for cid in categorias_ids],
+            })
+
+        duplicated = Marca.objects.filter(nombre__iexact=nombre).exclude(id=marca.id).exists()
+        if duplicated:
+            return render(request, "admin/editar_marca.html", {
+                "error": "Ya existe otra marca con ese nombre.",
+                "marca": marca,
+                "categorias": categorias,
+                "selected_categorias": [str(cid) for cid in categorias_ids],
+            })
+
+        marca.nombre = nombre
+        marca.nombre_en = nombre_en
+        if logo:
+            marca.logo = logo
+        marca.save()
+        marca.categorias.set(categorias_ids)
+
+        messages.success(request, "Marca actualizada correctamente")
+        return redirect("lista_marcas")
+
+    selected_categorias = [str(c.id) for c in marca.categorias.all()]
+
+    return render(request, "admin/editar_marca.html", {
+        "marca": marca,
+        "categorias": categorias,
+        "selected_categorias": selected_categorias,
+    })
+
+
+@login_required
+def desactivar_marca(request, marca_id):
+
+    if request.user.role != "admin":
+        return redirect("login")
+
+    marca = get_object_or_404(Marca, id=marca_id)
+    marca.activo = False
+    marca.save()
+
+    messages.success(request, "Marca inhabilitada")
+    return redirect('lista_marcas')
+
+
+@login_required
+def activar_marca(request, marca_id):
+
+    if request.user.role != "admin":
+        return redirect("login")
+
+    marca = get_object_or_404(Marca, id=marca_id)
+    marca.activo = True
+    marca.save()
+
+    messages.success(request, "Marca activada")
+    return redirect('lista_marcas')
+
+def desactivar_producto(request, producto_id):
+
+    producto = get_object_or_404(Producto, id=producto_id)
+
+    producto.activo = False
+    producto.save()
+
+    return redirect('lista_productos')
+
+def activar_producto(request, producto_id):
+
+    producto = get_object_or_404(Producto, id=producto_id)
+
+    producto.activo = True
+    producto.save()
+
+    return redirect('lista_productos')
+
+def editar_producto(request, producto_id):
+
+    producto = get_object_or_404(Producto, id=producto_id)
+
+    categorias = Categoria.objects.all()
+    marcas = Marca.objects.all()
+
+    presentaciones = producto.presentaciones.all()
+
+    if request.method == "POST":
+
+        # -------- PRODUCTO --------
+
+        producto.nombre = request.POST.get("nombre")
+        producto.nombre_en = request.POST.get("nombre_en")
+        producto.codigo_barras = request.POST.get("codigo_barras")
+        producto.descripcion = request.POST.get("descripcion")
+        producto.descripcion_en = request.POST.get("descripcion_en")
+
+        categoria_id = request.POST.get("categoria")
+        marca_id = request.POST.get("marca")
+
+        if categoria_id:
+            producto.categoria_id = categoria_id
+
+        if marca_id:
+            producto.marca_id = marca_id
+
+        if request.FILES.get("imagen"):
+            producto.imagen = request.FILES.get("imagen")
+
+        producto.activo = True if request.POST.get("activo") else False
+        producto.destacado = True if request.POST.get("destacado") else False
+
+        producto.descuento = request.POST.get("descuento") or 0
+
+        producto.save()
+
+        # -------- PRESENTACIONES --------
+
+        for p in presentaciones:
+
+            p.nombre = request.POST.get(f"presentacion_nombre_{p.id}")
+            p.tipo_contenido = request.POST.get(f"tipo_contenido_{p.id}")
+
+            unidades = request.POST.get(f"unidades_{p.id}")
+            if unidades:
+                p.unidades = int(unidades)
+
+            precio1 = request.POST.get(f"precio1_{p.id}", "").strip()
+            precio2 = request.POST.get(f"precio2_{p.id}", "").strip()
+            precio3 = request.POST.get(f"precio3_{p.id}", "").strip()
+            precio4 = request.POST.get(f"precio4_{p.id}", "").strip()
+            precio5 = request.POST.get(f"precio5_{p.id}", "").strip()
+
+            if precio1:
+                p.precio_1 = _parse_decimal(precio1, p.precio_1)
+
+            if precio2:
+                p.precio_2 = _parse_decimal(precio2, p.precio_2)
+
+            if precio3:
+                p.precio_3 = _parse_decimal(precio3, p.precio_3)
+
+            if precio4:
+                p.precio_4 = _parse_decimal(precio4, p.precio_4)
+
+            if precio5:
+                p.precio_5 = _parse_decimal(precio5, p.precio_5)
+
+            p.save()
+
+        # Si el producto no tenia presentaciones, permitir crear la primera desde esta vista.
+        if not presentaciones.exists():
+            nueva_nombre = (request.POST.get("presentacion_nueva") or "").strip()
+            nuevo_tipo = (request.POST.get("tipo_contenido_nuevo") or "unidades").strip() or "unidades"
+            nuevas_unidades_raw = (request.POST.get("unidades_nuevo") or "").strip()
+
+            nprecio1 = (request.POST.get("precio1_nuevo") or "").strip()
+            nprecio2 = (request.POST.get("precio2_nuevo") or "").strip()
+            nprecio3 = (request.POST.get("precio3_nuevo") or "").strip()
+            nprecio4 = (request.POST.get("precio4_nuevo") or "").strip()
+            nprecio5 = (request.POST.get("precio5_nuevo") or "").strip()
+
+            if any([nueva_nombre, nuevas_unidades_raw, nprecio1, nprecio2, nprecio3, nprecio4, nprecio5]):
+                try:
+                    nuevas_unidades = int(nuevas_unidades_raw) if nuevas_unidades_raw else 1
+                except ValueError:
+                    nuevas_unidades = 1
+
+                if nuevas_unidades < 1:
+                    nuevas_unidades = 1
+
+                Presentacion.objects.create(
+                    producto=producto,
+                    nombre=nueva_nombre or "Presentacion 1",
+                    tipo_contenido=nuevo_tipo,
+                    unidades=nuevas_unidades,
+                    precio_1=_parse_decimal(nprecio1),
+                    precio_2=_parse_decimal(nprecio2),
+                    precio_3=_parse_decimal(nprecio3),
+                    precio_4=_parse_decimal(nprecio4),
+                    precio_5=_parse_decimal(nprecio5),
+                )
+
+        return redirect("lista_productos")
+    
+    return render(request, "admin/editar_producto.html", {
+        "producto": producto,
+        "categorias": categorias,
+        "marcas": marcas,
+        "presentaciones": presentaciones
+    })
 
 

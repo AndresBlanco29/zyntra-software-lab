@@ -1,0 +1,81 @@
+{% extends "bases/base_vendedor.html" %}
+
+{% block title %}
+Clientes Pendientes
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4">Clientes Pendientes</h2>
+
+<div class="table-responsive">
+
+<table class="table table-striped">
+
+<thead>
+<tr>
+<th>Empresa</th>
+<th>Ciudad</th>
+<th>Teléfono</th>
+<th>Sales Tax</th>
+<th>Certificado</th>
+<th>Acciones</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for cliente in clientes %}
+
+<tr>
+
+<td>{{ cliente.nombre_empresa }}</td>
+<td>{{ cliente.ciudad }}</td>
+<td>{{ cliente.telefono }}</td>
+<td>{{ cliente.sales_tax_number }}</td>
+
+<td>
+
+{% if cliente.certificado_tax %}
+<a href="{{ cliente.certificado_tax.url }}" target="_blank" class="btn btn-info btn-sm">
+Ver certificado
+</a>
+{% else %}
+No disponible
+{% endif %}
+
+</td>
+
+<td>
+
+<a href="{% url 'ver_cliente' cliente.id %}" class="btn btn-secondary btn-sm">
+Ver
+</a>
+
+<a href="{% url 'aprobar_cliente' cliente.id %}" class="btn btn-success btn-sm">
+Aprobar
+</a>
+
+<a href="{% url 'rechazar_cliente' cliente.id %}" class="btn btn-danger btn-sm">
+Rechazar
+</a>
+
+</td>
+
+</tr>
+
+{% empty %}
+
+<tr>
+<td colspan="6">No hay clientes pendientes</td>
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+{% endblock %}

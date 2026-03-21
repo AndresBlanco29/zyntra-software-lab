@@ -1,0 +1,364 @@
+{% load static i18n %}
+<!-- FORMULARIO DE REGISTRO PARA MODAL (3 PASOS) -->
+
+<div class="text-center mb-4" id="logoHeader">
+  <img src="{% static 'img/logo.png' %}" class="logo-img mb-2" alt="Logo" style="width: 100px; height: auto;">
+  <h4 class="fw-bold text-secondary" style="color: #1e293b; margin-top: 0.5rem;">{% trans "La Tortilla Grocery" %}</h4>
+</div>
+
+<div class="text-center mb-4" id="headerRegistro">
+  <h4 class="fw-bold text-primary">{% trans "Crear Cuenta Mayorista" %}</h4>
+  <p class="text-muted" style="font-size: 14px;">{% trans "Estás a tres pasos de formar parte de nuestra red comercial" %}</p>
+  <div class="fw-bold text-primary" id="stepText1">{% trans "Paso 1 de 3" %}</div>
+  <div class="progress mx-auto mt-2" style="height: 6px; max-width: 300px">
+    <div id="progressBar1" class="progress-bar bg-primary" style="width: 33.33%"></div>
+  </div>
+</div>
+
+<form method="POST" enctype="multipart/form-data" id="registroForm">
+  {% csrf_token %}
+
+  <!-- PASO 1: DATOS PERSONALES -->
+  <div id="step1">
+    <div class="mb-3">
+      <input type="text" class="form-control form-control-lg" placeholder="{% trans 'Nombre*' %}" name="nombre" required />
+    </div>
+
+    <div class="mb-3">
+      <input type="text" class="form-control form-control-lg" placeholder="{% trans 'Apellido*' %}" name="apellido" required />
+    </div>
+
+    <div class="mb-3">
+      <input type="text" class="form-control form-control-lg" placeholder="{% trans 'ID (9 Dígitos)*' %}" name="id_cliente" pattern="[0-9]{9}" maxlength="9" inputmode="numeric" required />
+    </div>
+
+    <div class="mb-3">
+      <input type="tel" class="form-control form-control-lg" placeholder="{% trans 'Número de Contacto Móvil*' %}" name="telefono" pattern="[0-9]{10}" inputmode="numeric" maxlength="10" required />
+    </div>
+
+    <div class="d-grid">
+      <button type="button" class="btn btn-continuar btn-lg" onclick="nextStepModal(1)">{% trans "Continuar" %}</button>
+    </div>
+  </div>
+
+  <!-- PASO 2: CREDENCIALES -->
+  <div id="stepCredenciales" style="display: none;">
+    <div class="text-center mb-4">
+      <div class="fw-bold text-primary">{% trans "Paso 2 de 3" %}</div>
+      <div class="progress mx-auto mt-2" style="height: 6px; max-width: 300px">
+        <div class="progress-bar bg-primary" style="width: 66.66%"></div>
+      </div>
+      <br>
+      <h5 class="fw-bold text-primary">{% trans "Crear acceso a la plataforma" %}</h5>
+    </div>
+
+    <div class="mb-3">
+      <input type="text" class="form-control form-control-lg" name="username" placeholder="{% trans 'Usuario*' %}" required />
+    </div>
+
+    <div class="mb-3">
+      <input type="email" class="form-control form-control-lg" name="email" placeholder="{% trans 'Correo electrónico*' %}" required />
+    </div>
+
+    <div class="mb-3 position-relative">
+      <input type="password" id="passwordStep2" class="form-control form-control-lg pe-5" name="password1" placeholder="{% trans 'Contraseña*' %}" required />
+      <span class="position-absolute top-50 end-0 translate-middle-y me-3" style="cursor: pointer;" onclick="togglePasswordField('passwordStep2', 'toggleIconStep2')">
+        <i id="toggleIconStep2" class="bi bi-eye"></i>
+      </span>
+    </div>
+
+    <div class="mb-3 position-relative">
+      <input type="password" id="confirmPasswordStep2" class="form-control form-control-lg pe-5" name="password2" placeholder="{% trans 'Confirmar contraseña*' %}" required />
+      <span class="position-absolute top-50 end-0 translate-middle-y me-3" style="cursor: pointer;" onclick="togglePasswordField('confirmPasswordStep2', 'toggleIconConfirmStep2')">
+        <i id="toggleIconConfirmStep2" class="bi bi-eye"></i>
+      </span>
+    </div>
+
+    <div class="d-grid gap-2">
+      <button type="button" class="btn btn-continuar btn-lg" onclick="nextStepModal(2)">{% trans "Continuar" %}</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="prevStepModal(2)">{% trans "Volver" %}</button>
+    </div>
+  </div>
+
+  <!-- PASO 3: DATOS FISCALES Y COMERCIALES -->
+  <div id="step2" style="display: none;">
+    <div class="text-center mb-3">
+      <div class="fw-bold text-primary">{% trans "Paso 3 de 3" %}</div>
+      <div class="progress mx-auto mt-2" style="height: 6px; max-width: 300px">
+        <div class="progress-bar bg-primary" style="width: 100%"></div>
+      </div>
+      <br>
+      <h5 class="fw-bold text-primary text-center mb-2">{% trans "Información Fiscal y Comercial" %}</h5>
+      <p class="text-center text-muted" style="font-size: 13px;">{% trans "Completa los siguientes datos para validar tu empresa" %}</p>
+      <hr class="my-3" />
+    </div>
+
+    <!-- DATOS DE LA EMPRESA -->
+    <h6 class="fw-bold text-center mb-3" style="font-size: 14px;">{% trans "Datos de la empresa" %}</h6>
+    <div class="row g-2">
+      <div class="col-12">
+        <input type="text" class="form-control form-control-lg" name="empresa" placeholder="{% trans 'Nombre legal de la empresa' %}" required />
+      </div>
+      <div class="col-12">
+        <input type="text" class="form-control form-control-lg" name="sales_tax" placeholder="{% trans 'Número de impuesto sobre ventas' %}" inputmode="numeric" pattern="[0-9]+" required />
+      </div>
+      <div class="col-12">
+        <input type="text" class="form-control form-control-lg" name="telefono_comercial" placeholder="{% trans 'Teléfono Comercial' %}" inputmode="numeric" maxlength="10" required />
+      </div>
+      <div class="col-12">
+        <input type="email" class="form-control form-control-lg" name="email_comercial" placeholder="{% trans 'Correo Comercial' %}" required />
+      </div>
+    </div>
+
+    <hr class="my-3" />
+
+    <!-- DIRECCIÓN COMERCIAL -->
+    <h6 class="fw-bold text-center mb-3" style="font-size: 14px;">{% trans "Dirección Comercial" %}</h6>
+    <div class="row g-2">
+      <div class="col-12">
+        <input type="text" class="form-control form-control-lg" name="direccion" placeholder="{% trans 'Dirección Principal' %}" required />
+      </div>
+      <div class="col-12">
+        <input type="text" class="form-control form-control-lg" name="direccion2" placeholder="{% trans 'Dirección 2 (opcional)' %}" />
+      </div>
+      <div class="col-6">
+        <input type="text" class="form-control form-control-lg" name="ciudad" placeholder="{% trans 'Ciudad' %}" required />
+      </div>
+      <div class="col-6">
+        <input type="text" class="form-control form-control-lg" name="estado" placeholder="{% trans 'Estado' %}" required />
+      </div>
+      <div class="col-6">
+        <input type="text" class="form-control form-control-lg" name="codigo_postal" placeholder="{% trans 'Código Postal' %}" required />
+      </div>
+      <div class="col-6">
+        <input type="text" class="form-control form-control-lg" name="pais" value="{% trans 'EEUU' %}" readonly />
+      </div>
+    </div>
+
+    <hr class="my-3" />
+
+    <!-- CERTIFICADO -->
+    <h6 class="fw-bold text-center mb-2" style="font-size: 14px;">{% trans "Certificado de Impuesto sobre Ventas" %}</h6>
+    <div class="upload-box text-center mb-3">
+      <input type="file" id="certificado" name="certificado" accept=".pdf,.jpg,.png" required hidden>
+      <div class="upload-content" onclick="document.getElementById('certificado').click()" style="padding: 15px; border: 2px dashed #ccc; border-radius: 8px; cursor: pointer; background: #f8f9fa;">
+        <i class="bi bi-cloud-arrow-up fs-3 text-secondary"></i>
+        <p class="fw-bold mt-2 text-primary" style="font-size: 13px; margin: 0;">{% trans "Arrastra o haz clic para subir (PDF o imagen)" %}</p>
+        <small class="text-muted d-block mt-1" style="font-size: 11px;">{% trans "Emitido por el Department of Revenue" %}</small>
+        <div id="nombreArchivo" style="margin-top: 10px; color: #0b3d91; font-weight: 600; display: none;"></div>
+      </div>
+    </div>
+
+    <!-- CHECKBOX CONFIRMACIÓN -->
+    <div class="form-check my-3 text-center">
+      <input class="form-check-input" type="checkbox" name="confirmacion" required id="confirmacion" />
+      <label class="form-check-label small" for="confirmacion">
+        {% trans "Confirmo que la información es correcta y verificable." %}
+      </label>
+    </div>
+
+    <div class="d-grid gap-2">
+      <button type="submit" class="btn btn-continuar btn-lg">{% trans "Enviar para Aprobación" %}</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="prevStepModal(3)">{% trans "Volver" %}</button>
+    </div>
+  </div>
+</form>
+
+<style>
+  .btn-continuar {
+    background: linear-gradient(to right, #ffe600, #c7c700);
+    border: none;
+    color: #1e293b;
+    font-weight: 700;
+    border-radius: 8px;
+    font-size: 16px;
+    padding: 12px 20px;
+  }
+
+  .btn-continuar:hover {
+    background: linear-gradient(to right, #ffd700, #b8b300);
+    color: #1e293b;
+  }
+
+  .form-control-lg {
+    border: 1px solid #d4d8e2;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 15px;
+  }
+
+  .form-control-lg:focus {
+    border-color: #0b3d91;
+    box-shadow: 0 0 0 0.2rem rgba(11, 61, 145, 0.25);
+  }
+</style>
+
+<script>
+window.togglePasswordField = function(inputId, iconId) {
+  const passwordInput = document.getElementById(inputId);
+  const toggleIcon = document.getElementById(iconId);
+
+  if (!passwordInput || !toggleIcon) {
+    return;
+  }
+
+  if (passwordInput.type === 'password') {
+    passwordInput.type = 'text';
+    toggleIcon.classList.remove('bi-eye');
+    toggleIcon.classList.add('bi-eye-slash');
+  } else {
+    passwordInput.type = 'password';
+    toggleIcon.classList.remove('bi-eye-slash');
+    toggleIcon.classList.add('bi-eye');
+  }
+};
+
+// Mostrar nombre del archivo cargado
+setTimeout(function() {
+  const fileInput = document.getElementById('certificado');
+  if (fileInput) {
+    fileInput.addEventListener('change', function() {
+      const nombreDiv = document.getElementById('nombreArchivo');
+      if (nombreDiv && this.files.length > 0) {
+        nombreDiv.textContent = '✓ ' + this.files[0].name;
+        nombreDiv.style.display = 'block';
+        nombreDiv.style.color = '#28a745';
+      }
+    });
+  }
+}, 0);
+
+// Navegar entre pasos en el modal
+window.nextStepModal = function(stepNum) {
+  const currentStep = stepNum === 1 ? 'step1' : stepNum === 2 ? 'stepCredenciales' : 'step2';
+  const nextStep = stepNum === 1 ? 'stepCredenciales' : stepNum === 2 ? 'step2' : null;
+  
+  // Validar campos del paso actual
+  const form = document.getElementById('registroForm');
+  const currentStepDiv = document.getElementById(currentStep);
+  
+  if (!form || !currentStepDiv) {
+    console.error('{% trans "Formulario o paso no encontrado" %}');
+    return;
+  }
+  
+  const inputs = currentStepDiv.querySelectorAll('input[required]');
+  let allValid = true;
+
+  for (let input of inputs) {
+    if (!input.value.trim()) {
+      input.classList.add('is-invalid');
+      allValid = false;
+    } else {
+      input.classList.remove('is-invalid');
+      // Validar patterns
+      if (input.pattern && !new RegExp('^' + input.pattern + '$').test(input.value)) {
+        input.classList.add('is-invalid');
+        allValid = false;
+      }
+    }
+  }
+
+  if (stepNum === 2) {
+    const pass1 = form.querySelector('input[name="password1"]');
+    const pass2 = form.querySelector('input[name="password2"]');
+    if (!pass1 || !pass2) {
+      console.error('{% trans "Campos de contraseña no encontrados" %}');
+      return;
+    }
+    
+    if (pass1.value !== pass2.value) {
+      alert('{% trans "Las contraseñas no coinciden" %}');
+      pass2.classList.add('is-invalid');
+      return;
+    }
+
+    if (!allValid) {
+      return;
+    }
+
+    // Verificar que el usuario no exista
+    const username = form.querySelector('input[name="username"]').value;
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch('{% url "verificar_username" %}', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: 'username=' + encodeURIComponent(username)
+    })
+      .then(response => response.json())
+      .then(data => {
+        if (data.existe) {
+          alert('{% trans "El usuario ya existe. Elige otro." %}');
+          form.querySelector('input[name="username"]').classList.add('is-invalid');
+          return;
+        }
+        if (nextStep) {
+          document.getElementById(currentStep).style.display = 'none';
+          document.getElementById(nextStep).style.display = 'block';
+          // El header ya está oculto desde el paso 1
+        }
+      })
+      .catch(error => {
+        console.error('Error verificando username:', error);
+        alert('{% trans "Error al verificar el usuario. Intenta de nuevo." %}');
+      });
+    return;
+  }
+
+  if (allValid && nextStep) {
+    document.getElementById(currentStep).style.display = 'none';
+    document.getElementById(nextStep).style.display = 'block';
+    
+    // Ocultar el header general cuando pasamos al paso 2
+    if (stepNum === 1) {
+      const headerRegistro = document.getElementById('headerRegistro');
+      if (headerRegistro) {
+        headerRegistro.style.display = 'none';
+      }
+    }
+  }
+};
+
+window.prevStepModal = function(stepNum) {
+  const currentStep = stepNum === 2 ? 'stepCredenciales' : stepNum === 3 ? 'step2' : 'step1';
+  const prevStep = stepNum === 2 ? 'step1' : stepNum === 3 ? 'stepCredenciales' : null;
+  
+  if (prevStep) {
+    document.getElementById(currentStep).style.display = 'none';
+    document.getElementById(prevStep).style.display = 'block';
+    
+    // Mostrar el header general cuando volvemos al paso 1
+    if (stepNum === 2) {
+      const headerRegistro = document.getElementById('headerRegistro');
+      if (headerRegistro) {
+        headerRegistro.style.display = 'block';
+      }
+    }
+  }
+};
+
+window.mostrarMensajeExito = function() {
+  const container = document.getElementById('loginFormContainer');
+  if (container) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 2rem;">
+        <div style="font-size: 60px; color: #28a745; margin-bottom: 1.5rem;">
+          <i class="bi bi-check-circle"></i>
+        </div>
+        <h3 style="color: #0b3d91; font-weight: 700; margin-bottom: 1rem;">{% trans "¡Solicitud Recibida!" %}</h3>
+        <p style="color: #475569; margin-bottom: 1.5rem; line-height: 1.6;">
+          {% trans "Tu solicitud de registro fue enviada correctamente." %}<br>
+          {% trans "Un administrador revisará tu documentación y te contactará pronto." %}
+        </p>
+        <button type="button" class="btn btn-yellow" data-bs-dismiss="modal" style="background: linear-gradient(to right, #ffe600, #c7c700); border: none; color: #1e293b; font-weight: 700; padding: 12px 20px; border-radius: 8px;">
+          {% trans "Cerrar" %}
+        </button>
+      </div>
+    `;
+  }
+};
+</script>

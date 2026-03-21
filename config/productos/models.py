@@ -20,6 +20,8 @@ class Marca(models.Model):
     nombre = models.CharField(max_length=100)
     nombre_en = models.CharField(max_length=100, blank=True)
 
+    activo = models.BooleanField(default=True)
+
     logo = models.ImageField(upload_to="marcas/", blank=True, null=True)
 
     categorias = models.ManyToManyField(Categoria, blank=True)
@@ -58,6 +60,14 @@ class Producto(models.Model):
         upload_to='productos/',
         blank=True,
         null=True
+    )
+
+    codigo_barras = models.CharField(
+        max_length=100,
+        unique=True,
+        blank=True,
+        null=True,
+        help_text="Código de barras único del producto"
     )
 
     activo = models.BooleanField(default=True)
@@ -101,11 +111,11 @@ class Presentacion(models.Model):
     tipo_contenido = models.CharField(max_length=50, default="unidades")
     tipo_contenido_en = models.CharField(max_length=50, blank=True)
 
-    precio_1 = models.DecimalField(max_digits=10, decimal_places=2)
-    precio_2 = models.DecimalField(max_digits=10, decimal_places=2)
-    precio_3 = models.DecimalField(max_digits=10, decimal_places=2)
-    precio_4 = models.DecimalField(max_digits=10, decimal_places=2)
-    precio_5 = models.DecimalField(max_digits=10, decimal_places=2)
+    precio_1 = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    precio_2 = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    precio_3 = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    precio_4 = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    precio_5 = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     @property
     def tipo_contenido_traducido(self):

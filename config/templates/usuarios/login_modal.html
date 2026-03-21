@@ -1,0 +1,167 @@
+{% load static %}
+
+<!-- Header con logo -->
+<div class="text-center mb-3">
+  <img src="{% static 'img/logo.png' %}" class="login-modal-logo mb-2" alt="Logo" />
+  <h5 class="fw-bold text-secondary mb-3">La Tortilla Grocery</h5>
+</div>
+
+<hr class="mb-3">
+
+<!-- Título -->
+<div class="text-center mb-4">
+  <h6 class="fw-bold text-primary mb-1">Acceso a Plataforma</h6>
+  <small class="text-muted">Inicia sesión con tu perfil asignado.</small>
+</div>
+
+<!-- Mensajes de error -->
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-danger alert-dismissible fade show mb-3" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<!-- Formulario Login -->
+<form method="POST" id="loginForm">
+  {% csrf_token %}
+  
+  <div class="mb-3">
+    <input 
+      type="text" 
+      name="username" 
+      class="form-control" 
+      placeholder="Usuario"
+      id="username"
+      required
+    >
+  </div>
+
+  <div class="mb-3 position-relative">
+    <input 
+      type="password" 
+      name="password" 
+      class="form-control pe-5" 
+      placeholder="Contraseña"
+      id="password"
+      required
+    />
+    <span 
+      class="position-absolute top-50 end-0 translate-middle-y me-3"
+      style="cursor: pointer"
+      onclick="togglePasswordModal()"
+    >
+      <i id="toggleIconModal" class="bi bi-eye"></i>
+    </span>
+  </div>
+
+  <div class="mb-3 form-check">
+    <input type="checkbox" class="form-check-input" id="rememberMe" name="remember">
+    <label class="form-check-label" for="rememberMe">
+      Recuérdame
+    </label>
+  </div>
+
+  <button type="submit" class="btn btn-yellow w-100 fw-bold">Iniciar Sesión</button>
+</form>
+
+<hr class="my-3">
+
+<p class="text-center text-muted small mb-0">
+  ¿No tienes cuenta? 
+  <a href="#" class="fw-bold text-primary" onclick="cargarRegistro(); return false;">Regístrate aquí</a>
+</p>
+
+<script>
+// Mostrar/Ocultar contraseña
+function togglePasswordModal() {
+  const passwordInput = document.getElementById('password');
+  const toggleIcon = document.getElementById('toggleIconModal');
+  
+  if (passwordInput.type === 'password') {
+    passwordInput.type = 'text';
+    toggleIcon.classList.remove('bi-eye');
+    toggleIcon.classList.add('bi-eye-slash');
+  } else {
+    passwordInput.type = 'password';
+    toggleIcon.classList.remove('bi-eye-slash');
+    toggleIcon.classList.add('bi-eye');
+  }
+}
+
+// Enviar el formulario via AJAX
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  
+  const formData = new FormData(this);
+  const username = formData.get('username').toLowerCase();
+  formData.set('username', username);
+  
+  fetch('{% url "login_modal" %}', {
+    method: 'POST',
+    body: formData
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Redirigir después de login exitoso
+      window.location.href = data.redirect;
+    } else {
+      // Mostrar error
+      const alertDiv = document.createElement('div');
+      alertDiv.className = 'alert alert-danger alert-dismissible fade show';
+      alertDiv.innerHTML = '<strong>Error:</strong> ' + data.error + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+      document.getElementById('loginForm').parentElement.insertBefore(alertDiv, document.getElementById('loginForm'));
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    alert('Error al iniciar sesión');
+  });
+});
+</script>
+
+<style>
+.login-modal-logo {
+  width: 120px;
+  height: auto;
+}
+
+.form-control {
+  background-color: #eef2f7;
+  border: 1px solid #d9e0e7;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.form-control:focus {
+  background-color: #eef2f7;
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.15);
+  outline: none;
+}
+
+.btn-yellow {
+  background: linear-gradient(to right, #ffe600, #c7c700);
+  color: #1e293b;
+  border: none;
+  font-weight: 700;
+  transition: opacity 0.2s;
+}
+
+.btn-yellow:hover {
+  opacity: 0.9;
+  color: #1e293b;
+}
+
+.form-check-input {
+  border: 1px solid #d9e0e7;
+}
+
+.form-check-input:checked {
+  background-color: #0b3d91;
+  border-color: #0b3d91;
+}
+</style>

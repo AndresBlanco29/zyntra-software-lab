@@ -32,12 +32,12 @@
 
 <tr>
 <td style="padding:5px;"><strong>Cliente:</strong></td>
-<td>{{ cliente.nombre }}</td>
+<td>{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}</td>
 </tr>
 
 <tr>
 <td style="padding:5px;"><strong>Empresa:</strong></td>
-<td>{{ cliente.empresa }}</td>
+<td>{{ cliente.nombre_empresa }}</td>
 </tr>
 
 <tr>
@@ -47,7 +47,7 @@
 
 <tr>
 <td style="padding:5px;"><strong>Correo:</strong></td>
-<td>{{ cliente.correo }}</td>
+<td>{{ cliente.usuario.email }}</td>
 </tr>
 
 </table>

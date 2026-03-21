@@ -25,7 +25,7 @@
 
 <div class="card-body p-4">
 
-<form method="POST" enctype="multipart/form-data">
+<form method="POST" enctype="multipart/form-data" id="clientForm" novalidate>
 
 {% csrf_token %}
 
@@ -60,12 +60,12 @@
 
 <div class="col-md-6">
 <label>{% trans "Documento" %}</label>
-<input type="text" class="form-control" name="documento" />
+<input type="text" class="form-control documento-input" name="documento" placeholder="Máximo 9 números" maxlength="9" />
 </div>
 
 <div class="col-md-6">
 <label>{% trans "Teléfono" %}</label>
-<input type="text" class="form-control" name="telefono" required />
+<input type="text" class="form-control telefono-input" name="telefono" placeholder="10 dígitos" maxlength="10" required />
 </div>
 
 <div class="col-md-6">
@@ -93,7 +93,7 @@
 
 <div class="col-md-6">
 <label>{% trans "Teléfono Comercial" %} *</label>
-<input type="text" class="form-control" name="telefono_comercial" />
+<input type="text" class="form-control telefono-input" name="telefono_comercial" placeholder="10 dígitos" maxlength="10" />
 </div>
 
 <div class="col-md-6">
@@ -166,7 +166,7 @@ required
 
 <div class="form-check my-4">
 
-<input class="form-check-input" type="checkbox" required />
+<input class="form-check-input" type="checkbox" id="confirmCheckbox" required />
 
 <label class="form-check-label">
 {% trans "Confirmo que la información es correcta" %}
@@ -175,6 +175,10 @@ required
 </div>
 
 <div class="text-center">
+
+<button type="button" class="btn btn-secondary px-5 me-2" onclick="prevStep()">
+{% trans "Volver" %}
+</button>
 
 <button type="submit" class="btn btn-yellow px-5">
 {% trans "Enviar Solicitud" %}
@@ -191,11 +195,193 @@ required
 </div>
 </div>
 
+<!-- MODAL DE ERROR -->
+<div class="modal fade" id="errorModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0" style="border-radius: 12px;">
+      <div class="modal-header border-0 pb-0" style="background: linear-gradient(135deg, #d32f2f, #ff5252); border-radius: 12px 12px 0 0;">
+        <div class="text-white w-100 text-center py-3">
+          <i class="bi bi-exclamation-circle" style="font-size: 2rem;"></i>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center pt-4">
+        <h5 class="fw-bold mb-3">{% trans "Error en la Validación" %}</h5>
+        <p id="errorMessage" class="text-muted mb-0"></p>
+      </div>
+      <div class="modal-footer border-0 justify-content-center pb-4">
+        <button type="button" class="btn" style="background-color: #d32f2f; color: white;" data-bs-dismiss="modal">
+          {% trans "Entendido" %}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DE ÉXITO -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0" style="border-radius: 12px;">
+      <div class="modal-header border-0 pb-0" style="background: linear-gradient(135deg, #0b3d91, #1565c0); border-radius: 12px 12px 0 0;">
+        <div class="text-white w-100 text-center py-3">
+          <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center pt-4">
+        <h5 class="fw-bold" style="color: #0b3d91;">{% trans "¡Solicitud Enviada!" %}</h5>
+        <p class="text-muted mt-3">{% trans "Tu solicitud ha sido enviada al administrador correctamente." %}</p>
+      </div>
+      <div class="modal-footer border-0 justify-content-center pb-4">
+        <button type="button" class="btn" style="background-color: #0b3d91; color: white;" data-bs-dismiss="modal">
+          {% trans "Aceptar" %}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="{% static 'js/crear_cliente.js'%}"></script>
 
 <script>
 
+// Permitir solo números en documento y teléfono
+document.addEventListener('DOMContentLoaded', function() {
+  const documentoInputs = document.querySelectorAll('.documento-input');
+  const telefonoInputs = document.querySelectorAll('.telefono-input');
+  
+  const allInputs = [...documentoInputs, ...telefonoInputs];
+  
+  allInputs.forEach(input => {
+    // Solo números al presionar tecla
+    input.addEventListener('keypress', function(e) {
+      if (!/[0-9]/.test(e.key)) {
+        e.preventDefault();
+      }
+    });
+    
+    // Remover cualquier carácter no numérico al escribir
+    input.addEventListener('input', function() {
+      this.value = this.value.replace(/[^0-9]/g, '');
+    });
+  });
+  
+  // Interceptar submit del formulario
+  const form = document.getElementById('clientForm');
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      validarFormulario();
+    });
+  }
+});
 
+function validarFormulario() {
+  const nombre = document.querySelector('input[name="nombre"]').value.trim();
+  const apellido = document.querySelector('input[name="apellido"]').value.trim();
+  const documento = document.querySelector('input[name="documento"]').value.trim();
+  const telefono = document.querySelector('input[name="telefono"]').value.trim();
+  const email = document.querySelector('input[name="email"]').value.trim();
+  const empresa = document.querySelector('input[name="empresa"]').value.trim();
+  const sales_tax = document.querySelector('input[name="sales_tax"]').value.trim();
+  const telefono_comercial = document.querySelector('input[name="telefono_comercial"]').value.trim();
+  const email_comercial = document.querySelector('input[name="email_comercial"]').value.trim();
+  const direccion = document.querySelector('input[name="direccion"]').value.trim();
+  const ciudad = document.querySelector('input[name="ciudad"]').value.trim();
+  const estado = document.querySelector('input[name="estado"]').value.trim();
+  const codigo_postal = document.querySelector('input[name="codigo_postal"]').value.trim();
+  const pais = document.querySelector('input[name="pais"]').value.trim();
+  const certificado = document.querySelector('input[name="certificado"]').files.length;
+  const checkbox = document.getElementById('confirmCheckbox').checked;
+  
+  // Validación de campos requeridos
+  if (!nombre || !apellido || !telefono || !email || !empresa || !sales_tax ||
+      !direccion || !ciudad || !estado || !codigo_postal || !pais) {
+    mostrarError('Por favor llenar todos los campos obligatorios');
+    return;
+  }
+  
+  // Validación de documento (máximo 9 dígitos)
+  if (documento && documento.length > 9) {
+    mostrarError('El documento debe tener máximo 9 dígitos');
+    return;
+  }
+  
+  // Validación de teléfono (10 dígitos)
+  if (!/^\d{10}$/.test(telefono)) {
+    mostrarError('El teléfono debe tener exactamente 10 dígitos');
+    return;
+  }
+  
+  // Validación de email
+  if (!validarEmail(email)) {
+    mostrarError('El correo debe ser válido (ejemplo: usuario@dominio.com)');
+    return;
+  }
+  
+  // Validación de teléfono comercial si está lleno
+  if (telefono_comercial && !/^\d{10}$/.test(telefono_comercial)) {
+    mostrarError('El teléfono comercial debe tener 10 dígitos');
+    return;
+  }
+  
+  // Validación de email comercial si está lleno
+  if (email_comercial && !validarEmail(email_comercial)) {
+    mostrarError('El correo comercial debe ser válido');
+    return;
+  }
+  
+  // Validación de certificado
+  if (!certificado) {
+    mostrarError('Por favor subir el certificado de impuesto');
+    return;
+  }
+  
+  // Validación de checkbox
+  if (!checkbox) {
+    mostrarError('Debes confirmar que la información es correcta');
+    return;
+  }
+  
+  // Si todo es válido
+  mostrarExito();
+  
+  // Enviar formulario después de 2 segundos
+  setTimeout(function() {
+    document.getElementById('clientForm').submit();
+  }, 2000);
+}
+
+function mostrarError(mensaje) {
+  document.getElementById('errorMessage').textContent = mensaje;
+  const modal = new bootstrap.Modal(document.getElementById('errorModal'));
+  modal.show();
+}
+
+function validarEmail(email) {
+  // Expresión regular para validar email
+  const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return regexEmail.test(email);
+}
+
+function mostrarExito() {
+  const modal = new bootstrap.Modal(document.getElementById('successModal'));
+  modal.show();
+}
+
+function nextStep() {
+  document.getElementById('step1').style.display = 'none';
+  document.getElementById('step2').style.display = 'block';
+  document.getElementById('stepText').textContent = 'Paso 2 de 2';
+  document.getElementById('progressBar').style.width = '100%';
+}
+
+function prevStep() {
+  document.getElementById('step2').style.display = 'none';
+  document.getElementById('step1').style.display = 'block';
+  document.getElementById('stepText').textContent = 'Paso 1 de 2';
+  document.getElementById('progressBar').style.width = '50%';
+}
 
 function toggleLanguageMenu(){
 

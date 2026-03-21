@@ -1,6 +1,12 @@
+from django.core.cache import cache
+from django.db.models import Prefetch
 from django.shortcuts import render
-from productos.models import Producto, Marca
-from .models import Testimonio
+from productos.models import Producto, Marca, Presentacion
+from .models import Testimonio, HomeContenido
+from urllib.parse import urlparse
+
+
+HOME_CACHE_TIMEOUT = 60
 
 
 def chunk(lista, n):
@@ -9,27 +15,152 @@ def chunk(lista, n):
         yield lista[i:i + n]
 
 
-def home(request):
-
-    productos_destacados = list(
-        Producto.objects.filter(
-            activo=True,
-            destacado=True
-        ).prefetch_related("presentaciones")
+def _presentaciones_prefetch():
+    return Prefetch(
+        "presentaciones",
+        queryset=Presentacion.objects.only(
+            "id",
+            "producto_id",
+            "nombre",
+            "nombre_en",
+            "unidades",
+            "tipo_contenido",
+            "tipo_contenido_en",
+        ).order_by("id"),
     )
+
+
+def _hydrate_productos(productos):
+    for producto in productos:
+        presentaciones = list(producto.presentaciones.all())
+        producto.presentaciones_prefetch = presentaciones
+        producto.primera_presentacion = presentaciones[0] if presentaciones else None
+    return productos
+
+
+def _get_cached_home_productos():
+    cache_key = "home:productos_destacados"
+    productos = cache.get(cache_key)
+    if productos is None:
+        productos = _hydrate_productos(list(
+            Producto.objects.filter(
+                activo=True,
+                destacado=True
+            ).select_related("marca", "categoria").only(
+                "id",
+                "nombre",
+                "nombre_en",
+                "imagen",
+                "descuento",
+                "marca_id",
+                "categoria_id",
+            ).prefetch_related(_presentaciones_prefetch())
+        ))
+        cache.set(cache_key, productos, HOME_CACHE_TIMEOUT)
+    return productos
+
+
+def _get_cached_home_marcas():
+    cache_key = "home:marcas_activas"
+    marcas = cache.get(cache_key)
+    if marcas is None:
+        marcas = list(Marca.objects.filter(activo=True).only(
+            "id",
+            "nombre",
+            "nombre_en",
+            "logo",
+            "activo",
+        ))
+        cache.set(cache_key, marcas, HOME_CACHE_TIMEOUT)
+    return marcas
+
+
+def _get_cached_home_testimonios():
+    cache_key = "home:testimonios_activos"
+    testimonios = cache.get(cache_key)
+    if testimonios is None:
+        testimonios = list(Testimonio.objects.filter(activo=True).only(
+            "id",
+            "nombre",
+            "negocio",
+            "negocio_en",
+            "comentario",
+            "comentario_en",
+            "estrellas",
+            "foto",
+            "activo",
+            "orden",
+        ))
+        cache.set(cache_key, testimonios, HOME_CACHE_TIMEOUT)
+    return testimonios
+
+
+def _get_cached_home_contenido():
+    cache_key = "home:contenido"
+    contenido = cache.get(cache_key)
+    if contenido is None:
+        contenido = HomeContenido.objects.filter(activo=True).only(
+            "id",
+            "hero_titulo_principal",
+            "hero_titulo_principal_en",
+            "hero_titulo_resaltado",
+            "hero_titulo_resaltado_en",
+            "hero_titulo_final",
+            "hero_titulo_final_en",
+            "hero_subtitulo",
+            "hero_subtitulo_en",
+            "hero_boton_texto",
+            "hero_boton_texto_en",
+            "cta_titulo",
+            "cta_titulo_en",
+            "cta_boton_registro_texto",
+            "cta_boton_registro_texto_en",
+            "cta_boton_catalogo_texto",
+            "cta_boton_catalogo_texto_en",
+            "activo",
+        ).first()
+        cache.set(cache_key, contenido, HOME_CACHE_TIMEOUT)
+    return contenido
+
+
+def _came_from_internal_route(request):
+    referer = request.META.get("HTTP_REFERER", "")
+    if not referer:
+        return False
+
+    try:
+        parsed = urlparse(referer)
+    except Exception:
+        return False
+
+    if parsed.netloc != request.get_host():
+        return False
+
+    current_path = (request.path or "/").rstrip("/") or "/"
+    ref_path = (parsed.path or "/").rstrip("/") or "/"
+    return ref_path != current_path
+
+
+def home(request):
+    disable_back_navigation = request.GET.get("no_back") == "1" or _came_from_internal_route(request)
+
+    productos_destacados = _get_cached_home_productos()
 
     # dividir en grupos de 3
     ofertas_chunks = list(chunk(productos_destacados, 3))
 
-    marcas = Marca.objects.all()
+    marcas = _get_cached_home_marcas()
 
     # NUEVO: traer testimonios activos
-    testimonios = Testimonio.objects.filter(
-        activo=True
-    )
+    testimonios = _get_cached_home_testimonios()
+    home_contenido = _get_cached_home_contenido()
 
-    return render(request, "home.html", {
+    response = render(request, "home.html", {
         "ofertas_chunks": ofertas_chunks,
         "marcas": marcas,
-        "testimonios": testimonios   # 👈 enviar al template
+        "testimonios": testimonios,
+        "home_contenido": home_contenido,
+        "disable_back_navigation": disable_back_navigation,
     })
+
+    return response

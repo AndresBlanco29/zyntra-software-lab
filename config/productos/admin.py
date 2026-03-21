@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 from .models import Producto, Presentacion, Categoria, Marca
 
 
@@ -12,6 +13,7 @@ class ProductoAdmin(admin.ModelAdmin):
 
     list_display = (
         "nombre",
+        "codigo_barras",
         "categoria",
         "marca",
         "activo",
@@ -29,9 +31,39 @@ class ProductoAdmin(admin.ModelAdmin):
     search_fields = (
         "nombre",
         "descripcion",
+        "codigo_barras",
+    )
+
+    fieldsets = (
+        ("Información General", {
+            "fields": ("nombre", "nombre_en", "codigo_barras"),
+            "description": "Los campos marcados con * son requeridos"
+        }),
+        ("Descripción", {
+            "fields": ("descripcion", "descripcion_en"),
+            "classes": ("collapse",)
+        }),
+        ("Clasificación", {
+            "fields": ("categoria", "marca")
+        }),
+        ("Detalles del Producto", {
+            "fields": ("imagen", "descuento", "activo", "destacado")
+        }),
+        ("Integraciones", {
+            "fields": ("quickbooks_id",),
+            "classes": ("collapse",)
+        }),
     )
 
     inlines = [PresentacionInline]
+
+    def save_model(self, request, obj, form, change):
+        """Validar que el código de barras sea obligatorio"""
+        if not obj.codigo_barras or obj.codigo_barras.strip() == '':
+            raise ValidationError(
+                "El código de barras es requerido. Por favor ingresa un valor único."
+            )
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(Categoria)

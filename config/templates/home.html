@@ -17,7 +17,7 @@
 
 </head>
 
-<body>
+<body data-auth="{{ user.is_authenticated|yesno:'true,false' }}">
 
 
 <!-- HERO + NAVBAR -->
@@ -30,7 +30,7 @@
 
 <nav class="navbar navbar-expand-lg navbar-dark navbar-home">
 
-<a class="navbar-brand fw-bold d-flex align-items-center" href="#">
+<a class="navbar-brand fw-bold d-flex align-items-center" href="/">
 
 <img src="{% static 'img/logo.png' %}" class="logo-navbar">
 
@@ -49,31 +49,31 @@ La Tortilla Grocery
 <ul class="navbar-nav">
 
 <li class="nav-item">
-<a class="nav-link" href="#">{% trans "Inicio" %}</a>
+<a class="nav-link" href="/">{% trans "Inicio" %}</a>
 </li>
 
 <li class="nav-item">
-<a class="nav-link" href="#">{% trans "Quienes Somos" %}</a>
+<a class="nav-link" href="#quienes-somos">{% trans "Quienes Somos" %}</a>
 </li>
 
 <li class="nav-item">
-<a class="nav-link" href="#">{% trans "Marcas" %}</a>
+<a class="nav-link" href="#marcas">{% trans "Marcas" %}</a>
 </li>
 
 <li class="nav-item">
-<a class="nav-link" href="#">{% trans "Ofertas" %}</a>
+<a class="nav-link" href="#ofertas">{% trans "Ofertas" %}</a>
 </li>
 
 <li class="nav-item">
-<a class="nav-link" href="#">{% trans "Contacto" %}</a>
+<a class="nav-link" href="#contacto">{% trans "Contacto" %}</a>
 </li>
 
 <li class="nav-item">
-<a class="nav-link" href="#">{% trans "Catálogo" %}</a>
+<a class="nav-link" href="{% url 'catalogo' %}">{% trans "Catálogo" %}</a>
 </li>
 
 <li class="nav-item">
-<a class="nav-link login-btn" href="#">{% trans "Login" %}</a>
+<button class="nav-link login-btn" type="button" data-bs-toggle="modal" data-bs-target="#loginModal">{% trans "Login" %}</button>
 </li>
 
 </ul>
@@ -96,22 +96,42 @@ La Tortilla Grocery
 
 <h1 class="hero-title">
 
+{% if home_contenido %}
+{{ home_contenido.hero_titulo_principal_traducido }}
+{% else %}
 {% blocktrans %}Tu Mayorista de{% endblocktrans %}
+{% endif %}
 
 <span class="text-yellow">
+{% if home_contenido %}
+{{ home_contenido.hero_titulo_resaltado_traducido }}
+{% else %}
 {% trans "Productos Latinos" %}
+{% endif %}
 </span>
 
+{% if home_contenido %}
+{{ home_contenido.hero_titulo_final_traducido }}
+{% else %}
 {% blocktrans %}de Confianza{% endblocktrans %}
+{% endif %}
 
 </h1>
 
 <p class="hero-subtitle">
+{% if home_contenido %}
+{{ home_contenido.hero_subtitulo_traducido }}
+{% else %}
 {% trans "Haz tus pedidos de forma rápida y segura. Compras al por mayor." %}
+{% endif %}
 </p>
 
-<a href="#" class="btn btn-yellow hero-btn">
+<a href="{% url 'catalogo' %}" class="btn btn-yellow hero-btn">
+{% if home_contenido %}
+{{ home_contenido.hero_boton_texto_traducido }} →
+{% else %}
 {% trans "Ver Catálogo" %} →
+{% endif %}
 </a>
 
 </div>
@@ -131,7 +151,7 @@ La Tortilla Grocery
 
 <!-- QUIENES SOMOS -->
 
-<section class="quienes-section">
+<section class="quienes-section" id="quienes-somos">
 
 <div class="container">
 
@@ -361,8 +381,8 @@ en un mercado competitivo.
 
 <i class="bi bi-collection fs-1"></i>
 
-<h6>{% trans "Amplio Catálogo" %}</h6>
-<p>{% trans "Productos latinos de alta rotación" %}</p>
+<h6>{% trans "Variedad Garantizada" %}</h6>
+<p>{% trans "Marcas y presentaciones para surtir tu negocio" %}</p>
 
 </div>
 </div>
@@ -469,7 +489,7 @@ en un mercado competitivo.
 
 <!-- MARCAS -->
 
-<section class="marcas-section">
+<section class="marcas-section" id="marcas">
 
 <div class="container">
 
@@ -502,7 +522,7 @@ en un mercado competitivo.
 
 <!-- OFERTAS DESTACADAS -->
 
-<section class="ofertas-section">
+<section class="ofertas-section" id="ofertas">
 
 <div class="container">
 
@@ -541,23 +561,23 @@ en un mercado competitivo.
 
 <h5>{{ producto.nombre }}</h5>
 
-{% with producto.presentaciones.first as presentacion %}
+                {% with producto.primera_presentacion as presentacion %}
 {% if presentacion %}
 <p class="producto-info">
-({{ presentacion.unidades }} {{ presentacion.tipo_contenido }})
+({{ presentacion.unidades }} {{ presentacion.tipo_contenido_traducido }})
 </p>
 {% endif %}
 {% endwith %}
 
 <div class="producto-opcion">
 
-<label>Presentación:</label>
+<label>{% trans "Presentación:" %}</label>
 
 <select class="form-select form-select-sm">
 
-{% for p in producto.presentaciones.all %}
+{% for p in producto.presentaciones_prefetch %}
 <option>
-{{ p.nombre }} ({{ p.unidades }} {{ p.tipo_contenido }})
+{{ p.nombre_traducido }} ({{ p.unidades }} {{ p.tipo_contenido_traducido }})
 </option>
 {% endfor %}
 
@@ -581,7 +601,7 @@ en un mercado competitivo.
 
 </div>
 
-<button class="btn btn-yellow btn-sm mt-2">{% trans "Añadir a cotización" %}</button>
+<button class="btn btn-yellow btn-sm mt-2 agregar-oferta-btn">{% trans "Añadir a cotización" %}</button>
 
 </div>
 
@@ -640,7 +660,7 @@ en un mercado competitivo.
 
 <!-- TESTIMONIOS INFINITOS -->
 
-<section class="testimonios-section">
+<section class="testimonios-section" id="testimonios">
 
 <div class="container">
 
@@ -675,7 +695,7 @@ en un mercado competitivo.
 
 <h6>{{ t.nombre }}</h6>
 
-<small>{{ t.negocio }}</small>
+<small>{{ t.negocio_traducido }}</small>
 
 <div class="stars">
 {% for i in "12345"|slice:":t.estrellas" %}
@@ -690,7 +710,7 @@ en un mercado competitivo.
 <hr>
 
 <p>
-{{ t.comentario }}
+{{ t.comentario_traducido }}
 </p>
 
 </div>
@@ -729,17 +749,29 @@ en un mercado competitivo.
 <div class="container text-center">
 
 <h3 class="cta-title">
+{% if home_contenido %}
+{{ home_contenido.cta_titulo_traducido }}
+{% else %}
 {% trans "¿Tienes una tienda? Solicita tu cuenta mayorista hoy" %}
+{% endif %}
 </h3>
 
 <div class="cta-buttons">
 
-<a href="#" class="btn btn-yellow cta-btn">
+<a href="#" class="btn btn-yellow cta-btn" onclick="abrirModalRegistro(); return false;">
+{% if home_contenido %}
+{{ home_contenido.cta_boton_registro_texto_traducido }}
+{% else %}
 {% trans "Crear Cuenta" %}
+{% endif %}
 </a>
 
-<a href="#" class="btn btn-catalogo cta-btn">
+<a href="{% url 'catalogo' %}" class="btn btn-catalogo cta-btn">
+{% if home_contenido %}
+{{ home_contenido.cta_boton_catalogo_texto_traducido }}
+{% else %}
 {% trans "Ver Catálogo" %}
+{% endif %}
 </a>
 
 </div>
@@ -753,7 +785,7 @@ en un mercado competitivo.
 
 <!-- FOOTER -->
 
-<footer class="footer-main">
+<footer class="footer-main" id="contacto">
 
 <div class="container">
 
@@ -767,16 +799,20 @@ en un mercado competitivo.
 
 <img src="{% static 'img/logo.png' %}" class="footer-logo">
 
-<h5>{% trans "La Tortilla Grocery" %}</h5>
+<div class="footer-brand-text">
+
+<h5 class="footer-brand-name">{% trans "La Tortilla" %}<br>{% trans "Grocery" %}</h5>
+
+<p>{% trans "La Tortilla Grocery LLC es un distribuidor mayorista de productos latinos de confianza." %}
+{% trans "Abastecemos tiendas, supermercados y restaurantes con calidad, precios competitivos" %}
+{% trans "y entregas eficientes." %}
+</p>
+
+</div>
 
 </div>
 
 <hr class="footer-divider">
-
-<p> {% trans "La Tortilla Grocery LLC es un distribuidor mayorista de productos latinos de confianza." %}
-{% trans "Abastecemos tiendas, supermercados y restaurantes con calidad, precios competitivos" %}
-{% trans "y entregas eficientes." %}
-</p>
 
 </div>
 
@@ -788,11 +824,11 @@ en un mercado competitivo.
 <h6>{% trans "Compañía" %}</h6>
 
 <ul>
-<li><a href="#">{% trans "Inicio" %}</a></li>
-<li><a href="#">{% trans "Quienes Somos" %}</a></li>
-<li><a href="#">{% trans "Marcas" %}</a></li>
-<li><a href="#">{% trans "Ofertas" %}</a></li>
-<li><a href="#">{% trans "Testimonios" %}</a></li>
+<li><a href="/">{% trans "Inicio" %}</a></li>
+<li><a href="#quienes-somos">{% trans "Quienes Somos" %}</a></li>
+<li><a href="#marcas">{% trans "Marcas" %}</a></li>
+<li><a href="#ofertas">{% trans "Ofertas" %}</a></li>
+<li><a href="#testimonios">{% trans "Testimonios" %}</a></li>
 </ul>
 
 </div>
@@ -861,15 +897,152 @@ en un mercado competitivo.
 </footer>
 
 
+<!-- MODAL LOGIN -->
+<div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background: white; border: none; border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);">
+      <button type="button" class="btn-close btn-close-dark position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close" style="z-index: 10;"></button>
+      <div id="loginFormContainer" style="padding: 2rem;">
+        <div class="text-center">
+          <div class="spinner-border" role="status">
+            <span class="visually-hidden">{% trans "Loading..." %}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-</script src="{% static 'js/home.js' %}"></script>
+<!-- MODAL ERROR DE LOGIN -->
+<div class="modal fade" id="loginErrorModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background: white; border: none; border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);">
+      <div style="padding: 2rem;">
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+          <div style="font-size: 60px; color: #d32f2f; margin-bottom: 1rem;">
+            <i class="bi bi-exclamation-circle"></i>
+          </div>
+          <h3 style="color: #0b3d91; font-weight: 700; margin-bottom: 0.5rem;">{% trans "Credenciales Incorrectas" %}</h3>
+          <p id="loginErrorMessage" style="color: #475569; margin-bottom: 1.5rem; line-height: 1.6;">
+            {% trans "Verifica tu usuario y contraseña. Intenta de nuevo." %}
+          </p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button type="button" class="btn w-100" onclick="cerrarErrorYReiniciar()" style="background: linear-gradient(to right, #ffe600, #c7c700); border: none; color: #1e293b; font-weight: 700; padding: 12px 20px; border-radius: 8px;">
+            {% trans "Intentar de Nuevo" %}
+          </button>
+          <button type="button" class="btn btn-outline-secondary w-100" data-bs-dismiss="modal" style="border: 2px solid #d4d8e2; color: #475569; font-weight: 600; padding: 12px 20px; border-radius: 8px;">
+            {% trans "Cerrar" %}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Cargar el formulario de login cuando se abre el modal
+document.addEventListener('DOMContentLoaded', function() {
+  const loginModal = document.getElementById('loginModal');
+  
+  if (!loginModal) {
+    return;
+  }
+  
+  loginModal.addEventListener('show.bs.modal', function() {
+    const container = document.getElementById('loginFormContainer');
+    
+    if (!container) {
+      return;
+    }
+    
+    // Crear timeout
+    const timeoutId = setTimeout(function() {
+      container.innerHTML = '<div class="alert alert-warning">{% trans "El formulario está tardando mucho." %} <button onclick="location.reload()">{% trans "Recarga" %}</button></div>';
+    }, 8000);
+    
+    fetch('{% url "login" %}', {
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+      .then(function(response) {
+        clearTimeout(timeoutId);
+        if (!response.ok) {
+          throw new Error('Error ' + response.status);
+        }
+        return response.text();
+      })
+      .then(function(html) {
+        if (!html || html.trim().length === 0) {
+          throw new Error('Respuesta vacía');
+        }
+        container.innerHTML = html;
+        
+        // Interceptar submit
+        setTimeout(function() {
+          const form = container.querySelector('form');
+          if (form) {
+            form.addEventListener('submit', function(e) {
+              e.preventDefault();
+              
+              const formData = new FormData(form);
+              fetch('{% url "login" %}', {
+                method: 'POST',
+                headers: {
+                  'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData
+              })
+              .then(function(response) {
+                return response.json();
+              })
+              .then(function(data) {
+                if (data.success) {
+                  // Login exitoso, redirigir
+                  window.location.href = data.redirect;
+                } else {
+                  // Login falló, mostrar modal de error con mensaje específico
+                  let mensajeError = '{% trans "Credenciales incorrectas" %}';
+                  
+                  if (data.error === 'user_not_found') {
+                    mensajeError = '{% trans "El usuario no existe en la base de datos" %}';
+                  } else if (data.error === 'password_incorrect') {
+                    mensajeError = '{% trans "Contraseña incorrecta" %}';
+                  }
+                  
+                  // Cerrar modal de login
+                  const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+                  if (loginModal) {
+                    loginModal.hide();
+                  }
+                  
+                  // Mostrar modal de error
+                  document.getElementById('loginErrorMessage').textContent = mensajeError;
+                  const errorModal = new bootstrap.Modal(document.getElementById('loginErrorModal'));
+                  errorModal.show();
+                }
+              })
+              .catch(function(err) { 
+                console.error('Error:', err);
+                // Si hay error en la petición, intentar cargar el formulario nuevamente
+                container.innerHTML = '<div class="alert alert-danger">{% trans "Error al procesar. Intenta de nuevo." %}</div>';
+              });
+            });
+          }
+        }, 100);
+      })
+      .catch(function(error) {
+        clearTimeout(timeoutId);
+        container.innerHTML = '<div class="alert alert-danger">{% trans "Error al cargar" %}</div>';
+      });
+  });
+});
+</script>
+
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
 
 <script>
-    
-
-
-
 const track = document.getElementById("testimoniosTrack");
 
 let cards = document.querySelectorAll(".testimonio-card");
@@ -878,7 +1051,7 @@ let index = 1; // el del centro
 
 function activarCentro(){
 
-cards.forEach(card => card.classList.remove("active"));
+cards.forEach(function(card) { card.classList.remove("active"); });
 
 cards[index].classList.add("active");
 
@@ -893,7 +1066,7 @@ const cardWidth = cards[0].offsetWidth + 40;
 track.style.transition = "transform .7s ease";
 track.style.transform = `translateX(-${cardWidth}px)`;
 
-setTimeout(()=>{
+setTimeout(function(){
 
 track.appendChild(cards[0]);
 
@@ -910,81 +1083,356 @@ activarCentro();
 
 activarCentro();
 
-setInterval(moverCarrusel,3000);
-
-
-
+setInterval(moverCarrusel, 3000);
 
 </script>
 
 <script>
-
+// Script de carrusel de marcas con validación
 document.addEventListener("DOMContentLoaded", function(){
-
-const marcasTrack = document.getElementById("marcasTrack");
-
-if(marcasTrack){
-
-const logos = marcasTrack.innerHTML;
-
-/* duplicar logos para loop infinito */
-for(let i = 0; i < 5; i++){
-marcasTrack.innerHTML += logos;
-}
-
-}
-
-});
-
-</script>
-
-<script>
-    document.addEventListener("DOMContentLoaded", function(){
-
-    document.querySelectorAll(".cantidad-box").forEach(function(box){
-
-    let input = box.querySelector(".cantidad-input");
-    let mas = box.querySelector(".btn-mas");
-    let menos = box.querySelector(".btn-menos");
-
-    mas.addEventListener("click", function(){
-
-    input.value = parseInt(input.value) + 1;
-
-    });
-
-    menos.addEventListener("click", function(){
-
-    if(parseInt(input.value) > 1){
-    input.value = parseInt(input.value) - 1;
+  const marcasTrack = document.getElementById("marcasTrack");
+  
+  if(marcasTrack){
+    const logos = marcasTrack.innerHTML;
+    /* duplicar logos para loop infinito */
+    for(let i = 0; i < 5; i++){
+      marcasTrack.innerHTML += logos;
     }
+  }
+});
 
+</script>
+
+<script>
+// Validar que los elementos de cantidad existan antes de operar
+document.addEventListener("DOMContentLoaded", function(){
+  const cantidadBoxes = document.querySelectorAll(".cantidad-box");
+  
+  if (cantidadBoxes.length === 0) {
+    console.warn('No se encontraron cajas de cantidad en la página');
+    return;
+  }
+  
+  cantidadBoxes.forEach(function(box){
+    const input = box.querySelector(".cantidad-input");
+    const mas = box.querySelector(".btn-mas");
+    const menos = box.querySelector(".btn-menos");
+    
+    // Validar que todos los elementos existan
+    if (!input || !mas || !menos) {
+      console.warn('Elemento faltante en caja de cantidad', box);
+      return;
+    }
+    
+    // Establecer valor inicial válido
+    if (!input.value || parseInt(input.value) < 1) {
+      input.value = 1;
+    }
+    
+    mas.addEventListener("click", function(){
+      let valor = parseInt(input.value) || 1;
+      input.value = valor + 1;
     });
-
+    
+    menos.addEventListener("click", function(){
+      let valor = parseInt(input.value) || 1;
+      if(valor > 1){
+        input.value = valor - 1;
+      }
     });
-
+  });
 });
 </script>
 
 <script>
-
-
-
+// Validar selector de idioma
 function toggleLanguageMenu(){
-
-const menu = document.getElementById("languageMenu");
-
-if(menu.style.display === "flex"){
-menu.style.display = "none";
-}else{
-menu.style.display = "flex";
+  const menu = document.getElementById("languageMenu");
+  if (!menu) {
+    console.warn('No se encontró el menú de idiomas');
+    return;
+  }
+  
+  if(menu.style.display === "flex"){
+    menu.style.display = "none";
+  }else{
+    menu.style.display = "flex";
+  }
 }
 
+// Validar autenticación para agregar ofertas
+document.querySelectorAll(".agregar-oferta-btn").forEach(function(btn) {
+  btn.addEventListener("click", function() {
+    const isAuthenticated = document.body.dataset.auth === 'true';
+    
+    if (!isAuthenticated) {
+      // Mostrar el modal de login si no está autenticado
+      const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+      if (loginModal) {
+        loginModal.show();
+      } else {
+        console.error('No se pudo inicializar el modal de login');
+      }
+      return;
+    }
+    
+    // Aquí iría la lógica para agregar a cotización si estuviera autenticado
+    // Por ahora solo validamos que sea un usuario autenticado
+  });
+});
+
+// Función para cerrar el modal de error y reabrir el modal de login
+function cerrarErrorYReiniciar() {
+  const errorModal = bootstrap.Modal.getInstance(document.getElementById('loginErrorModal'));
+  if (errorModal) {
+    errorModal.hide();
+  }
+  
+  // Esperar a que se cierre el modal de error y abrir el modal de login nuevamente
+  setTimeout(function() {
+    const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+    loginModal.show();
+  }, 300);
 }
 
+// Función global para toggle de contraseña
+function togglePassword() {
+  const passwordInput = document.getElementById('password');
+  const toggleIcon = document.getElementById('toggleIcon');
+  
+  if (passwordInput && toggleIcon) {
+    if (passwordInput.type === 'password') {
+      passwordInput.type = 'text';
+      toggleIcon.classList.remove('bi-eye');
+      toggleIcon.classList.add('bi-eye-slash');
+    } else {
+      passwordInput.type = 'password';
+      toggleIcon.classList.remove('bi-eye-slash');
+      toggleIcon.classList.add('bi-eye');
+    }
+  }
+}
+
+// Función para abrir el modal y mostrar el formulario de registro
+function abrirModalRegistro() {
+  const loginModalElement = document.getElementById('loginModal');
+  if (!loginModalElement) {
+    console.error('{% trans "No se encontró el modal de login" %}');
+    return;
+  }
+  
+  const loginModal = new bootstrap.Modal(loginModalElement);
+  loginModal.show();
+  
+  // Después de que el modal se abra, cargamos el formulario de registro
+  setTimeout(function() {
+    cargarRegistro();
+  }, 300);
+}
+
+// Función para cargar el formulario de registro en el modal
+function cargarRegistro() {
+  const container = document.getElementById('loginFormContainer');
+  
+  if (!container) {
+    console.error('{% trans "No se encontró el contenedor del formulario" %}');
+    return;
+  }
+  
+  // Crear timeout
+  const timeoutId = setTimeout(function() {
+    container.innerHTML = '<div class="alert alert-warning">{% trans "El formulario está tardando mucho." %} <button onclick="location.reload()">{% trans "Recarga" %}</button></div>';
+  }, 8000);
+  
+  fetch('{% url "registro_modal" %}', {
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+    .then(function(response) {
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        throw new Error('Error ' + response.status);
+      }
+      return response.text();
+    })
+    .then(function(html) {
+      if (!html || html.trim().length === 0) {
+        throw new Error('Respuesta vacía');
+      }
+      container.innerHTML = html;
+      
+      // Ejecutar scripts que vienen en el HTML
+      const scripts = container.querySelectorAll('script');
+      scripts.forEach(function(script) {
+        const newScript = document.createElement('script');
+        newScript.textContent = script.textContent;
+        // Copiar atributos
+        for (let attr of script.attributes) {
+          newScript.setAttribute(attr.name, attr.value);
+        }
+        container.appendChild(newScript);
+      });
+      
+      // Interceptar el submit del formulario de registro después de que los scripts se ejecuten
+      setTimeout(function() {
+        const form = container.querySelector('#registroForm');
+        if (form && !form.hasListener) {
+          form.hasListener = true;
+          form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Validar checkbox de términos
+            const checkbox = container.querySelector('input[name="confirmacion"]');
+            if (checkbox && !checkbox.checked) {
+              alert('{% trans "Debes marcar el checkbox para continuar con el registro" %}');
+              return;
+            }
+            
+            const formData = new FormData(form);
+            fetch('{% url "registro_usuario" %}', {
+              method: 'POST',
+              headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+              },
+              body: formData
+            })
+            .then(function(response) {
+              const contentType = response.headers.get('content-type') || '';
+              if (contentType.includes('application/json')) {
+                return response.json().then(function(data) {
+                  return { kind: 'json', data: data };
+                });
+              }
+              return response.text().then(function(html) {
+                return { kind: 'html', html: html };
+              });
+            })
+            .then(function(result) {
+              if (result.kind === 'json') {
+                if (result.data.success) {
+                  mostrarExitoRegistro();
+                } else {
+                  alert(result.data.message || '{% trans "Error al registrarse. Intenta de nuevo." %}');
+                }
+                return;
+              }
+
+              const html = result.html;
+              if (
+                html.includes('Tu solicitud fue enviada') ||
+                html.includes('Your request was submitted') ||
+                html.includes('administrator will review')
+              ) {
+                mostrarExitoRegistro();
+              } else {
+                container.innerHTML = html;
+              }
+            })
+            .catch(error => { 
+              console.error('Error:', error);
+              alert('{% trans "Error al registrarse. Intenta de nuevo." %}');
+            });
+          });
+        }
+      }, 100);
+    })
+    .catch(function(error) {
+      clearTimeout(timeoutId);
+      console.error('Error:', error);
+      container.innerHTML = '<div class="alert alert-danger">{% trans "Error al cargar el formulario de registro" %}</div>';
+    });
+}
+
+// Función para mostrar mensaje de éxito del registro
+function mostrarExitoRegistro() {
+  const container = document.getElementById('loginFormContainer');
+  
+  container.innerHTML = `
+    <div style="text-align: center; padding: 2rem;">
+      <div style="font-size: 60px; color: #28a745; margin-bottom: 1.5rem;">
+        <i class="bi bi-check-circle"></i>
+      </div>
+      <h3 style="color: #0b3d91; font-weight: 700; margin-bottom: 1rem;">{% trans "¡Solicitud Recibida!" %}</h3>
+      <p style="color: #475569; margin-bottom: 1.5rem; line-height: 1.6;">
+        {% trans "Tu solicitud de registro fue enviada correctamente." %}<br>
+        {% trans "Un administrador revisará tu documentación y te contactará pronto." %}
+      </p>
+      <button type="button" class="btn btn-yellow" data-bs-dismiss="modal" style="background: linear-gradient(to right, #ffe600, #c7c700); border: none; color: #1e293b; font-weight: 700; padding: 12px 20px; border-radius: 8px;">
+        {% trans "Cerrar" %}
+      </button>
+    </div>
+  `;
+}
 </script>
 
 {% get_current_language as LANGUAGE_CODE %}
+
+<script>
+// Control del histórico de navegación - Prevenir que anchor links creen historial
+document.addEventListener('DOMContentLoaded', function() {
+  const forceNoBack = {{ disable_back_navigation|yesno:"true,false" }};
+  const cameFromInternalRoute = (function() {
+    if (!document.referrer) {
+      return false;
+    }
+
+    try {
+      const ref = new URL(document.referrer);
+      const refPath = (ref.pathname || '/').replace(/\/+$/, '') || '/';
+      const currentPath = (window.location.pathname || '/').replace(/\/+$/, '') || '/';
+      return ref.origin === window.location.origin && refPath !== currentPath;
+    } catch (e) {
+      return false;
+    }
+  })();
+
+  const shouldLockBack = forceNoBack || cameFromInternalRoute;
+
+  // Limpiar histórico al cargar la página
+  window.history.replaceState(null, null, window.location.href);
+
+  if (shouldLockBack) {
+    window.history.pushState(null, null, window.location.href);
+  }
+  
+  // Interceptar todos los clicks en anchor links
+  document.querySelectorAll('a[href^="#"]').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      // No prevenir el comportamiento predeterminado para que el anchor funcione
+      // Pero reemplazar el estado del histórico para no crear una nueva entrada
+      setTimeout(function() {
+        window.history.replaceState(null, null, window.location.href);
+      }, 100);
+    });
+  });
+  
+  // Prevenir que el modal cree entradas en el histórico
+  const loginModal = document.getElementById('loginModal');
+  if (loginModal) {
+    loginModal.addEventListener('show.bs.modal', function() {
+      // No hacer push, solo mantener el estado actual
+      window.history.replaceState(null, null, window.location.href);
+    });
+    
+    loginModal.addEventListener('hide.bs.modal', function() {
+      // Cuando se cierra el modal, también reemplazar el estado
+      window.history.replaceState(null, null, window.location.href);
+    });
+  }
+  
+  // Detectar cuando el usuario intenta usar el botón atrás
+  window.addEventListener('popstate', function(event) {
+    if (shouldLockBack) {
+      // Keep user on Home to avoid stale back navigation after leaving catalog/logout.
+      window.history.pushState(null, null, window.location.href);
+      return;
+    }
+
+    window.history.replaceState(null, null, window.location.href);
+  });
+});
+</script>
 
 <div class="language-widget">
 
@@ -1024,6 +1472,50 @@ EN
 </div>
 
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const navbar = document.querySelector('.navbar-home');
+  if (!navbar) {
+    return;
+  }
+
+  // Prevent long-press text selection/callout on mobile header items.
+  navbar.addEventListener('selectstart', function (e) {
+    e.preventDefault();
+  });
+
+  navbar.addEventListener('contextmenu', function (e) {
+    e.preventDefault();
+  });
+
+  navbar.querySelectorAll('a, button').forEach(function (el) {
+    el.setAttribute('draggable', 'false');
+  });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const flipBoxes = document.querySelectorAll('.elegirnos-section .flip-box');
+
+  if (!flipBoxes.length) {
+    return;
+  }
+
+  const supportsHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+  if (supportsHover) {
+    return;
+  }
+
+  flipBoxes.forEach(function (box) {
+    box.addEventListener('click', function () {
+      box.classList.toggle('is-flipped');
+    });
+  });
+});
+</script>
 
 
 </body>

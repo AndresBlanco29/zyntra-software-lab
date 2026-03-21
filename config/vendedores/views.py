@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from clientes.models import Cliente
 from usuarios.models import Usuario
@@ -9,6 +9,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.conf import settings
 from django.utils import timezone
+import pytz
 
 
 def crear_cliente(request):
@@ -85,7 +86,7 @@ def catalogo_vendedor(request, cliente_id):
     productos = Producto.objects.filter(activo=True).prefetch_related("presentaciones")
 
     categorias = Categoria.objects.all()
-    marcas = Marca.objects.all()
+    marcas = Marca.objects.filter(activo=True)
 
     carrito = request.session.get("pedido", {})
 
@@ -326,7 +327,7 @@ def enviar_pedido(request):
         "items": items,
         "total": total,
         "vendedor": request.user.get_full_name(),
-        "fecha": timezone.now(),
+        "fecha": timezone.now().astimezone(pytz.timezone('America/New_York')),
         "tipo_orden": tipo_orden
     }
 
@@ -350,3 +351,91 @@ def enviar_pedido(request):
     request.session["pedido"] = {}
 
     return JsonResponse({"success": True})
+
+
+def editar_cliente(request):
+    """Vista para editar los datos del cliente"""
+    
+    if request.method == 'POST':
+        import json
+        
+        try:
+            data = json.loads(request.body)
+            cliente_id = data.get('cliente_id')
+            empresa = data.get('empresa')
+            correo = data.get('correo')
+            telefono = data.get('telefono')
+            
+            # Obtener el cliente
+            cliente = Cliente.objects.get(id=cliente_id)
+            
+            # Verificar que el vendedor es el que intenta editar
+            # (puedes agregar validación si es necesario)
+            
+            # Actualizar datos del cliente
+            cliente.nombre_empresa = empresa
+            cliente.telefono = telefono
+            cliente.save()
+            
+            # Actualizar email del usuario
+            cliente.usuario.email = correo
+            cliente.usuario.save()
+            
+            return JsonResponse({'success': True, 'message': 'Cliente actualizado correctamente'})
+            
+        except Cliente.DoesNotExist:
+            return JsonResponse({'success': False, 'message': 'Cliente no encontrado'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)})
+    
+    return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=400)
+
+
+@require_POST
+def desactivar_cliente(request):
+    """Desactiva un cliente y su usuario asociado."""
+
+    try:
+        import json
+        data = json.loads(request.body)
+        cliente_id = data.get('cliente_id')
+
+        if not cliente_id:
+            return JsonResponse({'success': False, 'message': 'ID de cliente requerido'}, status=400)
+
+        cliente = get_object_or_404(Cliente, id=cliente_id)
+        cliente.aprobado = False
+        cliente.save(update_fields=['aprobado'])
+
+        cliente.usuario.is_active = False
+        cliente.usuario.save(update_fields=['is_active'])
+
+        return JsonResponse({'success': True, 'message': 'Cliente desactivado correctamente'})
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=400)
+
+
+@require_POST
+def activar_cliente(request):
+    """Activa un cliente y su usuario asociado."""
+
+    try:
+        import json
+        data = json.loads(request.body)
+        cliente_id = data.get('cliente_id')
+
+        if not cliente_id:
+            return JsonResponse({'success': False, 'message': 'ID de cliente requerido'}, status=400)
+
+        cliente = get_object_or_404(Cliente, id=cliente_id)
+        cliente.aprobado = True
+        cliente.save(update_fields=['aprobado'])
+
+        cliente.usuario.is_active = True
+        cliente.usuario.save(update_fields=['is_active'])
+
+        return JsonResponse({'success': True, 'message': 'Cliente activado correctamente'})
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)}, status=400)

@@ -49,7 +49,7 @@
             Estás a dos pasos de formar parte de nuestra red comercial
           </p>
 
-          <div class="fw-bold text-primary" id="stepText1">Paso 1 de 2</div>
+          <div class="fw-bold text-primary" id="stepText1">Paso 1 de 3</div>
 
           <div
             class="progress mx-auto mt-2"
@@ -63,7 +63,7 @@
           </div>
         </div>
 
-        <form method="POST" enctype="multipart/form-data" action="{% url 'registro' %}">
+        <form method="POST" enctype="multipart/form-data" action="{% url 'registro_usuario' %}">
           {% csrf_token %}
 
           <!-- PASO 1 FORMULARIO-->
@@ -123,7 +123,73 @@
             </div>
           </div>
 
-          <!-- PASO 2 -->
+          <!-- PASO 2 CREDENCIALES -->
+          <div id="stepCredenciales" style="display:none">
+
+            <div class="text-center mb-4">
+              <div class="fw-bold text-primary">Paso 2 de 3</div>
+
+              <div class="progress mx-auto mt-2" style="height:6px; max-width:300px">
+                <div class="progress-bar bg-primary" style="width:70%"></div>
+              </div>
+
+              <br>
+              <h5 class="fw-bold text-primary">Crear acceso a la plataforma</h5>
+            </div>
+
+            <div class="mb-3">
+              <input
+                type="text"
+                class="form-control form-control-lg"
+                name="username"
+                placeholder="Usuario*"
+                required
+              />
+            </div>
+
+            <div class="mb-3">
+              <input
+                type="email"
+                class="form-control form-control-lg"
+                name="email"
+                placeholder="Correo electrónico*"
+                required
+              />
+            </div>
+
+            <div class="mb-3">
+              <input
+                type="password"
+                class="form-control form-control-lg"
+                name="password1"
+                placeholder="Contraseña*"
+                required
+              />
+            </div>
+
+            <div class="mb-3">
+              <input
+                type="password"
+                class="form-control form-control-lg"
+                name="password2"
+                placeholder="Confirmar contraseña*"
+                required
+              />
+            </div>
+
+            <div class="d-grid">
+              <button
+                type="button"
+                class="btn btn-continuar btn-lg"
+                onclick="nextStepCredenciales()"
+              >
+                Continuar
+              </button>
+            </div>
+
+          </div>
+
+          <!-- PASO 3 -->
           <div id="step2" style="display: none">
             
             
@@ -290,7 +356,7 @@
               <!-- CHECKBOX CONFIRMACIÓN -->
               <div class="form-check my-4 text-center">
 
-                <input class="form-check-input" type="checkbox" required id="confirmacion">
+                <input class="form-check-input" type="checkbox" name="confirmacion" required id="confirmacion">
 
                 <label class="form-check-label small" for="confirmacion">
                 Confirmo que la información proporcionada es correcta y verificable.
@@ -298,7 +364,7 @@
               </div>
 
               <div class="d-grid">
-                <button type="submit" class="btn btn-continuar btn-lg">
+                <button type="submit" class="btn btn-continuar btn-lg" formnovalidate>
                 Enviar para Aprobación
                 </button>
               </div>

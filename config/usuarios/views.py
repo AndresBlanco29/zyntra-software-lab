@@ -558,7 +558,7 @@ def registro_view(request):
                 usuario.telefono = telefono
                 usuario.documento = documento
                 usuario.role = 'cliente'
-                usuario.is_active = False
+                usuario.is_active = True
                 usuario.save()
 
                 Cliente.objects.create(

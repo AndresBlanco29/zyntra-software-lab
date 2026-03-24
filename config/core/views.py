@@ -124,12 +124,9 @@ def _get_cached_home_contenido():
                 "cta_boton_catalogo_texto_en",
                 "activo",
             ).first()
-        except Exception as e:
-            logger.exception("Error en home")
-            ofertas_chunks = []
-            marcas = []
-            testimonios = []
-            home_contenido = None
+        except (OperationalError, ProgrammingError):
+            contenido = None
+        cache.set(cache_key, contenido, HOME_CACHE_TIMEOUT)
     return contenido
 
 
@@ -156,17 +153,13 @@ def home(request):
 
     try:
         productos_destacados = _get_cached_home_productos()
-
-        # dividir en grupos de 3
         ofertas_chunks = list(chunk(productos_destacados, 3))
-
         marcas = _get_cached_home_marcas()
-
-        # NUEVO: traer testimonios activos
         testimonios = _get_cached_home_testimonios()
         home_contenido = _get_cached_home_contenido()
-    except (OperationalError, ProgrammingError):
-        logger.exception("No se pudo cargar el contenido dinamico del home")
+
+    except Exception as e:
+        print("ERROR EN HOME:", str(e))  # 👈 CLAVE
         ofertas_chunks = []
         marcas = []
         testimonios = []

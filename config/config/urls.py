@@ -21,6 +21,8 @@ from django.views.static import serve
 
 from django.conf import settings
 from django.conf.urls.static import static
+from core.views import home
+
 
 
 
@@ -28,7 +30,7 @@ urlpatterns = [
 
     path('admin/', admin.site.urls),
 
-    path('', include('core.urls')),  # 👈 SOLO UNA raíz
+    path('', home),
 
     path('productos/', include('productos.urls')),
     

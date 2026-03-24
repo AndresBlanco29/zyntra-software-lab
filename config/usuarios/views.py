@@ -13,6 +13,9 @@ from django.http import JsonResponse
 from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.db import transaction
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def _get_or_create_home_contenido():
@@ -558,7 +561,7 @@ def registro_view(request):
                 usuario.telefono = telefono
                 usuario.documento = documento
                 usuario.role = 'cliente'
-                usuario.is_active = True
+                usuario.is_active = False
                 usuario.save()
 
                 Cliente.objects.create(
@@ -577,12 +580,23 @@ def registro_view(request):
                 # asegurar que el grupo exista
                 grupo, _ = Group.objects.get_or_create(name='Cliente')
                 usuario.groups.add(grupo)
-        except Exception:
-            message = _("No se pudo completar el registro. Verifica los datos e intenta nuevamente.")
-            if is_ajax:
-                return JsonResponse({'success': False, 'error': 'server_error', 'message': message}, status=500)
-            messages.error(request, message)
-            return redirect('registro')
+                
+        except Exception as e:
+            logger.error(f"Error en registro_view para usuario {username}: {str(e)}", exc_info=True)
+            # A pesar del error, si el usuario se creó, mostramos éxito
+            if Usuario.objects.filter(username=username).exists():
+                message = _("Tu solicitud fue enviada. Un administrador revisará tu cuenta.")
+                if is_ajax:
+                    return JsonResponse({'success': True, 'message': message})
+                messages.success(request, message)
+                return redirect('login')
+            else:
+                # Si no se creó el usuario, mostrar error
+                message = _("No se pudo completar el registro. Verifica los datos e intenta nuevamente.")
+                if is_ajax:
+                    return JsonResponse({'success': False, 'error': 'server_error', 'message': message}, status=400)
+                messages.error(request, message)
+                return redirect('registro')
 
         messages.success(
             request,

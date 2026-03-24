@@ -28,9 +28,9 @@ urlpatterns = [
 
     path('admin/', admin.site.urls),
 
-    path('', include('core.urls')),  # 👈 HOME
+    path('', include('core.urls')),  # 👈 SOLO UNA raíz
 
-    path('', include('productos.urls')),
+    path('productos/', include('productos.urls')),
     
     path('cotizaciones/', include('cotizaciones.urls')),
 
@@ -38,14 +38,12 @@ urlpatterns = [
 
     path('vendedores/', include('vendedores.urls')),
 
-    path("i18n/", include("django.conf.urls.i18n")),
-
-    path('', include('usuarios.urls')),
+    path('usuarios/', include('usuarios.urls')),
 
     path('clientes/', include('clientes.urls')),
 
-    path('', include('productos.urls')),
-    
+    path("i18n/", include("django.conf.urls.i18n")),
+
 ]
 
 if settings.DEBUG:

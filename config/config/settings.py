@@ -46,8 +46,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key')
 DEBUG = env_bool('DEBUG', False)
 SERVE_MEDIA = env_bool('SERVE_MEDIA', True)
 
-allowed_hosts = os.environ.get('ALLOWED_HOSTS', '')
-ALLOWED_HOSTS = [host.strip() for host in allowed_hosts.split(',') if host.strip()]
+ALLOWED_HOSTS = ['*']
 
 railway_domain = 'tortilla-erp-production.up.railway.app'
 if railway_domain not in ALLOWED_HOSTS:
@@ -156,7 +155,7 @@ mysql_name = os.environ.get('MYSQLDATABASE', '')
 mysql_user = os.environ.get('MYSQLUSER', '')
 mysql_password = os.environ.get('MYSQLPASSWORD', '')
 mysql_host = os.environ.get('MYSQLHOST', '')
-mysql_port = os.environ.get('MYSQLPORT', '')
+mysql_port = os.environ.get('MYSQLPORT', '3306')
 db_conn_max_age = env_int('DB_CONN_MAX_AGE', 600)
 view_cache_timeout = env_int('VIEW_CACHE_TIMEOUT', 60)
 

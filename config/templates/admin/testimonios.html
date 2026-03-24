@@ -10,12 +10,6 @@ Testimonios
 <span>Testimonios del Home</span>
 </h2>
 
-{% if messages %}
-  {% for message in messages %}
-  <div class="alert alert-success">{{ message }}</div>
-  {% endfor %}
-{% endif %}
-
 <div class="d-flex gap-2 mb-3 flex-wrap">
   <a href="{% url 'crear_testimonio' %}" class="btn btn-primary">Crear Testimonio</a>
   <a href="{% url 'contenido_home' %}" class="btn btn-secondary">Volver a Contenido Home</a>

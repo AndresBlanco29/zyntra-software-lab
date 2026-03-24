@@ -169,6 +169,37 @@ Tomar Pedido
 
 </div>
 
+{% if messages %}
+<div id="flashMessages" class="d-none">
+  {% for message in messages %}
+  <div
+    class="flash-message-item"
+    data-tags="{{ message.tags|default:'' }}"
+    data-text="{{ message|striptags|escape }}">
+  </div>
+  {% endfor %}
+</div>
+
+<div class="modal fade" id="feedbackModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0" style="border-radius: 12px; overflow: hidden;">
+      <div class="modal-header border-0" id="feedbackModalHeader" style="background: linear-gradient(135deg, #0b3d91, #2f77d1); color: #fff;">
+        <h5 class="modal-title fw-bold" id="feedbackModalTitle">Notificacion</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center py-4" style="background: #ffffff;">
+        <p id="feedbackModalMessage" class="mb-0" style="font-size: 1rem; color: #1f2937;"></p>
+      </div>
+      <div class="modal-footer border-0 pt-0" style="justify-content: center;">
+        <button type="button" class="btn" data-bs-dismiss="modal" style="background: #0b3d91; color: #fff; font-weight: 600; padding: 0.45rem 1.2rem; border-radius: 8px;">
+          Entendido
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const toggleBtn = document.getElementById('sidebarToggleBtn');
@@ -200,6 +231,48 @@ document.addEventListener('DOMContentLoaded', function () {
       closeSidebar();
     }
   });
+
+  const flashContainer = document.getElementById('flashMessages');
+  if (!flashContainer) {
+    return;
+  }
+
+  const flashItems = flashContainer.querySelectorAll('.flash-message-item');
+  if (!flashItems.length) {
+    return;
+  }
+
+  // If multiple messages exist, show only the latest action to avoid stacking old alerts.
+  const latestMessage = flashItems[flashItems.length - 1];
+  const tags = (latestMessage.dataset.tags || '').toLowerCase();
+  const text = latestMessage.dataset.text || '';
+
+  const modalHeader = document.getElementById('feedbackModalHeader');
+  const modalTitle = document.getElementById('feedbackModalTitle');
+  const modalMessage = document.getElementById('feedbackModalMessage');
+  const modalElement = document.getElementById('feedbackModal');
+
+  if (!modalHeader || !modalTitle || !modalMessage || !modalElement) {
+    return;
+  }
+
+  if (tags.includes('error')) {
+    modalHeader.style.background = 'linear-gradient(135deg, #9f1239, #dc2626)';
+    modalTitle.textContent = 'Error';
+  } else if (tags.includes('warning')) {
+    modalHeader.style.background = 'linear-gradient(135deg, #b45309, #f59e0b)';
+    modalTitle.textContent = 'Aviso';
+  } else if (tags.includes('success')) {
+    modalHeader.style.background = 'linear-gradient(135deg, #0b3d91, #2f77d1)';
+    modalTitle.textContent = 'Operacion exitosa';
+  } else {
+    modalHeader.style.background = 'linear-gradient(135deg, #374151, #6b7280)';
+    modalTitle.textContent = 'Informacion';
+  }
+
+  modalMessage.textContent = text;
+  const feedbackModal = new bootstrap.Modal(modalElement);
+  feedbackModal.show();
 });
 </script>
 

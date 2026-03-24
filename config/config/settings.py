@@ -43,7 +43,7 @@ LOCALE_PATHS = [
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key')
 
-DEBUG = env_bool('DEBUG', False)
+DEBUG = True
 SERVE_MEDIA = env_bool('SERVE_MEDIA', True)
 
 ALLOWED_HOSTS = ['*']

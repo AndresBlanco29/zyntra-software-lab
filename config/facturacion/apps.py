@@ -2,4 +2,4 @@ from django.apps import AppConfig
 
 
 class FacturacionConfig(AppConfig):
-    name = 'facturacion'
+    name = 'config.facturacion'

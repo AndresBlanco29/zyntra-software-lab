@@ -35,9 +35,12 @@ class Command(BaseCommand):
             if getattr(user, "role", None) != "admin":
                 user.role = "admin"
                 updated_fields.append("role")
+            if not user.check_password(password):
+                user.set_password(password)
+                updated_fields.append("password")
 
             if updated_fields:
-                user.save(update_fields=updated_fields)
+                user.save()
                 self.stdout.write(self.style.SUCCESS(
                     f"Updated existing superuser '{username}'."
                 ))

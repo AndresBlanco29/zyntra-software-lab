@@ -398,6 +398,10 @@ def editar_cliente(request):
 @require_POST
 def desactivar_cliente(request):
     """Desactiva un cliente y su usuario asociado."""
+    
+    # Solo administradores pueden desactivar clientes
+    if not (request.user.is_superuser or request.user.role == 'admin'):
+        return JsonResponse({'success': False, 'message': 'Permiso denegado. Solo administradores pueden desactivar clientes.'}, status=403)
 
     try:
         import json
@@ -423,6 +427,10 @@ def desactivar_cliente(request):
 @require_POST
 def activar_cliente(request):
     """Activa un cliente y su usuario asociado."""
+    
+    # Solo administradores pueden activar clientes
+    if not (request.user.is_superuser or request.user.role == 'admin'):
+        return JsonResponse({'success': False, 'message': 'Permiso denegado. Solo administradores pueden activar clientes.'}, status=403)
 
     try:
         import json

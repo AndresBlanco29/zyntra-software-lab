@@ -86,18 +86,18 @@ INSTALLED_APPS = [
     'corsheaders',
 
     # tus apps
-    'core',
-    'cotizaciones',
-    'facturacion',
-    'inventario',
-    'notificaciones',
-    'pedidos',
-    'productos',
-    'reportes',
-    'usuarios',
-    'vendedores',
-    'clientes',
-    'carrito',
+    'config.core',
+    'config.productos',
+    'config.usuarios',
+    'config.clientes',
+    'config.vendedores',
+    'config.carrito',
+    'config.cotizaciones',
+    'config.facturacion',
+    'config.inventario',
+    'config.notificaciones',
+    'config.pedidos',
+    'config.reportes',
 ]
 
 # ========================

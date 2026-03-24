@@ -127,16 +127,18 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 {% trans "Editar" %}
 </button>
 
-{% if cliente.aprobado %}
-<button class="btn btn-danger btn-sm"
-  onclick="abrirModalEstadoCliente({{ cliente.id }}, '{{ cliente.usuario.first_name|escapejs }} {{ cliente.usuario.last_name|escapejs }}', 'desactivar')">
-  {% trans "Desactivar" %}
-</button>
-{% else %}
-<button class="btn btn-success btn-sm"
-  onclick="abrirModalEstadoCliente({{ cliente.id }}, '{{ cliente.usuario.first_name|escapejs }} {{ cliente.usuario.last_name|escapejs }}', 'activar')">
-  {% trans "Activar" %}
-</button>
+{% if request.user.is_superuser or request.user.role == 'admin' %}
+  {% if cliente.aprobado %}
+  <button class="btn btn-danger btn-sm"
+    onclick="abrirModalEstadoCliente({{ cliente.id }}, '{{ cliente.usuario.first_name|escapejs }} {{ cliente.usuario.last_name|escapejs }}', 'desactivar')">
+    {% trans "Desactivar" %}
+  </button>
+  {% else %}
+  <button class="btn btn-success btn-sm"
+    onclick="abrirModalEstadoCliente({{ cliente.id }}, '{{ cliente.usuario.first_name|escapejs }} {{ cliente.usuario.last_name|escapejs }}', 'activar')">
+    {% trans "Activar" %}
+  </button>
+  {% endif %}
 {% endif %}
 
 </td>

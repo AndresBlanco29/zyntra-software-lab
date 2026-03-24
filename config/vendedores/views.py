@@ -10,6 +10,7 @@ from django.template.loader import render_to_string
 from django.conf import settings
 from django.utils import timezone
 import pytz
+from django.contrib import messages
 
 
 def crear_cliente(request):
@@ -30,6 +31,9 @@ def crear_cliente(request):
         sales_tax = request.POST.get("sales_tax")
 
         certificado = request.FILES.get("certificado")
+        if not certificado:
+            messages.error(request, "Debes adjuntar el certificado tax para crear el cliente.")
+            return render(request, "vendedores/crear_cliente.html")
 
         # crear usuario
         username = f"user_{uuid.uuid4().hex[:8]}"

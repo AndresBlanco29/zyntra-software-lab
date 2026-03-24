@@ -12,6 +12,7 @@ from django.contrib.auth.hashers import make_password
 from django.http import JsonResponse
 from django.urls import reverse
 from django.utils.translation import gettext as _
+from django.db import transaction
 
 
 def _get_or_create_home_contenido():
@@ -535,39 +536,53 @@ def registro_view(request):
         apellido = request.POST.get('apellido')
         telefono = request.POST.get('telefono')
         documento = request.POST.get('id_cliente')
+        certificado = request.FILES.get('certificado')
 
-        
+        if not certificado:
+            message = _("Debes adjuntar el certificado tax para completar el registro.")
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': 'certificado_required', 'message': message}, status=400)
+            messages.error(request, message)
+            return redirect('registro')
 
-        usuario = Usuario.objects.create_user(
-            username=username,
-            email=email,
-            password=password,
-            first_name=nombre,
-            last_name=apellido
-        )
+        try:
+            with transaction.atomic():
+                usuario = Usuario.objects.create_user(
+                    username=username,
+                    email=email,
+                    password=password,
+                    first_name=nombre,
+                    last_name=apellido
+                )
 
-        usuario.telefono = telefono
-        usuario.documento = documento
-        usuario.role = 'cliente'
-        usuario.is_active = False
-        usuario.save()
+                usuario.telefono = telefono
+                usuario.documento = documento
+                usuario.role = 'cliente'
+                usuario.is_active = False
+                usuario.save()
 
-        Cliente.objects.create(
-            usuario=usuario,
-            nombre_empresa=request.POST.get('empresa'),
-            telefono=request.POST.get('telefono_comercial'),
-            direccion=request.POST.get('direccion'),
-            ciudad=request.POST.get('ciudad'),
-            estado=request.POST.get('estado'),
-            codigo_postal=request.POST.get('codigo_postal'),
-            pais=request.POST.get('pais'),
-            sales_tax_number=request.POST.get('sales_tax'),
-            certificado_tax=request.FILES.get('certificado')
-        )
+                Cliente.objects.create(
+                    usuario=usuario,
+                    nombre_empresa=request.POST.get('empresa'),
+                    telefono=request.POST.get('telefono_comercial'),
+                    direccion=request.POST.get('direccion'),
+                    ciudad=request.POST.get('ciudad'),
+                    estado=request.POST.get('estado'),
+                    codigo_postal=request.POST.get('codigo_postal'),
+                    pais=request.POST.get('pais'),
+                    sales_tax_number=request.POST.get('sales_tax'),
+                    certificado_tax=certificado,
+                )
 
-        # agregar al grupo cliente
-        grupo = Group.objects.get(name='Cliente')
-        usuario.groups.add(grupo)
+                # asegurar que el grupo exista
+                grupo, _ = Group.objects.get_or_create(name='Cliente')
+                usuario.groups.add(grupo)
+        except Exception:
+            message = _("No se pudo completar el registro. Verifica los datos e intenta nuevamente.")
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': 'server_error', 'message': message}, status=500)
+            messages.error(request, message)
+            return redirect('registro')
 
         messages.success(
             request,

@@ -37,6 +37,9 @@ def registro_cliente(request):
         # ARCHIVO
         # =========================
         certificado = request.FILES.get("certificado")
+        if not certificado:
+            messages.error(request, "Debes adjuntar el certificado tax para completar el registro.")
+            return redirect("registro")
 
         # =========================
         # CREAR USUARIO
@@ -66,7 +69,7 @@ def registro_cliente(request):
         )
 
         # asignar rol cliente
-        grupo_cliente = Group.objects.get(name="Cliente")
+        grupo_cliente, _ = Group.objects.get_or_create(name="Cliente")
         usuario.groups.add(grupo_cliente)
 
         messages.success(

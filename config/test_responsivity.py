@@ -87,7 +87,7 @@ def test_html_viewport():
     html_files = [
         'templates/home.html',
         'templates/productos/catalogo.html',
-        'templates/usuarios/login_modal_form.html'
+        'templates/usuarios/login.html'
     ]
     
     viewport_pattern = r'<meta\s+name="viewport"'

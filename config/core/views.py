@@ -1,12 +1,16 @@
 from django.core.cache import cache
+from django.db import OperationalError, ProgrammingError
 from django.db.models import Prefetch
+from django.http import JsonResponse
 from django.shortcuts import render
+import logging
 from productos.models import Producto, Marca, Presentacion
 from .models import Testimonio, HomeContenido
 from urllib.parse import urlparse
 
 
 HOME_CACHE_TIMEOUT = 60
+logger = logging.getLogger(__name__)
 
 
 def chunk(lista, n):
@@ -99,26 +103,29 @@ def _get_cached_home_contenido():
     cache_key = "home:contenido"
     contenido = cache.get(cache_key)
     if contenido is None:
-        contenido = HomeContenido.objects.filter(activo=True).only(
-            "id",
-            "hero_titulo_principal",
-            "hero_titulo_principal_en",
-            "hero_titulo_resaltado",
-            "hero_titulo_resaltado_en",
-            "hero_titulo_final",
-            "hero_titulo_final_en",
-            "hero_subtitulo",
-            "hero_subtitulo_en",
-            "hero_boton_texto",
-            "hero_boton_texto_en",
-            "cta_titulo",
-            "cta_titulo_en",
-            "cta_boton_registro_texto",
-            "cta_boton_registro_texto_en",
-            "cta_boton_catalogo_texto",
-            "cta_boton_catalogo_texto_en",
-            "activo",
-        ).first()
+        try:
+            contenido = HomeContenido.objects.filter(activo=True).only(
+                "id",
+                "hero_titulo_principal",
+                "hero_titulo_principal_en",
+                "hero_titulo_resaltado",
+                "hero_titulo_resaltado_en",
+                "hero_titulo_final",
+                "hero_titulo_final_en",
+                "hero_subtitulo",
+                "hero_subtitulo_en",
+                "hero_boton_texto",
+                "hero_boton_texto_en",
+                "cta_titulo",
+                "cta_titulo_en",
+                "cta_boton_registro_texto",
+                "cta_boton_registro_texto_en",
+                "cta_boton_catalogo_texto",
+                "cta_boton_catalogo_texto_en",
+                "activo",
+            ).first()
+        except (OperationalError, ProgrammingError):
+            contenido = None
         cache.set(cache_key, contenido, HOME_CACHE_TIMEOUT)
     return contenido
 
@@ -144,16 +151,23 @@ def _came_from_internal_route(request):
 def home(request):
     disable_back_navigation = request.GET.get("no_back") == "1" or _came_from_internal_route(request)
 
-    productos_destacados = _get_cached_home_productos()
+    try:
+        productos_destacados = _get_cached_home_productos()
 
-    # dividir en grupos de 3
-    ofertas_chunks = list(chunk(productos_destacados, 3))
+        # dividir en grupos de 3
+        ofertas_chunks = list(chunk(productos_destacados, 3))
 
-    marcas = _get_cached_home_marcas()
+        marcas = _get_cached_home_marcas()
 
-    # NUEVO: traer testimonios activos
-    testimonios = _get_cached_home_testimonios()
-    home_contenido = _get_cached_home_contenido()
+        # NUEVO: traer testimonios activos
+        testimonios = _get_cached_home_testimonios()
+        home_contenido = _get_cached_home_contenido()
+    except (OperationalError, ProgrammingError):
+        logger.exception("No se pudo cargar el contenido dinamico del home")
+        ofertas_chunks = []
+        marcas = []
+        testimonios = []
+        home_contenido = None
 
     response = render(request, "home.html", {
         "ofertas_chunks": ofertas_chunks,
@@ -164,3 +178,7 @@ def home(request):
     })
 
     return response
+
+
+def health(request):
+    return JsonResponse({"status": "ok"})

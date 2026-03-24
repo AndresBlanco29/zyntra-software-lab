@@ -149,7 +149,28 @@ def _came_from_internal_route(request):
 
 
 def home(request):
-    return JsonResponse({"ok": True})
+    try:
+        marcas = _get_cached_home_marcas()
+        testimonios = _get_cached_home_testimonios()
+        productos_destacados = _get_cached_home_productos()
+        ofertas_chunks = list(chunk(productos_destacados, 4))
+        home_contenido = _get_cached_home_contenido()
+    except (OperationalError, ProgrammingError) as exc:
+        logger.warning("home fallback due to db error: %s", exc)
+        marcas = []
+        testimonios = []
+        productos_destacados = []
+        ofertas_chunks = []
+        home_contenido = None
+
+    context = {
+        "marcas": marcas,
+        "testimonios": testimonios,
+        "productos_destacados": productos_destacados,
+        "ofertas_chunks": ofertas_chunks,
+        "home_contenido": home_contenido,
+    }
+    return render(request, "home.html", context)
 
 
 def health(request):

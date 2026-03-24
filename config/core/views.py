@@ -124,9 +124,12 @@ def _get_cached_home_contenido():
                 "cta_boton_catalogo_texto_en",
                 "activo",
             ).first()
-        except (OperationalError, ProgrammingError):
-            contenido = None
-        cache.set(cache_key, contenido, HOME_CACHE_TIMEOUT)
+        except Exception as e:
+            logger.exception("Error en home")
+            ofertas_chunks = []
+            marcas = []
+            testimonios = []
+            home_contenido = None
     return contenido
 
 

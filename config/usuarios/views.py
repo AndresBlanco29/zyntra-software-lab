@@ -578,7 +578,7 @@ def registro_view(request):
                 )
 
                 # asegurar que el grupo exista
-                grupo, _ = Group.objects.get_or_create(name='Cliente')
+                grupo, created = Group.objects.get_or_create(name='Cliente')
                 usuario.groups.add(grupo)
                 
         except Exception as e:

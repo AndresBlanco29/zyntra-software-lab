@@ -43,10 +43,11 @@ LOCALE_PATHS = [
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key')
 
-DEBUG = True
+DEBUG = env_bool('DEBUG', False)
 SERVE_MEDIA = env_bool('SERVE_MEDIA', True)
 
-ALLOWED_HOSTS = ['*']
+allowed_hosts = os.environ.get('ALLOWED_HOSTS', '')
+ALLOWED_HOSTS = [host.strip() for host in allowed_hosts.split(',') if host.strip()]
 
 railway_domain = 'tortilla-erp-production.up.railway.app'
 if railway_domain not in ALLOWED_HOSTS:
@@ -58,7 +59,7 @@ if DEBUG:
             ALLOWED_HOSTS.append(host)
 
 if not ALLOWED_HOSTS:
-    ALLOWED_HOSTS = ['*']
+    ALLOWED_HOSTS = [railway_domain]
 
 csrf_trusted_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
 CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_trusted_origins.split(',') if origin.strip()]
@@ -300,6 +301,6 @@ LOGGING = {
     },
     'root': {
         'handlers': ['console'],
-        'level': 'DEBUG',
+        'level': 'DEBUG' if DEBUG else 'INFO',
     },
 }

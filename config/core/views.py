@@ -149,31 +149,7 @@ def _came_from_internal_route(request):
 
 
 def home(request):
-    disable_back_navigation = request.GET.get("no_back") == "1" or _came_from_internal_route(request)
-
-    try:
-        productos_destacados = _get_cached_home_productos()
-        ofertas_chunks = list(chunk(productos_destacados, 3))
-        marcas = _get_cached_home_marcas()
-        testimonios = _get_cached_home_testimonios()
-        home_contenido = _get_cached_home_contenido()
-
-    except Exception as e:
-        print("ERROR EN HOME:", str(e))  # 👈 CLAVE
-        ofertas_chunks = []
-        marcas = []
-        testimonios = []
-        home_contenido = None
-
-    response = render(request, "home.html", {
-        "ofertas_chunks": ofertas_chunks,
-        "marcas": marcas,
-        "testimonios": testimonios,
-        "home_contenido": home_contenido,
-        "disable_back_navigation": disable_back_navigation,
-    })
-
-    return response
+    return JsonResponse({"ok": True})
 
 
 def health(request):

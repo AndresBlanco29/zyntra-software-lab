@@ -11,6 +11,10 @@ from decimal import Decimal, InvalidOperation
 CATALOGO_CACHE_TIMEOUT = 60
 
 
+def _is_admin_user(user):
+    return bool(user and user.is_authenticated and (user.is_superuser or user.role == "admin"))
+
+
 def _parse_decimal(value, default="0"):
     text = str(value or "").strip().replace(",", ".")
     if not text:
@@ -112,7 +116,7 @@ def catalogo(request):
 
 def lista_productos(request):
 
-    if not request.user.is_authenticated or request.user.role != "admin":
+    if not _is_admin_user(request.user):
         return redirect("login")
 
     productos = Producto.objects.all()
@@ -129,7 +133,7 @@ def lista_productos(request):
 @login_required
 def lista_marcas(request):
 
-    if request.user.role != "admin":
+    if not _is_admin_user(request.user):
         return redirect("login")
 
     marcas = Marca.objects.all().prefetch_related('categorias')
@@ -141,7 +145,7 @@ def lista_marcas(request):
 @login_required
 def crear_producto(request):
 
-    if request.user.role != "admin":
+    if not _is_admin_user(request.user):
         return redirect("login")
 
     if request.method == "POST":
@@ -241,7 +245,7 @@ def crear_producto(request):
 @login_required
 def crear_categoria(request):
 
-    if request.user.role != "admin":
+    if not _is_admin_user(request.user):
         return redirect("login")
 
     if request.method == "POST":
@@ -275,7 +279,7 @@ def crear_categoria(request):
 @login_required
 def crear_marca(request):
 
-    if request.user.role != "admin":
+    if not _is_admin_user(request.user):
         return redirect("login")
 
     categorias = Categoria.objects.all()
@@ -325,7 +329,7 @@ def crear_marca(request):
 @login_required
 def editar_marca(request, marca_id):
 
-    if request.user.role != "admin":
+    if not _is_admin_user(request.user):
         return redirect("login")
 
     marca = get_object_or_404(Marca, id=marca_id)
@@ -376,7 +380,7 @@ def editar_marca(request, marca_id):
 @login_required
 def desactivar_marca(request, marca_id):
 
-    if request.user.role != "admin":
+    if not _is_admin_user(request.user):
         return redirect("login")
 
     marca = get_object_or_404(Marca, id=marca_id)
@@ -390,7 +394,7 @@ def desactivar_marca(request, marca_id):
 @login_required
 def activar_marca(request, marca_id):
 
-    if request.user.role != "admin":
+    if not _is_admin_user(request.user):
         return redirect("login")
 
     marca = get_object_or_404(Marca, id=marca_id)

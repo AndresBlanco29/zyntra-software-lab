@@ -1,8 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
-from clientes.models import Cliente
-from usuarios.models import Usuario
-from productos.models import Producto, Presentacion, Categoria, Marca
+from config.clientes.models import Cliente
+from config.usuarios.models import Usuario
+from config.productos.models import Producto, Presentacion, Categoria, Marca
 from django.views.decorators.http import require_POST
 import uuid
 from django.core.mail import EmailMultiAlternatives

@@ -4,7 +4,7 @@ import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
-from productos.models import Categoria, Marca
+from config.productos.models import Categoria, Marca
 
 # Obtener las categorías
 bebidas = Categoria.objects.get(nombre='bebidas')

@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from usuarios.models import Usuario
-from clientes.models import Cliente
+from config.usuarios.models import Usuario
+from config.clientes.models import Cliente
 from django.contrib.auth.models import Group
 import uuid
 

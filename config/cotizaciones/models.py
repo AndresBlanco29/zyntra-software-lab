@@ -1,7 +1,7 @@
 from django.db import models
-from clientes.models import Cliente
-from productos.models import Producto, Presentacion
-from usuarios.models import Usuario
+from config.clientes.models import Cliente
+from config.productos.models import Producto, Presentacion
+from config.usuarios.models import Usuario
 
 
 class Cotizacion(models.Model):

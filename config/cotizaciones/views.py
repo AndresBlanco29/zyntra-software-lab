@@ -1,7 +1,7 @@
 from django.shortcuts import redirect, render
 from .models import Cotizacion, CotizacionItem
-from clientes.models import Cliente
-from productos.models import Presentacion, Producto
+from config.clientes.models import Cliente
+from config.productos.models import Presentacion, Producto
 from decimal import Decimal
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.template.loader import render_to_string

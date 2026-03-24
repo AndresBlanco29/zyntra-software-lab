@@ -4,7 +4,7 @@ from django.db.models import Prefetch
 from django.http import JsonResponse
 from django.shortcuts import render
 import logging
-from productos.models import Producto, Marca, Presentacion
+from config.productos.models import Producto, Marca, Presentacion
 from .models import Testimonio, HomeContenido
 from urllib.parse import urlparse
 

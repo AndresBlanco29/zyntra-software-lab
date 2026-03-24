@@ -1,5 +1,5 @@
 from django.db import models
-from usuarios.models import Usuario
+from config.usuarios.models import Usuario
 
 class Cliente(models.Model):
 

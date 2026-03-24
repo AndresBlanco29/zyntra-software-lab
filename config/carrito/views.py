@@ -1,6 +1,6 @@
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from productos.models import Producto, Presentacion
+from config.productos.models import Producto, Presentacion
 from django.shortcuts import render
 
 def ver_cotizacion(request):

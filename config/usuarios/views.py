@@ -4,9 +4,9 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.models import Group
 from .models import Usuario
-from clientes.models import Cliente
-from core.models import Testimonio, HomeContenido
-from productos.models import Producto, Marca
+from config.clientes.models import Cliente
+from config.core.models import Testimonio, HomeContenido
+from config.productos.models import Producto, Marca
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.hashers import make_password
 from django.http import JsonResponse

@@ -20,10 +20,24 @@ def _get_or_create_home_contenido():
         contenido = HomeContenido.objects.create(activo=True)
     return contenido
 
+
+def _is_admin_user(user):
+    return bool(user and user.is_authenticated and (user.is_superuser or user.role == 'admin'))
+
+
+def _redirect_for_user(user):
+    if _is_admin_user(user):
+        return reverse('panel_admin')
+    if user.role == 'vendedor':
+        return reverse('vendedores_clientes')
+    if user.role == 'cliente':
+        return reverse('catalogo')
+    return '/'
+
 @login_required
 def panel_admin(request):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     clientes_pendientes = Cliente.objects.filter(aprobado=False).count()
@@ -44,7 +58,7 @@ def panel_admin(request):
 @login_required
 def contenido_home(request):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     context = {
@@ -61,7 +75,7 @@ def contenido_home(request):
 @login_required
 def editar_home_contenido(request):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     contenido = _get_or_create_home_contenido()
@@ -106,7 +120,7 @@ def editar_home_contenido(request):
 @login_required
 def lista_testimonios(request):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     testimonios = Testimonio.objects.all()
@@ -119,7 +133,7 @@ def lista_testimonios(request):
 @login_required
 def crear_testimonio(request):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     if request.method == 'POST':
@@ -174,7 +188,7 @@ def crear_testimonio(request):
 @login_required
 def editar_testimonio(request, testimonio_id):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     testimonio = get_object_or_404(Testimonio, id=testimonio_id)
@@ -233,7 +247,7 @@ def editar_testimonio(request, testimonio_id):
 @login_required
 def desactivar_testimonio(request, testimonio_id):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     testimonio = get_object_or_404(Testimonio, id=testimonio_id)
@@ -249,7 +263,7 @@ def desactivar_testimonio(request, testimonio_id):
 @login_required
 def activar_testimonio(request, testimonio_id):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     testimonio = get_object_or_404(Testimonio, id=testimonio_id)
@@ -264,7 +278,7 @@ def activar_testimonio(request, testimonio_id):
 @login_required
 def crear_vendedor(request):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     if request.method == 'POST':
@@ -300,7 +314,7 @@ def crear_vendedor(request):
 @login_required
 def lista_vendedores(request):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     vendedores = Usuario.objects.filter(role='vendedor')
@@ -314,7 +328,7 @@ def lista_vendedores(request):
 @login_required
 def editar_vendedor(request, vendedor_id):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     vendedor = get_object_or_404(Usuario, id=vendedor_id, role='vendedor')
@@ -340,7 +354,7 @@ def editar_vendedor(request, vendedor_id):
 @login_required
 def desactivar_vendedor(request, vendedor_id):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     vendedor = get_object_or_404(Usuario, id=vendedor_id, role='vendedor')
@@ -354,7 +368,7 @@ def desactivar_vendedor(request, vendedor_id):
 @login_required
 def activar_vendedor(request, vendedor_id):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     vendedor = get_object_or_404(Usuario, id=vendedor_id, role='vendedor')
@@ -368,7 +382,7 @@ def activar_vendedor(request, vendedor_id):
 @login_required
 def clientes_pendientes(request):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     clientes = Cliente.objects.filter(aprobado=False)
@@ -382,7 +396,7 @@ def clientes_pendientes(request):
 @login_required
 def aprobar_cliente(request, cliente_id):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     cliente = get_object_or_404(Cliente, id=cliente_id)
@@ -400,7 +414,7 @@ def aprobar_cliente(request, cliente_id):
 @login_required
 def rechazar_cliente(request, cliente_id):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     cliente = get_object_or_404(Cliente, id=cliente_id)
@@ -415,7 +429,7 @@ def rechazar_cliente(request, cliente_id):
 @login_required
 def ver_cliente(request, cliente_id):
 
-    if request.user.role != 'admin':
+    if not _is_admin_user(request.user):
         return redirect('login')
 
     cliente = get_object_or_404(Cliente, id=cliente_id)
@@ -448,24 +462,10 @@ def login_view(request):
 
                 if is_ajax:
                     # Retornar JSON con éxito y la URL de redirección
-                    if user.role == 'admin':
-                        return JsonResponse({'success': True, 'redirect': reverse('panel_admin')})
-                    elif user.role == 'vendedor':
-                        return JsonResponse({'success': True, 'redirect': reverse('vendedores_clientes')})
-                    elif user.role == 'cliente':
-                        return JsonResponse({'success': True, 'redirect': reverse('catalogo')})
-                    else:
-                        return JsonResponse({'success': True, 'redirect': '/'})
+                    return JsonResponse({'success': True, 'redirect': _redirect_for_user(user)})
                 else:
                     # Redirecciones normales
-                    if user.role == 'admin':
-                        return redirect('panel_admin')
-                    elif user.role == 'vendedor':
-                        return redirect('vendedores_clientes')
-                    elif user.role == 'cliente':
-                        return redirect('catalogo')
-                    else:
-                        return redirect('/')
+                    return redirect(_redirect_for_user(user))
             else:
                 # Usuario existe pero contraseña es incorrecta
                 if is_ajax:
@@ -597,13 +597,7 @@ def login_form_modal(request):
             
             # Devolver JSON con redirect
             import json
-            redirect_url = '/'
-            if user.role == 'admin':
-                redirect_url = '/admin/dashboard/'
-            elif user.role == 'vendedor':
-                redirect_url = '/vendedores/clientes/'
-            elif user.role == 'cliente':
-                redirect_url = '/productos/catalogo/'
+            redirect_url = _redirect_for_user(user)
             
             return HttpResponse(
                 json.dumps({'success': True, 'redirect': redirect_url}),
@@ -624,4 +618,5 @@ def registro_form_modal(request):
     """Devuelve solo el formulario de registro para cargar en modal"""
     # GET - Devolver solo el formulario de registro
     return render(request, 'usuarios/registro_modal_form.html')
+
 

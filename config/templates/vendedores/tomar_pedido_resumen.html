@@ -58,7 +58,7 @@ La Tortilla Grocery
 <div class="sidebar p-0 bg-white" id="pedidoResumenSidebar">
 
 <div class="sidebar-user">
-{% trans "Vendedor" %} Andrés
+{% trans "Vendedor" %} {{ request.user.username }}
 </div>
 
 <div class="list-group list-group-flush">

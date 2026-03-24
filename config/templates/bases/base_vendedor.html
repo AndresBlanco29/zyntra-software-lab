@@ -94,7 +94,7 @@ La Tortilla Grocery
 
 <div class="list-group list-group-flush">
 
-{% if request.user.role == "admin" %}
+{% if request.user.is_superuser or request.user.role == "admin" %}
 
 <a href="{% url 'panel_admin' %}"
 class="list-group-item list-group-item-action

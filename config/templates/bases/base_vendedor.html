@@ -89,7 +89,13 @@ La Tortilla Grocery
 <div class="sidebar" id="panelSidebar">
 
 <div class="sidebar-user">
+{% if request.user.role == "vendedor" %}
+{% trans "Vendedor" %}: {{ request.user.username }}
+{% elif request.user.is_superuser or request.user.role == "admin" %}
+{% trans "Administrador" %}: {% firstof request.user.get_full_name request.user.username %}
+{% else %}
 {% firstof request.user.get_full_name request.user.username %}
+{% endif %}
 </div>
 
 <div class="list-group list-group-flush">

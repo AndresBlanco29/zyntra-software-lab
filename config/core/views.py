@@ -1,6 +1,7 @@
 from django.core.cache import cache
 from django.db import OperationalError, ProgrammingError
 from django.db.models import Prefetch
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import render
 import logging
@@ -49,7 +50,8 @@ def _get_cached_home_productos():
         productos = _hydrate_productos(list(
             Producto.objects.filter(
                 activo=True,
-                destacado=True
+            ).filter(
+                Q(destacado=True) | Q(descuento__gt=0)
             ).select_related("marca", "categoria").only(
                 "id",
                 "nombre",

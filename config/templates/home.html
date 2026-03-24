@@ -638,11 +638,47 @@ en un mercado competitivo.
 
 <div class="producto-oferta">
 
+{% if producto.descuento > 0 %}
+<div class="sale-badge">
+-{{ producto.descuento }}%
+</div>
+{% endif %}
+
 {% if producto.imagen %}
 <img src="{{ producto.imagen.url }}" class="producto-img">
 {% endif %}
 
 <h5>{{ producto.nombre }}</h5>
+
+{% with producto.primera_presentacion as presentacion %}
+{% if presentacion %}
+<p class="producto-info">
+({{ presentacion.unidades }} {{ presentacion.tipo_contenido_traducido }})
+</p>
+{% endif %}
+{% endwith %}
+
+<div class="producto-opcion">
+<label>{% trans "Presentación:" %}</label>
+<select class="form-select form-select-sm">
+{% for p in producto.presentaciones_prefetch %}
+<option>
+{{ p.nombre_traducido }} ({{ p.unidades }} {{ p.tipo_contenido_traducido }})
+</option>
+{% endfor %}
+</select>
+</div>
+
+<div class="producto-opcion">
+<label>{% trans "Cantidad:" %}</label>
+<div class="cantidad-box">
+<button type="button" class="btn-menos">-</button>
+<input type="number" class="cantidad-input" value="1" min="1">
+<button type="button" class="btn-mas">+</button>
+</div>
+</div>
+
+<button class="btn btn-yellow btn-sm mt-2 agregar-oferta-btn">{% trans "Añadir a cotización" %}</button>
 
 </div>
 

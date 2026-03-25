@@ -65,11 +65,11 @@ document.addEventListener('DOMContentLoaded', function() {
             let cantidad = card.querySelector(".cantidad").textContent;
             let precio = card.querySelector(".precio-select").value;
 
-            // VALIDACIÓN: Si no hay precio seleccionado, mostrar modal
+            // VALIDACIÓN: Si no hay precio seleccionado, mostrar modal y detener
             if (!precio || precio === "") {
                 const modalPrecio = new bootstrap.Modal(document.getElementById('modalPrecioRequerido'));
                 modalPrecio.show();
-                return;
+                return; // IMPORTANTE: no continuar
             }
 
             console.log("Precio enviado:", precio);
@@ -82,7 +82,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 },
                 body: `producto_id=${producto_id}&presentacion_id=${presentacion_id}&cantidad=${cantidad}&precio=${precio}`
             })
-            .then(response => response.json())
+            .then(response => {
+                // Si el servidor rechaza (400, 500, etc), mostrar modal y NO continuar
+                if (!response.ok) {
+                    const modalPrecio = new bootstrap.Modal(document.getElementById('modalPrecioRequerido'));
+                    modalPrecio.show();
+                    throw new Error("Error del servidor: " + response.status);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
                     document.getElementById("contadorPedido").textContent = data.total_items;
@@ -91,47 +99,48 @@ document.addEventListener('DOMContentLoaded', function() {
                     setTimeout(() => {
                         btn.textContent = "Agregar al Pedido";
                     }, 1200);
+                    
+                    document.getElementById("pedidoCantidad").textContent = data.total_items;
+
+                    animarNumero(
+                        document.getElementById("pedidoTotal"),
+                        data.total
+                    );
+
+                    const barra = document.querySelector(".pedido-bar");
+                    barra.style.transform = "scale(1.03)";
+                    setTimeout(()=>{
+                        barra.style.transform = "scale(1)";
+                    },200);
                 }
-
-                document.getElementById("pedidoCantidad").textContent = data.total_items
-
-                animarNumero(
-                    document.getElementById("pedidoTotal"),
-                    data.total
-                )
-
-                const barra = document.querySelector(".pedido-bar")
-
-                barra.style.transform = "scale(1.03)"
-
-                setTimeout(()=>{
-                    barra.style.transform = "scale(1)"
-                },200)
-
+            })
+            .catch(error => {
+                console.error("Error al agregar producto:", error);
+                // El modal ya se mostró en el .then()
             });
 
             function animarNumero(elemento, nuevoValor){
 
-                let inicio = parseFloat(elemento.textContent) || 0
-                let fin = parseFloat(nuevoValor)
+                let inicio = parseFloat(elemento.textContent) || 0;
+                let fin = parseFloat(nuevoValor);
 
-                let duracion = 300
-                let paso = (fin - inicio) / (duracion / 16)
+                let duracion = 300;
+                let paso = (fin - inicio) / (duracion / 16);
 
-                let contador = inicio
+                let contador = inicio;
 
                 let intervalo = setInterval(()=>{
 
-                    contador += paso
+                    contador += paso;
 
                     if((paso > 0 && contador >= fin) || (paso < 0 && contador <= fin)){
-                        contador = fin
-                        clearInterval(intervalo)
+                        contador = fin;
+                        clearInterval(intervalo);
                     }
 
-                    elemento.textContent = contador.toFixed(2)
+                    elemento.textContent = contador.toFixed(2);
 
-                },16)
+                },16);
 
             }
 

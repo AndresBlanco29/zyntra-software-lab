@@ -46,30 +46,48 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key')
 DEBUG = env_bool('DEBUG', False)
 SERVE_MEDIA = env_bool('SERVE_MEDIA', True)
 
+# Dominio canónico (sin www). Se usa en ALLOWED_HOSTS, CSRF y el middleware de redirección.
+CANONICAL_DOMAIN = 'latortillagroceryapp.com'
+
+# ---- ALLOWED_HOSTS ----
 allowed_hosts = os.environ.get('ALLOWED_HOSTS', '')
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts.split(',') if host.strip()]
 
 railway_domain = 'tortilla-erp-production.up.railway.app'
-if railway_domain not in ALLOWED_HOSTS:
-    ALLOWED_HOSTS.append(railway_domain)
+for _host in (railway_domain, CANONICAL_DOMAIN, f'www.{CANONICAL_DOMAIN}'):
+    if _host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_host)
 
 if DEBUG:
     for host in ('127.0.0.1', 'localhost'):
         if host not in ALLOWED_HOSTS:
             ALLOWED_HOSTS.append(host)
 
-if not ALLOWED_HOSTS:
-    ALLOWED_HOSTS = [railway_domain]
-
+# ---- CSRF ----
 csrf_trusted_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
 CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_trusted_origins.split(',') if origin.strip()]
 
-railway_origin = f'https://{railway_domain}'
-if railway_origin not in CSRF_TRUSTED_ORIGINS:
-    CSRF_TRUSTED_ORIGINS.append(railway_origin)
+for _origin in (
+    f'https://{railway_domain}',
+    f'https://{CANONICAL_DOMAIN}',
+    f'https://www.{CANONICAL_DOMAIN}',
+):
+    if _origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_origin)
 
+# ---- HTTPS ----
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
+
+# Redirige HTTP → HTTPS en producción. Railway expone todo via proxy HTTPS,
+# por lo que X-Forwarded-Proto: https llega siempre y no causa bucle de redirección.
+SECURE_SSL_REDIRECT = not DEBUG
+
+# HSTS: el navegador recuerda HTTPS durante 1 año (sólo activo en producción).
+SECURE_HSTS_SECONDS          = 0 if DEBUG else 31536000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD            = not DEBUG
+SECURE_CONTENT_TYPE_NOSNIFF    = True
 
 # ========================
 # APPS
@@ -112,6 +130,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'config.config.middleware.WwwRedirectMiddleware',
     #'config.middleware.NoCacheMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',

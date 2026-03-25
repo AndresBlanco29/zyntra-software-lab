@@ -85,7 +85,6 @@ INSTALLED_APPS = [
 
     # terceros
     'corsheaders',
-    'anymail',
 
     # tus apps
     'config.core',
@@ -278,21 +277,27 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # ========================
-# EMAIL  (Resend HTTP API via django-anymail — no SMTP needed)
+# EMAIL
 # ========================
 
-EMAIL_BACKEND = 'anymail.backends.resend.EmailBackend'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 465
+EMAIL_USE_TLS = False
+EMAIL_USE_SSL = True
+EMAIL_TIMEOUT = env_int('EMAIL_TIMEOUT', 30)
 
-ANYMAIL = {
-    'RESEND_API_KEY': os.environ.get('RESEND_API_KEY', ''),
-}
+# Gmail sender account (e.g. ltgordersapp@gmail.com)
+EMAIL_HOST_USER = os.environ.get('EMAIL_USER', 'ltgordersapp@gmail.com')
+
+# Prefer EMAIL_APP_PASSWORD for Gmail app-password flow.
+# Fallback to EMAIL_PASSWORD for backward compatibility.
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_APP_PASSWORD') or os.environ.get('EMAIL_PASSWORD', '')
 
 # Destinatario para notificaciones de cotizaciones y pedidos.
 ORDERS_NOTIFICATION_EMAIL = os.environ.get('ORDERS_NOTIFICATION_EMAIL', 'ltgordersapp@gmail.com')
 
-# El remitente debe ser un dominio verificado en Resend.
-# Ejemplo: 'LTG Orders <noreply@tudominio.com>'
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'LTG Orders <onboarding@resend.dev>')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

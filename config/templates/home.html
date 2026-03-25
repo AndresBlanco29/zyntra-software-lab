@@ -1134,10 +1134,22 @@ document.addEventListener("DOMContentLoaded", function(){
   if(!marcasTrack) return;
   const originals = Array.from(marcasTrack.children);
   if(!originals.length) return;
-  /* duplicar logos para loop infinito (6× total para llenar pantalla) */
-  for(let i = 0; i < 5; i++){
+
+  /* Calcular cuántos sets hacen falta para llenar 2× el ancho de la pantalla.
+     Siempre par, para que -50% del track = exactamente un "ciclo visual" seamless. */
+  const screenW = window.innerWidth || 1200;
+  const oneSetW = marcasTrack.scrollWidth;
+  let total = Math.max(10, Math.ceil(screenW * 2 / oneSetW));
+  if(total % 2 !== 0) total++;
+  total = Math.min(total, 30);
+
+  for(let i = 1; i < total; i++){
     originals.forEach(function(card){ marcasTrack.appendChild(card.cloneNode(true)); });
   }
+
+  /* Velocidad constante: ~120px/s independiente de la cantidad de marcas */
+  const halfPx = marcasTrack.scrollWidth / 2;
+  marcasTrack.style.animationDuration = Math.round(halfPx / 120) + 's';
 });
 
 </script>

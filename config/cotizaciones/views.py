@@ -7,8 +7,13 @@ from django.core.mail import send_mail, EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.http import JsonResponse
 from django.conf import settings
+from django.contrib import messages
 from django.utils import timezone
 import pytz
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def agregar_a_cotizacion(request):
@@ -142,12 +147,20 @@ def guardar_cotizacion(request):
     email = EmailMultiAlternatives(
         subject=f"Nueva solicitud de cotización #{cotizacion.id}",
         body="Se ha recibido una nueva solicitud de cotización.",
-        from_email=None,
-        to=["andresilloblanco29@gmail.com"]
+        from_email=settings.DEFAULT_FROM_EMAIL or settings.EMAIL_HOST_USER,
+        to=[settings.ORDERS_NOTIFICATION_EMAIL]
     )
 
-    email.attach_alternative(html_content, "text/html")
-    email.send()
+    try:
+        email.attach_alternative(html_content, "text/html")
+        email.send(fail_silently=False)
+        messages.success(request, "Tu solicitud de cotización fue enviada correctamente.")
+    except Exception as exc:
+        logger.exception("Error enviando correo de cotización %s: %s", cotizacion.id, exc)
+        messages.warning(
+            request,
+            "La cotización fue guardada, pero el correo de notificación no pudo enviarse."
+        )
 
     request.session['carrito'] = {}
 

@@ -288,6 +288,9 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
 
+# Destinatario para notificaciones de cotizaciones y pedidos.
+ORDERS_NOTIFICATION_EMAIL = os.environ.get('ORDERS_NOTIFICATION_EMAIL', 'ltgordersapp@gmail.com')
+
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

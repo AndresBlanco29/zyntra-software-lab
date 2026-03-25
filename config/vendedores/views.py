@@ -11,6 +11,10 @@ from django.conf import settings
 from django.utils import timezone
 import pytz
 from django.contrib import messages
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def crear_cliente(request):
@@ -344,13 +348,19 @@ def enviar_pedido(request):
     email = EmailMultiAlternatives(
         subject=f"Nuevo Pedido - {cliente.nombre_empresa}",
         body="Nuevo pedido generado en el sistema.",
-        from_email=settings.EMAIL_HOST_USER,
-        to=["andresilloblanco29@gmail.com"]
+        from_email=settings.DEFAULT_FROM_EMAIL or settings.EMAIL_HOST_USER,
+        to=[settings.ORDERS_NOTIFICATION_EMAIL]
     )
 
-    email.attach_alternative(html_content, "text/html")
-
-    email.send()
+    try:
+        email.attach_alternative(html_content, "text/html")
+        email.send(fail_silently=False)
+    except Exception as exc:
+        logger.exception("Error enviando correo de pedido para cliente %s: %s", cliente.id, exc)
+        return JsonResponse({
+            "success": False,
+            "error": "El pedido se generó, pero no se pudo enviar el correo de notificación."
+        }, status=500)
 
     request.session["pedido"] = {}
 

@@ -235,6 +235,8 @@ def editar_testimonio(request, testimonio_id):
         testimonio.orden = orden
         testimonio.activo = True if request.POST.get('activo') else False
         if foto:
+            if testimonio.foto:
+                testimonio.foto.delete(save=False)
             testimonio.foto = foto
         testimonio.save()
 

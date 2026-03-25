@@ -361,6 +361,8 @@ def editar_marca(request, marca_id):
         marca.nombre = nombre
         marca.nombre_en = nombre_en
         if logo:
+            if marca.logo:
+                marca.logo.delete(save=False)
             marca.logo = logo
         marca.save()
         marca.categorias.set(categorias_ids)
@@ -451,6 +453,8 @@ def editar_producto(request, producto_id):
             producto.marca_id = marca_id
 
         if request.FILES.get("imagen"):
+            if producto.imagen:
+                producto.imagen.delete(save=False)
             producto.imagen = request.FILES.get("imagen")
 
         producto.activo = True if request.POST.get("activo") else False

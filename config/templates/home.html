@@ -495,9 +495,9 @@ en un mercado competitivo.
 <section class="marcas-section" id="marcas">
 
 <div class="container">
-
 <div class="title-divider">
 <span>{% trans "Marcas que distribuimos" %}</span>
+</div>
 </div>
 
 <div class="marcas-slider">
@@ -1131,12 +1131,12 @@ setInterval(moverCarrusel, 3000);
 document.addEventListener("DOMContentLoaded", function(){
   const marcasTrack = document.getElementById("marcasTrack");
   
-  if(marcasTrack){
-    const logos = marcasTrack.innerHTML;
-    /* duplicar logos para loop infinito */
-    for(let i = 0; i < 5; i++){
-      marcasTrack.innerHTML += logos;
-    }
+  if(!marcasTrack) return;
+  const originals = Array.from(marcasTrack.children);
+  if(!originals.length) return;
+  /* duplicar logos para loop infinito (6× total para llenar pantalla) */
+  for(let i = 0; i < 5; i++){
+    originals.forEach(function(card){ marcasTrack.appendChild(card.cloneNode(true)); });
   }
 });
 

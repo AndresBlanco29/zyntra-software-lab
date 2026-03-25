@@ -86,6 +86,8 @@ INSTALLED_APPS = [
     # terceros
     'corsheaders',
     'anymail',
+    'cloudinary_storage',
+    'cloudinary',
 
     # tus apps
     'config.core',
@@ -245,6 +247,8 @@ if DEBUG:
 else:
     staticfiles_backend = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+USE_CLOUDINARY_MEDIA = env_bool('USE_CLOUDINARY_MEDIA', False)
+
 STORAGES = {
     'default': {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',
@@ -277,6 +281,25 @@ CACHES = {
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+if USE_CLOUDINARY_MEDIA:
+    cloudinary_cloud_name = os.environ.get('CLOUDINARY_CLOUD_NAME', '').strip()
+    cloudinary_api_key = os.environ.get('CLOUDINARY_API_KEY', '').strip()
+    cloudinary_api_secret = os.environ.get('CLOUDINARY_API_SECRET', '').strip()
+
+    if not all([cloudinary_cloud_name, cloudinary_api_key, cloudinary_api_secret]):
+        raise RuntimeError('Cloudinary media storage is enabled but CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY or CLOUDINARY_API_SECRET is missing.')
+
+    CLOUDINARY_STORAGE = {
+        'CLOUD_NAME': cloudinary_cloud_name,
+        'API_KEY': cloudinary_api_key,
+        'API_SECRET': cloudinary_api_secret,
+        'SECURE': True,
+    }
+
+    STORAGES['default'] = {
+        'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage',
+    }
+
 # ========================
 # EMAIL  (Resend HTTP API via django-anymail)
 # ========================
@@ -292,7 +315,7 @@ ORDERS_NOTIFICATION_EMAIL = os.environ.get('ORDERS_NOTIFICATION_EMAIL', 'ltgorde
 
 # Remitente: debe ser un correo de tu dominio verificado en Resend.
 # Ej: 'Pedidos LTG <pedidos@tudominio.com>'
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Pedidos LTG <pedidos@tudominio.com>')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Pedidos LTG <pedidos@latortillagroceryapp.com>')
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

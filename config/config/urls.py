@@ -16,9 +16,9 @@ urlpatterns = [
     path('i18n/', include('django.conf.urls.i18n')),
 ]
 
-if settings.DEBUG:
+if settings.DEBUG and not getattr(settings, 'USE_CLOUDINARY_MEDIA', False):
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-elif getattr(settings, 'SERVE_MEDIA', False):
+elif getattr(settings, 'SERVE_MEDIA', False) and not getattr(settings, 'USE_CLOUDINARY_MEDIA', False):
     urlpatterns += [
         re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
     ]

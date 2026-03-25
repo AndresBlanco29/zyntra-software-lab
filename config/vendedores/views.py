@@ -129,10 +129,14 @@ def agregar_producto_pedido(request):
 
         precio = request.POST.get("precio")
 
-        if precio:
-            precio = float(precio.replace(",", "."))
-        else:
-            precio = 0
+        # Validación: rechazar si precio no está seleccionado
+        if not precio or precio == "":
+            return JsonResponse({
+                "success": False,
+                "error": "Debes seleccionar un precio antes de agregar el producto."
+            }, status=400)
+
+        precio = float(precio.replace(",", "."))
 
         if presentacion_id in carrito:
 

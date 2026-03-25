@@ -388,6 +388,56 @@ $<span id="pedidoTotal">{{ total }}</span>
 
 </div>
 
+<!-- MODAL VALIDACIÓN PRECIO -->
+<div class="modal fade" id="modalPrecioRequerido" tabindex="-1" aria-labelledby="modalPrecioLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <!-- Header con color corporativo azul -->
+      <div class="modal-header bg-primary-corp text-white border-0">
+        <h5 class="modal-title fw-bold" id="modalPrecioLabel">
+          ⚠️ {% trans "Selecciona un Precio" %}
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <!-- Body -->
+      <div class="modal-body text-center py-4">
+        <p class="mb-4" style="font-size: 1.05rem;">
+          {% trans "Debes seleccionar un precio antes de agregar el producto al pedido." %}
+        </p>
+        <div style="font-size: 3rem; margin: 20px 0;">💰</div>
+        <p class="text-muted" style="font-size: 0.95rem;">
+          {% trans "Asegúrate de elegir el precio que se aplicará para este cliente." %}
+        </p>
+      </div>
+      <!-- Footer -->
+      <div class="modal-footer border-0 bg-light">
+        <button type="button" class="btn btn-primary-corp fw-bold" data-bs-dismiss="modal">
+          {% trans "Entendido" %}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .bg-primary-corp {
+    background-color: #0b3d91 !important;
+  }
+  
+  .btn-primary-corp {
+    background-color: #0b3d91;
+    border-color: #0b3d91;
+  }
+  
+  .btn-primary-corp:hover {
+    background-color: #092d6e;
+    border-color: #092d6e;
+  }
+  
+  .modal-content {
+    border-radius: 12px;
+  }
+</style>
 
 <script src="{% static 'js/tomar_pedido_catalogo.js' %}"></script>
 

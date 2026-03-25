@@ -55,83 +55,88 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     /* AGREGAR AL CARRITO */
-    /* AGREGAR AL CARRITO */
-document.querySelectorAll(".agregar-btn").forEach(btn => {
-    btn.addEventListener("click", function () {
+    document.querySelectorAll(".agregar-btn").forEach(btn => {
+        btn.addEventListener("click", function () {
 
-        let card = this.closest(".producto-card");
+            let card = this.closest(".producto-card");
 
-        let producto_id = card.dataset.productoId;
-        let presentacion_id = card.querySelector(".presentacion-select").value;
-        let cantidad = card.querySelector(".cantidad").textContent;
+            let producto_id = card.dataset.productoId;
+            let presentacion_id = card.querySelector(".presentacion-select").value;
+            let cantidad = card.querySelector(".cantidad").textContent;
+            let precio = card.querySelector(".precio-select").value;
 
-        let precio = card.querySelector(".precio-select").value;   // 🔥 ESTA LÍNEA FALTABA
-
-        console.log("Precio enviado:", precio);
-
-        fetch(agregarUrl, {
-            method: "POST",
-            headers: {
-                "X-CSRFToken": csrfToken,
-                "Content-Type": "application/x-www-form-urlencoded"
-            },
-            body: `producto_id=${producto_id}&presentacion_id=${presentacion_id}&cantidad=${cantidad}&precio=${precio}` // 🔥 AQUÍ TAMBIÉN
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                document.getElementById("contadorPedido").textContent = data.total_items;
-
-                btn.textContent = "Añadido ✔";
-                setTimeout(() => {
-                    btn.textContent = "Añadir a cotización";
-                }, 1200);
+            // VALIDACIÓN: Si no hay precio seleccionado, mostrar modal
+            if (!precio || precio === "") {
+                const modalPrecio = new bootstrap.Modal(document.getElementById('modalPrecioRequerido'));
+                modalPrecio.show();
+                return;
             }
 
-            document.getElementById("pedidoCantidad").textContent = data.total_items
+            console.log("Precio enviado:", precio);
 
-            animarNumero(
-                document.getElementById("pedidoTotal"),
-                data.total
-            )
+            fetch(agregarUrl, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrfToken,
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: `producto_id=${producto_id}&presentacion_id=${presentacion_id}&cantidad=${cantidad}&precio=${precio}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById("contadorPedido").textContent = data.total_items;
 
-            const barra = document.querySelector(".pedido-bar")
-
-            barra.style.transform = "scale(1.03)"
-
-            setTimeout(()=>{
-                barra.style.transform = "scale(1)"
-            },200)
-
-        });
-
-        function animarNumero(elemento, nuevoValor){
-
-            let inicio = parseFloat(elemento.textContent) || 0
-            let fin = parseFloat(nuevoValor)
-
-            let duracion = 300
-            let paso = (fin - inicio) / (duracion / 16)
-
-            let contador = inicio
-
-            let intervalo = setInterval(()=>{
-
-                contador += paso
-
-                if((paso > 0 && contador >= fin) || (paso < 0 && contador <= fin)){
-                    contador = fin
-                    clearInterval(intervalo)
+                    btn.textContent = "Añadido ✔";
+                    setTimeout(() => {
+                        btn.textContent = "Agregar al Pedido";
+                    }, 1200);
                 }
 
-                elemento.textContent = contador.toFixed(2)
+                document.getElementById("pedidoCantidad").textContent = data.total_items
 
-            },16)
+                animarNumero(
+                    document.getElementById("pedidoTotal"),
+                    data.total
+                )
 
-        }
+                const barra = document.querySelector(".pedido-bar")
 
+                barra.style.transform = "scale(1.03)"
+
+                setTimeout(()=>{
+                    barra.style.transform = "scale(1)"
+                },200)
+
+            });
+
+            function animarNumero(elemento, nuevoValor){
+
+                let inicio = parseFloat(elemento.textContent) || 0
+                let fin = parseFloat(nuevoValor)
+
+                let duracion = 300
+                let paso = (fin - inicio) / (duracion / 16)
+
+                let contador = inicio
+
+                let intervalo = setInterval(()=>{
+
+                    contador += paso
+
+                    if((paso > 0 && contador >= fin) || (paso < 0 && contador <= fin)){
+                        contador = fin
+                        clearInterval(intervalo)
+                    }
+
+                    elemento.textContent = contador.toFixed(2)
+
+                },16)
+
+            }
+
+        });
     });
-});
 
     /* CAMBIAR TEXTO SEGÚN PRESENTACIÓN */
     document.querySelectorAll(".producto-card").forEach(card => {

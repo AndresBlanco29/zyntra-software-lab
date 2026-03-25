@@ -284,14 +284,21 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False
+EMAIL_TIMEOUT = env_int('EMAIL_TIMEOUT', 20)
 
-EMAIL_HOST_USER = os.environ.get('EMAIL_USER', '')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_PASSWORD', '')
+# Gmail sender account (e.g. ltgordersapp@gmail.com)
+EMAIL_HOST_USER = os.environ.get('EMAIL_USER', 'ltgordersapp@gmail.com')
+
+# Prefer EMAIL_APP_PASSWORD for Gmail app-password flow.
+# Fallback to EMAIL_PASSWORD for backward compatibility.
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_APP_PASSWORD') or os.environ.get('EMAIL_PASSWORD', '')
 
 # Destinatario para notificaciones de cotizaciones y pedidos.
 ORDERS_NOTIFICATION_EMAIL = os.environ.get('ORDERS_NOTIFICATION_EMAIL', 'ltgordersapp@gmail.com')
 
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGGING = {

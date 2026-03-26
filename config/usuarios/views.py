@@ -17,6 +17,7 @@ import mimetypes
 import os
 import re
 import urllib.request
+import urllib.error
 import logging
 
 logger = logging.getLogger(__name__)
@@ -154,6 +155,101 @@ def _cloudinary_download_url_for_file(field_file):
             return secure_url, resolved_name
 
     return None, None
+
+
+def _probe_cloudinary_certificate(field_file):
+    """Prueba variantes de URLs de Cloudinary y devuelve el primer archivo accesible."""
+    try:
+        from cloudinary.models import CLOUDINARY_FIELD_DB_RE
+        from cloudinary.utils import cloudinary_url, private_download_url
+    except Exception:
+        return None
+
+    file_name = (field_file.name or '').strip().lstrip('/')
+    if not file_name:
+        return None
+
+    public_ids = []
+
+    def add_candidate(value):
+        value = (value or '').strip().lstrip('/')
+        if value and value not in public_ids:
+            public_ids.append(value)
+
+    add_candidate(file_name)
+    if file_name.startswith('media/'):
+        add_candidate(file_name[6:])
+
+    match = re.match(CLOUDINARY_FIELD_DB_RE, file_name)
+    if match:
+        add_candidate(match.group('public_id'))
+
+    expanded_ids = []
+    for candidate in public_ids:
+        if candidate not in expanded_ids:
+            expanded_ids.append(candidate)
+        base_candidate, _ = os.path.splitext(candidate)
+        if base_candidate and base_candidate not in expanded_ids:
+            expanded_ids.append(base_candidate)
+
+    extension = os.path.splitext(file_name)[1].lstrip('.').lower() or None
+    remote_urls = []
+
+    def add_url(url, resolved_name):
+        if not url:
+            return
+        remote_urls.append((url, resolved_name))
+
+    for public_id in expanded_ids:
+        base_name = os.path.basename(public_id)
+        for resource_type in ('image', 'raw'):
+            for delivery_type in ('upload', 'authenticated', 'private'):
+                format_value = extension if resource_type == 'image' else None
+                try:
+                    generated_url, _ = cloudinary_url(
+                        public_id,
+                        resource_type=resource_type,
+                        type=delivery_type,
+                        format=format_value,
+                        sign_url=delivery_type != 'upload',
+                        secure=True,
+                    )
+                    add_url(generated_url, base_name)
+                except Exception:
+                    pass
+
+                if extension:
+                    try:
+                        private_url = private_download_url(
+                            public_id,
+                            extension,
+                            resource_type=resource_type,
+                            type=delivery_type,
+                            secure=True,
+                        )
+                        add_url(private_url, f"{base_name}.{extension}" if not os.path.splitext(base_name)[1] else base_name)
+                    except Exception:
+                        pass
+
+    seen_urls = set()
+    for remote_url, resolved_name in remote_urls:
+        if remote_url in seen_urls:
+            continue
+        seen_urls.add(remote_url)
+
+        try:
+            with urllib.request.urlopen(remote_url, timeout=20) as remote_file:
+                file_bytes = remote_file.read()
+                remote_content_type = remote_file.headers.get_content_type()
+            final_name = _ensure_extension(resolved_name or os.path.basename(file_name), remote_content_type)
+            return file_bytes, remote_content_type, final_name
+        except urllib.error.HTTPError as exc:
+            if exc.code in (401, 403, 404):
+                continue
+        except Exception:
+            continue
+
+    return None
 
 
 def _ensure_extension(file_name, content_type):
@@ -631,6 +727,13 @@ def ver_certificado_cliente(request, cliente_id):
                 return response
         except Exception:
             pass
+
+        probed_file = _probe_cloudinary_certificate(cliente.certificado_tax)
+        if probed_file:
+            file_bytes, remote_content_type, final_name = probed_file
+            response = HttpResponse(file_bytes, content_type=remote_content_type or 'application/octet-stream')
+            response['Content-Disposition'] = f'attachment; filename="{final_name}"'
+            return response
 
         raise Http404("No se pudo abrir el certificado")
 

@@ -98,7 +98,7 @@ class HomeContenido(models.Model):
     cta_boton_catalogo_texto = models.CharField(max_length=80, default="Ver Catalogo")
     cta_boton_catalogo_texto_en = models.CharField(max_length=80, blank=True, null=True)
 
-    quienes_titulo = models.CharField(max_length=120, default="¿Quiénes Somos?")
+    quienes_titulo = models.CharField(max_length=120, default="Quienes Somos?")
     quienes_titulo_en = models.CharField(max_length=120, blank=True, null=True)
 
     quienes_descripcion = models.TextField(

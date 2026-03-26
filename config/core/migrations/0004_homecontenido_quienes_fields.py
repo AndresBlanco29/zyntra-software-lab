@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='homecontenido',
             name='quienes_titulo',
-            field=models.CharField(default='¿Quiénes Somos?', max_length=120),
+            field=models.CharField(default='Quienes Somos?', max_length=120),
         ),
         migrations.AddField(
             model_name='homecontenido',

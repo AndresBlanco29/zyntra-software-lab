@@ -1,6 +1,7 @@
 from django.core.cache import cache
 from django.db.models import Prefetch
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from .models import Producto, Categoria, Marca, Presentacion
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
@@ -95,6 +96,11 @@ def _get_cached_catalogo_marcas():
 
 
 def catalogo(request):
+    force_guest_mode = request.GET.get("guest") == "1"
+    can_quote = bool(request.user.is_authenticated and not force_guest_mode)
+    catalogo_url = reverse("catalogo")
+    if force_guest_mode:
+        catalogo_url = f"{catalogo_url}?guest=1"
 
     productos = _get_cached_catalogo_productos()
 
@@ -105,7 +111,10 @@ def catalogo(request):
     context = {
         'productos': productos,
         'categorias': categorias,
-        'marcas': marcas
+        'marcas': marcas,
+        'guest_mode': force_guest_mode,
+        'can_quote': can_quote,
+        'catalogo_url': catalogo_url,
     }
 
     response = render(request, 'productos/catalogo.html', context)

@@ -22,7 +22,7 @@
 data-lang="{{ LANGUAGE_CODE }}"
 data-agregar-url="{% url 'agregar_a_cotizacion' %}"
 data-csrf="{{ csrf_token }}"
-data-auth="{{ user.is_authenticated|yesno:'true,false' }}">
+data-auth="{{ can_quote|yesno:'true,false' }}">
 
     <!-- NAVBAR -->
     <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
@@ -44,7 +44,7 @@ data-auth="{{ user.is_authenticated|yesno:'true,false' }}">
             </a>
 
             <div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">
-                {% if user.is_authenticated %}
+              {% if can_quote %}
                 <a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">
                     {% trans "Cotización" %} (<span id="contadorCarrito">{{ carrito|length }}</span>)
                 </a>
@@ -68,9 +68,9 @@ data-auth="{{ user.is_authenticated|yesno:'true,false' }}">
             <!-- SIDEBAR -->
             <div class="col-md-2 sidebar p-0" id="catalogSidebar">
 
-                <div class="sidebar-user {% if not user.is_authenticated %}guest-mode{% endif %}">
+              <div class="sidebar-user {% if guest_mode or not can_quote %}guest-mode{% endif %}">
 
-                {% if user.is_authenticated %}
+              {% if can_quote %}
                     <i class="bi bi-person-check me-2"></i>{{ user.username }}
                 {% else %}
                     <i class="bi bi-person-dash me-2"></i>{% trans "Modo Invitado" %}
@@ -79,10 +79,10 @@ data-auth="{{ user.is_authenticated|yesno:'true,false' }}">
                 </div>
 
                 <div class="list-group list-group-flush">
-                    <a href="{% url 'catalogo' %}" class="list-group-item active">
+                  <a href="{{ catalogo_url }}" class="list-group-item active">
                         {% trans "Catálogo" %}
                     </a>
-                    {% if user.is_authenticated %}
+                  {% if can_quote %}
                     <a href="{% url 'ver_cotizacion' %}" class="list-group-item">
                         {% trans "Mi Cotización" %}
                     </a>
@@ -218,7 +218,7 @@ data-auth="{{ user.is_authenticated|yesno:'true,false' }}">
                                     </div>
                                 </div>
 
-                                {% if user.is_authenticated %}
+                                  {% if can_quote %}
                                 <button class="btn btn-yellow w-100 agregar-btn">
                                    {% trans "Añadir a cotización" %}
                                 </button>

@@ -72,7 +72,7 @@ La Tortilla Grocery
 </li>
 
 <li class="nav-item">
-<a class="nav-link" href="{% url 'catalogo' %}">{% trans "Catálogo" %}</a>
+<a class="nav-link" href="{% url 'catalogo' %}?guest=1">{% trans "Catálogo" %}</a>
 </li>
 
 <li class="nav-item">
@@ -129,7 +129,7 @@ La Tortilla Grocery
 {% endif %}
 </p>
 
-<a href="{% url 'catalogo' %}" class="btn btn-yellow hero-btn">
+<a href="{% url 'catalogo' %}?guest=1" class="btn btn-yellow hero-btn">
 {% if home_contenido %}
 {{ home_contenido.hero_boton_texto_traducido }} →
 {% else %}
@@ -812,7 +812,7 @@ en un mercado competitivo.
 {% endif %}
 </a>
 
-<a href="{% url 'catalogo' %}" class="btn btn-catalogo cta-btn">
+<a href="{% url 'catalogo' %}?guest=1" class="btn btn-catalogo cta-btn">
 {% if home_contenido %}
 {{ home_contenido.cta_boton_catalogo_texto_traducido }}
 {% else %}

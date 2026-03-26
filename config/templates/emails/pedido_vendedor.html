@@ -63,8 +63,10 @@
 <td>
 {% if tipo_orden == "telefono" %}
 Orden telefónica
-{% elif tipo_orden == "personal" %}
-Orden tomada en persona
+{% else %}
+	{% if tipo_orden == "personal" %}
+		Orden tomada en persona
+	{% endif %}
 {% endif %}
 </td>
 </tr>

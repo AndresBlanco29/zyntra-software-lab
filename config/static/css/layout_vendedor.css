@@ -126,31 +126,35 @@ width:100%;
     z-index: 9999;
 }
 
+/* Botón circular de idioma estilo home */
 .language-toggle {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    min-width: 80px;
-    height: 50px;
+    width: 54px;
+    height: 54px;
     border: none;
     background: #0b3d91;
     color: white;
-    padding: 0 16px;
-    border-radius: 40px;
-    font-size: 15px;
+    border-radius: 50%;
+    font-size: 28px;
     font-weight: 600;
     cursor: pointer;
     box-shadow: 0 10px 25px rgba(0, 0, 0, .25);
     transition: .2s;
+    position: relative;
+    padding: 0;
 }
 
+/* Efecto de escala al pasar el mouse */
 .language-toggle:hover {
-    transform: scale(1.05);
+    transform: scale(1.08);
+    background: #2353a5;
 }
 
+/* Oculta el texto de idioma en el botón, solo ícono visible */
 .language-current {
-    font-weight: 600;
+    display: none;
 }
 
 .language-toggle,
@@ -187,15 +191,13 @@ width:100%;
     background: #f3f4f6;
 }
 
-@media (max-width: 992px) {
-    .layout {
-        height: auto;
-        min-height: 100vh;
+@media (max-width: 576px) {
+    .language-toggle {
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
     }
-
-    .content {
-        margin-left: 0;
-        width: 100%;
+}
         padding: 24px 18px;
         height: auto;
         min-height: calc(100vh - 70px);

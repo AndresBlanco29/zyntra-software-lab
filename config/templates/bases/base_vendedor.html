@@ -103,23 +103,32 @@ La Tortilla Grocery
 </div>
 
 <div class="list-group list-group-flush">
-
-{% if request.user.is_superuser or request.user.role == "admin" %}
-
-<a href="{% url 'panel_admin' %}"
-class="list-group-item list-group-item-action
-{% if request.resolver_match.url_name == 'panel_admin' %}active{% endif %}">
-{% trans "Dashboard" %}
-</a>
-
-<a href="{% url 'clientes_pendientes' %}"
-class="list-group-item list-group-item-action
-{% if request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' %}active{% endif %}">
-{% trans "Solicitudes" %}
-</a>
-
-<a href="{% url 'lista_vendedores' %}"
-class="list-group-item list-group-item-action
+{% get_current_language as CURRENT_LANGUAGE %}
+<div class="language-widget">
+  <button
+    class="language-toggle"
+    onclick="toggleLanguageMenu()"
+    aria-expanded="false"
+    aria-controls="languageMenu"
+    type="button"
+  >
+    <span class="language-label">
+      {{ CURRENT_LANGUAGE|upper }}
+    </span>
+  </button>
+  <div class="language-menu" id="languageMenu">
+    <form action="{% url 'set_language' %}" method="post">
+      {% csrf_token %}
+      <input name="next" type="hidden" value="{{ request.path }}">
+      <button name="language" value="es" class="language-option" type="submit">
+        🇪🇸 Español
+      </button>
+      <button name="language" value="en" class="language-option" type="submit">
+        🇺🇸 English
+      </button>
+    </form>
+  </div>
+</div>
 {% if request.resolver_match.url_name == 'lista_vendedores' or request.resolver_match.url_name == 'crear_vendedor' %}active{% endif %}">
 {% trans "Vendedores" %}
 </a>

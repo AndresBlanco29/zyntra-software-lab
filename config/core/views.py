@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 import logging
 from config.productos.models import Producto, Marca, Presentacion
-from .models import Testimonio, HomeContenido
+from .models import Testimonio, HomeContenido, ensure_homecontenido_quienes_schema
 from urllib.parse import urlparse
 
 
@@ -131,7 +131,34 @@ def _get_cached_home_contenido():
                 "activo",
             ).first()
         except (OperationalError, ProgrammingError):
-            contenido = None
+            try:
+                ensure_homecontenido_quienes_schema()
+                contenido = HomeContenido.objects.filter(activo=True).only(
+                    "id",
+                    "hero_titulo_principal",
+                    "hero_titulo_principal_en",
+                    "hero_titulo_resaltado",
+                    "hero_titulo_resaltado_en",
+                    "hero_titulo_final",
+                    "hero_titulo_final_en",
+                    "hero_subtitulo",
+                    "hero_subtitulo_en",
+                    "hero_boton_texto",
+                    "hero_boton_texto_en",
+                    "cta_titulo",
+                    "cta_titulo_en",
+                    "cta_boton_registro_texto",
+                    "cta_boton_registro_texto_en",
+                    "cta_boton_catalogo_texto",
+                    "cta_boton_catalogo_texto_en",
+                    "quienes_titulo",
+                    "quienes_titulo_en",
+                    "quienes_descripcion",
+                    "quienes_descripcion_en",
+                    "activo",
+                ).first()
+            except Exception:
+                contenido = None
         cache.set(cache_key, contenido, HOME_CACHE_TIMEOUT)
     return contenido
 

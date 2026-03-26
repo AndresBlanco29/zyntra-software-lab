@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import OperationalError, ProgrammingError, connection, models
 from django.utils.translation import get_language
 
 
@@ -163,3 +163,37 @@ class HomeContenido(models.Model):
 
     def __str__(self):
         return f"Home contenido ({'activo' if self.activo else 'inactivo'})"
+
+
+def ensure_homecontenido_quienes_schema():
+    table_name = HomeContenido._meta.db_table
+    target_fields = (
+        'quienes_titulo',
+        'quienes_titulo_en',
+        'quienes_descripcion',
+        'quienes_descripcion_en',
+    )
+
+    def get_existing_columns():
+        with connection.cursor() as cursor:
+            return {
+                column.name for column in connection.introspection.get_table_description(cursor, table_name)
+            }
+
+    schema_updated = False
+    existing_columns = get_existing_columns()
+
+    for field_name in target_fields:
+        if field_name in existing_columns:
+            continue
+
+        try:
+            with connection.schema_editor() as schema_editor:
+                schema_editor.add_field(HomeContenido, HomeContenido._meta.get_field(field_name))
+            schema_updated = True
+        except (OperationalError, ProgrammingError) as exc:
+            if field_name not in get_existing_columns():
+                raise exc
+        existing_columns = get_existing_columns()
+
+    return schema_updated

@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.models import Group
 from .models import Usuario
 from config.clientes.models import Cliente
-from config.core.models import Testimonio, HomeContenido
+from config.core.models import Testimonio, HomeContenido, ensure_homecontenido_quienes_schema
 from config.productos.models import Producto, Marca
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.clickjacking import xframe_options_sameorigin
@@ -65,6 +65,15 @@ def _get_or_create_home_contenido():
             contenido = HomeContenido.objects.create(activo=True)
         return with_fallback_defaults(contenido)
     except (OperationalError, ProgrammingError):
+        try:
+            ensure_homecontenido_quienes_schema()
+            contenido = HomeContenido.objects.order_by('-actualizado').first()
+            if contenido is None:
+                contenido = HomeContenido.objects.create(activo=True)
+            return with_fallback_defaults(contenido)
+        except Exception:
+            pass
+
         contenido = HomeContenido.objects.only(*legacy_fields).order_by('-actualizado').first()
         return with_fallback_defaults(contenido)
 
@@ -513,34 +522,38 @@ def editar_home_contenido(request):
         try:
             contenido.save()
         except (OperationalError, ProgrammingError):
-            if contenido.pk:
-                legacy_update_fields = [
-                    'hero_titulo_principal',
-                    'hero_titulo_principal_en',
-                    'hero_titulo_resaltado',
-                    'hero_titulo_resaltado_en',
-                    'hero_titulo_final',
-                    'hero_titulo_final_en',
-                    'hero_subtitulo',
-                    'hero_subtitulo_en',
-                    'hero_boton_texto',
-                    'hero_boton_texto_en',
-                    'cta_titulo',
-                    'cta_titulo_en',
-                    'cta_boton_registro_texto',
-                    'cta_boton_registro_texto_en',
-                    'cta_boton_catalogo_texto',
-                    'cta_boton_catalogo_texto_en',
-                    'activo',
-                ]
-                contenido.save(update_fields=legacy_update_fields)
-                messages.warning(
-                    request,
-                    'La base de datos aun no tiene los campos de Quienes somos. El resto del contenido se guardo, pero esa seccion no podra guardarse hasta que Railway aplique la migracion.'
-                )
-                migration_pending_warning = True
-            else:
-                raise
+            try:
+                ensure_homecontenido_quienes_schema()
+                contenido.save()
+            except Exception:
+                if contenido.pk:
+                    legacy_update_fields = [
+                        'hero_titulo_principal',
+                        'hero_titulo_principal_en',
+                        'hero_titulo_resaltado',
+                        'hero_titulo_resaltado_en',
+                        'hero_titulo_final',
+                        'hero_titulo_final_en',
+                        'hero_subtitulo',
+                        'hero_subtitulo_en',
+                        'hero_boton_texto',
+                        'hero_boton_texto_en',
+                        'cta_titulo',
+                        'cta_titulo_en',
+                        'cta_boton_registro_texto',
+                        'cta_boton_registro_texto_en',
+                        'cta_boton_catalogo_texto',
+                        'cta_boton_catalogo_texto_en',
+                        'activo',
+                    ]
+                    contenido.save(update_fields=legacy_update_fields)
+                    messages.warning(
+                        request,
+                        'La base de datos aun no tiene los campos de Quienes somos. El resto del contenido se guardo, pero esa seccion no podra guardarse hasta que Railway aplique la migracion.'
+                    )
+                    migration_pending_warning = True
+                else:
+                    raise
 
         cache.delete('home:contenido')
         if not migration_pending_warning:

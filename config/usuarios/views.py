@@ -40,6 +40,67 @@ def _redirect_for_user(user):
         return reverse('catalogo')
     return '/'
 
+
+def _cloudinary_signed_url_for_file(field_file):
+    """Genera URL firmada para archivos en Cloudinary cuando open() falla."""
+    try:
+        from cloudinary.utils import cloudinary_url
+    except Exception:
+        return None
+
+    file_name = (field_file.name or '').lstrip('/')
+    if not file_name:
+        return None
+
+    # Algunos registros antiguos guardaron prefijo "media/" en Cloudinary.
+    public_id = file_name[6:] if file_name.startswith('media/') else file_name
+
+    base_public_id, ext = os.path.splitext(public_id)
+    ext = ext.lstrip('.').lower()
+
+    candidates = [
+        {
+            'public_id': public_id,
+            'resource_type': 'raw',
+            'type': 'upload',
+        },
+        {
+            'public_id': public_id,
+            'resource_type': 'raw',
+            'type': 'authenticated',
+        },
+        {
+            'public_id': base_public_id,
+            'resource_type': 'image',
+            'type': 'upload',
+            'format': ext if ext else None,
+        },
+        {
+            'public_id': base_public_id,
+            'resource_type': 'image',
+            'type': 'authenticated',
+            'format': ext if ext else None,
+        },
+    ]
+
+    for option in candidates:
+        kwargs = {
+            'resource_type': option['resource_type'],
+            'type': option['type'],
+            'sign_url': True,
+            'secure': True,
+        }
+        if option.get('format'):
+            kwargs['format'] = option['format']
+        try:
+            signed_url, _ = cloudinary_url(option['public_id'], **kwargs)
+            if signed_url:
+                return signed_url
+        except Exception:
+            continue
+
+    return None
+
 @login_required
 def panel_admin(request):
 
@@ -464,7 +525,19 @@ def ver_certificado_cliente(request, cliente_id):
         certificado = cliente.certificado_tax
         certificado.open('rb')
     except Exception as exc:
-        logger.exception("No se pudo abrir certificado del cliente %s: %s", cliente.id, exc)
+        logger.warning("Fallo open() para certificado cliente %s: %s", cliente.id, exc)
+
+        signed_url = _cloudinary_signed_url_for_file(cliente.certificado_tax)
+        if signed_url:
+            return redirect(signed_url)
+
+        try:
+            fallback_url = cliente.certificado_tax.url
+            if fallback_url:
+                return redirect(fallback_url)
+        except Exception:
+            pass
+
         raise Http404("No se pudo abrir el certificado")
 
     nombre_archivo = os.path.basename(certificado.name) or f"certificado_{cliente.id}"

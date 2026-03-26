@@ -98,6 +98,18 @@ class HomeContenido(models.Model):
     cta_boton_catalogo_texto = models.CharField(max_length=80, default="Ver Catalogo")
     cta_boton_catalogo_texto_en = models.CharField(max_length=80, blank=True, null=True)
 
+    quienes_titulo = models.CharField(max_length=120, default="¿Quiénes Somos?")
+    quienes_titulo_en = models.CharField(max_length=120, blank=True, null=True)
+
+    quienes_descripcion = models.TextField(
+        default=(
+            "En La Tortilla Grocery LLC, somos el aliado de confianza de los negocios latinos. "
+            "Ofrecemos productos y servicios mayoristas de alta calidad, adaptados a sus necesidades. "
+            "Nos enfocamos en brindar soluciones eficientes para que su negocio crezca y prospere en un mercado competitivo."
+        )
+    )
+    quienes_descripcion_en = models.TextField(blank=True, null=True)
+
     activo = models.BooleanField(default=True)
     actualizado = models.DateTimeField(auto_now=True)
 
@@ -140,6 +152,14 @@ class HomeContenido(models.Model):
     @property
     def cta_boton_catalogo_texto_traducido(self):
         return self._translated(self.cta_boton_catalogo_texto, self.cta_boton_catalogo_texto_en)
+
+    @property
+    def quienes_titulo_traducido(self):
+        return self._translated(self.quienes_titulo, self.quienes_titulo_en)
+
+    @property
+    def quienes_descripcion_traducido(self):
+        return self._translated(self.quienes_descripcion, self.quienes_descripcion_en)
 
     def __str__(self):
         return f"Home contenido ({'activo' if self.activo else 'inactivo'})"

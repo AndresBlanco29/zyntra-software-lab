@@ -98,6 +98,29 @@ Editar Banner y Textos Home
         </div>
 
         <div class="col-12">
+          <hr class="my-2">
+          <h5 class="mb-3">Seccion Quienes somos</h5>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Titulo (ES)</label>
+          <input type="text" name="quienes_titulo" class="form-control" value="{{ contenido.quienes_titulo }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Titulo (EN)</label>
+          <input type="text" name="quienes_titulo_en" class="form-control" value="{{ contenido.quienes_titulo_en|default:'' }}">
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Descripcion (ES)</label>
+          <textarea name="quienes_descripcion" class="form-control" rows="5">{{ contenido.quienes_descripcion }}</textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Descripcion (EN)</label>
+          <textarea name="quienes_descripcion_en" class="form-control" rows="5">{{ contenido.quienes_descripcion_en|default:'' }}</textarea>
+        </div>
+
+        <div class="col-12">
           <div class="form-check mt-2">
             <input class="form-check-input" type="checkbox" name="activo" id="activo" {% if contenido.activo %}checked{% endif %}>
             <label class="form-check-label" for="activo">Contenido activo</label>

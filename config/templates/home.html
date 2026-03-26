@@ -167,19 +167,26 @@ La Tortilla Grocery
 <div class="col-lg-6">
 
 <h4 class="quienes-title">
+{% if home_contenido %}
+{{ home_contenido.quienes_titulo_traducido }}
+{% else %}
 {% trans "¿Quiénes Somos?" %}
+{% endif %}
 </h4>
 
 <hr>
 
 <p class="quienes-text">
-
+{% if home_contenido %}
+{{ home_contenido.quienes_descripcion_traducido }}
+{% else %}
 {% blocktrans %}
 En La Tortilla Grocery LLC, somos el aliado de confianza de los negocios latinos.
 Ofrecemos productos y servicios mayoristas de alta calidad, adaptados a sus necesidades.
 Nos enfocamos en brindar soluciones eficientes para que su negocio crezca y prospere
 en un mercado competitivo.
 {% endblocktrans %}
+{% endif %}
 
 </p>
 

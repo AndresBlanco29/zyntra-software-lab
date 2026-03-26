@@ -124,6 +124,10 @@ def _get_cached_home_contenido():
                 "cta_boton_registro_texto_en",
                 "cta_boton_catalogo_texto",
                 "cta_boton_catalogo_texto_en",
+                "quienes_titulo",
+                "quienes_titulo_en",
+                "quienes_descripcion",
+                "quienes_descripcion_en",
                 "activo",
             ).first()
         except (OperationalError, ProgrammingError):

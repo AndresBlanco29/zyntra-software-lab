@@ -462,6 +462,12 @@ def editar_home_contenido(request):
         contenido.cta_boton_catalogo_texto = (request.POST.get('cta_boton_catalogo_texto') or '').strip() or contenido.cta_boton_catalogo_texto
         contenido.cta_boton_catalogo_texto_en = (request.POST.get('cta_boton_catalogo_texto_en') or '').strip()
 
+        contenido.quienes_titulo = (request.POST.get('quienes_titulo') or '').strip() or contenido.quienes_titulo
+        contenido.quienes_titulo_en = (request.POST.get('quienes_titulo_en') or '').strip()
+
+        contenido.quienes_descripcion = (request.POST.get('quienes_descripcion') or '').strip() or contenido.quienes_descripcion
+        contenido.quienes_descripcion_en = (request.POST.get('quienes_descripcion_en') or '').strip()
+
         contenido.activo = True if request.POST.get('activo') else False
         contenido.save()
 

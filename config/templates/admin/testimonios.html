@@ -1,31 +1,32 @@
 {% extends "bases/base_vendedor.html" %}
+{% load i18n %}
 
 {% block title %}
-Testimonios
+{% trans "Testimonios" %}
 {% endblock %}
 
 {% block content %}
 
 <h2 class="mb-4 admin-toolbar">
-<span>Testimonios del Home</span>
+<span>{% trans "Testimonios del Home" %}</span>
 </h2>
 
 <div class="d-flex gap-2 mb-3 flex-wrap">
-  <a href="{% url 'crear_testimonio' %}" class="btn btn-primary">Crear Testimonio</a>
-  <a href="{% url 'contenido_home' %}" class="btn btn-secondary">Volver a Contenido Home</a>
+  <a href="{% url 'crear_testimonio' %}" class="btn btn-primary">{% trans "Crear Testimonio" %}</a>
+  <a href="{% url 'contenido_home' %}" class="btn btn-secondary">{% trans "Volver a Contenido Home" %}</a>
 </div>
 
 <div class="table-responsive">
   <table class="table table-striped align-middle">
     <thead>
       <tr>
-        <th>Foto</th>
-        <th>Nombre</th>
-        <th>Negocio</th>
-        <th>Estrellas</th>
-        <th>Orden</th>
-        <th>Estado</th>
-        <th>Acciones</th>
+        <th>{% trans "Foto" %}</th>
+        <th>{% trans "Nombre" %}</th>
+        <th>{% trans "Negocio" %}</th>
+        <th>{% trans "Estrellas" %}</th>
+        <th>{% trans "Orden" %}</th>
+        <th>{% trans "Estado" %}</th>
+        <th>{% trans "Acciones" %}</th>
       </tr>
     </thead>
     <tbody>
@@ -44,23 +45,23 @@ Testimonios
         <td>{{ testimonio.orden }}</td>
         <td>
           {% if testimonio.activo %}
-          <span class="badge bg-success">Activo</span>
+          <span class="badge bg-success">{% trans "Activo" %}</span>
           {% else %}
-          <span class="badge bg-secondary">Oculto</span>
+          <span class="badge bg-secondary">{% trans "Oculto" %}</span>
           {% endif %}
         </td>
         <td>
-          <a href="{% url 'editar_testimonio' testimonio.id %}" class="btn btn-sm btn-warning">Editar</a>
+          <a href="{% url 'editar_testimonio' testimonio.id %}" class="btn btn-sm btn-warning">{% trans "Editar" %}</a>
           {% if testimonio.activo %}
-          <a href="{% url 'desactivar_testimonio' testimonio.id %}" class="btn btn-sm btn-danger">Ocultar</a>
+          <a href="{% url 'desactivar_testimonio' testimonio.id %}" class="btn btn-sm btn-danger">{% trans "Ocultar" %}</a>
           {% else %}
-          <a href="{% url 'activar_testimonio' testimonio.id %}" class="btn btn-sm btn-success">Activar</a>
+          <a href="{% url 'activar_testimonio' testimonio.id %}" class="btn btn-sm btn-success">{% trans "Activar" %}</a>
           {% endif %}
         </td>
       </tr>
       {% empty %}
       <tr>
-        <td colspan="7" class="text-center text-muted py-4">No hay testimonios registrados</td>
+        <td colspan="7" class="text-center text-muted py-4">{% trans "No hay testimonios registrados" %}</td>
       </tr>
       {% endfor %}
     </tbody>

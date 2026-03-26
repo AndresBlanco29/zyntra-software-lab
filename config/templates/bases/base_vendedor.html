@@ -1,4 +1,5 @@
 {% load static i18n %}
+{% get_current_language as CURRENT_LANGUAGE %}
 <!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
 
@@ -27,7 +28,7 @@
 
 <div class="container-fluid">
 
-<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="sidebarToggleBtn" aria-label="Abrir menu">
+<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="sidebarToggleBtn" aria-label="{% trans 'Abrir menu' %}">
 ☰
 </button>
 
@@ -39,8 +40,18 @@ La Tortilla Grocery
 
 {% block navbar_right %}
 
+<form action="{% url 'set_language' %}" method="post" class="d-inline-flex align-items-center me-2">
+{% csrf_token %}
+<input type="hidden" name="next" value="{{ request.get_full_path }}">
+<label for="panelLanguage" class="visually-hidden">{% trans "Idioma" %}</label>
+<select id="panelLanguage" name="language" class="form-select form-select-sm" onchange="this.form.submit()" style="min-width: 96px;">
+<option value="es" {% if CURRENT_LANGUAGE == 'es' %}selected{% endif %}>ES</option>
+<option value="en" {% if CURRENT_LANGUAGE == 'en' %}selected{% endif %}>EN</option>
+</select>
+</form>
+
 <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#logoutModal" style="font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
-<i class="bi bi-box-arrow-right"></i> Cerrar sesión
+<i class="bi bi-box-arrow-right"></i> {% trans "Cerrar sesion" %}
 </button>
 
 {% endblock %}
@@ -51,7 +62,7 @@ La Tortilla Grocery
 
 </nav>
 
-<!-- Modal de confirmación de logout -->
+<!-- Modal de confirmacion de logout -->
 <div class="modal fade" id="logoutModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);">
@@ -61,21 +72,21 @@ La Tortilla Grocery
         </div>
         
         <h5 class="modal-title mb-2" style="color: #0b3d91; font-weight: 700; font-size: 1.5rem;">
-          ¿Estás seguro de salir?
+          {% trans "Estas seguro de salir?" %}
         </h5>
         
         <p class="text-muted mb-0" style="font-size: 1rem;">
-          Se cerrará tu sesión en <strong>La Tortilla Grocery</strong>
+          {% trans "Se cerrara tu sesion en" %} <strong>La Tortilla Grocery</strong>
         </p>
       </div>
       
       <div class="modal-footer border-0" style="justify-content: center; gap: 1rem; padding: 1.5rem 2rem; background: #fff;">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="font-weight: 600; border-width: 2px;">
-          Cancelar
+          {% trans "Cancelar" %}
         </button>
         
         <a href="{% url 'logout' %}" class="btn btn-danger" style="font-weight: 600; padding: 0.5rem 1.5rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
-          <i class="bi bi-box-arrow-right"></i> Sí, salir
+          <i class="bi bi-box-arrow-right"></i> {% trans "Si, salir" %}
         </a>
       </div>
     </div>
@@ -108,48 +119,48 @@ La Tortilla Grocery
 <a href="{% url 'panel_admin' %}"
 class="list-group-item list-group-item-action
 {% if request.resolver_match.url_name == 'panel_admin' %}active{% endif %}">
-Dashboard
+{% trans "Dashboard" %}
 </a>
 
 <a href="{% url 'clientes_pendientes' %}"
 class="list-group-item list-group-item-action
 {% if request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' %}active{% endif %}">
-Solicitudes
+{% trans "Solicitudes" %}
 </a>
 
 <a href="{% url 'lista_vendedores' %}"
 class="list-group-item list-group-item-action
 {% if request.resolver_match.url_name == 'lista_vendedores' or request.resolver_match.url_name == 'crear_vendedor' %}active{% endif %}">
-Vendedores
+{% trans "Vendedores" %}
 </a>
 
 <a href="{% url 'lista_productos' %}"
 class="list-group-item list-group-item-action
 {% if request.resolver_match.url_name == 'lista_productos' or request.resolver_match.url_name == 'crear_producto' or request.resolver_match.url_name == 'crear_categoria' or request.resolver_match.url_name == 'crear_marca' or request.resolver_match.url_name == 'lista_marcas' or request.resolver_match.url_name == 'editar_marca' %}active{% endif %}">
-Productos
+{% trans "Productos" %}
 </a>
 
 <a href="{% url 'contenido_home' %}"
 class="list-group-item list-group-item-action
 {% if request.resolver_match.url_name == 'contenido_home' or request.resolver_match.url_name == 'editar_home_contenido' or request.resolver_match.url_name == 'lista_testimonios' or request.resolver_match.url_name == 'crear_testimonio' or request.resolver_match.url_name == 'editar_testimonio' %}active{% endif %}">
-Contenido Home
+{% trans "Contenido Home" %}
 </a>
 
 {% elif request.user.role == "vendedor" %}
 
 <a href="{% url 'crear_cliente' %}"
 class="list-group-item list-group-item-action {% if 'crear-cliente' in request.path %}active{% endif %}">
-Crear Cliente
+{% trans "Crear Cliente" %}
 </a>
 
 <a href="{% url 'vendedores_clientes' %}"
 class="list-group-item list-group-item-action {% if 'clientes' in request.path %}active{% endif %}">
-Clientes
+{% trans "Clientes" %}
 </a>
 
 <a href="{% url 'tomar_pedido' %}"
 class="list-group-item list-group-item-action {% if 'tomar-pedido' in request.path %}active{% endif %}">
-Tomar Pedido
+{% trans "Tomar Pedido" %}
 </a>
 
 {% endif %}
@@ -187,15 +198,15 @@ Tomar Pedido
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0" style="border-radius: 12px; overflow: hidden;">
       <div class="modal-header border-0" id="feedbackModalHeader" style="background: linear-gradient(135deg, #0b3d91, #2f77d1); color: #fff;">
-        <h5 class="modal-title fw-bold" id="feedbackModalTitle">Notificacion</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h5 class="modal-title fw-bold" id="feedbackModalTitle">{% trans "Notificacion" %}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% trans 'Cerrar' %}"></button>
       </div>
       <div class="modal-body text-center py-4" style="background: #ffffff;">
         <p id="feedbackModalMessage" class="mb-0" style="font-size: 1rem; color: #1f2937;"></p>
       </div>
       <div class="modal-footer border-0 pt-0" style="justify-content: center;">
         <button type="button" class="btn" data-bs-dismiss="modal" style="background: #0b3d91; color: #fff; font-weight: 600; padding: 0.45rem 1.2rem; border-radius: 8px;">
-          Entendido
+          {% trans "Entendido" %}
         </button>
       </div>
     </div>
@@ -205,6 +216,13 @@ Tomar Pedido
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+  const feedbackTranslations = {
+    error: "{% trans 'Error'|escapejs %}",
+    warning: "{% trans 'Aviso'|escapejs %}",
+    success: "{% trans 'Operacion exitosa'|escapejs %}",
+    info: "{% trans 'Informacion'|escapejs %}"
+  };
+
   const toggleBtn = document.getElementById('sidebarToggleBtn');
   const sidebar = document.getElementById('panelSidebar');
   const backdrop = document.getElementById('sidebarBackdrop');
@@ -261,16 +279,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (tags.includes('error')) {
     modalHeader.style.background = 'linear-gradient(135deg, #9f1239, #dc2626)';
-    modalTitle.textContent = 'Error';
+    modalTitle.textContent = feedbackTranslations.error;
   } else if (tags.includes('warning')) {
     modalHeader.style.background = 'linear-gradient(135deg, #b45309, #f59e0b)';
-    modalTitle.textContent = 'Aviso';
+    modalTitle.textContent = feedbackTranslations.warning;
   } else if (tags.includes('success')) {
     modalHeader.style.background = 'linear-gradient(135deg, #0b3d91, #2f77d1)';
-    modalTitle.textContent = 'Operacion exitosa';
+    modalTitle.textContent = feedbackTranslations.success;
   } else {
     modalHeader.style.background = 'linear-gradient(135deg, #374151, #6b7280)';
-    modalTitle.textContent = 'Informacion';
+    modalTitle.textContent = feedbackTranslations.info;
   }
 
   modalMessage.textContent = text;

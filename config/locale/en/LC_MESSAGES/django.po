@@ -678,6 +678,651 @@ msgstr "Total"
 msgid "Seguir Agregando Productos"
 msgstr "Continue Adding Products"
 
+msgid "Idioma"
+msgstr "Language"
+
+msgid "Abrir menu"
+msgstr "Open menu"
+
+msgid "Cerrar sesion"
+msgstr "Log out"
+
+msgid "Estas seguro de salir?"
+msgstr "Are you sure you want to leave?"
+
+msgid "Se cerrara tu sesion en"
+msgstr "Your session will be closed in"
+
+msgid "Si, salir"
+msgstr "Yes, log out"
+
+msgid "Dashboard"
+msgstr "Dashboard"
+
+msgid "Solicitudes"
+msgstr "Requests"
+
+msgid "Contenido Home"
+msgstr "Home Content"
+
+msgid "Notificacion"
+msgstr "Notification"
+
+msgid "Entendido"
+msgstr "Understood"
+
+msgid "Operacion exitosa"
+msgstr "Successful operation"
+
+msgid "Informacion"
+msgstr "Information"
+
+msgid "Panel Administrador"
+msgstr "Admin Panel"
+
+msgid "Clientes Pendientes"
+msgstr "Pending Customers"
+
+msgid "Clientes Aprobados"
+msgstr "Approved Customers"
+
+msgid "Telefono"
+msgstr "Phone"
+
+msgid "Certificado"
+msgstr "Certificate"
+
+msgid "Ver certificado"
+msgstr "View certificate"
+
+msgid "No disponible"
+msgstr "Not available"
+
+msgid "Aprobar"
+msgstr "Approve"
+
+msgid "Rechazar"
+msgstr "Reject"
+
+msgid "No hay clientes pendientes"
+msgstr "There are no pending customers"
+
+msgid "Buscar por nombre o email..."
+msgstr "Search by name or email..."
+
+msgid "No hay vendedores registrados"
+msgstr "There are no sellers registered"
+
+msgid "Operacion completada"
+msgstr "Operation completed"
+
+msgid "Se ha creado correctamente el vendedor."
+msgstr "The seller has been created successfully."
+
+msgid "Confirmar accion"
+msgstr "Confirm action"
+
+msgid "Confirmar"
+msgstr "Confirm"
+
+msgid "Activar vendedor"
+msgstr "Activate seller"
+
+msgid "Deseas activar a"
+msgstr "Do you want to activate"
+
+msgid "Si, activar"
+msgstr "Yes, activate"
+
+msgid "Desactivar vendedor"
+msgstr "Deactivate seller"
+
+msgid "Deseas desactivar a"
+msgstr "Do you want to deactivate"
+
+msgid "Si, desactivar"
+msgstr "Yes, deactivate"
+
+msgid "Todas las categorias"
+msgstr "All categories"
+
+msgid "Todas las marcas"
+msgstr "All brands"
+
+msgid "Gestionar Marcas"
+msgstr "Manage Brands"
+
+msgid "Codigo de Barras"
+msgstr "Barcode"
+
+msgid "Inhabilitar"
+msgstr "Disable"
+
+msgid "No hay productos registrados"
+msgstr "There are no products registered"
+
+msgid "Contrasena"
+msgstr "Password"
+
+msgid "Editar Vendedor"
+msgstr "Edit Seller"
+
+msgid "El nombre de usuario no se puede cambiar"
+msgstr "The username cannot be changed"
+
+msgid "Nombre de la categoria"
+msgstr "Category name"
+
+msgid "Nombre en ingles (opcional)"
+msgstr "English name (optional)"
+
+msgid "Guardar Categoria"
+msgstr "Save Category"
+
+msgid "Volver a Productos"
+msgstr "Back to Products"
+
+msgid "Nombre de la marca"
+msgstr "Brand name"
+
+msgid "Logo (opcional)"
+msgstr "Logo (optional)"
+
+msgid "Categorias asociadas (opcional)"
+msgstr "Associated categories (optional)"
+
+msgid "Mantener presionada Ctrl (o Cmd) para seleccionar varias categorias."
+msgstr "Hold Ctrl (or Cmd) to select multiple categories."
+
+msgid "Guardar Marca"
+msgstr "Save Brand"
+
+msgid "Volver a Marcas"
+msgstr "Back to Brands"
+
+msgid "Editar Marca"
+msgstr "Edit Brand"
+
+msgid "Logo actual"
+msgstr "Current logo"
+
+msgid "Sin logo"
+msgstr "No logo"
+
+msgid "Nombre del producto"
+msgstr "Product name"
+
+msgid "Nombre en ingles"
+msgstr "English name"
+
+msgid "Campo requerido. Debe ser unico para cada producto."
+msgstr "Required field. It must be unique for each product."
+
+msgid "Descripcion"
+msgstr "Description"
+
+msgid "Descripcion en ingles"
+msgstr "Description in English"
+
+msgid "Seleccionar categoria"
+msgstr "Select category"
+
+msgid "Seleccionar marca"
+msgstr "Select brand"
+
+msgid "Producto activo"
+msgstr "Active product"
+
+msgid "Producto destacado"
+msgstr "Featured product"
+
+msgid "Descuento (%)"
+msgstr "Discount (%)"
+
+msgid "Presentacion"
+msgstr "Packaging"
+
+msgid "Tipo de contenido"
+msgstr "Content type"
+
+msgid "Unidades"
+msgstr "Units"
+
+msgid "Precios"
+msgstr "Prices"
+
+msgid "Precio 1"
+msgstr "Price 1"
+
+msgid "Precio 2"
+msgstr "Price 2"
+
+msgid "Precio 3"
+msgstr "Price 3"
+
+msgid "Precio 4"
+msgstr "Price 4"
+
+msgid "Precio 5"
+msgstr "Price 5"
+
+msgid "Crear producto"
+msgstr "Create product"
+
+msgid "Editar Producto"
+msgstr "Edit Product"
+
+msgid "Presentaciones"
+msgstr "Packaging Options"
+
+msgid "Este producto no tiene presentaciones aun. Puedes crear la primera presentacion aqui."
+msgstr "This product does not have packaging options yet. You can create the first one here."
+
+msgid "Marcas activas"
+msgstr "Active brands"
+
+msgid "Marcas inactivas"
+msgstr "Inactive brands"
+
+msgid "Testimonios activos"
+msgstr "Active testimonials"
+
+msgid "Testimonios ocultos"
+msgstr "Hidden testimonials"
+
+msgid "Banner y textos principales"
+msgstr "Banner and main texts"
+
+msgid "Controla los textos principales del hero y del CTA del home desde el panel administrador."
+msgstr "Control the main hero and CTA texts from the admin panel."
+
+msgid "Editar textos home"
+msgstr "Edit home texts"
+
+msgid "Vista previa actual:"
+msgstr "Current preview:"
+
+msgid "Hero:"
+msgstr "Hero:"
+
+msgid "Quienes somos:"
+msgstr "About us:"
+
+msgid "Tarjeticas:"
+msgstr "Info cards:"
+
+msgid "Estadisticas:"
+msgstr "Statistics:"
+
+msgid "Logos de marcas"
+msgstr "Brand logos"
+
+msgid "Administra las marcas y los logos que aparecen en la seccion de marcas del home."
+msgstr "Manage the brands and logos shown in the home brands section."
+
+msgid "Gestionar logos"
+msgstr "Manage logos"
+
+msgid "Crear marca"
+msgstr "Create brand"
+
+msgid "Crea, edita, ordena y oculta testimonios para controlar lo que se muestra en el home."
+msgstr "Create, edit, order, and hide testimonials to control what is shown on the home page."
+
+msgid "Gestionar testimonios"
+msgstr "Manage testimonials"
+
+msgid "Crear testimonio"
+msgstr "Create testimonial"
+
+msgid "Editar Banner y Textos Home"
+msgstr "Edit Banner and Home Texts"
+
+msgid "Editar Banner y Textos del Home"
+msgstr "Edit Banner and Home Texts"
+
+msgid "Hero principal"
+msgstr "Main hero"
+
+msgid "Titulo principal (ES)"
+msgstr "Main title (ES)"
+
+msgid "Titulo resaltado (ES)"
+msgstr "Highlighted title (ES)"
+
+msgid "Titulo final (ES)"
+msgstr "Final title (ES)"
+
+msgid "Titulo principal (EN)"
+msgstr "Main title (EN)"
+
+msgid "Titulo resaltado (EN)"
+msgstr "Highlighted title (EN)"
+
+msgid "Titulo final (EN)"
+msgstr "Final title (EN)"
+
+msgid "Subtitulo (ES)"
+msgstr "Subtitle (ES)"
+
+msgid "Boton hero (ES)"
+msgstr "Hero button (ES)"
+
+msgid "Subtitulo (EN)"
+msgstr "Subtitle (EN)"
+
+msgid "Boton hero (EN)"
+msgstr "Hero button (EN)"
+
+msgid "CTA mayorista"
+msgstr "Wholesale CTA"
+
+msgid "Titulo CTA (ES)"
+msgstr "CTA title (ES)"
+
+msgid "Titulo CTA (EN)"
+msgstr "CTA title (EN)"
+
+msgid "Boton crear cuenta (ES)"
+msgstr "Create account button (ES)"
+
+msgid "Boton crear cuenta (EN)"
+msgstr "Create account button (EN)"
+
+msgid "Boton catalogo (ES)"
+msgstr "Catalog button (ES)"
+
+msgid "Boton catalogo (EN)"
+msgstr "Catalog button (EN)"
+
+msgid "Seccion Quienes somos"
+msgstr "About us section"
+
+msgid "Titulo (ES)"
+msgstr "Title (ES)"
+
+msgid "Titulo (EN)"
+msgstr "Title (EN)"
+
+msgid "Descripcion (ES)"
+msgstr "Description (ES)"
+
+msgid "Descripcion (EN)"
+msgstr "Description (EN)"
+
+msgid "Tarjetas informativas"
+msgstr "Info cards"
+
+msgid "Tarjeta 1 titulo (ES)"
+msgstr "Card 1 title (ES)"
+
+msgid "Tarjeta 1 titulo (EN)"
+msgstr "Card 1 title (EN)"
+
+msgid "Tarjeta 1 subtitulo (ES)"
+msgstr "Card 1 subtitle (ES)"
+
+msgid "Tarjeta 1 subtitulo (EN)"
+msgstr "Card 1 subtitle (EN)"
+
+msgid "Tarjeta 2 titulo (ES)"
+msgstr "Card 2 title (ES)"
+
+msgid "Tarjeta 2 titulo (EN)"
+msgstr "Card 2 title (EN)"
+
+msgid "Tarjeta 2 subtitulo (ES)"
+msgstr "Card 2 subtitle (ES)"
+
+msgid "Tarjeta 2 subtitulo (EN)"
+msgstr "Card 2 subtitle (EN)"
+
+msgid "Tarjeta 3 titulo (ES)"
+msgstr "Card 3 title (ES)"
+
+msgid "Tarjeta 3 titulo (EN)"
+msgstr "Card 3 title (EN)"
+
+msgid "Tarjeta 3 subtitulo (ES)"
+msgstr "Card 3 subtitle (ES)"
+
+msgid "Tarjeta 3 subtitulo (EN)"
+msgstr "Card 3 subtitle (EN)"
+
+msgid "Tarjeta 4 titulo (ES)"
+msgstr "Card 4 title (ES)"
+
+msgid "Tarjeta 4 titulo (EN)"
+msgstr "Card 4 title (EN)"
+
+msgid "Tarjeta 4 subtitulo (ES)"
+msgstr "Card 4 subtitle (ES)"
+
+msgid "Tarjeta 4 subtitulo (EN)"
+msgstr "Card 4 subtitle (EN)"
+
+msgid "Estadistica 1 valor (ES)"
+msgstr "Statistic 1 value (ES)"
+
+msgid "Estadistica 1 valor (EN)"
+msgstr "Statistic 1 value (EN)"
+
+msgid "Estadistica 1 texto (ES)"
+msgstr "Statistic 1 text (ES)"
+
+msgid "Estadistica 1 texto (EN)"
+msgstr "Statistic 1 text (EN)"
+
+msgid "Estadistica 2 valor (ES)"
+msgstr "Statistic 2 value (ES)"
+
+msgid "Estadistica 2 valor (EN)"
+msgstr "Statistic 2 value (EN)"
+
+msgid "Estadistica 2 texto (ES)"
+msgstr "Statistic 2 text (ES)"
+
+msgid "Estadistica 2 texto (EN)"
+msgstr "Statistic 2 text (EN)"
+
+msgid "Estadistica 3 valor (ES)"
+msgstr "Statistic 3 value (ES)"
+
+msgid "Estadistica 3 valor (EN)"
+msgstr "Statistic 3 value (EN)"
+
+msgid "Estadistica 3 texto (ES)"
+msgstr "Statistic 3 text (ES)"
+
+msgid "Estadistica 3 texto (EN)"
+msgstr "Statistic 3 text (EN)"
+
+msgid "Contenido activo"
+msgstr "Active content"
+
+msgid "Testimonios del Home"
+msgstr "Home Testimonials"
+
+msgid "Volver a Contenido Home"
+msgstr "Back to Home Content"
+
+msgid "Foto"
+msgstr "Photo"
+
+msgid "Negocio"
+msgstr "Business"
+
+msgid "Estrellas"
+msgstr "Stars"
+
+msgid "Orden"
+msgstr "Order"
+
+msgid "Oculto"
+msgstr "Hidden"
+
+msgid "Ocultar"
+msgstr "Hide"
+
+msgid "No hay testimonios registrados"
+msgstr "There are no testimonials registered"
+
+msgid "Crear Testimonio"
+msgstr "Create Testimonial"
+
+msgid "Negocio en ingles"
+msgstr "Business in English"
+
+msgid "Comentario"
+msgstr "Comment"
+
+msgid "Comentario en ingles"
+msgstr "Comment in English"
+
+msgid "Mostrar en home"
+msgstr "Show on home"
+
+msgid "Guardar Testimonio"
+msgstr "Save Testimonial"
+
+msgid "Editar Testimonio"
+msgstr "Edit Testimonial"
+
+msgid "Foto actual"
+msgstr "Current photo"
+
+msgid "Detalle Cliente"
+msgstr "Customer Detail"
+
+msgid "Detalle del Cliente"
+msgstr "Customer Detail"
+
+msgid "Empresa:"
+msgstr "Company:"
+
+msgid "Correo:"
+msgstr "Email:"
+
+msgid "Telefono:"
+msgstr "Phone:"
+
+msgid "Estado:"
+msgstr "State:"
+
+msgid "Codigo Postal:"
+msgstr "Postal Code:"
+
+msgid "Sales Tax:"
+msgstr "Sales Tax:"
+
+msgid "Pais:"
+msgstr "Country:"
+
+msgid "Certificado de Impuesto"
+msgstr "Tax Certificate"
+
+msgid "No se subio certificado"
+msgstr "No certificate was uploaded"
+
+msgid "Aprobar cliente"
+msgstr "Approve customer"
+
+msgid "Diagnostico Certificado"
+msgstr "Certificate Diagnostic"
+
+msgid "Diagnostico de certificado"
+msgstr "Certificate diagnostic"
+
+msgid "ID:"
+msgstr "ID:"
+
+msgid "Email:"
+msgstr "Email:"
+
+msgid "No se pudo abrir el certificado"
+msgstr "The certificate could not be opened"
+
+msgid "Este detalle solo lo ve el administrador y sirve para identificar el error real del archivo."
+msgstr "This detail is only visible to the administrator and helps identify the real file error."
+
+msgid "Volver al cliente"
+msgstr "Back to customer"
+
+msgid "Volver a solicitudes"
+msgstr "Back to requests"
+
+msgid "Ver Certificado"
+msgstr "View Certificate"
+
+msgid "Certificado del cliente"
+msgstr "Customer certificate"
+
+msgid "La base de datos aun no tiene todos los campos nuevos del home. El resto del contenido se guardo, pero las secciones nuevas no podran guardarse hasta que Railway aplique la migracion."
+msgstr "The database does not yet have all the new home fields. The rest of the content was saved, but the new sections cannot be saved until Railway applies the migration."
+
+msgid "Contenido del home actualizado correctamente"
+msgstr "Home content updated successfully"
+
+msgid "Nombre y comentario son obligatorios."
+msgstr "Name and comment are required."
+
+msgid "Testimonio creado correctamente"
+msgstr "Testimonial created successfully"
+
+msgid "Testimonio actualizado correctamente"
+msgstr "Testimonial updated successfully"
+
+msgid "Testimonio ocultado correctamente"
+msgstr "Testimonial hidden successfully"
+
+msgid "Testimonio activado correctamente"
+msgstr "Testimonial activated successfully"
+
+msgid "El usuario ya existe"
+msgstr "The user already exists"
+
+msgid "Vendedor creado correctamente"
+msgstr "Seller created successfully"
+
+msgid "Vendedor actualizado correctamente"
+msgstr "Seller updated successfully"
+
+msgid "Vendedor %(nombre)s desactivado"
+msgstr "Seller %(nombre)s deactivated"
+
+msgid "Vendedor %(nombre)s activado"
+msgstr "Seller %(nombre)s activated"
+
+msgid "El nombre de la categoria es obligatorio."
+msgstr "The category name is required."
+
+msgid "Ya existe una categoria con ese nombre."
+msgstr "A category with that name already exists."
+
+msgid "Categoria creada correctamente"
+msgstr "Category created successfully"
+
+msgid "El nombre de la marca es obligatorio."
+msgstr "The brand name is required."
+
+msgid "Ya existe una marca con ese nombre."
+msgstr "A brand with that name already exists."
+
+msgid "Marca creada correctamente"
+msgstr "Brand created successfully"
+
+msgid "Ya existe otra marca con ese nombre."
+msgstr "Another brand with that name already exists."
+
+msgid "Marca actualizada correctamente"
+msgstr "Brand updated successfully"
+
+msgid "Marca inhabilitada"
+msgstr "Brand disabled"
+
+msgid "Marca activada"
+msgstr "Brand activated"
+
 #: .\templates\vendedores\tomar_pedido_resumen.html:349
 msgid "Enviar Pedido"
 msgstr "Send Order"

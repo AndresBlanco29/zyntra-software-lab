@@ -1,12 +1,13 @@
 {% extends "bases/base_vendedor.html" %}
+{% load i18n %}
 
 {% block title %}
-Editar Vendedor
+{% trans "Editar Vendedor" %}
 {% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4">Editar Vendedor</h2>
+<h2 class="mb-4">{% trans "Editar Vendedor" %}</h2>
 
 <div class="card shadow-sm">
 <div class="card-body">
@@ -16,37 +17,37 @@ Editar Vendedor
 {% csrf_token %}
 
 <div class="mb-3">
-<label class="form-label">Nombre</label>
+<label class="form-label">{% trans "Nombre" %}</label>
 <input type="text" name="nombre" class="form-control" value="{{ vendedor.first_name }}" required>
 </div>
 
 <div class="mb-3">
-<label class="form-label">Apellido</label>
+<label class="form-label">{% trans "Apellido" %}</label>
 <input type="text" name="apellido" class="form-control" value="{{ vendedor.last_name }}" required>
 </div>
 
 <div class="mb-3">
-<label class="form-label">Email</label>
+<label class="form-label">{% trans "Email" %}</label>
 <input type="email" name="email" class="form-control" value="{{ vendedor.email }}" required>
 </div>
 
 <div class="mb-3">
-<label class="form-label">Teléfono</label>
+<label class="form-label">{% trans "Telefono" %}</label>
 <input type="text" name="telefono" class="form-control" value="{{ vendedor.telefono }}">
 </div>
 
 <div class="mb-3">
-<label class="form-label">Usuario</label>
+<label class="form-label">{% trans "Usuario" %}</label>
 <input type="text" class="form-control" value="{{ vendedor.username }}" disabled>
-<small class="text-muted">El nombre de usuario no se puede cambiar</small>
+<small class="text-muted">{% trans "El nombre de usuario no se puede cambiar" %}</small>
 </div>
 
 <button type="submit" class="btn btn-success">
-Guardar cambios
+{% trans "Guardar cambios" %}
 </button>
 
 <a href="{% url 'lista_vendedores' %}" class="btn btn-secondary">
-Cancelar
+{% trans "Cancelar" %}
 </a>
 
 </form>

@@ -1,12 +1,13 @@
 {% extends "bases/base_vendedor.html" %}
+{% load i18n %}
 
 {% block title %}
-Editar Banner y Textos Home
+{% trans "Editar Banner y Textos Home" %}
 {% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4">Editar Banner y Textos del Home</h2>
+<h2 class="mb-4">{% trans "Editar Banner y Textos del Home" %}</h2>
 
 {% if messages %}
   {% for message in messages %}
@@ -19,247 +20,247 @@ Editar Banner y Textos Home
     <form method="POST">
       {% csrf_token %}
 
-      <h5 class="mb-3">Hero principal</h5>
+      <h5 class="mb-3">{% trans "Hero principal" %}</h5>
       <div class="row g-3">
         <div class="col-md-4">
-          <label class="form-label">Titulo principal (ES)</label>
+          <label class="form-label">{% trans "Titulo principal (ES)" %}</label>
           <input type="text" name="hero_titulo_principal" class="form-control" value="{{ contenido.hero_titulo_principal }}">
         </div>
         <div class="col-md-4">
-          <label class="form-label">Titulo resaltado (ES)</label>
+          <label class="form-label">{% trans "Titulo resaltado (ES)" %}</label>
           <input type="text" name="hero_titulo_resaltado" class="form-control" value="{{ contenido.hero_titulo_resaltado }}">
         </div>
         <div class="col-md-4">
-          <label class="form-label">Titulo final (ES)</label>
+          <label class="form-label">{% trans "Titulo final (ES)" %}</label>
           <input type="text" name="hero_titulo_final" class="form-control" value="{{ contenido.hero_titulo_final }}">
         </div>
 
         <div class="col-md-4">
-          <label class="form-label">Titulo principal (EN)</label>
+          <label class="form-label">{% trans "Titulo principal (EN)" %}</label>
           <input type="text" name="hero_titulo_principal_en" class="form-control" value="{{ contenido.hero_titulo_principal_en|default:'' }}">
         </div>
         <div class="col-md-4">
-          <label class="form-label">Titulo resaltado (EN)</label>
+          <label class="form-label">{% trans "Titulo resaltado (EN)" %}</label>
           <input type="text" name="hero_titulo_resaltado_en" class="form-control" value="{{ contenido.hero_titulo_resaltado_en|default:'' }}">
         </div>
         <div class="col-md-4">
-          <label class="form-label">Titulo final (EN)</label>
+          <label class="form-label">{% trans "Titulo final (EN)" %}</label>
           <input type="text" name="hero_titulo_final_en" class="form-control" value="{{ contenido.hero_titulo_final_en|default:'' }}">
         </div>
 
         <div class="col-md-8">
-          <label class="form-label">Subtitulo (ES)</label>
+          <label class="form-label">{% trans "Subtitulo (ES)" %}</label>
           <input type="text" name="hero_subtitulo" class="form-control" value="{{ contenido.hero_subtitulo }}">
         </div>
         <div class="col-md-4">
-          <label class="form-label">Boton hero (ES)</label>
+          <label class="form-label">{% trans "Boton hero (ES)" %}</label>
           <input type="text" name="hero_boton_texto" class="form-control" value="{{ contenido.hero_boton_texto }}">
         </div>
 
         <div class="col-md-8">
-          <label class="form-label">Subtitulo (EN)</label>
+          <label class="form-label">{% trans "Subtitulo (EN)" %}</label>
           <input type="text" name="hero_subtitulo_en" class="form-control" value="{{ contenido.hero_subtitulo_en|default:'' }}">
         </div>
         <div class="col-md-4">
-          <label class="form-label">Boton hero (EN)</label>
+          <label class="form-label">{% trans "Boton hero (EN)" %}</label>
           <input type="text" name="hero_boton_texto_en" class="form-control" value="{{ contenido.hero_boton_texto_en|default:'' }}">
         </div>
       </div>
 
       <hr class="my-4">
 
-      <h5 class="mb-3">CTA mayorista</h5>
+      <h5 class="mb-3">{% trans "CTA mayorista" %}</h5>
       <div class="row g-3">
         <div class="col-md-6">
-          <label class="form-label">Titulo CTA (ES)</label>
+          <label class="form-label">{% trans "Titulo CTA (ES)" %}</label>
           <input type="text" name="cta_titulo" class="form-control" value="{{ contenido.cta_titulo }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Titulo CTA (EN)</label>
+          <label class="form-label">{% trans "Titulo CTA (EN)" %}</label>
           <input type="text" name="cta_titulo_en" class="form-control" value="{{ contenido.cta_titulo_en|default:'' }}">
         </div>
 
         <div class="col-md-3">
-          <label class="form-label">Boton crear cuenta (ES)</label>
+          <label class="form-label">{% trans "Boton crear cuenta (ES)" %}</label>
           <input type="text" name="cta_boton_registro_texto" class="form-control" value="{{ contenido.cta_boton_registro_texto }}">
         </div>
         <div class="col-md-3">
-          <label class="form-label">Boton crear cuenta (EN)</label>
+          <label class="form-label">{% trans "Boton crear cuenta (EN)" %}</label>
           <input type="text" name="cta_boton_registro_texto_en" class="form-control" value="{{ contenido.cta_boton_registro_texto_en|default:'' }}">
         </div>
 
         <div class="col-md-3">
-          <label class="form-label">Boton catalogo (ES)</label>
+          <label class="form-label">{% trans "Boton catalogo (ES)" %}</label>
           <input type="text" name="cta_boton_catalogo_texto" class="form-control" value="{{ contenido.cta_boton_catalogo_texto }}">
         </div>
         <div class="col-md-3">
-          <label class="form-label">Boton catalogo (EN)</label>
+          <label class="form-label">{% trans "Boton catalogo (EN)" %}</label>
           <input type="text" name="cta_boton_catalogo_texto_en" class="form-control" value="{{ contenido.cta_boton_catalogo_texto_en|default:'' }}">
         </div>
 
         <div class="col-12">
           <hr class="my-2">
-          <h5 class="mb-3">Seccion Quienes somos</h5>
+          <h5 class="mb-3">{% trans "Seccion Quienes somos" %}</h5>
         </div>
 
         <div class="col-md-6">
-          <label class="form-label">Titulo (ES)</label>
+          <label class="form-label">{% trans "Titulo (ES)" %}</label>
           <input type="text" name="quienes_titulo" class="form-control" value="{{ contenido.quienes_titulo }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Titulo (EN)</label>
+          <label class="form-label">{% trans "Titulo (EN)" %}</label>
           <input type="text" name="quienes_titulo_en" class="form-control" value="{{ contenido.quienes_titulo_en|default:'' }}">
         </div>
 
         <div class="col-md-6">
-          <label class="form-label">Descripcion (ES)</label>
+          <label class="form-label">{% trans "Descripcion (ES)" %}</label>
           <textarea name="quienes_descripcion" class="form-control" rows="5">{{ contenido.quienes_descripcion }}</textarea>
         </div>
         <div class="col-md-6">
-          <label class="form-label">Descripcion (EN)</label>
+          <label class="form-label">{% trans "Descripcion (EN)" %}</label>
           <textarea name="quienes_descripcion_en" class="form-control" rows="5">{{ contenido.quienes_descripcion_en|default:'' }}</textarea>
         </div>
 
         <div class="col-12">
           <hr class="my-2">
-          <h5 class="mb-3">Tarjetas informativas</h5>
+          <h5 class="mb-3">{% trans "Tarjetas informativas" %}</h5>
         </div>
 
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 1 titulo (ES)</label>
+          <label class="form-label">{% trans "Tarjeta 1 titulo (ES)" %}</label>
           <input type="text" name="beneficio_1_titulo" class="form-control" value="{{ contenido.beneficio_1_titulo }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 1 titulo (EN)</label>
+          <label class="form-label">{% trans "Tarjeta 1 titulo (EN)" %}</label>
           <input type="text" name="beneficio_1_titulo_en" class="form-control" value="{{ contenido.beneficio_1_titulo_en|default:'' }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 1 subtitulo (ES)</label>
+          <label class="form-label">{% trans "Tarjeta 1 subtitulo (ES)" %}</label>
           <input type="text" name="beneficio_1_subtitulo" class="form-control" value="{{ contenido.beneficio_1_subtitulo }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 1 subtitulo (EN)</label>
+          <label class="form-label">{% trans "Tarjeta 1 subtitulo (EN)" %}</label>
           <input type="text" name="beneficio_1_subtitulo_en" class="form-control" value="{{ contenido.beneficio_1_subtitulo_en|default:'' }}">
         </div>
 
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 2 titulo (ES)</label>
+          <label class="form-label">{% trans "Tarjeta 2 titulo (ES)" %}</label>
           <input type="text" name="beneficio_2_titulo" class="form-control" value="{{ contenido.beneficio_2_titulo }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 2 titulo (EN)</label>
+          <label class="form-label">{% trans "Tarjeta 2 titulo (EN)" %}</label>
           <input type="text" name="beneficio_2_titulo_en" class="form-control" value="{{ contenido.beneficio_2_titulo_en|default:'' }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 2 subtitulo (ES)</label>
+          <label class="form-label">{% trans "Tarjeta 2 subtitulo (ES)" %}</label>
           <input type="text" name="beneficio_2_subtitulo" class="form-control" value="{{ contenido.beneficio_2_subtitulo }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 2 subtitulo (EN)</label>
+          <label class="form-label">{% trans "Tarjeta 2 subtitulo (EN)" %}</label>
           <input type="text" name="beneficio_2_subtitulo_en" class="form-control" value="{{ contenido.beneficio_2_subtitulo_en|default:'' }}">
         </div>
 
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 3 titulo (ES)</label>
+          <label class="form-label">{% trans "Tarjeta 3 titulo (ES)" %}</label>
           <input type="text" name="beneficio_3_titulo" class="form-control" value="{{ contenido.beneficio_3_titulo }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 3 titulo (EN)</label>
+          <label class="form-label">{% trans "Tarjeta 3 titulo (EN)" %}</label>
           <input type="text" name="beneficio_3_titulo_en" class="form-control" value="{{ contenido.beneficio_3_titulo_en|default:'' }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 3 subtitulo (ES)</label>
+          <label class="form-label">{% trans "Tarjeta 3 subtitulo (ES)" %}</label>
           <input type="text" name="beneficio_3_subtitulo" class="form-control" value="{{ contenido.beneficio_3_subtitulo }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 3 subtitulo (EN)</label>
+          <label class="form-label">{% trans "Tarjeta 3 subtitulo (EN)" %}</label>
           <input type="text" name="beneficio_3_subtitulo_en" class="form-control" value="{{ contenido.beneficio_3_subtitulo_en|default:'' }}">
         </div>
 
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 4 titulo (ES)</label>
+          <label class="form-label">{% trans "Tarjeta 4 titulo (ES)" %}</label>
           <input type="text" name="beneficio_4_titulo" class="form-control" value="{{ contenido.beneficio_4_titulo }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 4 titulo (EN)</label>
+          <label class="form-label">{% trans "Tarjeta 4 titulo (EN)" %}</label>
           <input type="text" name="beneficio_4_titulo_en" class="form-control" value="{{ contenido.beneficio_4_titulo_en|default:'' }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 4 subtitulo (ES)</label>
+          <label class="form-label">{% trans "Tarjeta 4 subtitulo (ES)" %}</label>
           <input type="text" name="beneficio_4_subtitulo" class="form-control" value="{{ contenido.beneficio_4_subtitulo }}">
         </div>
         <div class="col-md-6">
-          <label class="form-label">Tarjeta 4 subtitulo (EN)</label>
+          <label class="form-label">{% trans "Tarjeta 4 subtitulo (EN)" %}</label>
           <input type="text" name="beneficio_4_subtitulo_en" class="form-control" value="{{ contenido.beneficio_4_subtitulo_en|default:'' }}">
         </div>
 
         <div class="col-12">
           <hr class="my-2">
-          <h5 class="mb-3">Estadisticas</h5>
+          <h5 class="mb-3">{% trans "Estadisticas" %}</h5>
         </div>
 
         <div class="col-md-3">
-          <label class="form-label">Estadistica 1 valor (ES)</label>
+          <label class="form-label">{% trans "Estadistica 1 valor (ES)" %}</label>
           <input type="text" name="estadistica_1_valor" class="form-control" value="{{ contenido.estadistica_1_valor }}">
         </div>
         <div class="col-md-3">
-          <label class="form-label">Estadistica 1 valor (EN)</label>
+          <label class="form-label">{% trans "Estadistica 1 valor (EN)" %}</label>
           <input type="text" name="estadistica_1_valor_en" class="form-control" value="{{ contenido.estadistica_1_valor_en|default:'' }}">
         </div>
         <div class="col-md-3">
-          <label class="form-label">Estadistica 1 texto (ES)</label>
+          <label class="form-label">{% trans "Estadistica 1 texto (ES)" %}</label>
           <input type="text" name="estadistica_1_label" class="form-control" value="{{ contenido.estadistica_1_label }}">
         </div>
         <div class="col-md-3">
-          <label class="form-label">Estadistica 1 texto (EN)</label>
+          <label class="form-label">{% trans "Estadistica 1 texto (EN)" %}</label>
           <input type="text" name="estadistica_1_label_en" class="form-control" value="{{ contenido.estadistica_1_label_en|default:'' }}">
         </div>
 
         <div class="col-md-3">
-          <label class="form-label">Estadistica 2 valor (ES)</label>
+          <label class="form-label">{% trans "Estadistica 2 valor (ES)" %}</label>
           <input type="text" name="estadistica_2_valor" class="form-control" value="{{ contenido.estadistica_2_valor }}">
         </div>
         <div class="col-md-3">
-          <label class="form-label">Estadistica 2 valor (EN)</label>
+          <label class="form-label">{% trans "Estadistica 2 valor (EN)" %}</label>
           <input type="text" name="estadistica_2_valor_en" class="form-control" value="{{ contenido.estadistica_2_valor_en|default:'' }}">
         </div>
         <div class="col-md-3">
-          <label class="form-label">Estadistica 2 texto (ES)</label>
+          <label class="form-label">{% trans "Estadistica 2 texto (ES)" %}</label>
           <input type="text" name="estadistica_2_label" class="form-control" value="{{ contenido.estadistica_2_label }}">
         </div>
         <div class="col-md-3">
-          <label class="form-label">Estadistica 2 texto (EN)</label>
+          <label class="form-label">{% trans "Estadistica 2 texto (EN)" %}</label>
           <input type="text" name="estadistica_2_label_en" class="form-control" value="{{ contenido.estadistica_2_label_en|default:'' }}">
         </div>
 
         <div class="col-md-3">
-          <label class="form-label">Estadistica 3 valor (ES)</label>
+          <label class="form-label">{% trans "Estadistica 3 valor (ES)" %}</label>
           <input type="text" name="estadistica_3_valor" class="form-control" value="{{ contenido.estadistica_3_valor }}">
         </div>
         <div class="col-md-3">
-          <label class="form-label">Estadistica 3 valor (EN)</label>
+          <label class="form-label">{% trans "Estadistica 3 valor (EN)" %}</label>
           <input type="text" name="estadistica_3_valor_en" class="form-control" value="{{ contenido.estadistica_3_valor_en|default:'' }}">
         </div>
         <div class="col-md-3">
-          <label class="form-label">Estadistica 3 texto (ES)</label>
+          <label class="form-label">{% trans "Estadistica 3 texto (ES)" %}</label>
           <input type="text" name="estadistica_3_label" class="form-control" value="{{ contenido.estadistica_3_label }}">
         </div>
         <div class="col-md-3">
-          <label class="form-label">Estadistica 3 texto (EN)</label>
+          <label class="form-label">{% trans "Estadistica 3 texto (EN)" %}</label>
           <input type="text" name="estadistica_3_label_en" class="form-control" value="{{ contenido.estadistica_3_label_en|default:'' }}">
         </div>
 
         <div class="col-12">
           <div class="form-check mt-2">
             <input class="form-check-input" type="checkbox" name="activo" id="activo" {% if contenido.activo %}checked{% endif %}>
-            <label class="form-check-label" for="activo">Contenido activo</label>
+            <label class="form-check-label" for="activo">{% trans "Contenido activo" %}</label>
           </div>
         </div>
       </div>
 
       <div class="d-flex gap-2 mt-4">
-        <button type="submit" class="btn btn-success">Guardar cambios</button>
-        <a href="{% url 'contenido_home' %}" class="btn btn-secondary">Volver</a>
+        <button type="submit" class="btn btn-success">{% trans "Guardar cambios" %}</button>
+        <a href="{% url 'contenido_home' %}" class="btn btn-secondary">{% trans "Volver" %}</a>
       </div>
     </form>
   </div>

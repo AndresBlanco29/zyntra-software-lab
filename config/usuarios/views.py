@@ -605,7 +605,7 @@ def editar_home_contenido(request):
                     contenido.save(update_fields=legacy_update_fields)
                     messages.warning(
                         request,
-                        'La base de datos aun no tiene todos los campos nuevos del home. El resto del contenido se guardo, pero las secciones nuevas no podran guardarse hasta que Railway aplique la migracion.'
+                        _('La base de datos aun no tiene todos los campos nuevos del home. El resto del contenido se guardo, pero las secciones nuevas no podran guardarse hasta que Railway aplique la migracion.')
                     )
                     migration_pending_warning = True
                 else:
@@ -613,7 +613,7 @@ def editar_home_contenido(request):
 
         cache.delete('home:contenido')
         if not migration_pending_warning:
-            messages.success(request, 'Contenido del home actualizado correctamente')
+            messages.success(request, _('Contenido del home actualizado correctamente'))
         return redirect('contenido_home')
 
     return render(request, 'admin/editar_home_contenido.html', {
@@ -660,7 +660,7 @@ def crear_testimonio(request):
 
         if not nombre or not comentario:
             return render(request, 'admin/crear_testimonio.html', {
-                'error': 'Nombre y comentario son obligatorios.',
+                'error': _('Nombre y comentario son obligatorios.'),
                 'form_data': request.POST,
             })
 
@@ -683,7 +683,7 @@ def crear_testimonio(request):
 
         cache.delete('home:testimonios_activos')
 
-        messages.success(request, 'Testimonio creado correctamente')
+        messages.success(request, _('Testimonio creado correctamente'))
         return redirect('lista_testimonios')
 
     return render(request, 'admin/crear_testimonio.html')
@@ -717,7 +717,7 @@ def editar_testimonio(request, testimonio_id):
 
         if not nombre or not comentario:
             return render(request, 'admin/editar_testimonio.html', {
-                'error': 'Nombre y comentario son obligatorios.',
+                'error': _('Nombre y comentario son obligatorios.'),
                 'testimonio': testimonio,
             })
 
@@ -742,7 +742,7 @@ def editar_testimonio(request, testimonio_id):
 
         cache.delete('home:testimonios_activos')
 
-        messages.success(request, 'Testimonio actualizado correctamente')
+        messages.success(request, _('Testimonio actualizado correctamente'))
         return redirect('lista_testimonios')
 
     return render(request, 'admin/editar_testimonio.html', {
@@ -762,7 +762,7 @@ def desactivar_testimonio(request, testimonio_id):
 
     cache.delete('home:testimonios_activos')
 
-    messages.success(request, 'Testimonio ocultado correctamente')
+    messages.success(request, _('Testimonio ocultado correctamente'))
     return redirect('lista_testimonios')
 
 
@@ -778,7 +778,7 @@ def activar_testimonio(request, testimonio_id):
 
     cache.delete('home:testimonios_activos')
 
-    messages.success(request, 'Testimonio activado correctamente')
+    messages.success(request, _('Testimonio activado correctamente'))
     return redirect('lista_testimonios')
 
 @login_required
@@ -797,7 +797,7 @@ def crear_vendedor(request):
         telefono = request.POST.get('telefono')
 
         if Usuario.objects.filter(username=username).exists():
-            messages.error(request, "El usuario ya existe")
+            messages.error(request, _("El usuario ya existe"))
             return redirect('crear_vendedor')
 
         Usuario.objects.create(
@@ -811,7 +811,7 @@ def crear_vendedor(request):
             is_active=True
         )
 
-        messages.success(request, "Vendedor creado correctamente")
+        messages.success(request, _("Vendedor creado correctamente"))
 
         return redirect('lista_vendedores')
 
@@ -847,7 +847,7 @@ def editar_vendedor(request, vendedor_id):
         vendedor.telefono = request.POST.get('telefono')
         vendedor.save()
 
-        messages.success(request, "Vendedor actualizado correctamente")
+        messages.success(request, _("Vendedor actualizado correctamente"))
 
         return redirect('lista_vendedores')
 
@@ -867,7 +867,7 @@ def desactivar_vendedor(request, vendedor_id):
     vendedor.is_active = False
     vendedor.save()
 
-    messages.success(request, f"Vendedor {vendedor.first_name} desactivado")
+    messages.success(request, _("Vendedor %(nombre)s desactivado") % {'nombre': vendedor.first_name})
 
     return redirect('lista_vendedores')
 
@@ -881,7 +881,7 @@ def activar_vendedor(request, vendedor_id):
     vendedor.is_active = True
     vendedor.save()
 
-    messages.success(request, f"Vendedor {vendedor.first_name} activado")
+    messages.success(request, _("Vendedor %(nombre)s activado") % {'nombre': vendedor.first_name})
 
     return redirect('lista_vendedores')
 

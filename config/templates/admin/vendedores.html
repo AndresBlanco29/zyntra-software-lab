@@ -1,4 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
+{% load i18n %}
 
 {% block title %}
 Vendedores
@@ -7,19 +8,19 @@ Vendedores
 {% block content %}
 
 <h2 class="mb-4 admin-toolbar">
-<span>Vendedores</span>
+<span>{% trans "Vendedores" %}</span>
 <div class="admin-toolbar-filters admin-toolbar-filters-narrow">
   <input 
     type="text" 
     id="buscador" 
     class="form-control" 
-    placeholder="Buscar por nombre o email..."
+    placeholder="{% trans 'Buscar por nombre o email...' %}"
   >
 </div>
 </h2>
 
 <a href="{% url 'crear_vendedor' %}" class="btn btn-primary mb-3">
-Crear Vendedor
+{% trans "Crear Vendedor" %}
 </a>
 
 <div class="table-responsive">
@@ -28,10 +29,10 @@ Crear Vendedor
 
 <thead>
 <tr>
-<th>Nombre</th>
-<th>Email</th>
-<th>Teléfono</th>
-<th>Acciones</th>
+<th>{% trans "Nombre" %}</th>
+<th>{% trans "Email" %}</th>
+<th>{% trans "Telefono" %}</th>
+<th>{% trans "Acciones" %}</th>
 </tr>
 </thead>
 
@@ -50,21 +51,21 @@ Crear Vendedor
 <td>
 {% if vendedor.is_active %}
 <a href="{% url 'editar_vendedor' vendedor.id %}" class="btn btn-sm btn-warning">
-Editar
+{% trans "Editar" %}
 </a>
 <button type="button"
 class="btn btn-sm btn-danger"
 onclick="abrirConfirmacionVendedor('{{ vendedor.first_name|escapejs }} {{ vendedor.last_name|escapejs }}', '{% url 'desactivar_vendedor' vendedor.id %}', 'desactivar')">
-Desactivar
+{% trans "Desactivar" %}
 </button>
 {% else %}
 <a href="{% url 'editar_vendedor' vendedor.id %}" class="btn btn-sm btn-warning">
-Editar
+{% trans "Editar" %}
 </a>
 <button type="button"
 class="btn btn-sm btn-success"
 onclick="abrirConfirmacionVendedor('{{ vendedor.first_name|escapejs }} {{ vendedor.last_name|escapejs }}', '{% url 'activar_vendedor' vendedor.id %}', 'activar')">
-Activar
+{% trans "Activar" %}
 </button>
 {% endif %}
 </td>
@@ -74,7 +75,7 @@ Activar
 {% empty %}
 
 <tr class="vendedor-row" id="noVendedores">
-<td colspan="4" class="text-center text-muted py-4">No hay vendedores registrados</td>
+<td colspan="4" class="text-center text-muted py-4">{% trans "No hay vendedores registrados" %}</td>
 </tr>
 
 {% endfor %}
@@ -96,14 +97,14 @@ Activar
     <div class="modal-content" style="border: none; border-radius: 16px; box-shadow: 0 22px 50px rgba(0, 0, 0, 0.25); overflow: hidden;">
       <div class="modal-body text-center" style="padding: 2.4rem 1.8rem; background: linear-gradient(135deg, #f7fbff 0%, #eaf2ff 100%);">
         <div style="font-size: 54px; line-height: 1; margin-bottom: 0.9rem;">✅</div>
-        <h4 id="vendedorSuccessTitle" style="color: #0b3d91; font-weight: 700; margin-bottom: 0.55rem;">Operacion completada</h4>
+        <h4 id="vendedorSuccessTitle" style="color: #0b3d91; font-weight: 700; margin-bottom: 0.55rem;">{% trans "Operacion completada" %}</h4>
         <p id="vendedorSuccessText" style="color: #475569; margin: 0; font-size: 15px; line-height: 1.5;">
-          Se ha creado correctamente el vendedor.
+          {% trans "Se ha creado correctamente el vendedor." %}
         </p>
       </div>
       <div class="modal-footer border-0" style="justify-content: center; background: #ffffff; padding: 1rem 1.4rem 1.4rem;">
         <button type="button" class="btn" data-bs-dismiss="modal" style="background: linear-gradient(to right, #ffe600, #c7c700); color: #1e293b; border: none; font-weight: 700; padding: 9px 26px; border-radius: 10px;">
-          Continuar
+          {% trans "Continuar" %}
         </button>
       </div>
     </div>
@@ -115,13 +116,13 @@ Activar
     <div class="modal-content" style="border: none; border-radius: 16px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.24); overflow: hidden;">
       <div class="modal-body text-center" style="padding: 2.2rem 1.8rem; background: linear-gradient(135deg, #f8fbff 0%, #e9f0ff 100%);">
         <div style="font-size: 52px; line-height: 1; margin-bottom: 0.85rem;">⚠️</div>
-        <h4 id="confirmarVendedorTitle" style="color: #0b3d91; font-weight: 700; margin-bottom: 0.5rem;">Confirmar acción</h4>
+        <h4 id="confirmarVendedorTitle" style="color: #0b3d91; font-weight: 700; margin-bottom: 0.5rem;">{% trans "Confirmar accion" %}</h4>
         <p id="confirmarVendedorText" style="color: #475569; margin: 0; font-size: 15px; line-height: 1.5;"></p>
       </div>
       <div class="modal-footer border-0" style="justify-content: center; gap: 0.5rem; background: #ffffff; padding: 1rem 1.4rem 1.4rem;">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="font-weight: 600;">Cancelar</button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="font-weight: 600;">{% trans "Cancelar" %}</button>
         <a id="confirmarVendedorAction" href="#" class="btn" style="color: white; border: none; font-weight: 700; padding: 9px 22px; border-radius: 10px; background: linear-gradient(to right, #dc2626, #b91c1c);">
-          Confirmar
+          {% trans "Confirmar" %}
         </a>
       </div>
     </div>
@@ -129,6 +130,16 @@ Activar
 </div>
 
 <script>
+const vendedorTranslations = {
+  activateTitle: "{% trans 'Activar vendedor'|escapejs %}",
+  activateText: "{% trans 'Deseas activar a'|escapejs %}",
+  activateButton: "{% trans 'Si, activar'|escapejs %}",
+  deactivateTitle: "{% trans 'Desactivar vendedor'|escapejs %}",
+  deactivateText: "{% trans 'Deseas desactivar a'|escapejs %}",
+  deactivateButton: "{% trans 'Si, desactivar'|escapejs %}",
+  successTitle: "{% trans 'Operacion completada'|escapejs %}"
+};
+
 function abrirConfirmacionVendedor(nombreCompleto, actionUrl, accion) {
   const titleNode = document.getElementById("confirmarVendedorTitle");
   const textNode = document.getElementById("confirmarVendedorText");
@@ -139,14 +150,14 @@ function abrirConfirmacionVendedor(nombreCompleto, actionUrl, accion) {
   }
 
   if (accion === "activar") {
-    titleNode.textContent = "Activar vendedor";
-    textNode.textContent = `¿Deseas activar a ${nombreCompleto}?`;
-    actionNode.textContent = "Si, activar";
+    titleNode.textContent = vendedorTranslations.activateTitle;
+    textNode.textContent = `${vendedorTranslations.activateText} ${nombreCompleto}?`;
+    actionNode.textContent = vendedorTranslations.activateButton;
     actionNode.style.background = "linear-gradient(to right, #0b3d91, #1565c0)";
   } else {
-    titleNode.textContent = "Desactivar vendedor";
-    textNode.textContent = `¿Deseas desactivar a ${nombreCompleto}?`;
-    actionNode.textContent = "Si, desactivar";
+    titleNode.textContent = vendedorTranslations.deactivateTitle;
+    textNode.textContent = `${vendedorTranslations.deactivateText} ${nombreCompleto}?`;
+    actionNode.textContent = vendedorTranslations.deactivateButton;
     actionNode.style.background = "linear-gradient(to right, #dc2626, #b91c1c)";
   }
 
@@ -195,15 +206,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const normalized = (successMessage || "").toLowerCase();
 
     if (titleNode) {
-      if (normalized.includes("desactiv")) {
-        titleNode.textContent = "Vendedor desactivado";
-      } else if (normalized.includes("activad")) {
-        titleNode.textContent = "Vendedor activado";
-      } else if (normalized.includes("actualiz")) {
-        titleNode.textContent = "Vendedor actualizado";
-      } else {
-        titleNode.textContent = "Vendedor creado";
-      }
+      titleNode.textContent = vendedorTranslations.successTitle;
     }
 
     if (textNode && successMessage) {

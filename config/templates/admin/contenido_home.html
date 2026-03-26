@@ -1,18 +1,19 @@
 {% extends "bases/base_vendedor.html" %}
+{% load i18n %}
 
 {% block title %}
-Contenido Home
+{% trans "Contenido Home" %}
 {% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4">Contenido del Home</h2>
+<h2 class="mb-4">{% trans "Contenido del Home" %}</h2>
 
 <div class="row g-3 mb-4">
   <div class="col-md-6 col-xl-3">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <div class="text-muted small mb-2">Marcas activas</div>
+        <div class="text-muted small mb-2">{% trans "Marcas activas" %}</div>
         <div class="fs-2 fw-bold">{{ marcas_activas }}</div>
       </div>
     </div>
@@ -21,7 +22,7 @@ Contenido Home
   <div class="col-md-6 col-xl-3">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <div class="text-muted small mb-2">Marcas inactivas</div>
+        <div class="text-muted small mb-2">{% trans "Marcas inactivas" %}</div>
         <div class="fs-2 fw-bold">{{ marcas_inactivas }}</div>
       </div>
     </div>
@@ -30,7 +31,7 @@ Contenido Home
   <div class="col-md-6 col-xl-3">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <div class="text-muted small mb-2">Testimonios activos</div>
+        <div class="text-muted small mb-2">{% trans "Testimonios activos" %}</div>
         <div class="fs-2 fw-bold">{{ testimonios_activos }}</div>
       </div>
     </div>
@@ -39,7 +40,7 @@ Contenido Home
   <div class="col-md-6 col-xl-3">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <div class="text-muted small mb-2">Testimonios ocultos</div>
+        <div class="text-muted small mb-2">{% trans "Testimonios ocultos" %}</div>
         <div class="fs-2 fw-bold">{{ testimonios_inactivos }}</div>
       </div>
     </div>
@@ -50,32 +51,32 @@ Contenido Home
   <div class="col-lg-6">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <h4 class="mb-3">Banner y textos principales</h4>
-        <p class="text-muted mb-4">Controla los textos principales del hero y del CTA del home desde el panel administrador.</p>
+        <h4 class="mb-3">{% trans "Banner y textos principales" %}</h4>
+        <p class="text-muted mb-4">{% trans "Controla los textos principales del hero y del CTA del home desde el panel administrador." %}</p>
         <div class="d-flex gap-2 flex-wrap mb-3">
-          <a href="{% url 'editar_home_contenido' %}" class="btn btn-primary">Editar textos home</a>
+          <a href="{% url 'editar_home_contenido' %}" class="btn btn-primary">{% trans "Editar textos home" %}</a>
         </div>
 
-        <div class="small text-muted">Vista previa actual:</div>
+        <div class="small text-muted">{% trans "Vista previa actual:" %}</div>
         <div class="border rounded p-3 mt-2 bg-light">
-          <div class="fw-semibold">Hero:</div>
+          <div class="fw-semibold">{% trans "Hero:" %}</div>
           <div>{{ home_contenido.hero_titulo_principal }}</div>
           <div>{{ home_contenido.hero_titulo_resaltado }}</div>
           <div>{{ home_contenido.hero_titulo_final }}</div>
           <div class="mt-2">{{ home_contenido.hero_subtitulo }}</div>
           <div class="mt-2"><span class="badge text-bg-secondary">{{ home_contenido.hero_boton_texto }}</span></div>
 
-          <div class="fw-semibold mt-3">Quienes somos:</div>
+          <div class="fw-semibold mt-3">{% trans "Quienes somos:" %}</div>
           <div>{{ home_contenido.quienes_titulo }}</div>
           <div class="mt-1">{{ home_contenido.quienes_descripcion|truncatewords:30 }}</div>
 
-          <div class="fw-semibold mt-3">Tarjeticas:</div>
+          <div class="fw-semibold mt-3">{% trans "Tarjeticas:" %}</div>
           <div>1. {{ home_contenido.beneficio_1_titulo }} - {{ home_contenido.beneficio_1_subtitulo }}</div>
           <div>2. {{ home_contenido.beneficio_2_titulo }} - {{ home_contenido.beneficio_2_subtitulo }}</div>
           <div>3. {{ home_contenido.beneficio_3_titulo }} - {{ home_contenido.beneficio_3_subtitulo }}</div>
           <div>4. {{ home_contenido.beneficio_4_titulo }} - {{ home_contenido.beneficio_4_subtitulo }}</div>
 
-          <div class="fw-semibold mt-3">Estadisticas:</div>
+          <div class="fw-semibold mt-3">{% trans "Estadisticas:" %}</div>
           <div>{{ home_contenido.estadistica_1_valor }} - {{ home_contenido.estadistica_1_label }}</div>
           <div>{{ home_contenido.estadistica_2_valor }} - {{ home_contenido.estadistica_2_label }}</div>
           <div>{{ home_contenido.estadistica_3_valor }} - {{ home_contenido.estadistica_3_label }}</div>
@@ -87,11 +88,11 @@ Contenido Home
   <div class="col-lg-6">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <h4 class="mb-3">Logos de marcas</h4>
-        <p class="text-muted mb-4">Administra las marcas y los logos que aparecen en la seccion de marcas del home.</p>
+        <h4 class="mb-3">{% trans "Logos de marcas" %}</h4>
+        <p class="text-muted mb-4">{% trans "Administra las marcas y los logos que aparecen en la seccion de marcas del home." %}</p>
         <div class="d-flex gap-2 flex-wrap">
-          <a href="{% url 'lista_marcas' %}" class="btn btn-primary">Gestionar logos</a>
-          <a href="{% url 'crear_marca' %}" class="btn btn-outline-primary">Crear marca</a>
+          <a href="{% url 'lista_marcas' %}" class="btn btn-primary">{% trans "Gestionar logos" %}</a>
+          <a href="{% url 'crear_marca' %}" class="btn btn-outline-primary">{% trans "Crear marca" %}</a>
         </div>
       </div>
     </div>
@@ -100,11 +101,11 @@ Contenido Home
   <div class="col-lg-12">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <h4 class="mb-3">Que dicen nuestros clientes</h4>
-        <p class="text-muted mb-4">Crea, edita, ordena y oculta testimonios para controlar lo que se muestra en el home.</p>
+        <h4 class="mb-3">{% trans "Que dicen nuestros clientes" %}</h4>
+        <p class="text-muted mb-4">{% trans "Crea, edita, ordena y oculta testimonios para controlar lo que se muestra en el home." %}</p>
         <div class="d-flex gap-2 flex-wrap">
-          <a href="{% url 'lista_testimonios' %}" class="btn btn-primary">Gestionar testimonios</a>
-          <a href="{% url 'crear_testimonio' %}" class="btn btn-outline-primary">Crear testimonio</a>
+          <a href="{% url 'lista_testimonios' %}" class="btn btn-primary">{% trans "Gestionar testimonios" %}</a>
+          <a href="{% url 'crear_testimonio' %}" class="btn btn-outline-primary">{% trans "Crear testimonio" %}</a>
         </div>
       </div>
     </div>

@@ -1,13 +1,13 @@
 {% extends "bases/base_vendedor.html" %}
-{% load cache %}
+{% load cache i18n %}
 
 {% block title %}
-Editar Producto
+{% trans "Editar Producto" %}
 {% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4">Editar Producto</h2>
+<h2 class="mb-4">{% trans "Editar Producto" %}</h2>
 
 <div class="card shadow-sm">
 <div class="card-body">
@@ -19,42 +19,42 @@ Editar Producto
 <!-- NOMBRE -->
 
 <div class="mb-3">
-<label class="form-label">Nombre del producto</label>
+<label class="form-label">{% trans "Nombre del producto" %}</label>
 <input type="text" name="nombre" class="form-control" value="{{ producto.nombre }}" required>
 </div>
 
 <div class="mb-3">
-<label class="form-label">Nombre en inglés</label>
+<label class="form-label">{% trans "Nombre en ingles" %}</label>
 <input type="text" name="nombre_en" class="form-control" value="{{ producto.nombre_en }}">
 </div>
 
 <!-- CODIGO DE BARRAS -->
 
 <div class="mb-3">
-<label class="form-label">Código de Barras <span class="text-danger">*</span></label>
-<input type="text" name="codigo_barras" class="form-control" value="{{ producto.codigo_barras }}" placeholder="Ej: 7501234567890" required>
+<label class="form-label">{% trans "Codigo de Barras" %} <span class="text-danger">*</span></label>
+<input type="text" name="codigo_barras" class="form-control" value="{{ producto.codigo_barras }}" placeholder="{% trans 'Ej: 7501234567890' %}" required>
 </div>
 
 <!-- DESCRIPCION -->
 
 <div class="mb-3">
-<label class="form-label">Descripción</label>
+<label class="form-label">{% trans "Descripcion" %}</label>
 <textarea name="descripcion" class="form-control">{{ producto.descripcion }}</textarea>
 </div>
 
 <div class="mb-3">
-<label class="form-label">Descripción en inglés</label>
+<label class="form-label">{% trans "Descripcion en ingles" %}</label>
 <textarea name="descripcion_en" class="form-control">{{ producto.descripcion_en }}</textarea>
 </div>
 
 <!-- CATEGORIA -->
 
 <div class="mb-3">
-<label class="form-label">Categoría</label>
+<label class="form-label">{% trans "Categoria" %}</label>
 
 <select name="categoria" class="form-control">
 
-<option value="">Seleccionar categoría</option>
+<option value="">{% trans "Seleccionar categoria" %}</option>
 
 {% for categoria in categorias %}
 
@@ -75,11 +75,11 @@ Editar Producto
 
 <div class="mb-3">
 
-<label class="form-label">Marca</label>
+<label class="form-label">{% trans "Marca" %}</label>
 
 <select name="marca" class="form-control">
 
-<option value="">Seleccionar marca</option>
+<option value="">{% trans "Seleccionar marca" %}</option>
 
 {% for marca in marcas %}
 
@@ -100,7 +100,7 @@ Editar Producto
 
 <div class="mb-3">
 
-<label class="form-label">Imagen</label>
+<label class="form-label">{% trans "Imagen" %}</label>
 
 {% if producto.imagen %}
 
@@ -115,7 +115,7 @@ Editar Producto
 
 <hr class="my-4">
 
-<h4>Presentaciones</h4>
+<h4>{% trans "Presentaciones" %}</h4>
 
 {% for p in presentaciones %}
 
@@ -127,17 +127,17 @@ Editar Producto
 <div class="row">
 
 <div class="col-md-3 mb-3">
-<label class="form-label">Presentación</label>
+<label class="form-label">{% trans "Presentacion" %}</label>
 <input type="text" name="presentacion_nombre_{{p.id}}" class="form-control" value="{{ p.nombre }}">
 </div>
 
 <div class="col-md-3 mb-3">
-<label class="form-label">Tipo de contenido</label>
+<label class="form-label">{% trans "Tipo de contenido" %}</label>
 <input type="text" name="tipo_contenido_{{p.id}}" class="form-control" value="{{ p.tipo_contenido }}">
 </div>
 
 <div class="col-md-2 mb-3">
-<label class="form-label">Unidades</label>
+<label class="form-label">{% trans "Unidades" %}</label>
 <input type="number" name="unidades_{{p.id}}" class="form-control" value="{{ p.unidades }}">
 </div>
 
@@ -146,27 +146,27 @@ Editar Producto
 <div class="row">
 
 <div class="col-md-2 mb-3">
-<label class="form-label">Precio 1</label>
+<label class="form-label">{% trans "Precio 1" %}</label>
 <input type="number" step="0.01" name="precio1_{{p.id}}" class="form-control" value="{{p.precio_1|stringformat:'f'}}">
 </div>
 
 <div class="col-md-2 mb-3">
-<label class="form-label">Precio 2</label>
+<label class="form-label">{% trans "Precio 2" %}</label>
 <input type="number" step="0.01" name="precio2_{{p.id}}" class="form-control" value="{{p.precio_2|stringformat:'f'}}">
 </div>
 
 <div class="col-md-2 mb-3">
-<label class="form-label">Precio 3</label>
+<label class="form-label">{% trans "Precio 3" %}</label>
 <input type="number" step="0.01" name="precio3_{{p.id}}" class="form-control" value="{{p.precio_3|stringformat:'f'}}">
 </div>
 
 <div class="col-md-2 mb-3">
-<label class="form-label">Precio 4</label>
+<label class="form-label">{% trans "Precio 4" %}</label>
 <input type="number" step="0.01" name="precio4_{{p.id}}" class="form-control" value="{{p.precio_4|stringformat:'f'}}">
 </div>
 
 <div class="col-md-2 mb-3">
-<label class="form-label">Precio 5</label>
+<label class="form-label">{% trans "Precio 5" %}</label>
 <input type="number" step="0.01" name="precio5_{{p.id}}" class="form-control" value="{{p.precio_5|stringformat:'f'}}">
 </div>
 
@@ -178,7 +178,7 @@ Editar Producto
 {% empty %}
 
 <div class="alert alert-warning">
-Este producto no tiene presentaciones aun. Puedes crear la primera presentacion aqui.
+{% trans "Este producto no tiene presentaciones aun. Puedes crear la primera presentacion aqui." %}
 </div>
 
 <div class="card mb-3">
@@ -187,17 +187,17 @@ Este producto no tiene presentaciones aun. Puedes crear la primera presentacion 
 <div class="row">
 
 <div class="col-md-3 mb-3">
-<label class="form-label">Presentación</label>
-<input type="text" name="presentacion_nueva" class="form-control" placeholder="Ej: Caja, Bolsa, Pack">
+<label class="form-label">{% trans "Presentacion" %}</label>
+<input type="text" name="presentacion_nueva" class="form-control" placeholder="{% trans 'Ej: Caja, Bolsa, Pack' %}">
 </div>
 
 <div class="col-md-3 mb-3">
-<label class="form-label">Tipo de contenido</label>
+<label class="form-label">{% trans "Tipo de contenido" %}</label>
 <input type="text" name="tipo_contenido_nuevo" class="form-control" value="unidades">
 </div>
 
 <div class="col-md-2 mb-3">
-<label class="form-label">Unidades</label>
+<label class="form-label">{% trans "Unidades" %}</label>
 <input type="number" name="unidades_nuevo" class="form-control" value="1" min="1">
 </div>
 
@@ -206,27 +206,27 @@ Este producto no tiene presentaciones aun. Puedes crear la primera presentacion 
 <div class="row">
 
 <div class="col-md-2 mb-3">
-<label class="form-label">Precio 1</label>
+<label class="form-label">{% trans "Precio 1" %}</label>
 <input type="number" step="0.01" name="precio1_nuevo" class="form-control">
 </div>
 
 <div class="col-md-2 mb-3">
-<label class="form-label">Precio 2</label>
+<label class="form-label">{% trans "Precio 2" %}</label>
 <input type="number" step="0.01" name="precio2_nuevo" class="form-control">
 </div>
 
 <div class="col-md-2 mb-3">
-<label class="form-label">Precio 3</label>
+<label class="form-label">{% trans "Precio 3" %}</label>
 <input type="number" step="0.01" name="precio3_nuevo" class="form-control">
 </div>
 
 <div class="col-md-2 mb-3">
-<label class="form-label">Precio 4</label>
+<label class="form-label">{% trans "Precio 4" %}</label>
 <input type="number" step="0.01" name="precio4_nuevo" class="form-control">
 </div>
 
 <div class="col-md-2 mb-3">
-<label class="form-label">Precio 5</label>
+<label class="form-label">{% trans "Precio 5" %}</label>
 <input type="number" step="0.01" name="precio5_nuevo" class="form-control">
 </div>
 
@@ -246,7 +246,7 @@ Este producto no tiene presentaciones aun. Puedes crear la primera presentacion 
 <input type="checkbox" name="activo" class="form-check-input"
 {% if producto.activo %}checked{% endif %}>
 
-<label class="form-check-label">Producto activo</label>
+<label class="form-check-label">{% trans "Producto activo" %}</label>
 
 </div>
 
@@ -255,24 +255,24 @@ Este producto no tiene presentaciones aun. Puedes crear la primera presentacion 
 <input type="checkbox" name="destacado" class="form-check-input"
 {% if producto.destacado %}checked{% endif %}>
 
-<label class="form-check-label">Producto destacado</label>
+<label class="form-check-label">{% trans "Producto destacado" %}</label>
 
 </div>
 
 <div class="mb-3">
 
-<label class="form-label">Descuento (%)</label>
+<label class="form-label">{% trans "Descuento (%)" %}</label>
 
 <input type="number" name="descuento" class="form-control" value="{{ producto.descuento }}">
 
 </div>
 
 <button type="submit" class="btn btn-success">
-Guardar cambios
+{% trans "Guardar cambios" %}
 </button>
 
 <a href="{% url 'lista_productos' %}" class="btn btn-secondary">
-Cancelar
+{% trans "Cancelar" %}
 </a>
 
 </form>

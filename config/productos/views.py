@@ -6,6 +6,7 @@ from .models import Producto, Categoria, Marca, Presentacion
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
+from django.utils.translation import gettext as _
 from decimal import Decimal, InvalidOperation
 
 
@@ -263,14 +264,14 @@ def crear_categoria(request):
 
         if not nombre:
             return render(request, "admin/crear_categoria.html", {
-                "error": "El nombre de la categoria es obligatorio.",
+                "error": _("El nombre de la categoria es obligatorio."),
                 "nombre": nombre,
                 "nombre_en": nombre_en,
             })
 
         if Categoria.objects.filter(nombre__iexact=nombre).exists():
             return render(request, "admin/crear_categoria.html", {
-                "error": "Ya existe una categoria con ese nombre.",
+                "error": _("Ya existe una categoria con ese nombre."),
                 "nombre": nombre,
                 "nombre_en": nombre_en,
             })
@@ -279,7 +280,7 @@ def crear_categoria(request):
             nombre=nombre,
             nombre_en=nombre_en,
         )
-        messages.success(request, "Categoria creada correctamente")
+        messages.success(request, _("Categoria creada correctamente"))
         return redirect("lista_productos")
 
     return render(request, "admin/crear_categoria.html")
@@ -301,7 +302,7 @@ def crear_marca(request):
 
         if not nombre:
             return render(request, "admin/crear_marca.html", {
-                "error": "El nombre de la marca es obligatorio.",
+                "error": _("El nombre de la marca es obligatorio."),
                 "categorias": categorias,
                 "selected_categorias": [str(cid) for cid in categorias_ids],
                 "nombre": nombre,
@@ -310,7 +311,7 @@ def crear_marca(request):
 
         if Marca.objects.filter(nombre__iexact=nombre).exists():
             return render(request, "admin/crear_marca.html", {
-                "error": "Ya existe una marca con ese nombre.",
+                "error": _("Ya existe una marca con ese nombre."),
                 "categorias": categorias,
                 "selected_categorias": [str(cid) for cid in categorias_ids],
                 "nombre": nombre,
@@ -326,7 +327,7 @@ def crear_marca(request):
         if categorias_ids:
             marca.categorias.set(categorias_ids)
 
-        messages.success(request, "Marca creada correctamente")
+        messages.success(request, _("Marca creada correctamente"))
         return redirect("lista_marcas")
 
     return render(request, "admin/crear_marca.html", {
@@ -352,7 +353,7 @@ def editar_marca(request, marca_id):
 
         if not nombre:
             return render(request, "admin/editar_marca.html", {
-                "error": "El nombre de la marca es obligatorio.",
+                "error": _("El nombre de la marca es obligatorio."),
                 "marca": marca,
                 "categorias": categorias,
                 "selected_categorias": [str(cid) for cid in categorias_ids],
@@ -361,7 +362,7 @@ def editar_marca(request, marca_id):
         duplicated = Marca.objects.filter(nombre__iexact=nombre).exclude(id=marca.id).exists()
         if duplicated:
             return render(request, "admin/editar_marca.html", {
-                "error": "Ya existe otra marca con ese nombre.",
+                "error": _("Ya existe otra marca con ese nombre."),
                 "marca": marca,
                 "categorias": categorias,
                 "selected_categorias": [str(cid) for cid in categorias_ids],
@@ -376,7 +377,7 @@ def editar_marca(request, marca_id):
         marca.save()
         marca.categorias.set(categorias_ids)
 
-        messages.success(request, "Marca actualizada correctamente")
+        messages.success(request, _("Marca actualizada correctamente"))
         return redirect("lista_marcas")
 
     selected_categorias = [str(c.id) for c in marca.categorias.all()]
@@ -398,7 +399,7 @@ def desactivar_marca(request, marca_id):
     marca.activo = False
     marca.save()
 
-    messages.success(request, "Marca inhabilitada")
+    messages.success(request, _("Marca inhabilitada"))
     return redirect('lista_marcas')
 
 
@@ -412,7 +413,7 @@ def activar_marca(request, marca_id):
     marca.activo = True
     marca.save()
 
-    messages.success(request, "Marca activada")
+    messages.success(request, _("Marca activada"))
     return redirect('lista_marcas')
 
 def desactivar_producto(request, producto_id):

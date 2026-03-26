@@ -1,54 +1,55 @@
 {% extends "bases/base_vendedor.html" %}
+{% load i18n %}
 
 {% block title %}
-Crear Vendedor
+{% trans "Crear Vendedor" %}
 {% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4">Crear Vendedor</h2>
+<h2 class="mb-4">{% trans "Crear Vendedor" %}</h2>
 
 <form method="POST">
 
 {% csrf_token %}
 
 <div class="mb-3">
-<label>Nombre</label>
+<label>{% trans "Nombre" %}</label>
 <input type="text" name="nombre" class="form-control" required>
 </div>
 
 <div class="mb-3">
-<label>Apellido</label>
+<label>{% trans "Apellido" %}</label>
 <input type="text" name="apellido" class="form-control" required>
 </div>
 
 <div class="mb-3">
-<label>Usuario</label>
+<label>{% trans "Usuario" %}</label>
 <input type="text" name="username" class="form-control" required>
 </div>
 
 <div class="mb-3">
-<label>Email</label>
+<label>{% trans "Email" %}</label>
 <input type="email" name="email" class="form-control" required>
 </div>
 
 <div class="mb-3">
-<label>Contraseña</label>
+<label>{% trans "Contrasena" %}</label>
 <input type="password" name="password" class="form-control" required>
 </div>
 
 <div class="mb-3">
-<label>Teléfono</label>
+<label>{% trans "Telefono" %}</label>
 <input type="text" name="telefono" class="form-control">
 </div>
 
 <div class="d-flex gap-2">
 <button type="submit" class="btn btn-success">
-Crear Vendedor
+{% trans "Crear Vendedor" %}
 </button>
 
 <a href="{% url 'lista_vendedores' %}" class="btn btn-secondary">
-Cancelar
+{% trans "Cancelar" %}
 </a>
 </div>
 

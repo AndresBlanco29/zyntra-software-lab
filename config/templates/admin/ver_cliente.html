@@ -1,12 +1,13 @@
 {% extends "bases/base_vendedor.html" %}
+{% load i18n %}
 
 {% block title %}
-Detalle Cliente
+{% trans "Detalle Cliente" %}
 {% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4">Detalle del Cliente</h2>
+<h2 class="mb-4">{% trans "Detalle del Cliente" %}</h2>
 
 <div class="card shadow-sm">
 
@@ -15,42 +16,42 @@ Detalle Cliente
 <div class="row">
 
 <div class="col-md-6 mb-3">
-<strong>Empresa:</strong><br>
+<strong>{% trans "Empresa:" %}</strong><br>
 {{ cliente.nombre_empresa }}
 </div>
 
 <div class="col-md-6 mb-3">
-<strong>Correo:</strong><br>
+<strong>{% trans "Correo:" %}</strong><br>
 {{ cliente.usuario.email }}
 </div>
 
 <div class="col-md-6 mb-3">
-<strong>Teléfono:</strong><br>
+<strong>{% trans "Telefono:" %}</strong><br>
 {{ cliente.telefono }}
 </div>
 
 <div class="col-md-6 mb-3">
-<strong>Ciudad:</strong><br>
+<strong>{% trans "Ciudad:" %}</strong><br>
 {{ cliente.ciudad }}
 </div>
 
 <div class="col-md-6 mb-3">
-<strong>Estado:</strong><br>
+<strong>{% trans "Estado:" %}</strong><br>
 {{ cliente.estado }}
 </div>
 
 <div class="col-md-6 mb-3">
-<strong>Código Postal:</strong><br>
+<strong>{% trans "Codigo Postal:" %}</strong><br>
 {{ cliente.codigo_postal }}
 </div>
 
 <div class="col-md-6 mb-3">
-<strong>Sales Tax:</strong><br>
+<strong>{% trans "Sales Tax:" %}</strong><br>
 {{ cliente.sales_tax_number }}
 </div>
 
 <div class="col-md-6 mb-3">
-<strong>País:</strong><br>
+<strong>{% trans "Pais:" %}</strong><br>
 {{ cliente.pais }}
 </div>
 
@@ -58,14 +59,14 @@ Detalle Cliente
 
 <hr>
 
-<h5 class="mb-3">Certificado de Impuesto</h5>
+<h5 class="mb-3">{% trans "Certificado de Impuesto" %}</h5>
 
 {% if cliente.certificado_tax %}
 <a href="{% url 'ver_certificado_cliente' cliente.id %}" target="_blank" class="btn btn-info">
-Ver certificado
+{% trans "Ver certificado" %}
 </a>
 {% else %}
-<p>No se subió certificado</p>
+<p>{% trans "No se subio certificado" %}</p>
 {% endif %}
 
 <hr>
@@ -73,15 +74,15 @@ Ver certificado
 <div class="mt-3">
 
 <a href="{% url 'aprobar_cliente' cliente.id %}" class="btn btn-success">
-Aprobar cliente
+{% trans "Aprobar cliente" %}
 </a>
 
 <a href="{% url 'rechazar_cliente' cliente.id %}" class="btn btn-danger">
-Rechazar cliente
+{% trans "Rechazar cliente" %}
 </a>
 
 <a href="{% url 'clientes_pendientes' %}" class="btn btn-secondary">
-Volver
+{% trans "Volver" %}
 </a>
 
 </div>

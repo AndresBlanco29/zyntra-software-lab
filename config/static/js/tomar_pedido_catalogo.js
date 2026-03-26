@@ -173,56 +173,29 @@ PRECIO SEGUN PRESENTACION
 ========================= */
 
 document.querySelectorAll(".presentacion-select").forEach(select => {
+    select.addEventListener("change", function () {
+        const card = this.closest(".producto-card");
+        const option = this.selectedOptions[0];
 
-select.addEventListener("change", function () {
+        const precios = [
+            option.dataset.precio1,
+            option.dataset.precio2,
+            option.dataset.precio3,
+            option.dataset.precio4,
+            option.dataset.precio5
+        ];
 
-const card = this.closest(".producto-card")
+        const precioSelect = card.querySelector(".precio-select");
+        precioSelect.innerHTML = '<option value="">Seleccionar precio</option>';
 
-const option = this.selectedOptions[0]
-
-const precios = [
-option.dataset.precio1,
-option.dataset.precio2,
-option.dataset.precio3,
-option.dataset.precio4,
-option.dataset.precio5
-]
-
-const precioSelect = card.querySelector(".precio-select")
-
-precioSelect.innerHTML = '<option value="">Seleccionar precio</option>'
-
-precios.forEach((precio, index) => {
-
-if (precio && precio !== "0.00") {
-
-precioSelect.innerHTML += `
-<option value="${precio}">
-Precio ${index + 1} - $${precio}
-</option>
-`
-
-}
-
-})
-
-})
-
-})
-
-const presentacion = card.querySelector(".presentacion-select").value;
-const precio = card.querySelector(".precio-select").value;
-const cantidad = card.querySelector(".cantidad").innerText;
-
-fetch(urlAgregar, {
-    method: "POST",
-    headers: {
-        "X-CSRFToken": csrf,
-        "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: new URLSearchParams({
-        presentacion_id: presentacion,
-        cantidad: cantidad,
-        precio: precio
-    })
-})
+        precios.forEach((precio, index) => {
+            if (precio && precio !== "0.00") {
+                precioSelect.innerHTML += `
+                <option value="${precio}">
+                Precio ${index + 1} - $${precio}
+                </option>
+                `;
+            }
+        });
+    });
+});

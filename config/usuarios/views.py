@@ -9,12 +9,13 @@ from config.core.models import Testimonio, HomeContenido
 from config.productos.models import Producto, Marca
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.hashers import make_password
-from django.http import JsonResponse, FileResponse, Http404
+from django.http import JsonResponse, FileResponse, Http404, HttpResponse
 from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.db import transaction
 import mimetypes
 import os
+import urllib.request
 import logging
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,21 @@ def _cloudinary_signed_url_for_file(field_file):
             continue
 
     return None
+
+
+def _ensure_extension(file_name, content_type):
+    if not file_name:
+        file_name = 'certificado'
+
+    root, ext = os.path.splitext(file_name)
+    if ext:
+        return file_name
+
+    guessed_ext = mimetypes.guess_extension(content_type or '')
+    if guessed_ext:
+        return f"{root}{guessed_ext}"
+
+    return f"{root}.bin"
 
 @login_required
 def panel_admin(request):
@@ -521,31 +537,49 @@ def ver_certificado_cliente(request, cliente_id):
     if not cliente.certificado_tax:
         raise Http404("No hay certificado para este cliente")
 
+    certificado = cliente.certificado_tax
+    nombre_archivo = os.path.basename(certificado.name) or f"certificado_{cliente.id}"
+
     try:
-        certificado = cliente.certificado_tax
         certificado.open('rb')
+        content_type, _ = mimetypes.guess_type(nombre_archivo)
+        final_name = _ensure_extension(nombre_archivo, content_type)
+        return FileResponse(
+            certificado,
+            as_attachment=True,
+            filename=final_name,
+            content_type=content_type or 'application/octet-stream',
+        )
     except Exception as exc:
         logger.warning("Fallo open() para certificado cliente %s: %s", cliente.id, exc)
 
         signed_url = _cloudinary_signed_url_for_file(cliente.certificado_tax)
         if signed_url:
-            return redirect(signed_url)
+            try:
+                with urllib.request.urlopen(signed_url, timeout=20) as remote_file:
+                    file_bytes = remote_file.read()
+                    remote_content_type = remote_file.headers.get_content_type()
+                final_name = _ensure_extension(nombre_archivo, remote_content_type)
+                response = HttpResponse(file_bytes, content_type=remote_content_type or 'application/octet-stream')
+                response['Content-Disposition'] = f'attachment; filename="{final_name}"'
+                return response
+            except Exception as signed_exc:
+                logger.warning("Fallo descarga firmada Cloudinary cliente %s: %s", cliente.id, signed_exc)
 
         try:
             fallback_url = cliente.certificado_tax.url
             if fallback_url:
-                return redirect(fallback_url)
+                with urllib.request.urlopen(fallback_url, timeout=20) as remote_file:
+                    file_bytes = remote_file.read()
+                    remote_content_type = remote_file.headers.get_content_type()
+                final_name = _ensure_extension(nombre_archivo, remote_content_type)
+                response = HttpResponse(file_bytes, content_type=remote_content_type or 'application/octet-stream')
+                response['Content-Disposition'] = f'attachment; filename="{final_name}"'
+                return response
         except Exception:
             pass
 
         raise Http404("No se pudo abrir el certificado")
-
-    nombre_archivo = os.path.basename(certificado.name) or f"certificado_{cliente.id}"
-    content_type, _ = mimetypes.guess_type(nombre_archivo)
-
-    response = FileResponse(certificado, content_type=content_type or 'application/octet-stream')
-    response['Content-Disposition'] = f'inline; filename="{nombre_archivo}"'
-    return response
 
 #funcion del login
 def login_view(request):

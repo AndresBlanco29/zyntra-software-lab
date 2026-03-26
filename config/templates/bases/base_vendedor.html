@@ -50,44 +50,6 @@ La Tortilla Grocery
 
 </div>
 
-<div class="language-widget">
-
-<button class="language-toggle" type="button" id="panelLanguageToggle" aria-expanded="false" aria-controls="panelLanguageMenu">
-
-🌎
-
-<span class="language-current">
-{% if CURRENT_LANGUAGE == "es" %}
-ES
-{% else %}
-EN
-{% endif %}
-
-</span>
-
-</button>
-
-<div class="language-menu" id="panelLanguageMenu">
-
-<form action="{% url 'set_language' %}" method="post">
-
-{% csrf_token %}
-<input name="next" type="hidden" value="{{ request.get_full_path }}">
-
-<button name="language" value="es" class="language-option" type="submit">
-🇪🇸 Español
-</button>
-
-<button name="language" value="en" class="language-option" type="submit">
-🇺🇸 English
-</button>
-
-</form>
-
-</div>
-
-</div>
-
 </nav>
 
 <!-- Modal de confirmacion de logout -->
@@ -211,6 +173,44 @@ class="list-group-item list-group-item-action {% if 'tomar-pedido' in request.pa
 
 </div>
 
+<div class="language-widget">
+
+<button class="language-toggle" onclick="toggleLanguageMenu()" type="button" aria-expanded="false" aria-controls="languageMenu">
+
+🌎
+
+<span class="language-current">
+{% if CURRENT_LANGUAGE == "es" %}
+ES
+{% else %}
+EN
+{% endif %}
+
+</span>
+
+</button>
+
+<div class="language-menu" id="languageMenu">
+
+<form action="{% url 'set_language' %}" method="post">
+
+{% csrf_token %}
+<input name="next" type="hidden" value="{{ request.path }}">
+
+<button name="language" value="es" class="language-option" type="submit">
+🇪🇸 Español
+</button>
+
+<button name="language" value="en" class="language-option" type="submit">
+🇺🇸 English
+</button>
+
+</form>
+
+</div>
+
+</div>
+
 {% if messages %}
 <div id="flashMessages" class="d-none">
   {% for message in messages %}
@@ -243,6 +243,19 @@ class="list-group-item list-group-item-action {% if 'tomar-pedido' in request.pa
 {% endif %}
 
 <script>
+function toggleLanguageMenu() {
+  const menu = document.getElementById('languageMenu');
+  const toggle = document.querySelector('.language-toggle');
+
+  if (!menu || !toggle) {
+    return;
+  }
+
+  const isOpen = menu.style.display === 'flex';
+  menu.style.display = isOpen ? 'none' : 'flex';
+  toggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+}
+
 document.addEventListener('DOMContentLoaded', function () {
   const feedbackTranslations = {
     error: "{% trans 'Error'|escapejs %}",
@@ -254,8 +267,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const toggleBtn = document.getElementById('sidebarToggleBtn');
   const sidebar = document.getElementById('panelSidebar');
   const backdrop = document.getElementById('sidebarBackdrop');
-  const languageToggle = document.getElementById('panelLanguageToggle');
-  const languageMenu = document.getElementById('panelLanguageMenu');
+  const languageToggle = document.querySelector('.language-toggle');
+  const languageMenu = document.getElementById('languageMenu');
 
   function closeLanguageMenu() {
     if (!languageMenu || !languageToggle) {
@@ -269,9 +282,6 @@ document.addEventListener('DOMContentLoaded', function () {
   if (languageToggle && languageMenu) {
     languageToggle.addEventListener('click', function (event) {
       event.stopPropagation();
-      const isOpen = languageMenu.style.display === 'flex';
-      languageMenu.style.display = isOpen ? 'none' : 'flex';
-      languageToggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
     });
 
     languageMenu.addEventListener('click', function (event) {

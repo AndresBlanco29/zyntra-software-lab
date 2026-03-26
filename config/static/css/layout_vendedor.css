@@ -121,11 +121,9 @@ width:100%;
 /* WIDGET IDIOMA */
 .language-widget {
     position: fixed;
-    bottom: 12px;
-    left: 12px;
-    z-index: 1200;
-    width: max-content;
-    height: auto;
+    bottom: 25px;
+    left: 25px;
+    z-index: 9999;
 }
 
 .language-toggle {
@@ -393,8 +391,8 @@ width:100%;
     }
 
     .language-widget {
-        bottom: 10px;
-        left: 10px;
+        bottom: 15px;
+        left: 12px;
     }
 
     .language-toggle {
@@ -406,8 +404,8 @@ width:100%;
     }
 
     .language-menu {
-        bottom: 52px;
-        left: 0;
+        bottom: 55px;
+        left: -60px;
     }
 
     .language-option {

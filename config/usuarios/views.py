@@ -8,6 +8,7 @@ from config.clientes.models import Cliente
 from config.core.models import Testimonio, HomeContenido
 from config.productos.models import Producto, Marca
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.contrib.auth.hashers import make_password
 from django.http import JsonResponse, FileResponse, Http404, HttpResponse
 from django.urls import reverse
@@ -800,6 +801,7 @@ def ver_cliente(request, cliente_id):
 
 
 @login_required
+@xframe_options_sameorigin
 def ver_certificado_cliente(request, cliente_id):
 
     if not _is_admin_user(request.user):

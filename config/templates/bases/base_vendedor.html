@@ -231,6 +231,22 @@ function toggleLanguageMenu() {
     return;
   }
 
+  <!-- Selector de idioma moderno en la esquina inferior izquierda -->
+  <div style="position: absolute; left: 0; bottom: 32px; width: 100%; display: flex; justify-content: center; z-index: 1001;">
+    <div class="language-widget">
+      <button class="language-toggle" onclick="toggleLanguageMenu()" type="button" aria-expanded="false" aria-controls="languageMenu" title="{% if CURRENT_LANGUAGE == 'es' %}Español{% else %}English{% endif %}">
+        🌎
+      </button>
+      <div class="language-menu" id="languageMenu">
+        <form action="{% url 'set_language' %}" method="post">
+          {% csrf_token %}
+          <input name="next" type="hidden" value="{{ request.path }}">
+          <button name="language" value="es" class="language-option" type="submit">🇪🇸 Español</button>
+          <button name="language" value="en" class="language-option" type="submit">🇺🇸 English</button>
+        </form>
+      </div>
+    </div>
+  </div>
   const isOpen = menu.style.display === 'flex';
   menu.style.display = isOpen ? 'none' : 'flex';
   toggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
@@ -246,32 +262,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
   const toggleBtn = document.getElementById('sidebarToggleBtn');
   const sidebar = document.getElementById('panelSidebar');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  const languageToggle = document.querySelector('.language-toggle');
-  const languageMenu = document.getElementById('languageMenu');
-
-  function closeLanguageMenu() {
-    if (!languageMenu || !languageToggle) {
-      return;
-    }
-
-    languageMenu.style.display = 'none';
-    languageToggle.setAttribute('aria-expanded', 'false');
-  }
-
-  if (languageToggle && languageMenu) {
-    languageToggle.addEventListener('click', function (event) {
-      event.stopPropagation();
-    });
-
-    languageMenu.addEventListener('click', function (event) {
-      event.stopPropagation();
-    });
-
-    document.addEventListener('click', closeLanguageMenu);
-    document.addEventListener('keydown', function (event) {
-      if (event.key === 'Escape') {
-        closeLanguageMenu();
       }
     });
   }

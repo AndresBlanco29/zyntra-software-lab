@@ -1,6 +1,6 @@
 from django.conf import settings
-from django.http import HttpResponsePermanentRedirect
-from django.contrib.auth.views import redirect_to_login
+from django.http import HttpResponsePermanentRedirect, HttpResponseRedirect
+from urllib.parse import quote
 
 
 class WwwRedirectMiddleware:
@@ -78,10 +78,8 @@ class ProtectedAreaLoginMiddleware:
             return self.get_response(request)
 
         if self._is_protected_path(path) and not request.user.is_authenticated:
-            return redirect_to_login(
-                request.get_full_path(),
-                login_url=getattr(settings, "LOGIN_URL", "/login/"),
-            )
+            next_url = quote(request.get_full_path(), safe="")
+            return HttpResponseRedirect(f"/?show_login=1&next={next_url}")
 
         return self.get_response(request)
 

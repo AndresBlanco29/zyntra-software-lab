@@ -1281,6 +1281,26 @@ function abrirModalRegistro() {
   }, 300);
 }
 
+// Abre modal login automáticamente cuando viene de una ruta protegida.
+document.addEventListener('DOMContentLoaded', function() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('show_login') === '1') {
+    const loginModalElement = document.getElementById('loginModal');
+    if (!loginModalElement) {
+      return;
+    }
+
+    const loginModal = new bootstrap.Modal(loginModalElement);
+    loginModal.show();
+
+    // Limpia el parámetro para evitar reabrir el modal al recargar.
+    params.delete('show_login');
+    const newQuery = params.toString();
+    const newUrl = newQuery ? `${window.location.pathname}?${newQuery}` : window.location.pathname;
+    window.history.replaceState({}, document.title, newUrl);
+  }
+});
+
 // Función para cargar el formulario de registro en el modal
 function cargarRegistro() {
   const container = document.getElementById('loginFormContainer');

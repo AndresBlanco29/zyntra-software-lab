@@ -337,6 +337,26 @@ def _ensure_extension(file_name, content_type):
 
     return f"{root}.bin"
 
+
+def _build_inline_file_response(file_obj_or_bytes, content_type, file_name, use_file_response=False):
+    final_name = _ensure_extension(file_name, content_type)
+
+    if use_file_response:
+        response = FileResponse(
+            file_obj_or_bytes,
+            as_attachment=False,
+            filename=final_name,
+            content_type=content_type or 'application/octet-stream',
+        )
+    else:
+        response = HttpResponse(
+            file_obj_or_bytes,
+            content_type=content_type or 'application/octet-stream',
+        )
+
+    response['Content-Disposition'] = f'inline; filename="{final_name}"'
+    return response
+
 @login_required
 def panel_admin(request):
 
@@ -773,12 +793,11 @@ def ver_certificado_cliente(request, cliente_id):
     try:
         certificado.open('rb')
         content_type, _ = mimetypes.guess_type(nombre_archivo)
-        final_name = _ensure_extension(nombre_archivo, content_type)
-        return FileResponse(
+        return _build_inline_file_response(
             certificado,
-            as_attachment=True,
-            filename=final_name,
-            content_type=content_type or 'application/octet-stream',
+            content_type,
+            nombre_archivo,
+            use_file_response=True,
         )
     except Exception as exc:
         logger.warning("Fallo open() para certificado cliente %s: %s", cliente.id, exc)
@@ -791,10 +810,11 @@ def ver_certificado_cliente(request, cliente_id):
                 with urllib.request.urlopen(download_url, timeout=20) as remote_file:
                     file_bytes = remote_file.read()
                     remote_content_type = remote_file.headers.get_content_type()
-                final_name = _ensure_extension(resolved_name or nombre_archivo, remote_content_type)
-                response = HttpResponse(file_bytes, content_type=remote_content_type or 'application/octet-stream')
-                response['Content-Disposition'] = f'attachment; filename="{final_name}"'
-                return response
+                return _build_inline_file_response(
+                    file_bytes,
+                    remote_content_type,
+                    resolved_name or nombre_archivo,
+                )
             except Exception as download_exc:
                 logger.warning("Fallo descarga Cloudinary cliente %s: %s", cliente.id, download_exc)
                 diagnostico.append(f"descarga cloudinary resolver fallo: {download_exc}")
@@ -803,9 +823,7 @@ def ver_certificado_cliente(request, cliente_id):
                 if pdf_preview:
                     file_bytes, remote_content_type, final_name = pdf_preview
                     diagnostico.append("pdf preview cloudinary: ok")
-                    response = HttpResponse(file_bytes, content_type=remote_content_type or 'image/jpeg')
-                    response['Content-Disposition'] = f'inline; filename="{final_name}"'
-                    return response
+                    return _build_inline_file_response(file_bytes, remote_content_type, final_name)
                 diagnostico.append("pdf preview cloudinary: sin coincidencia")
         else:
             diagnostico.append("cloudinary api/url resolver: sin coincidencia")
@@ -817,19 +835,14 @@ def ver_certificado_cliente(request, cliente_id):
                 with urllib.request.urlopen(fallback_url, timeout=20) as remote_file:
                     file_bytes = remote_file.read()
                     remote_content_type = remote_file.headers.get_content_type()
-                final_name = _ensure_extension(nombre_archivo, remote_content_type)
-                response = HttpResponse(file_bytes, content_type=remote_content_type or 'application/octet-stream')
-                response['Content-Disposition'] = f'attachment; filename="{final_name}"'
-                return response
+                return _build_inline_file_response(file_bytes, remote_content_type, nombre_archivo)
         except Exception as fallback_exc:
             diagnostico.append(f"fallback url fallo: {fallback_exc}")
 
         probed_file = _probe_cloudinary_certificate(cliente.certificado_tax)
         if probed_file:
             file_bytes, remote_content_type, final_name = probed_file
-            response = HttpResponse(file_bytes, content_type=remote_content_type or 'application/octet-stream')
-            response['Content-Disposition'] = f'attachment; filename="{final_name}"'
-            return response
+            return _build_inline_file_response(file_bytes, remote_content_type, final_name)
 
         diagnostico.append("probe cloudinary: sin coincidencia")
 

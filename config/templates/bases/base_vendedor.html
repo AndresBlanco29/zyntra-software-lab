@@ -120,6 +120,7 @@ La Tortilla Grocery
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_vendedores' or request.resolver_match.url_name == 'crear_vendedor' %}active{% endif %}">
     {% trans "Vendedores" %}
   </a>
+{% endif %}
   <script>
   // Unificado: selector de idioma, sidebar y feedback
   document.addEventListener('DOMContentLoaded', function () {

@@ -42,65 +42,78 @@ def _redirect_for_user(user):
     return '/'
 
 
-def _cloudinary_signed_url_for_file(field_file):
-    """Genera URL firmada para archivos en Cloudinary cuando open() falla."""
+def _cloudinary_download_url_for_file(field_file):
+    """Resuelve una URL usable de Cloudinary verificando el recurso real."""
     try:
-        from cloudinary.utils import cloudinary_url
+        from cloudinary import api
+        from cloudinary.utils import private_download_url
     except Exception:
-        return None
+        return None, None
 
     file_name = (field_file.name or '').lstrip('/')
     if not file_name:
-        return None
+        return None, None
 
-    # Algunos registros antiguos guardaron prefijo "media/" en Cloudinary.
     public_id = file_name[6:] if file_name.startswith('media/') else file_name
-
     base_public_id, ext = os.path.splitext(public_id)
-    ext = ext.lstrip('.').lower()
+    ext = ext.lstrip('.').lower() or None
 
     candidates = [
-        {
-            'public_id': public_id,
-            'resource_type': 'raw',
-            'type': 'upload',
-        },
-        {
-            'public_id': public_id,
-            'resource_type': 'raw',
-            'type': 'authenticated',
-        },
-        {
-            'public_id': base_public_id,
-            'resource_type': 'image',
-            'type': 'upload',
-            'format': ext if ext else None,
-        },
-        {
-            'public_id': base_public_id,
-            'resource_type': 'image',
-            'type': 'authenticated',
-            'format': ext if ext else None,
-        },
+        {'public_id': public_id, 'resource_type': 'raw', 'type': 'upload'},
+        {'public_id': public_id, 'resource_type': 'raw', 'type': 'authenticated'},
+        {'public_id': public_id, 'resource_type': 'raw', 'type': 'private'},
+        {'public_id': base_public_id, 'resource_type': 'raw', 'type': 'upload'},
+        {'public_id': base_public_id, 'resource_type': 'raw', 'type': 'authenticated'},
+        {'public_id': base_public_id, 'resource_type': 'raw', 'type': 'private'},
+        {'public_id': base_public_id, 'resource_type': 'image', 'type': 'upload'},
+        {'public_id': base_public_id, 'resource_type': 'image', 'type': 'authenticated'},
+        {'public_id': base_public_id, 'resource_type': 'image', 'type': 'private'},
     ]
 
+    seen = set()
     for option in candidates:
-        kwargs = {
-            'resource_type': option['resource_type'],
-            'type': option['type'],
-            'sign_url': True,
-            'secure': True,
-        }
-        if option.get('format'):
-            kwargs['format'] = option['format']
+        key = (option['public_id'], option['resource_type'], option['type'])
+        if key in seen or not option['public_id']:
+            continue
+        seen.add(key)
+
         try:
-            signed_url, _ = cloudinary_url(option['public_id'], **kwargs)
-            if signed_url:
-                return signed_url
+            resource = api.resource(
+                option['public_id'],
+                resource_type=option['resource_type'],
+                type=option['type'],
+            )
         except Exception:
             continue
 
-    return None
+        resource_public_id = resource.get('public_id') or option['public_id']
+        resource_type = resource.get('resource_type') or option['resource_type']
+        delivery_type = resource.get('type') or option['type']
+        resource_format = resource.get('format') or ext
+
+        resolved_name = os.path.basename(resource_public_id)
+        if resource_format and not os.path.splitext(resolved_name)[1]:
+            resolved_name = f"{resolved_name}.{resource_format}"
+
+        if delivery_type in {'authenticated', 'private'}:
+            try:
+                download_url = private_download_url(
+                    resource_public_id,
+                    resource_format,
+                    resource_type=resource_type,
+                    type=delivery_type,
+                    secure=True,
+                )
+                if download_url:
+                    return download_url, resolved_name
+            except Exception:
+                continue
+
+        secure_url = resource.get('secure_url') or resource.get('url')
+        if secure_url:
+            return secure_url, resolved_name
+
+    return None, None
 
 
 def _ensure_extension(file_name, content_type):
@@ -553,18 +566,18 @@ def ver_certificado_cliente(request, cliente_id):
     except Exception as exc:
         logger.warning("Fallo open() para certificado cliente %s: %s", cliente.id, exc)
 
-        signed_url = _cloudinary_signed_url_for_file(cliente.certificado_tax)
-        if signed_url:
+        download_url, resolved_name = _cloudinary_download_url_for_file(cliente.certificado_tax)
+        if download_url:
             try:
-                with urllib.request.urlopen(signed_url, timeout=20) as remote_file:
+                with urllib.request.urlopen(download_url, timeout=20) as remote_file:
                     file_bytes = remote_file.read()
                     remote_content_type = remote_file.headers.get_content_type()
-                final_name = _ensure_extension(nombre_archivo, remote_content_type)
+                final_name = _ensure_extension(resolved_name or nombre_archivo, remote_content_type)
                 response = HttpResponse(file_bytes, content_type=remote_content_type or 'application/octet-stream')
                 response['Content-Disposition'] = f'attachment; filename="{final_name}"'
                 return response
-            except Exception as signed_exc:
-                logger.warning("Fallo descarga firmada Cloudinary cliente %s: %s", cliente.id, signed_exc)
+            except Exception as download_exc:
+                logger.warning("Fallo descarga Cloudinary cliente %s: %s", cliente.id, download_exc)
 
         try:
             fallback_url = cliente.certificado_tax.url

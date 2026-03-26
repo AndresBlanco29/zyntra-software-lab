@@ -688,6 +688,16 @@ def ver_certificado_cliente(request, cliente_id):
 
     certificado = cliente.certificado_tax
     nombre_archivo = os.path.basename(certificado.name) or f"certificado_{cliente.id}"
+    diagnostico = [
+        f"cliente_id={cliente.id}",
+        f"certificado_tax.name={certificado.name}",
+        f"nombre_archivo={nombre_archivo}",
+    ]
+
+    try:
+        diagnostico.append(f"certificado_tax.url={certificado.url}")
+    except Exception as exc:
+        diagnostico.append(f"certificado_tax.url=ERROR: {exc}")
 
     try:
         certificado.open('rb')
@@ -701,9 +711,11 @@ def ver_certificado_cliente(request, cliente_id):
         )
     except Exception as exc:
         logger.warning("Fallo open() para certificado cliente %s: %s", cliente.id, exc)
+        diagnostico.append(f"open() fallo: {exc}")
 
         download_url, resolved_name = _cloudinary_download_url_for_file(cliente.certificado_tax)
         if download_url:
+            diagnostico.append(f"cloudinary api/url resolver ok: {download_url}")
             try:
                 with urllib.request.urlopen(download_url, timeout=20) as remote_file:
                     file_bytes = remote_file.read()
@@ -714,10 +726,14 @@ def ver_certificado_cliente(request, cliente_id):
                 return response
             except Exception as download_exc:
                 logger.warning("Fallo descarga Cloudinary cliente %s: %s", cliente.id, download_exc)
+                diagnostico.append(f"descarga cloudinary resolver fallo: {download_exc}")
+        else:
+            diagnostico.append("cloudinary api/url resolver: sin coincidencia")
 
         try:
             fallback_url = cliente.certificado_tax.url
             if fallback_url:
+                diagnostico.append(f"fallback url intento: {fallback_url}")
                 with urllib.request.urlopen(fallback_url, timeout=20) as remote_file:
                     file_bytes = remote_file.read()
                     remote_content_type = remote_file.headers.get_content_type()
@@ -725,8 +741,8 @@ def ver_certificado_cliente(request, cliente_id):
                 response = HttpResponse(file_bytes, content_type=remote_content_type or 'application/octet-stream')
                 response['Content-Disposition'] = f'attachment; filename="{final_name}"'
                 return response
-        except Exception:
-            pass
+        except Exception as fallback_exc:
+            diagnostico.append(f"fallback url fallo: {fallback_exc}")
 
         probed_file = _probe_cloudinary_certificate(cliente.certificado_tax)
         if probed_file:
@@ -735,7 +751,13 @@ def ver_certificado_cliente(request, cliente_id):
             response['Content-Disposition'] = f'attachment; filename="{final_name}"'
             return response
 
-        raise Http404("No se pudo abrir el certificado")
+        diagnostico.append("probe cloudinary: sin coincidencia")
+
+        context = {
+            'cliente': cliente,
+            'diagnostico': diagnostico,
+        }
+        return render(request, 'admin/certificado_diagnostico.html', context, status=404)
 
 #funcion del login
 def login_view(request):

@@ -1,0 +1,38 @@
+{% extends "bases/base_vendedor.html" %}
+
+{% block title %}
+Diagnostico Certificado
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4">Diagnostico de certificado</h2>
+
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body">
+    <h5 class="mb-3">Cliente</h5>
+    <p class="mb-1"><strong>ID:</strong> {{ cliente.id }}</p>
+    <p class="mb-1"><strong>Empresa:</strong> {{ cliente.nombre_empresa }}</p>
+    <p class="mb-0"><strong>Email:</strong> {{ cliente.usuario.email }}</p>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body">
+    <h5 class="mb-3 text-danger">No se pudo abrir el certificado</h5>
+    <p class="text-muted mb-3">Este detalle solo lo ve el administrador y sirve para identificar el error real del archivo.</p>
+
+    <div class="bg-light rounded p-3" style="overflow:auto;">
+      {% for linea in diagnostico %}
+      <div style="font-family: Consolas, monospace; font-size: 0.95rem; margin-bottom: 0.45rem;">{{ linea }}</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="d-flex gap-2">
+  <a href="{% url 'ver_cliente' cliente.id %}" class="btn btn-secondary">Volver al cliente</a>
+  <a href="{% url 'clientes_pendientes' %}" class="btn btn-outline-secondary">Volver a solicitudes</a>
+</div>
+
+{% endblock %}

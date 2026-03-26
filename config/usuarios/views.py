@@ -252,6 +252,77 @@ def _probe_cloudinary_certificate(field_file):
     return None
 
 
+def _cloudinary_pdf_preview(field_file):
+    """Si Cloudinary bloquea el PDF original, entrega la primera pagina como imagen."""
+    try:
+        from cloudinary import api
+        from cloudinary.models import CLOUDINARY_FIELD_DB_RE
+        from cloudinary.utils import cloudinary_url
+    except Exception:
+        return None
+
+    file_name = (field_file.name or '').strip().lstrip('/')
+    if not file_name:
+        return None
+
+    public_ids = []
+
+    def add_candidate(value):
+        value = (value or '').strip().lstrip('/')
+        if value and value not in public_ids:
+            public_ids.append(value)
+
+    add_candidate(file_name)
+    if file_name.startswith('media/'):
+        add_candidate(file_name[6:])
+
+    match = re.match(CLOUDINARY_FIELD_DB_RE, file_name)
+    if match:
+        add_candidate(match.group('public_id'))
+
+    expanded_ids = []
+    for candidate in public_ids:
+        if candidate not in expanded_ids:
+            expanded_ids.append(candidate)
+        base_candidate, _ = os.path.splitext(candidate)
+        if base_candidate and base_candidate not in expanded_ids:
+            expanded_ids.append(base_candidate)
+
+    for public_id in expanded_ids:
+        for delivery_type in ('upload', 'authenticated', 'private'):
+            try:
+                resource = api.resource(public_id, resource_type='image', type=delivery_type)
+            except Exception:
+                continue
+
+            if (resource.get('format') or '').lower() != 'pdf':
+                continue
+
+            try:
+                preview_url, _ = cloudinary_url(
+                    resource.get('public_id') or public_id,
+                    resource_type='image',
+                    type=resource.get('type') or delivery_type,
+                    format='jpg',
+                    page=1,
+                    version=resource.get('version'),
+                    secure=True,
+                    sign_url=(resource.get('type') or delivery_type) != 'upload',
+                )
+
+                with urllib.request.urlopen(preview_url, timeout=20) as remote_file:
+                    file_bytes = remote_file.read()
+                    remote_content_type = remote_file.headers.get_content_type()
+
+                preview_name = os.path.basename(resource.get('public_id') or public_id)
+                preview_name = _ensure_extension(preview_name, remote_content_type or 'image/jpeg')
+                return file_bytes, remote_content_type or 'image/jpeg', preview_name
+            except Exception:
+                continue
+
+    return None
+
+
 def _ensure_extension(file_name, content_type):
     if not file_name:
         file_name = 'certificado'
@@ -727,6 +798,15 @@ def ver_certificado_cliente(request, cliente_id):
             except Exception as download_exc:
                 logger.warning("Fallo descarga Cloudinary cliente %s: %s", cliente.id, download_exc)
                 diagnostico.append(f"descarga cloudinary resolver fallo: {download_exc}")
+
+                pdf_preview = _cloudinary_pdf_preview(cliente.certificado_tax)
+                if pdf_preview:
+                    file_bytes, remote_content_type, final_name = pdf_preview
+                    diagnostico.append("pdf preview cloudinary: ok")
+                    response = HttpResponse(file_bytes, content_type=remote_content_type or 'image/jpeg')
+                    response['Content-Disposition'] = f'inline; filename="{final_name}"'
+                    return response
+                diagnostico.append("pdf preview cloudinary: sin coincidencia")
         else:
             diagnostico.append("cloudinary api/url resolver: sin coincidencia")
 

@@ -5,22 +5,22 @@
 Dashboard
 {% endblock %}
 
-
+{% block content %}
 <div class="language-widget" style="margin-bottom: 32px;">
-	<button class="language-toggle" onclick="toggleLanguageMenu()">
-		🌎
-		<span class="language-current">
-			{% if LANGUAGE_CODE == "es" %}ES{% else %}EN{% endif %}
-		</span>
-	</button>
-	<div class="language-menu" id="languageMenu">
-		<form action="{% url 'set_language' %}" method="post">
-			{% csrf_token %}
-			<input name="next" type="hidden" value="{{ request.path }}">
-			<button name="language" value="es" class="language-option">🇪🇸 Español</button>
-			<button name="language" value="en" class="language-option">🇺🇸 English</button>
-		</form>
-	</div>
+  <button class="language-toggle" onclick="toggleLanguageMenu()">
+    🌎
+    <span class="language-current">
+      {% if LANGUAGE_CODE == "es" %}ES{% else %}EN{% endif %}
+    </span>
+  </button>
+  <div class="language-menu" id="languageMenu">
+    <form action="{% url 'set_language' %}" method="post">
+      {% csrf_token %}
+      <input name="next" type="hidden" value="{{ request.path }}">
+      <button name="language" value="es" class="language-option">🇪🇸 Español</button>
+      <button name="language" value="en" class="language-option">🇺🇸 English</button>
+    </form>
+  </div>
 </div>
 
 <h2 class="mb-4">{% trans "Panel Administrador" %}</h2>
@@ -64,5 +64,4 @@ Dashboard
 </div>
 
 </div>
-
 {% endblock %}

@@ -40,21 +40,49 @@ La Tortilla Grocery
 
 {% block navbar_right %}
 
-<form action="{% url 'set_language' %}" method="post" class="d-inline-flex align-items-center me-2">
-{% csrf_token %}
-<input type="hidden" name="next" value="{{ request.get_full_path }}">
-<label for="panelLanguage" class="visually-hidden">{% trans "Idioma" %}</label>
-<select id="panelLanguage" name="language" class="form-select form-select-sm" onchange="this.form.submit()" style="min-width: 96px;">
-<option value="es" {% if CURRENT_LANGUAGE == 'es' %}selected{% endif %}>ES</option>
-<option value="en" {% if CURRENT_LANGUAGE == 'en' %}selected{% endif %}>EN</option>
-</select>
-</form>
-
 <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#logoutModal" style="font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
 <i class="bi bi-box-arrow-right"></i> {% trans "Cerrar sesion" %}
 </button>
 
 {% endblock %}
+
+</div>
+
+</div>
+
+<div class="language-widget">
+
+<button class="language-toggle" type="button" id="panelLanguageToggle" aria-expanded="false" aria-controls="panelLanguageMenu">
+
+🌎
+
+<span class="language-current">
+{% if CURRENT_LANGUAGE == "es" %}
+ES
+{% else %}
+EN
+{% endif %}
+
+</span>
+
+</button>
+
+<div class="language-menu" id="panelLanguageMenu">
+
+<form action="{% url 'set_language' %}" method="post">
+
+{% csrf_token %}
+<input name="next" type="hidden" value="{{ request.get_full_path }}">
+
+<button name="language" value="es" class="language-option" type="submit">
+🇪🇸 Español
+</button>
+
+<button name="language" value="en" class="language-option" type="submit">
+🇺🇸 English
+</button>
+
+</form>
 
 </div>
 
@@ -226,6 +254,37 @@ document.addEventListener('DOMContentLoaded', function () {
   const toggleBtn = document.getElementById('sidebarToggleBtn');
   const sidebar = document.getElementById('panelSidebar');
   const backdrop = document.getElementById('sidebarBackdrop');
+  const languageToggle = document.getElementById('panelLanguageToggle');
+  const languageMenu = document.getElementById('panelLanguageMenu');
+
+  function closeLanguageMenu() {
+    if (!languageMenu || !languageToggle) {
+      return;
+    }
+
+    languageMenu.style.display = 'none';
+    languageToggle.setAttribute('aria-expanded', 'false');
+  }
+
+  if (languageToggle && languageMenu) {
+    languageToggle.addEventListener('click', function (event) {
+      event.stopPropagation();
+      const isOpen = languageMenu.style.display === 'flex';
+      languageMenu.style.display = isOpen ? 'none' : 'flex';
+      languageToggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+    });
+
+    languageMenu.addEventListener('click', function (event) {
+      event.stopPropagation();
+    });
+
+    document.addEventListener('click', closeLanguageMenu);
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        closeLanguageMenu();
+      }
+    });
+  }
 
   if (!toggleBtn || !sidebar || !backdrop) {
     return;

@@ -15,6 +15,7 @@ from django.utils.translation import gettext as _
 from django.db import transaction
 import mimetypes
 import os
+import re
 import urllib.request
 import logging
 
@@ -46,6 +47,7 @@ def _cloudinary_download_url_for_file(field_file):
     """Resuelve una URL usable de Cloudinary verificando el recurso real."""
     try:
         from cloudinary import api
+        from cloudinary.models import CLOUDINARY_FIELD_DB_RE
         from cloudinary.utils import private_download_url
     except Exception:
         return None, None
@@ -54,20 +56,58 @@ def _cloudinary_download_url_for_file(field_file):
     if not file_name:
         return None, None
 
-    public_id = file_name[6:] if file_name.startswith('media/') else file_name
-    base_public_id, ext = os.path.splitext(public_id)
-    ext = ext.lstrip('.').lower() or None
+    public_id_candidates = []
+
+    def add_public_id(candidate):
+        candidate = (candidate or '').strip().lstrip('/')
+        if candidate and candidate not in public_id_candidates:
+            public_id_candidates.append(candidate)
+
+    add_public_id(file_name)
+    if file_name.startswith('media/'):
+        add_public_id(file_name[6:])
+
+    match = re.match(CLOUDINARY_FIELD_DB_RE, file_name)
+    parsed_format = None
+    if match:
+        add_public_id(match.group('public_id'))
+        parsed_format = match.group('format')
+
+    expanded_ids = []
+    for public_id_candidate in public_id_candidates:
+        if public_id_candidate not in expanded_ids:
+            expanded_ids.append(public_id_candidate)
+        base_public_id, _ = os.path.splitext(public_id_candidate)
+        if base_public_id and base_public_id not in expanded_ids:
+            expanded_ids.append(base_public_id)
+
+    extension = os.path.splitext(file_name)[1].lstrip('.').lower() or parsed_format or None
 
     candidates = [
-        {'public_id': public_id, 'resource_type': 'raw', 'type': 'upload'},
-        {'public_id': public_id, 'resource_type': 'raw', 'type': 'authenticated'},
-        {'public_id': public_id, 'resource_type': 'raw', 'type': 'private'},
-        {'public_id': base_public_id, 'resource_type': 'raw', 'type': 'upload'},
-        {'public_id': base_public_id, 'resource_type': 'raw', 'type': 'authenticated'},
-        {'public_id': base_public_id, 'resource_type': 'raw', 'type': 'private'},
-        {'public_id': base_public_id, 'resource_type': 'image', 'type': 'upload'},
-        {'public_id': base_public_id, 'resource_type': 'image', 'type': 'authenticated'},
-        {'public_id': base_public_id, 'resource_type': 'image', 'type': 'private'},
+        *[
+            {'public_id': public_id_candidate, 'resource_type': 'image', 'type': 'upload'}
+            for public_id_candidate in expanded_ids
+        ],
+        *[
+            {'public_id': public_id_candidate, 'resource_type': 'image', 'type': 'authenticated'}
+            for public_id_candidate in expanded_ids
+        ],
+        *[
+            {'public_id': public_id_candidate, 'resource_type': 'image', 'type': 'private'}
+            for public_id_candidate in expanded_ids
+        ],
+        *[
+            {'public_id': public_id_candidate, 'resource_type': 'raw', 'type': 'upload'}
+            for public_id_candidate in expanded_ids
+        ],
+        *[
+            {'public_id': public_id_candidate, 'resource_type': 'raw', 'type': 'authenticated'}
+            for public_id_candidate in expanded_ids
+        ],
+        *[
+            {'public_id': public_id_candidate, 'resource_type': 'raw', 'type': 'private'}
+            for public_id_candidate in expanded_ids
+        ],
     ]
 
     seen = set()
@@ -89,7 +129,7 @@ def _cloudinary_download_url_for_file(field_file):
         resource_public_id = resource.get('public_id') or option['public_id']
         resource_type = resource.get('resource_type') or option['resource_type']
         delivery_type = resource.get('type') or option['type']
-        resource_format = resource.get('format') or ext
+        resource_format = resource.get('format') or extension
 
         resolved_name = os.path.basename(resource_public_id)
         if resource_format and not os.path.splitext(resolved_name)[1]:

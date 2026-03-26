@@ -164,16 +164,52 @@ width:100%;
     -webkit-touch-callout: none;
 }
 
+
 .language-menu {
     position: absolute;
     bottom: 60px;
     left: 0;
     background: white;
     border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, .2);
+    box-shadow: 0 10px 30px rgba(0,0,0,.2);
     overflow: hidden;
     display: none;
     flex-direction: column;
+}
+
+@media (max-width: 576px) {
+    .language-menu {
+        bottom: 55px;
+        left: -60px;
+    }
+}
+
+/* OPCIONES MENU */
+.language-option {
+    border: none;
+    background: white;
+    padding: 10px 16px;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    width: 160px;
+    transition: .2s;
+}
+
+.language-option:hover {
+    background: #f3f4f6;
+}
+
+@media (max-width: 576px) {
+    .language-option {
+        width: 140px;
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+}
+
+.language-option:hover{
+    background:#f3f4f6;
 }
 
 .language-option {

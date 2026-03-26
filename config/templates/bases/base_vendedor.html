@@ -165,28 +165,17 @@ La Tortilla Grocery
 
 <div class="language-widget">
 
-
 <button class="language-toggle" onclick="toggleLanguageMenu()" type="button" aria-expanded="false" aria-controls="languageMenu" title="{% if CURRENT_LANGUAGE == 'es' %}Español{% else %}English{% endif %}">
-  🌎
+  🌎 <span style="margin-left:8px;font-weight:700;letter-spacing:1px;">{% if CURRENT_LANGUAGE == 'es' %}ES{% else %}EN{% endif %}</span>
 </button>
 
 <div class="language-menu" id="languageMenu">
-
-<form action="{% url 'set_language' %}" method="post">
-
-{% csrf_token %}
-<input name="next" type="hidden" value="{{ request.path }}">
-
-<button name="language" value="es" class="language-option" type="submit">
-🇪🇸 Español
-</button>
-
-<button name="language" value="en" class="language-option" type="submit">
-🇺🇸 English
-</button>
-
-</form>
-
+  <form action="{% url 'set_language' %}" method="post">
+    {% csrf_token %}
+    <input name="next" type="hidden" value="{{ request.path }}">
+    <button name="language" value="es" class="language-option" type="submit">🇪🇸 Español</button>
+    <button name="language" value="en" class="language-option" type="submit">🇺🇸 English</button>
+  </form>
 </div>
 
 </div>

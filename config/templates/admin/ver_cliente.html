@@ -61,7 +61,7 @@ Detalle Cliente
 <h5 class="mb-3">Certificado de Impuesto</h5>
 
 {% if cliente.certificado_tax %}
-<a href="{{ cliente.certificado_tax.url }}" target="_blank" class="btn btn-info">
+<a href="{% url 'ver_certificado_cliente' cliente.id %}" target="_blank" class="btn btn-info">
 Ver certificado
 </a>
 {% else %}

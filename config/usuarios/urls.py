@@ -1,6 +1,6 @@
 from django.urls import path
 from django.contrib.auth.views import LogoutView
-from .views import login_view, registro_view, panel_admin, clientes_pendientes, aprobar_cliente, ver_cliente, rechazar_cliente, lista_vendedores, crear_vendedor, editar_vendedor, desactivar_vendedor, activar_vendedor, login_form_modal, registro_form_modal, verificar_username, logout_view, contenido_home, lista_testimonios, crear_testimonio, editar_testimonio, desactivar_testimonio, activar_testimonio, editar_home_contenido
+from .views import login_view, registro_view, panel_admin, clientes_pendientes, aprobar_cliente, ver_cliente, ver_certificado_cliente, rechazar_cliente, lista_vendedores, crear_vendedor, editar_vendedor, desactivar_vendedor, activar_vendedor, login_form_modal, registro_form_modal, verificar_username, logout_view, contenido_home, lista_testimonios, crear_testimonio, editar_testimonio, desactivar_testimonio, activar_testimonio, editar_home_contenido
 
 urlpatterns = [
     path('login/', login_view, name='login'),
@@ -14,6 +14,7 @@ urlpatterns = [
     path('panel-admin/aprobar-cliente/<int:cliente_id>/', aprobar_cliente, name='aprobar_cliente'),
     path('panel-admin/rechazar-cliente/<int:cliente_id>/', rechazar_cliente, name='rechazar_cliente'),
     path('panel-admin/ver-cliente/<int:cliente_id>/', ver_cliente, name='ver_cliente'),
+    path('panel-admin/ver-certificado/<int:cliente_id>/', ver_certificado_cliente, name='ver_certificado_cliente'),
 
     path('panel-admin/vendedores/', lista_vendedores, name='lista_vendedores'),
     path('panel-admin/crear-vendedor/', crear_vendedor, name='crear_vendedor'),

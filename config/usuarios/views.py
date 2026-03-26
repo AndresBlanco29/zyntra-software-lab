@@ -9,10 +9,12 @@ from config.core.models import Testimonio, HomeContenido
 from config.productos.models import Producto, Marca
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.hashers import make_password
-from django.http import JsonResponse
+from django.http import JsonResponse, FileResponse, Http404
 from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.db import transaction
+import mimetypes
+import os
 import logging
 
 logger = logging.getLogger(__name__)
@@ -445,6 +447,32 @@ def ver_cliente(request, cliente_id):
     }
 
     return render(request, 'admin/ver_cliente.html', context)
+
+
+@login_required
+def ver_certificado_cliente(request, cliente_id):
+
+    if not _is_admin_user(request.user):
+        return redirect('login')
+
+    cliente = get_object_or_404(Cliente, id=cliente_id)
+
+    if not cliente.certificado_tax:
+        raise Http404("No hay certificado para este cliente")
+
+    try:
+        certificado = cliente.certificado_tax
+        certificado.open('rb')
+    except Exception as exc:
+        logger.exception("No se pudo abrir certificado del cliente %s: %s", cliente.id, exc)
+        raise Http404("No se pudo abrir el certificado")
+
+    nombre_archivo = os.path.basename(certificado.name) or f"certificado_{cliente.id}"
+    content_type, _ = mimetypes.guess_type(nombre_archivo)
+
+    response = FileResponse(certificado, content_type=content_type or 'application/octet-stream')
+    response['Content-Disposition'] = f'inline; filename="{nombre_archivo}"'
+    return response
 
 #funcion del login
 def login_view(request):

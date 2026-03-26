@@ -52,8 +52,29 @@ def _get_or_create_home_contenido():
         if instance is None:
             instance = HomeContenido(activo=True)
 
-        for field_name in ('quienes_titulo', 'quienes_titulo_en', 'quienes_descripcion', 'quienes_descripcion_en'):
-            if field_name not in instance.__dict__:
+        deferred_fields = set()
+        if getattr(instance, 'pk', None):
+            try:
+                deferred_fields = instance.get_deferred_fields()
+            except Exception:
+                deferred_fields = set()
+
+        for field_name in (
+            'quienes_titulo', 'quienes_titulo_en', 'quienes_descripcion', 'quienes_descripcion_en',
+            'beneficio_1_titulo', 'beneficio_1_titulo_en', 'beneficio_1_subtitulo', 'beneficio_1_subtitulo_en',
+            'beneficio_2_titulo', 'beneficio_2_titulo_en', 'beneficio_2_subtitulo', 'beneficio_2_subtitulo_en',
+            'beneficio_3_titulo', 'beneficio_3_titulo_en', 'beneficio_3_subtitulo', 'beneficio_3_subtitulo_en',
+            'beneficio_4_titulo', 'beneficio_4_titulo_en', 'beneficio_4_subtitulo', 'beneficio_4_subtitulo_en',
+            'estadistica_1_valor', 'estadistica_1_valor_en', 'estadistica_1_label', 'estadistica_1_label_en',
+            'estadistica_2_valor', 'estadistica_2_valor_en', 'estadistica_2_label', 'estadistica_2_label_en',
+            'estadistica_3_valor', 'estadistica_3_valor_en', 'estadistica_3_label', 'estadistica_3_label_en',
+        ):
+            current_value = instance.__dict__.get(field_name)
+            if (
+                field_name in deferred_fields
+                or field_name not in instance.__dict__
+                or current_value == field_name
+            ):
                 default_value = HomeContenido._meta.get_field(field_name).get_default()
                 setattr(instance, field_name, default_value)
 
@@ -517,6 +538,41 @@ def editar_home_contenido(request):
         contenido.quienes_descripcion = (request.POST.get('quienes_descripcion') or '').strip() or contenido.quienes_descripcion
         contenido.quienes_descripcion_en = (request.POST.get('quienes_descripcion_en') or '').strip()
 
+        contenido.beneficio_1_titulo = (request.POST.get('beneficio_1_titulo') or '').strip() or contenido.beneficio_1_titulo
+        contenido.beneficio_1_titulo_en = (request.POST.get('beneficio_1_titulo_en') or '').strip()
+        contenido.beneficio_1_subtitulo = (request.POST.get('beneficio_1_subtitulo') or '').strip() or contenido.beneficio_1_subtitulo
+        contenido.beneficio_1_subtitulo_en = (request.POST.get('beneficio_1_subtitulo_en') or '').strip()
+
+        contenido.beneficio_2_titulo = (request.POST.get('beneficio_2_titulo') or '').strip() or contenido.beneficio_2_titulo
+        contenido.beneficio_2_titulo_en = (request.POST.get('beneficio_2_titulo_en') or '').strip()
+        contenido.beneficio_2_subtitulo = (request.POST.get('beneficio_2_subtitulo') or '').strip() or contenido.beneficio_2_subtitulo
+        contenido.beneficio_2_subtitulo_en = (request.POST.get('beneficio_2_subtitulo_en') or '').strip()
+
+        contenido.beneficio_3_titulo = (request.POST.get('beneficio_3_titulo') or '').strip() or contenido.beneficio_3_titulo
+        contenido.beneficio_3_titulo_en = (request.POST.get('beneficio_3_titulo_en') or '').strip()
+        contenido.beneficio_3_subtitulo = (request.POST.get('beneficio_3_subtitulo') or '').strip() or contenido.beneficio_3_subtitulo
+        contenido.beneficio_3_subtitulo_en = (request.POST.get('beneficio_3_subtitulo_en') or '').strip()
+
+        contenido.beneficio_4_titulo = (request.POST.get('beneficio_4_titulo') or '').strip() or contenido.beneficio_4_titulo
+        contenido.beneficio_4_titulo_en = (request.POST.get('beneficio_4_titulo_en') or '').strip()
+        contenido.beneficio_4_subtitulo = (request.POST.get('beneficio_4_subtitulo') or '').strip() or contenido.beneficio_4_subtitulo
+        contenido.beneficio_4_subtitulo_en = (request.POST.get('beneficio_4_subtitulo_en') or '').strip()
+
+        contenido.estadistica_1_valor = (request.POST.get('estadistica_1_valor') or '').strip() or contenido.estadistica_1_valor
+        contenido.estadistica_1_valor_en = (request.POST.get('estadistica_1_valor_en') or '').strip()
+        contenido.estadistica_1_label = (request.POST.get('estadistica_1_label') or '').strip() or contenido.estadistica_1_label
+        contenido.estadistica_1_label_en = (request.POST.get('estadistica_1_label_en') or '').strip()
+
+        contenido.estadistica_2_valor = (request.POST.get('estadistica_2_valor') or '').strip() or contenido.estadistica_2_valor
+        contenido.estadistica_2_valor_en = (request.POST.get('estadistica_2_valor_en') or '').strip()
+        contenido.estadistica_2_label = (request.POST.get('estadistica_2_label') or '').strip() or contenido.estadistica_2_label
+        contenido.estadistica_2_label_en = (request.POST.get('estadistica_2_label_en') or '').strip()
+
+        contenido.estadistica_3_valor = (request.POST.get('estadistica_3_valor') or '').strip() or contenido.estadistica_3_valor
+        contenido.estadistica_3_valor_en = (request.POST.get('estadistica_3_valor_en') or '').strip()
+        contenido.estadistica_3_label = (request.POST.get('estadistica_3_label') or '').strip() or contenido.estadistica_3_label
+        contenido.estadistica_3_label_en = (request.POST.get('estadistica_3_label_en') or '').strip()
+
         contenido.activo = True if request.POST.get('activo') else False
 
         try:
@@ -549,7 +605,7 @@ def editar_home_contenido(request):
                     contenido.save(update_fields=legacy_update_fields)
                     messages.warning(
                         request,
-                        'La base de datos aun no tiene los campos de Quienes somos. El resto del contenido se guardo, pero esa seccion no podra guardarse hasta que Railway aplique la migracion.'
+                        'La base de datos aun no tiene todos los campos nuevos del home. El resto del contenido se guardo, pero las secciones nuevas no podran guardarse hasta que Railway aplique la migracion.'
                     )
                     migration_pending_warning = True
                 else:
@@ -557,7 +613,7 @@ def editar_home_contenido(request):
 
         cache.delete('home:contenido')
         if not migration_pending_warning:
-            messages.success(request, 'Banners y textos del home actualizados correctamente')
+            messages.success(request, 'Contenido del home actualizado correctamente')
         return redirect('contenido_home')
 
     return render(request, 'admin/editar_home_contenido.html', {

@@ -110,6 +110,41 @@ class HomeContenido(models.Model):
     )
     quienes_descripcion_en = models.TextField(blank=True, null=True)
 
+    beneficio_1_titulo = models.CharField(max_length=120, default="Abastecimiento Inteligente")
+    beneficio_1_titulo_en = models.CharField(max_length=120, blank=True, null=True)
+    beneficio_1_subtitulo = models.CharField(max_length=160, default="Productos siempre disponibles")
+    beneficio_1_subtitulo_en = models.CharField(max_length=160, blank=True, null=True)
+
+    beneficio_2_titulo = models.CharField(max_length=120, default="Logica Eficiente")
+    beneficio_2_titulo_en = models.CharField(max_length=120, blank=True, null=True)
+    beneficio_2_subtitulo = models.CharField(max_length=160, default="Entrega rapida y segura")
+    beneficio_2_subtitulo_en = models.CharField(max_length=160, blank=True, null=True)
+
+    beneficio_3_titulo = models.CharField(max_length=120, default="Relacion a Largo Plazo")
+    beneficio_3_titulo_en = models.CharField(max_length=120, blank=True, null=True)
+    beneficio_3_subtitulo = models.CharField(max_length=160, default="Compromiso y confianza")
+    beneficio_3_subtitulo_en = models.CharField(max_length=160, blank=True, null=True)
+
+    beneficio_4_titulo = models.CharField(max_length=120, default="Crecimiento Sostenible")
+    beneficio_4_titulo_en = models.CharField(max_length=120, blank=True, null=True)
+    beneficio_4_subtitulo = models.CharField(max_length=160, default="Apoyo para tu expansion")
+    beneficio_4_subtitulo_en = models.CharField(max_length=160, blank=True, null=True)
+
+    estadistica_1_valor = models.CharField(max_length=60, default="+100")
+    estadistica_1_valor_en = models.CharField(max_length=60, blank=True, null=True)
+    estadistica_1_label = models.CharField(max_length=120, default="Negocios Abastecidos")
+    estadistica_1_label_en = models.CharField(max_length=120, blank=True, null=True)
+
+    estadistica_2_valor = models.CharField(max_length=60, default="98%")
+    estadistica_2_valor_en = models.CharField(max_length=60, blank=True, null=True)
+    estadistica_2_label = models.CharField(max_length=120, default="Pedidos Exitosos")
+    estadistica_2_label_en = models.CharField(max_length=120, blank=True, null=True)
+
+    estadistica_3_valor = models.CharField(max_length=60, default="+5 Anos")
+    estadistica_3_valor_en = models.CharField(max_length=60, blank=True, null=True)
+    estadistica_3_label = models.CharField(max_length=120, default="De Experiencia")
+    estadistica_3_label_en = models.CharField(max_length=120, blank=True, null=True)
+
     activo = models.BooleanField(default=True)
     actualizado = models.DateTimeField(auto_now=True)
 
@@ -161,6 +196,62 @@ class HomeContenido(models.Model):
     def quienes_descripcion_traducido(self):
         return self._translated(self.quienes_descripcion, self.quienes_descripcion_en)
 
+    @property
+    def beneficio_1_titulo_traducido(self):
+        return self._translated(self.beneficio_1_titulo, self.beneficio_1_titulo_en)
+
+    @property
+    def beneficio_1_subtitulo_traducido(self):
+        return self._translated(self.beneficio_1_subtitulo, self.beneficio_1_subtitulo_en)
+
+    @property
+    def beneficio_2_titulo_traducido(self):
+        return self._translated(self.beneficio_2_titulo, self.beneficio_2_titulo_en)
+
+    @property
+    def beneficio_2_subtitulo_traducido(self):
+        return self._translated(self.beneficio_2_subtitulo, self.beneficio_2_subtitulo_en)
+
+    @property
+    def beneficio_3_titulo_traducido(self):
+        return self._translated(self.beneficio_3_titulo, self.beneficio_3_titulo_en)
+
+    @property
+    def beneficio_3_subtitulo_traducido(self):
+        return self._translated(self.beneficio_3_subtitulo, self.beneficio_3_subtitulo_en)
+
+    @property
+    def beneficio_4_titulo_traducido(self):
+        return self._translated(self.beneficio_4_titulo, self.beneficio_4_titulo_en)
+
+    @property
+    def beneficio_4_subtitulo_traducido(self):
+        return self._translated(self.beneficio_4_subtitulo, self.beneficio_4_subtitulo_en)
+
+    @property
+    def estadistica_1_valor_traducido(self):
+        return self._translated(self.estadistica_1_valor, self.estadistica_1_valor_en)
+
+    @property
+    def estadistica_1_label_traducido(self):
+        return self._translated(self.estadistica_1_label, self.estadistica_1_label_en)
+
+    @property
+    def estadistica_2_valor_traducido(self):
+        return self._translated(self.estadistica_2_valor, self.estadistica_2_valor_en)
+
+    @property
+    def estadistica_2_label_traducido(self):
+        return self._translated(self.estadistica_2_label, self.estadistica_2_label_en)
+
+    @property
+    def estadistica_3_valor_traducido(self):
+        return self._translated(self.estadistica_3_valor, self.estadistica_3_valor_en)
+
+    @property
+    def estadistica_3_label_traducido(self):
+        return self._translated(self.estadistica_3_label, self.estadistica_3_label_en)
+
     def __str__(self):
         return f"Home contenido ({'activo' if self.activo else 'inactivo'})"
 
@@ -172,6 +263,34 @@ def ensure_homecontenido_quienes_schema():
         'quienes_titulo_en',
         'quienes_descripcion',
         'quienes_descripcion_en',
+        'beneficio_1_titulo',
+        'beneficio_1_titulo_en',
+        'beneficio_1_subtitulo',
+        'beneficio_1_subtitulo_en',
+        'beneficio_2_titulo',
+        'beneficio_2_titulo_en',
+        'beneficio_2_subtitulo',
+        'beneficio_2_subtitulo_en',
+        'beneficio_3_titulo',
+        'beneficio_3_titulo_en',
+        'beneficio_3_subtitulo',
+        'beneficio_3_subtitulo_en',
+        'beneficio_4_titulo',
+        'beneficio_4_titulo_en',
+        'beneficio_4_subtitulo',
+        'beneficio_4_subtitulo_en',
+        'estadistica_1_valor',
+        'estadistica_1_valor_en',
+        'estadistica_1_label',
+        'estadistica_1_label_en',
+        'estadistica_2_valor',
+        'estadistica_2_valor_en',
+        'estadistica_2_label',
+        'estadistica_2_label_en',
+        'estadistica_3_valor',
+        'estadistica_3_valor_en',
+        'estadistica_3_label',
+        'estadistica_3_label_en',
     )
 
     def get_existing_columns():

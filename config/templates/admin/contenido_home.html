@@ -68,6 +68,17 @@ Contenido Home
           <div class="fw-semibold mt-3">Quienes somos:</div>
           <div>{{ home_contenido.quienes_titulo }}</div>
           <div class="mt-1">{{ home_contenido.quienes_descripcion|truncatewords:30 }}</div>
+
+          <div class="fw-semibold mt-3">Tarjeticas:</div>
+          <div>1. {{ home_contenido.beneficio_1_titulo }} - {{ home_contenido.beneficio_1_subtitulo }}</div>
+          <div>2. {{ home_contenido.beneficio_2_titulo }} - {{ home_contenido.beneficio_2_subtitulo }}</div>
+          <div>3. {{ home_contenido.beneficio_3_titulo }} - {{ home_contenido.beneficio_3_subtitulo }}</div>
+          <div>4. {{ home_contenido.beneficio_4_titulo }} - {{ home_contenido.beneficio_4_subtitulo }}</div>
+
+          <div class="fw-semibold mt-3">Estadisticas:</div>
+          <div>{{ home_contenido.estadistica_1_valor }} - {{ home_contenido.estadistica_1_label }}</div>
+          <div>{{ home_contenido.estadistica_2_valor }} - {{ home_contenido.estadistica_2_label }}</div>
+          <div>{{ home_contenido.estadistica_3_valor }} - {{ home_contenido.estadistica_3_label }}</div>
         </div>
       </div>
     </div>

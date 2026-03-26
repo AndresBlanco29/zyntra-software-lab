@@ -211,8 +211,8 @@ en un mercado competitivo.
 
 <div>
 
-<h6>{% trans "Abastecimiento Inteligente" %}</h6>
-<small>{% trans "Productos siempre disponibles" %}</small>
+<h6>{% if home_contenido %}{{ home_contenido.beneficio_1_titulo_traducido }}{% else %}{% trans "Abastecimiento Inteligente" %}{% endif %}</h6>
+<small>{% if home_contenido %}{{ home_contenido.beneficio_1_subtitulo_traducido }}{% else %}{% trans "Productos siempre disponibles" %}{% endif %}</small>
 
 </div>
 
@@ -231,8 +231,8 @@ en un mercado competitivo.
 
 <div>
 
-<h6>{% trans "Lógica Eficiente" %}</h6>
-<small>{% trans "Entrega rápida y segura" %}</small>
+<h6>{% if home_contenido %}{{ home_contenido.beneficio_2_titulo_traducido }}{% else %}{% trans "Lógica Eficiente" %}{% endif %}</h6>
+<small>{% if home_contenido %}{{ home_contenido.beneficio_2_subtitulo_traducido }}{% else %}{% trans "Entrega rápida y segura" %}{% endif %}</small>
 
 </div>
 
@@ -251,8 +251,8 @@ en un mercado competitivo.
 
 <div>
 
-<h6>{% trans "Relación a Largo Plazo" %}</h6>
-<small>{% trans "Compromiso y confianza" %}</small>
+<h6>{% if home_contenido %}{{ home_contenido.beneficio_3_titulo_traducido }}{% else %}{% trans "Relación a Largo Plazo" %}{% endif %}</h6>
+<small>{% if home_contenido %}{{ home_contenido.beneficio_3_subtitulo_traducido }}{% else %}{% trans "Compromiso y confianza" %}{% endif %}</small>
 
 </div>
 
@@ -271,8 +271,8 @@ en un mercado competitivo.
 
 <div>
 
-<h6>{% trans "Crecimiento Sostenible" %}</h6>
-<small>{% trans "Apoyo para tu expansión" %}</small>
+<h6>{% if home_contenido %}{{ home_contenido.beneficio_4_titulo_traducido }}{% else %}{% trans "Crecimiento Sostenible" %}{% endif %}</h6>
+<small>{% if home_contenido %}{{ home_contenido.beneficio_4_subtitulo_traducido }}{% else %}{% trans "Apoyo para tu expansión" %}{% endif %}</small>
 
 </div>
 
@@ -298,22 +298,22 @@ en un mercado competitivo.
 
 <div class="col-md-4 stat-item">
 
-<h2 class="h2">+100</h2>
-<p>{% trans "Negocios Abastecidos" %}</p>
+<h2 class="h2">{% if home_contenido %}{{ home_contenido.estadistica_1_valor_traducido }}{% else %}+100{% endif %}</h2>
+<p>{% if home_contenido %}{{ home_contenido.estadistica_1_label_traducido }}{% else %}{% trans "Negocios Abastecidos" %}{% endif %}</p>
 
 </div>
 
 <div class="col-md-4 stat-item">
 
-<h2 class="h2">98%</h2>
-<p>{% trans "Pedidos Exitosos" %}</p>
+<h2 class="h2">{% if home_contenido %}{{ home_contenido.estadistica_2_valor_traducido }}{% else %}98%{% endif %}</h2>
+<p>{% if home_contenido %}{{ home_contenido.estadistica_2_label_traducido }}{% else %}{% trans "Pedidos Exitosos" %}{% endif %}</p>
 
 </div>
 
 <div class="col-md-4 stat-item">
 
-<h2 class="h2">+5 Años</h2>
-<p>{% trans "De Experiencia" %}</p>
+<h2 class="h2">{% if home_contenido %}{{ home_contenido.estadistica_3_valor_traducido }}{% else %}+5 Años{% endif %}</h2>
+<p>{% if home_contenido %}{{ home_contenido.estadistica_3_label_traducido }}{% else %}{% trans "De Experiencia" %}{% endif %}</p>
 
 </div>
 

@@ -223,18 +223,21 @@ La Tortilla Grocery
 {% endif %}
 
 <script>
+
 function toggleLanguageMenu() {
   const menu = document.getElementById('languageMenu');
   const toggle = document.querySelector('.language-toggle');
-
-  if (!menu || !toggle) {
-    return;
-  }
-
+  if (!menu || !toggle) return;
   const isOpen = menu.style.display === 'flex';
-  menu.style.display = isOpen ? 'none' : 'flex';
-  toggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+  if (isOpen) {
+    menu.style.display = 'none';
+    toggle.setAttribute('aria-expanded', 'false');
+  } else {
+    menu.style.display = 'flex';
+    toggle.setAttribute('aria-expanded', 'true');
+  }
 }
+
 
 document.addEventListener('DOMContentLoaded', function () {
   const feedbackTranslations = {
@@ -250,11 +253,9 @@ document.addEventListener('DOMContentLoaded', function () {
   const languageToggle = document.querySelector('.language-toggle');
   const languageMenu = document.getElementById('languageMenu');
 
+  // --- SOLO PARA EL SELECTOR DE VENDEDOR ---
   function closeLanguageMenu() {
-    if (!languageMenu || !languageToggle) {
-      return;
-    }
-
+    if (!languageMenu || !languageToggle) return;
     languageMenu.style.display = 'none';
     languageToggle.setAttribute('aria-expanded', 'false');
   }
@@ -262,13 +263,17 @@ document.addEventListener('DOMContentLoaded', function () {
   if (languageToggle && languageMenu) {
     languageToggle.addEventListener('click', function (event) {
       event.stopPropagation();
+      toggleLanguageMenu();
     });
 
     languageMenu.addEventListener('click', function (event) {
       event.stopPropagation();
     });
 
-    document.addEventListener('click', closeLanguageMenu);
+    document.addEventListener('click', function () {
+      closeLanguageMenu();
+    });
+
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape') {
         closeLanguageMenu();

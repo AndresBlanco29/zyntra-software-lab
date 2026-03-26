@@ -777,6 +777,17 @@ def ver_certificado_cliente(request, cliente_id):
     if not cliente.certificado_tax:
         raise Http404("No hay certificado para este cliente")
 
+    if request.GET.get('contenido') != '1':
+        nombre_archivo = os.path.basename(cliente.certificado_tax.name) or f"certificado_{cliente.id}"
+        extension = os.path.splitext(nombre_archivo)[1].lower()
+        context = {
+            'cliente': cliente,
+            'nombre_archivo': nombre_archivo,
+            'certificado_src': f"{request.path}?contenido=1",
+            'es_pdf': extension == '.pdf',
+        }
+        return render(request, 'admin/ver_certificado.html', context)
+
     certificado = cliente.certificado_tax
     nombre_archivo = os.path.basename(certificado.name) or f"certificado_{cliente.id}"
     diagnostico = [

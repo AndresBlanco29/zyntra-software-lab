@@ -65,14 +65,17 @@ document.addEventListener('DOMContentLoaded', function() {
             let cantidad = card.querySelector(".cantidad").textContent;
             let precio = card.querySelector(".precio-select").value;
 
-            // VALIDACIÓN: Si no hay precio seleccionado, mostrar modal y detener
-            if (!precio || precio === "") {
+            console.log("DEBUG - Intento agregar:", { precio, presentacion_id, cantidad });
+
+            // VALIDACIÓN: Si no hay precio seleccionado, mostrar modal y DETENER
+            if (!precio || precio === "" || precio === null) {
+                console.log("DEBUG - Precio vacío, mostrando modal");
                 const modalPrecio = new bootstrap.Modal(document.getElementById('modalPrecioRequerido'));
                 modalPrecio.show();
-                return; // IMPORTANTE: no continuar
+                return; // DETIENE COMPLETAMENTE
             }
 
-            console.log("Precio enviado:", precio);
+            console.log("DEBUG - Precio válido, enviando fetch...");
 
             fetch(agregarUrl, {
                 method: "POST",
@@ -83,24 +86,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: `producto_id=${producto_id}&presentacion_id=${presentacion_id}&cantidad=${cantidad}&precio=${precio}`
             })
             .then(response => {
-                // Si el servidor rechaza (400, 500, etc), mostrar modal y NO continuar
+                console.log("DEBUG - Respuesta del servidor:", response.status);
+                
                 if (!response.ok) {
+                    console.log("DEBUG - Error 400, mostrando modal");
                     const modalPrecio = new bootstrap.Modal(document.getElementById('modalPrecioRequerido'));
                     modalPrecio.show();
-                    throw new Error("Error del servidor: " + response.status);
+                    return Promise.reject("Error: " + response.status);
                 }
                 return response.json();
             })
             .then(data => {
+                console.log("DEBUG - Datos recibidos:", data);
+                
                 if (data.success) {
+                    console.log("DEBUG - Actualizar UI");
                     document.getElementById("contadorPedido").textContent = data.total_items;
+                    document.getElementById("pedidoCantidad").textContent = data.total_items;
 
                     btn.textContent = "Añadido ✔";
                     setTimeout(() => {
                         btn.textContent = "Agregar al Pedido";
                     }, 1200);
-                    
-                    document.getElementById("pedidoCantidad").textContent = data.total_items;
 
                     animarNumero(
                         document.getElementById("pedidoTotal"),
@@ -111,26 +118,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     barra.style.transform = "scale(1.03)";
                     setTimeout(()=>{
                         barra.style.transform = "scale(1)";
-                    },200);
+                    }, 200);
+                } else {
+                    console.log("DEBUG - success=false, no actualizar");
                 }
             })
             .catch(error => {
-                console.error("Error al agregar producto:", error);
-                // El modal ya se mostró en el .then()
+                console.error("DEBUG - Error capturado:", error);
+                // El modal ya se mostró en el then anterior
             });
 
             function animarNumero(elemento, nuevoValor){
-
                 let inicio = parseFloat(elemento.textContent) || 0;
                 let fin = parseFloat(nuevoValor);
 
+                console.log("DEBUG - Animando de", inicio, "a", fin);
+
                 let duracion = 300;
                 let paso = (fin - inicio) / (duracion / 16);
-
                 let contador = inicio;
 
                 let intervalo = setInterval(()=>{
-
                     contador += paso;
 
                     if((paso > 0 && contador >= fin) || (paso < 0 && contador <= fin)){
@@ -139,9 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
 
                     elemento.textContent = contador.toFixed(2);
-
-                },16);
-
+                }, 16);
             }
 
         });

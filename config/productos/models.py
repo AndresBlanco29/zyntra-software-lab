@@ -1,5 +1,58 @@
+import unicodedata
+
 from django.db import models
 from django.utils.translation import get_language
+
+
+def _normalize_translation_term(value):
+    normalized = unicodedata.normalize("NFKD", (value or "").strip().lower())
+    return "".join(char for char in normalized if not unicodedata.combining(char))
+
+
+PRESENTACION_TERM_TRANSLATIONS = {
+    "unidad": {"es": "unidad", "en": "unit"},
+    "unidades": {"es": "unidades", "en": "units"},
+    "unit": {"es": "unidad", "en": "unit"},
+    "units": {"es": "unidades", "en": "units"},
+    "caja": {"es": "caja", "en": "box"},
+    "cajas": {"es": "cajas", "en": "boxes"},
+    "box": {"es": "caja", "en": "box"},
+    "boxes": {"es": "cajas", "en": "boxes"},
+    "paquete": {"es": "paquete", "en": "package"},
+    "paquetes": {"es": "paquetes", "en": "packages"},
+    "package": {"es": "paquete", "en": "package"},
+    "packages": {"es": "paquetes", "en": "packages"},
+    "pack": {"es": "pack", "en": "pack"},
+    "packs": {"es": "packs", "en": "packs"},
+    "bolsa": {"es": "bolsa", "en": "bag"},
+    "bolsas": {"es": "bolsas", "en": "bags"},
+    "bag": {"es": "bolsa", "en": "bag"},
+    "bags": {"es": "bolsas", "en": "bags"},
+    "botella": {"es": "botella", "en": "bottle"},
+    "botellas": {"es": "botellas", "en": "bottles"},
+    "bottle": {"es": "botella", "en": "bottle"},
+    "bottles": {"es": "botellas", "en": "bottles"},
+    "lata": {"es": "lata", "en": "can"},
+    "latas": {"es": "latas", "en": "cans"},
+    "can": {"es": "lata", "en": "can"},
+    "cans": {"es": "latas", "en": "cans"},
+    "pallet": {"es": "pallet", "en": "pallet"},
+    "pallets": {"es": "pallets", "en": "pallets"},
+}
+
+
+def _translate_presentacion_term(value, target_language):
+    translation = PRESENTACION_TERM_TRANSLATIONS.get(_normalize_translation_term(value))
+    if translation:
+        return translation[target_language]
+    return value
+
+
+def _resolve_presentacion_translation(primary_value, secondary_value, target_language):
+    for candidate in ((secondary_value, primary_value) if target_language == "en" else (primary_value, secondary_value)):
+        if candidate:
+            return _translate_presentacion_term(candidate, target_language)
+    return ""
 
 class Categoria(models.Model):
 
@@ -119,12 +172,10 @@ class Presentacion(models.Model):
 
     @property
     def tipo_contenido_traducido(self):
-        if get_language().startswith("en") and self.tipo_contenido_en:
-            return self.tipo_contenido_en
-        return self.tipo_contenido
+        target_language = "en" if get_language().startswith("en") else "es"
+        return _resolve_presentacion_translation(self.tipo_contenido, self.tipo_contenido_en, target_language)
 
     @property
     def nombre_traducido(self):
-        if get_language().startswith("en") and self.nombre_en:
-            return self.nombre_en
-        return self.nombre
+        target_language = "en" if get_language().startswith("en") else "es"
+        return _resolve_presentacion_translation(self.nombre, self.nombre_en, target_language)

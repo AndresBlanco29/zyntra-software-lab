@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.http import HttpResponsePermanentRedirect
+from django.contrib.auth.views import redirect_to_login
 
 
 class WwwRedirectMiddleware:
@@ -34,3 +35,60 @@ class NoCacheMiddleware:
         response["Pragma"] = "no-cache"
         response["Expires"] = "0"
         return response
+
+
+class ProtectedAreaLoginMiddleware:
+    """Exige autenticación para zonas privadas por prefijo de URL."""
+
+    # Rutas que siempre deben ser públicas.
+    PUBLIC_PATH_PREFIXES = (
+        "/static/",
+        "/media/",
+        "/login/",
+        "/login-modal/",
+        "/registro/",
+        "/registro-modal/",
+        "/verificar-username/",
+        "/logout/",
+        "/i18n/",
+        "/health/",
+    )
+
+    PUBLIC_EXACT_PATHS = {
+        "/",
+        "/catalogo/",
+        "/sitemap.xml",
+        "/clientes/registro/",
+    }
+
+    # Zonas privadas que requieren usuario autenticado.
+    PROTECTED_PATH_PREFIXES = (
+        "/panel-admin/",
+        "/vendedores/",
+        "/productos/",
+    )
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        path = request.path
+
+        if self._is_public_path(path):
+            return self.get_response(request)
+
+        if self._is_protected_path(path) and not request.user.is_authenticated:
+            return redirect_to_login(
+                request.get_full_path(),
+                login_url=getattr(settings, "LOGIN_URL", "/login/"),
+            )
+
+        return self.get_response(request)
+
+    def _is_public_path(self, path):
+        return path in self.PUBLIC_EXACT_PATHS or any(
+            path.startswith(prefix) for prefix in self.PUBLIC_PATH_PREFIXES
+        )
+
+    def _is_protected_path(self, path):
+        return any(path.startswith(prefix) for prefix in self.PROTECTED_PATH_PREFIXES)

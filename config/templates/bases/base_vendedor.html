@@ -163,21 +163,20 @@ La Tortilla Grocery
 
 </div>
 
+
 <div class="language-widget">
-
-<button class="language-toggle" onclick="toggleLanguageMenu()" type="button" aria-expanded="false" aria-controls="languageMenu" title="{% if CURRENT_LANGUAGE == 'es' %}Español{% else %}English{% endif %}">
-  🌎 <span style="margin-left:8px;font-weight:700;letter-spacing:1px;">{% if CURRENT_LANGUAGE == 'es' %}ES{% else %}EN{% endif %}</span>
-</button>
-
-<div class="language-menu" id="languageMenu">
-  <form action="{% url 'set_language' %}" method="post">
-    {% csrf_token %}
-    <input name="next" type="hidden" value="{{ request.path }}">
-    <button name="language" value="es" class="language-option" type="submit">🇪🇸 Español</button>
-    <button name="language" value="en" class="language-option" type="submit">🇺🇸 English</button>
-  </form>
-</div>
-
+  <button class="language-toggle" id="languageToggleBtn" type="button" aria-expanded="false" aria-controls="languageMenu" title="{% if CURRENT_LANGUAGE == 'es' %}Español{% else %}English{% endif %}">
+    <span class="language-icon" style="font-size: 20px;">🌎</span>
+    <span class="language-code" style="position: absolute; bottom: 7px; right: 10px; font-size: 13px; font-weight: 700; letter-spacing: 1px;">{% if CURRENT_LANGUAGE == 'es' %}ES{% else %}EN{% endif %}</span>
+  </button>
+  <div class="language-menu" id="languageMenu">
+    <form action="{% url 'set_language' %}" method="post">
+      {% csrf_token %}
+      <input name="next" type="hidden" value="{{ request.path }}">
+      <button name="language" value="es" class="language-option" type="submit">🇪🇸 Español</button>
+      <button name="language" value="en" class="language-option" type="submit">🇺🇸 English</button>
+    </form>
+  </div>
 </div>
 
 {% if messages %}
@@ -211,15 +210,29 @@ La Tortilla Grocery
 </div>
 {% endif %}
 
+
 <script>
-function toggleLanguageMenu() {
+// Selector de idioma funcional y compacto
+document.addEventListener('DOMContentLoaded', function () {
+  const toggleBtn = document.getElementById('languageToggleBtn');
   const menu = document.getElementById('languageMenu');
-  const toggle = document.querySelector('.language-toggle');
-  if (!menu || !toggle) return;
-  const isOpen = menu.style.display === 'flex';
-  menu.style.display = isOpen ? 'none' : 'flex';
-  toggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
-}
+  if (toggleBtn && menu) {
+    toggleBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      const isOpen = menu.style.display === 'flex';
+      menu.style.display = isOpen ? 'none' : 'flex';
+      toggleBtn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+    });
+    // Cerrar menú al hacer clic fuera
+    document.addEventListener('click', function (e) {
+      if (!menu.contains(e.target) && !toggleBtn.contains(e.target)) {
+        menu.style.display = 'none';
+        toggleBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  // ...existing code...
 
 document.addEventListener('DOMContentLoaded', function () {
   const feedbackTranslations = {
@@ -229,36 +242,26 @@ document.addEventListener('DOMContentLoaded', function () {
     info: "{% trans 'Informacion'|escapejs %}"
   };
 
-  const toggleBtn = document.getElementById('sidebarToggleBtn');
+
+  // Sidebar (no tocar)
+  const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
   const sidebar = document.getElementById('panelSidebar');
-      }
-    });
-  }
-
-  if (!toggleBtn || !sidebar || !backdrop) {
-    return;
-  }
-
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (!sidebarToggleBtn || !sidebar || !backdrop) return;
   function closeSidebar() {
     sidebar.classList.remove('show');
     backdrop.classList.remove('show');
   }
-
-  toggleBtn.addEventListener('click', function () {
+  sidebarToggleBtn.addEventListener('click', function () {
     sidebar.classList.toggle('show');
     backdrop.classList.toggle('show');
   });
-
   backdrop.addEventListener('click', closeSidebar);
-
   sidebar.querySelectorAll('a').forEach(function (link) {
     link.addEventListener('click', closeSidebar);
   });
-
   window.addEventListener('resize', function () {
-    if (window.innerWidth > 992) {
-      closeSidebar();
-    }
+    if (window.innerWidth > 992) closeSidebar();
   });
 
   const flashContainer = document.getElementById('flashMessages');
@@ -302,7 +305,7 @@ document.addEventListener('DOMContentLoaded', function () {
   modalMessage.textContent = text;
   const feedbackModal = new bootstrap.Modal(modalElement);
   feedbackModal.show();
-});
+</script>
 </script>
 
 </body>

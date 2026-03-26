@@ -120,102 +120,91 @@ La Tortilla Grocery
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_vendedores' or request.resolver_match.url_name == 'crear_vendedor' %}active{% endif %}">
     {% trans "Vendedores" %}
   </a>
-  <a href="{% url 'lista_productos' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_productos' or request.resolver_match.url_name == 'crear_producto' or request.resolver_match.url_name == 'crear_categoria' or request.resolver_match.url_name == 'crear_marca' or request.resolver_match.url_name == 'lista_marcas' or request.resolver_match.url_name == 'editar_marca' %}active{% endif %}">
-    {% trans "Productos" %}
-  </a>
-  <a href="{% url 'contenido_home' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'contenido_home' or request.resolver_match.url_name == 'editar_home_contenido' or request.resolver_match.url_name == 'lista_testimonios' or request.resolver_match.url_name == 'crear_testimonio' or request.resolver_match.url_name == 'editar_testimonio' %}active{% endif %}">
-    {% trans "Contenido Home" %}
-  </a>
-{% else %}
-  {% if request.user.role == "vendedor" %}
-    <a href="{% url 'crear_cliente' %}"
-      class="list-group-item list-group-item-action {% if 'crear-cliente' in request.path %}active{% endif %}">
-      {% trans "Crear Cliente" %}
-    </a>
-    <a href="{% url 'vendedores_clientes' %}"
-      class="list-group-item list-group-item-action {% if 'clientes' in request.path %}active{% endif %}">
-      {% trans "Clientes" %}
-    </a>
-    <a href="{% url 'tomar_pedido' %}"
-      class="list-group-item list-group-item-action {% if 'tomar-pedido' in request.path %}active{% endif %}">
-      {% trans "Tomar Pedido" %}
-    </a>
-  {% endif %}
-{% endif %}
+  <script>
+  // Unificado: selector de idioma, sidebar y feedback
+  document.addEventListener('DOMContentLoaded', function () {
+    // Selector de idioma
+    const toggleBtn = document.getElementById('languageToggleBtn');
+    const menu = document.getElementById('languageMenu');
+    if (toggleBtn && menu) {
+      toggleBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const isOpen = menu.style.display === 'flex';
+        menu.style.display = isOpen ? 'none' : 'flex';
+        toggleBtn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+      });
+      document.addEventListener('click', function (e) {
+        if (!menu.contains(e.target) && !toggleBtn.contains(e.target)) {
+          menu.style.display = 'none';
+          toggleBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
 
-</div>
+    // Feedback translations
+    const feedbackTranslations = {
+      error: "{% trans 'Error'|escapejs %}",
+      warning: "{% trans 'Aviso'|escapejs %}",
+      success: "{% trans 'Operacion exitosa'|escapejs %}",
+      info: "{% trans 'Informacion'|escapejs %}"
+    };
 
-</div>
+    // Sidebar (no tocar)
+    const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+    const sidebar = document.getElementById('panelSidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (sidebarToggleBtn && sidebar && backdrop) {
+      function closeSidebar() {
+        sidebar.classList.remove('show');
+        backdrop.classList.remove('show');
+      }
+      sidebarToggleBtn.addEventListener('click', function () {
+        sidebar.classList.toggle('show');
+        backdrop.classList.toggle('show');
+      });
+      backdrop.addEventListener('click', closeSidebar);
+      sidebar.querySelectorAll('a').forEach(function (link) {
+        link.addEventListener('click', closeSidebar);
+      });
+      window.addEventListener('resize', function () {
+        if (window.innerWidth > 992) closeSidebar();
+      });
+    }
 
-<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
-
-
-<!-- CONTENIDO -->
-
-<div class="content">
-
-{% block content %}
-{% endblock %}
-
-</div>
-
-</div>
-
-
-<div class="language-widget">
-  <button class="language-toggle" id="languageToggleBtn" type="button" aria-expanded="false" aria-controls="languageMenu" title="{% if CURRENT_LANGUAGE == 'es' %}Español{% else %}English{% endif %}">
-    <span class="language-icon" style="font-size: 20px;">🌎</span>
-    <span class="language-code" style="position: absolute; bottom: 7px; right: 10px; font-size: 13px; font-weight: 700; letter-spacing: 1px;">{% if CURRENT_LANGUAGE == 'es' %}ES{% else %}EN{% endif %}</span>
-  </button>
-  <div class="language-menu" id="languageMenu">
-    <form action="{% url 'set_language' %}" method="post">
-      {% csrf_token %}
-      <input name="next" type="hidden" value="{{ request.path }}">
-      <button name="language" value="es" class="language-option" type="submit">🇪🇸 Español</button>
-      <button name="language" value="en" class="language-option" type="submit">🇺🇸 English</button>
-    </form>
-  </div>
-</div>
-
-{% if messages %}
-<div id="flashMessages" class="d-none">
-  {% for message in messages %}
-  <div
-    class="flash-message-item"
-    data-tags="{{ message.tags|default:'' }}"
-    data-text="{{ message|striptags|escape }}">
-  </div>
-  {% endfor %}
-</div>
-
-<div class="modal fade" id="feedbackModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content border-0" style="border-radius: 12px; overflow: hidden;">
-      <div class="modal-header border-0" id="feedbackModalHeader" style="background: linear-gradient(135deg, #0b3d91, #2f77d1); color: #fff;">
-        <h5 class="modal-title fw-bold" id="feedbackModalTitle">{% trans "Notificacion" %}</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% trans 'Cerrar' %}"></button>
-      </div>
-      <div class="modal-body text-center py-4" style="background: #ffffff;">
-        <p id="feedbackModalMessage" class="mb-0" style="font-size: 1rem; color: #1f2937;"></p>
-      </div>
-      <div class="modal-footer border-0 pt-0" style="justify-content: center;">
-        <button type="button" class="btn" data-bs-dismiss="modal" style="background: #0b3d91; color: #fff; font-weight: 600; padding: 0.45rem 1.2rem; border-radius: 8px;">
-          {% trans "Entendido" %}
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-
-<script>
-// Selector de idioma funcional y compacto
-document.addEventListener('DOMContentLoaded', function () {
-  const toggleBtn = document.getElementById('languageToggleBtn');
-  const menu = document.getElementById('languageMenu');
+    // Feedback modal
+    const flashContainer = document.getElementById('flashMessages');
+    if (flashContainer) {
+      const flashItems = flashContainer.querySelectorAll('.flash-message-item');
+      if (flashItems.length) {
+        const latestMessage = flashItems[flashItems.length - 1];
+        const tags = (latestMessage.dataset.tags || '').toLowerCase();
+        const text = latestMessage.dataset.text || '';
+        const modalHeader = document.getElementById('feedbackModalHeader');
+        const modalTitle = document.getElementById('feedbackModalTitle');
+        const modalMessage = document.getElementById('feedbackModalMessage');
+        const modalElement = document.getElementById('feedbackModal');
+        if (modalHeader && modalTitle && modalMessage && modalElement) {
+          if (tags.includes('error')) {
+            modalHeader.style.background = 'linear-gradient(135deg, #9f1239, #dc2626)';
+            modalTitle.textContent = feedbackTranslations.error;
+          } else if (tags.includes('warning')) {
+            modalHeader.style.background = 'linear-gradient(135deg, #b45309, #f59e0b)';
+            modalTitle.textContent = feedbackTranslations.warning;
+          } else if (tags.includes('success')) {
+            modalHeader.style.background = 'linear-gradient(135deg, #0b3d91, #2f77d1)';
+            modalTitle.textContent = feedbackTranslations.success;
+          } else {
+            modalHeader.style.background = 'linear-gradient(135deg, #374151, #6b7280)';
+            modalTitle.textContent = feedbackTranslations.info;
+          }
+          modalMessage.textContent = text;
+          const feedbackModal = new bootstrap.Modal(modalElement);
+          feedbackModal.show();
+        }
+      }
+    }
+  });
+  </script>
   if (toggleBtn && menu) {
     toggleBtn.addEventListener('click', function (e) {
       e.stopPropagation();

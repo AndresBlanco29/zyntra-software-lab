@@ -338,6 +338,39 @@ def _ensure_extension(file_name, content_type):
     return f"{root}.bin"
 
 
+def _detect_content_type_from_bytes(file_bytes):
+    if not file_bytes:
+        return None
+
+    if file_bytes.startswith(b'%PDF-'):
+        return 'application/pdf'
+    if file_bytes.startswith(b'\x89PNG\r\n\x1a\n'):
+        return 'image/png'
+    if file_bytes.startswith(b'\xff\xd8\xff'):
+        return 'image/jpeg'
+    if file_bytes.startswith((b'GIF87a', b'GIF89a')):
+        return 'image/gif'
+    if file_bytes[:4] == b'RIFF' and file_bytes[8:12] == b'WEBP':
+        return 'image/webp'
+
+    return None
+
+
+def _resolve_content_type(content_type, file_name=None, file_bytes=None):
+    normalized = (content_type or '').split(';', 1)[0].strip().lower()
+    guessed_from_name, _ = mimetypes.guess_type(file_name or '')
+
+    if not normalized or normalized == 'application/octet-stream':
+        normalized = guessed_from_name or normalized
+
+    if (not normalized or normalized == 'application/octet-stream') and file_bytes:
+        sniffed_type = _detect_content_type_from_bytes(file_bytes)
+        if sniffed_type:
+            normalized = sniffed_type
+
+    return normalized or 'application/octet-stream'
+
+
 def _build_inline_file_response(file_obj_or_bytes, content_type, file_name, use_file_response=False):
     final_name = _ensure_extension(file_name, content_type)
 
@@ -803,7 +836,14 @@ def ver_certificado_cliente(request, cliente_id):
 
     try:
         certificado.open('rb')
-        content_type, _ = mimetypes.guess_type(nombre_archivo)
+        head_bytes = b''
+        try:
+            head_bytes = certificado.read(32)
+            certificado.seek(0)
+        except Exception:
+            pass
+
+        content_type = _resolve_content_type(None, nombre_archivo, head_bytes)
         return _build_inline_file_response(
             certificado,
             content_type,
@@ -821,9 +861,14 @@ def ver_certificado_cliente(request, cliente_id):
                 with urllib.request.urlopen(download_url, timeout=20) as remote_file:
                     file_bytes = remote_file.read()
                     remote_content_type = remote_file.headers.get_content_type()
+                resolved_content_type = _resolve_content_type(
+                    remote_content_type,
+                    resolved_name or nombre_archivo,
+                    file_bytes,
+                )
                 return _build_inline_file_response(
                     file_bytes,
-                    remote_content_type,
+                    resolved_content_type,
                     resolved_name or nombre_archivo,
                 )
             except Exception as download_exc:
@@ -846,7 +891,8 @@ def ver_certificado_cliente(request, cliente_id):
                 with urllib.request.urlopen(fallback_url, timeout=20) as remote_file:
                     file_bytes = remote_file.read()
                     remote_content_type = remote_file.headers.get_content_type()
-                return _build_inline_file_response(file_bytes, remote_content_type, nombre_archivo)
+                fallback_content_type = _resolve_content_type(remote_content_type, nombre_archivo, file_bytes)
+                return _build_inline_file_response(file_bytes, fallback_content_type, nombre_archivo)
         except Exception as fallback_exc:
             diagnostico.append(f"fallback url fallo: {fallback_exc}")
 

@@ -1,90 +1,180 @@
 {% load static i18n %}
 {% get_current_language as CURRENT_LANGUAGE %}
-<script>
-// Unificado: selector de idioma, sidebar y feedback
-document.addEventListener('DOMContentLoaded', function () {
-  // Selector de idioma
-  const toggleBtn = document.getElementById('languageToggleBtn');
-  const menu = document.getElementById('languageMenu');
-  if (toggleBtn && menu) {
-    toggleBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      const isOpen = menu.style.display === 'flex';
-      menu.style.display = isOpen ? 'none' : 'flex';
-      toggleBtn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
-    });
-    document.addEventListener('click', function (e) {
-      if (!menu.contains(e.target) && !toggleBtn.contains(e.target)) {
-        menu.style.display = 'none';
-        toggleBtn.setAttribute('aria-expanded', 'false');
-      }
-    });
-  }
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE }}">
 
-  // Feedback translations
-  const feedbackTranslations = {
-    error: "{% trans 'Error'|escapejs %}",
-    warning: "{% trans 'Aviso'|escapejs %}",
-    success: "{% trans 'Operacion exitosa'|escapejs %}",
-    info: "{% trans 'Informacion'|escapejs %}"
-  };
+<head>
 
-  // Sidebar (no tocar)
-  const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
-  const sidebar = document.getElementById('panelSidebar');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  if (sidebarToggleBtn && sidebar && backdrop) {
-    function closeSidebar() {
-      sidebar.classList.remove('show');
-      backdrop.classList.remove('show');
-    }
-    sidebarToggleBtn.addEventListener('click', function () {
-      sidebar.classList.toggle('show');
-      backdrop.classList.toggle('show');
-    });
-    backdrop.addEventListener('click', closeSidebar);
-    sidebar.querySelectorAll('a').forEach(function (link) {
-      link.addEventListener('click', closeSidebar);
-    });
-    window.addEventListener('resize', function () {
-      if (window.innerWidth > 992) closeSidebar();
-    });
-  }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-  // Feedback modal
-  const flashContainer = document.getElementById('flashMessages');
-  if (flashContainer) {
-    const flashItems = flashContainer.querySelectorAll('.flash-message-item');
-    if (flashItems.length) {
-      const latestMessage = flashItems[flashItems.length - 1];
-      const tags = (latestMessage.dataset.tags || '').toLowerCase();
-      const text = (latestMessage.dataset.text || '');
-      const modalHeader = document.getElementById('feedbackModalHeader');
-      const modalTitle = document.getElementById('feedbackModalTitle');
-      const modalMessage = document.getElementById('feedbackModalMessage');
-      const modalElement = document.getElementById('feedbackModal');
-      if (modalHeader && modalTitle && modalMessage && modalElement) {
-        if (tags.includes('error')) {
-          modalHeader.style.background = 'linear-gradient(135deg, #9f1239, #dc2626)';
-          modalTitle.textContent = feedbackTranslations.error;
-        } else if (tags.includes('warning')) {
-          modalHeader.style.background = 'linear-gradient(135deg, #b45309, #f59e0b)';
-          modalTitle.textContent = feedbackTranslations.warning;
-        } else if (tags.includes('success')) {
-          modalHeader.style.background = 'linear-gradient(135deg, #0b3d91, #2f77d1)';
-          modalTitle.textContent = feedbackTranslations.success;
-        } else {
-          modalHeader.style.background = 'linear-gradient(135deg, #374151, #6b7280)';
-          modalTitle.textContent = feedbackTranslations.info;
+<title>{% block title %}{% trans "Sistema" %}{% endblock %}</title>
+
+<link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
+<link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
+
+<link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
+<link rel="stylesheet" href="{% static 'css/layout_vendedor.css' %}">
+
+<script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
+
+<div class="container-fluid">
+
+<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="sidebarToggleBtn" aria-label="{% trans 'Abrir menu' %}">
+☰
+</button>
+
+<a class="navbar-brand fw-bold">
+La Tortilla Grocery
+</a>
+
+<div class="ms-auto">
+
+{% block navbar_right %}
+
+<button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#logoutModal" style="font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
+<i class="bi bi-box-arrow-right"></i> {% trans "Cerrar sesion" %}
+</button>
+
+{% endblock %}
+
+</div>
+
+</div>
+
+</nav>
+
+<!-- Modal de confirmacion de logout -->
+<div class="modal fade" id="logoutModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);">
+      <div class="modal-body text-center" style="padding: 3rem 2rem; background: linear-gradient(135deg, #f8f9fa 0%, #e8ecf1 100%);">
+        <div style="font-size: 60px; margin-bottom: 1.5rem;">
+          👋
+        </div>
+        
+        <h5 class="modal-title mb-2" style="color: #0b3d91; font-weight: 700; font-size: 1.5rem;">
+          {% trans "Estas seguro de salir?" %}
+        </h5>
+        
+        <p class="text-muted mb-0" style="font-size: 1rem;">
+          {% trans "Se cerrara tu sesion en" %} <strong>La Tortilla Grocery</strong>
+        </p>
+      </div>
+      
+      <div class="modal-footer border-0" style="justify-content: center; gap: 1rem; padding: 1.5rem 2rem; background: #fff;">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="font-weight: 600; border-width: 2px;">
+          {% trans "Cancelar" %}
+        </button>
+        
+        <a href="{% url 'logout' %}" class="btn btn-danger" style="font-weight: 600; padding: 0.5rem 1.5rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
+          <i class="bi bi-box-arrow-right"></i> {% trans "Si, salir" %}
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- LAYOUT PRINCIPAL -->
+
+<div class="layout">
+
+<!-- SIDEBAR -->
+
+<div class="sidebar" id="panelSidebar">
+
+<div class="sidebar-user">
+{% if request.user.role == "vendedor" %}
+  {% trans "Vendedor" %}: {{ request.user.username }}
+{% else %}
+  {% if request.user.is_superuser or request.user.role == "admin" %}
+    {% trans "Administrador" %}: {% firstof request.user.get_full_name request.user.username %}
+  {% else %}
+    {% firstof request.user.get_full_name request.user.username %}
+  {% endif %}
+{% endif %}
+</div>
+
+<div class="list-group list-group-flush">
+{% get_current_language as CURRENT_LANGUAGE %}
+
+{% if request.user.is_superuser or request.user.role == "admin" %}
+  <a href="{% url 'panel_admin' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'panel_admin' %}active{% endif %}">
+    {% trans "Dashboard" %}
+  </a>
+  <a href="{% url 'clientes_pendientes' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' %}active{% endif %}">
+    {% trans "Solicitudes" %}
+  </a>
+  <a href="{% url 'lista_vendedores' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_vendedores' or request.resolver_match.url_name == 'crear_vendedor' %}active{% endif %}">
+    {% trans "Vendedores" %}
+  </a>
+{% endif %}
+  <script>
+  // Unificado: selector de idioma, sidebar y feedback
+  document.addEventListener('DOMContentLoaded', function () {
+    // Selector de idioma
+    const toggleBtn = document.getElementById('languageToggleBtn');
+    const menu = document.getElementById('languageMenu');
+    if (toggleBtn && menu) {
+      toggleBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const isOpen = menu.style.display === 'flex';
+        menu.style.display = isOpen ? 'none' : 'flex';
+        toggleBtn.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+      });
+      document.addEventListener('click', function (e) {
+        if (!menu.contains(e.target) && !toggleBtn.contains(e.target)) {
+          menu.style.display = 'none';
+          toggleBtn.setAttribute('aria-expanded', 'false');
         }
-        modalMessage.textContent = text;
-        const feedbackModal = new bootstrap.Modal(modalElement);
-        feedbackModal.show();
-      }
+      });
     }
-  }
-});
-</script>
+
+    // Feedback translations
+    const feedbackTranslations = {
+      error: "{% trans 'Error'|escapejs %}",
+      warning: "{% trans 'Aviso'|escapejs %}",
+      success: "{% trans 'Operacion exitosa'|escapejs %}",
+      info: "{% trans 'Informacion'|escapejs %}"
+    };
+
+    // Sidebar (no tocar)
+    const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+    const sidebar = document.getElementById('panelSidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (sidebarToggleBtn && sidebar && backdrop) {
+      function closeSidebar() {
+        sidebar.classList.remove('show');
+        backdrop.classList.remove('show');
+      }
+      sidebarToggleBtn.addEventListener('click', function () {
+        sidebar.classList.toggle('show');
+        backdrop.classList.toggle('show');
+      });
+      backdrop.addEventListener('click', closeSidebar);
+      sidebar.querySelectorAll('a').forEach(function (link) {
+        link.addEventListener('click', closeSidebar);
+      });
+      window.addEventListener('resize', function () {
+        if (window.innerWidth > 992) closeSidebar();
+      });
+    }
+
+    // Feedback modal
+    const flashContainer = document.getElementById('flashMessages');
+    if (flashContainer) {
       const flashItems = flashContainer.querySelectorAll('.flash-message-item');
       if (flashItems.length) {
         const latestMessage = flashItems[flashItems.length - 1];

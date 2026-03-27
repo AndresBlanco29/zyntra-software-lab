@@ -609,7 +609,7 @@ msgstr "Approved Customers"
 #: .\config\templates\admin\vendedores.html:11
 #: .\config\templates\bases\base_vendedor.html:121
 msgid "Vendedores"
-msgstr "seller"
+msgstr "Sellers"
 
 #: .\config\templates\admin\dashboard.html:46
 #: .\config\templates\admin\productos.html:11
@@ -1214,8 +1214,6 @@ msgid "Solicitudes"
 msgstr "Requests"
 
 #: .\config\templates\bases\base_vendedor.html:129
-#, fuzzy
-#| msgid "Contenido del Home"
 msgid "Contenido de Inicio"
 msgstr "Home Content"
 

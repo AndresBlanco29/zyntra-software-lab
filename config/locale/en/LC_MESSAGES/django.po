@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: La Tortilla Grocery\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-26 20:38-0500\n"
+"POT-Creation-Date: 2026-03-26 20:56-0500\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -370,8 +370,6 @@ msgstr "Description in English"
 #: .\config\templates\admin\crear_producto.html:46
 #: .\config\templates\admin\editar_producto.html:53
 #: .\config\templates\admin\productos.html:84
-#, fuzzy
-#| msgid "Categoría"
 msgid "Categoria"
 msgstr "Category"
 
@@ -844,10 +842,8 @@ msgstr "Active content"
 #: .\config\templates\admin\editar_home_contenido.html:262
 #: .\config\templates\admin\editar_producto.html:271
 #: .\config\templates\admin\editar_vendedor.html:46
-#, fuzzy
-#| msgid "Guardar Marca"
 msgid "Guardar cambios"
-msgstr "Save Brand"
+msgstr "Save Changes"
 
 #: .\config\templates\admin\editar_home_contenido.html:263
 #: .\config\templates\admin\ver_cliente.html:85
@@ -874,9 +870,9 @@ msgstr "No logo"
 #: .\config\templates\admin\editar_testimonio.html:78
 #: .\config\templates\vendedores\clientes.html:198
 #, fuzzy
-#| msgid "Guardar Categoria"
+#| msgid "Guardar cambios"
 msgid "Guardar Cambios"
-msgstr "Save Category"
+msgstr "Save Changes"
 
 #: .\config\templates\admin\editar_producto.html:5
 #: .\config\templates\admin\editar_producto.html:10
@@ -929,10 +925,8 @@ msgid "Logo"
 msgstr "Logo"
 
 #: .\config\templates\admin\marcas.html:33
-#, fuzzy
-#| msgid "Categoría"
 msgid "Categorias"
-msgstr "Category"
+msgstr "Categorys"
 
 #: .\config\templates\admin\marcas.html:34
 #: .\config\templates\admin\productos.html:85
@@ -1132,8 +1126,6 @@ msgid "Telefono:"
 msgstr "Phone:"
 
 #: .\config\templates\admin\ver_cliente.html:34
-#, fuzzy
-#| msgid "Ciudad"
 msgid "Ciudad:"
 msgstr "City"
 
@@ -1166,10 +1158,8 @@ msgid "Aprobar cliente"
 msgstr "Approve customer"
 
 #: .\config\templates\admin\ver_cliente.html:81
-#, fuzzy
-#| msgid "Crear Cliente"
 msgid "Rechazar cliente"
-msgstr "Create Customer"
+msgstr "reject client"
 
 #: .\config\templates\bases\base_vendedor.html:11
 msgid "Sistema"
@@ -2114,19 +2104,17 @@ msgid "Acción"
 msgstr "Action"
 
 #: .\config\templates\vendedores\clientes.html:166
-#, fuzzy
-#| msgid "Cambiar Cliente"
 msgid "Editar Cliente"
-msgstr "Change Customer"
+msgstr "Edit Customer"
 
 #: .\config\templates\vendedores\clientes.html:192
 msgid "Exactamente 10 dígitos"
-msgstr ""
+msgstr "Exactly 10 digits"
 
 #: .\config\templates\vendedores\clientes.html:239
 #: .\config\templates\vendedores\crear_cliente.html:237
 msgid "Aceptar"
-msgstr ""
+msgstr "Accept"
 
 #: .\config\templates\vendedores\crear_cliente.html:12
 msgid "Solicitud de Creación de Cliente"
@@ -2186,7 +2174,7 @@ msgstr "Send Request"
 
 #: .\config\templates\vendedores\crear_cliente.html:209
 msgid "Error en la Validación"
-msgstr ""
+msgstr "validation error"
 
 #: .\config\templates\vendedores\crear_cliente.html:233
 #, fuzzy
@@ -2273,11 +2261,11 @@ msgstr "Select Price"
 
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:405
 msgid "Debes seleccionar un precio antes de agregar el producto al pedido."
-msgstr ""
+msgstr "You must select a price before adding the product to the order."
 
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:409
 msgid "Asegúrate de elegir el precio que se aplicará para este cliente."
-msgstr ""
+msgstr "Make sure you choose the price that will apply to this customer."
 
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:104
 msgid "Cliente Seleccionado"
@@ -2404,6 +2392,8 @@ msgstr "Your request was submitted. An administrator will review your account."
 msgid ""
 "No se pudo completar el registro. Verifica los datos e intenta nuevamente."
 msgstr ""
+"Registration could not be completed. Please verify your information and try "
+"again."
 
 #, fuzzy
 #~| msgid "Producto"

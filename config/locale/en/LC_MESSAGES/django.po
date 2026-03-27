@@ -1799,10 +1799,9 @@ msgid "Volver al Home"
 msgstr "Back to Home"
 
 #: .\config\templates\productos\catalogo.html:76
-#, fuzzy
-#| msgid "Método no permitido"
+
 msgid "Modo Invitado"
-msgstr "Method not allowed"
+msgstr "guest mode"
 
 #: .\config\templates\productos\catalogo.html:91
 msgid "Inicia sesión"

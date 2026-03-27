@@ -128,12 +128,7 @@ overflow-x: hidden;
     }
 }
 
-@media (max-width: 1500px) and (min-width: 1100px) {
-  .logo-navbar {
-    height: 80px;
-    width: auto;
-  }
-}
+
 
 /* MOBILE RESPONSIVE 576px */
 @media (max-width: 576px) {
@@ -3838,4 +3833,9 @@ background:rgba(255,255,255,.25);
     }
 }
 
-
+@media (max-width: 1500px) and (min-width: 1100px) {
+  .logo-navbar {
+    height: 80px !important;
+    width: auto !important;
+  }
+}

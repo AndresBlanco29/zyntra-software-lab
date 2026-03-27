@@ -1000,22 +1000,16 @@ msgstr "Disable"
 #: .\config\templates\admin\testimonios.html:58
 #: .\config\templates\admin\vendedores.html:68
 #: .\config\templates\vendedores\clientes.html:139
-#, fuzzy
-#| msgid "Activo"
 msgid "Activar"
-msgstr "Active"
+msgstr "Activate"
 
 #: .\config\templates\admin\marcas.html:96
-#, fuzzy
-#| msgid "No hay productos registrados"
 msgid "No hay marcas registradas"
-msgstr "There are no products registered"
+msgstr "There are no brands registered"
 
 #: .\config\templates\admin\productos.html:19
-#, fuzzy
-#| msgid "Buscar Productos..."
 msgid "Buscar..."
-msgstr "Search Products..."
+msgstr "Search..."
 
 #: .\config\templates\admin\productos.html:24
 msgid "Todas las categorias"
@@ -1074,10 +1068,8 @@ msgstr "Search by name or email..."
 
 #: .\config\templates\admin\vendedores.html:59
 #: .\config\templates\vendedores\clientes.html:134
-#, fuzzy
-#| msgid "Deseas activar a"
 msgid "Desactivar"
-msgstr "Do you want to activate"
+msgstr "Deactivate"
 
 #: .\config\templates\admin\vendedores.html:78
 msgid "No hay vendedores registrados"
@@ -1156,10 +1148,8 @@ msgid "Telefono:"
 msgstr "Phone:"
 
 #: .\config\templates\admin\ver_cliente.html:34
-#, fuzzy
-#| msgid "Ciudad"
 msgid "Ciudad:"
-msgstr "City"
+msgstr "City:"
 
 #: .\config\templates\admin\ver_cliente.html:39
 msgid "Estado:"
@@ -1190,10 +1180,8 @@ msgid "Aprobar cliente"
 msgstr "Approve customer"
 
 #: .\config\templates\admin\ver_cliente.html:81
-#, fuzzy
-#| msgid "Crear Cliente"
 msgid "Rechazar cliente"
-msgstr "Create Customer"
+msgstr "Reject customer"
 
 #: .\config\templates\bases\base_vendedor.html:11
 msgid "Sistema"
@@ -1226,10 +1214,8 @@ msgid "Vendedor"
 msgstr "seller"
 
 #: .\config\templates\bases\base_vendedor.html:100
-#, fuzzy
-#| msgid "Panel Administrador"
 msgid "Administrador"
-msgstr "Admin Panel"
+msgstr "Administrator"
 
 #: .\config\templates\bases\base_vendedor.html:113
 msgid "Dashboard"
@@ -1244,10 +1230,8 @@ msgid "Sellers"
 msgstr ""
 
 #: .\config\templates\bases\base_vendedor.html:125
-#, fuzzy
-#| msgid "Producto"
 msgid "Products"
-msgstr "Product"
+msgstr "Products"
 
 #: .\config\templates\bases\base_vendedor.html:129
 msgid "Home Content"

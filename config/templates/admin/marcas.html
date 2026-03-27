@@ -48,12 +48,26 @@ Marcas
 {% endif %}
 </td>
 
-<td>{{ marca.nombre }}</td>
+<td>
+	{% get_current_language as LANGUAGE_CODE %}
+	{% if LANGUAGE_CODE == "en" and marca.nombre_en %}
+		{{ marca.nombre_en }}
+	{% else %}
+		{{ marca.nombre }}
+	{% endif %}
+</td>
 <td>{% if marca.nombre_en %}{{ marca.nombre_en }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
 
 <td>
 {% for categoria in marca.categorias.all %}
-<span class="badge text-bg-light border me-1">{{ categoria.nombre }}</span>
+<span class="badge text-bg-light border me-1">
+	{% get_current_language as LANGUAGE_CODE %}
+	{% if LANGUAGE_CODE == "en" and categoria.nombre_en %}
+		{{ categoria.nombre_en }}
+	{% else %}
+		{{ categoria.nombre }}
+	{% endif %}
+</span>
 {% empty %}
 <span class="text-muted">{% trans "Sin categorias" %}</span>
 {% endfor %}

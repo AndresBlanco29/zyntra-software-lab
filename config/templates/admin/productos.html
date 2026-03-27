@@ -23,7 +23,14 @@ Productos
       <select id="filtroCategoria" class="form-select">
         <option value="">{% trans "Todas las categorias" %}</option>
         {% for categoria in categorias %}
-        <option value="{{ categoria.id }}">{{ categoria.nombre }}</option>
+        <option value="{{ categoria.id }}">
+          {% get_current_language as LANGUAGE_CODE %}
+          {% if LANGUAGE_CODE == "en" and categoria.nombre_en %}
+            {{ categoria.nombre_en }}
+          {% else %}
+            {{ categoria.nombre }}
+          {% endif %}
+        </option>
         {% endfor %}
       </select>
     </div>
@@ -31,7 +38,14 @@ Productos
       <select id="filtroMarca" class="form-select">
         <option value="">{% trans "Todas las marcas" %}</option>
         {% for marca in marcas %}
-        <option value="{{ marca.id }}" data-categoria="{% for cat in marca.categorias.all %}{{ cat.id }} {% endfor %}">{{ marca.nombre }}</option>
+        <option value="{{ marca.id }}" data-categoria="{% for cat in marca.categorias.all %}{{ cat.id }} {% endfor %}">
+          {% get_current_language as LANGUAGE_CODE %}
+          {% if LANGUAGE_CODE == "en" and marca.nombre_en %}
+            {{ marca.nombre_en }}
+          {% else %}
+            {{ marca.nombre }}
+          {% endif %}
+        </option>
         {% endfor %}
       </select>
     </div>
@@ -85,7 +99,14 @@ Productos
 {% endif %}
 </td>
 
-<td>{{ producto.nombre }}</td>
+<td>
+  {% get_current_language as LANGUAGE_CODE %}
+  {% if LANGUAGE_CODE == "en" and producto.nombre_en %}
+    {{ producto.nombre_en }}
+  {% else %}
+    {{ producto.nombre }}
+  {% endif %}
+</td>
 
 <td>
 {% if producto.codigo_barras %}
@@ -95,9 +116,23 @@ Productos
 {% endif %}
 </td>
 
-<td>{{ producto.marca }}</td>
+<td>
+  {% get_current_language as LANGUAGE_CODE %}
+  {% if LANGUAGE_CODE == "en" and producto.marca.nombre_en %}
+    {{ producto.marca.nombre_en }}
+  {% else %}
+    {{ producto.marca.nombre }}
+  {% endif %}
+</td>
 
-<td>{{ producto.categoria }}</td>
+<td>
+  {% get_current_language as LANGUAGE_CODE %}
+  {% if LANGUAGE_CODE == "en" and producto.categoria.nombre_en %}
+    {{ producto.categoria.nombre_en }}
+  {% else %}
+    {{ producto.categoria.nombre }}
+  {% endif %}
+</td>
 
 <td>
 {% if producto.activo %}

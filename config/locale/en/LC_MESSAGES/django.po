@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: La Tortilla Grocery\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-26 20:17-0500\n"
+"POT-Creation-Date: 2026-03-26 20:35-0500\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -126,8 +126,6 @@ msgid "Telefono"
 msgstr "Phone"
 
 #: .\config\templates\admin\clientes_pendientes.html:21
-#, fuzzy
-#| msgid "Sales Tax:"
 msgid "Sales Tax"
 msgstr "Sales Tax:"
 
@@ -155,10 +153,8 @@ msgid "No disponible"
 msgstr "Not available"
 
 #: .\config\templates\admin\clientes_pendientes.html:53
-#, fuzzy
-#| msgid "Volver"
 msgid "Ver"
-msgstr "Back"
+msgstr "View"
 
 #: .\config\templates\admin\clientes_pendientes.html:57
 msgid "Aprobar"
@@ -177,8 +173,6 @@ msgid "Contenido Home"
 msgstr "Home Content"
 
 #: .\config\templates\admin\contenido_home.html:10
-#, fuzzy
-#| msgid "Contenido Home"
 msgid "Contenido del Home"
 msgstr "Home Content"
 
@@ -274,10 +268,8 @@ msgstr "Create testimonial"
 #: .\config\templates\admin\crear_categoria.html:5
 #: .\config\templates\admin\crear_categoria.html:10
 #: .\config\templates\admin\productos.html:61
-#, fuzzy
-#| msgid "Guardar Categoria"
 msgid "Crear Categoria"
-msgstr "Save Category"
+msgstr "Create Category"
 
 #: .\config\templates\admin\crear_categoria.html:26
 msgid "Nombre de la categoria"
@@ -302,10 +294,8 @@ msgstr "Back to Products"
 #: .\config\templates\admin\crear_marca.html:10
 #: .\config\templates\admin\marcas.html:16
 #: .\config\templates\admin\productos.html:65
-#, fuzzy
-#| msgid "Crear marca"
 msgid "Crear Marca"
-msgstr "Create brand"
+msgstr "Create Brand"
 
 #: .\config\templates\admin\crear_marca.html:26
 #: .\config\templates\admin\editar_marca.html:25
@@ -338,10 +328,8 @@ msgstr "Back to Brands"
 #: .\config\templates\admin\crear_producto.html:5
 #: .\config\templates\admin\crear_producto.html:10
 #: .\config\templates\admin\productos.html:57
-#, fuzzy
-#| msgid "Crear producto"
 msgid "Crear Producto"
-msgstr "Create product"
+msgstr "Create Product"
 
 #: .\config\templates\admin\crear_producto.html:20
 #: .\config\templates\admin\editar_producto.html:22
@@ -424,7 +412,7 @@ msgstr "Featured product"
 #: .\config\templates\admin\crear_producto.html:89
 #: .\config\templates\admin\editar_producto.html:264
 #, fuzzy, python-format
-#| msgid "Descuento (%)"
+#| msgid "Descuento (%%)"
 msgid "Descuento (%%)"
 msgstr "Discount (%)"
 
@@ -583,10 +571,8 @@ msgstr "Save Testimonial"
 #: .\config\templates\admin\crear_vendedor.html:10
 #: .\config\templates\admin\crear_vendedor.html:48
 #: .\config\templates\admin\vendedores.html:23
-#, fuzzy
-#| msgid "Editar Vendedor"
 msgid "Crear Vendedor"
-msgstr "Edit Seller"
+msgstr "Create Seller"
 
 #: .\config\templates\admin\crear_vendedor.html:22
 #: .\config\templates\admin\editar_vendedor.html:25
@@ -603,10 +589,8 @@ msgstr "Username"
 #: .\config\templates\admin\crear_vendedor.html:32
 #: .\config\templates\admin\editar_vendedor.html:30
 #: .\config\templates\admin\vendedores.html:33
-#, fuzzy
-#| msgid "Email:"
 msgid "Email"
-msgstr "Email:"
+msgstr "Email"
 
 #: .\config\templates\admin\crear_vendedor.html:37
 msgid "Contrasena"
@@ -623,17 +607,13 @@ msgstr "Approved Customers"
 #: .\config\templates\admin\dashboard.html:37
 #: .\config\templates\admin\vendedores.html:5
 #: .\config\templates\admin\vendedores.html:11
-#, fuzzy
-#| msgid "Vendedor"
 msgid "Vendedores"
 msgstr "seller"
 
 #: .\config\templates\admin\dashboard.html:46
 #: .\config\templates\admin\productos.html:11
-#, fuzzy
-#| msgid "Producto"
 msgid "Productos"
-msgstr "Product"
+msgstr "Products"
 
 #: .\config\templates\admin\editar_home_contenido.html:5
 msgid "Editar Banner y Textos Home"
@@ -804,8 +784,6 @@ msgid "Tarjeta 4 subtitulo (EN)"
 msgstr "Card 4 subtitle (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:199
-#, fuzzy
-#| msgid "Estadisticas:"
 msgid "Estadisticas"
 msgstr "Statistics:"
 
@@ -1000,10 +978,8 @@ msgstr "Disable"
 #: .\config\templates\admin\testimonios.html:58
 #: .\config\templates\admin\vendedores.html:68
 #: .\config\templates\vendedores\clientes.html:139
-#, fuzzy
-#| msgid "Activo"
 msgid "Activar"
-msgstr "Active"
+msgstr "Activate"
 
 #: .\config\templates\admin\marcas.html:96
 #, fuzzy
@@ -1012,10 +988,8 @@ msgid "No hay marcas registradas"
 msgstr "There are no products registered"
 
 #: .\config\templates\admin\productos.html:19
-#, fuzzy
-#| msgid "Buscar Productos..."
 msgid "Buscar..."
-msgstr "Search Products..."
+msgstr "Search..."
 
 #: .\config\templates\admin\productos.html:24
 msgid "Todas las categorias"

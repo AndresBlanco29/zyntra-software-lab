@@ -114,19 +114,19 @@ La Tortilla Grocery
   </a>
   <a href="{% url 'clientes_pendientes' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' %}active{% endif %}">
-    {% trans "Solicitudes" %}
+    {% trans "Requests" %}
   </a>
   <a href="{% url 'lista_vendedores' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_vendedores' or request.resolver_match.url_name == 'crear_vendedor' %}active{% endif %}">
-    {% trans "Vendedores" %}
+    {% trans "Sellers" %}
   </a>
   <a href="{% url 'lista_productos' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_productos' or request.resolver_match.url_name == 'crear_producto' or request.resolver_match.url_name == 'crear_categoria' or request.resolver_match.url_name == 'crear_marca' or request.resolver_match.url_name == 'lista_marcas' or request.resolver_match.url_name == 'editar_marca' %}active{% endif %}">
-    {% trans "Productos" %}
+    {% trans "Products" %}
   </a>
   <a href="{% url 'contenido_home' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'contenido_home' or request.resolver_match.url_name == 'editar_home_contenido' or request.resolver_match.url_name == 'lista_testimonios' or request.resolver_match.url_name == 'crear_testimonio' or request.resolver_match.url_name == 'editar_testimonio' %}active{% endif %}">
-    {% trans "Contenido Home" %}
+    {% trans "Home Content" %}
   </a>
 {% else %}
   {% if request.user.role == "vendedor" %}

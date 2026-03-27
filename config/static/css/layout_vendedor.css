@@ -290,36 +290,63 @@ width:100%;
     }
 }
 
+
     .content {
         padding: 24px 18px;
         height: auto;
         min-height: calc(100vh - 70px);
+        margin-left: 240px;
     }
 
-    .sidebar {
-        left: -320px;
-        z-index: 1060;
-        background: #fff;
-        transition: left 0.25s ease;
+    /* Sidebar siempre visible en escritorio */
+    @media (min-width: 992px) {
+        .sidebar {
+            left: 0 !important;
+            z-index: 1060;
+            background: #fff;
+            transition: none;
+            width: 253px;
+        }
+        .sidebar.show {
+            left: 0 !important;
+        }
+        .sidebar-backdrop {
+            display: none !important;
+        }
+        .content {
+            margin-left: 240px;
+        }
     }
 
-    .sidebar.show {
-        left: 0;
-    }
-
-    .sidebar-backdrop {
-        display: none;
-        position: fixed;
-        top: 70px;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0, 0, 0, 0.35);
-        z-index: 1055;
-    }
-
-    .sidebar-backdrop.show {
-        display: block;
+    /* Sidebar deslizable solo en móvil/tablet */
+    @media (max-width: 991.98px) {
+        .sidebar {
+            left: -320px;
+            z-index: 2000;
+            background: #fff;
+            transition: left 0.25s ease;
+            width: 80%;
+            max-width: 300px;
+        }
+        .sidebar.show {
+            left: 0;
+        }
+        .sidebar-backdrop {
+            display: none;
+            position: fixed;
+            top: 70px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.35);
+            z-index: 1055;
+        }
+        .sidebar-backdrop.show {
+            display: block;
+        }
+        .content {
+            margin-left: 0;
+        }
     }
 
     .admin-toolbar {

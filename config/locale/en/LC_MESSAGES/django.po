@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: La Tortilla Grocery\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-26 20:35-0500\n"
+"POT-Creation-Date: 2026-03-26 20:38-0500\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -607,11 +607,13 @@ msgstr "Approved Customers"
 #: .\config\templates\admin\dashboard.html:37
 #: .\config\templates\admin\vendedores.html:5
 #: .\config\templates\admin\vendedores.html:11
+#: .\config\templates\bases\base_vendedor.html:121
 msgid "Vendedores"
 msgstr "seller"
 
 #: .\config\templates\admin\dashboard.html:46
 #: .\config\templates\admin\productos.html:11
+#: .\config\templates\bases\base_vendedor.html:125
 msgid "Productos"
 msgstr "Products"
 
@@ -1208,22 +1210,14 @@ msgid "Dashboard"
 msgstr "Dashboard"
 
 #: .\config\templates\bases\base_vendedor.html:117
-msgid "Requests"
-msgstr ""
-
-#: .\config\templates\bases\base_vendedor.html:121
-msgid "Sellers"
-msgstr ""
-
-#: .\config\templates\bases\base_vendedor.html:125
-#, fuzzy
-#| msgid "Producto"
-msgid "Products"
-msgstr "Product"
+msgid "Solicitudes"
+msgstr "Requests"
 
 #: .\config\templates\bases\base_vendedor.html:129
-msgid "Home Content"
-msgstr ""
+#, fuzzy
+#| msgid "Contenido del Home"
+msgid "Contenido de Inicio"
+msgstr "Home Content"
 
 #: .\config\templates\bases\base_vendedor.html:135
 #: .\config\templates\vendedores\crear_cliente.html:5
@@ -2413,6 +2407,11 @@ msgid ""
 "No se pudo completar el registro. Verifica los datos e intenta nuevamente."
 msgstr ""
 
+#, fuzzy
+#~| msgid "Producto"
+#~ msgid "Products"
+#~ msgstr "Product"
+
 #~ msgid "Tienda Suprema"
 #~ msgstr "Supreme Store"
 
@@ -2421,9 +2420,6 @@ msgstr ""
 
 #~ msgid "Idioma"
 #~ msgstr "Language"
-
-#~ msgid "Solicitudes"
-#~ msgstr "Requests"
 
 #~ msgid ""
 #~ "Ofrecemos productos y servicios mayoristas de alta calidad, adaptados a "

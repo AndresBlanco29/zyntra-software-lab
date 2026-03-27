@@ -509,3 +509,53 @@ width:100%;
         font-size: 12px;
     }
 }
+
+/* --- DASHBOARD ADMIN RESPONSIVE --- */
+.dashboard-cards .card {
+  margin-bottom: 16px;
+}
+.dashboard-cards .card-body {
+  padding: 18px 8px;
+}
+.dashboard-cards h3 {
+  font-size: 1.7rem;
+}
+.dashboard-cards p {
+  font-size: 1.05rem;
+}
+@media (max-width: 768px) {
+  .dashboard-cards .card-body {
+    padding: 14px 6px;
+  }
+  .dashboard-cards h3 {
+    font-size: 1.3rem;
+  }
+  .dashboard-cards p {
+    font-size: 0.98rem;
+  }
+}
+@media (max-width: 576px) {
+  .dashboard-cards .card {
+    margin-bottom: 12px;
+  }
+  .dashboard-cards .card-body {
+    padding: 12px 4px;
+  }
+  .dashboard-cards h3 {
+    font-size: 1.1rem;
+  }
+  .dashboard-cards p {
+    font-size: 0.93rem;
+  }
+  .dashboard-cards img,
+  .dashboard-cards .icon {
+    max-width: 40px;
+    height: auto;
+  }
+  .dashboard-cards .col-12,
+  .dashboard-cards .col-sm-6,
+  .dashboard-cards .col-lg-3 {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}

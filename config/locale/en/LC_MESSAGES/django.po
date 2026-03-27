@@ -1801,7 +1801,7 @@ msgstr "Back to Home"
 #: .\config\templates\productos\catalogo.html:76
 
 msgid "Modo Invitado"
-msgstr "guest mode"
+msgstr "Guest Mode"
 
 #: .\config\templates\productos\catalogo.html:91
 msgid "Inicia sesión"

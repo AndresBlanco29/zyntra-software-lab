@@ -65,13 +65,19 @@ right:0;
 z-index:1000;
 }
 
-.sidebar{
-position:fixed;
-top:70px;
-left:0;
-width:253px;
-height:calc(100vh - 70px);
-overflow-y:auto;
+
+.sidebar {
+    position: fixed;
+    top: 70px;
+    left: 0;
+    width: 253px;
+    height: calc(100vh - 70px);
+    overflow-y: auto;
+    margin: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    z-index: 1060;
 }
 
 .content{
@@ -306,6 +312,11 @@ width:100%;
             background: #fff;
             transition: none;
             width: 253px;
+            top: 70px;
+            margin: 0;
+            padding: 0;
+            border: none;
+            box-shadow: none;
         }
         .sidebar.show {
             left: 0 !important;

@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: La Tortilla Grocery\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-26 19:40-0500\n"
+"POT-Creation-Date: 2026-03-26 20:17-0500\n"
 "Language: en\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -409,7 +409,7 @@ msgstr "Select brand"
 #: .\config\templates\admin\editar_producto.html:103
 #: .\config\templates\admin\productos.html:80
 msgid "Imagen"
-msgstr ""
+msgstr "Image"
 
 #: .\config\templates\admin\crear_producto.html:80
 #: .\config\templates\admin\editar_producto.html:249
@@ -438,7 +438,7 @@ msgstr "Packaging"
 #: .\config\templates\admin\crear_producto.html:101
 #: .\config\templates\admin\editar_producto.html:191
 msgid "Ej: Caja, Bolsa, Pack"
-msgstr ""
+msgstr "Ej: Box, bag, package"
 
 #: .\config\templates\admin\crear_producto.html:105
 #: .\config\templates\admin\editar_producto.html:135
@@ -448,7 +448,7 @@ msgstr "Content type"
 
 #: .\config\templates\admin\crear_producto.html:106
 msgid "Ej: Unidades, Libras, Onzas"
-msgstr ""
+msgstr "Ej: units, pounds, ounces"
 
 #: .\config\templates\admin\crear_producto.html:110
 #: .\config\templates\admin\editar_producto.html:140
@@ -946,7 +946,7 @@ msgstr "Brands"
 
 #: .\config\templates\admin\marcas.html:30
 msgid "Logo"
-msgstr ""
+msgstr "Logo"
 
 #: .\config\templates\admin\marcas.html:33
 #, fuzzy
@@ -1226,10 +1226,8 @@ msgid "Vendedor"
 msgstr "seller"
 
 #: .\config\templates\bases\base_vendedor.html:100
-#, fuzzy
-#| msgid "Panel Administrador"
 msgid "Administrador"
-msgstr "Admin Panel"
+msgstr "Administrator"
 
 #: .\config\templates\bases\base_vendedor.html:113
 msgid "Dashboard"
@@ -1237,7 +1235,7 @@ msgstr "Dashboard"
 
 #: .\config\templates\bases\base_vendedor.html:117
 msgid "Requests"
-msgstr "Solicitudes"
+msgstr ""
 
 #: .\config\templates\bases\base_vendedor.html:121
 msgid "Sellers"
@@ -1298,11 +1296,11 @@ msgstr "Understood"
 
 #: .\config\templates\bases\base_vendedor.html:237
 msgid "Error"
-msgstr ""
+msgstr "Error"
 
 #: .\config\templates\bases\base_vendedor.html:238
 msgid "Aviso"
-msgstr ""
+msgstr "warning"
 
 #: .\config\templates\bases\base_vendedor.html:239
 msgid "Operacion exitosa"
@@ -1411,6 +1409,8 @@ msgid ""
 "Nuestro equipo revisará tu solicitud y se pondrá en contacto para confirmar "
 "precios y disponibilidad."
 msgstr ""
+"Our team will review your request and contact you to confirm prices and "
+"availability."
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:298
 #, fuzzy
@@ -1440,7 +1440,7 @@ msgstr "Quote"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:324
 msgid "Por favor, ve al catálogo y añade productos a tu cotización."
-msgstr ""
+msgstr "Please go to the catalog and add products to your quote."
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:328
 #, fuzzy

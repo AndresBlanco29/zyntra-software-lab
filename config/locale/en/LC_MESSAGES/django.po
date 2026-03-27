@@ -1237,7 +1237,7 @@ msgstr "Dashboard"
 
 #: .\config\templates\bases\base_vendedor.html:117
 msgid "Requests"
-msgstr ""
+msgstr "Solicitudes"
 
 #: .\config\templates\bases\base_vendedor.html:121
 msgid "Sellers"

@@ -48,7 +48,7 @@ padding: 20px !important;
 .sidebar{
 position: fixed !important;
 top: 70px !important;
-left: -270px !important;
+left: -100px !important;
 width: 250px !important;
 height: calc(100vh - 70px) !important;
 z-index: 999;
@@ -70,9 +70,6 @@ padding: 15px !important;
 height: auto;
 }
 
-.sidebar{
-display: none;
-}
 
 .navbar-brand {
 font-size: 16px !important;

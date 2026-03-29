@@ -798,6 +798,39 @@ background:#f3f4f6;
         left: 0 !important;
     }
 
+/* Fix: ensure mobile sidebar is fully off-canvas until toggled and add backdrop */
+@media (max-width: 992px) {
+    .sidebar {
+        left: -270px !important;
+        display: block !important;
+        box-shadow: none !important;
+    }
+
+    .sidebar.show {
+        left: 0 !important;
+        box-shadow: 2px 0 12px rgba(0,0,0,0.08) !important;
+    }
+
+    .sidebar-backdrop {
+        display: none;
+    }
+
+    .sidebar-backdrop.show {
+        display: block;
+        position: fixed;
+        top: 70px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.35);
+        z-index: 1050;
+    }
+
+    .main-content {
+        margin-left: 0 !important;
+    }
+}
+
     .sidebar-backdrop {
         display: none;
         position: fixed;

@@ -868,3 +868,39 @@ background:#f3f4f6;
         left: 12px;
     }
 }
+
+/* Strong mobile off-canvas: hide sidebar fully using transform */
+@media (max-width: 576px) {
+    .sidebar {
+        left: 0 !important;
+        transform: translateX(-100%) !important;
+        transition: transform .28s ease !important;
+        will-change: transform;
+        box-shadow: none !important;
+    }
+
+    .sidebar.show {
+        transform: translateX(0) !important;
+        box-shadow: 2px 0 20px rgba(0,0,0,0.12) !important;
+    }
+
+    .sidebar-backdrop {
+        display: none;
+    }
+
+    .sidebar-backdrop.show {
+        display: block;
+        position: fixed;
+        top: 70px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.38);
+        z-index: 1045;
+    }
+
+    /* Ensure content doesn't shift and is fully visible */
+    .main-content {
+        margin-left: 0 !important;
+    }
+}

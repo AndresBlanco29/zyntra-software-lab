@@ -1,9 +1,5 @@
-<<<<<<< HEAD
 # Python
 __pycache__/
-=======
-_pycache_/
->>>>>>> 9e87964cf87f35398e0e45113e517a3c0ee65f35
 *.pyc
 *.pyo
 *.pyd
@@ -27,8 +23,4 @@ Thumbs.db
 *.sql
 
 # Logs
-<<<<<<< HEAD
 *.log
-=======
-*.log
->>>>>>> 9e87964cf87f35398e0e45113e517a3c0ee65f35

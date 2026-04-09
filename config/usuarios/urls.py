@@ -1,6 +1,6 @@
 from django.urls import path
 from django.contrib.auth.views import LogoutView
-from .views import login_view, registro_view, panel_admin, clientes_pendientes, aprobar_cliente, ver_cliente, ver_certificado_cliente, rechazar_cliente, lista_vendedores, crear_vendedor, editar_vendedor, desactivar_vendedor, activar_vendedor, login_form_modal, registro_form_modal, verificar_username, logout_view, contenido_home, lista_testimonios, crear_testimonio, editar_testimonio, desactivar_testimonio, activar_testimonio, editar_home_contenido
+from .views import login_view, registro_view, panel_admin, perfil_admin, clientes_pendientes, aprobar_cliente, ver_cliente, ver_certificado_cliente, rechazar_cliente, lista_vendedores, crear_vendedor, editar_vendedor, desactivar_vendedor, activar_vendedor, login_form_modal, registro_form_modal, verificar_username, logout_view, contenido_home, lista_testimonios, crear_testimonio, editar_testimonio, desactivar_testimonio, activar_testimonio, editar_home_contenido
 
 urlpatterns = [
     path('login/', login_view, name='login'),
@@ -10,6 +10,7 @@ urlpatterns = [
     path('verificar-username/', verificar_username, name='verificar_username'),
 
     path('panel-admin/', panel_admin, name='panel_admin'),
+    path('panel-admin/mi-perfil/', perfil_admin, name='perfil_admin'),
     path('panel-admin/clientes-pendientes/', clientes_pendientes, name='clientes_pendientes'),
     path('panel-admin/aprobar-cliente/<int:cliente_id>/', aprobar_cliente, name='aprobar_cliente'),
     path('panel-admin/rechazar-cliente/<int:cliente_id>/', rechazar_cliente, name='rechazar_cliente'),

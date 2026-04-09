@@ -116,6 +116,67 @@ msgstr "Clientes Pendientes"
 msgid "Empresa"
 msgstr "Empresa"
 
+#: .\config\templates\admin\perfil_admin.html:3
+#: .\config\templates\bases\base_vendedor.html:117
+msgid "Mi perfil"
+msgstr "Mi perfil"
+
+#: .\config\templates\admin\perfil_admin.html:8
+msgid "Administra tu informacion de acceso y manten actualizados tus datos de cuenta."
+msgstr "Administra tu informacion de acceso y manten actualizados tus datos de cuenta."
+
+#: .\config\templates\admin\perfil_admin.html:13
+msgid "Informacion personal"
+msgstr "Informacion personal"
+
+#: .\config\templates\admin\perfil_admin.html:42
+msgid "Seguridad"
+msgstr "Seguridad"
+
+#: .\config\templates\admin\perfil_admin.html:48
+msgid "Contrasena actual"
+msgstr "Contrasena actual"
+
+#: .\config\templates\admin\perfil_admin.html:53
+msgid "Nueva contrasena"
+msgstr "Nueva contrasena"
+
+#: .\config\templates\admin\perfil_admin.html:58
+msgid "Confirmar nueva contrasena"
+msgstr "Confirmar nueva contrasena"
+
+#: .\config\templates\admin\perfil_admin.html:62
+msgid "Cambiar contrasena"
+msgstr "Cambiar contrasena"
+
+#: .\config\usuarios\views.py:585
+msgid "El correo electronico es obligatorio."
+msgstr "El correo electronico es obligatorio."
+
+#: .\config\usuarios\views.py:590
+msgid "Ya existe otro usuario con ese correo electronico."
+msgstr "Ya existe otro usuario con ese correo electronico."
+
+#: .\config\usuarios\views.py:598
+msgid "Tu perfil fue actualizado correctamente."
+msgstr "Tu perfil fue actualizado correctamente."
+
+#: .\config\usuarios\views.py:607
+msgid "La contrasena actual no es correcta."
+msgstr "La contrasena actual no es correcta."
+
+#: .\config\usuarios\views.py:611
+msgid "Debes ingresar y confirmar la nueva contrasena."
+msgstr "Debes ingresar y confirmar la nueva contrasena."
+
+#: .\config\usuarios\views.py:615
+msgid "Las nuevas contrasenas no coinciden."
+msgstr "Las nuevas contrasenas no coinciden."
+
+#: .\config\usuarios\views.py:627
+msgid "Tu contrasena fue actualizada correctamente."
+msgstr "Tu contrasena fue actualizada correctamente."
+
 #: .\config\templates\admin\clientes_pendientes.html:19
 #: .\config\templates\usuarios\registro_modal_form.html:125
 #: .\config\templates\vendedores\crear_cliente.html:134
@@ -1607,6 +1668,10 @@ msgstr "Cantidad:"
 #: .\config\templates\productos\catalogo.html:223
 msgid "Añadir a cotización"
 msgstr "Añadir a cotización"
+
+#: .\config\templates\productos\catalogo.html:223
+msgid "Añadir pedido"
+msgstr "Añadir pedido"
 
 #: .\config\templates\home.html:801
 msgid "¿Tienes una tienda? Solicita tu cuenta mayorista hoy"

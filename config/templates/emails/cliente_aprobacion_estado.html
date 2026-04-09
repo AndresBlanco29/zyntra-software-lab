@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+</head>
+<body style="font-family: Arial, sans-serif; background:#f4f6f9; padding:30px; color:#1e293b;">
+
+<table width="100%" cellspacing="0" cellpadding="0">
+<tr>
+<td align="center">
+
+<table width="700" style="background:white;border-radius:10px;overflow:hidden;box-shadow:0px 10px 25px rgba(0,0,0,0.1);">
+
+<tr>
+<td style="background:linear-gradient(90deg,#023B82,#0C64CF,#3F89DA); padding:25px; text-align:center; color:white;">
+<h2 style="margin:0;">La Tortilla Grocery</h2>
+<p style="margin:5px 0 0 0;">{{ preview_text }}</p>
+</td>
+</tr>
+
+<tr>
+<td style="padding:25px;">
+<h3 style="margin-top:0;">Hello {{ client_name }},</h3>
+
+{% if approved %}
+<p>Your wholesale account request has been approved.</p>
+<p>You can now sign in with the credentials you created during registration.</p>
+{% else %}
+<p>Your wholesale account request was not approved at this time.</p>
+<p>If you want to continue the process, please contact our team or submit a new request with updated information.</p>
+{% endif %}
+
+{% if company_name %}
+<div style="background:#f8fafc;border:1px solid #e2e8f0;padding:14px 16px;border-radius:8px;margin:18px 0;">
+<strong>Company:</strong> {{ company_name }}
+</div>
+{% endif %}
+
+<p style="margin-bottom:0;">Thank you for your interest in La Tortilla Grocery.</p>
+</td>
+</tr>
+
+<tr>
+<td style="background:#f8f8f8;padding:20px;text-align:center;font-size:12px;color:#666;">
+<p style="margin:0;">This message was sent automatically from the La Tortilla Grocery platform.</p>
+</td>
+</tr>
+
+</table>
+
+</td>
+</tr>
+</table>
+
+</body>
+</html>

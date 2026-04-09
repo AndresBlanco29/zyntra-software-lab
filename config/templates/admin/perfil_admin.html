@@ -1,0 +1,79 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Mi perfil" %}{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-2">{% trans "Mi perfil" %}</h2>
+<p class="text-muted mb-4">{% trans "Administra tu informacion de acceso y manten actualizados tus datos de cuenta." %}</p>
+
+<div class="row g-4">
+  <div class="col-12 col-xl-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="mb-3">{% trans "Informacion personal" %}</h5>
+
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="profile">
+
+          <div class="mb-3">
+            <label class="form-label">{% trans "Nombre" %}</label>
+            <input type="text" name="nombre" class="form-control" value="{{ usuario_objetivo.first_name }}">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">{% trans "Apellido" %}</label>
+            <input type="text" name="apellido" class="form-control" value="{{ usuario_objetivo.last_name }}">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">{% trans "Email" %}</label>
+            <input type="email" name="email" class="form-control" value="{{ usuario_objetivo.email }}" required>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">{% trans "Usuario" %}</label>
+            <input type="text" class="form-control" value="{{ usuario_objetivo.username }}" disabled>
+            <small class="text-muted">{% trans "El nombre de usuario no se puede cambiar" %}</small>
+          </div>
+
+          <button type="submit" class="btn btn-success">{% trans "Guardar cambios" %}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-xl-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="mb-3">{% trans "Seguridad" %}</h5>
+
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="password">
+
+          <div class="mb-3">
+            <label class="form-label">{% trans "Contrasena actual" %}</label>
+            <input type="password" name="current_password" class="form-control" required>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">{% trans "Nueva contrasena" %}</label>
+            <input type="password" name="new_password" class="form-control" required>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label">{% trans "Confirmar nueva contrasena" %}</label>
+            <input type="password" name="confirm_password" class="form-control" required>
+          </div>
+
+          <button type="submit" class="btn btn-primary">{% trans "Cambiar contrasena" %}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,28 +1,99 @@
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
+from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.models import Group
 from .models import Usuario
+from .us_locations import US_STATE_CITIES, match_state_name, match_city_for_state
 from config.clientes.models import Cliente
 from config.core.models import Testimonio, HomeContenido, ensure_homecontenido_quienes_schema
 from config.productos.models import Producto, Marca
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.contrib.auth.hashers import make_password
+from django.core.mail import EmailMultiAlternatives
 from django.http import JsonResponse, FileResponse, Http404, HttpResponse
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.translation import gettext as _
 from django.db import transaction
 from django.db import OperationalError, ProgrammingError
+from django.conf import settings
 import mimetypes
 import os
 import re
 import urllib.request
 import urllib.error
 import logging
+import json
 
 logger = logging.getLogger(__name__)
+
+
+def _registration_context(**extra):
+    context = {
+        'us_locations_json': json.dumps(US_STATE_CITIES),
+        'us_states': sorted(US_STATE_CITIES.keys()),
+    }
+    context.update(extra)
+    return context
+
+
+def _send_client_decision_email(*, client_email, client_name, approved, company_name):
+    if not client_email:
+        return 'no-email'
+
+    resend_api_key = (settings.ANYMAIL.get('RESEND_API_KEY') or '').strip()
+
+    if (
+        settings.EMAIL_BACKEND == 'anymail.backends.resend.EmailBackend'
+        and (not resend_api_key or resend_api_key == 'tu_api_key_real')
+    ):
+        raise RuntimeError('RESEND_API_KEY is missing')
+
+    subject = (
+        'La Tortilla Grocery - Wholesale account approved'
+        if approved
+        else 'La Tortilla Grocery - Wholesale account request update'
+    )
+    preview_text = (
+        'Your wholesale account has been approved.'
+        if approved
+        else 'Your wholesale account request was not approved.'
+    )
+    html_content = render_to_string(
+        'emails/cliente_aprobacion_estado.html',
+        {
+            'client_name': client_name,
+            'company_name': company_name,
+            'approved': approved,
+            'preview_text': preview_text,
+        },
+    )
+    text_content = (
+        f'Hello {client_name},\n\n'
+        + (
+            'Your wholesale account request for La Tortilla Grocery has been approved. '
+            'You can now sign in with the credentials you registered.'
+            if approved
+            else 'Your wholesale account request for La Tortilla Grocery was not approved at this time. '
+            'If you believe this was a mistake, please contact our team or submit a new request with updated information.'
+        )
+        + (f'\n\nCompany: {company_name}' if company_name else '')
+        + '\n\nLa Tortilla Grocery'
+    )
+
+    email = EmailMultiAlternatives(
+        subject=subject,
+        body=text_content,
+        from_email=settings.DEFAULT_FROM_EMAIL or settings.SERVER_EMAIL,
+        to=[client_email],
+    )
+    email.attach_alternative(html_content, 'text/html')
+    email.send(fail_silently=False)
+    return 'sent'
 
 
 def _get_or_create_home_contenido():
@@ -481,6 +552,75 @@ def panel_admin(request):
 
 
 @login_required
+def perfil_admin(request):
+
+    if not _is_admin_user(request.user):
+        return redirect('login')
+
+    usuario = request.user
+
+    if request.method == 'POST':
+        action = (request.POST.get('action') or '').strip()
+
+        if action == 'profile':
+            nombre = (request.POST.get('nombre') or '').strip()
+            apellido = (request.POST.get('apellido') or '').strip()
+            email = (request.POST.get('email') or '').strip()
+
+            if not email:
+                messages.error(request, _('El correo electronico es obligatorio.'))
+                return redirect('perfil_admin')
+
+            existing_user = Usuario.objects.filter(email__iexact=email).exclude(pk=usuario.pk).first()
+            if existing_user:
+                messages.error(request, _('Ya existe otro usuario con ese correo electronico.'))
+                return redirect('perfil_admin')
+
+            usuario.first_name = nombre
+            usuario.last_name = apellido
+            usuario.email = email
+            usuario.save(update_fields=['first_name', 'last_name', 'email'])
+
+            messages.success(request, _('Tu perfil fue actualizado correctamente.'))
+            return redirect('perfil_admin')
+
+        if action == 'password':
+            current_password = request.POST.get('current_password') or ''
+            new_password = request.POST.get('new_password') or ''
+            confirm_password = request.POST.get('confirm_password') or ''
+
+            if not usuario.check_password(current_password):
+                messages.error(request, _('La contrasena actual no es correcta.'))
+                return redirect('perfil_admin')
+
+            if not new_password or not confirm_password:
+                messages.error(request, _('Debes ingresar y confirmar la nueva contrasena.'))
+                return redirect('perfil_admin')
+
+            if new_password != confirm_password:
+                messages.error(request, _('Las nuevas contrasenas no coinciden.'))
+                return redirect('perfil_admin')
+
+            try:
+                validate_password(new_password, usuario)
+            except ValidationError as exc:
+                for error in exc.messages:
+                    messages.error(request, error)
+                return redirect('perfil_admin')
+
+            usuario.set_password(new_password)
+            usuario.save(update_fields=['password'])
+            update_session_auth_hash(request, usuario)
+
+            messages.success(request, _('Tu contrasena fue actualizada correctamente.'))
+            return redirect('perfil_admin')
+
+    return render(request, 'admin/perfil_admin.html', {
+        'usuario_objetivo': usuario,
+    })
+
+
+@login_required
 def contenido_home(request):
 
     if not _is_admin_user(request.user):
@@ -915,6 +1055,24 @@ def aprobar_cliente(request, cliente_id):
     usuario.is_active = True
     usuario.save()
 
+    try:
+        email_sent = _send_client_decision_email(
+            client_email=usuario.email,
+            client_name=(usuario.first_name or usuario.username or 'Client').strip(),
+            approved=True,
+            company_name=cliente.nombre_empresa,
+        )
+        if email_sent == 'sent':
+            messages.success(request, _('Cliente aprobado y correo enviado al cliente.'))
+        else:
+            messages.success(request, _('Cliente aprobado. El cliente no tiene correo registrado para notificar.'))
+    except RuntimeError as exc:
+        logger.warning('Configuracion de correo incompleta al aprobar cliente %s: %s', cliente.id, exc)
+        messages.warning(request, _('Cliente aprobado, pero el correo no esta configurado en este entorno. Falta RESEND_API_KEY.'))
+    except Exception as exc:
+        logger.exception('Error enviando correo de aprobación para cliente %s: %s', cliente.id, exc)
+        messages.warning(request, _('Cliente aprobado, pero no se pudo enviar el correo al cliente.'))
+
     return redirect('clientes_pendientes')
 
 @login_required
@@ -926,6 +1084,28 @@ def rechazar_cliente(request, cliente_id):
     cliente = get_object_or_404(Cliente, id=cliente_id)
 
     usuario = cliente.usuario
+
+    client_email = usuario.email
+    client_name = (usuario.first_name or usuario.username or 'Client').strip()
+    company_name = cliente.nombre_empresa
+
+    try:
+        email_sent = _send_client_decision_email(
+            client_email=client_email,
+            client_name=client_name,
+            approved=False,
+            company_name=company_name,
+        )
+        if email_sent == 'sent':
+            messages.success(request, _('Cliente rechazado y correo enviado al cliente.'))
+        else:
+            messages.success(request, _('Cliente rechazado. El cliente no tiene correo registrado para notificar.'))
+    except RuntimeError as exc:
+        logger.warning('Configuracion de correo incompleta al rechazar cliente %s: %s', cliente.id, exc)
+        messages.warning(request, _('Cliente rechazado, pero el correo no esta configurado en este entorno. Falta RESEND_API_KEY.'))
+    except Exception as exc:
+        logger.exception('Error enviando correo de rechazo para cliente %s: %s', cliente.id, exc)
+        messages.warning(request, _('Cliente rechazado, pero no se pudo enviar el correo al cliente.'))
 
     cliente.delete()
     usuario.delete()
@@ -1154,6 +1334,24 @@ def registro_view(request):
         telefono = request.POST.get('telefono')
         documento = request.POST.get('id_cliente')
         certificado = request.FILES.get('certificado')
+        submitted_state = request.POST.get('estado', '').strip()
+        submitted_city = request.POST.get('ciudad', '').strip()
+
+        matched_state = match_state_name(submitted_state)
+        if not matched_state:
+            message = _("Debes seleccionar un estado valido.")
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': 'invalid_state', 'message': message}, status=400)
+            messages.error(request, message)
+            return redirect('registro')
+
+        matched_city = match_city_for_state(matched_state, submitted_city)
+        if not matched_city:
+            message = _("Debes seleccionar una ciudad valida para el estado elegido.")
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': 'invalid_city', 'message': message}, status=400)
+            messages.error(request, message)
+            return redirect('registro')
 
         if not certificado:
             message = _("Debes adjuntar el certificado tax para completar el registro.")
@@ -1183,8 +1381,8 @@ def registro_view(request):
                     nombre_empresa=request.POST.get('empresa'),
                     telefono=request.POST.get('telefono_comercial'),
                     direccion=request.POST.get('direccion'),
-                    ciudad=request.POST.get('ciudad'),
-                    estado=request.POST.get('estado'),
+                    ciudad=matched_city,
+                    estado=matched_state,
                     codigo_postal=request.POST.get('codigo_postal'),
                     pais=request.POST.get('pais'),
                     sales_tax_number=request.POST.get('sales_tax'),
@@ -1202,8 +1400,7 @@ def registro_view(request):
                 message = _("Tu solicitud fue enviada. Un administrador revisará tu cuenta.")
                 if is_ajax:
                     return JsonResponse({'success': True, 'message': message})
-                messages.success(request, message)
-                return redirect('login')
+                return render(request, 'usuarios/login.html', {'registration_notice': message})
             else:
                 # Si no se creó el usuario, mostrar error
                 message = _("No se pudo completar el registro. Verifica los datos e intenta nuevamente.")
@@ -1212,17 +1409,14 @@ def registro_view(request):
                 messages.error(request, message)
                 return redirect('registro')
 
-        messages.success(
-            request,
-            _("Tu solicitud fue enviada. Un administrador revisará tu cuenta.")
-        )
+        success_message = _("Tu solicitud fue enviada. Un administrador revisará tu cuenta.")
 
         if is_ajax:
-            return JsonResponse({'success': True, 'message': _('Tu solicitud fue enviada. Un administrador revisará tu cuenta.')})
+            return JsonResponse({'success': True, 'message': success_message})
 
-        return redirect('login')
+        return render(request, 'usuarios/login.html', {'registration_notice': success_message})
 
-    return render(request, 'usuarios/registro.html')
+    return render(request, 'usuarios/registro.html', _registration_context())
 
 
 def login_form_modal(request):
@@ -1260,6 +1454,6 @@ def login_form_modal(request):
 def registro_form_modal(request):
     """Devuelve solo el formulario de registro para cargar en modal"""
     # GET - Devolver solo el formulario de registro
-    return render(request, 'usuarios/registro_modal_form.html')
+    return render(request, 'usuarios/registro_modal_form.html', _registration_context())
 
 

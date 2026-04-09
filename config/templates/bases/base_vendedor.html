@@ -113,6 +113,10 @@ La Tortilla Grocery
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'panel_admin' %}active{% endif %}">
     {% trans "Dashboard" %}
   </a>
+  <a href="{% url 'perfil_admin' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'perfil_admin' %}active{% endif %}">
+    {% trans "Mi perfil" %}
+  </a>
   <a href="{% url 'clientes_pendientes' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' %}active{% endif %}">
     {% trans "Solicitudes" %}

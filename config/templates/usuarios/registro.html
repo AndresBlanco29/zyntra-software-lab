@@ -226,7 +226,7 @@
             
               <h6 class="fw-bold text-center mb-3">{% if CURRENT_LANGUAGE == 'es' %}Datos de la empresa (Obligatorio){% else %}Business details (Required){% endif %}</h6>
 
-              <div class="row g-3">
+              <div class="row g-3" data-location-group>
                 <div class="col-md-6">
                   <input
                     type="text"
@@ -306,81 +306,18 @@
                 </div>
 
                 <div class="col-md-6">
-                  <input
-                    type="text"
-                    class="form-control form-control-lg"
-                    name="ciudad"
-                    placeholder="{% if CURRENT_LANGUAGE == 'es' %}Ciudad{% else %}City{% endif %}"
-                    required/>
+                  <select class="form-select form-control-lg" name="estado" data-state-select required>
+                    <option value="">{% if CURRENT_LANGUAGE == 'es' %}Selecciona un estado{% else %}Select a state{% endif %}</option>
+                    {% for state_name in us_states %}
+                    <option value="{{ state_name }}">{{ state_name }}</option>
+                    {% endfor %}
+                  </select>
                 </div>
 
                 <div class="col-md-6">
-                  <div class="state-selector" data-state-selector>
-                    <input
-                      type="text"
-                      class="form-control form-control-lg state-selector-input"
-                      name="estado"
-                      placeholder="{% if CURRENT_LANGUAGE == 'es' %}Buscar o seleccionar estado{% else %}Search or select state{% endif %}"
-                      autocomplete="off"
-                      data-state-input
-                      required/>
-                    <button type="button" class="state-selector-toggle" data-state-toggle aria-label="{% if CURRENT_LANGUAGE == 'es' %}Mostrar estados{% else %}Show states{% endif %}">
-                      <i class="bi bi-chevron-down"></i>
-                    </button>
-                    <div class="state-selector-menu" data-state-menu hidden>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Alabama">Alabama</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Alaska">Alaska</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Arizona">Arizona</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Arkansas">Arkansas</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="California">California</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Colorado">Colorado</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Connecticut">Connecticut</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Delaware">Delaware</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Florida">Florida</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Georgia">Georgia</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Hawaii">Hawaii</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Idaho">Idaho</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Illinois">Illinois</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Indiana">Indiana</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Iowa">Iowa</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Kansas">Kansas</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Kentucky">Kentucky</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Louisiana">Louisiana</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Maine">Maine</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Maryland">Maryland</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Massachusetts">Massachusetts</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Michigan">Michigan</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Minnesota">Minnesota</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Mississippi">Mississippi</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Missouri">Missouri</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Montana">Montana</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Nebraska">Nebraska</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Nevada">Nevada</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="New Hampshire">New Hampshire</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="New Jersey">New Jersey</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="New Mexico">New Mexico</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="New York">New York</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="North Carolina">North Carolina</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="North Dakota">North Dakota</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Ohio">Ohio</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Oklahoma">Oklahoma</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Oregon">Oregon</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Pennsylvania">Pennsylvania</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Rhode Island">Rhode Island</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="South Carolina">South Carolina</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="South Dakota">South Dakota</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Tennessee">Tennessee</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Texas">Texas</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Utah">Utah</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Vermont">Vermont</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Virginia">Virginia</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Washington">Washington</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="West Virginia">West Virginia</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Wisconsin">Wisconsin</button>
-                      <button type="button" class="state-selector-option" data-state-option data-value="Wyoming">Wyoming</button>
-                      <div class="state-selector-empty" data-state-empty hidden>{% if CURRENT_LANGUAGE == 'es' %}No se encontraron estados{% else %}No states found{% endif %}</div>
-                    </div>
-                  </div>
+                  <select class="form-select form-control-lg" name="ciudad" data-city-select disabled required>
+                    <option value="">{% if CURRENT_LANGUAGE == 'es' %}Selecciona primero un estado{% else %}Select a state first{% endif %}</option>
+                  </select>
                 </div>
 
                 <div class="col-md-6">
@@ -491,6 +428,9 @@
       </div>  
     </div>
 
+    <script>
+      window.__LTG_US_LOCATIONS = {{ us_locations_json|safe }};
+    </script>
     <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
     <script src="{%static 'js/registro.js'%}"></script>
     <script src="{% static 'js/tax-example.js' %}"></script>

@@ -861,14 +861,15 @@ background:#f3f4f6;
     #carouselOfertas .carousel-item .row {
         width: 100%;
         margin: 0 !important;
-        justify-content: center !important;
+        justify-content: flex-start !important;
+        padding-left: 14px;
     }
 
     #carouselOfertas .carousel-item .col-lg-3,
     #carouselOfertas .carousel-item .col-md-6 {
         width: auto !important;
         max-width: 90%;
-        margin: 0 auto !important;
+        margin: 0 !important;
         padding: 0 5px !important;
         flex: 0 0 auto;
     }
@@ -1278,14 +1279,15 @@ background:#f3f4f6;
     #carouselOfertas .carousel-item .row {
         width: 100%;
         margin: 0 !important;
-        justify-content: center !important;
+        justify-content: flex-start !important;
+        padding-left: 12px;
     }
 
     #carouselOfertas .carousel-item .col-lg-3,
     #carouselOfertas .carousel-item .col-md-6 {
         width: auto !important;
         max-width: 90%;
-        margin: 0 auto !important;
+        margin: 0 !important;
         padding: 0 5px !important;
         flex: 0 0 auto;
     }
@@ -3311,12 +3313,12 @@ background:rgba(255,255,255,.25);
     }
 }
 
-/* Mobile: show only 2 featured offers per slide */
+/* Mobile: show only 1 featured offer per slide */
 @media (max-width: 768px) {
-    #ofertas #carouselOfertas .carousel-item .row > .col-lg-3:nth-child(n+3),
-    #ofertas #carouselOfertas .carousel-item .row > .col-md-6:nth-child(n+3),
-    #ofertas .row.g-4.justify-content-center > .col-lg-4:nth-child(n+3),
-    #ofertas .row.g-4.justify-content-center > .col-md-6:nth-child(n+3) {
+    #ofertas #carouselOfertas .carousel-item .row > .col-lg-3:nth-child(n+2),
+    #ofertas #carouselOfertas .carousel-item .row > .col-md-6:nth-child(n+2),
+    #ofertas .row.g-4.justify-content-center > .col-lg-4:nth-child(n+2),
+    #ofertas .row.g-4.justify-content-center > .col-md-6:nth-child(n+2) {
         display: none !important;
     }
 
@@ -3838,4 +3840,554 @@ background:rgba(255,255,255,.25);
     height: 80px !important;
     width: auto !important;
   }
+}
+
+.install-app-section {
+    padding: 28px 0 36px;
+    background:
+        radial-gradient(circle at top left, rgba(11, 61, 145, 0.1), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(255, 212, 0, 0.18), transparent 24%),
+        linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+
+.install-app-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+    gap: 34px;
+    align-items: center;
+    padding: 34px;
+    border-radius: 32px;
+    background: rgba(255, 255, 255, 0.96);
+    border: 1px solid rgba(11, 61, 145, 0.08);
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1);
+}
+
+.install-app-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #0b3d91, #2f77d1);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.install-app-copy h3 {
+    margin: 16px 0 14px;
+    color: #0f172a;
+    font-size: clamp(1.8rem, 2.5vw, 2.5rem);
+    line-height: 1.1;
+    font-weight: 800;
+}
+
+.install-app-description {
+    margin: 0;
+    color: #475569;
+    font-size: 1rem;
+    line-height: 1.7;
+    max-width: 62ch;
+}
+
+.install-steps-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 24px;
+}
+
+.install-step-card {
+    position: relative;
+    min-height: 180px;
+    padding: 18px;
+    border-radius: 22px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+}
+
+.install-step-number {
+    display: inline-flex;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #ffd400;
+    color: #0f172a;
+    font-weight: 800;
+    margin-bottom: 12px;
+}
+
+.install-step-card h4 {
+    margin: 0 0 8px;
+    color: #0b3d91;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.install-step-card p {
+    margin: 0;
+    color: #475569;
+    font-size: 0.94rem;
+    line-height: 1.6;
+}
+
+.install-app-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: center;
+    margin-top: 24px;
+}
+
+.install-app-primary-btn {
+    background: linear-gradient(135deg, #0b3d91, #1565c0);
+    color: #fff;
+    font-weight: 700;
+    border: none;
+    border-radius: 14px;
+    padding: 13px 22px;
+    box-shadow: 0 14px 30px rgba(11, 61, 145, 0.22);
+}
+
+.install-app-primary-btn:hover {
+    background: linear-gradient(135deg, #0a3479, #1355a0);
+    color: #fff;
+}
+
+.install-app-secondary-link {
+    color: #0b3d91;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.install-app-secondary-link:hover {
+    color: #1565c0;
+}
+
+.install-app-visual {
+    display: flex;
+    justify-content: center;
+}
+
+.iphone-mockup {
+    width: min(360px, 100%);
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+    border-radius: 44px;
+    padding: 14px;
+    box-shadow: 0 28px 65px rgba(15, 23, 42, 0.28);
+}
+
+.iphone-notch {
+    width: 42%;
+    height: 24px;
+    margin: 0 auto -12px;
+    border-radius: 0 0 18px 18px;
+    background: #020617;
+    position: relative;
+    z-index: 2;
+}
+
+.iphone-screen {
+    min-height: 570px;
+    border-radius: 34px;
+    padding: 20px 18px 16px;
+    background:
+        radial-gradient(circle at top right, rgba(255, 212, 0, 0.26), transparent 28%),
+        linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+    overflow: hidden;
+}
+
+.iphone-status-row {
+    display: flex;
+    justify-content: space-between;
+    color: #0f172a;
+    font-size: 0.88rem;
+    font-weight: 700;
+    margin-bottom: 18px;
+}
+
+.iphone-preview-card {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(11, 61, 145, 0.08);
+    border-radius: 28px;
+    padding: 22px 18px;
+    min-height: 455px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    box-shadow: 0 20px 45px rgba(15, 23, 42, 0.09);
+}
+
+.iphone-preview-top {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    color: #475569;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.iphone-preview-chip {
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(11, 61, 145, 0.08);
+    color: #0b3d91;
+}
+
+.iphone-app-icon {
+    width: 100px;
+    height: 100px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #ffffff, #eef4ff);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 0 0 1px rgba(11, 61, 145, 0.08), 0 12px 24px rgba(11, 61, 145, 0.14);
+}
+
+.iphone-app-icon img {
+    width: 72px;
+    height: 72px;
+    object-fit: contain;
+}
+
+.iphone-preview-card h4 {
+    margin: 20px 0 10px;
+    color: #0f172a;
+    font-size: 1.35rem;
+    font-weight: 800;
+}
+
+.iphone-preview-card p {
+    margin: 0 0 20px;
+    color: #475569;
+    line-height: 1.6;
+}
+
+.iphone-preview-play {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    border-radius: 999px;
+    border: none;
+    background: #ffd400;
+    color: #0f172a;
+    font-weight: 800;
+    box-shadow: 0 12px 24px rgba(255, 212, 0, 0.32);
+}
+
+.iphone-preview-play i {
+    font-size: 1.1rem;
+}
+
+.iphone-home-dock {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 14px;
+}
+
+.iphone-home-dock span {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(15, 23, 42, 0.18);
+}
+
+.iphone-home-dock span.is-active {
+    width: 28px;
+    border-radius: 999px;
+    background: #0b3d91;
+}
+
+.install-tutorial-dialog {
+    max-width: 1060px;
+}
+
+.install-tutorial-modal-content {
+    border: none;
+    border-radius: 28px;
+    overflow: hidden;
+    box-shadow: 0 28px 80px rgba(15, 23, 42, 0.24);
+}
+
+.install-tutorial-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
+    min-height: 560px;
+}
+
+.install-tutorial-video-panel {
+    padding: 28px;
+    background: linear-gradient(135deg, #091a39 0%, #12366f 100%);
+}
+
+.install-video-frame {
+    width: 100%;
+    height: 100%;
+    min-height: 420px;
+    border-radius: 24px;
+    background:
+        radial-gradient(circle at top right, rgba(255, 212, 0, 0.18), transparent 28%),
+        linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.install-video-player {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #020617;
+}
+
+.install-video-empty {
+    max-width: 420px;
+    padding: 24px;
+    text-align: center;
+    color: #fff;
+}
+
+.install-video-empty-icon {
+    width: 82px;
+    height: 82px;
+    margin: 0 auto 18px;
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.12);
+    font-size: 2rem;
+}
+
+.install-video-empty h4 {
+    margin-bottom: 10px;
+    font-size: 1.5rem;
+    font-weight: 800;
+}
+
+.install-video-empty p {
+    margin: 0;
+    line-height: 1.7;
+    color: rgba(255, 255, 255, 0.84);
+}
+
+.install-tutorial-copy-panel {
+    padding: 34px 28px;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.install-tutorial-copy-panel h3 {
+    margin: 16px 0 12px;
+    color: #0f172a;
+    font-size: 2rem;
+    line-height: 1.12;
+    font-weight: 800;
+}
+
+.install-tutorial-copy-panel p {
+    color: #475569;
+    line-height: 1.7;
+    margin-bottom: 18px;
+}
+
+.install-tutorial-checklist {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.install-tutorial-checklist li {
+    position: relative;
+    padding-left: 28px;
+    margin-bottom: 12px;
+    color: #0f172a;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.install-tutorial-checklist li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ffd400, #ffae00);
+    box-shadow: 0 0 0 4px rgba(255, 212, 0, 0.18);
+}
+
+@media (max-width: 992px) {
+    .install-app-shell,
+    .install-tutorial-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .install-app-shell {
+        padding: 26px;
+    }
+
+    .install-steps-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .install-app-description {
+        max-width: none;
+    }
+
+    .install-tutorial-video-panel,
+    .install-tutorial-copy-panel {
+        padding: 22px;
+    }
+
+    .install-video-frame {
+        min-height: 320px;
+    }
+}
+
+@media (max-width: 576px) {
+    .install-app-section {
+        padding: 18px 0 26px;
+    }
+
+    .install-app-shell {
+        padding: 20px 16px;
+        gap: 24px;
+        border-radius: 24px;
+    }
+
+    .install-app-copy h3 {
+        font-size: 1.65rem;
+    }
+
+    .install-app-description,
+    .install-step-card p,
+    .install-tutorial-copy-panel p {
+        font-size: 0.94rem;
+    }
+
+    .install-step-card {
+        min-height: auto;
+    }
+
+    .install-app-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .install-app-primary-btn,
+    .install-app-secondary-link {
+        width: 100%;
+        text-align: center;
+        justify-content: center;
+    }
+
+    .iphone-mockup {
+        width: min(100%, 320px);
+        border-radius: 34px;
+        padding: 10px;
+    }
+
+    .iphone-screen {
+        min-height: 500px;
+        border-radius: 28px;
+        padding: 16px 14px 14px;
+    }
+
+    .iphone-preview-card {
+        min-height: 400px;
+        padding: 18px 14px;
+    }
+
+    .iphone-app-icon {
+        width: 88px;
+        height: 88px;
+    }
+
+    .iphone-app-icon img {
+        width: 62px;
+        height: 62px;
+    }
+
+    .install-tutorial-video-panel,
+    .install-tutorial-copy-panel {
+        padding: 18px;
+    }
+
+    .install-video-frame {
+        min-height: 250px;
+        border-radius: 18px;
+    }
+
+    .install-video-empty {
+        padding: 18px;
+    }
+
+    .install-video-empty h4 {
+        font-size: 1.25rem;
+    }
+
+    .install-tutorial-copy-panel h3 {
+        font-size: 1.6rem;
+    }
+}
+
+@media (max-width: 768px) {
+    #ofertas #carouselOfertas {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    #ofertas #carouselOfertas .carousel-inner {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        margin: 0 auto !important;
+    }
+
+    #ofertas #carouselOfertas .carousel-item .row {
+        justify-content: center !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        margin: 0 !important;
+    }
+
+    #ofertas #carouselOfertas .carousel-item .row > .col-lg-3,
+    #ofertas #carouselOfertas .carousel-item .row > .col-md-6 {
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+
+    #ofertas #carouselOfertas .carousel-control-prev,
+    #ofertas #carouselOfertas .carousel-control-next {
+        width: 28px !important;
+        height: 28px !important;
+        top: 50% !important;
+        bottom: auto !important;
+        transform: translateY(-50%);
+    }
+
+    #ofertas #carouselOfertas .carousel-control-prev {
+        left: 2px !important;
+    }
+
+    #ofertas #carouselOfertas .carousel-control-next {
+        right: 2px !important;
+    }
 }

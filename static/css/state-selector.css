@@ -26,6 +26,17 @@
   outline: 2px solid rgba(11, 61, 145, 0.35);
 }
 
+.state-selector-input:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.state-selector-toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .state-selector-menu {
   position: absolute;
   top: calc(100% + 8px);

@@ -1,4 +1,4 @@
-{% load static %}
+{% load static i18n %}
 <!doctype html>
 <html lang="es">
   <head>
@@ -51,6 +51,10 @@
         </div>
 
         <!-- Formulario -->
+
+        {% if registration_notice %}
+        <div class="alert alert-success">{{ registration_notice }}</div>
+        {% endif %}
 
         {% if messages %} {% for message in messages %}
         <div id="mensaje-error" class="alert alert-danger">{{ message }}</div>

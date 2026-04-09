@@ -336,7 +336,7 @@ z-index:9999;
 
 @media (max-width: 768px) {
     /* organiza filtros y buscador en columna */
-    .d-flex.gap-2 {
+    .catalog-header .selects-row {
         flex-direction: column;
         gap: 10px !important;
     }

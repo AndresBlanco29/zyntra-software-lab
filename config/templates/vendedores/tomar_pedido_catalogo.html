@@ -17,6 +17,7 @@
 <link rel="stylesheet" href="{% static 'css/tomar_pedido_catalogo.css' %}">
 
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+<script defer src="{% static 'js/language-session.js' %}"></script>
 
 </head>
 
@@ -514,7 +515,7 @@ EN
 
 <div class="language-menu" id="languageMenu">
 
-<form action="{% url 'set_language' %}" method="post">
+<form action="{% url 'set_language' %}" method="post" data-language-form>
 
 {% csrf_token %}
 <input name="next" type="hidden" value="{{ request.path }}">

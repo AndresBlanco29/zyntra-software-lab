@@ -112,6 +112,67 @@ msgstr "Pending Customers"
 msgid "Empresa"
 msgstr "Company"
 
+#: .\config\templates\admin\perfil_admin.html:3
+#: .\config\templates\bases\base_vendedor.html:117
+msgid "Mi perfil"
+msgstr "My Profile"
+
+#: .\config\templates\admin\perfil_admin.html:8
+msgid "Administra tu informacion de acceso y manten actualizados tus datos de cuenta."
+msgstr "Manage your account information and keep your access details up to date."
+
+#: .\config\templates\admin\perfil_admin.html:13
+msgid "Informacion personal"
+msgstr "Personal information"
+
+#: .\config\templates\admin\perfil_admin.html:42
+msgid "Seguridad"
+msgstr "Security"
+
+#: .\config\templates\admin\perfil_admin.html:48
+msgid "Contrasena actual"
+msgstr "Current password"
+
+#: .\config\templates\admin\perfil_admin.html:53
+msgid "Nueva contrasena"
+msgstr "New password"
+
+#: .\config\templates\admin\perfil_admin.html:58
+msgid "Confirmar nueva contrasena"
+msgstr "Confirm new password"
+
+#: .\config\templates\admin\perfil_admin.html:62
+msgid "Cambiar contrasena"
+msgstr "Change password"
+
+#: .\config\usuarios\views.py:585
+msgid "El correo electronico es obligatorio."
+msgstr "Email is required."
+
+#: .\config\usuarios\views.py:590
+msgid "Ya existe otro usuario con ese correo electronico."
+msgstr "Another user with that email already exists."
+
+#: .\config\usuarios\views.py:598
+msgid "Tu perfil fue actualizado correctamente."
+msgstr "Your profile was updated successfully."
+
+#: .\config\usuarios\views.py:607
+msgid "La contrasena actual no es correcta."
+msgstr "The current password is incorrect."
+
+#: .\config\usuarios\views.py:611
+msgid "Debes ingresar y confirmar la nueva contrasena."
+msgstr "You must enter and confirm the new password."
+
+#: .\config\usuarios\views.py:615
+msgid "Las nuevas contrasenas no coinciden."
+msgstr "The new passwords do not match."
+
+#: .\config\usuarios\views.py:627
+msgid "Tu contrasena fue actualizada correctamente."
+msgstr "Your password was updated successfully."
+
 #: .\config\templates\admin\clientes_pendientes.html:19
 #: .\config\templates\usuarios\registro_modal_form.html:125
 #: .\config\templates\vendedores\crear_cliente.html:134
@@ -1625,6 +1686,10 @@ msgstr "Quantity:"
 msgid "Añadir a cotización"
 msgstr "Add to Quote"
 
+#: .\config\templates\productos\catalogo.html:223
+msgid "Añadir pedido"
+msgstr "Add to Order"
+
 #: .\config\templates\home.html:801
 msgid "¿Tienes una tienda? Solicita tu cuenta mayorista hoy"
 msgstr "Do you have a store? Request your wholesale account today"
@@ -1937,6 +2002,11 @@ msgstr "Last Name*"
 #: .\config\templates\usuarios\registro_modal_form.html:32
 msgid "ID (9 Dígitos)*"
 msgstr "ID (9 Digits)*"
+
+#: .\config\templates\usuarios\registro.html:99
+#: .\config\templates\usuarios\registro_modal_form.html:32
+msgid "ID Negocio (9 Dígitos)*"
+msgstr "Business ID (9 Digits)*"
 
 #: .\config\templates\usuarios\registro_modal_form.html:36
 msgid "Número de Contacto Móvil*"

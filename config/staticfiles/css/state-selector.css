@@ -1,0 +1,96 @@
+.state-selector {
+  position: relative;
+}
+
+.state-selector-input {
+  padding-right: 48px;
+}
+
+.state-selector-toggle {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+}
+
+.state-selector-toggle:focus-visible {
+  outline: 2px solid rgba(11, 61, 145, 0.35);
+}
+
+.state-selector-input:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.state-selector-toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.state-selector-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 1085;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #d4d8e2;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16);
+  padding: 8px;
+}
+
+.state-selector-menu[hidden] {
+  display: none;
+}
+
+.state-selector-option,
+.state-selector-empty {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.96rem;
+}
+
+.state-selector-option {
+  color: #0f172a;
+}
+
+.state-selector-option:hover,
+.state-selector-option:focus-visible {
+  background: #eef4ff;
+  color: #0b3d91;
+  outline: none;
+}
+
+.state-selector-empty {
+  color: #64748b;
+}
+
+@media (max-width: 576px) {
+  .state-selector-menu {
+    max-height: 220px;
+    padding: 6px;
+  }
+
+  .state-selector-option,
+  .state-selector-empty {
+    padding: 12px;
+    font-size: 0.95rem;
+  }
+}

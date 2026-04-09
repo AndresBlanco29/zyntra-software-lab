@@ -1,7 +1,5 @@
-
 # Python
 __pycache__/
-_pycache_/
 *.pyc
 *.pyo
 *.pyd
@@ -27,5 +25,8 @@ Thumbs.db
 # Logs
 *.log
 
+# Archivos de traducción compilados
 *.mo
+
+# (opcional) archivos de traducción fuente
 *.po

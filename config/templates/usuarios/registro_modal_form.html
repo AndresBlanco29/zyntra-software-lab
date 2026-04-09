@@ -1,4 +1,5 @@
 {% load static i18n %}
+{% get_current_language as CURRENT_LANGUAGE %}
 <!-- FORMULARIO DE REGISTRO PARA MODAL (3 PASOS) -->
 
 <div class="text-center mb-4" id="logoHeader">
@@ -29,7 +30,7 @@
     </div>
 
     <div class="mb-3">
-      <input type="text" class="form-control form-control-lg" placeholder="{% trans 'ID (9 Dígitos)*' %}" name="id_cliente" pattern="[0-9]{9}" maxlength="9" inputmode="numeric" required />
+      <input id="id_negocio_modal" type="text" class="form-control form-control-lg" placeholder="{% trans 'ID Negocio (9 Dígitos)*' %}" name="id_cliente" pattern="[0-9]{9}" maxlength="9" inputmode="numeric" required />
     </div>
 
     <div class="mb-3">
@@ -76,7 +77,7 @@
 
     <div class="d-grid gap-2">
       <button type="button" class="btn btn-continuar btn-lg" onclick="nextStepModal(2)">{% trans "Continuar" %}</button>
-      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="prevStepModal(2)">{% trans "Volver" %}</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="prevStepModal(2)">{% if CURRENT_LANGUAGE == 'es' %}Volver{% else %}Back{% endif %}</button>
     </div>
   </div>
 
@@ -88,63 +89,87 @@
         <div class="progress-bar bg-primary" style="width: 100%"></div>
       </div>
       <br>
-      <h5 class="fw-bold text-primary text-center mb-2">{% trans "Información Fiscal y Comercial" %}</h5>
-      <p class="text-center text-muted" style="font-size: 13px;">{% trans "Completa los siguientes datos para validar tu empresa" %}</p>
+      <h5 class="fw-bold text-primary text-center mb-2">{% if CURRENT_LANGUAGE == 'es' %}Información Fiscal y Comercial{% else %}Tax and Business Information{% endif %}</h5>
+      <p class="text-center text-muted" style="font-size: 13px;">{% if CURRENT_LANGUAGE == 'es' %}Completa los siguientes datos para validar tu empresa{% else %}Complete the following details to validate your business{% endif %}</p>
       <hr class="my-3" />
     </div>
 
     <!-- DATOS DE LA EMPRESA -->
-    <h6 class="fw-bold text-center mb-3" style="font-size: 14px;">{% trans "Datos de la empresa" %}</h6>
-    <div class="row g-2">
+    <h6 class="fw-bold text-center mb-3" style="font-size: 14px;">{% if CURRENT_LANGUAGE == 'es' %}Datos de la empresa{% else %}Business details{% endif %}</h6>
+    <div class="row g-2" data-location-group>
       <div class="col-12">
-        <input type="text" class="form-control form-control-lg" name="empresa" placeholder="{% trans 'Nombre legal de la empresa' %}" required />
+        <input type="text" class="form-control form-control-lg" name="empresa" placeholder="{% if CURRENT_LANGUAGE == 'es' %}Nombre legal de la empresa{% else %}Legal business name{% endif %}" required />
       </div>
       <div class="col-12">
-        <input type="text" class="form-control form-control-lg" name="sales_tax" placeholder="{% trans 'Número de impuesto sobre ventas' %}" inputmode="numeric" pattern="[0-9]+" required />
+        <div class="input-group">
+          <input id="id_sales_tax_modal" type="text" class="form-control form-control-lg" name="sales_tax" placeholder="{% if CURRENT_LANGUAGE == 'es' %}Número de impuesto sobre ventas{% else %}Sales tax number{% endif %}" inputmode="numeric" pattern="[0-9]+" required />
+          <button type="button" class="btn btn-outline-secondary" id="btn-tax-example-modal" onclick="openTaxExample(event)"
+            data-tax-example-mode="number"
+            data-tax-example-title="{% if CURRENT_LANGUAGE == 'es' %}Ejemplo: Número de impuesto sobre ventas{% else %}Example: Sales tax number{% endif %}"
+            data-tax-example-note="{% if CURRENT_LANGUAGE == 'es' %}Localiza el número de impuesto en tu certificado y escríbelo sin espacios ni guiones.{% else %}Find the sales tax number on your certificate and enter it without spaces or hyphens.{% endif %}"
+            data-tax-example-label="{% if CURRENT_LANGUAGE == 'es' %}Aquí va el número de impuesto{% else %}Enter this sales tax number{% endif %}">
+            {% if CURRENT_LANGUAGE == 'es' %}Ver ejemplo{% else %}View example{% endif %}
+          </button>
+        </div>
       </div>
       <div class="col-12">
-        <input type="text" class="form-control form-control-lg" name="telefono_comercial" placeholder="{% trans 'Teléfono Comercial' %}" inputmode="numeric" maxlength="10" required />
+        <input type="text" class="form-control form-control-lg" name="telefono_comercial" placeholder="{% if CURRENT_LANGUAGE == 'es' %}Teléfono Comercial{% else %}Business phone{% endif %}" inputmode="numeric" maxlength="10" required />
       </div>
       <div class="col-12">
-        <input type="email" class="form-control form-control-lg" name="email_comercial" placeholder="{% trans 'Correo Comercial' %}" required />
+        <input type="email" class="form-control form-control-lg" name="email_comercial" placeholder="{% if CURRENT_LANGUAGE == 'es' %}Correo Comercial{% else %}Business email{% endif %}" required />
       </div>
     </div>
 
     <hr class="my-3" />
 
     <!-- DIRECCIÓN COMERCIAL -->
-    <h6 class="fw-bold text-center mb-3" style="font-size: 14px;">{% trans "Dirección Comercial" %}</h6>
-    <div class="row g-2">
+    <h6 class="fw-bold text-center mb-3" style="font-size: 14px;">{% if CURRENT_LANGUAGE == 'es' %}Dirección Comercial{% else %}Business address{% endif %}</h6>
+    <div class="row g-2" data-location-group>
       <div class="col-12">
-        <input type="text" class="form-control form-control-lg" name="direccion" placeholder="{% trans 'Dirección Principal' %}" required />
+        <input type="text" class="form-control form-control-lg" name="direccion" placeholder="{% if CURRENT_LANGUAGE == 'es' %}Dirección Principal{% else %}Primary address{% endif %}" required />
       </div>
       <div class="col-12">
-        <input type="text" class="form-control form-control-lg" name="direccion2" placeholder="{% trans 'Dirección 2 (opcional)' %}" />
+        <input type="text" class="form-control form-control-lg" name="direccion2" placeholder="{% if CURRENT_LANGUAGE == 'es' %}Dirección 2 (opcional){% else %}Address line 2 (optional){% endif %}" />
       </div>
       <div class="col-6">
-        <input type="text" class="form-control form-control-lg" name="ciudad" placeholder="{% trans 'Ciudad' %}" required />
+        <select class="form-select form-control-lg" name="estado" data-state-select required>
+          <option value="">{% if CURRENT_LANGUAGE == 'es' %}Selecciona un estado{% else %}Select a state{% endif %}</option>
+          {% for state_name in us_states %}
+          <option value="{{ state_name }}">{{ state_name }}</option>
+          {% endfor %}
+        </select>
       </div>
       <div class="col-6">
-        <input type="text" class="form-control form-control-lg" name="estado" placeholder="{% trans 'Estado' %}" required />
+        <select class="form-select form-control-lg" name="ciudad" data-city-select disabled required>
+          <option value="">{% if CURRENT_LANGUAGE == 'es' %}Selecciona primero un estado{% else %}Select a state first{% endif %}</option>
+        </select>
       </div>
       <div class="col-6">
-        <input type="text" class="form-control form-control-lg" name="codigo_postal" placeholder="{% trans 'Código Postal' %}" required />
+        <input type="text" class="form-control form-control-lg" name="codigo_postal" placeholder="{% if CURRENT_LANGUAGE == 'es' %}Código Postal{% else %}ZIP code{% endif %}" required />
       </div>
       <div class="col-6">
-        <input type="text" class="form-control form-control-lg" name="pais" value="{% trans 'EEUU' %}" readonly />
+        <input type="text" class="form-control form-control-lg" name="pais" value="{% if CURRENT_LANGUAGE == 'es' %}EEUU{% else %}USA{% endif %}" readonly />
       </div>
     </div>
 
     <hr class="my-3" />
 
     <!-- CERTIFICADO -->
-    <h6 class="fw-bold text-center mb-2" style="font-size: 14px;">{% trans "Certificado de Impuesto sobre Ventas" %}</h6>
+    <h6 class="fw-bold text-center mb-2" style="font-size: 14px;">{% if CURRENT_LANGUAGE == 'es' %}Certificado de Impuesto sobre Ventas{% else %}Sales Tax Certificate{% endif %}</h6>
+    <div class="text-center mb-3">
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openTaxExample(event)"
+        data-tax-example-mode="certificate"
+        data-tax-example-title="{% if CURRENT_LANGUAGE == 'es' %}Ejemplo: Certificado de impuesto sobre ventas{% else %}Example: Sales tax certificate{% endif %}"
+        data-tax-example-note="{% if CURRENT_LANGUAGE == 'es' %}Este es un ejemplo del certificado que debes subir para completar el registro.{% else %}This is an example of the certificate you need to upload to complete your registration.{% endif %}">
+        {% if CURRENT_LANGUAGE == 'es' %}Ver ejemplo{% else %}View example{% endif %}
+      </button>
+    </div>
     <div class="upload-box text-center mb-3">
       <input type="file" id="certificado" name="certificado" accept=".pdf,.jpg,.png" required hidden>
       <div class="upload-content" onclick="document.getElementById('certificado').click()" style="padding: 15px; border: 2px dashed #ccc; border-radius: 8px; cursor: pointer; background: #f8f9fa;">
         <i class="bi bi-cloud-arrow-up fs-3 text-secondary"></i>
-        <p class="fw-bold mt-2 text-primary" style="font-size: 13px; margin: 0;">{% trans "Arrastra o haz clic para subir (PDF o imagen)" %}</p>
-        <small class="text-muted d-block mt-1" style="font-size: 11px;">{% trans "Emitido por el Department of Revenue" %}</small>
+        <p class="fw-bold mt-2 text-primary" style="font-size: 13px; margin: 0;">{% if CURRENT_LANGUAGE == 'es' %}Arrastra o haz clic para subir (PDF o imagen){% else %}Drag or click to upload (PDF or image){% endif %}</p>
+        <small class="text-muted d-block mt-1" style="font-size: 11px;">{% if CURRENT_LANGUAGE == 'es' %}Emitido por el Department of Revenue{% else %}Issued by the Department of Revenue{% endif %}</small>
         <div id="nombreArchivo" style="margin-top: 10px; color: #0b3d91; font-weight: 600; display: none;"></div>
       </div>
     </div>
@@ -153,16 +178,46 @@
     <div class="form-check my-3 text-center">
       <input class="form-check-input" type="checkbox" name="confirmacion" required id="confirmacion" />
       <label class="form-check-label small" for="confirmacion">
-        {% trans "Confirmo que la información es correcta y verificable." %}
+        {% if CURRENT_LANGUAGE == 'es' %}Confirmo que la información es correcta y verificable.{% else %}I confirm that the information is accurate and verifiable.{% endif %}
       </label>
     </div>
 
     <div class="d-grid gap-2">
-      <button type="submit" class="btn btn-continuar btn-lg">{% trans "Enviar para Aprobación" %}</button>
-      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="prevStepModal(3)">{% trans "Volver" %}</button>
+      <button type="submit" class="btn btn-continuar btn-lg">{% if CURRENT_LANGUAGE == 'es' %}Enviar para Aprobación{% else %}Submit for Approval{% endif %}</button>
+      <button type="button" class="btn btn-outline-secondary btn-sm" onclick="prevStepModal(3)">{% if CURRENT_LANGUAGE == 'es' %}Volver{% else %}Back{% endif %}</button>
     </div>
   </div>
 </form>
+
+<!-- Modal: Ejemplo Sales Tax -->
+<div class="modal fade" id="taxExampleModal" tabindex="-1" aria-labelledby="taxExampleLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="taxExampleLabel">{% if CURRENT_LANGUAGE == 'es' %}Ejemplo: Número de impuesto sobre ventas{% else %}Example: Sales tax number{% endif %}</h5>
+        <button type="button" class="btn-close" aria-label="Close" onclick="closeTaxExample()"></button>
+      </div>
+      <div class="modal-body">
+        <div class="tax-example-container" style="position:relative;">
+          <img id="taxExampleImg" src="{% static 'img/examples/sales_tax_example.png' %}" alt="Ejemplo Sales Tax" class="img-fluid" />
+          <div class="tax-overlay" style="position:absolute;inset:0;pointer-events:none;">
+            <div class="tax-highlight" id="taxHighlight" style="position:absolute;border:3px solid rgba(255,99,71,0.95);box-shadow:0 8px 24px rgba(0,0,0,0.25);background:rgba(255,99,71,0.06);border-radius:6px;">
+              <div class="tax-label" id="taxLabel" style="position:absolute;top:50%;left:calc(100% + 14px);transform:translateY(-50%);padding:6px 10px;background:rgba(255,99,71,0.95);color:#fff;border-radius:6px;font-weight:600;font-size:0.9rem;white-space:nowrap">{% if CURRENT_LANGUAGE == 'es' %}Aquí va el número de impuesto{% else %}Enter this sales tax number{% endif %}</div>
+            </div>
+          </div>
+        </div>
+        <p class="mt-3 text-muted small" id="taxExampleNote">{% if CURRENT_LANGUAGE == 'es' %}Localiza el número de impuesto en tu certificado y escríbelo sin espacios ni guiones.{% else %}Find the sales tax number on your certificate and enter it without spaces or hyphens.{% endif %}</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeTaxExample()">{% if CURRENT_LANGUAGE == 'es' %}Cerrar{% else %}Close{% endif %}</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+window.__LTG_US_LOCATIONS = {{ us_locations_json|safe }};
+</script>
 
 <style>
   .btn-continuar {
@@ -191,6 +246,13 @@
     border-color: #0b3d91;
     box-shadow: 0 0 0 0.2rem rgba(11, 61, 145, 0.25);
   }
+
+  /* Tax example styles */
+  .tax-example-container{position:relative;display:block;text-align:center}
+  .tax-example-container img{max-width:100%;height:auto;display:block;margin:0 auto}
+  .tax-overlay{position:absolute;inset:0;pointer-events:none}
+  .tax-highlight{position:absolute;border-radius:6px}
+  .tax-label{position:absolute;top:50%;left:calc(100% + 14px);transform:translateY(-50%);margin:0;padding:6px 10px;background:rgba(255,99,71,0.95);color:#fff;border-radius:6px;font-weight:600;font-size:0.9rem;white-space:nowrap}
 </style>
 
 <script>
@@ -361,4 +423,46 @@ window.mostrarMensajeExito = function() {
     `;
   }
 };
+
+// Position the highlight box over the example image when modal opens
+;(function(){
+  var modalEl = null;
+  try{ modalEl = document.getElementById('taxExampleModal'); }catch(e){}
+  if(!modalEl) return;
+
+  var highlightRect = { x: 54.5, y: 43.5, w: 18.9, h: 9.5 };
+
+  function positionHighlight(){
+    var img = document.getElementById('taxExampleImg');
+    var highlight = document.getElementById('taxHighlight');
+    if(!img || !highlight) return;
+
+    highlight.style.left = highlightRect.x + '%';
+    highlight.style.top = highlightRect.y + '%';
+    highlight.style.width = highlightRect.w + '%';
+    highlight.style.height = highlightRect.h + '%';
+  }
+
+  modalEl.addEventListener('shown.bs.modal', function(){
+    positionHighlight();
+  });
+
+  modalEl.addEventListener('hidden.bs.modal', function(){
+    var activeParentModal = document.querySelector('.modal.show:not(#taxExampleModal)');
+    if (activeParentModal) {
+      document.body.classList.add('modal-open');
+    }
+
+    window.setTimeout(function(){
+      var targetInput = document.getElementById('id_sales_tax_modal') || document.getElementById('id_sales_tax');
+      if (targetInput) {
+        targetInput.focus();
+      }
+    }, 150);
+  });
+  window.addEventListener('resize', function(){
+    var inst = bootstrap.Modal.getInstance(modalEl);
+    if(inst && inst._isShown){ positionHighlight(); }
+  });
+})();
 </script>

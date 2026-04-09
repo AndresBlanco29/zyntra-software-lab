@@ -48,7 +48,7 @@ padding: 20px !important;
 .sidebar{
 position: fixed !important;
 top: 70px !important;
-left: -250px !important;
+left: -100px !important;
 width: 250px !important;
 height: calc(100vh - 70px) !important;
 z-index: 999;
@@ -70,9 +70,6 @@ padding: 15px !important;
 height: auto;
 }
 
-.sidebar{
-display: none;
-}
 
 .navbar-brand {
 font-size: 16px !important;
@@ -148,7 +145,7 @@ margin: 15px 0 !important;
 .sidebar{
 position: fixed !important;
 top: 70px !important;
-left: 0 !important;
+left: -270px !important;
 width: 250px !important;
 height: calc(100vh - 70px) !important;
 z-index: 999;
@@ -798,6 +795,39 @@ background:#f3f4f6;
         left: 0 !important;
     }
 
+/* Fix: ensure mobile sidebar is fully off-canvas until toggled and add backdrop */
+@media (max-width: 992px) {
+    .sidebar {
+        left: -270px !important;
+        display: block !important;
+        box-shadow: none !important;
+    }
+
+    .sidebar.show {
+        left: 0 !important;
+        box-shadow: 2px 0 12px rgba(0,0,0,0.08) !important;
+    }
+
+    .sidebar-backdrop {
+        display: none;
+    }
+
+    .sidebar-backdrop.show {
+        display: block;
+        position: fixed;
+        top: 70px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.35);
+        z-index: 1050;
+    }
+
+    .main-content {
+        margin-left: 0 !important;
+    }
+}
+
     .sidebar-backdrop {
         display: none;
         position: fixed;
@@ -836,5 +866,41 @@ background:#f3f4f6;
     .language-widget {
         bottom: 14px;
         left: 12px;
+    }
+}
+
+/* Strong mobile off-canvas: hide sidebar fully using transform */
+@media (max-width: 576px) {
+    .sidebar {
+        left: 0 !important;
+        transform: translateX(-100%) !important;
+        transition: transform .28s ease !important;
+        will-change: transform;
+        box-shadow: none !important;
+    }
+
+    .sidebar.show {
+        transform: translateX(0) !important;
+        box-shadow: 2px 0 20px rgba(0,0,0,0.12) !important;
+    }
+
+    .sidebar-backdrop {
+        display: none;
+    }
+
+    .sidebar-backdrop.show {
+        display: block;
+        position: fixed;
+        top: 70px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.38);
+        z-index: 1045;
+    }
+
+    /* Ensure content doesn't shift and is fully visible */
+    .main-content {
+        margin-left: 0 !important;
     }
 }

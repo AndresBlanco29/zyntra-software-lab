@@ -1,4 +1,5 @@
 {% load static i18n %}
+{% get_current_language as CURRENT_LANGUAGE %}
 <!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
 
@@ -14,6 +15,11 @@
 
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
 <link rel="stylesheet" href="{% static 'css/home.css' %}">
+<link rel="stylesheet" href="{% static 'css/tax-example.css' %}">
+<link rel="stylesheet" href="{% static 'css/state-selector.css' %}">
+<script defer src="{% static 'js/language-session.js' %}"></script>
+<script defer src="{% static 'js/tax-example.js' %}"></script>
+<script defer src="{% static 'js/state-selector.js' %}"></script>
 
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
@@ -704,6 +710,130 @@ en un mercado competitivo.
 
 </section>
 
+<section class="install-app-section" id="modo-app">
+
+<div class="container">
+
+<div class="title-divider">
+<span>{% if CURRENT_LANGUAGE == 'es' %}Usa La Tortilla Grocery como app{% else %}Use La Tortilla Grocery like an app{% endif %}</span>
+</div>
+
+<div class="install-app-shell">
+
+<div class="install-app-copy">
+
+<div class="install-app-badge">iPhone</div>
+
+<h3>
+{% if CURRENT_LANGUAGE == 'es' %}
+Agrega la web a tu pantalla de inicio y ábrela como si fuera una aplicación
+{% else %}
+Add the website to your home screen and open it like an app
+{% endif %}
+</h3>
+
+<p class="install-app-description">
+{% if CURRENT_LANGUAGE == 'es' %}
+Tus clientes pueden entrar más rápido, tener el acceso siempre visible y sentir una experiencia mucho más parecida a una app nativa desde Safari en iPhone.
+{% else %}
+Your customers can open it faster, keep it visible on their home screen, and get an experience that feels much closer to a native app from Safari on iPhone.
+{% endif %}
+</p>
+
+<div class="install-steps-grid">
+
+<div class="install-step-card">
+<span class="install-step-number">1</span>
+<h4>{% if CURRENT_LANGUAGE == 'es' %}Abre la web en Safari{% else %}Open the site in Safari{% endif %}</h4>
+<p>{% if CURRENT_LANGUAGE == 'es' %}Ingresa a La Tortilla Grocery desde tu iPhone usando el navegador Safari.{% else %}Open La Tortilla Grocery on your iPhone using the Safari browser.{% endif %}</p>
+</div>
+
+<div class="install-step-card">
+<span class="install-step-number">2</span>
+<h4>{% if CURRENT_LANGUAGE == 'es' %}Toca el botón Compartir{% else %}Tap the Share button{% endif %}</h4>
+<p>{% if CURRENT_LANGUAGE == 'es' %}Busca el icono de compartir en la barra inferior del iPhone.{% else %}Look for the share icon in the iPhone bottom toolbar.{% endif %}</p>
+</div>
+
+<div class="install-step-card">
+<span class="install-step-number">3</span>
+<h4>{% if CURRENT_LANGUAGE == 'es' %}Selecciona “Agregar a pantalla de inicio”{% else %}Select “Add to Home Screen”{% endif %}</h4>
+<p>{% if CURRENT_LANGUAGE == 'es' %}Confirma el nombre y tendrás el acceso directo listo como app.{% else %}Confirm the name and your shortcut will be ready like an app.{% endif %}</p>
+</div>
+
+</div>
+
+<div class="install-app-actions">
+<button
+type="button"
+class="btn install-app-primary-btn"
+data-bs-toggle="modal"
+data-bs-target="#installTutorialModal"
+data-install-video-trigger
+data-video-src="">
+{% if CURRENT_LANGUAGE == 'es' %}Ver tutorial en video{% else %}Watch video tutorial{% endif %}
+</button>
+
+<a href="#contacto" class="install-app-secondary-link">
+{% if CURRENT_LANGUAGE == 'es' %}¿Necesitas ayuda? Contáctanos{% else %}Need help? Contact us{% endif %}
+</a>
+</div>
+
+</div>
+
+<div class="install-app-visual">
+
+<div class="iphone-mockup">
+<div class="iphone-notch"></div>
+
+<div class="iphone-screen">
+
+<div class="iphone-status-row">
+<span>9:41</span>
+<span><i class="bi bi-reception-4"></i> <i class="bi bi-battery-full"></i></span>
+</div>
+
+<div class="iphone-preview-card">
+<div class="iphone-preview-top">
+<span class="iphone-preview-safari">Safari</span>
+<span class="iphone-preview-chip">{% if CURRENT_LANGUAGE == 'es' %}Modo app{% else %}App mode{% endif %}</span>
+</div>
+
+<div class="iphone-app-icon">
+<img src="{% static 'img/logo.png' %}" alt="La Tortilla Grocery">
+</div>
+
+<h4>La Tortilla Grocery</h4>
+<p>{% if CURRENT_LANGUAGE == 'es' %}Acceso rápido desde tu pantalla de inicio{% else %}Fast access from your home screen{% endif %}</p>
+
+<button
+type="button"
+class="iphone-preview-play"
+data-bs-toggle="modal"
+data-bs-target="#installTutorialModal"
+data-install-video-trigger
+data-video-src="">
+<i class="bi bi-play-fill"></i>
+{% if CURRENT_LANGUAGE == 'es' %}Ver cómo se instala{% else %}See how to install it{% endif %}
+</button>
+
+</div>
+
+<div class="iphone-home-dock">
+<span></span>
+<span></span>
+<span class="is-active"></span>
+<span></span>
+</div>
+
+</div>
+</div>
+
+</div>
+
+</div>
+
+</section>
+
 <!-- TESTIMONIOS INFINITOS -->
 
 <section class="testimonios-section" id="testimonios">
@@ -942,6 +1072,45 @@ en un mercado competitivo.
 
 </footer>
 
+<div class="modal fade" id="installTutorialModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl install-tutorial-dialog">
+    <div class="modal-content install-tutorial-modal-content">
+      <button type="button" class="btn-close btn-close-dark position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close"></button>
+
+      <div class="install-tutorial-layout">
+        <div class="install-tutorial-video-panel">
+          <div class="install-video-frame">
+            <video class="install-video-player d-none" data-install-video-player controls playsinline preload="metadata">
+              <source data-install-video-source src="" type="video/mp4">
+            </video>
+
+            <div class="install-video-empty" data-install-video-empty>
+              <div class="install-video-empty-icon">
+                <i class="bi bi-phone"></i>
+              </div>
+              <h4>{% if CURRENT_LANGUAGE == 'es' %}Tu tutorial de iPhone aparecerá aquí{% else %}Your iPhone tutorial will appear here{% endif %}</h4>
+              <p>{% if CURRENT_LANGUAGE == 'es' %}La sección ya quedó lista. Cuando termines tu grabación, conectamos el video y este espacio mostrará la guía paso a paso para instalar la web como app.{% else %}This section is already prepared. Once your recording is ready, we can connect the video and this space will show the step by step guide to install the website like an app.{% endif %}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="install-tutorial-copy-panel">
+          <div class="install-app-badge">iPhone</div>
+          <h3>{% if CURRENT_LANGUAGE == 'es' %}Instálala en menos de un minuto{% else %}Install it in under a minute{% endif %}</h3>
+          <p>{% if CURRENT_LANGUAGE == 'es' %}Esta guía está pensada para que cualquier cliente pueda guardar La Tortilla Grocery en su pantalla de inicio y usarla como acceso directo diario.{% else %}This guide is designed so any customer can save La Tortilla Grocery to their home screen and use it as a daily shortcut.{% endif %}</p>
+
+          <ul class="install-tutorial-checklist">
+            <li>{% if CURRENT_LANGUAGE == 'es' %}Abre la página en Safari{% else %}Open the website in Safari{% endif %}</li>
+            <li>{% if CURRENT_LANGUAGE == 'es' %}Pulsa el botón Compartir{% else %}Tap the Share button{% endif %}</li>
+            <li>{% if CURRENT_LANGUAGE == 'es' %}Toca “Agregar a pantalla de inicio”{% else %}Tap “Add to Home Screen”{% endif %}</li>
+            <li>{% if CURRENT_LANGUAGE == 'es' %}Disfruta un acceso más rápido desde tu iPhone{% else %}Enjoy faster access from your iPhone{% endif %}</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 
 <!-- MODAL LOGIN -->
 <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
@@ -997,6 +1166,11 @@ document.addEventListener('DOMContentLoaded', function() {
   
   loginModal.addEventListener('show.bs.modal', function() {
     const container = document.getElementById('loginFormContainer');
+
+    if (loginModal.dataset.preserveContentOnShow === 'true') {
+      loginModal.dataset.preserveContentOnShow = 'false';
+      return;
+    }
     
     if (!container) {
       return;
@@ -1442,6 +1616,52 @@ function mostrarExitoRegistro() {
     </div>
   `;
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+  const tutorialModal = document.getElementById('installTutorialModal');
+
+  if (!tutorialModal) {
+    return;
+  }
+
+  const videoPlayer = tutorialModal.querySelector('[data-install-video-player]');
+  const videoSource = tutorialModal.querySelector('[data-install-video-source]');
+  const emptyState = tutorialModal.querySelector('[data-install-video-empty]');
+
+  function setTutorialVideo(sourceUrl) {
+    const hasVideo = Boolean(sourceUrl && sourceUrl.trim());
+
+    if (!videoPlayer || !videoSource || !emptyState) {
+      return;
+    }
+
+    if (hasVideo) {
+      videoSource.src = sourceUrl;
+      videoPlayer.load();
+      videoPlayer.classList.remove('d-none');
+      emptyState.classList.add('d-none');
+      return;
+    }
+
+    videoPlayer.pause();
+    videoSource.removeAttribute('src');
+    videoPlayer.load();
+    videoPlayer.classList.add('d-none');
+    emptyState.classList.remove('d-none');
+  }
+
+  document.querySelectorAll('[data-install-video-trigger]').forEach(function(trigger) {
+    trigger.addEventListener('click', function() {
+      setTutorialVideo(trigger.getAttribute('data-video-src') || '');
+    });
+  });
+
+  tutorialModal.addEventListener('hidden.bs.modal', function() {
+    if (videoPlayer) {
+      videoPlayer.pause();
+    }
+  });
+});
 </script>
 
 {% get_current_language as LANGUAGE_CODE %}
@@ -1532,7 +1752,7 @@ EN
 
 <div class="language-menu" id="languageMenu">
 
-<form action="{% url 'set_language' %}" method="post">
+<form action="{% url 'set_language' %}" method="post" data-language-form>
 
 {% csrf_token %}
 <input name="next" type="hidden" value="{{ request.path }}">

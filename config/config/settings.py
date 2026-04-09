@@ -20,6 +20,7 @@ load_dotenv()
 # ========================
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BASE_DIR.parent
 
 
 def env_bool(name, default=False):
@@ -172,6 +173,7 @@ TEMPLATES = [
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
+                'django.template.context_processors.i18n',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
@@ -248,7 +250,8 @@ AUTH_PASSWORD_VALIDATORS = [
 # INTERNACIONALIZACIÓN
 # ========================
 
-LANGUAGE_CODE = 'es'
+LANGUAGE_CODE = 'en'
+LANGUAGE_COOKIE_AGE = None
 
 TIME_ZONE = 'America/New_York'
 
@@ -269,7 +272,8 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 STATICFILES_DIRS = [
-    BASE_DIR / 'static'
+    BASE_DIR / 'static',
+    PROJECT_ROOT / 'static',
 ]
 
 if DEBUG:

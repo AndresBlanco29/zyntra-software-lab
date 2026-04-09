@@ -1,70 +1,74 @@
 # SOME DESCRIPTIVE TITLE.
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
-# This file is distributed under the same license as the PACKAGE package.
+# This file is distributed under the same license as the La Tortilla Grocery package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
 msgid ""
 msgstr ""
 "Project-Id-Version: La Tortilla Grocery\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-26 20:56-0500\n"
-"Language: en\n"
+"POT-Creation-Date: 2026-04-08 17:36-0500\n"
+"PO-Revision-Date: 2026-04-08 17:36-0500\n"
+"Last-Translator: \n"
+"Language-Team: Spanish\n"
+"Language: es\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-
 #: .\config\productos\views.py:267
 msgid "El nombre de la categoria es obligatorio."
-msgstr "The category name is required."
+msgstr "El nombre de la categoria es obligatorio."
 
 #: .\config\productos\views.py:274
 msgid "Ya existe una categoria con ese nombre."
-msgstr "A category with that name already exists."
+msgstr "Ya existe una categoria con ese nombre."
 
 #: .\config\productos\views.py:283
 msgid "Categoria creada correctamente"
-msgstr "Category created successfully"
+msgstr "Categoria creada correctamente"
 
 #: .\config\productos\views.py:305 .\config\productos\views.py:356
 msgid "El nombre de la marca es obligatorio."
-msgstr "The brand name is required."
+msgstr "El nombre de la marca es obligatorio."
 
 #: .\config\productos\views.py:314
 msgid "Ya existe una marca con ese nombre."
-msgstr "A brand with that name already exists."
+msgstr "Ya existe una marca con ese nombre."
 
 #: .\config\productos\views.py:330
 msgid "Marca creada correctamente"
-msgstr "Brand created successfully"
+msgstr "Marca creada correctamente"
 
 #: .\config\productos\views.py:365
 msgid "Ya existe otra marca con ese nombre."
-msgstr "Another brand with that name already exists."
+msgstr "Ya existe otra marca con ese nombre."
 
 #: .\config\productos\views.py:380
 msgid "Marca actualizada correctamente"
-msgstr "Brand updated successfully"
+msgstr "Marca actualizada correctamente"
 
 #: .\config\productos\views.py:402
 msgid "Marca inhabilitada"
-msgstr "Brand disabled"
+msgstr "Marca inhabilitada"
 
 #: .\config\productos\views.py:416
 msgid "Marca activada"
-msgstr "Brand activated"
+msgstr "Marca activada"
 
 #: .\config\templates\admin\certificado_diagnostico.html:5
 msgid "Diagnostico Certificado"
-msgstr "Certificate Diagnostic"
+msgstr "Diagnostico Certificado"
 
 #: .\config\templates\admin\certificado_diagnostico.html:10
 msgid "Diagnostico de certificado"
-msgstr "Certificate diagnostic"
+msgstr "Correo electrónico:"
 
 #: .\config\templates\admin\certificado_diagnostico.html:14
 #: .\config\templates\vendedores\clientes.html:69
 #: .\config\templates\vendedores\tomar_pedido.html:32
 msgid "Cliente"
-msgstr "Customer"
+msgstr "Cliente"
 
 #: .\config\templates\admin\certificado_diagnostico.html:15
 msgid "ID:"
@@ -73,7 +77,7 @@ msgstr "ID:"
 #: .\config\templates\admin\certificado_diagnostico.html:16
 #: .\config\templates\admin\ver_cliente.html:19
 msgid "Empresa:"
-msgstr "Company:"
+msgstr "Empresa:"
 
 #: .\config\templates\admin\certificado_diagnostico.html:17
 msgid "Email:"
@@ -81,58 +85,58 @@ msgstr "Email:"
 
 #: .\config\templates\admin\certificado_diagnostico.html:23
 msgid "No se pudo abrir el certificado"
-msgstr "The certificate could not be opened"
+msgstr "No se pudo abrir el certificado"
 
 #: .\config\templates\admin\certificado_diagnostico.html:24
 msgid ""
 "Este detalle solo lo ve el administrador y sirve para identificar el error "
 "real del archivo."
 msgstr ""
-"This detail is only visible to the administrator and helps identify the real "
-"file error."
+"Este detalle solo lo ve el administrador y sirve para identificar el error "
+"real del archivo."
 
 #: .\config\templates\admin\certificado_diagnostico.html:35
 #: .\config\templates\admin\ver_certificado.html:15
 msgid "Volver al cliente"
-msgstr "Back to customer"
+msgstr "Volver al cliente"
 
 #: .\config\templates\admin\certificado_diagnostico.html:36
 msgid "Volver a solicitudes"
-msgstr "Back to requests"
+msgstr "Volver a solicitudes"
 
 #: .\config\templates\admin\clientes_pendientes.html:10
-#: .\config\templates\admin\dashboard.html:19
+#: .\config\templates\admin\dashboard.html:21
 msgid "Clientes Pendientes"
-msgstr "Pending Customers"
+msgstr "Clientes Pendientes"
 
 #: .\config\templates\admin\clientes_pendientes.html:18
 #: .\config\templates\vendedores\clientes.html:71
 #: .\config\templates\vendedores\clientes.html:180
 #: .\config\templates\vendedores\tomar_pedido.html:33
 msgid "Empresa"
-msgstr "Company"
+msgstr "Empresa"
 
 #: .\config\templates\admin\clientes_pendientes.html:19
 #: .\config\templates\usuarios\registro_modal_form.html:125
 #: .\config\templates\vendedores\crear_cliente.html:134
 msgid "Ciudad"
-msgstr "City"
+msgstr "Ciudad"
 
 #: .\config\templates\admin\clientes_pendientes.html:20
 #: .\config\templates\admin\crear_vendedor.html:42
 #: .\config\templates\admin\editar_vendedor.html:35
 #: .\config\templates\admin\vendedores.html:34
 msgid "Telefono"
-msgstr "Phone"
+msgstr "Telefono"
 
 #: .\config\templates\admin\clientes_pendientes.html:21
 msgid "Sales Tax"
-msgstr "Sales Tax:"
+msgstr "Impuesto sobre ventas"
 
 #: .\config\templates\admin\clientes_pendientes.html:22
 #: .\config\templates\admin\ver_certificado.html:12
 msgid "Certificado"
-msgstr "Certificate"
+msgstr "Certificado"
 
 #: .\config\templates\admin\clientes_pendientes.html:23
 #: .\config\templates\admin\marcas.html:35
@@ -141,74 +145,76 @@ msgstr "Certificate"
 #: .\config\templates\admin\vendedores.html:35
 #: .\config\templates\cotizaciones\ver_cotizacion.html:106
 msgid "Acciones"
-msgstr "Actions"
+msgstr "Acciones"
 
 #: .\config\templates\admin\clientes_pendientes.html:42
 #: .\config\templates\admin\ver_cliente.html:66
 msgid "Ver certificado"
-msgstr "View certificate"
+msgstr "Ver certificado"
 
 #: .\config\templates\admin\clientes_pendientes.html:45
 msgid "No disponible"
-msgstr "Not available"
+msgstr "No disponible"
 
 #: .\config\templates\admin\clientes_pendientes.html:53
 msgid "Ver"
-msgstr "View"
+msgstr "Ver"
 
 #: .\config\templates\admin\clientes_pendientes.html:57
 msgid "Aprobar"
-msgstr "Approve"
+msgstr "Aprobar"
 
 #: .\config\templates\admin\clientes_pendientes.html:61
 msgid "Rechazar"
-msgstr "Reject"
+msgstr "Rechazar"
 
 #: .\config\templates\admin\clientes_pendientes.html:71
 msgid "No hay clientes pendientes"
-msgstr "There are no pending customers"
+msgstr "No hay clientes pendientes"
 
 #: .\config\templates\admin\contenido_home.html:5
 msgid "Contenido Home"
-msgstr "Home Content"
+msgstr "Contenido Home"
 
 #: .\config\templates\admin\contenido_home.html:10
 msgid "Contenido del Home"
-msgstr "Home Content"
+msgstr "Contenido del Home"
 
 #: .\config\templates\admin\contenido_home.html:16
 msgid "Marcas activas"
-msgstr "Active brands"
+msgstr "Marcas activas"
 
 #: .\config\templates\admin\contenido_home.html:25
 msgid "Marcas inactivas"
-msgstr "Inactive brands"
+msgstr "Marcas inactivas"
 
 #: .\config\templates\admin\contenido_home.html:34
 msgid "Testimonios activos"
-msgstr "Active testimonials"
+msgstr "Testimonios activos"
 
 #: .\config\templates\admin\contenido_home.html:43
 msgid "Testimonios ocultos"
-msgstr "Hidden testimonials"
+msgstr "Testimonios ocultos"
 
 #: .\config\templates\admin\contenido_home.html:54
 msgid "Banner y textos principales"
-msgstr "Banner and main texts"
+msgstr "Banner y textos principales"
 
 #: .\config\templates\admin\contenido_home.html:55
 msgid ""
 "Controla los textos principales del hero y del CTA del home desde el panel "
 "administrador."
-msgstr "Control the main hero and CTA texts from the admin panel."
+msgstr ""
+"Controla los textos principales del hero y del CTA del home desde el panel "
+"administrador."
 
 #: .\config\templates\admin\contenido_home.html:57
 msgid "Editar textos home"
-msgstr "Edit home texts"
+msgstr "Editar textos home"
 
 #: .\config\templates\admin\contenido_home.html:60
 msgid "Vista previa actual:"
-msgstr "Current preview:"
+msgstr "Vista previa actual:"
 
 #: .\config\templates\admin\contenido_home.html:62
 msgid "Hero:"
@@ -216,167 +222,169 @@ msgstr "Hero:"
 
 #: .\config\templates\admin\contenido_home.html:69
 msgid "Quienes somos:"
-msgstr "About us:"
+msgstr "Quienes somos:"
 
 #: .\config\templates\admin\contenido_home.html:73
 msgid "Tarjeticas:"
-msgstr "Info cards:"
+msgstr "Tarjeticas:"
 
 #: .\config\templates\admin\contenido_home.html:79
 msgid "Estadisticas:"
-msgstr "Statistics:"
+msgstr "Estadisticas:"
 
 #: .\config\templates\admin\contenido_home.html:91
 msgid "Logos de marcas"
-msgstr "Brand logos"
+msgstr "Logos de marcas"
 
 #: .\config\templates\admin\contenido_home.html:92
 msgid ""
 "Administra las marcas y los logos que aparecen en la seccion de marcas del "
 "home."
-msgstr "Manage the brands and logos shown in the home brands section."
+msgstr ""
+"Administra las marcas y los logos que aparecen en la seccion de marcas del "
+"home."
 
 #: .\config\templates\admin\contenido_home.html:94
 msgid "Gestionar logos"
-msgstr "Manage logos"
+msgstr "Gestionar logos"
 
 #: .\config\templates\admin\contenido_home.html:95
 msgid "Crear marca"
-msgstr "Create brand"
+msgstr "Crear marca"
 
 #: .\config\templates\admin\contenido_home.html:104
 #: .\config\templates\home.html:714
 msgid "Que dicen nuestros clientes"
-msgstr "What Our Customers Say"
+msgstr "Que dicen nuestros clientes"
 
 #: .\config\templates\admin\contenido_home.html:105
 msgid ""
 "Crea, edita, ordena y oculta testimonios para controlar lo que se muestra en "
 "el home."
 msgstr ""
-"Create, edit, order, and hide testimonials to control what is shown on the "
-"home page."
+"Crea, edita, ordena y oculta testimonios para controlar lo que se muestra en "
+"el home."
 
 #: .\config\templates\admin\contenido_home.html:107
 msgid "Gestionar testimonios"
-msgstr "Manage testimonials"
+msgstr "Gestionar testimonios"
 
 #: .\config\templates\admin\contenido_home.html:108
 msgid "Crear testimonio"
-msgstr "Create testimonial"
+msgstr "Crear testimonio"
 
 #: .\config\templates\admin\crear_categoria.html:5
 #: .\config\templates\admin\crear_categoria.html:10
 #: .\config\templates\admin\productos.html:61
 msgid "Crear Categoria"
-msgstr "Create Category"
+msgstr "Crear Categoria"
 
 #: .\config\templates\admin\crear_categoria.html:26
 msgid "Nombre de la categoria"
-msgstr "Category name"
+msgstr "Nombre de la categoria"
 
 #: .\config\templates\admin\crear_categoria.html:31
 #: .\config\templates\admin\crear_marca.html:31
 #: .\config\templates\admin\editar_marca.html:30
 msgid "Nombre en ingles (opcional)"
-msgstr "English name (optional)"
+msgstr "Nombre en ingles (opcional)"
 
 #: .\config\templates\admin\crear_categoria.html:37
 msgid "Guardar Categoria"
-msgstr "Save Category"
+msgstr "Guardar Categoria"
 
 #: .\config\templates\admin\crear_categoria.html:41
 #: .\config\templates\admin\marcas.html:20
 msgid "Volver a Productos"
-msgstr "Back to Products"
+msgstr "Volver a Productos"
 
 #: .\config\templates\admin\crear_marca.html:5
 #: .\config\templates\admin\crear_marca.html:10
 #: .\config\templates\admin\marcas.html:16
 #: .\config\templates\admin\productos.html:65
 msgid "Crear Marca"
-msgstr "Create Brand"
+msgstr "Crear Marca"
 
 #: .\config\templates\admin\crear_marca.html:26
 #: .\config\templates\admin\editar_marca.html:25
 msgid "Nombre de la marca"
-msgstr "Brand name"
+msgstr "Nombre de la marca"
 
 #: .\config\templates\admin\crear_marca.html:36
 msgid "Logo (opcional)"
-msgstr "Logo (optional)"
+msgstr "Logo (opcional)"
 
 #: .\config\templates\admin\crear_marca.html:41
 #: .\config\templates\admin\editar_marca.html:47
 msgid "Categorias asociadas (opcional)"
-msgstr "Associated categories (optional)"
+msgstr "Categorias asociadas (opcional)"
 
 #: .\config\templates\admin\crear_marca.html:49
 #: .\config\templates\admin\editar_marca.html:53
 msgid "Mantener presionada Ctrl (o Cmd) para seleccionar varias categorias."
-msgstr "Hold Ctrl (or Cmd) to select multiple categories."
+msgstr "Mantener presionada Ctrl (o Cmd) para seleccionar varias categorias."
 
 #: .\config\templates\admin\crear_marca.html:54
 msgid "Guardar Marca"
-msgstr "Save Brand"
+msgstr "Guardar Marca"
 
 #: .\config\templates\admin\crear_marca.html:58
 #: .\config\templates\admin\editar_marca.html:58
 msgid "Volver a Marcas"
-msgstr "Back to Brands"
+msgstr "Volver a Marcas"
 
 #: .\config\templates\admin\crear_producto.html:5
 #: .\config\templates\admin\crear_producto.html:10
 #: .\config\templates\admin\productos.html:57
 msgid "Crear Producto"
-msgstr "Create Product"
+msgstr "Crear Producto"
 
 #: .\config\templates\admin\crear_producto.html:20
 #: .\config\templates\admin\editar_producto.html:22
 msgid "Nombre del producto"
-msgstr "Product name"
+msgstr "Nombre del producto"
 
 #: .\config\templates\admin\crear_producto.html:25
 #: .\config\templates\admin\editar_producto.html:27
 #: .\config\templates\admin\marcas.html:32
 msgid "Nombre en ingles"
-msgstr "English name"
+msgstr "Nombre en ingles"
 
 #: .\config\templates\admin\crear_producto.html:30
 #: .\config\templates\admin\editar_producto.html:34
 #: .\config\templates\admin\productos.html:82
 msgid "Codigo de Barras"
-msgstr "Barcode"
+msgstr "Codigo de Barras"
 
 #: .\config\templates\admin\crear_producto.html:31
 #: .\config\templates\admin\editar_producto.html:35
 msgid "Ej: 7501234567890"
-msgstr ""
+msgstr "Ej: 7501234567890"
 
 #: .\config\templates\admin\crear_producto.html:32
 msgid "Campo requerido. Debe ser unico para cada producto."
-msgstr "Required field. It must be unique for each product."
+msgstr "Campo requerido. Debe ser unico para cada producto."
 
 #: .\config\templates\admin\crear_producto.html:36
 #: .\config\templates\admin\editar_producto.html:41
 msgid "Descripcion"
-msgstr "Description"
+msgstr "Descripcion"
 
 #: .\config\templates\admin\crear_producto.html:41
 #: .\config\templates\admin\editar_producto.html:46
 msgid "Descripcion en ingles"
-msgstr "Description in English"
+msgstr "Descripcion en ingles"
 
 #: .\config\templates\admin\crear_producto.html:46
 #: .\config\templates\admin\editar_producto.html:53
 #: .\config\templates\admin\productos.html:84
 msgid "Categoria"
-msgstr "Category"
+msgstr "Categoria"
 
 #: .\config\templates\admin\crear_producto.html:48
 #: .\config\templates\admin\editar_producto.html:57
 msgid "Seleccionar categoria"
-msgstr "Select category"
+msgstr "Seleccionar categoria"
 
 #: .\config\templates\admin\crear_producto.html:60
 #: .\config\templates\admin\editar_producto.html:78
@@ -384,105 +392,104 @@ msgstr "Select category"
 #: .\config\templates\productos\catalogo.html:138
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:173
 msgid "Marca"
-msgstr "Brand"
+msgstr "Marca"
 
 #: .\config\templates\admin\crear_producto.html:62
 #: .\config\templates\admin\editar_producto.html:82
 msgid "Seleccionar marca"
-msgstr "Select brand"
+msgstr "Seleccionar marca"
 
 #: .\config\templates\admin\crear_producto.html:74
 #: .\config\templates\admin\editar_producto.html:103
 #: .\config\templates\admin\productos.html:80
 msgid "Imagen"
-msgstr "Image"
+msgstr "Imagen"
 
 #: .\config\templates\admin\crear_producto.html:80
 #: .\config\templates\admin\editar_producto.html:249
 msgid "Producto activo"
-msgstr "Active product"
+msgstr "Producto activo"
 
 #: .\config\templates\admin\crear_producto.html:85
 #: .\config\templates\admin\editar_producto.html:258
 msgid "Producto destacado"
-msgstr "Featured product"
+msgstr "Producto destacado"
 
 #: .\config\templates\admin\crear_producto.html:89
 #: .\config\templates\admin\editar_producto.html:264
-#, fuzzy, python-format
-#| msgid "Descuento (%%)"
+#, python-format
 msgid "Descuento (%%)"
-msgstr "Discount (%)"
+msgstr "Descuento (%%)"
 
 #: .\config\templates\admin\crear_producto.html:95
 #: .\config\templates\admin\crear_producto.html:100
 #: .\config\templates\admin\editar_producto.html:130
 #: .\config\templates\admin\editar_producto.html:190
 msgid "Presentacion"
-msgstr "Packaging"
+msgstr "Presentacion"
 
 #: .\config\templates\admin\crear_producto.html:101
 #: .\config\templates\admin\editar_producto.html:191
 msgid "Ej: Caja, Bolsa, Pack"
-msgstr "Ej: Box, bag, package"
+msgstr "Ej: Caja, Bolsa, Pack"
 
 #: .\config\templates\admin\crear_producto.html:105
 #: .\config\templates\admin\editar_producto.html:135
 #: .\config\templates\admin\editar_producto.html:195
 msgid "Tipo de contenido"
-msgstr "Content type"
+msgstr "Tipo de contenido"
 
 #: .\config\templates\admin\crear_producto.html:106
 msgid "Ej: Unidades, Libras, Onzas"
-msgstr "Ej: units, pounds, ounces"
+msgstr "Ej: Unidades, Libras, Onzas"
 
 #: .\config\templates\admin\crear_producto.html:110
 #: .\config\templates\admin\editar_producto.html:140
 #: .\config\templates\admin\editar_producto.html:200
 msgid "Unidades"
-msgstr "Units"
+msgstr "Unidades"
 
 #: .\config\templates\admin\crear_producto.html:111
 msgid "Ej: 12"
-msgstr ""
+msgstr "Ej: 12"
 
 #: .\config\templates\admin\crear_producto.html:119
 msgid "Precios"
-msgstr "Prices"
+msgstr "Precios"
 
 #: .\config\templates\admin\crear_producto.html:124
 #: .\config\templates\admin\editar_producto.html:149
 #: .\config\templates\admin\editar_producto.html:209
 msgid "Precio 1"
-msgstr "Price 1"
+msgstr "Precio 1"
 
 #: .\config\templates\admin\crear_producto.html:129
 #: .\config\templates\admin\editar_producto.html:154
 #: .\config\templates\admin\editar_producto.html:214
 msgid "Precio 2"
-msgstr "Price 2"
+msgstr "Precio 2"
 
 #: .\config\templates\admin\crear_producto.html:134
 #: .\config\templates\admin\editar_producto.html:159
 #: .\config\templates\admin\editar_producto.html:219
 msgid "Precio 3"
-msgstr "Price 3"
+msgstr "Precio 3"
 
 #: .\config\templates\admin\crear_producto.html:139
 #: .\config\templates\admin\editar_producto.html:164
 #: .\config\templates\admin\editar_producto.html:224
 msgid "Precio 4"
-msgstr "Price 4"
+msgstr "Precio 4"
 
 #: .\config\templates\admin\crear_producto.html:144
 #: .\config\templates\admin\editar_producto.html:169
 #: .\config\templates\admin\editar_producto.html:229
 msgid "Precio 5"
-msgstr "Price 5"
+msgstr "Precio 5"
 
 #: .\config\templates\admin\crear_producto.html:151
 msgid "Crear producto"
-msgstr "Create product"
+msgstr "Crear producto"
 
 #: .\config\templates\admin\crear_producto.html:155
 #: .\config\templates\admin\crear_testimonio.html:72
@@ -497,13 +504,13 @@ msgstr "Create product"
 #: .\config\templates\vendedores\clientes.html:197
 #: .\config\templates\vendedores\clientes.html:237
 msgid "Cancelar"
-msgstr "Cancel"
+msgstr "Cancelar"
 
 #: .\config\templates\admin\crear_testimonio.html:5
 #: .\config\templates\admin\crear_testimonio.html:10
 #: .\config\templates\admin\testimonios.html:15
 msgid "Crear Testimonio"
-msgstr "Create Testimonial"
+msgstr "Crear Testimonio"
 
 #: .\config\templates\admin\crear_testimonio.html:23
 #: .\config\templates\admin\crear_vendedor.html:17
@@ -516,73 +523,73 @@ msgstr "Create Testimonial"
 #: .\config\templates\vendedores\clientes.html:175
 #: .\config\templates\vendedores\crear_cliente.html:52
 msgid "Nombre"
-msgstr "First Name"
+msgstr "Nombre"
 
 #: .\config\templates\admin\crear_testimonio.html:28
 #: .\config\templates\admin\editar_testimonio.html:28
 #: .\config\templates\admin\testimonios.html:25
 msgid "Negocio"
-msgstr "Business"
+msgstr "Negocio"
 
 #: .\config\templates\admin\crear_testimonio.html:33
 #: .\config\templates\admin\editar_testimonio.html:33
 msgid "Negocio en ingles"
-msgstr "Business in English"
+msgstr "Negocio en ingles"
 
 #: .\config\templates\admin\crear_testimonio.html:38
 #: .\config\templates\admin\editar_testimonio.html:38
 #: .\config\templates\admin\testimonios.html:26
 msgid "Estrellas"
-msgstr "Stars"
+msgstr "Estrellas"
 
 #: .\config\templates\admin\crear_testimonio.html:43
 #: .\config\templates\admin\editar_testimonio.html:43
 #: .\config\templates\admin\testimonios.html:27
 msgid "Orden"
-msgstr "Order"
+msgstr "Orden"
 
 #: .\config\templates\admin\crear_testimonio.html:48
 #: .\config\templates\admin\editar_testimonio.html:48
 msgid "Comentario"
-msgstr "Comment"
+msgstr "Comentario"
 
 #: .\config\templates\admin\crear_testimonio.html:53
 #: .\config\templates\admin\editar_testimonio.html:53
 msgid "Comentario en ingles"
-msgstr "Comment in English"
+msgstr "Comentario en ingles"
 
 #: .\config\templates\admin\crear_testimonio.html:58
 #: .\config\templates\admin\testimonios.html:23
 msgid "Foto"
-msgstr "Photo"
+msgstr "Foto"
 
 #: .\config\templates\admin\crear_testimonio.html:65
 #: .\config\templates\admin\editar_testimonio.html:72
 msgid "Mostrar en home"
-msgstr "Show on home"
+msgstr "Mostrar en home"
 
 #: .\config\templates\admin\crear_testimonio.html:71
 msgid "Guardar Testimonio"
-msgstr "Save Testimonial"
+msgstr "Guardar Testimonio"
 
 #: .\config\templates\admin\crear_vendedor.html:5
 #: .\config\templates\admin\crear_vendedor.html:10
 #: .\config\templates\admin\crear_vendedor.html:48
 #: .\config\templates\admin\vendedores.html:23
 msgid "Crear Vendedor"
-msgstr "Create Seller"
+msgstr "Crear Vendedor"
 
 #: .\config\templates\admin\crear_vendedor.html:22
 #: .\config\templates\admin\editar_vendedor.html:25
 #: .\config\templates\vendedores\crear_cliente.html:57
 msgid "Apellido"
-msgstr "Last Name"
+msgstr "Apellido"
 
 #: .\config\templates\admin\crear_vendedor.html:27
 #: .\config\templates\admin\editar_vendedor.html:40
 #: .\config\templates\usuarios\login_modal_form.html:19
 msgid "Usuario"
-msgstr "Username"
+msgstr "Usuario"
 
 #: .\config\templates\admin\crear_vendedor.html:32
 #: .\config\templates\admin\editar_vendedor.html:30
@@ -592,258 +599,258 @@ msgstr "Email"
 
 #: .\config\templates\admin\crear_vendedor.html:37
 msgid "Contrasena"
-msgstr "Password"
+msgstr "Contrasena"
 
 #: .\config\templates\admin\dashboard.html:11
 msgid "Panel Administrador"
-msgstr "Admin Panel"
+msgstr "Panel Administrador"
 
-#: .\config\templates\admin\dashboard.html:28
+#: .\config\templates\admin\dashboard.html:30
 msgid "Clientes Aprobados"
-msgstr "Approved Customers"
+msgstr "Clientes Aprobados"
 
-#: .\config\templates\admin\dashboard.html:37
+#: .\config\templates\admin\dashboard.html:39
 #: .\config\templates\admin\vendedores.html:5
 #: .\config\templates\admin\vendedores.html:11
 #: .\config\templates\bases\base_vendedor.html:121
 msgid "Vendedores"
-msgstr "Sellers"
+msgstr "Vendedores"
 
-#: .\config\templates\admin\dashboard.html:46
+#: .\config\templates\admin\dashboard.html:48
 #: .\config\templates\admin\productos.html:11
 #: .\config\templates\bases\base_vendedor.html:125
 msgid "Productos"
-msgstr "Products"
+msgstr "Productos"
 
 #: .\config\templates\admin\editar_home_contenido.html:5
 msgid "Editar Banner y Textos Home"
-msgstr "Edit Banner and Home Texts"
+msgstr "Editar Banner y Textos Home"
 
 #: .\config\templates\admin\editar_home_contenido.html:10
 msgid "Editar Banner y Textos del Home"
-msgstr "Edit Banner and Home Texts"
+msgstr "Editar Banner y Textos del Home"
 
 #: .\config\templates\admin\editar_home_contenido.html:23
 msgid "Hero principal"
-msgstr "Main hero"
+msgstr "Hero principal"
 
 #: .\config\templates\admin\editar_home_contenido.html:26
 msgid "Titulo principal (ES)"
-msgstr "Main title (ES)"
+msgstr "Titulo principal (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:30
 msgid "Titulo resaltado (ES)"
-msgstr "Highlighted title (ES)"
+msgstr "Titulo resaltado (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:34
 msgid "Titulo final (ES)"
-msgstr "Final title (ES)"
+msgstr "Titulo final (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:39
 msgid "Titulo principal (EN)"
-msgstr "Main title (EN)"
+msgstr "Titulo principal (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:43
 msgid "Titulo resaltado (EN)"
-msgstr "Highlighted title (EN)"
+msgstr "Titulo resaltado (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:47
 msgid "Titulo final (EN)"
-msgstr "Final title (EN)"
+msgstr "Titulo final (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:52
 msgid "Subtitulo (ES)"
-msgstr "Subtitle (ES)"
+msgstr "Subtitulo (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:56
 msgid "Boton hero (ES)"
-msgstr "Hero button (ES)"
+msgstr "Boton hero (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:61
 msgid "Subtitulo (EN)"
-msgstr "Subtitle (EN)"
+msgstr "Subtitulo (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:65
 msgid "Boton hero (EN)"
-msgstr "Hero button (EN)"
+msgstr "Boton hero (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:72
 msgid "CTA mayorista"
-msgstr "Wholesale CTA"
+msgstr "CTA mayorista"
 
 #: .\config\templates\admin\editar_home_contenido.html:75
 msgid "Titulo CTA (ES)"
-msgstr "CTA title (ES)"
+msgstr "Titulo CTA (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:79
 msgid "Titulo CTA (EN)"
-msgstr "CTA title (EN)"
+msgstr "Titulo CTA (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:84
 msgid "Boton crear cuenta (ES)"
-msgstr "Create account button (ES)"
+msgstr "Boton crear cuenta (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:88
 msgid "Boton crear cuenta (EN)"
-msgstr "Create account button (EN)"
+msgstr "Boton crear cuenta (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:93
 msgid "Boton catalogo (ES)"
-msgstr "Catalog button (ES)"
+msgstr "Boton catalogo (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:97
 msgid "Boton catalogo (EN)"
-msgstr "Catalog button (EN)"
+msgstr "Boton catalogo (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:103
 msgid "Seccion Quienes somos"
-msgstr "About us section"
+msgstr "Seccion Quienes somos"
 
 #: .\config\templates\admin\editar_home_contenido.html:107
 msgid "Titulo (ES)"
-msgstr "Title (ES)"
+msgstr "Titulo (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:111
 msgid "Titulo (EN)"
-msgstr "Title (EN)"
+msgstr "Titulo (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:116
 msgid "Descripcion (ES)"
-msgstr "Description (ES)"
+msgstr "Descripcion (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:120
 msgid "Descripcion (EN)"
-msgstr "Description (EN)"
+msgstr "Descripcion (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:126
 msgid "Tarjetas informativas"
-msgstr "Info cards"
+msgstr "Tarjetas informativas"
 
 #: .\config\templates\admin\editar_home_contenido.html:130
 msgid "Tarjeta 1 titulo (ES)"
-msgstr "Card 1 title (ES)"
+msgstr "Tarjeta 1 titulo (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:134
 msgid "Tarjeta 1 titulo (EN)"
-msgstr "Card 1 title (EN)"
+msgstr "Tarjeta 1 titulo (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:138
 msgid "Tarjeta 1 subtitulo (ES)"
-msgstr "Card 1 subtitle (ES)"
+msgstr "Tarjeta 1 subtitulo (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:142
 msgid "Tarjeta 1 subtitulo (EN)"
-msgstr "Card 1 subtitle (EN)"
+msgstr "Tarjeta 1 subtitulo (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:147
 msgid "Tarjeta 2 titulo (ES)"
-msgstr "Card 2 title (ES)"
+msgstr "Tarjeta 2 titulo (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:151
 msgid "Tarjeta 2 titulo (EN)"
-msgstr "Card 2 title (EN)"
+msgstr "Tarjeta 2 titulo (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:155
 msgid "Tarjeta 2 subtitulo (ES)"
-msgstr "Card 2 subtitle (ES)"
+msgstr "Tarjeta 2 subtitulo (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:159
 msgid "Tarjeta 2 subtitulo (EN)"
-msgstr "Card 2 subtitle (EN)"
+msgstr "Tarjeta 2 subtitulo (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:164
 msgid "Tarjeta 3 titulo (ES)"
-msgstr "Card 3 title (ES)"
+msgstr "Tarjeta 3 titulo (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:168
 msgid "Tarjeta 3 titulo (EN)"
-msgstr "Card 3 title (EN)"
+msgstr "Tarjeta 3 titulo (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:172
 msgid "Tarjeta 3 subtitulo (ES)"
-msgstr "Card 3 subtitle (ES)"
+msgstr "Tarjeta 3 subtitulo (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:176
 msgid "Tarjeta 3 subtitulo (EN)"
-msgstr "Card 3 subtitle (EN)"
+msgstr "Tarjeta 3 subtitulo (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:181
 msgid "Tarjeta 4 titulo (ES)"
-msgstr "Card 4 title (ES)"
+msgstr "Tarjeta 4 titulo (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:185
 msgid "Tarjeta 4 titulo (EN)"
-msgstr "Card 4 title (EN)"
+msgstr "Tarjeta 4 titulo (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:189
 msgid "Tarjeta 4 subtitulo (ES)"
-msgstr "Card 4 subtitle (ES)"
+msgstr "Tarjeta 4 subtitulo (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:193
 msgid "Tarjeta 4 subtitulo (EN)"
-msgstr "Card 4 subtitle (EN)"
+msgstr "Tarjeta 4 subtitulo (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:199
 msgid "Estadisticas"
-msgstr "Statistics:"
+msgstr "Estadisticas"
 
 #: .\config\templates\admin\editar_home_contenido.html:203
 msgid "Estadistica 1 valor (ES)"
-msgstr "Statistic 1 value (ES)"
+msgstr "Estadistica 1 valor (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:207
 msgid "Estadistica 1 valor (EN)"
-msgstr "Statistic 1 value (EN)"
+msgstr "Estadistica 1 valor (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:211
 msgid "Estadistica 1 texto (ES)"
-msgstr "Statistic 1 text (ES)"
+msgstr "Estadistica 1 texto (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:215
 msgid "Estadistica 1 texto (EN)"
-msgstr "Statistic 1 text (EN)"
+msgstr "Estadistica 1 texto (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:220
 msgid "Estadistica 2 valor (ES)"
-msgstr "Statistic 2 value (ES)"
+msgstr "Estadistica 2 valor (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:224
 msgid "Estadistica 2 valor (EN)"
-msgstr "Statistic 2 value (EN)"
+msgstr "Estadistica 2 valor (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:228
 msgid "Estadistica 2 texto (ES)"
-msgstr "Statistic 2 text (ES)"
+msgstr "Estadistica 2 texto (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:232
 msgid "Estadistica 2 texto (EN)"
-msgstr "Statistic 2 text (EN)"
+msgstr "Estadistica 2 texto (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:237
 msgid "Estadistica 3 valor (ES)"
-msgstr "Statistic 3 value (ES)"
+msgstr "Estadistica 3 valor (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:241
 msgid "Estadistica 3 valor (EN)"
-msgstr "Statistic 3 value (EN)"
+msgstr "Estadistica 3 valor (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:245
 msgid "Estadistica 3 texto (ES)"
-msgstr "Statistic 3 text (ES)"
+msgstr "Estadistica 3 texto (ES)"
 
 #: .\config\templates\admin\editar_home_contenido.html:249
 msgid "Estadistica 3 texto (EN)"
-msgstr "Statistic 3 text (EN)"
+msgstr "Estadistica 3 texto (EN)"
 
 #: .\config\templates\admin\editar_home_contenido.html:256
 msgid "Contenido activo"
-msgstr "Active content"
+msgstr "Contenido activo"
 
 #: .\config\templates\admin\editar_home_contenido.html:262
 #: .\config\templates\admin\editar_producto.html:271
 #: .\config\templates\admin\editar_vendedor.html:46
 msgid "Guardar cambios"
-msgstr "Save Changes"
+msgstr "Guardar cambios"
 
 #: .\config\templates\admin\editar_home_contenido.html:263
 #: .\config\templates\admin\ver_cliente.html:85
@@ -851,74 +858,70 @@ msgstr "Save Changes"
 #: .\config\templates\usuarios\registro_modal_form.html:162
 #: .\config\templates\vendedores\crear_cliente.html:180
 msgid "Volver"
-msgstr "Back"
+msgstr "Volver"
 
 #: .\config\templates\admin\editar_marca.html:5
 #: .\config\templates\admin\editar_marca.html:10
 msgid "Editar Marca"
-msgstr "Edit Brand"
+msgstr "Editar Marca"
 
 #: .\config\templates\admin\editar_marca.html:35
 msgid "Logo actual"
-msgstr "Current logo"
+msgstr "Logo actual"
 
 #: .\config\templates\admin\editar_marca.html:40
 msgid "Sin logo"
-msgstr "No logo"
+msgstr "Sin logo"
 
 #: .\config\templates\admin\editar_marca.html:57
 #: .\config\templates\admin\editar_testimonio.html:78
 #: .\config\templates\vendedores\clientes.html:198
-#, fuzzy
-#| msgid "Guardar cambios"
 msgid "Guardar Cambios"
-msgstr "Save Changes"
+msgstr "Guardar Cambios"
 
 #: .\config\templates\admin\editar_producto.html:5
 #: .\config\templates\admin\editar_producto.html:10
 msgid "Editar Producto"
-msgstr "Edit Product"
+msgstr "Editar Producto"
 
 #: .\config\templates\admin\editar_producto.html:118
 msgid "Presentaciones"
-msgstr "Packaging Options"
+msgstr "Presentaciones"
 
 #: .\config\templates\admin\editar_producto.html:181
 msgid ""
 "Este producto no tiene presentaciones aun. Puedes crear la primera "
 "presentacion aqui."
 msgstr ""
-"This product does not have packaging options yet. You can create the first "
-"one here."
+"Este producto no tiene presentaciones aun. Puedes crear la primera "
+"presentacion aqui."
 
 #: .\config\templates\admin\editar_testimonio.html:5
 #: .\config\templates\admin\editar_testimonio.html:10
 msgid "Editar Testimonio"
-msgstr "Edit Testimonial"
+msgstr "Editar Testimonio"
 
 #: .\config\templates\admin\editar_testimonio.html:58
 msgid "Foto actual"
-msgstr "Current photo"
+msgstr "Foto actual"
 
 #: .\config\templates\admin\editar_testimonio.html:63
-#, fuzzy
-#| msgid "Sin logo"
 msgid "Sin foto"
-msgstr "No logo"
+msgstr "Sin foto"
 
 #: .\config\templates\admin\editar_vendedor.html:5
 #: .\config\templates\admin\editar_vendedor.html:10
 msgid "Editar Vendedor"
-msgstr "Edit Seller"
+msgstr "Editar Vendedor"
 
 #: .\config\templates\admin\editar_vendedor.html:42
 msgid "El nombre de usuario no se puede cambiar"
-msgstr "The username cannot be changed"
+msgstr "El nombre de usuario no se puede cambiar"
 
 #: .\config\templates\admin\marcas.html:11 .\config\templates\home.html:63
 #: .\config\templates\home.html:875
 msgid "Marcas"
-msgstr "Brands"
+msgstr "Marcas"
 
 #: .\config\templates\admin\marcas.html:30
 msgid "Logo"
@@ -926,7 +929,7 @@ msgstr "Logo"
 
 #: .\config\templates\admin\marcas.html:33
 msgid "Categorias"
-msgstr "Categorys"
+msgstr "Categorias"
 
 #: .\config\templates\admin\marcas.html:34
 #: .\config\templates\admin\productos.html:85
@@ -935,25 +938,19 @@ msgstr "Categorys"
 #: .\config\templates\vendedores\clientes.html:77
 #: .\config\templates\vendedores\crear_cliente.html:139
 msgid "Estado"
-msgstr "State"
+msgstr "Estado"
 
 #: .\config\templates\admin\marcas.html:72
-#, fuzzy
-#| msgid "Seleccionar categoria"
 msgid "Sin categorias"
-msgstr "Select category"
+msgstr "Sin categorias"
 
 #: .\config\templates\admin\marcas.html:78
-#, fuzzy
-#| msgid "Activo"
 msgid "Activa"
-msgstr "Active"
+msgstr "Activa"
 
 #: .\config\templates\admin\marcas.html:80
-#, fuzzy
-#| msgid "Inactivo"
 msgid "Inactiva"
-msgstr "Inactive"
+msgstr "Inactiva"
 
 #: .\config\templates\admin\marcas.html:85
 #: .\config\templates\admin\productos.html:148
@@ -962,12 +959,12 @@ msgstr "Inactive"
 #: .\config\templates\admin\vendedores.html:63
 #: .\config\templates\vendedores\clientes.html:127
 msgid "Editar"
-msgstr "Edit"
+msgstr "Editar"
 
 #: .\config\templates\admin\marcas.html:88
 #: .\config\templates\admin\productos.html:154
 msgid "Inhabilitar"
-msgstr "Disable"
+msgstr "Inhabilitar"
 
 #: .\config\templates\admin\marcas.html:90
 #: .\config\templates\admin\productos.html:160
@@ -975,225 +972,223 @@ msgstr "Disable"
 #: .\config\templates\admin\vendedores.html:68
 #: .\config\templates\vendedores\clientes.html:139
 msgid "Activar"
-msgstr "Activate"
+msgstr "Activar"
 
 #: .\config\templates\admin\marcas.html:96
-#, fuzzy
-#| msgid "No hay productos registrados"
 msgid "No hay marcas registradas"
-msgstr "There are no products registered"
+msgstr "No hay marcas registradas"
 
 #: .\config\templates\admin\productos.html:19
 msgid "Buscar..."
-msgstr "Search..."
+msgstr "Buscar..."
 
 #: .\config\templates\admin\productos.html:24
 msgid "Todas las categorias"
-msgstr "All categories"
+msgstr "Todas las categorias"
 
 #: .\config\templates\admin\productos.html:39
 msgid "Todas las marcas"
-msgstr "All brands"
+msgstr "Todas las marcas"
 
 #: .\config\templates\admin\productos.html:69
 msgid "Gestionar Marcas"
-msgstr "Manage Brands"
+msgstr "Gestionar Marcas"
 
 #: .\config\templates\admin\productos.html:139
 #: .\config\templates\admin\testimonios.html:48
 #: .\config\templates\vendedores\clientes.html:110
 msgid "Activo"
-msgstr "Active"
+msgstr "Activo"
 
 #: .\config\templates\admin\productos.html:141
 #: .\config\templates\vendedores\clientes.html:116
 msgid "Inactivo"
-msgstr "Inactive"
+msgstr "Inactivo"
 
 #: .\config\templates\admin\productos.html:172
 msgid "No hay productos registrados"
-msgstr "There are no products registered"
+msgstr "No hay productos registrados"
 
 #: .\config\templates\admin\testimonios.html:5 .\config\templates\home.html:877
 msgid "Testimonios"
-msgstr "Testimonials"
+msgstr "Testimonios"
 
 #: .\config\templates\admin\testimonios.html:11
 msgid "Testimonios del Home"
-msgstr "Home Testimonials"
+msgstr "Testimonios del Home"
 
 #: .\config\templates\admin\testimonios.html:16
 msgid "Volver a Contenido Home"
-msgstr "Back to Home Content"
+msgstr "Volver a Contenido Home"
 
 #: .\config\templates\admin\testimonios.html:50
 msgid "Oculto"
-msgstr "Hidden"
+msgstr "Oculto"
 
 #: .\config\templates\admin\testimonios.html:56
 msgid "Ocultar"
-msgstr "Hide"
+msgstr "Ocultar"
 
 #: .\config\templates\admin\testimonios.html:64
 msgid "No hay testimonios registrados"
-msgstr "There are no testimonials registered"
+msgstr "No hay testimonios registrados"
 
 #: .\config\templates\admin\vendedores.html:17
 msgid "Buscar por nombre o email..."
-msgstr "Search by name or email..."
+msgstr "Buscar por nombre o email..."
 
 #: .\config\templates\admin\vendedores.html:59
 #: .\config\templates\vendedores\clientes.html:134
-#, fuzzy
-#| msgid "Deseas activar a"
 msgid "Desactivar"
-msgstr "Do you want to activate"
+msgstr "Desactivar"
 
 #: .\config\templates\admin\vendedores.html:78
 msgid "No hay vendedores registrados"
-msgstr "There are no sellers registered"
+msgstr "No hay vendedores registrados"
 
 #: .\config\templates\admin\vendedores.html:100
 #: .\config\templates\admin\vendedores.html:140
 msgid "Operacion completada"
-msgstr "Operation completed"
+msgstr "Operacion completada"
 
 #: .\config\templates\admin\vendedores.html:102
 msgid "Se ha creado correctamente el vendedor."
-msgstr "The seller has been created successfully."
+msgstr "Se ha creado correctamente el vendedor."
 
 #: .\config\templates\admin\vendedores.html:107
+#: .\config\templates\usuarios\registro.html:125
+#: .\config\templates\usuarios\registro.html:190
 #: .\config\templates\usuarios\registro_modal_form.html:40
 #: .\config\templates\usuarios\registro_modal_form.html:78
 #: .\config\templates\vendedores\crear_cliente.html:109
 msgid "Continuar"
-msgstr "Continue"
+msgstr "Continuar"
 
 #: .\config\templates\admin\vendedores.html:119
 msgid "Confirmar accion"
-msgstr "Confirm action"
+msgstr "Confirmar accion"
 
 #: .\config\templates\admin\vendedores.html:125
 msgid "Confirmar"
-msgstr "Confirm"
+msgstr "Confirmar"
 
 #: .\config\templates\admin\vendedores.html:134
 msgid "Activar vendedor"
-msgstr "Activate seller"
+msgstr "Activar vendedor"
 
 #: .\config\templates\admin\vendedores.html:135
 msgid "Deseas activar a"
-msgstr "Do you want to activate"
+msgstr "Deseas activar a"
 
 #: .\config\templates\admin\vendedores.html:136
 msgid "Si, activar"
-msgstr "Yes, activate"
+msgstr "Si, activar"
 
 #: .\config\templates\admin\vendedores.html:137
 msgid "Desactivar vendedor"
-msgstr "Deactivate seller"
+msgstr "Desactivar vendedor"
 
 #: .\config\templates\admin\vendedores.html:138
 msgid "Deseas desactivar a"
-msgstr "Do you want to deactivate"
+msgstr "Deseas desactivar a"
 
 #: .\config\templates\admin\vendedores.html:139
 msgid "Si, desactivar"
-msgstr "Yes, deactivate"
+msgstr "Si, desactivar"
 
 #: .\config\templates\admin\ver_certificado.html:5
 msgid "Ver Certificado"
-msgstr "View Certificate"
+msgstr "Ver Certificado"
 
 #: .\config\templates\admin\ver_certificado.html:22
 msgid "Certificado del cliente"
-msgstr "Customer certificate"
+msgstr "Certificado del cliente"
 
 #: .\config\templates\admin\ver_cliente.html:5
 msgid "Detalle Cliente"
-msgstr "Customer Detail"
+msgstr "Detalle Cliente"
 
 #: .\config\templates\admin\ver_cliente.html:10
 msgid "Detalle del Cliente"
-msgstr "Customer Detail"
+msgstr "Detalle del Cliente"
 
 #: .\config\templates\admin\ver_cliente.html:24
 msgid "Correo:"
-msgstr "Email:"
+msgstr "Correo:"
 
 #: .\config\templates\admin\ver_cliente.html:29
 msgid "Telefono:"
-msgstr "Phone:"
+msgstr "Telefono:"
 
 #: .\config\templates\admin\ver_cliente.html:34
 msgid "Ciudad:"
-msgstr "City"
+msgstr "Ciudad:"
 
 #: .\config\templates\admin\ver_cliente.html:39
 msgid "Estado:"
-msgstr "State:"
+msgstr "Estado:"
 
 #: .\config\templates\admin\ver_cliente.html:44
 msgid "Codigo Postal:"
-msgstr "Postal Code:"
+msgstr "Codigo Postal:"
 
 #: .\config\templates\admin\ver_cliente.html:49
 msgid "Sales Tax:"
-msgstr "Sales Tax:"
+msgstr "Impuesto sobre ventas:"
 
 #: .\config\templates\admin\ver_cliente.html:54
 msgid "Pais:"
-msgstr "Country:"
+msgstr "Pais:"
 
 #: .\config\templates\admin\ver_cliente.html:62
 msgid "Certificado de Impuesto"
-msgstr "Tax Certificate"
+msgstr "Certificado de Impuesto"
 
 #: .\config\templates\admin\ver_cliente.html:69
 msgid "No se subio certificado"
-msgstr "No certificate was uploaded"
+msgstr "No se subio certificado"
 
 #: .\config\templates\admin\ver_cliente.html:77
 msgid "Aprobar cliente"
-msgstr "Approve customer"
+msgstr "Aprobar cliente"
 
 #: .\config\templates\admin\ver_cliente.html:81
 msgid "Rechazar cliente"
-msgstr "reject client"
+msgstr "Rechazar cliente"
 
 #: .\config\templates\bases\base_vendedor.html:11
 msgid "Sistema"
-msgstr "System"
+msgstr "Sistema"
 
 #: .\config\templates\bases\base_vendedor.html:31
 msgid "Abrir menu"
-msgstr "Open menu"
+msgstr "Abrir menu"
 
 #: .\config\templates\bases\base_vendedor.html:44
 msgid "Cerrar sesion"
-msgstr "Log out"
+msgstr "Cerrar sesion"
 
 #: .\config\templates\bases\base_vendedor.html:65
 msgid "Estas seguro de salir?"
-msgstr "Are you sure you want to leave?"
+msgstr "Estas seguro de salir?"
 
 #: .\config\templates\bases\base_vendedor.html:69
 msgid "Se cerrara tu sesion en"
-msgstr "Your session will be closed in"
+msgstr "Se cerrara tu sesion en"
 
 #: .\config\templates\bases\base_vendedor.html:79
 msgid "Si, salir"
-msgstr "Yes, log out"
+msgstr "Si, salir"
 
 #: .\config\templates\bases\base_vendedor.html:97
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:68
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:64
 msgid "Vendedor"
-msgstr "seller"
+msgstr "Vendedor"
 
 #: .\config\templates\bases\base_vendedor.html:100
 msgid "Administrador"
-msgstr "Administrator"
+msgstr "Administrador"
 
 #: .\config\templates\bases\base_vendedor.html:113
 msgid "Dashboard"
@@ -1201,18 +1196,18 @@ msgstr "Dashboard"
 
 #: .\config\templates\bases\base_vendedor.html:117
 msgid "Solicitudes"
-msgstr "Requests"
+msgstr "Solicitudes"
 
 #: .\config\templates\bases\base_vendedor.html:129
 msgid "Contenido de Inicio"
-msgstr "Home Content"
+msgstr "Contenido de Inicio"
 
 #: .\config\templates\bases\base_vendedor.html:135
 #: .\config\templates\vendedores\crear_cliente.html:5
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:74
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:70
 msgid "Crear Cliente"
-msgstr "Create Customer"
+msgstr "Crear Cliente"
 
 #: .\config\templates\bases\base_vendedor.html:139
 #: .\config\templates\vendedores\clientes.html:5
@@ -1220,7 +1215,7 @@ msgstr "Create Customer"
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:78
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:74
 msgid "Clientes"
-msgstr "Customers"
+msgstr "Clientes"
 
 #: .\config\templates\bases\base_vendedor.html:143
 #: .\config\templates\vendedores\tomar_pedido.html:5
@@ -1229,11 +1224,11 @@ msgstr "Customers"
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:82
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:78
 msgid "Tomar Pedido"
-msgstr "Take Order"
+msgstr "Tomar Pedido"
 
 #: .\config\templates\bases\base_vendedor.html:209
 msgid "Notificacion"
-msgstr "Notification"
+msgstr "Notificacion"
 
 #: .\config\templates\bases\base_vendedor.html:210
 #: .\config\templates\home.html:981 .\config\templates\home.html:1440
@@ -1242,13 +1237,13 @@ msgstr "Notification"
 #: .\config\templates\vendedores\clientes.html:219
 #: .\config\templates\vendedores\clientes.html:261
 msgid "Cerrar"
-msgstr "Close"
+msgstr "Cerrar"
 
 #: .\config\templates\bases\base_vendedor.html:217
 #: .\config\templates\vendedores\crear_cliente.html:214
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:415
 msgid "Entendido"
-msgstr "Understood"
+msgstr "Entendido"
 
 #: .\config\templates\bases\base_vendedor.html:237
 msgid "Error"
@@ -1256,222 +1251,207 @@ msgstr "Error"
 
 #: .\config\templates\bases\base_vendedor.html:238
 msgid "Aviso"
-msgstr "warning"
+msgstr "Aviso"
 
 #: .\config\templates\bases\base_vendedor.html:239
 msgid "Operacion exitosa"
-msgstr "Successful operation"
+msgstr "Operacion exitosa"
 
 #: .\config\templates\bases\base_vendedor.html:240
 msgid "Informacion"
-msgstr "Information"
+msgstr "Informacion"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:7
 #: .\config\templates\cotizaciones\ver_cotizacion.html:65
 #: .\config\templates\cotizaciones\ver_cotizacion.html:83
 #: .\config\templates\productos\catalogo.html:87
 msgid "Mi Cotización"
-msgstr "My Quote"
+msgstr "Mi Cotización"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:39
 #: .\config\templates\productos\catalogo.html:49
 msgid "Cotización"
-msgstr "Quote"
+msgstr "Cotización"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:42
 #: .\config\templates\productos\catalogo.html:52
 msgid "Cerrar Sesión"
-msgstr "Sign Out"
+msgstr "Cerrar Sesión"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:61
 #: .\config\templates\home.html:75 .\config\templates\productos\catalogo.html:8
 #: .\config\templates\productos\catalogo.html:83
 msgid "Catálogo"
-msgstr "Catalog"
+msgstr "Catálogo"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:86
 msgid "Revisa los productos antes de enviar tu solicitud"
-msgstr "Review the products before sending your request"
+msgstr "Revisa los productos antes de enviar tu solicitud"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:103
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:126
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:143
 msgid "Producto"
-msgstr "Product"
+msgstr "Producto"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:104
 #: .\config\templates\productos\catalogo.html:193
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:127
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:147
 msgid "Presentación"
-msgstr "Packaging"
+msgstr "Presentación"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:105
 #: .\config\templates\productos\catalogo.html:211
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:128
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:178
 msgid "Cantidad"
-msgstr "Quantity"
+msgstr "Cantidad"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:157
 #: .\config\templates\productos\catalogo.html:186
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:238
 msgid "por"
-msgstr "by"
+msgstr "por"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:207
 msgid "No hay productos en la cotización."
-msgstr "There are no products in the quote."
+msgstr "No hay productos en la cotización."
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:225
 msgid "Buscar Productos..."
-msgstr "Search Products..."
+msgstr "Buscar Productos..."
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:236
 msgid "Total de productos"
-msgstr "Total Products"
+msgstr "Total de productos"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:246
 msgid "Nota Opcional"
-msgstr "Optional Note"
+msgstr "Nota Opcional"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:254
 msgid "La cotización será enviada para validación de precios."
-msgstr "The quote will be sent for price validation."
+msgstr "La cotización será enviada para validación de precios."
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:259
 msgid "Enviar Solicitud de Cotización"
-msgstr "Send Quote Request"
+msgstr "Enviar Solicitud de Cotización"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:284
 #: .\config\templates\productos\catalogo.html:705
 #: .\config\templates\vendedores\crear_cliente.html:232
 msgid "¡Solicitud Enviada!"
-msgstr "Request Sent!"
+msgstr "¡Solicitud Enviada!"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:286
-#, fuzzy
-#| msgid "Tu solicitud de registro ha sido recibida exitosamente."
 msgid "Tu solicitud de cotización ha sido recibida correctamente."
-msgstr "Your registration request has been received successfully."
+msgstr "Tu solicitud de cotización ha sido recibida correctamente."
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:291
 #: .\config\templates\productos\catalogo.html:714
 msgid "Información importante"
-msgstr "Important information"
+msgstr "Información importante"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:294
 msgid ""
 "Nuestro equipo revisará tu solicitud y se pondrá en contacto para confirmar "
 "precios y disponibilidad."
 msgstr ""
-"Our team will review your request and contact you to confirm prices and "
-"availability."
+"Nuestro equipo revisará tu solicitud y se pondrá en contacto para confirmar "
+"precios y disponibilidad."
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:298
-#, fuzzy
-#| msgid "Ver Catálogo"
 msgid "Volver al Catálogo"
-msgstr "View Catalog"
+msgstr "Volver al Catálogo"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:314
-#, fuzzy
-#| msgid "Producto"
 msgid "Sin Productos"
-msgstr "Product"
+msgstr "Sin Productos"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:316
-#, fuzzy
-#| msgid "Revisa los productos antes de enviar tu solicitud"
 msgid ""
 "Debes agregar al menos un producto antes de enviar la solicitud de "
 "cotización."
-msgstr "Review the products before sending your request"
+msgstr ""
+"Debes agregar al menos un producto antes de enviar la solicitud de "
+"cotización."
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:321
-#, fuzzy
-#| msgid "Cotización"
 msgid "Cotización vacía"
-msgstr "Quote"
+msgstr "Cotización vacía"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:324
 msgid "Por favor, ve al catálogo y añade productos a tu cotización."
-msgstr "Please go to the catalog and add products to your quote."
+msgstr "Por favor, ve al catálogo y añade productos a tu cotización."
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:328
-#, fuzzy
-#| msgid "Ver Catálogo"
 msgid "Ir al Catálogo"
-msgstr "View Catalog"
+msgstr "Ir al Catálogo"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:376
 #: .\config\templates\cotizaciones\ver_cotizacion.html:381
-#, fuzzy
-#| msgid "Añadir a cotización"
 msgid "Error al enviar la cotización"
-msgstr "Add to Quote"
+msgstr "Error al enviar la cotización"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:431
 #: .\config\templates\productos\catalogo.html:303
-#, fuzzy
-#| msgid "Estas seguro de salir?"
 msgid "¿Estás seguro de salir?"
-msgstr "Are you sure you want to leave?"
+msgstr "¿Estás seguro de salir?"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:435
 #: .\config\templates\productos\catalogo.html:307
 msgid "Se cerrará tu sesión en"
-msgstr "Your session will be closed in"
+msgstr "Se cerrará tu sesión en"
 
 #: .\config\templates\cotizaciones\ver_cotizacion.html:445
 #: .\config\templates\productos\catalogo.html:317
 msgid "Sí, salir"
-msgstr "Yes, sign out"
+msgstr "Sí, salir"
 
 #: .\config\templates\home.html:55 .\config\templates\home.html:873
 msgid "Inicio"
-msgstr "Home"
+msgstr "Inicio"
 
 #: .\config\templates\home.html:59 .\config\templates\home.html:874
 msgid "Quienes Somos"
-msgstr "About Us"
+msgstr "Quienes Somos"
 
 #: .\config\templates\home.html:67 .\config\templates\home.html:876
 msgid "Ofertas"
-msgstr "Offers"
+msgstr "Ofertas"
 
 #: .\config\templates\home.html:71
 msgid "Contacto"
-msgstr "Contact"
+msgstr "Contacto"
 
 #: .\config\templates\home.html:79
 msgid "Login"
-msgstr "Login"
+msgstr "Iniciar Sesión"
 
 #: .\config\templates\home.html:105
 msgid "Tu Mayorista de"
-msgstr "Your Wholesale Supplier of"
+msgstr "Tu Mayorista de"
 
 #: .\config\templates\home.html:112
 msgid "Productos Latinos"
-msgstr "Latin Products"
+msgstr "Productos Latinos"
 
 #: .\config\templates\home.html:119
 msgid "de Confianza"
-msgstr "You Can Trust"
+msgstr "de Confianza"
 
 #: .\config\templates\home.html:128
 msgid "Haz tus pedidos de forma rápida y segura. Compras al por mayor."
-msgstr ""
-"Place your orders quickly and securely. Wholesale purchasing made easy."
+msgstr "Haz tus pedidos de forma rápida y segura. Compras al por mayor."
 
 #: .\config\templates\home.html:136 .\config\templates\home.html:819
 msgid "Ver Catálogo"
-msgstr "View Catalog"
+msgstr "Ver Catálogo"
 
 #: .\config\templates\home.html:173
 msgid "¿Quiénes Somos?"
-msgstr "Who We Are"
+msgstr "¿Quiénes Somos?"
 
 #: .\config\templates\home.html:183
 msgid ""
@@ -1485,186 +1465,188 @@ msgid ""
 "en un mercado competitivo.\n"
 msgstr ""
 "\n"
-"At La Tortilla Grocery LLC, we are the trusted partner for Latino "
-"businesses. We offer high-quality wholesale products and services tailored "
-"to your needs. We focus on providing efficient solutions to help your "
-"business grow and thrive in a competitive market.\n"
+"En La Tortilla Grocery LLC, somos el aliado de confianza de los negocios "
+"latinos.\n"
+"Ofrecemos productos y servicios mayoristas de alta calidad, adaptados a sus "
+"necesidades.\n"
+"Nos enfocamos en brindar soluciones eficientes para que su negocio crezca y "
+"prospere\n"
+"en un mercado competitivo.\n"
 
 #: .\config\templates\home.html:214
 msgid "Abastecimiento Inteligente"
-msgstr "Smart Supply"
+msgstr "Abastecimiento Inteligente"
 
 #: .\config\templates\home.html:215
 msgid "Productos siempre disponibles"
-msgstr "Products always available"
+msgstr "Productos siempre disponibles"
 
 #: .\config\templates\home.html:234
 msgid "Lógica Eficiente"
-msgstr "Efficient Logistics"
+msgstr "Lógica Eficiente"
 
 #: .\config\templates\home.html:235
 msgid "Entrega rápida y segura"
-msgstr "Fast and secure delivery"
+msgstr "Entrega rápida y segura"
 
 #: .\config\templates\home.html:254
 msgid "Relación a Largo Plazo"
-msgstr "Long-Term Partnership"
+msgstr "Relación a Largo Plazo"
 
 #: .\config\templates\home.html:255
 msgid "Compromiso y confianza"
-msgstr "Commitment and trust"
+msgstr "Compromiso y confianza"
 
 #: .\config\templates\home.html:274
 msgid "Crecimiento Sostenible"
-msgstr "Sustainable Growth"
+msgstr "Crecimiento Sostenible"
 
 #: .\config\templates\home.html:275
 msgid "Apoyo para tu expansión"
-msgstr "Support for your expansion"
+msgstr "Apoyo para tu expansión"
 
 #: .\config\templates\home.html:302
 msgid "Negocios Abastecidos"
-msgstr "Businesses Supplied"
+msgstr "Negocios Abastecidos"
 
 #: .\config\templates\home.html:309
 msgid "Pedidos Exitosos"
-msgstr "Successful Orders"
+msgstr "Pedidos Exitosos"
 
 #: .\config\templates\home.html:316
 msgid "De Experiencia"
-msgstr "Years of Experience"
+msgstr "De Experiencia"
 
 #: .\config\templates\home.html:337
 msgid "¿Por Qué Elegirnos?"
-msgstr "Why Choose Us?"
+msgstr "¿Por Qué Elegirnos?"
 
 #: .\config\templates\home.html:356
 msgid "Amplio Catálogo"
-msgstr "Wide Catalog"
+msgstr "Amplio Catálogo"
 
 #: .\config\templates\home.html:357
 msgid "Productos latinos de alta rotación"
-msgstr "High-demand Latin products"
+msgstr "Productos latinos de alta rotación"
 
 #: .\config\templates\home.html:365
 msgid "Entregas rápidas y seguras para mantener"
-msgstr "Fast and secure deliveries to keep"
+msgstr "Entregas rápidas y seguras para mantener"
 
 #: .\config\templates\home.html:366
 msgid "tu negocio siempre abastecido."
-msgstr "your business always stocked."
+msgstr "tu negocio siempre abastecido."
 
 #: .\config\templates\home.html:394
 msgid "Variedad Garantizada"
-msgstr "Guaranteed Variety"
+msgstr "Variedad Garantizada"
 
 #: .\config\templates\home.html:395
 msgid "Marcas y presentaciones para surtir tu negocio"
-msgstr "Brands and package options to stock your business"
+msgstr "Marcas y presentaciones para surtir tu negocio"
 
 #: .\config\templates\home.html:404
 msgid "Gran variedad de productos latinos"
-msgstr "A wide variety of Latin products"
+msgstr "Gran variedad de productos latinos"
 
 #: .\config\templates\home.html:405
 msgid "listos para tu negocio."
-msgstr "ready for your business."
+msgstr "listos para tu negocio."
 
 #: .\config\templates\home.html:432
 msgid "Precios Competitivos"
-msgstr "Competitive Prices"
+msgstr "Precios Competitivos"
 
 #: .\config\templates\home.html:433
 msgid "Márgenes atractivos para tu negocio"
-msgstr "Attractive margins for your business"
+msgstr "Márgenes atractivos para tu negocio"
 
 #: .\config\templates\home.html:442
 msgid "Precios al por mayor para maximizar"
-msgstr "Wholesale prices to maximize"
+msgstr "Precios al por mayor para maximizar"
 
 #: .\config\templates\home.html:443
 msgid "las ganancias de tu tienda."
-msgstr "your store’s profits."
+msgstr "las ganancias de tu tienda."
 
 #: .\config\templates\home.html:470
 msgid "Atención Personalizada"
-msgstr "Personalized Service"
+msgstr "Atención Personalizada"
 
 #: .\config\templates\home.html:471
 msgid "Soporte directo y confiable"
-msgstr "Reliable direct support"
+msgstr "Soporte directo y confiable"
 
 #: .\config\templates\home.html:480
 msgid "Asesoría y soporte directo para"
-msgstr "Guidance and direct support to"
+msgstr "Asesoría y soporte directo para"
 
 #: .\config\templates\home.html:481
 msgid "hacer crecer tu negocio."
-msgstr "help your business grow."
+msgstr "hacer crecer tu negocio."
 
 #: .\config\templates\home.html:506
 msgid "Marcas que distribuimos"
-msgstr "Brands We Distribute"
+msgstr "Marcas que distribuimos"
 
 #: .\config\templates\home.html:540
 msgid "Ofertas Destacadas"
-msgstr "Featured Offers"
+msgstr "Ofertas Destacadas"
 
 #: .\config\templates\home.html:584 .\config\templates\home.html:672
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:251
 msgid "Presentación:"
-msgstr "Packaging:"
+msgstr "Presentación:"
 
 #: .\config\templates\home.html:600 .\config\templates\home.html:683
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:323
 msgid "Cantidad:"
-msgstr "Quantity:"
+msgstr "Cantidad:"
 
 #: .\config\templates\home.html:614 .\config\templates\home.html:691
 #: .\config\templates\productos\catalogo.html:223
 msgid "Añadir a cotización"
-msgstr "Add to Quote"
+msgstr "Añadir a cotización"
 
 #: .\config\templates\home.html:801
 msgid "¿Tienes una tienda? Solicita tu cuenta mayorista hoy"
-msgstr "Do you have a store? Request your wholesale account today"
+msgstr "¿Tienes una tienda? Solicita tu cuenta mayorista hoy"
 
 #: .\config\templates\home.html:811
 msgid "Crear Cuenta"
-msgstr "Create Account"
+msgstr "Crear Cuenta"
 
 #: .\config\templates\home.html:850
-#, fuzzy
-#| msgid "La Tortilla Grocery"
 msgid "La Tortilla"
-msgstr "La Tortilla Grocery"
+msgstr "La Tortilla"
 
 #: .\config\templates\home.html:850
 msgid "Grocery"
-msgstr ""
+msgstr "Grocery"
 
 #: .\config\templates\home.html:852
 msgid ""
 "La Tortilla Grocery LLC es un distribuidor mayorista de productos latinos de "
 "confianza."
 msgstr ""
-"La Tortilla Grocery LLC is a trusted wholesale distributor of Latin products."
+"La Tortilla Grocery LLC es un distribuidor mayorista de productos latinos de "
+"confianza."
 
 #: .\config\templates\home.html:853
 msgid ""
 "Abastecemos tiendas, supermercados y restaurantes con calidad, precios "
 "competitivos"
 msgstr ""
-"We supply stores, supermarkets, and restaurants with quality products and "
-"competitive prices"
+"Abastecemos tiendas, supermercados y restaurantes con calidad, precios "
+"competitivos"
 
 #: .\config\templates\home.html:854
 msgid "y entregas eficientes."
-msgstr "and efficient deliveries."
+msgstr "y entregas eficientes."
 
 #: .\config\templates\home.html:870
 msgid "Compañía"
-msgstr "Company"
+msgstr "Compañía"
 
 #: .\config\templates\home.html:887
 msgid "Legal"
@@ -1672,15 +1654,15 @@ msgstr "Legal"
 
 #: .\config\templates\home.html:890
 msgid "Política y Privacidad"
-msgstr "Privacy Policy"
+msgstr "Política de Privacidad"
 
 #: .\config\templates\home.html:891
 msgid "Términos y Condiciones"
-msgstr "Terms and Conditions"
+msgstr "Términos y Condiciones"
 
 #: .\config\templates\home.html:901
 msgid "Contactanos"
-msgstr "Contact Us"
+msgstr "Contáctanos"
 
 #: .\config\templates\home.html:904
 msgid "1666 Roswell Rd Bldg 100"
@@ -1700,529 +1682,538 @@ msgstr "+1 (470) 967 2782"
 
 #: .\config\templates\home.html:932
 msgid "© 2025 La Tortilla Grocery LLC. Todos los derechos reservados."
-msgstr "© 2025 La Tortilla Grocery LLC. All rights reserved."
+msgstr "© 2025 La Tortilla Grocery LLC. Todos los derechos reservados."
 
 #: .\config\templates\home.html:936
 msgid "Desarrollado por Solutions.com"
-msgstr "Developed by Solutions.com"
+msgstr "Desarrollado por Solutions.com"
 
 #: .\config\templates\home.html:954
 #: .\config\templates\productos\catalogo.html:373
 msgid "Loading..."
-msgstr "Loading..."
+msgstr "Cargando..."
 
 #: .\config\templates\home.html:971
 #: .\config\templates\productos\catalogo.html:390
 msgid "Credenciales Incorrectas"
-msgstr "Incorrect Credentials"
+msgstr "Credenciales Incorrectas"
 
 #: .\config\templates\home.html:973
 #: .\config\templates\productos\catalogo.html:392
 msgid "Verifica tu usuario y contraseña. Intenta de nuevo."
-msgstr "Check your username and password. Please try again."
+msgstr "Verifica tu usuario y contraseña. Intenta de nuevo."
 
 #: .\config\templates\home.html:978
 #: .\config\templates\productos\catalogo.html:397
 msgid "Intentar de Nuevo"
-msgstr "Try Again"
+msgstr "Intentar de Nuevo"
 
 #: .\config\templates\home.html:1007 .\config\templates\home.html:1322
 #: .\config\templates\productos\catalogo.html:467
 msgid "El formulario está tardando mucho."
-msgstr "The form is taking too long."
+msgstr "El formulario está tardando mucho."
 
 #: .\config\templates\home.html:1007 .\config\templates\home.html:1322
 #: .\config\templates\productos\catalogo.html:467
 msgid "Recarga"
-msgstr "Reload"
+msgstr "Recarga"
 
 #: .\config\templates\home.html:1052 .\config\usuarios\views.py:1252
 msgid "Credenciales incorrectas"
-msgstr "Incorrect credentials"
+msgstr "Credenciales incorrectas"
 
 #: .\config\templates\home.html:1055 .\config\usuarios\views.py:1097
 msgid "El usuario no existe en la base de datos"
-msgstr "The user does not exist in the database"
+msgstr "El usuario no existe en la base de datos"
 
 #: .\config\templates\home.html:1057 .\config\usuarios\views.py:1090
 #: .\config\usuarios\views.py:1092
 msgid "Contraseña incorrecta"
-msgstr "Incorrect password"
+msgstr "Contraseña incorrecta"
 
 #: .\config\templates\home.html:1075
 msgid "Error al procesar. Intenta de nuevo."
-msgstr "Processing error. Please try again."
+msgstr "Error al procesar. Intenta de nuevo."
 
 #: .\config\templates\home.html:1083
 msgid "Error al cargar"
-msgstr "Loading error"
+msgstr "Error al cargar"
 
 #: .\config\templates\home.html:1278
 msgid "No se encontró el modal de login"
-msgstr "Login modal was not found"
+msgstr "No se encontró el modal de login"
 
 #: .\config\templates\home.html:1316
 msgid "No se encontró el contenedor del formulario"
-msgstr "Form container was not found"
+msgstr "No se encontró el contenedor del formulario"
 
 #: .\config\templates\home.html:1366
 #: .\config\templates\productos\catalogo.html:589
 msgid "Debes marcar el checkbox para continuar con el registro"
-msgstr "You must check the box to continue with registration"
+msgstr "Debes marcar el checkbox para continuar con el registro"
 
 #: .\config\templates\home.html:1394 .\config\templates\home.html:1412
 msgid "Error al registrarse. Intenta de nuevo."
-msgstr "Registration error. Please try again."
+msgstr "Error al registrarse. Intenta de nuevo."
 
 #: .\config\templates\home.html:1421
 msgid "Error al cargar el formulario de registro"
-msgstr "Error loading the registration form"
+msgstr "Error al cargar el formulario de registro"
 
 #: .\config\templates\home.html:1434
 #: .\config\templates\usuarios\registro_modal_form.html:352
 msgid "¡Solicitud Recibida!"
-msgstr "Request Received!"
+msgstr "¡Solicitud Recibida!"
 
 #: .\config\templates\home.html:1436
 #: .\config\templates\usuarios\registro_modal_form.html:354
 msgid "Tu solicitud de registro fue enviada correctamente."
-msgstr "Your registration request was sent successfully."
+msgstr "Tu solicitud de registro fue enviada correctamente."
 
 #: .\config\templates\home.html:1437
 #: .\config\templates\usuarios\registro_modal_form.html:355
 msgid "Un administrador revisará tu documentación y te contactará pronto."
-msgstr "An administrator will review your documentation and contact you soon."
+msgstr "Un administrador revisará tu documentación y te contactará pronto."
 
 #: .\config\templates\productos\catalogo.html:56
 #: .\config\templates\productos\catalogo.html:722
 msgid "Volver al Home"
-msgstr "Back to Home"
+msgstr "Volver al Home"
 
 #: .\config\templates\productos\catalogo.html:76
-
 msgid "Modo Invitado"
-msgstr "Guest Mode"
+msgstr "Modo Invitado"
 
 #: .\config\templates\productos\catalogo.html:91
 msgid "Inicia sesión"
-msgstr "Sign in"
+msgstr "Inicia sesión"
 
 #: .\config\templates\productos\catalogo.html:110
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:131
 msgid "Catálogo de Productos"
-msgstr "Product Catalog"
+msgstr "Catálogo de Productos"
 
 #: .\config\templates\productos\catalogo.html:113
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:135
 msgid "Explore nuestro inventario mayorista"
-msgstr "Explore our wholesale inventory"
+msgstr "Explore nuestro inventario mayorista"
 
 #: .\config\templates\productos\catalogo.html:126
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:149
 msgid "Buscar Productos"
-msgstr "Search Products"
+msgstr "Buscar Productos"
 
 #: .\config\templates\productos\catalogo.html:130
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:156
 msgid "Categoría"
-msgstr "Category"
+msgstr "Categoría"
 
 #: .\config\templates\productos\catalogo.html:227
 msgid "Inicia sesión para cotizar"
-msgstr "Sign in to request a quote"
+msgstr "Inicia sesión para cotizar"
 
 #: .\config\templates\productos\catalogo.html:566
 msgid "Error al cargar el formulario de login"
-msgstr "Error loading the login form"
+msgstr "Error al cargar el formulario de login"
 
 #: .\config\templates\productos\catalogo.html:619
 #: .\config\templates\productos\catalogo.html:637
 msgid "Error al registrarse"
-msgstr "Registration error"
+msgstr "Error al registrarse"
 
 #: .\config\templates\productos\catalogo.html:660
 #: .\config\templates\productos\catalogo.html:803
 msgid "Error al cargar el formulario"
-msgstr "Error loading form"
+msgstr "Error al cargar el formulario"
 
 #: .\config\templates\productos\catalogo.html:675
 msgid "Error en el Registro"
-msgstr "Registration Error"
+msgstr "Error en el Registro"
 
 #: .\config\templates\productos\catalogo.html:680
 msgid "Nombre de usuario no disponible"
-msgstr "Username not available"
+msgstr "Nombre de usuario no disponible"
 
 #: .\config\templates\productos\catalogo.html:683
 msgid ""
 "El nombre de usuario que ingresaste ya está registrado en el sistema. Por "
 "favor, intenta con otro nombre de usuario."
 msgstr ""
-"The username you entered is already registered in the system. Please try "
-"another username."
+"El nombre de usuario que ingresaste ya está registrado en el sistema. Por "
+"favor, intenta con otro nombre de usuario."
 
 #: .\config\templates\productos\catalogo.html:688
 msgid "Intentar Nuevamente"
-msgstr "Try Again"
+msgstr "Intentar Nuevamente"
 
 #: .\config\templates\productos\catalogo.html:709
 msgid "Tu solicitud de registro ha sido recibida exitosamente."
-msgstr "Your registration request has been received successfully."
+msgstr "Tu solicitud de registro ha sido recibida exitosamente."
 
 #: .\config\templates\productos\catalogo.html:717
 msgid ""
 "Nuestro equipo de administración revisará tus datos y verificará tu "
 "información. Recibirás una confirmación en tu correo dentro de 24-48 horas."
 msgstr ""
-"Our administration team will review your data and verify your information. "
-"You will receive a confirmation email within 24-48 hours."
+"Nuestro equipo de administración revisará tus datos y verificará tu "
+"información. Recibirás una confirmación en tu correo dentro de 24-48 horas."
 
 #: .\config\templates\usuarios\login_modal_form.html:5
+#: .\config\templates\usuarios\registro.html:44
 #: .\config\templates\usuarios\registro_modal_form.html:6
 msgid "La Tortilla Grocery"
 msgstr "La Tortilla Grocery"
 
 #: .\config\templates\usuarios\login_modal_form.html:11
 msgid "Acceso a Plataforma"
-msgstr "Platform Access"
+msgstr "Acceso a Plataforma"
 
 #: .\config\templates\usuarios\login_modal_form.html:12
 msgid "Inicia sesión con tu perfil asignado."
-msgstr "Sign in with your assigned profile."
+msgstr "Inicia sesión con tu perfil asignado."
 
 #: .\config\templates\usuarios\login_modal_form.html:20
 msgid "Ingresa tu usuario"
-msgstr "Enter your username"
+msgstr "Ingresa tu usuario"
 
 #: .\config\templates\usuarios\login_modal_form.html:24
 msgid "Contraseña"
-msgstr "Password"
+msgstr "Contraseña"
 
 #: .\config\templates\usuarios\login_modal_form.html:25
 msgid "Ingresa tu contraseña"
-msgstr "Enter your password"
+msgstr "Ingresa tu contraseña"
 
 #: .\config\templates\usuarios\login_modal_form.html:33
 msgid "Iniciar Sesión"
-msgstr "Sign In"
+msgstr "Iniciar Sesión"
 
 #: .\config\templates\usuarios\login_modal_form.html:40
 msgid "¿No tienes cuenta?"
-msgstr "Don't have an account?"
+msgstr "¿No tienes cuenta?"
 
 #: .\config\templates\usuarios\login_modal_form.html:41
 msgid "Regístrate"
-msgstr "Sign up"
+msgstr "Regístrate"
 
+#: .\config\templates\usuarios\registro.html:49
 #: .\config\templates\usuarios\registro_modal_form.html:10
 msgid "Crear Cuenta Mayorista"
-msgstr "Create Wholesale Account"
+msgstr "Crear Cuenta Mayorista"
 
-#: .\config\templates\usuarios\registro_modal_form.html:11
-msgid "Estás a tres pasos de formar parte de nuestra red comercial"
-msgstr "You are three steps away from becoming part of our commercial network"
+#: .\config\templates\usuarios\registro.html:52
+msgid "Estás a dos pasos de formar parte de nuestra red comercial"
+msgstr "Estás a dos pasos de formar parte de nuestra red comercial"
 
+#: .\config\templates\usuarios\registro.html:55
 #: .\config\templates\usuarios\registro_modal_form.html:12
 msgid "Paso 1 de 3"
-msgstr "Step 1 of 3"
+msgstr "Paso 1 de 3"
 
+#: .\config\templates\usuarios\registro.html:78
 #: .\config\templates\usuarios\registro_modal_form.html:24
 msgid "Nombre*"
-msgstr "First Name*"
+msgstr "Nombre*"
 
+#: .\config\templates\usuarios\registro.html:88
 #: .\config\templates\usuarios\registro_modal_form.html:28
 msgid "Apellido*"
-msgstr "Last Name*"
-
-#: .\config\templates\usuarios\registro_modal_form.html:32
-msgid "ID (9 Dígitos)*"
-msgstr "ID (9 Digits)*"
+msgstr "Apellido*"
 
 #: .\config\templates\usuarios\registro.html:99
 #: .\config\templates\usuarios\registro_modal_form.html:32
 msgid "ID Negocio (9 Dígitos)*"
-msgstr "Business ID (9 Digits)*"
+msgstr "ID Negocio (9 Dígitos)*"
 
+#: .\config\templates\usuarios\registro.html:112
 #: .\config\templates\usuarios\registro_modal_form.html:36
 msgid "Número de Contacto Móvil*"
-msgstr "Mobile Contact Number*"
+msgstr "Número de Contacto Móvil*"
 
+#: .\config\templates\usuarios\registro.html:134
 #: .\config\templates\usuarios\registro_modal_form.html:47
 msgid "Paso 2 de 3"
-msgstr "Step 2 of 3"
+msgstr "Paso 2 de 3"
 
+#: .\config\templates\usuarios\registro.html:141
 #: .\config\templates\usuarios\registro_modal_form.html:52
 msgid "Crear acceso a la plataforma"
-msgstr "Create platform access"
+msgstr "Crear acceso a la plataforma"
 
+#: .\config\templates\usuarios\registro.html:149
 #: .\config\templates\usuarios\registro_modal_form.html:56
 msgid "Usuario*"
-msgstr "Username*"
+msgstr "Usuario*"
 
+#: .\config\templates\usuarios\registro.html:159
 #: .\config\templates\usuarios\registro_modal_form.html:60
 msgid "Correo electrónico*"
-msgstr "Email*"
+msgstr "Correo electrónico*"
 
+#: .\config\templates\usuarios\registro.html:169
 #: .\config\templates\usuarios\registro_modal_form.html:64
 msgid "Contraseña*"
-msgstr "Password*"
+msgstr "Contraseña*"
 
+#: .\config\templates\usuarios\registro.html:179
 #: .\config\templates\usuarios\registro_modal_form.html:71
 msgid "Confirmar contraseña*"
-msgstr "Confirm password*"
+msgstr "Confirmar contraseña*"
+
+#: .\config\templates\usuarios\registro_modal_form.html:11
+msgid "Estás a tres pasos de formar parte de nuestra red comercial"
+msgstr "Estás a tres pasos de formar parte de nuestra red comercial"
 
 #: .\config\templates\usuarios\registro_modal_form.html:86
 msgid "Paso 3 de 3"
-msgstr "Step 3 of 3"
+msgstr "Paso 3 de 3"
 
 #: .\config\templates\usuarios\registro_modal_form.html:91
 msgid "Información Fiscal y Comercial"
-msgstr "Tax and Commercial Information"
+msgstr "Información Fiscal y Comercial"
 
 #: .\config\templates\usuarios\registro_modal_form.html:92
 msgid "Completa los siguientes datos para validar tu empresa"
-msgstr "Complete the following details to validate your business"
+msgstr "Completa los siguientes datos para validar tu empresa"
 
 #: .\config\templates\usuarios\registro_modal_form.html:97
 msgid "Datos de la empresa"
-msgstr "Company details"
+msgstr "Datos de la empresa"
 
 #: .\config\templates\usuarios\registro_modal_form.html:100
 msgid "Nombre legal de la empresa"
-msgstr "Legal company name"
+msgstr "Nombre legal de la empresa"
 
 #: .\config\templates\usuarios\registro_modal_form.html:103
 msgid "Número de impuesto sobre ventas"
-msgstr "Sales tax number"
+msgstr "Número de impuesto sobre ventas"
 
 #: .\config\templates\usuarios\registro_modal_form.html:106
 #: .\config\templates\vendedores\crear_cliente.html:95
 msgid "Teléfono Comercial"
-msgstr "Business Phone"
+msgstr "Teléfono Comercial"
 
 #: .\config\templates\usuarios\registro_modal_form.html:109
 #: .\config\templates\vendedores\crear_cliente.html:100
 msgid "Correo Comercial"
-msgstr "Business Email"
+msgstr "Correo Comercial"
 
 #: .\config\templates\usuarios\registro_modal_form.html:116
 msgid "Dirección Comercial"
-msgstr "Business Address"
+msgstr "Dirección Comercial"
 
 #: .\config\templates\usuarios\registro_modal_form.html:119
 msgid "Dirección Principal"
-msgstr "Primary Address"
+msgstr "Dirección Principal"
 
 #: .\config\templates\usuarios\registro_modal_form.html:122
 msgid "Dirección 2 (opcional)"
-msgstr "Address 2 (optional)"
+msgstr "Dirección 2 (opcional)"
 
 #: .\config\templates\usuarios\registro_modal_form.html:131
 #: .\config\templates\vendedores\crear_cliente.html:144
 msgid "Código Postal"
-msgstr "Postal Code"
+msgstr "Código Postal"
 
 #: .\config\templates\usuarios\registro_modal_form.html:134
 msgid "EEUU"
-msgstr "USA"
+msgstr "EEUU"
 
 #: .\config\templates\usuarios\registro_modal_form.html:141
 msgid "Certificado de Impuesto sobre Ventas"
-msgstr "Sales Tax Certificate"
+msgstr "Certificado de Impuesto sobre Ventas"
 
 #: .\config\templates\usuarios\registro_modal_form.html:146
 msgid "Arrastra o haz clic para subir (PDF o imagen)"
-msgstr "Drag or click to upload (PDF or image)"
+msgstr "Arrastra o haz clic para subir (PDF o imagen)"
 
 #: .\config\templates\usuarios\registro_modal_form.html:147
 msgid "Emitido por el Department of Revenue"
-msgstr "Issued by the Department of Revenue"
+msgstr "Emitido por el Department of Revenue"
 
 #: .\config\templates\usuarios\registro_modal_form.html:156
 msgid "Confirmo que la información es correcta y verificable."
-msgstr "I confirm that the information is correct and verifiable."
+msgstr "Confirmo que la información es correcta y verificable."
 
 #: .\config\templates\usuarios\registro_modal_form.html:161
 msgid "Enviar para Aprobación"
-msgstr "Submit for Approval"
+msgstr "Enviar para Aprobación"
 
 #: .\config\templates\usuarios\registro_modal_form.html:241
 msgid "Formulario o paso no encontrado"
-msgstr "Form or step not found"
+msgstr "Formulario o paso no encontrado"
 
 #: .\config\templates\usuarios\registro_modal_form.html:266
 msgid "Campos de contraseña no encontrados"
-msgstr "Password fields not found"
+msgstr "Campos de contraseña no encontrados"
 
 #: .\config\templates\usuarios\registro_modal_form.html:271
 #: .\config\usuarios\views.py:1146
 msgid "Las contraseñas no coinciden"
-msgstr "Passwords do not match"
+msgstr "Las contraseñas no coinciden"
 
 #: .\config\templates\usuarios\registro_modal_form.html:295
 msgid "El usuario ya existe. Elige otro."
-msgstr "The username already exists. Choose another one."
+msgstr "El usuario ya existe. Elige otro."
 
 #: .\config\templates\usuarios\registro_modal_form.html:307
 msgid "Error al verificar el usuario. Intenta de nuevo."
-msgstr "Error verifying username. Please try again."
+msgstr "Error al verificar el usuario. Intenta de nuevo."
 
 #: .\config\templates\vendedores\clientes.html:19
 msgid "Consulta datos del cliente"
-msgstr "View customer information"
+msgstr "Consulta datos del cliente"
 
 #: .\config\templates\vendedores\clientes.html:30
 #: .\config\templates\vendedores\tomar_pedido.html:22
 msgid "Buscar por nombre, empresa o documento"
-msgstr "Search by name, company or document"
+msgstr "Buscar por nombre, empresa o documento"
 
 #: .\config\templates\vendedores\clientes.html:36
 msgid "Todos"
-msgstr "All"
+msgstr "Todos"
 
 #: .\config\templates\vendedores\clientes.html:40
 msgid "Activos"
-msgstr "Active"
+msgstr "Activos"
 
 #: .\config\templates\vendedores\clientes.html:44
 msgid "Inactivos"
-msgstr "Inactive"
+msgstr "Inactivos"
 
 #: .\config\templates\vendedores\clientes.html:73
 #: .\config\templates\vendedores\clientes.html:185
 #: .\config\templates\vendedores\crear_cliente.html:72
 msgid "Correo Electrónico"
-msgstr "Email"
+msgstr "Correo Electrónico"
 
 #: .\config\templates\vendedores\clientes.html:75
 #: .\config\templates\vendedores\clientes.html:190
 #: .\config\templates\vendedores\crear_cliente.html:67
 msgid "Teléfono"
-msgstr "Phone"
+msgstr "Teléfono"
 
 #: .\config\templates\vendedores\clientes.html:79
 #: .\config\templates\vendedores\tomar_pedido.html:34
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:131
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:242
 msgid "Acción"
-msgstr "Action"
+msgstr "Acción"
 
 #: .\config\templates\vendedores\clientes.html:166
 msgid "Editar Cliente"
-msgstr "Edit Customer"
+msgstr "Editar Cliente"
 
 #: .\config\templates\vendedores\clientes.html:192
 msgid "Exactamente 10 dígitos"
-msgstr "Exactly 10 digits"
+msgstr "Exactamente 10 dígitos"
 
 #: .\config\templates\vendedores\clientes.html:239
 #: .\config\templates\vendedores\crear_cliente.html:237
 msgid "Aceptar"
-msgstr "Accept"
+msgstr "Aceptar"
 
 #: .\config\templates\vendedores\crear_cliente.html:12
 msgid "Solicitud de Creación de Cliente"
-msgstr "Customer Creation Request"
+msgstr "Solicitud de Creación de Cliente"
 
 #: .\config\templates\vendedores\crear_cliente.html:13
 msgid "Llene todos los campos para la solicitud"
-msgstr "Fill in all fields to submit the request"
+msgstr "Llene todos los campos para la solicitud"
 
 #: .\config\templates\vendedores\crear_cliente.html:23
 msgid "Datos Básicos"
-msgstr "Basic Information"
+msgstr "Datos Básicos"
 
 #: .\config\templates\vendedores\crear_cliente.html:35
 msgid "Paso 1 de 2"
-msgstr "Step 1 of 2"
+msgstr "Paso 1 de 2"
 
 #: .\config\templates\vendedores\crear_cliente.html:62
 msgid "Documento"
-msgstr "Document"
+msgstr "Documento"
 
 #: .\config\templates\vendedores\crear_cliente.html:80
 msgid "Datos de la Empresa"
-msgstr "Company Information"
+msgstr "Datos de la Empresa"
 
 #: .\config\templates\vendedores\crear_cliente.html:85
 msgid "Nombre legal"
-msgstr "Legal Name"
+msgstr "Nombre legal"
 
 #: .\config\templates\vendedores\crear_cliente.html:90
 msgid "Número de impuestos"
-msgstr "Tax Number"
+msgstr "Número de impuestos"
 
 #: .\config\templates\vendedores\crear_cliente.html:124
 msgid "Dirección Línea 1"
-msgstr "Address Line 1"
+msgstr "Dirección Línea 1"
 
 #: .\config\templates\vendedores\crear_cliente.html:129
 msgid "Dirección Línea 2"
-msgstr "Address Line 2"
+msgstr "Dirección Línea 2"
 
 #: .\config\templates\vendedores\crear_cliente.html:149
 msgid "País"
-msgstr "Country"
+msgstr "País"
 
 #: .\config\templates\vendedores\crear_cliente.html:157
 msgid "Subir Certificado de Impuesto"
-msgstr "Upload Tax Certificate"
+msgstr "Subir Certificado de Impuesto"
 
 #: .\config\templates\vendedores\crear_cliente.html:172
 msgid "Confirmo que la información es correcta"
-msgstr "I confirm that the information provided is correct"
+msgstr "Confirmo que la información es correcta"
 
 #: .\config\templates\vendedores\crear_cliente.html:184
 msgid "Enviar Solicitud"
-msgstr "Send Request"
+msgstr "Enviar Solicitud"
 
 #: .\config\templates\vendedores\crear_cliente.html:209
 msgid "Error en la Validación"
-msgstr "validation error"
+msgstr "Error en la Validación"
 
 #: .\config\templates\vendedores\crear_cliente.html:233
-#, fuzzy
-#| msgid "Tu solicitud fue enviada. Un administrador revisará tu cuenta."
 msgid "Tu solicitud ha sido enviada al administrador correctamente."
-msgstr "Your request was submitted. An administrator will review your account."
+msgstr "Tu solicitud ha sido enviada al administrador correctamente."
 
 #: .\config\templates\vendedores\tomar_pedido.html:16
 msgid "Paso 1: Seleccionar Cliente"
-msgstr "Step 1: Select Customer"
+msgstr "Paso 1: Seleccionar Cliente"
 
 #: .\config\templates\vendedores\tomar_pedido.html:61
 msgid "Seleccionar"
-msgstr "Select"
+msgstr "Seleccionar"
 
 #: .\config\templates\vendedores\tomar_pedido.html:82
 msgid "Cliente:"
-msgstr "Customer:"
+msgstr "Cliente:"
 
 #: .\config\templates\vendedores\tomar_pedido.html:82
 msgid "Sin Seleccionar"
-msgstr "Not Selected"
+msgstr "Sin Seleccionar"
 
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:47
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:50
 msgid "Pedido"
-msgstr "Order"
+msgstr "Pedido"
 
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:105
 msgid "Cliente Seleccionado:"
-msgstr "Selected Customer:"
+msgstr "Cliente Seleccionado:"
 
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:113
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:109
 msgid "Cambiar Cliente"
-msgstr "Change Customer"
+msgstr "Cambiar Cliente"
 
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:285
 msgid "Precio:"
-msgstr "Price:"
+msgstr "Precio:"
 
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:292
 msgid "Seleccionar precio"
-msgstr "Select Price"
+msgstr "Seleccionar precio"
 
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:296
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:300
@@ -2237,43 +2228,41 @@ msgstr "Select Price"
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:223
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:228
 msgid "Precio"
-msgstr "Price"
+msgstr "Precio"
 
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:341
 msgid "Agregar al Pedido"
-msgstr "Add to Order"
+msgstr "Agregar al Pedido"
 
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:365
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:14
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:94
 msgid "Resumen del Pedido"
-msgstr "Order Summary"
+msgstr "Resumen del Pedido"
 
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:367
 msgid "productos"
-msgstr "products"
+msgstr "productos"
 
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:383
 msgid "Ver Pedido"
-msgstr "View Order"
+msgstr "Ver Pedido"
 
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:398
-#, fuzzy
-#| msgid "Seleccionar precio"
 msgid "Selecciona un Precio"
-msgstr "Select Price"
+msgstr "Selecciona un Precio"
 
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:405
 msgid "Debes seleccionar un precio antes de agregar el producto al pedido."
-msgstr "You must select a price before adding the product to the order."
+msgstr "Debes seleccionar un precio antes de agregar el producto al pedido."
 
 #: .\config\templates\vendedores\tomar_pedido_catalogo.html:409
 msgid "Asegúrate de elegir el precio que se aplicará para este cliente."
-msgstr "Make sure you choose the price that will apply to this customer."
+msgstr "Asegúrate de elegir el precio que se aplicará para este cliente."
 
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:104
 msgid "Cliente Seleccionado"
-msgstr "Selected Customer"
+msgstr "Cliente Seleccionado"
 
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:130
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:238
@@ -2283,19 +2272,19 @@ msgstr "Subtotal"
 
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:168
 msgid "caja"
-msgstr "box"
+msgstr "caja"
 
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:271
 msgid "Orden tomada en persona"
-msgstr "Order taken in person"
+msgstr "Orden tomada en persona"
 
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:281
 msgid "Orden telefónica"
-msgstr "Phone order"
+msgstr "Orden telefónica"
 
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:306
 msgid "IVA"
-msgstr "Tax"
+msgstr "IVA"
 
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:316
 msgid "Total"
@@ -2303,15 +2292,15 @@ msgstr "Total"
 
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:333
 msgid "Seguir Agregando Productos"
-msgstr "Continue Adding Products"
+msgstr "Seguir Agregando Productos"
 
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:337
 msgid "Enviar Pedido"
-msgstr "Send Order"
+msgstr "Enviar Pedido"
 
 #: .\config\templates\vendedores\tomar_pedido_resumen.html:381
 msgid "Pedido enviado correctamente"
-msgstr "Order sent successfully"
+msgstr "Pedido enviado correctamente"
 
 #: .\config\usuarios\views.py:608
 msgid ""
@@ -2319,112 +2308,80 @@ msgid ""
 "contenido se guardo, pero las secciones nuevas no podran guardarse hasta que "
 "Railway aplique la migracion."
 msgstr ""
-"The database does not yet have all the new home fields. The rest of the "
-"content was saved, but the new sections cannot be saved until Railway "
-"applies the migration."
+"La base de datos aun no tiene todos los campos nuevos del home. El resto del "
+"contenido se guardo, pero las secciones nuevas no podran guardarse hasta que "
+"Railway aplique la migracion."
 
 #: .\config\usuarios\views.py:616
 msgid "Contenido del home actualizado correctamente"
-msgstr "Home content updated successfully"
+msgstr "Contenido del home actualizado correctamente"
 
 #: .\config\usuarios\views.py:663 .\config\usuarios\views.py:720
 msgid "Nombre y comentario son obligatorios."
-msgstr "Name and comment are required."
+msgstr "Nombre y comentario son obligatorios."
 
 #: .\config\usuarios\views.py:686
 msgid "Testimonio creado correctamente"
-msgstr "Testimonial created successfully"
+msgstr "Testimonio creado correctamente"
 
 #: .\config\usuarios\views.py:745
 msgid "Testimonio actualizado correctamente"
-msgstr "Testimonial updated successfully"
+msgstr "Testimonio actualizado correctamente"
 
 #: .\config\usuarios\views.py:765
 msgid "Testimonio ocultado correctamente"
-msgstr "Testimonial hidden successfully"
+msgstr "Testimonio ocultado correctamente"
 
 #: .\config\usuarios\views.py:781
 msgid "Testimonio activado correctamente"
-msgstr "Testimonial activated successfully"
+msgstr "Testimonio activado correctamente"
 
 #: .\config\usuarios\views.py:800
 msgid "El usuario ya existe"
-msgstr "The user already exists"
+msgstr "El usuario ya existe"
 
 #: .\config\usuarios\views.py:814
 msgid "Vendedor creado correctamente"
-msgstr "Seller created successfully"
+msgstr "Vendedor creado correctamente"
 
 #: .\config\usuarios\views.py:850
 msgid "Vendedor actualizado correctamente"
-msgstr "Seller updated successfully"
+msgstr "Vendedor actualizado correctamente"
 
 #: .\config\usuarios\views.py:870
 #, python-format
 msgid "Vendedor %(nombre)s desactivado"
-msgstr "Seller %(nombre)s deactivated"
+msgstr "Vendedor %(nombre)s desactivado"
 
 #: .\config\usuarios\views.py:884
 #, python-format
 msgid "Vendedor %(nombre)s activado"
-msgstr "Seller %(nombre)s activated"
+msgstr "Vendedor %(nombre)s activado"
 
 #: .\config\usuarios\views.py:1099
 msgid "Usuario no existe"
-msgstr "User does not exist"
+msgstr "Usuario no existe"
 
 #: .\config\usuarios\views.py:1122
 msgid "Método no permitido"
-msgstr "Method not allowed"
+msgstr "Método no permitido"
 
 #: .\config\usuarios\views.py:1137
 msgid "El nombre de usuario ya existe"
-msgstr "The username already exists"
+msgstr "El nombre de usuario ya existe"
 
 #: .\config\usuarios\views.py:1159
-#, fuzzy
-#| msgid "Debes marcar el checkbox para continuar con el registro"
 msgid "Debes adjuntar el certificado tax para completar el registro."
-msgstr "You must check the box to continue with registration"
+msgstr "Debes adjuntar el certificado tax para completar el registro."
 
 #: .\config\usuarios\views.py:1202 .\config\usuarios\views.py:1217
 #: .\config\usuarios\views.py:1221
 msgid "Tu solicitud fue enviada. Un administrador revisará tu cuenta."
-msgstr "Your request was submitted. An administrator will review your account."
+msgstr "Tu solicitud fue enviada. Un administrador revisará tu cuenta."
 
 #: .\config\usuarios\views.py:1209
 msgid ""
 "No se pudo completar el registro. Verifica los datos e intenta nuevamente."
 msgstr ""
-"Registration could not be completed. Please verify your information and try "
-"again."
+"No se pudo completar el registro. Verifica los datos e intenta nuevamente."
 
-#, fuzzy
-#~| msgid "Producto"
-#~ msgid "Products"
-#~ msgstr "Product"
-
-#~ msgid "Tienda Suprema"
-#~ msgstr "Supreme Store"
-
-#~ msgid "Menú"
-#~ msgstr "Menu"
-
-#~ msgid "Idioma"
-#~ msgstr "Language"
-
-#~ msgid ""
-#~ "Ofrecemos productos y servicios mayoristas de alta calidad, adaptados a "
-#~ "sus necesidades."
-#~ msgstr ""
-#~ "We provide high-quality wholesale products and services tailored to their "
-#~ "needs."
-
-#~ msgid ""
-#~ "Nos enfocamos en brindar soluciones eficientes para que su negocio crezca "
-#~ "y prospere"
-#~ msgstr ""
-#~ "Our focus is on delivering efficient solutions to help your business grow"
-
-#~ msgid "en un mercado competitivo."
-#~ msgstr "and thrive in a competitive market."

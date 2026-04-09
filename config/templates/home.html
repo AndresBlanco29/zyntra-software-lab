@@ -14,6 +14,11 @@
 
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
 <link rel="stylesheet" href="{% static 'css/home.css' %}">
+<link rel="stylesheet" href="{% static 'css/tax-example.css' %}">
+<link rel="stylesheet" href="{% static 'css/state-selector.css' %}">
+<script defer src="{% static 'js/language-session.js' %}"></script>
+<script defer src="{% static 'js/tax-example.js' %}"></script>
+<script defer src="{% static 'js/state-selector.js' %}"></script>
 
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
@@ -997,6 +1002,11 @@ document.addEventListener('DOMContentLoaded', function() {
   
   loginModal.addEventListener('show.bs.modal', function() {
     const container = document.getElementById('loginFormContainer');
+
+    if (loginModal.dataset.preserveContentOnShow === 'true') {
+      loginModal.dataset.preserveContentOnShow = 'false';
+      return;
+    }
     
     if (!container) {
       return;
@@ -1532,7 +1542,7 @@ EN
 
 <div class="language-menu" id="languageMenu">
 
-<form action="{% url 'set_language' %}" method="post">
+<form action="{% url 'set_language' %}" method="post" data-language-form>
 
 {% csrf_token %}
 <input name="next" type="hidden" value="{{ request.path }}">

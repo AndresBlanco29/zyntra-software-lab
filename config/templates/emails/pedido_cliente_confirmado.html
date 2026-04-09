@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family: Arial, sans-serif; background:#f5f7fb; padding:24px;">
+  <table width="100%" cellpadding="0" cellspacing="0">
+    <tr><td align="center">
+      <table width="720" style="background:#fff; border-radius:10px; overflow:hidden;">
+        <tr><td style="padding:20px; background:#0b3d91; color:#fff;"><h2 style="margin:0;">Orden de Compra Recibida</h2></td></tr>
+        <tr><td style="padding:20px;">
+          <p>Estimado cliente {{ cliente.nombre_empresa }},</p>
+          <p>Tu orden de compra <strong>#{{ pedido.id }}</strong> fue recibida correctamente.</p>
+          <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse:collapse; font-size:14px;">
+            <tr style="background:#f1f5f9;">
+              <th align="left">Producto</th>
+              <th align="center">Cant.</th>
+              <th align="center">Precio</th>
+              <th align="center">Subtotal</th>
+            </tr>
+            {% for item in items %}
+            <tr style="border-bottom:1px solid #e2e8f0;">
+              <td>{{ item.presentacion.producto.nombre }} ({{ item.presentacion.nombre }})</td>
+              <td align="center">{{ item.cantidad }}</td>
+              <td align="center">${{ item.precio }}</td>
+              <td align="center">${{ item.subtotal }}</td>
+            </tr>
+            {% endfor %}
+            <tr>
+              <td colspan="3" align="right" style="padding-top:12px;"><strong>Total:</strong></td>
+              <td align="center" style="padding-top:12px;"><strong>${{ pedido.total }}</strong></td>
+            </tr>
+          </table>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

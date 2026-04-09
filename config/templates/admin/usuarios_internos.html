@@ -1,0 +1,150 @@
+{% extends "bases/base_vendedor.html" %}
+
+{% block title %}
+Usuarios Internos
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4 admin-toolbar">
+<span>Usuarios Internos</span>
+<div class="admin-toolbar-filters admin-toolbar-filters-wide">
+  <div class="row g-2">
+    <div class="col-12 col-md-6">
+      <input
+        type="text"
+        id="buscadorUsuarios"
+        class="form-control"
+        placeholder="Buscar por nombre o email..."
+      >
+    </div>
+    <div class="col-12 col-md-6">
+      <select id="filtroRol" class="form-select">
+        <option value="">Todos los roles</option>
+        <option value="vendedor">Vendedor</option>
+        <option value="backoffice">BackOffice</option>
+      </select>
+    </div>
+  </div>
+</div>
+</h2>
+
+<div class="d-flex gap-2 mb-3">
+  <a href="{% url 'crear_vendedor' %}" class="btn btn-primary">
+    Crear Vendedor
+  </a>
+  <a href="{% url 'crear_backoffice' %}" class="btn btn-outline-primary">
+    Crear BackOffice
+  </a>
+</div>
+
+<div class="table-responsive">
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>Nombre</th>
+      <th>Email</th>
+      <th>Teléfono</th>
+      <th>Rol</th>
+      <th>Estado</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for usuario in usuarios_internos %}
+    <tr class="usuario-row"
+        data-nombre="{{ usuario.first_name|lower }} {{ usuario.last_name|lower }}"
+        data-email="{{ usuario.email|lower }}"
+        data-rol="{{ usuario.role }}">
+      <td>{{ usuario.first_name }} {{ usuario.last_name }}</td>
+      <td>{{ usuario.email }}</td>
+      <td>{{ usuario.telefono }}</td>
+      <td>
+        {% if usuario.role == 'vendedor' %}
+          <span class="badge bg-primary">Vendedor</span>
+        {% else %}
+          <span class="badge bg-warning text-dark">BackOffice</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if usuario.is_active %}
+          <span class="badge bg-success">Activo</span>
+        {% else %}
+          <span class="badge bg-secondary">Inactivo</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if usuario.role == 'vendedor' %}
+          <a href="{% url 'editar_vendedor' usuario.id %}" class="btn btn-sm btn-warning">Editar</a>
+          {% if usuario.is_active %}
+            <a href="{% url 'desactivar_vendedor' usuario.id %}" class="btn btn-sm btn-danger">Desactivar</a>
+          {% else %}
+            <a href="{% url 'activar_vendedor' usuario.id %}" class="btn btn-sm btn-success">Activar</a>
+          {% endif %}
+        {% else %}
+          <a href="{% url 'editar_backoffice' usuario.id %}" class="btn btn-sm btn-warning">Editar</a>
+          {% if usuario.is_active %}
+            <a href="{% url 'desactivar_backoffice' usuario.id %}" class="btn btn-sm btn-danger">Desactivar</a>
+          {% else %}
+            <a href="{% url 'activar_backoffice' usuario.id %}" class="btn btn-sm btn-success">Activar</a>
+          {% endif %}
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr id="sinUsuariosRow">
+      <td colspan="6" class="text-center text-muted py-4">No hay usuarios internos registrados.</td>
+    </tr>
+    {% endfor %}
+    <tr id="sinResultadosRow" style="display:none;">
+      <td colspan="6" class="text-center text-muted py-4">No hay resultados para el filtro aplicado.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const buscador = document.getElementById('buscadorUsuarios');
+  const filtroRol = document.getElementById('filtroRol');
+  const rows = document.querySelectorAll('.usuario-row');
+  const sinResultadosRow = document.getElementById('sinResultadosRow');
+
+  function aplicarFiltros() {
+    const texto = (buscador.value || '').toLowerCase();
+    const rol = filtroRol.value;
+
+    let visibles = 0;
+
+    rows.forEach(function(row) {
+      const nombre = row.dataset.nombre || '';
+      const email = row.dataset.email || '';
+      const rowRol = row.dataset.rol || '';
+
+      const coincideTexto = nombre.includes(texto) || email.includes(texto);
+      const coincideRol = !rol || rowRol === rol;
+
+      if (coincideTexto && coincideRol) {
+        row.style.display = '';
+        visibles += 1;
+      } else {
+        row.style.display = 'none';
+      }
+    });
+
+    if (sinResultadosRow) {
+      sinResultadosRow.style.display = rows.length > 0 && visibles === 0 ? '' : 'none';
+    }
+  }
+
+  if (buscador) {
+    buscador.addEventListener('keyup', aplicarFiltros);
+  }
+
+  if (filtroRol) {
+    filtroRol.addEventListener('change', aplicarFiltros);
+  }
+});
+</script>
+
+{% endblock %}

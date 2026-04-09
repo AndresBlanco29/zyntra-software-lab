@@ -1,0 +1,44 @@
+{% extends "bases/base_vendedor.html" %}
+
+{% block title %}Cotizaciones BackOffice{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Cotizaciones Recibidas</h2>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-striped align-middle mb-0">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Cliente</th>
+          <th>Fecha</th>
+          <th>Estado</th>
+          <th>Total</th>
+          <th>Accion</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cotizacion in cotizaciones %}
+        <tr>
+          <td>#{{ cotizacion.id }}</td>
+          <td>{{ cotizacion.cliente.nombre_empresa }}</td>
+          <td>{{ cotizacion.fecha|date:"d/m/Y H:i" }}</td>
+          <td>
+            <span class="badge bg-primary">{{ cotizacion.get_estado_display }}</span>
+          </td>
+          <td>${{ cotizacion.total }}</td>
+          <td>
+            <a class="btn btn-sm btn-warning" href="{% url 'backoffice_cotizacion_detalle' cotizacion.id %}">Gestionar</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center text-muted py-4">No hay cotizaciones registradas.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

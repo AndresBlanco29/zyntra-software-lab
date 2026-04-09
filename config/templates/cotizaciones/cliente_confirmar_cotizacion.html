@@ -1,0 +1,223 @@
+{% load static i18n %}
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% trans "Confirmar Cotización" %} #{{ cotizacion.id }}</title>
+
+<link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
+<link rel="stylesheet" href="{% static 'css/ver_cotizacion.css' %}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
+  <div class="container-fluid">
+    <button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="detalleSidebarToggle" aria-label="Abrir menu">
+      ☰
+    </button>
+
+    <a class="navbar-brand fw-bold" href="{% url 'catalogo' %}">
+      La Tortilla Grocery
+    </a>
+
+    <div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">
+      <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-light">
+        {% trans "Cotizaciones Recibidas" %}
+        {% if pendientes_cotizaciones %}
+        <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
+        {% endif %}
+      </a>
+      <a href="{% url 'logout' %}" class="btn btn-danger" style="font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
+        <i class="bi bi-box-arrow-right"></i> {% trans "Cerrar Sesión" %}
+      </a>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid">
+  <div class="sidebar" id="detalleSidebar">
+    <div class="sidebar-user">
+      <i class="bi bi-person-check me-2"></i>{{ user.username }}
+    </div>
+
+    <div class="list-group list-group-flush">
+      <a href="{% url 'catalogo' %}" class="list-group-item">{% trans "Catálogo" %}</a>
+      <a href="{% url 'ver_cotizacion' %}" class="list-group-item">{% trans "Mi Cotización" %}</a>
+      <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="list-group-item active">
+        {% trans "Cotizaciones Recibidas" %}
+        {% if pendientes_cotizaciones %}
+        <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
+        {% endif %}
+      </a>
+    </div>
+  </div>
+
+  <div class="sidebar-backdrop" id="detalleSidebarBackdrop"></div>
+
+  <div class="main-content">
+    <div class="container-fluid">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <div>
+          <h3 class="fw-bold mb-1">{% trans "Cotización" %} #{{ cotizacion.id }}</h3>
+          <p class="text-muted mb-0">{% trans "Valida precios, ajusta cantidades si es necesario y confirma tu orden." %}</p>
+        </div>
+        <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-secondary">{% trans "Volver a cotizaciones recibidas" %}</a>
+      </div>
+
+      {% if messages %}
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+
+      <div class="card custom-card mb-3">
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <small class="text-muted d-block">{% trans "Cliente" %}</small>
+              <strong>{{ cotizacion.cliente.nombre_empresa }}</strong>
+            </div>
+            <div class="col-md-4">
+              <small class="text-muted d-block">{% trans "Estado" %}</small>
+              {% if cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}
+                <span class="badge text-bg-warning">{% trans "Pendiente de confirmación" %}</span>
+              {% elif cotizacion.estado == 'CONFIRMADA_CLIENTE' %}
+                <span class="badge text-bg-success">{% trans "Confirmada" %}</span>
+              {% elif cotizacion.estado == 'CANCELADA_CLIENTE' %}
+                <span class="badge text-bg-secondary">{% trans "Cancelada" %}</span>
+              {% else %}
+                <span class="badge text-bg-light text-dark">{{ cotizacion.get_estado_display }}</span>
+              {% endif %}
+            </div>
+            <div class="col-md-4">
+              <small class="text-muted d-block">{% trans "Total" %}</small>
+              <strong>${{ cotizacion.total }}</strong>
+            </div>
+            <div class="col-12">
+              <small class="text-muted d-block">{% trans "Nota de BackOffice" %}</small>
+              <span>{{ cotizacion.nota_backoffice|default:'-' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% if pedido_existente %}
+        <div class="alert alert-success">{% trans "La orden de compra ya fue generada con ID" %} #{{ pedido_existente.id }}.</div>
+      {% endif %}
+
+      <div class="card custom-card">
+        <div class="card-body">
+          {% if puede_editar %}
+            <h5 class="mb-3">{% trans "Editar cantidades o eliminar productos" %}</h5>
+            <form method="post">
+              {% csrf_token %}
+          {% else %}
+            <h5 class="mb-3">{% trans "Resumen de la orden" %}</h5>
+            <div class="alert alert-info">{% trans "Esta cotización ya tiene una orden generada o finalizada. Solo puedes revisar el resumen." %}</div>
+          {% endif %}
+
+          <div class="table-responsive mb-3">
+            <table class="table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>{% trans "Producto" %}</th>
+                  <th>{% trans "Presentación" %}</th>
+                  <th>{% trans "Precio" %}</th>
+                  <th>{% trans "Cantidad" %}</th>
+                  <th>{% trans "Subtotal" %}</th>
+                  {% if puede_editar %}
+                    <th>{% trans "Eliminar" %}</th>
+                  {% endif %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in cotizacion.items.all %}
+                  <tr>
+                    <td>{{ item.presentacion.producto.nombre }}</td>
+                    <td>{{ item.presentacion.nombre }}</td>
+                    <td>${{ item.precio }}</td>
+                    <td>
+                      {% if puede_editar %}
+                        <input type="number" min="1" class="form-control form-control-sm" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}">
+                      {% else %}
+                        <span class="fw-semibold">{{ item.cantidad }}</span>
+                      {% endif %}
+                    </td>
+                    <td>${{ item.subtotal }}</td>
+                    {% if puede_editar %}
+                      <td>
+                        <input type="checkbox" name="eliminar_{{ item.id }}" class="form-check-input">
+                      </td>
+                    {% endif %}
+                  </tr>
+                {% empty %}
+                  <tr>
+                    <td colspan="{% if puede_editar %}6{% else %}5{% endif %}" class="text-center text-muted">{% trans "Sin productos." %}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          {% if puede_editar %}
+              <div class="mb-3">
+                <label class="form-label fw-semibold">{% trans "Nota adicional" %}</label>
+                <textarea class="form-control" rows="3" name="nota_cliente" placeholder="{% trans 'Comentarios para tu orden' %}"></textarea>
+              </div>
+
+              <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" name="acepta_terminos" id="aceptaTerminos">
+                <label class="form-check-label" for="aceptaTerminos">
+                  {% trans "Acepto los términos y precios recibidos y deseo proceder con la orden de compra." %}
+                </label>
+              </div>
+
+              <div class="d-flex flex-wrap gap-2">
+                <button type="submit" name="accion" value="aprobar" class="btn btn-primary">{% trans "Aprobar y Enviar Orden" %}</button>
+                <button type="submit" name="accion" value="cancelar" class="btn btn-outline-danger">{% trans "Cancelar Pedido" %}</button>
+              </div>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var toggleBtn = document.getElementById('detalleSidebarToggle');
+  var sidebar = document.getElementById('detalleSidebar');
+  var backdrop = document.getElementById('detalleSidebarBackdrop');
+
+  if (!toggleBtn || !sidebar || !backdrop) return;
+
+  function closeSidebar() {
+    sidebar.classList.remove('show');
+    backdrop.classList.remove('show');
+  }
+
+  toggleBtn.addEventListener('click', function () {
+    sidebar.classList.toggle('show');
+    backdrop.classList.toggle('show');
+  });
+
+  backdrop.addEventListener('click', closeSidebar);
+
+  sidebar.querySelectorAll('a, button').forEach(function (item) {
+    item.addEventListener('click', closeSidebar);
+  });
+
+  window.addEventListener('resize', function () {
+    if (window.innerWidth > 992) {
+      closeSidebar();
+    }
+  });
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,130 @@
+{% extends "bases/base_vendedor.html" %}
+
+{% block title %}Cotizacion #{{ cotizacion.id }}{% endblock %}
+
+{% block content %}
+<h2 class="mb-3">Cotizacion #{{ cotizacion.id }}</h2>
+<p class="text-muted mb-4">Cliente: {{ cotizacion.cliente.nombre_empresa }} | Estado: {{ cotizacion.get_estado_display }}</p>
+
+{% if messages %}
+  {% for message in messages %}
+  <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+  {% endfor %}
+{% endif %}
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <form method="post" class="card shadow-sm">
+      {% csrf_token %}
+      <div class="card-body">
+        <h5 class="mb-3">Productos Cotizados</h5>
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Presentacion</th>
+                <th style="width: 130px;">Cantidad</th>
+                <th style="width: 180px;">Precio Cliente</th>
+                <th>Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in cotizacion.items.all %}
+              <tr>
+                <td>{{ item.presentacion.producto.nombre }}</td>
+                <td>{{ item.presentacion.nombre }}</td>
+                <td>
+                  <input type="number" min="1" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" class="form-control form-control-sm">
+                </td>
+                <td>
+                  <input type="number" min="0" step="0.01" name="precio_{{ item.id }}" value="{{ item.precio }}" class="form-control form-control-sm">
+                </td>
+                <td>${{ item.subtotal }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Nota del cliente</label>
+          <textarea class="form-control" rows="3" disabled>{{ cotizacion.nota_cliente }}</textarea>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Nota BackOffice</label>
+          <textarea name="nota_backoffice" class="form-control" rows="3">{{ cotizacion.nota_backoffice }}</textarea>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center">
+          <strong>Total actualizado: ${{ cotizacion.total }}</strong>
+          <button type="submit" class="btn btn-primary">Guardar ajustes</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card shadow-sm mb-3">
+      <div class="card-body">
+        <h6 class="fw-bold">Envio oficial al cliente</h6>
+        <input class="form-control form-control-sm mb-2" value="{{ confirm_url }}" readonly>
+
+        <form method="post" action="{% url 'enviar_cotizacion_cliente' cotizacion.id %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-warning w-100">Enviar cotizacion por correo</button>
+        </form>
+
+        <div class="mt-3 small">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="fw-semibold">Correo oficial</span>
+            {% if cotizacion.correo_enviado %}
+            <span class="badge text-bg-success">Enviado</span>
+            {% else %}
+            <span class="badge text-bg-secondary">Pendiente</span>
+            {% endif %}
+          </div>
+          <div class="text-muted">
+            {% if cotizacion.correo_enviado_en %}
+            Ultimo envio: {{ cotizacion.correo_enviado_en|date:"d/m/Y h:i A" }}
+            {% else %}
+            Aun no se ha enviado correo oficial.
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h6 class="fw-bold">Canales de contacto</h6>
+        <p class="small text-muted mb-2">WhatsApp se usa como canal manual de seguimiento comercial.</p>
+        <p class="small text-muted mb-2">Numero detectado para contacto: {% if telefono_contacto %}+{{ telefono_contacto }}{% else %}No configurado{% endif %}</p>
+
+        <a class="btn btn-outline-success w-100 mb-2 {% if not whatsapp_link %}disabled{% endif %}" href="{% url 'abrir_whatsapp_manual_cotizacion' cotizacion.id %}" target="_blank">Abrir WhatsApp manual</a>
+
+        <div class="small mt-2">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="fw-semibold">WhatsApp manual</span>
+            {% if cotizacion.whatsapp_manual_abierto %}
+            <span class="badge text-bg-info">Abierto</span>
+            {% else %}
+            <span class="badge text-bg-secondary">Pendiente</span>
+            {% endif %}
+          </div>
+          <div class="text-muted">
+            {% if cotizacion.whatsapp_manual_abierto_en %}
+            Ultima apertura: {{ cotizacion.whatsapp_manual_abierto_en|date:"d/m/Y h:i A" }}
+            {% else %}
+            Aun no se ha abierto el contacto manual por WhatsApp.
+            {% endif %}
+          </div>
+        </div>
+
+        <p class="small text-muted mt-2 mb-0">Recomendado: usar correo como canal oficial y WhatsApp solo como seguimiento.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

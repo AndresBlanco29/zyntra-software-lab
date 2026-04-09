@@ -1,0 +1,60 @@
+{% extends "bases/base_vendedor.html" %}
+
+{% block title %}
+Panel BackOffice
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4">Panel BackOffice</h2>
+<p class="text-muted">Módulo dedicado para gestionar cotizaciones y órdenes de compra.</p>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body text-center">
+        <h3 class="mb-1">{{ cotizaciones_pendientes }}</h3>
+        <p class="mb-0">Cotizaciones pendientes</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body text-center">
+        <h3 class="mb-1">{{ ordenes_recibidas }}</h3>
+        <p class="mb-0">Órdenes recibidas</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body text-center">
+        <h3 class="mb-1">{{ ordenes_en_gestion }}</h3>
+        <p class="mb-0">Órdenes en gestión</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body text-center">
+        <h3 class="mb-1">{{ ordenes_listas_picking }}</h3>
+        <p class="mb-0">Listas para picking</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="mb-3">Accesos rápidos</h5>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'backoffice_cotizaciones' %}" class="btn btn-primary">Gestionar cotizaciones</a>
+      <a href="{% url 'backoffice_pedidos' %}" class="btn btn-warning">Gestionar órdenes de compra</a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

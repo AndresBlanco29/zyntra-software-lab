@@ -1,0 +1,44 @@
+{% extends "bases/base_vendedor.html" %}
+
+{% block title %}Ordenes de Compra{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Ordenes de Compra Recibidas</h2>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-striped align-middle mb-0">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Cliente</th>
+          <th>Origen</th>
+          <th>Estado</th>
+          <th>Total</th>
+          <th>Fecha</th>
+          <th>Accion</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for pedido in pedidos %}
+        <tr>
+          <td>#{{ pedido.id }}</td>
+          <td>{{ pedido.cliente.nombre_empresa }}</td>
+          <td>{{ pedido.get_origen_display }}</td>
+          <td><span class="badge bg-info text-dark">{{ pedido.get_estado_display }}</span></td>
+          <td>${{ pedido.total }}</td>
+          <td>{{ pedido.creada_en|date:"d/m/Y H:i" }}</td>
+          <td>
+            <a href="{% url 'backoffice_pedido_detalle' pedido.id %}" class="btn btn-sm btn-warning">Gestionar</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-4">No hay ordenes registradas.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "bases/base_vendedor.html" %}
+
+{% block title %}Orden #{{ pedido.id }}{% endblock %}
+
+{% block content %}
+<h2 class="mb-3">Orden de Compra #{{ pedido.id }}</h2>
+<p class="text-muted">Cliente: {{ pedido.cliente.nombre_empresa }} | Origen: {{ pedido.get_origen_display }}</p>
+
+{% if messages %}
+  {% for message in messages %}
+  <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+  {% endfor %}
+{% endif %}
+
+<form method="post" class="card shadow-sm mb-3">
+  {% csrf_token %}
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Estado</label>
+        <select name="estado" class="form-select">
+          {% for code,label in pedido.ESTADO_CHOICES %}
+          <option value="{{ code }}" {% if pedido.estado == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label fw-semibold">Nota BackOffice (Add Notes)</label>
+        <input name="nota_backoffice" class="form-control" value="{{ pedido.nota_backoffice }}">
+      </div>
+    </div>
+
+    <h5 class="mb-3">Detalle editable de productos</h5>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th>Presentacion</th>
+            <th>Cantidad</th>
+            <th>Precio</th>
+            <th>Subtotal</th>
+            <th>Eliminar</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in pedido.items.all %}
+          <tr>
+            <td>{{ item.presentacion.producto.nombre }}</td>
+            <td>{{ item.presentacion.nombre }}</td>
+            <td><input type="number" min="1" class="form-control form-control-sm" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}"></td>
+            <td><input type="number" min="0" step="0.01" class="form-control form-control-sm" name="precio_{{ item.id }}" value="{{ item.precio }}"></td>
+            <td>${{ item.subtotal }}</td>
+            <td><input type="checkbox" class="form-check-input" name="eliminar_{{ item.id }}"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <hr>
+    <h6 class="mb-3">Agregar nuevo producto a la orden</h6>
+    <div class="row g-2 mb-3">
+      <div class="col-md-6">
+        <select name="presentacion_nueva" class="form-select">
+          <option value="">Seleccionar presentacion...</option>
+          {% for p in presentaciones %}
+          <option value="{{ p.id }}">{{ p.producto.nombre }} - {{ p.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <input type="number" min="1" name="cantidad_nueva" class="form-control" placeholder="Cant.">
+      </div>
+      <div class="col-md-2">
+        <input type="number" min="0" step="0.01" name="precio_nuevo" class="form-control" placeholder="Precio">
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center">
+      <strong>Total: ${{ pedido.total }}</strong>
+      <button type="submit" class="btn btn-primary">Guardar cambios</button>
+    </div>
+  </div>
+</form>
+
+<div class="d-flex gap-2">
+  <a class="btn btn-outline-dark" href="{% url 'backoffice_picking_ticket' pedido.id %}">Generar Picking Ticket</a>
+  <a class="btn btn-success" href="{% url 'backoffice_picking_pdf' pedido.id %}">Exportar PDF</a>
+</div>
+{% endblock %}

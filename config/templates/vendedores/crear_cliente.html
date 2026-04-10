@@ -166,10 +166,10 @@ required
 
 <div class="form-check my-4">
 
-<input class="form-check-input" type="checkbox" id="confirmCheckbox" required />
+<input class="form-check-input" type="checkbox" id="confirmCheckbox" name="confirmacion" required />
 
 <label class="form-check-label">
-{% trans "Confirmo que la información es correcta" %}
+{% if CURRENT_LANGUAGE == 'es' %}Declaro que la información fiscal y comercial proporcionada para este cliente, incluido el número de impuesto sobre ventas y el certificado adjunto, es verdadera, exacta, actual y verificable según la información entregada por el cliente. Entiendo que el cliente es responsable por cualquier error, omisión o uso indebido de esa información.{% else %}I certify that the tax and business information provided for this customer, including the sales tax number and attached certificate, is true, accurate, current, and verifiable based on the information submitted by the customer. I understand that the customer is responsible for any error, omission, or improper use of that information.{% endif %}
 </label>
 
 </div>
@@ -242,65 +242,6 @@ required
 </div>
 
 <script src="{% static 'js/crear_cliente.js'%}"></script>
-
-<script>
-
-
-
-function toggleLanguageMenu(){
-
-const menu = document.getElementById("languageMenu");
-
-if(menu.style.display === "flex"){
-menu.style.display = "none";
-}else{
-menu.style.display = "flex";
-}
-
-}
-
-</script>
-
-{% get_current_language as LANGUAGE_CODE %}
-
-<div class="language-widget">
-
-<button class="language-toggle" onclick="toggleLanguageMenu()">
-
-🌎
-
-<span class="language-current">
-
-{% if LANGUAGE_CODE == "es" %}
-ES
-{% else %}
-EN
-{% endif %}
-
-</span>
-
-</button>
-
-<div class="language-menu" id="languageMenu">
-
-<form action="{% url 'set_language' %}" method="post">
-
-{% csrf_token %}
-<input name="next" type="hidden" value="{{ request.path }}">
-
-<button name="language" value="es" class="language-option">
-🇪🇸 Español
-</button>
-
-<button name="language" value="en" class="language-option">
-🇺🇸 English
-</button>
-
-</form>
-
-</div>
-
-</div>
 
 <script>
 
@@ -398,7 +339,7 @@ function validarFormulario() {
   
   // Validación de checkbox
   if (!checkbox) {
-    mostrarError('Debes confirmar que la información es correcta');
+    mostrarError('Debes aceptar la declaración sobre la veracidad de la información fiscal');
     return;
   }
   

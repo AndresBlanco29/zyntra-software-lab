@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.core.exceptions import ValidationError
-from .models import Producto, Presentacion, Categoria, Marca
+from .models import Producto, Presentacion, Categoria, Marca, ConfiguracionPrecios
 
 
 class PresentacionInline(admin.TabularInline):
@@ -80,3 +80,20 @@ class MarcaAdmin(admin.ModelAdmin):
     list_display = ("nombre",)
 
     search_fields = ("nombre",)
+
+
+@admin.register(ConfiguracionPrecios)
+class ConfiguracionPreciosAdmin(admin.ModelAdmin):
+    list_display = (
+        "porcentaje_1",
+        "porcentaje_2",
+        "porcentaje_3",
+        "porcentaje_4",
+        "porcentaje_5",
+    )
+
+    def has_add_permission(self, request):
+        return not ConfiguracionPrecios.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False

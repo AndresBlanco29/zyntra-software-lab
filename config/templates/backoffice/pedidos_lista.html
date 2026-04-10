@@ -1,9 +1,10 @@
 {% extends "bases/base_vendedor.html" %}
+{% load i18n %}
 
-{% block title %}Ordenes de Compra{% endblock %}
+{% block title %}{% trans "Purchase Orders" %}{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">Ordenes de Compra Recibidas</h2>
+<h2 class="mb-4">{% trans "Received Purchase Orders" %}</h2>
 
 <div class="card shadow-sm">
   <div class="table-responsive">
@@ -11,12 +12,12 @@
       <thead>
         <tr>
           <th>ID</th>
-          <th>Cliente</th>
-          <th>Origen</th>
-          <th>Estado</th>
-          <th>Total</th>
-          <th>Fecha</th>
-          <th>Accion</th>
+          <th>{% trans "Customer" %}</th>
+          <th>{% trans "Origin" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th>{% trans "Total" %}</th>
+          <th>{% trans "Date" %}</th>
+          <th>{% trans "Action" %}</th>
         </tr>
       </thead>
       <tbody>
@@ -24,17 +25,17 @@
         <tr>
           <td>#{{ pedido.id }}</td>
           <td>{{ pedido.cliente.nombre_empresa }}</td>
-          <td>{{ pedido.get_origen_display }}</td>
-          <td><span class="badge bg-info text-dark">{{ pedido.get_estado_display }}</span></td>
+          <td>{{ pedido.origen_label }}</td>
+          <td><span class="badge bg-info text-dark">{{ pedido.estado_label }}</span></td>
           <td>${{ pedido.total }}</td>
           <td>{{ pedido.creada_en|date:"d/m/Y H:i" }}</td>
           <td>
-            <a href="{% url 'backoffice_pedido_detalle' pedido.id %}" class="btn btn-sm btn-warning">Gestionar</a>
+            <a href="{% url 'backoffice_pedido_detalle' pedido.id %}" class="btn btn-sm btn-warning">{% trans "Manage" %}</a>
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="7" class="text-center text-muted py-4">No hay ordenes registradas.</td>
+          <td colspan="7" class="text-center text-muted py-4">{% trans "No purchase orders have been registered yet." %}</td>
         </tr>
         {% endfor %}
       </tbody>

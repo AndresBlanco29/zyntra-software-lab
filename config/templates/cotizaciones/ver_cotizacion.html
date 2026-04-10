@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% trans "Mi Cotización" %}</title>
+<title>{% trans "My Quote" %}</title>
 
 <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
 <link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
@@ -27,7 +27,7 @@ data-csrf="{{ csrf_token }}">
 <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
 <div class="container-fluid">
 
-<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="cotSidebarToggle" aria-label="Abrir menu">
+<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="cotSidebarToggle" aria-label="Open menu">
 ☰
 </button>
 
@@ -36,11 +36,17 @@ La Tortilla Grocery
 </a>
 
 <div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">
+<a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-light">
+{% trans "Quotes Received" %}
+{% if pendientes_cotizaciones %}
+<span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
+{% endif %}
+</a>
 <a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">
-{% trans "Cotización" %} (<span id="contadorCarrito">{{ carrito|length }}</span>)
+{% trans "Quote" %} (<span id="contadorCarrito">{{ carrito|length }}</span>)
 </a>
 <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#logoutModal" style="font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
-    <i class="bi bi-box-arrow-right"></i> {% trans "Cerrar Sesión" %}
+    <i class="bi bi-box-arrow-right"></i> {% trans "Log out" %}
 </button>
 </div>
 
@@ -59,11 +65,18 @@ La Tortilla Grocery
 <div class="list-group list-group-flush">
 
 <a href="{% url 'catalogo' %}" class="list-group-item">
-{% trans "Catálogo" %}
+{% trans "Catalog" %}
 </a>
 
 <a href="{% url 'ver_cotizacion' %}" class="list-group-item active">
-{% trans "Mi Cotización" %}
+{% trans "My Quote" %}
+</a>
+
+<a href="{% url 'cliente_cotizaciones_recibidas' %}" class="list-group-item">
+{% trans "Quotes Received" %}
+{% if pendientes_cotizaciones %}
+<span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
+{% endif %}
 </a>
 
 </div>
@@ -72,19 +85,19 @@ La Tortilla Grocery
 
 <div class="sidebar-backdrop" id="cotSidebarBackdrop"></div>
 
-<!-- CONTENIDO -->
+<!-- CONTENT -->
 <div class="main-content">
 
 <div class="container-fluid">
 
 <div class="row">
 
-<!-- COLUMNA IZQUIERDA (PRODUCTOS) -->
+<!-- LEFT COLUMN (PRODUCTS) -->
             <div class="col-12 col-lg-9 order-2 order-lg-1">
-<h3 class="fw-bold">{% trans "Mi Cotización" %}</h3>
+<h3 class="fw-bold">{% trans "My Quote" %}</h3>
 
 <p class="text-muted">
-{% trans "Revisa los productos antes de enviar tu solicitud" %}
+{% trans "Review the products before submitting your request" %}
 </p>
 
 <hr>
@@ -101,10 +114,10 @@ La Tortilla Grocery
 
 <thead>
 <tr>
-<th>{% trans "Producto" %}</th>
-<th>{% trans "Presentación" %}</th>
-<th>{% trans "Cantidad" %}</th>
-<th>{% trans "Acciones" %}</th>
+<th>{% trans "Product" %}</th>
+<th>{% trans "Presentation" %}</th>
+<th>{% trans "Quantity" %}</th>
+<th>{% trans "Actions" %}</th>
 </tr>
 </thead>
 
@@ -155,7 +168,7 @@ data-tipo="{{ p.tipo_contenido_traducido|lower }}"
 
 {% if p.id == item.presentacion_id %}
 
-{{ p.unidades }} {{ p.tipo_contenido_traducido }} {% trans "por" %} {{ p.nombre_traducido|lower }}
+{{ p.unidades }} {{ p.tipo_contenido_traducido }} {% trans "per" %} {{ p.nombre_traducido|lower }}
 
 {% endif %}
 
@@ -205,7 +218,7 @@ data-tipo="{{ p.tipo_contenido_traducido|lower }}"
 {% else %}
 
 <div class="alert alert-info">
- {% trans "No hay productos en la cotización." %}
+ {% trans "No products in the quote." %}
 </div>
 
 {% endif %}
@@ -214,16 +227,16 @@ data-tipo="{{ p.tipo_contenido_traducido|lower }}"
 
 
 
-<!-- COLUMNA DERECHA (PANEL) -->
+<!-- RIGHT COLUMN (PANEL) -->
             <div class="col-12 col-lg-3 order-1 order-lg-2">
-<!-- BUSCADOR -->
+<!-- SEARCH -->
 <div class="mb-4 pt-3">
 
 <input
 type="search"
 id="buscador"
 class="form-control"
-placeholder="{% trans "Buscar Productos..." %}">
+placeholder="{% trans "Search products..." %}">
 
 </div>
 
@@ -234,7 +247,7 @@ placeholder="{% trans "Buscar Productos..." %}">
 <div class="card-body">
 
 <h6 class="text-muted" id="totalProductos">
-{% trans "Total de productos" %}: {{ carrito|length }}
+{% trans "Total products" %}: {{ carrito|length }}
 </h6>
 
 <hr>
@@ -244,7 +257,7 @@ placeholder="{% trans "Buscar Productos..." %}">
 
 <div class="mb-3">
 
-<label class="form-label">{% trans "Nota Opcional" %}</label>
+<label class="form-label">{% trans "Optional note" %}</label>
 
 <textarea name="nota" rows="4" class="form-control"></textarea>
 
@@ -252,12 +265,12 @@ placeholder="{% trans "Buscar Productos..." %}">
 
 
 <div class="alert alert-info mt-3">
-{% trans "La cotización será enviada para validación de precios." %}
+{% trans "The quote will be sent for price validation." %}
 </div>
 
 
 <button type="submit" class="btn btn-yellow w-100 mt-3" id="btnEnviarCotizacion">
-{% trans "Enviar Solicitud de Cotización" %}
+{% trans "Send Quote Request" %}
 </button>
 
 </form>
@@ -273,7 +286,7 @@ placeholder="{% trans "Buscar Productos..." %}">
 
 </div>
 
-<!-- MODAL ÉXITO COTIZACIÓN -->
+<!-- SUCCESS MODAL -->
 <div class="modal fade" id="cotizacionExitoModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="background: white; border: none; border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);">
@@ -282,28 +295,28 @@ placeholder="{% trans "Buscar Productos..." %}">
           <div style="font-size: 60px; color: #0b3d91; margin-bottom: 1rem;">
             <i class="bi bi-check-circle"></i>
           </div>
-          <h3 style="color: #0b3d91; font-weight: 700; margin-bottom: 0.5rem;">{% trans "¡Solicitud Enviada!" %}</h3>
+          <h3 style="color: #0b3d91; font-weight: 700; margin-bottom: 0.5rem;">{% trans "Request Sent!" %}</h3>
           <p style="color: #475569; margin-bottom: 1.5rem; line-height: 1.6;">
-            {% trans "Tu solicitud de cotización ha sido recibida correctamente." %}
+            {% trans "Your quote request has been received successfully." %}
           </p>
         </div>
         <div style="background: #f0f7ff; border-left: 4px solid #ffd400; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; text-align: left;">
           <p style="color: #1e4fa8; font-weight: 600; margin: 0 0 0.5rem 0;">
-            📋 {% trans "Información importante" %}
+            📋 {% trans "Important information" %}
           </p>
           <p style="color: #475569; font-size: 14px; margin: 0;">
-            {% trans "Nuestro equipo revisará tu solicitud y se pondrá en contacto para confirmar precios y disponibilidad." %}
+            {% trans "Our team will review your request and contact you to confirm prices and availability." %}
           </p>
         </div>
         <button type="button" class="btn w-100" onclick="irAlCatalogo()" style="background: linear-gradient(to right, #ffe600, #c7c700); border: none; color: #1e293b; font-weight: 700; padding: 12px 20px; border-radius: 8px;">
-          {% trans "Volver al Catálogo" %}
+          {% trans "Back to Catalog" %}
         </button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- MODAL ERROR SIN PRODUCTOS -->
+<!-- NO PRODUCTS MODAL -->
 <div class="modal fade" id="sinProductosModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="background: white; border: none; border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);">
@@ -312,21 +325,21 @@ placeholder="{% trans "Buscar Productos..." %}">
           <div style="font-size: 60px; color: #d32f2f; margin-bottom: 1rem;">
             <i class="bi bi-inbox"></i>
           </div>
-          <h3 style="color: #0b3d91; font-weight: 700; margin-bottom: 0.5rem;">{% trans "Sin Productos" %}</h3>
+          <h3 style="color: #0b3d91; font-weight: 700; margin-bottom: 0.5rem;">{% trans "No Products" %}</h3>
           <p style="color: #475569; margin-bottom: 1.5rem; line-height: 1.6;">
-            {% trans "Debes agregar al menos un producto antes de enviar la solicitud de cotización." %}
+            {% trans "You must add at least one product before sending the quote request." %}
           </p>
         </div>
         <div style="background: #fff5f5; border-left: 4px solid #d32f2f; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; text-align: left;">
           <p style="color: #d32f2f; font-weight: 600; margin: 0 0 0.5rem 0;">
-            ⚠️ {% trans "Cotización vacía" %}
+            ⚠️ {% trans "Empty Quote" %}
           </p>
           <p style="color: #475569; font-size: 14px; margin: 0;">
-            {% trans "Por favor, ve al catálogo y añade productos a tu cotización." %}
+            {% trans "Please go to the catalog and add products to your quote." %}
           </p>
         </div>
         <button type="button" class="btn w-100" onclick="irAlCatalogo()" style="background: linear-gradient(to right, #ffe600, #c7c700); border: none; color: #1e293b; font-weight: 700; padding: 12px 20px; border-radius: 8px;">
-          {% trans "Ir al Catálogo" %}
+          {% trans "Go to Catalog" %}
         </button>
       </div>
     </div>
@@ -336,12 +349,12 @@ placeholder="{% trans "Buscar Productos..." %}">
 <script src="{% static 'js/ver_cotizacion.js' %}"></script>
 
 <script>
-// Función para ir al catálogo
+// Go to catalog
 function irAlCatalogo() {
   window.location.href = '{% url "catalogo" %}';
 }
 
-// Interceptar el submit del formulario de cotización
+// Intercept form submit
 document.addEventListener('DOMContentLoaded', function() {
   const formularioCotizacion = document.querySelector('form[action="{% url "guardar_cotizacion" %}"]');
   
@@ -349,7 +362,6 @@ document.addEventListener('DOMContentLoaded', function() {
     formularioCotizacion.addEventListener('submit', function(e) {
       e.preventDefault();
       
-      // Validar que hay al menos un producto en la tabla
       const filasProductos = document.querySelectorAll('#tablaProductos tbody tr');
       if (filasProductos.length === 0) {
         const modal = new bootstrap.Modal(document.getElementById('sinProductosModal'));
@@ -370,16 +382,15 @@ document.addEventListener('DOMContentLoaded', function() {
       })
       .then(response => {
         if (response.ok) {
-          // Mostrar modal de éxito
           const modal = new bootstrap.Modal(document.getElementById('cotizacionExitoModal'));
           modal.show();
         } else {
-          alert('{% trans "Error al enviar la cotización" %}');
+          alert('{% trans "Error sending quote" %}');
         }
       })
       .catch(error => {
         console.error('Error:', error);
-        alert('{% trans "Error al enviar la cotización" %}');
+        alert('{% trans "Error sending quote" %}');
       });
     });
   }
@@ -419,7 +430,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
-<!-- MODAL LOGOUT -->
+<!-- LOGOUT MODAL -->
 <div class="modal fade" id="logoutModal" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);">
@@ -429,21 +440,21 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
         
         <h5 class="modal-title mb-2" style="color: #0b3d91; font-weight: 700; font-size: 1.5rem;">
-          {% trans "¿Estás seguro de salir?" %}
+          {% trans "Are you sure you want to log out?" %}
         </h5>
         
         <p class="text-muted mb-0" style="font-size: 1rem;">
-          {% trans "Se cerrará tu sesión en" %} <strong>La Tortilla Grocery</strong>
+          {% trans "You will be logged out of" %} <strong>La Tortilla Grocery</strong>
         </p>
       </div>
       
       <div class="modal-footer border-0" style="justify-content: center; gap: 1rem; padding: 1.5rem 2rem; background: #fff;">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="font-weight: 600; border-width: 2px;">
-          {% trans "Cancelar" %}
+          {% trans "Cancel" %}
         </button>
         
         <a href="{% url 'logout' %}" class="btn btn-danger" style="font-weight: 600; padding: 0.5rem 1.5rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
-          <i class="bi bi-box-arrow-right"></i> {% trans "Sí, salir" %}
+          <i class="bi bi-box-arrow-right"></i> {% trans "Yes, log out" %}
         </a>
       </div>
     </div>

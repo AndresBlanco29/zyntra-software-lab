@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% trans "Confirmar Cotización" %} #{{ cotizacion.id }}</title>
+<title>{% trans "Confirm Quote" %} #{{ cotizacion.id }}</title>
 
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
 <link rel="stylesheet" href="{% static 'css/ver_cotizacion.css' %}">
@@ -25,7 +25,7 @@
 
     <div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">
       <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-light">
-        {% trans "Cotizaciones Recibidas" %}
+        {% trans "Quotes Received" %}
         {% if pendientes_cotizaciones %}
         <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
         {% endif %}
@@ -61,10 +61,10 @@
     <div class="container-fluid">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <div>
-          <h3 class="fw-bold mb-1">{% trans "Cotización" %} #{{ cotizacion.id }}</h3>
-          <p class="text-muted mb-0">{% trans "Valida precios, ajusta cantidades si es necesario y confirma tu orden." %}</p>
+          <h3 class="fw-bold mb-1">{% trans "Quote" %} #{{ cotizacion.id }}</h3>
+          <p class="text-muted mb-0">{% trans "Validate prices, adjust quantities if needed and confirm your order." %}</p>
         </div>
-        <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-secondary">{% trans "Volver a cotizaciones recibidas" %}</a>
+        <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-secondary">{% trans "Back to received quotes" %}</a>
       </div>
 
       {% if messages %}
@@ -81,13 +81,13 @@
               <strong>{{ cotizacion.cliente.nombre_empresa }}</strong>
             </div>
             <div class="col-md-4">
-              <small class="text-muted d-block">{% trans "Estado" %}</small>
+              <small class="text-muted d-block">{% trans "Status" %}</small>
               {% if cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}
-                <span class="badge text-bg-warning">{% trans "Pendiente de confirmación" %}</span>
+                <span class="badge text-bg-warning">{% trans "Pending confirmation" %}</span>
               {% elif cotizacion.estado == 'CONFIRMADA_CLIENTE' %}
-                <span class="badge text-bg-success">{% trans "Confirmada" %}</span>
+                <span class="badge text-bg-success">{% trans "Confirmed" %}</span>
               {% elif cotizacion.estado == 'CANCELADA_CLIENTE' %}
-                <span class="badge text-bg-secondary">{% trans "Cancelada" %}</span>
+                <span class="badge text-bg-secondary">{% trans "Cancelled" %}</span>
               {% else %}
                 <span class="badge text-bg-light text-dark">{{ cotizacion.get_estado_display }}</span>
               {% endif %}
@@ -104,19 +104,19 @@
         </div>
       </div>
 
-      {% if pedido_existente %}
-        <div class="alert alert-success">{% trans "La orden de compra ya fue generada con ID" %} #{{ pedido_existente.id }}.</div>
+            {% if pedido_existente %}
+        <div class="alert alert-success">{% trans "The purchase order has already been generated with ID" %} #{{ pedido_existente.id }}.</div>
       {% endif %}
 
       <div class="card custom-card">
         <div class="card-body">
-          {% if puede_editar %}
-            <h5 class="mb-3">{% trans "Editar cantidades o eliminar productos" %}</h5>
+            {% if puede_editar %}
+            <h5 class="mb-3">{% trans "Edit quantities or remove products" %}</h5>
             <form method="post">
               {% csrf_token %}
           {% else %}
-            <h5 class="mb-3">{% trans "Resumen de la orden" %}</h5>
-            <div class="alert alert-info">{% trans "Esta cotización ya tiene una orden generada o finalizada. Solo puedes revisar el resumen." %}</div>
+            <h5 class="mb-3">{% trans "Order summary" %}</h5>
+            <div class="alert alert-info">{% trans "This quote already has an order generated or finished. You can only review the summary." %}</div>
           {% endif %}
 
           <div class="table-responsive mb-3">
@@ -155,29 +155,29 @@
                   </tr>
                 {% empty %}
                   <tr>
-                    <td colspan="{% if puede_editar %}6{% else %}5{% endif %}" class="text-center text-muted">{% trans "Sin productos." %}</td>
+                    <td colspan="{% if puede_editar %}6{% else %}5{% endif %}" class="text-center text-muted">{% trans "No products." %}</td>
                   </tr>
                 {% endfor %}
               </tbody>
             </table>
           </div>
 
-          {% if puede_editar %}
+              {% if puede_editar %}
               <div class="mb-3">
-                <label class="form-label fw-semibold">{% trans "Nota adicional" %}</label>
-                <textarea class="form-control" rows="3" name="nota_cliente" placeholder="{% trans 'Comentarios para tu orden' %}"></textarea>
+                <label class="form-label fw-semibold">{% trans "Additional note" %}</label>
+                <textarea class="form-control" rows="3" name="nota_cliente" placeholder="{% trans 'Comments for your order' %}"></textarea>
               </div>
 
               <div class="form-check mb-3">
                 <input class="form-check-input" type="checkbox" name="acepta_terminos" id="aceptaTerminos">
                 <label class="form-check-label" for="aceptaTerminos">
-                  {% trans "Acepto los términos y precios recibidos y deseo proceder con la orden de compra." %}
+                  {% trans "I confirm that I have reviewed this order, including products, quantities, and prices, and I authorize La Tortilla Grocery LLC to process it under my business name. I understand that I am responsible for the accuracy of the order details submitted." %}
                 </label>
               </div>
 
               <div class="d-flex flex-wrap gap-2">
-                <button type="submit" name="accion" value="aprobar" class="btn btn-primary">{% trans "Aprobar y Enviar Orden" %}</button>
-                <button type="submit" name="accion" value="cancelar" class="btn btn-outline-danger">{% trans "Cancelar Pedido" %}</button>
+                <button type="submit" name="accion" value="aprobar" class="btn btn-primary">{% trans "Approve and Send Order" %}</button>
+                <button type="submit" name="accion" value="cancelar" class="btn btn-outline-danger">{% trans "Cancel Order" %}</button>
               </div>
             </form>
           {% endif %}

@@ -1,6 +1,6 @@
 from django.urls import path
 from django.contrib.auth.views import LogoutView
-from .views import login_view, registro_view, panel_admin, perfil_admin, clientes_pendientes, aprobar_cliente, ver_cliente, ver_certificado_cliente, rechazar_cliente, lista_vendedores, crear_vendedor, editar_vendedor, desactivar_vendedor, activar_vendedor, login_form_modal, registro_form_modal, verificar_username, logout_view, contenido_home, lista_testimonios, crear_testimonio, editar_testimonio, desactivar_testimonio, activar_testimonio, editar_home_contenido
+from .views import login_view, registro_view, panel_admin, perfil_admin, clientes_pendientes, aprobar_cliente, ver_cliente, ver_certificado_cliente, rechazar_cliente, lista_vendedores, crear_vendedor, editar_vendedor, desactivar_vendedor, activar_vendedor, login_form_modal, registro_form_modal, verificar_username, logout_view, contenido_home, lista_testimonios, crear_testimonio, editar_testimonio, desactivar_testimonio, activar_testimonio, editar_home_contenido, lista_usuarios_internos, crear_usuario_interno, editar_usuario_interno, desactivar_usuario_interno, activar_usuario_interno, crear_backoffice, editar_backoffice, desactivar_backoffice, activar_backoffice
 
 urlpatterns = [
     path('login/', login_view, name='login'),
@@ -17,11 +17,21 @@ urlpatterns = [
     path('panel-admin/ver-cliente/<int:cliente_id>/', ver_cliente, name='ver_cliente'),
     path('panel-admin/ver-certificado/<int:cliente_id>/', ver_certificado_cliente, name='ver_certificado_cliente'),
 
+    path('panel-admin/usuarios-internos/', lista_usuarios_internos, name='lista_usuarios_internos'),
+    path('panel-admin/usuarios-internos/crear/', crear_usuario_interno, name='crear_usuario_interno'),
+    path('panel-admin/usuarios-internos/editar/<int:usuario_id>/', editar_usuario_interno, name='editar_usuario_interno'),
+    path('panel-admin/usuarios-internos/desactivar/<int:usuario_id>/', desactivar_usuario_interno, name='desactivar_usuario_interno'),
+    path('panel-admin/usuarios-internos/activar/<int:usuario_id>/', activar_usuario_interno, name='activar_usuario_interno'),
+
     path('panel-admin/vendedores/', lista_vendedores, name='lista_vendedores'),
     path('panel-admin/crear-vendedor/', crear_vendedor, name='crear_vendedor'),
     path('panel-admin/editar-vendedor/<int:vendedor_id>/', editar_vendedor, name='editar_vendedor'),
     path('panel-admin/desactivar-vendedor/<int:vendedor_id>/', desactivar_vendedor, name='desactivar_vendedor'),
     path('panel-admin/activar-vendedor/<int:vendedor_id>/', activar_vendedor, name='activar_vendedor'),
+    path('panel-admin/crear-backoffice/', crear_backoffice, name='crear_backoffice'),
+    path('panel-admin/editar-backoffice/<int:usuario_id>/', editar_backoffice, name='editar_backoffice'),
+    path('panel-admin/desactivar-backoffice/<int:usuario_id>/', desactivar_backoffice, name='desactivar_backoffice'),
+    path('panel-admin/activar-backoffice/<int:usuario_id>/', activar_backoffice, name='activar_backoffice'),
 
     path('panel-admin/contenido-home/', contenido_home, name='contenido_home'),
     path('panel-admin/contenido-home/editar/', editar_home_contenido, name='editar_home_contenido'),

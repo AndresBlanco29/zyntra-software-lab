@@ -6,6 +6,13 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.models import Group
 from .models import Usuario
+from .permissions import (
+    build_permission_overrides_for_role,
+    build_permission_sections,
+    get_permission_summary_labels,
+    get_redirect_url_for_user,
+    internal_permission_required,
+)
 from .us_locations import US_STATE_CITIES, match_state_name, match_city_for_state
 from config.clientes.models import Cliente
 from config.core.models import Testimonio, HomeContenido, ensure_homecontenido_quienes_schema
@@ -18,6 +25,7 @@ from django.http import JsonResponse, FileResponse, Http404, HttpResponse
 from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.translation import gettext as _
+from django.utils import timezone
 from django.db import transaction
 from django.db import OperationalError, ProgrammingError
 from django.conf import settings
@@ -174,14 +182,46 @@ def _is_admin_user(user):
     return bool(user and user.is_authenticated and (user.is_superuser or user.role == 'admin'))
 
 
+def _is_backoffice_user(user):
+    return bool(user and user.is_authenticated and (user.is_superuser or user.role in {'admin', 'backoffice'}))
+
+
+def _get_allowed_internal_roles():
+    return {'vendedor', 'backoffice'}
+
+
+def _get_internal_role_label(role):
+    return {
+        'vendedor': _('Vendor'),
+        'backoffice': _('BackOffice'),
+    }.get(role, _('Internal user'))
+
+
+def _resolve_internal_role(value, *, fallback='vendedor'):
+    role = (value or fallback or '').strip().lower()
+    return role if role in _get_allowed_internal_roles() else fallback
+
+
+def _internal_users_queryset():
+    return Usuario.objects.filter(role__in=sorted(_get_allowed_internal_roles())).order_by('first_name', 'last_name', 'username')
+
+
 def _redirect_for_user(user):
-    if _is_admin_user(user):
-        return reverse('panel_admin')
-    if user.role == 'vendedor':
-        return reverse('vendedores_clientes')
-    if user.role == 'cliente':
-        return reverse('catalogo')
-    return '/'
+    return get_redirect_url_for_user(user)
+
+
+def _resolve_login_redirect(user, next_url=None):
+    next_url = (next_url or '').strip()
+    if next_url.startswith('/') and not next_url.startswith('//'):
+        return next_url
+    return _redirect_for_user(user)
+
+
+def _build_internal_permission_context(role, overrides=None):
+    return {
+        'permission_sections': build_permission_sections(role=role, overrides=overrides or {}),
+        'all_permission_codes': [permission['code'] for permission in build_permission_sections(role=role, overrides=overrides or {}) for permission in permission['permissions']],
+    }
 
 
 def _cloudinary_download_url_for_file(field_file):
@@ -531,10 +571,8 @@ def _build_inline_file_response(file_obj_or_bytes, content_type, file_name, use_
     return response
 
 @login_required
+@internal_permission_required('admin.dashboard.view')
 def panel_admin(request):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     clientes_pendientes = Cliente.objects.filter(aprobado=False).count()
     clientes_aprobados = Cliente.objects.filter(aprobado=True).count()
@@ -621,10 +659,8 @@ def perfil_admin(request):
 
 
 @login_required
+@internal_permission_required('admin.content.view')
 def contenido_home(request):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     context = {
         'marcas_activas': Marca.objects.filter(activo=True).count(),
@@ -638,10 +674,8 @@ def contenido_home(request):
 
 
 @login_required
+@internal_permission_required('admin.content.manage')
 def editar_home_contenido(request):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     contenido = _get_or_create_home_contenido()
 
@@ -762,10 +796,8 @@ def editar_home_contenido(request):
 
 
 @login_required
+@internal_permission_required('admin.content.view')
 def lista_testimonios(request):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     testimonios = Testimonio.objects.all()
 
@@ -775,10 +807,8 @@ def lista_testimonios(request):
 
 
 @login_required
+@internal_permission_required('admin.content.manage')
 def crear_testimonio(request):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     if request.method == 'POST':
         nombre = (request.POST.get('nombre') or '').strip()
@@ -830,10 +860,8 @@ def crear_testimonio(request):
 
 
 @login_required
+@internal_permission_required('admin.content.manage')
 def editar_testimonio(request, testimonio_id):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     testimonio = get_object_or_404(Testimonio, id=testimonio_id)
 
@@ -891,10 +919,8 @@ def editar_testimonio(request, testimonio_id):
 
 
 @login_required
+@internal_permission_required('admin.content.manage')
 def desactivar_testimonio(request, testimonio_id):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     testimonio = get_object_or_404(Testimonio, id=testimonio_id)
     testimonio.activo = False
@@ -907,10 +933,8 @@ def desactivar_testimonio(request, testimonio_id):
 
 
 @login_required
+@internal_permission_required('admin.content.manage')
 def activar_testimonio(request, testimonio_id):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     testimonio = get_object_or_404(Testimonio, id=testimonio_id)
     testimonio.activo = True
@@ -924,21 +948,47 @@ def activar_testimonio(request, testimonio_id):
 @login_required
 def crear_vendedor(request):
 
+    return crear_usuario_interno(request, preset_role='vendedor')
+
+
+@login_required
+def crear_backoffice(request):
+
+    return crear_usuario_interno(request, preset_role='backoffice')
+
+
+@login_required
+def crear_usuario_interno(request, preset_role=None):
+
     if not _is_admin_user(request.user):
         return redirect('login')
 
     if request.method == 'POST':
 
-        username = request.POST.get('username')
-        email = request.POST.get('email')
-        password = request.POST.get('password')
-        nombre = request.POST.get('nombre')
-        apellido = request.POST.get('apellido')
-        telefono = request.POST.get('telefono')
+        role = _resolve_internal_role(request.POST.get('role'), fallback=preset_role or 'vendedor')
+        username = (request.POST.get('username') or '').strip()
+        email = (request.POST.get('email') or '').strip()
+        password = request.POST.get('password') or ''
+        nombre = (request.POST.get('nombre') or '').strip()
+        apellido = (request.POST.get('apellido') or '').strip()
+        telefono = (request.POST.get('telefono') or '').strip()
+        permission_overrides = build_permission_overrides_for_role(role, request.POST.getlist('permissions'))
+
+        if not username:
+            messages.error(request, _('Username is required.'))
+            return redirect(request.path)
 
         if Usuario.objects.filter(username=username).exists():
-            messages.error(request, _("El usuario ya existe"))
-            return redirect('crear_vendedor')
+            messages.error(request, _('This username is already in use.'))
+            return redirect(request.path)
+
+        if Usuario.objects.filter(email__iexact=email).exists():
+            messages.error(request, _('Another user already uses that email address.'))
+            return redirect(request.path)
+
+        if not password:
+            messages.error(request, _('Password is required.'))
+            return redirect(request.path)
 
         Usuario.objects.create(
             username=username,
@@ -947,89 +997,174 @@ def crear_vendedor(request):
             first_name=nombre,
             last_name=apellido,
             telefono=telefono,
-            role='vendedor',
+            role=role,
+            permission_overrides=permission_overrides,
             is_active=True
         )
 
-        messages.success(request, _("Vendedor creado correctamente"))
+        messages.success(request, _('%(role)s created successfully.') % {'role': _get_internal_role_label(role)})
 
-        return redirect('lista_vendedores')
+        return redirect('lista_usuarios_internos')
 
-    return render(request, 'admin/crear_vendedor.html')
+    context = {
+        'selected_role': _resolve_internal_role(preset_role or 'vendedor'),
+        'role_choices': [(role, _get_internal_role_label(role)) for role in sorted(_get_allowed_internal_roles())],
+        'is_role_locked': bool(preset_role),
+    }
+    context.update(_build_internal_permission_context(context['selected_role']))
+    return render(request, 'admin/crear_usuario_interno.html', context)
 
 @login_required
 def lista_vendedores(request):
 
+    return lista_usuarios_internos(request)
+
+
+@login_required
+def lista_usuarios_internos(request):
+
     if not _is_admin_user(request.user):
         return redirect('login')
 
-    vendedores = Usuario.objects.filter(role='vendedor')
+    usuarios_internos = _internal_users_queryset()
+    for usuario in usuarios_internos:
+        usuario.permission_summary_labels = get_permission_summary_labels(usuario)
 
     context = {
-        'vendedores': vendedores
+        'usuarios_internos': usuarios_internos
     }
 
-    return render(request, 'admin/vendedores.html', context)
+    return render(request, 'admin/usuarios_internos.html', context)
 
 @login_required
 def editar_vendedor(request, vendedor_id):
 
+    return editar_usuario_interno(request, vendedor_id, preset_role='vendedor')
+
+
+@login_required
+def editar_backoffice(request, usuario_id):
+
+    return editar_usuario_interno(request, usuario_id, preset_role='backoffice')
+
+
+@login_required
+def editar_usuario_interno(request, usuario_id, preset_role=None):
+
     if not _is_admin_user(request.user):
         return redirect('login')
 
-    vendedor = get_object_or_404(Usuario, id=vendedor_id, role='vendedor')
+    filters = {'id': usuario_id, 'role__in': sorted(_get_allowed_internal_roles())}
+    if preset_role:
+        filters['role'] = preset_role
+
+    usuario = get_object_or_404(Usuario, **filters)
 
     if request.method == 'POST':
 
-        vendedor.first_name = request.POST.get('nombre')
-        vendedor.last_name = request.POST.get('apellido')
-        vendedor.email = request.POST.get('email')
-        vendedor.telefono = request.POST.get('telefono')
-        vendedor.save()
+        role = _resolve_internal_role(request.POST.get('role'), fallback=preset_role or usuario.role)
+        email = (request.POST.get('email') or '').strip()
+        telefono = (request.POST.get('telefono') or '').strip()
+        nombre = (request.POST.get('nombre') or '').strip()
+        apellido = (request.POST.get('apellido') or '').strip()
+        permission_overrides = build_permission_overrides_for_role(role, request.POST.getlist('permissions'))
 
-        messages.success(request, _("Vendedor actualizado correctamente"))
+        if Usuario.objects.filter(email__iexact=email).exclude(pk=usuario.pk).exists():
+            messages.error(request, _('Another user already uses that email address.'))
+            return redirect(request.path)
 
-        return redirect('lista_vendedores')
+        usuario.first_name = nombre
+        usuario.last_name = apellido
+        usuario.email = email
+        usuario.telefono = telefono
+        usuario.role = role
+        usuario.permission_overrides = permission_overrides
+        usuario.save(update_fields=['first_name', 'last_name', 'email', 'telefono', 'role', 'permission_overrides'])
+
+        messages.success(request, _('%(role)s updated successfully.') % {'role': _get_internal_role_label(role)})
+
+        return redirect('lista_usuarios_internos')
 
     context = {
-        'vendedor': vendedor
+        'usuario_interno': usuario,
+        'selected_role': _resolve_internal_role(preset_role or usuario.role),
+        'role_choices': [(role, _get_internal_role_label(role)) for role in sorted(_get_allowed_internal_roles())],
+        'is_role_locked': bool(preset_role),
     }
-
-    return render(request, 'admin/editar_vendedor.html', context)
+    context.update(_build_internal_permission_context(context['selected_role'], usuario.normalized_permission_overrides()))
+    return render(request, 'admin/editar_usuario_interno.html', context)
 
 @login_required
 def desactivar_vendedor(request, vendedor_id):
 
+    return desactivar_usuario_interno(request, vendedor_id, preset_role='vendedor')
+
+
+@login_required
+def desactivar_backoffice(request, usuario_id):
+
+    return desactivar_usuario_interno(request, usuario_id, preset_role='backoffice')
+
+
+@login_required
+def desactivar_usuario_interno(request, usuario_id, preset_role=None):
+
     if not _is_admin_user(request.user):
         return redirect('login')
 
-    vendedor = get_object_or_404(Usuario, id=vendedor_id, role='vendedor')
-    vendedor.is_active = False
-    vendedor.save()
+    filters = {'id': usuario_id, 'role__in': sorted(_get_allowed_internal_roles())}
+    if preset_role:
+        filters['role'] = preset_role
 
-    messages.success(request, _("Vendedor %(nombre)s desactivado") % {'nombre': vendedor.first_name})
+    usuario = get_object_or_404(Usuario, **filters)
+    usuario.is_active = False
+    usuario.save(update_fields=['is_active'])
 
-    return redirect('lista_vendedores')
+    messages.success(
+        request,
+        _('%(role)s %(name)s deactivated.')
+        % {'role': _get_internal_role_label(usuario.role), 'name': usuario.first_name or usuario.username}
+    )
+
+    return redirect('lista_usuarios_internos')
 
 @login_required
 def activar_vendedor(request, vendedor_id):
 
-    if not _is_admin_user(request.user):
-        return redirect('login')
+    return activar_usuario_interno(request, vendedor_id, preset_role='vendedor')
 
-    vendedor = get_object_or_404(Usuario, id=vendedor_id, role='vendedor')
-    vendedor.is_active = True
-    vendedor.save()
-
-    messages.success(request, _("Vendedor %(nombre)s activado") % {'nombre': vendedor.first_name})
-
-    return redirect('lista_vendedores')
 
 @login_required
-def clientes_pendientes(request):
+def activar_backoffice(request, usuario_id):
+
+    return activar_usuario_interno(request, usuario_id, preset_role='backoffice')
+
+
+@login_required
+def activar_usuario_interno(request, usuario_id, preset_role=None):
 
     if not _is_admin_user(request.user):
         return redirect('login')
+
+    filters = {'id': usuario_id, 'role__in': sorted(_get_allowed_internal_roles())}
+    if preset_role:
+        filters['role'] = preset_role
+
+    usuario = get_object_or_404(Usuario, **filters)
+    usuario.is_active = True
+    usuario.save(update_fields=['is_active'])
+
+    messages.success(
+        request,
+        _('%(role)s %(name)s activated.')
+        % {'role': _get_internal_role_label(usuario.role), 'name': usuario.first_name or usuario.username}
+    )
+
+    return redirect('lista_usuarios_internos')
+
+@login_required
+@internal_permission_required('admin.customer_requests.view')
+def clientes_pendientes(request):
 
     clientes = Cliente.objects.filter(aprobado=False)
 
@@ -1040,10 +1175,8 @@ def clientes_pendientes(request):
     return render(request, 'admin/clientes_pendientes.html', context)
 
 @login_required
+@internal_permission_required('admin.customer_requests.manage')
 def aprobar_cliente(request, cliente_id):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     cliente = get_object_or_404(Cliente, id=cliente_id)
 
@@ -1076,10 +1209,8 @@ def aprobar_cliente(request, cliente_id):
     return redirect('clientes_pendientes')
 
 @login_required
+@internal_permission_required('admin.customer_requests.manage')
 def rechazar_cliente(request, cliente_id):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     cliente = get_object_or_404(Cliente, id=cliente_id)
 
@@ -1113,10 +1244,8 @@ def rechazar_cliente(request, cliente_id):
     return redirect('clientes_pendientes')
 
 @login_required
+@internal_permission_required('admin.customer_requests.view')
 def ver_cliente(request, cliente_id):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     cliente = get_object_or_404(Cliente, id=cliente_id)
 
@@ -1129,10 +1258,8 @@ def ver_cliente(request, cliente_id):
 
 @login_required
 @xframe_options_sameorigin
+@internal_permission_required('admin.customer_requests.view')
 def ver_certificado_cliente(request, cliente_id):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     cliente = get_object_or_404(Cliente, id=cliente_id)
 
@@ -1241,6 +1368,8 @@ def ver_certificado_cliente(request, cliente_id):
 #funcion del login
 def login_view(request):
 
+    next_url = request.POST.get('next') or request.GET.get('next') or ''
+
     if request.method == 'POST':
 
         username = request.POST.get('username').lower()
@@ -1257,13 +1386,14 @@ def login_view(request):
             
             if user is not None:
                 login(request, user)
+                redirect_url = _resolve_login_redirect(user, next_url)
 
                 if is_ajax:
                     # Retornar JSON con éxito y la URL de redirección
-                    return JsonResponse({'success': True, 'redirect': _redirect_for_user(user)})
+                    return JsonResponse({'success': True, 'redirect': redirect_url})
                 else:
                     # Redirecciones normales
-                    return redirect(_redirect_for_user(user))
+                    return redirect(redirect_url)
             else:
                 # Usuario existe pero contraseña es incorrecta
                 if is_ajax:
@@ -1282,9 +1412,9 @@ def login_view(request):
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
     
     if is_ajax:
-        return render(request, 'usuarios/login_modal_form.html')
+        return render(request, 'usuarios/login_modal_form.html', {'next_url': next_url})
     else:
-        return render(request, 'usuarios/login.html')
+        return render(request, 'usuarios/login.html', {'next_url': next_url})
 
 
 # Función de logout personalizada
@@ -1360,6 +1490,13 @@ def registro_view(request):
             messages.error(request, message)
             return redirect('registro')
 
+        if not request.POST.get('confirmacion'):
+            message = _("Debes aceptar la declaración sobre la veracidad de la información fiscal para completar el registro.")
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': 'tax_declaration_required', 'message': message}, status=400)
+            messages.error(request, message)
+            return redirect('registro')
+
         try:
             with transaction.atomic():
                 usuario = Usuario.objects.create_user(
@@ -1387,6 +1524,8 @@ def registro_view(request):
                     pais=request.POST.get('pais'),
                     sales_tax_number=request.POST.get('sales_tax'),
                     certificado_tax=certificado,
+                    declaracion_fiscal_aceptada=True,
+                    declaracion_fiscal_aceptada_en=timezone.now(),
                 )
 
                 # asegurar que el grupo exista

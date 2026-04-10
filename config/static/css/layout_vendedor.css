@@ -1,4 +1,8 @@
 /* Refuerzo definitivo: menú y botones de idioma idénticos a home, máxima especificidad */
+:root {
+    --panel-navbar-offset: 72px;
+}
+
 .language-widget .language-menu {
     position: absolute !important;
     bottom: 60px !important;
@@ -68,10 +72,10 @@ z-index:1000;
 
 .sidebar {
     position: fixed;
-    top: 70px;
+    top: var(--panel-navbar-offset);
     left: 0;
     width: 253px;
-    height: calc(100vh - 70px);
+    height: calc(100vh - var(--panel-navbar-offset));
     overflow-y: auto;
     margin: 0;
     padding: 0;
@@ -82,10 +86,10 @@ z-index:1000;
 
 .content{
 margin-left:240px;
-margin-top:70px;
+margin-top:var(--panel-navbar-offset);
 padding:40px;
 
-height:calc(100vh - 70px);
+height:calc(100vh - var(--panel-navbar-offset));
 overflow-y:auto;
 
 width:100%;
@@ -300,7 +304,7 @@ width:100%;
     .content {
         padding: 24px 18px;
         height: auto;
-        min-height: calc(100vh - 70px);
+        min-height: calc(100vh - var(--panel-navbar-offset));
         margin-left: 240px;
     }
 
@@ -312,7 +316,7 @@ width:100%;
             background: #fff;
             transition: none;
             width: 253px;
-            top: 70px;
+            top: var(--panel-navbar-offset);
             margin: 0;
             padding: 0;
             border: none;
@@ -345,7 +349,7 @@ width:100%;
         .sidebar-backdrop {
             display: none;
             position: fixed;
-            top: 70px;
+            top: var(--panel-navbar-offset);
             left: 0;
             right: 0;
             bottom: 0;

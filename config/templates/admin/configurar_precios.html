@@ -1,0 +1,90 @@
+{% extends "bases/base_vendedor.html" %}
+{% load static i18n %}
+
+{% block title %}
+{% trans "Configure price percentages" %}
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4">{% trans "Configure price percentages" %}</h2>
+
+<div class="card shadow-sm">
+<div class="card-body" data-price-formula data-price-margins="{{ price_margins|join:',' }}">
+
+<form method="POST">
+{% csrf_token %}
+
+<p class="text-muted">
+{% trans "These percentages apply to every presentation with a cost. When you save, existing prices are recalculated automatically." %}
+</p>
+
+<div class="row">
+<div class="col-md-2 mb-3">
+<label class="form-label">{% trans "Price 1 (%)" %}</label>
+<input type="number" step="0.01" min="0" name="porcentaje_1" class="form-control" value="{{ configuracion.porcentaje_1|stringformat:'f' }}">
+</div>
+<div class="col-md-2 mb-3">
+<label class="form-label">{% trans "Price 2 (%)" %}</label>
+<input type="number" step="0.01" min="0" name="porcentaje_2" class="form-control" value="{{ configuracion.porcentaje_2|stringformat:'f' }}">
+</div>
+<div class="col-md-2 mb-3">
+<label class="form-label">{% trans "Price 3 (%)" %}</label>
+<input type="number" step="0.01" min="0" name="porcentaje_3" class="form-control" value="{{ configuracion.porcentaje_3|stringformat:'f' }}">
+</div>
+<div class="col-md-2 mb-3">
+<label class="form-label">{% trans "Price 4 (%)" %}</label>
+<input type="number" step="0.01" min="0" name="porcentaje_4" class="form-control" value="{{ configuracion.porcentaje_4|stringformat:'f' }}">
+</div>
+<div class="col-md-2 mb-3">
+<label class="form-label">{% trans "Price 5 (%)" %}</label>
+<input type="number" step="0.01" min="0" name="porcentaje_5" class="form-control" value="{{ configuracion.porcentaje_5|stringformat:'f' }}">
+</div>
+</div>
+
+<hr class="my-4">
+
+<h5 class="mb-3">{% trans "Preview" %}</h5>
+
+<div class="row align-items-end">
+<div class="col-md-3 mb-3">
+<label class="form-label">{% trans "Sample cost" %}</label>
+<input type="number" step="0.01" min="0" class="form-control" data-cost-input value="100">
+</div>
+<div class="col-md-9">
+<div class="row">
+<div class="col-md-2 mb-3">
+<label class="form-label">{% trans "Precio 1" %}</label>
+<input type="number" step="0.01" class="form-control" data-price-output="1" readonly>
+</div>
+<div class="col-md-2 mb-3">
+<label class="form-label">{% trans "Precio 2" %}</label>
+<input type="number" step="0.01" class="form-control" data-price-output="2" readonly>
+</div>
+<div class="col-md-2 mb-3">
+<label class="form-label">{% trans "Precio 3" %}</label>
+<input type="number" step="0.01" class="form-control" data-price-output="3" readonly>
+</div>
+<div class="col-md-2 mb-3">
+<label class="form-label">{% trans "Precio 4" %}</label>
+<input type="number" step="0.01" class="form-control" data-price-output="4" readonly>
+</div>
+<div class="col-md-2 mb-3">
+<label class="form-label">{% trans "Precio 5" %}</label>
+<input type="number" step="0.01" class="form-control" data-price-output="5" readonly>
+</div>
+</div>
+</div>
+</div>
+
+<button type="submit" class="btn btn-success">{% trans "Save percentages" %}</button>
+<a href="{% url 'lista_productos' %}" class="btn btn-secondary">{% trans "Back" %}</a>
+
+</form>
+
+</div>
+</div>
+
+<script src="{% static 'js/product-price-formula.js' %}"></script>
+
+{% endblock %}

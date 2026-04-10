@@ -1,16 +1,23 @@
+import uuid
+
 from django.db import models
+from django.utils.translation import gettext_lazy as _
+
 from config.clientes.models import Cliente
-from config.productos.models import Producto, Presentacion
+from config.productos.models import Presentacion
 from config.usuarios.models import Usuario
 
 
 class Cotizacion(models.Model):
 
     ESTADO_CHOICES = (
-        ('BORRADOR', 'Borrador'),
-        ('ENVIADA', 'Enviada'),
-        ('APROBADA', "Aprobada"),
-        ('RECHAZADA', 'Rechazada'),
+        ('BORRADOR', _('Draft')),
+        ('ENVIADA', _('Sent')),
+        ('LISTA_PARA_CONFIRMACION', _('Ready for confirmation')),
+        ('CONFIRMADA_CLIENTE', _('Confirmed by client')),
+        ('CANCELADA_CLIENTE', _('Canceled by client')),
+        ('APROBADA', _('Approved')),
+        ('RECHAZADA', _('Rejected')),
     )
 
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE)
@@ -26,7 +33,7 @@ class Cotizacion(models.Model):
     fecha = models.DateTimeField(auto_now_add=True)
 
     estado = models.CharField(
-        max_length=20,
+        max_length=30,
         choices=ESTADO_CHOICES,
         default='BORRADOR'
     )
@@ -36,6 +43,19 @@ class Cotizacion(models.Model):
         decimal_places=2,
         default=0
     )
+
+    nota_cliente = models.TextField(blank=True)
+    nota_confirmacion_cliente = models.TextField(blank=True)
+    nota_backoffice = models.TextField(blank=True)
+    token_cliente = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    correo_enviado = models.BooleanField(default=False)
+    correo_enviado_en = models.DateTimeField(null=True, blank=True)
+    sms_enviado = models.BooleanField(default=False)
+    sms_enviado_en = models.DateTimeField(null=True, blank=True)
+    whatsapp_enviado = models.BooleanField(default=False)
+    whatsapp_enviado_en = models.DateTimeField(null=True, blank=True)
+    whatsapp_manual_abierto = models.BooleanField(default=False)
+    whatsapp_manual_abierto_en = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Cotizacion #{self.id} - {self.cliente}"

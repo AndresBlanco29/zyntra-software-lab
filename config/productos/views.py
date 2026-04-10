@@ -2,12 +2,16 @@ from django.core.cache import cache
 from django.db.models import Prefetch
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from .models import Producto, Categoria, Marca, Presentacion
+from .models import Producto, Categoria, Marca, Presentacion, ConfiguracionPrecios
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
 from django.utils.translation import gettext as _
 from decimal import Decimal, InvalidOperation
+
+from config.clientes.models import Cliente
+from config.cotizaciones.models import Cotizacion
+from config.usuarios.permissions import internal_permission_required
 
 
 CATALOGO_CACHE_TIMEOUT = 60
@@ -25,6 +29,29 @@ def _parse_decimal(value, default="0"):
         return Decimal(text)
     except (InvalidOperation, ValueError):
         return Decimal(str(default))
+
+
+def _parse_optional_decimal(value):
+    text = str(value or "").strip().replace(",", ".")
+    if not text:
+        return None
+    try:
+        return Decimal(text)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _get_price_margin_config():
+    return ConfiguracionPrecios.obtener()
+
+
+def _get_price_margin_values():
+    return [str(porcentaje) for porcentaje in _get_price_margin_config().porcentajes_lista()]
+
+
+def _recalcular_presentaciones_con_costo():
+    for presentacion in Presentacion.objects.exclude(costo__isnull=True):
+        presentacion.save()
 
 
 def _presentaciones_prefetch():
@@ -99,6 +126,23 @@ def _get_cached_catalogo_marcas():
 def catalogo(request):
     force_guest_mode = request.GET.get("guest") == "1"
     can_quote = bool(request.user.is_authenticated and not force_guest_mode)
+    can_view_received_quotes = bool(
+        request.user.is_authenticated
+        and not force_guest_mode
+        and getattr(request.user, 'role', '') == 'cliente'
+    )
+    pendientes_cotizaciones = 0
+
+    if can_view_received_quotes:
+        try:
+            cliente = Cliente.objects.only('id').get(usuario=request.user)
+            pendientes_cotizaciones = Cotizacion.objects.filter(
+                cliente=cliente,
+                estado='LISTA_PARA_CONFIRMACION',
+            ).count()
+        except Cliente.DoesNotExist:
+            can_view_received_quotes = False
+
     catalogo_url = reverse("catalogo")
     if force_guest_mode:
         catalogo_url = f"{catalogo_url}?guest=1"
@@ -115,6 +159,8 @@ def catalogo(request):
         'marcas': marcas,
         'guest_mode': force_guest_mode,
         'can_quote': can_quote,
+        'can_view_received_quotes': can_view_received_quotes,
+        'pendientes_cotizaciones': pendientes_cotizaciones,
         'catalogo_url': catalogo_url,
     }
 
@@ -124,10 +170,9 @@ def catalogo(request):
     response["Expires"] = "0"
     return response
 
+@login_required
+@internal_permission_required('admin.products.view')
 def lista_productos(request):
-
-    if not _is_admin_user(request.user):
-        return redirect("login")
 
     productos = Producto.objects.all()
     categorias = Categoria.objects.all()
@@ -136,15 +181,14 @@ def lista_productos(request):
     return render(request, 'admin/productos.html', {
         'productos': productos,
         'categorias': categorias,
-        'marcas': marcas
+        'marcas': marcas,
+        'price_margins': _get_price_margin_values(),
     })
 
 
 @login_required
+@internal_permission_required('admin.products.view')
 def lista_marcas(request):
-
-    if not _is_admin_user(request.user):
-        return redirect("login")
 
     marcas = Marca.objects.all().prefetch_related('categorias')
 
@@ -153,10 +197,8 @@ def lista_marcas(request):
     })
 
 @login_required
+@internal_permission_required('admin.products.manage')
 def crear_producto(request):
-
-    if not _is_admin_user(request.user):
-        return redirect("login")
 
     if request.method == "POST":
 
@@ -204,21 +246,13 @@ def crear_producto(request):
         tipo_contenido = (request.POST.get("tipo_contenido") or "unidades").strip() or "unidades"
         unidades_raw = (request.POST.get("unidades") or "").strip()
 
-        precio_1_raw = (request.POST.get("precio_1") or "").strip()
-        precio_2_raw = (request.POST.get("precio_2") or "").strip()
-        precio_3_raw = (request.POST.get("precio_3") or "").strip()
-        precio_4_raw = (request.POST.get("precio_4") or "").strip()
-        precio_5_raw = (request.POST.get("precio_5") or "").strip()
+        costo_raw = (request.POST.get("costo") or "").strip()
 
         has_presentacion_data = any([
             presentacion_nombre,
             tipo_contenido,
             unidades_raw,
-            precio_1_raw,
-            precio_2_raw,
-            precio_3_raw,
-            precio_4_raw,
-            precio_5_raw,
+            costo_raw,
         ])
 
         if has_presentacion_data:
@@ -235,28 +269,45 @@ def crear_producto(request):
                 nombre=presentacion_nombre or "Presentacion 1",
                 tipo_contenido=tipo_contenido,
                 unidades=unidades,
-                precio_1=_parse_decimal(precio_1_raw),
-                precio_2=_parse_decimal(precio_2_raw),
-                precio_3=_parse_decimal(precio_3_raw),
-                precio_4=_parse_decimal(precio_4_raw),
-                precio_5=_parse_decimal(precio_5_raw),
+                costo=_parse_optional_decimal(costo_raw),
             )
 
         return redirect("lista_productos")
 
     context = {
         "categorias": Categoria.objects.all(),
-        "marcas": Marca.objects.all()
+        "marcas": Marca.objects.all(),
+        "price_margins": _get_price_margin_values(),
     }
 
     return render(request, "admin/crear_producto.html", context)
 
 
 @login_required
-def crear_categoria(request):
+@internal_permission_required('admin.products.manage')
+def configurar_precios(request):
+    configuracion = _get_price_margin_config()
 
-    if not _is_admin_user(request.user):
-        return redirect("login")
+    if request.method == "POST":
+        configuracion.porcentaje_1 = _parse_decimal(request.POST.get("porcentaje_1"), configuracion.porcentaje_1)
+        configuracion.porcentaje_2 = _parse_decimal(request.POST.get("porcentaje_2"), configuracion.porcentaje_2)
+        configuracion.porcentaje_3 = _parse_decimal(request.POST.get("porcentaje_3"), configuracion.porcentaje_3)
+        configuracion.porcentaje_4 = _parse_decimal(request.POST.get("porcentaje_4"), configuracion.porcentaje_4)
+        configuracion.porcentaje_5 = _parse_decimal(request.POST.get("porcentaje_5"), configuracion.porcentaje_5)
+        configuracion.save()
+        _recalcular_presentaciones_con_costo()
+        messages.success(request, _("Price percentages updated successfully"))
+        return redirect("configurar_precios")
+
+    return render(request, "admin/configurar_precios.html", {
+        "configuracion": configuracion,
+        "price_margins": [str(porcentaje) for porcentaje in configuracion.porcentajes_lista()],
+    })
+
+
+@login_required
+@internal_permission_required('admin.products.manage')
+def crear_categoria(request):
 
     if request.method == "POST":
         nombre = (request.POST.get("nombre") or "").strip()
@@ -287,10 +338,8 @@ def crear_categoria(request):
 
 
 @login_required
+@internal_permission_required('admin.products.manage')
 def crear_marca(request):
-
-    if not _is_admin_user(request.user):
-        return redirect("login")
 
     categorias = Categoria.objects.all()
 
@@ -337,10 +386,8 @@ def crear_marca(request):
 
 
 @login_required
+@internal_permission_required('admin.products.manage')
 def editar_marca(request, marca_id):
-
-    if not _is_admin_user(request.user):
-        return redirect("login")
 
     marca = get_object_or_404(Marca, id=marca_id)
     categorias = Categoria.objects.all()
@@ -390,10 +437,8 @@ def editar_marca(request, marca_id):
 
 
 @login_required
+@internal_permission_required('admin.products.manage')
 def desactivar_marca(request, marca_id):
-
-    if not _is_admin_user(request.user):
-        return redirect("login")
 
     marca = get_object_or_404(Marca, id=marca_id)
     marca.activo = False
@@ -404,10 +449,8 @@ def desactivar_marca(request, marca_id):
 
 
 @login_required
+@internal_permission_required('admin.products.manage')
 def activar_marca(request, marca_id):
-
-    if not _is_admin_user(request.user):
-        return redirect("login")
 
     marca = get_object_or_404(Marca, id=marca_id)
     marca.activo = True
@@ -416,6 +459,8 @@ def activar_marca(request, marca_id):
     messages.success(request, _("Marca activada"))
     return redirect('lista_marcas')
 
+@login_required
+@internal_permission_required('admin.products.manage')
 def desactivar_producto(request, producto_id):
 
     producto = get_object_or_404(Producto, id=producto_id)
@@ -425,6 +470,8 @@ def desactivar_producto(request, producto_id):
 
     return redirect('lista_productos')
 
+@login_required
+@internal_permission_required('admin.products.manage')
 def activar_producto(request, producto_id):
 
     producto = get_object_or_404(Producto, id=producto_id)
@@ -434,6 +481,8 @@ def activar_producto(request, producto_id):
 
     return redirect('lista_productos')
 
+@login_required
+@internal_permission_required('admin.products.manage')
 def editar_producto(request, producto_id):
 
     producto = get_object_or_404(Producto, id=producto_id)
@@ -485,26 +534,8 @@ def editar_producto(request, producto_id):
             if unidades:
                 p.unidades = int(unidades)
 
-            precio1 = request.POST.get(f"precio1_{p.id}", "").strip()
-            precio2 = request.POST.get(f"precio2_{p.id}", "").strip()
-            precio3 = request.POST.get(f"precio3_{p.id}", "").strip()
-            precio4 = request.POST.get(f"precio4_{p.id}", "").strip()
-            precio5 = request.POST.get(f"precio5_{p.id}", "").strip()
-
-            if precio1:
-                p.precio_1 = _parse_decimal(precio1, p.precio_1)
-
-            if precio2:
-                p.precio_2 = _parse_decimal(precio2, p.precio_2)
-
-            if precio3:
-                p.precio_3 = _parse_decimal(precio3, p.precio_3)
-
-            if precio4:
-                p.precio_4 = _parse_decimal(precio4, p.precio_4)
-
-            if precio5:
-                p.precio_5 = _parse_decimal(precio5, p.precio_5)
+            if f"costo_{p.id}" in request.POST:
+                p.costo = _parse_optional_decimal(request.POST.get(f"costo_{p.id}"))
 
             p.save()
 
@@ -514,13 +545,9 @@ def editar_producto(request, producto_id):
             nuevo_tipo = (request.POST.get("tipo_contenido_nuevo") or "unidades").strip() or "unidades"
             nuevas_unidades_raw = (request.POST.get("unidades_nuevo") or "").strip()
 
-            nprecio1 = (request.POST.get("precio1_nuevo") or "").strip()
-            nprecio2 = (request.POST.get("precio2_nuevo") or "").strip()
-            nprecio3 = (request.POST.get("precio3_nuevo") or "").strip()
-            nprecio4 = (request.POST.get("precio4_nuevo") or "").strip()
-            nprecio5 = (request.POST.get("precio5_nuevo") or "").strip()
+            ncosto = (request.POST.get("costo_nuevo") or "").strip()
 
-            if any([nueva_nombre, nuevas_unidades_raw, nprecio1, nprecio2, nprecio3, nprecio4, nprecio5]):
+            if any([nueva_nombre, nuevas_unidades_raw, ncosto]):
                 try:
                     nuevas_unidades = int(nuevas_unidades_raw) if nuevas_unidades_raw else 1
                 except ValueError:
@@ -534,11 +561,7 @@ def editar_producto(request, producto_id):
                     nombre=nueva_nombre or "Presentacion 1",
                     tipo_contenido=nuevo_tipo,
                     unidades=nuevas_unidades,
-                    precio_1=_parse_decimal(nprecio1),
-                    precio_2=_parse_decimal(nprecio2),
-                    precio_3=_parse_decimal(nprecio3),
-                    precio_4=_parse_decimal(nprecio4),
-                    precio_5=_parse_decimal(nprecio5),
+                    costo=_parse_optional_decimal(ncosto),
                 )
 
         return redirect("lista_productos")
@@ -547,7 +570,8 @@ def editar_producto(request, producto_id):
         "producto": producto,
         "categorias": categorias,
         "marcas": marcas,
-        "presentaciones": presentaciones
+        "presentaciones": presentaciones,
+        "price_margins": _get_price_margin_values(),
     })
 
 

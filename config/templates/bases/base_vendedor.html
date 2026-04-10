@@ -1,4 +1,4 @@
-{% load static i18n %}
+{% load static i18n permissions_tags %}
 {% get_current_language as CURRENT_LANGUAGE %}
 <!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
@@ -99,6 +99,8 @@ La Tortilla Grocery
 {% else %}
   {% if request.user.is_superuser or request.user.role == "admin" %}
     {% trans "Administrador" %}: {% firstof request.user.get_full_name request.user.username %}
+  {% elif request.user.role == "backoffice" %}
+    {% trans "BackOffice" %}: {% firstof request.user.get_full_name request.user.username %}
   {% else %}
     {% firstof request.user.get_full_name request.user.username %}
   {% endif %}
@@ -108,46 +110,75 @@ La Tortilla Grocery
 <div class="list-group list-group-flush">
 {% get_current_language as CURRENT_LANGUAGE %}
 
-{% if request.user.is_superuser or request.user.role == "admin" %}
+{% if request.user|has_internal_permission:'admin.dashboard.view' %}
   <a href="{% url 'panel_admin' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'panel_admin' %}active{% endif %}">
-    {% trans "Dashboard" %}
+    {% trans "Admin Dashboard" %}
   </a>
+{% endif %}
+{% if request.user.is_superuser or request.user.role == 'admin' %}
   <a href="{% url 'perfil_admin' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'perfil_admin' %}active{% endif %}">
     {% trans "Mi perfil" %}
   </a>
+  <a href="{% url 'lista_usuarios_internos' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_usuarios_internos' or request.resolver_match.url_name == 'crear_usuario_interno' or request.resolver_match.url_name == 'editar_usuario_interno' or request.resolver_match.url_name == 'crear_vendedor' or request.resolver_match.url_name == 'editar_vendedor' or request.resolver_match.url_name == 'crear_backoffice' or request.resolver_match.url_name == 'editar_backoffice' %}active{% endif %}">
+    {% trans "Internal Users" %}
+  </a>
+  {% endif %}
+  {% if request.user|has_internal_permission:'admin.customer_requests.view' %}
   <a href="{% url 'clientes_pendientes' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' %}active{% endif %}">
-    {% trans "Solicitudes" %}
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' or request.resolver_match.url_name == 'ver_certificado_cliente' %}active{% endif %}">
+    {% trans "Requests" %}
   </a>
-  <a href="{% url 'lista_vendedores' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_vendedores' or request.resolver_match.url_name == 'crear_vendedor' %}active{% endif %}">
-    {% trans "Vendedores" %}
-  </a>
+  {% endif %}
+  {% if request.user|has_internal_permission:'admin.products.view' %}
   <a href="{% url 'lista_productos' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_productos' or request.resolver_match.url_name == 'crear_producto' or request.resolver_match.url_name == 'crear_categoria' or request.resolver_match.url_name == 'crear_marca' or request.resolver_match.url_name == 'lista_marcas' or request.resolver_match.url_name == 'editar_marca' %}active{% endif %}">
-    {% trans "Productos" %}
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_productos' or request.resolver_match.url_name == 'crear_producto' or request.resolver_match.url_name == 'crear_categoria' or request.resolver_match.url_name == 'crear_marca' or request.resolver_match.url_name == 'lista_marcas' or request.resolver_match.url_name == 'editar_marca' or request.resolver_match.url_name == 'editar_producto' %}active{% endif %}">
+    {% trans "Products" %}
   </a>
+  {% endif %}
+  {% if request.user|has_internal_permission:'admin.content.view' %}
   <a href="{% url 'contenido_home' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'contenido_home' or request.resolver_match.url_name == 'editar_home_contenido' or request.resolver_match.url_name == 'lista_testimonios' or request.resolver_match.url_name == 'crear_testimonio' or request.resolver_match.url_name == 'editar_testimonio' %}active{% endif %}">
-    {% trans "Contenido de Inicio" %}
+    {% trans "Home Content" %}
   </a>
-{% else %}
-  {% if request.user.role == "vendedor" %}
-    <a href="{% url 'crear_cliente' %}"
-      class="list-group-item list-group-item-action {% if 'crear-cliente' in request.path %}active{% endif %}">
-      {% trans "Crear Cliente" %}
-    </a>
-    <a href="{% url 'vendedores_clientes' %}"
-      class="list-group-item list-group-item-action {% if 'clientes' in request.path %}active{% endif %}">
-      {% trans "Clientes" %}
-    </a>
-    <a href="{% url 'tomar_pedido' %}"
-      class="list-group-item list-group-item-action {% if 'tomar-pedido' in request.path %}active{% endif %}">
-      {% trans "Tomar Pedido" %}
-    </a>
   {% endif %}
+  {% if request.user|has_internal_permission:'backoffice.dashboard.view' %}
+  <a href="{% url 'backoffice_dashboard' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_dashboard' %}active{% endif %}">
+    {% trans "BackOffice" %}
+  </a>
+  {% endif %}
+  {% if request.user|has_internal_permission:'backoffice.quotes.view' %}
+  <a href="{% url 'backoffice_cotizaciones' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' %}active{% endif %}">
+    {% trans "Quotes" %}
+  </a>
+  {% endif %}
+  {% if request.user|has_internal_permission:'backoffice.orders.view' %}
+  <a href="{% url 'backoffice_pedidos' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' %}active{% endif %}">
+    {% trans "Purchase Orders" %}
+  </a>
+  {% endif %}
+  {% if not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'vendor.customers.manage' %}
+  <a href="{% url 'crear_cliente' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'crear_cliente' %}active{% endif %}">
+    {% trans "Create Customer" %}
+  </a>
+  {% endif %}
+  {% if not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'vendor.customers.view' %}
+  <a href="{% url 'vendedores_clientes' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'vendedores_clientes' %}active{% endif %}">
+    {% trans "Customers" %}
+  </a>
+  {% endif %}
+  {% if not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'vendor.orders.view' %}
+  <a href="{% url 'tomar_pedido' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'catalogo_vendedor' or request.resolver_match.url_name == 'ver_pedido' %}active{% endif %}">
+    {% trans "Take Order" %}
+  </a>
 {% endif %}
 
 </div>

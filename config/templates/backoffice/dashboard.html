@@ -1,20 +1,21 @@
 {% extends "bases/base_vendedor.html" %}
+{% load i18n %}
 
 {% block title %}
-Panel BackOffice
+{% trans "BackOffice Dashboard" %}
 {% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4">Panel BackOffice</h2>
-<p class="text-muted">Módulo dedicado para gestionar cotizaciones y órdenes de compra.</p>
+<h2 class="mb-4">{% trans "BackOffice Dashboard" %}</h2>
+<p class="text-muted">{% trans "Dedicated module for managing quotes and purchase orders." %}</p>
 
 <div class="row g-3 mb-4">
   <div class="col-md-6 col-xl-3">
     <div class="card shadow-sm h-100">
       <div class="card-body text-center">
         <h3 class="mb-1">{{ cotizaciones_pendientes }}</h3>
-        <p class="mb-0">Cotizaciones pendientes</p>
+        <p class="mb-0">{% trans "Pending quotes" %}</p>
       </div>
     </div>
   </div>
@@ -23,7 +24,7 @@ Panel BackOffice
     <div class="card shadow-sm h-100">
       <div class="card-body text-center">
         <h3 class="mb-1">{{ ordenes_recibidas }}</h3>
-        <p class="mb-0">Órdenes recibidas</p>
+        <p class="mb-0">{% trans "Received orders" %}</p>
       </div>
     </div>
   </div>
@@ -32,7 +33,7 @@ Panel BackOffice
     <div class="card shadow-sm h-100">
       <div class="card-body text-center">
         <h3 class="mb-1">{{ ordenes_en_gestion }}</h3>
-        <p class="mb-0">Órdenes en gestión</p>
+        <p class="mb-0">{% trans "Orders in progress" %}</p>
       </div>
     </div>
   </div>
@@ -41,7 +42,7 @@ Panel BackOffice
     <div class="card shadow-sm h-100">
       <div class="card-body text-center">
         <h3 class="mb-1">{{ ordenes_listas_picking }}</h3>
-        <p class="mb-0">Listas para picking</p>
+        <p class="mb-0">{% trans "Ready for picking" %}</p>
       </div>
     </div>
   </div>
@@ -49,11 +50,34 @@ Panel BackOffice
 
 <div class="card shadow-sm">
   <div class="card-body">
-    <h5 class="mb-3">Accesos rápidos</h5>
+    <h5 class="mb-3">{% trans "Quick actions" %}</h5>
     <div class="d-flex flex-wrap gap-2">
-      <a href="{% url 'backoffice_cotizaciones' %}" class="btn btn-primary">Gestionar cotizaciones</a>
-      <a href="{% url 'backoffice_pedidos' %}" class="btn btn-warning">Gestionar órdenes de compra</a>
+      <a href="{% url 'backoffice_cotizaciones' %}" class="btn btn-primary">{% trans "Manage quotes" %}</a>
+      <a href="{% url 'backoffice_pedidos' %}" class="btn btn-warning">{% trans "Manage purchase orders" %}</a>
     </div>
+  </div>
+</div>
+
+<div class="card shadow-sm mt-4">
+  <div class="card-body">
+    <h5 class="mb-3">{% trans "System notifications" %}</h5>
+    {% if notificaciones %}
+      <div class="list-group list-group-flush">
+        {% for notificacion in notificaciones %}
+          <a href="{{ notificacion.url|default:'#' }}" class="list-group-item list-group-item-action px-0 {% if not notificacion.url %}disabled{% endif %}">
+            <div class="d-flex justify-content-between align-items-start gap-3">
+              <div>
+                <div class="fw-semibold">{{ notificacion.titulo }}</div>
+                <div class="text-muted small">{{ notificacion.mensaje }}</div>
+              </div>
+              <small class="text-muted text-nowrap">{{ notificacion.creada_en|date:"d/m/Y H:i" }}</small>
+            </div>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-muted mb-0">{% trans "No notifications have been registered yet." %}</p>
+    {% endif %}
   </div>
 </div>
 

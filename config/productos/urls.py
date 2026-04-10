@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import catalogo, lista_productos, crear_producto, editar_producto, desactivar_producto, activar_producto, crear_categoria, crear_marca, lista_marcas, editar_marca, desactivar_marca, activar_marca
+from .views import catalogo, lista_productos, crear_producto, editar_producto, desactivar_producto, activar_producto, crear_categoria, crear_marca, lista_marcas, editar_marca, desactivar_marca, activar_marca, configurar_precios
 
 
 urlpatterns = [
@@ -7,6 +7,7 @@ urlpatterns = [
     path('panel-admin/productos/', lista_productos, name='lista_productos'),
     path('panel-admin/marcas/', lista_marcas, name='lista_marcas'),
     path('panel-admin/productos/crear/', crear_producto, name='crear_producto'),
+    path('panel-admin/productos/configurar-precios/', configurar_precios, name='configurar_precios'),
     path('panel-admin/categorias/crear/', crear_categoria, name='crear_categoria'),
     path('panel-admin/marcas/crear/', crear_marca, name='crear_marca'),
     path('panel-admin/marcas/editar/<int:marca_id>/', editar_marca, name='editar_marca'),

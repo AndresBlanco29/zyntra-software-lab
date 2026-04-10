@@ -734,9 +734,9 @@ Add the website to your home screen and open it like an app
 
 <p class="install-app-description">
 {% if CURRENT_LANGUAGE == 'es' %}
-Tus clientes pueden entrar más rápido, tener el acceso siempre visible y sentir una experiencia mucho más parecida a una app nativa desde Safari en iPhone.
+Tus clientes pueden entrar más rápido, tener el acceso siempre visible y sentir una experiencia mucho más parecida a una app nativa desde Safari o Chrome en iPhone.
 {% else %}
-Your customers can open it faster, keep it visible on their home screen, and get an experience that feels much closer to a native app from Safari on iPhone.
+Your customers can open it faster, keep it visible on their home screen, and get an experience that feels much closer to a native app from Safari or Chrome on iPhone.
 {% endif %}
 </p>
 
@@ -744,8 +744,8 @@ Your customers can open it faster, keep it visible on their home screen, and get
 
 <div class="install-step-card">
 <span class="install-step-number">1</span>
-<h4>{% if CURRENT_LANGUAGE == 'es' %}Abre la web en Safari{% else %}Open the site in Safari{% endif %}</h4>
-<p>{% if CURRENT_LANGUAGE == 'es' %}Ingresa a La Tortilla Grocery desde tu iPhone usando el navegador Safari.{% else %}Open La Tortilla Grocery on your iPhone using the Safari browser.{% endif %}</p>
+<h4>{% if CURRENT_LANGUAGE == 'es' %}Abre la web en Safari o Chrome{% else %}Open the site in Safari or Chrome{% endif %}</h4>
+<p>{% if CURRENT_LANGUAGE == 'es' %}Ingresa a La Tortilla Grocery desde tu iPhone usando Safari o Chrome.{% else %}Open La Tortilla Grocery on your iPhone using Safari or Chrome.{% endif %}</p>
 </div>
 
 <div class="install-step-card">
@@ -769,7 +769,7 @@ class="btn install-app-primary-btn"
 data-bs-toggle="modal"
 data-bs-target="#installTutorialModal"
 data-install-video-trigger
-data-video-src="">
+data-video-src="{% static 'video/video_tutorial.mp4' %}">
 {% if CURRENT_LANGUAGE == 'es' %}Ver tutorial en video{% else %}Watch video tutorial{% endif %}
 </button>
 
@@ -794,7 +794,7 @@ data-video-src="">
 
 <div class="iphone-preview-card">
 <div class="iphone-preview-top">
-<span class="iphone-preview-safari">Safari</span>
+<span class="iphone-preview-safari">Safari / Chrome</span>
 <span class="iphone-preview-chip">{% if CURRENT_LANGUAGE == 'es' %}Modo app{% else %}App mode{% endif %}</span>
 </div>
 
@@ -811,7 +811,7 @@ class="iphone-preview-play"
 data-bs-toggle="modal"
 data-bs-target="#installTutorialModal"
 data-install-video-trigger
-data-video-src="">
+data-video-src="{% static 'video/video_tutorial.mp4' %}">
 <i class="bi bi-play-fill"></i>
 {% if CURRENT_LANGUAGE == 'es' %}Ver cómo se instala{% else %}See how to install it{% endif %}
 </button>
@@ -1100,7 +1100,7 @@ data-video-src="">
           <p>{% if CURRENT_LANGUAGE == 'es' %}Esta guía está pensada para que cualquier cliente pueda guardar La Tortilla Grocery en su pantalla de inicio y usarla como acceso directo diario.{% else %}This guide is designed so any customer can save La Tortilla Grocery to their home screen and use it as a daily shortcut.{% endif %}</p>
 
           <ul class="install-tutorial-checklist">
-            <li>{% if CURRENT_LANGUAGE == 'es' %}Abre la página en Safari{% else %}Open the website in Safari{% endif %}</li>
+            <li>{% if CURRENT_LANGUAGE == 'es' %}Abre la página en Safari o Chrome{% else %}Open the website in Safari or Chrome{% endif %}</li>
             <li>{% if CURRENT_LANGUAGE == 'es' %}Pulsa el botón Compartir{% else %}Tap the Share button{% endif %}</li>
             <li>{% if CURRENT_LANGUAGE == 'es' %}Toca “Agregar a pantalla de inicio”{% else %}Tap “Add to Home Screen”{% endif %}</li>
             <li>{% if CURRENT_LANGUAGE == 'es' %}Disfruta un acceso más rápido desde tu iPhone{% else %}Enjoy faster access from your iPhone{% endif %}</li>
@@ -1180,8 +1180,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const timeoutId = setTimeout(function() {
       container.innerHTML = '<div class="alert alert-warning">{% trans "El formulario está tardando mucho." %} <button onclick="location.reload()">{% trans "Recarga" %}</button></div>';
     }, 8000);
+
+    const params = new URLSearchParams(window.location.search);
+    const nextUrl = params.get('next');
+    const loginFetchUrl = nextUrl
+      ? `{% url "login" %}?next=${encodeURIComponent(nextUrl)}`
+      : '{% url "login" %}';
     
-    fetch('{% url "login" %}', {
+    fetch(loginFetchUrl, {
       headers: {
         'X-Requested-With': 'XMLHttpRequest'
       }
@@ -1659,6 +1665,21 @@ document.addEventListener('DOMContentLoaded', function() {
   tutorialModal.addEventListener('hidden.bs.modal', function() {
     if (videoPlayer) {
       videoPlayer.pause();
+      videoPlayer.currentTime = 0;
+    }
+  });
+
+  tutorialModal.addEventListener('shown.bs.modal', function() {
+    if (!videoPlayer || videoPlayer.classList.contains('d-none')) {
+      return;
+    }
+
+    videoPlayer.currentTime = 0;
+
+    const playPromise = videoPlayer.play();
+
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch(function() {});
     }
   });
 });

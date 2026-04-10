@@ -1,10 +1,11 @@
 {% extends "bases/base_vendedor.html" %}
+{% load i18n %}
 
-{% block title %}Orden #{{ pedido.id }}{% endblock %}
+{% block title %}{% trans "Order" %} #{{ pedido.id }}{% endblock %}
 
 {% block content %}
-<h2 class="mb-3">Orden de Compra #{{ pedido.id }}</h2>
-<p class="text-muted">Cliente: {{ pedido.cliente.nombre_empresa }} | Origen: {{ pedido.get_origen_display }}</p>
+<h2 class="mb-3">{% trans "Purchase Order" %} #{{ pedido.id }}</h2>
+<p class="text-muted">{% trans "Customer" %}: {{ pedido.cliente.nombre_empresa }} | {% trans "Origin" %}: {{ pedido_origen_label }}</p>
 
 {% if messages %}
   {% for message in messages %}
@@ -17,30 +18,50 @@
   <div class="card-body">
     <div class="row g-3 mb-3">
       <div class="col-md-4">
-        <label class="form-label fw-semibold">Estado</label>
+        <label class="form-label fw-semibold">{% trans "Status" %}</label>
         <select name="estado" class="form-select">
-          {% for code,label in pedido.ESTADO_CHOICES %}
+          {% for code,label in state_choices %}
           <option value="{{ code }}" {% if pedido.estado == code %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="col-md-8">
-        <label class="form-label fw-semibold">Nota BackOffice (Add Notes)</label>
+        <label class="form-label fw-semibold">{% trans "BackOffice note" %}</label>
         <input name="nota_backoffice" class="form-control" value="{{ pedido.nota_backoffice }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">{% trans "Customer order authorization" %}</label>
+        <div>
+          {% if pedido.acepta_terminos %}
+            <span class="badge bg-success">{% trans "Accepted" %}</span>
+          {% else %}
+            <span class="badge bg-secondary">{% trans "Not accepted" %}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label fw-semibold">{% trans "Authorization recorded on" %}</label>
+        <div>
+          {% if pedido.acepta_terminos_en %}
+            {{ pedido.acepta_terminos_en|date:"d/m/Y H:i" }}
+          {% else %}
+            <span class="text-muted">{% trans "No record" %}</span>
+          {% endif %}
+        </div>
       </div>
     </div>
 
-    <h5 class="mb-3">Detalle editable de productos</h5>
+    <h5 class="mb-3">{% trans "Editable product details" %}</h5>
     <div class="table-responsive">
       <table class="table align-middle">
         <thead>
           <tr>
-            <th>Producto</th>
-            <th>Presentacion</th>
-            <th>Cantidad</th>
-            <th>Precio</th>
-            <th>Subtotal</th>
-            <th>Eliminar</th>
+            <th>{% trans "Product" %}</th>
+            <th>{% trans "Presentation" %}</th>
+            <th>{% trans "Quantity" %}</th>
+            <th>{% trans "Price" %}</th>
+            <th>{% trans "Subtotal" %}</th>
+            <th>{% trans "Remove" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -59,33 +80,33 @@
     </div>
 
     <hr>
-    <h6 class="mb-3">Agregar nuevo producto a la orden</h6>
+    <h6 class="mb-3">{% trans "Add a new product to this order" %}</h6>
     <div class="row g-2 mb-3">
       <div class="col-md-6">
         <select name="presentacion_nueva" class="form-select">
-          <option value="">Seleccionar presentacion...</option>
+          <option value="">{% trans "Select a presentation..." %}</option>
           {% for p in presentaciones %}
           <option value="{{ p.id }}">{{ p.producto.nombre }} - {{ p.nombre }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="col-md-2">
-        <input type="number" min="1" name="cantidad_nueva" class="form-control" placeholder="Cant.">
+        <input type="number" min="1" name="cantidad_nueva" class="form-control" placeholder="{% trans 'Qty.' %}">
       </div>
       <div class="col-md-2">
-        <input type="number" min="0" step="0.01" name="precio_nuevo" class="form-control" placeholder="Precio">
+        <input type="number" min="0" step="0.01" name="precio_nuevo" class="form-control" placeholder="{% trans 'Price' %}">
       </div>
     </div>
 
     <div class="d-flex justify-content-between align-items-center">
-      <strong>Total: ${{ pedido.total }}</strong>
-      <button type="submit" class="btn btn-primary">Guardar cambios</button>
+      <strong>{% trans "Total" %}: ${{ pedido.total }}</strong>
+      <button type="submit" class="btn btn-primary">{% trans "Save changes" %}</button>
     </div>
   </div>
 </form>
 
 <div class="d-flex gap-2">
-  <a class="btn btn-outline-dark" href="{% url 'backoffice_picking_ticket' pedido.id %}">Generar Picking Ticket</a>
-  <a class="btn btn-success" href="{% url 'backoffice_picking_pdf' pedido.id %}">Exportar PDF</a>
+  <a class="btn btn-outline-dark" href="{% url 'backoffice_picking_ticket' pedido.id %}">{% trans "Generate Picking Ticket" %}</a>
+  <a class="btn btn-success" href="{% url 'backoffice_picking_pdf' pedido.id %}">{% trans "Export PDF" %}</a>
 </div>
 {% endblock %}

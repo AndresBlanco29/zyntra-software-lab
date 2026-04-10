@@ -13,6 +13,7 @@ urlpatterns = [
     path('', include('config.core.urls')),
     path('', include('config.productos.urls')),
     path('cotizaciones/', include('config.cotizaciones.urls')),
+    path('pedidos/', include('config.pedidos.urls')),
     path('carrito/', include('config.carrito.urls')),
     path('vendedores/', include('config.vendedores.urls')),
     path('clientes/', include('config.clientes.urls')),

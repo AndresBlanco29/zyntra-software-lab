@@ -1,19 +1,20 @@
 {% extends "bases/base_vendedor.html" %}
+{% load i18n %}
 
-{% block title %}Picking Ticket #{{ pedido.id }}{% endblock %}
+{% block title %}{% trans "Picking Ticket" %} #{{ pedido.id }}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h2 class="mb-0">Picking Ticket - OC #{{ pedido.id }}</h2>
-  <a href="{% url 'backoffice_picking_pdf' pedido.id %}" class="btn btn-success">Exportar a PDF</a>
+  <h2 class="mb-0">{% trans "Picking Ticket" %} - PO #{{ pedido.id }}</h2>
+  <a href="{% url 'backoffice_picking_pdf' pedido.id %}" class="btn btn-success">{% trans "Export PDF" %}</a>
 </div>
 
 <div class="card shadow-sm mb-3">
   <div class="card-body">
-    <p class="mb-1"><strong>Cliente:</strong> {{ pedido.cliente.nombre_empresa }}</p>
-    <p class="mb-1"><strong>Contacto:</strong> {{ pedido.cliente.usuario.get_full_name }}</p>
-    <p class="mb-1"><strong>Estado:</strong> {{ pedido.get_estado_display }}</p>
-    <p class="mb-0"><strong>Nota cliente:</strong> {{ pedido.nota_cliente|default:'-' }}</p>
+    <p class="mb-1"><strong>{% trans "Customer" %}:</strong> {{ pedido.cliente.nombre_empresa }}</p>
+    <p class="mb-1"><strong>{% trans "Contact" %}:</strong> {{ pedido.cliente.usuario.get_full_name }}</p>
+    <p class="mb-1"><strong>{% trans "Status" %}:</strong> {{ pedido_estado_label }}</p>
+    <p class="mb-0"><strong>{% trans "Customer note" %}:</strong> {{ pedido.nota_cliente|default:'-' }}</p>
   </div>
 </div>
 
@@ -23,10 +24,10 @@
       <table class="table align-middle">
         <thead>
           <tr>
-            <th>Producto</th>
-            <th>Presentacion</th>
-            <th>Cantidad</th>
-            <th>Verificado en bodega</th>
+            <th>{% trans "Product" %}</th>
+            <th>{% trans "Presentation" %}</th>
+            <th>{% trans "Quantity" %}</th>
+            <th>{% trans "Warehouse check" %}</th>
           </tr>
         </thead>
         <tbody>

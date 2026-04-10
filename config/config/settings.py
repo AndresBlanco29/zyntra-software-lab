@@ -347,6 +347,13 @@ ANYMAIL = {
 # Destinatario para notificaciones de cotizaciones y pedidos.
 ORDERS_NOTIFICATION_EMAIL = os.environ.get('ORDERS_NOTIFICATION_EMAIL', 'ltgordersapp@gmail.com')
 
+APP_BASE_URL = os.environ.get('APP_BASE_URL', '').rstrip('/')
+
+TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
+TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
+TWILIO_SMS_FROM = os.environ.get('TWILIO_SMS_FROM', '')
+TWILIO_WHATSAPP_FROM = os.environ.get('TWILIO_WHATSAPP_FROM', '')
+
 # Remitente: debe ser un correo de tu dominio verificado en Resend.
 # Ej: 'Pedidos LTG <pedidos@tudominio.com>'
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Pedidos LTG <pedidos@latortillagroceryapp.com>')

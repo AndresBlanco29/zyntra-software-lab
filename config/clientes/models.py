@@ -60,6 +60,15 @@ class Cliente(models.Model):
         null=False
     )
 
+    declaracion_fiscal_aceptada = models.BooleanField(
+        default=False
+    )
+
+    declaracion_fiscal_aceptada_en = models.DateTimeField(
+        blank=True,
+        null=True
+    )
+
     aprobado = models.BooleanField(
         default=False
     )

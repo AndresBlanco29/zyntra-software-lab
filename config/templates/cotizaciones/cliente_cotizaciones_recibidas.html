@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% trans "Cotizaciones recibidas" %}</title>
+<title>{% trans "Received Quotes" %}</title>
 
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
 <link rel="stylesheet" href="{% static 'css/ver_cotizacion.css' %}">
@@ -27,7 +27,7 @@
       <a href="{% url 'catalogo' %}" class="btn btn-outline-light">{% trans "Catálogo" %}</a>
       <a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">{% trans "Mi Cotización" %}</a>
       <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-light">
-        {% trans "Cotizaciones Recibidas" %}
+        {% trans "Quotes Received" %}
         {% if pendientes_cotizaciones %}
         <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
         {% endif %}
@@ -49,7 +49,7 @@
       <a href="{% url 'catalogo' %}" class="list-group-item">{% trans "Catálogo" %}</a>
       <a href="{% url 'ver_cotizacion' %}" class="list-group-item">{% trans "Mi Cotización" %}</a>
       <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="list-group-item active">
-        {% trans "Cotizaciones Recibidas" %}
+        {% trans "Quotes Received" %}
         {% if pendientes_cotizaciones %}
         <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
         {% endif %}
@@ -63,73 +63,68 @@
     <div class="container-fluid">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <div>
-          <h3 class="fw-bold mb-1">{% trans "Cotizaciones Recibidas" %}</h3>
-          <p class="text-muted mb-0">{% trans "Revisa las cotizaciones que te envía BackOffice y confirma cuando estés listo." %}</p>
+          <h3 class="fw-bold mb-1">{% trans "Received Quotes" %}</h3>
+          <p class="text-muted mb-0">{% trans "Review the quotes sent by BackOffice and confirm when you're ready." %}</p>
         </div>
-        <span class="badge text-bg-warning px-3 py-2">{% trans "Pendientes" %}: {{ pendientes_count }}</span>
+        <span class="badge text-bg-warning px-3 py-2">{% trans "Pending" %}: {{ pendientes_count }}</span>
       </div>
-
-      {% if messages %}
-        {% for message in messages %}
-          <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
-
+      {% if cotizaciones %}
       <div class="card custom-card">
         <div class="card-body">
-          {% if cotizaciones %}
-            <div class="table-responsive">
-              <table class="table align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th>{% trans "Cotización" %}</th>
-                    <th>{% trans "Estado" %}</th>
-                    <th>{% trans "Total" %}</th>
-                    <th>{% trans "Productos" %}</th>
-                    <th class="text-end">{% trans "Acción" %}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for cotizacion in cotizaciones %}
-                    <tr>
-                      <td>
-                        <div class="fw-semibold">#{{ cotizacion.id }}</div>
-                        <small class="text-muted">{{ cotizacion.fecha|date:"d/m/Y H:i" }}</small>
-                      </td>
-                      <td>
-                        {% if cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}
-                          <span class="badge text-bg-warning">{% trans "Pendiente de confirmación" %}</span>
-                        {% elif cotizacion.estado == 'CONFIRMADA_CLIENTE' %}
-                          <span class="badge text-bg-success">{% trans "Confirmada" %}</span>
-                        {% elif cotizacion.estado == 'CANCELADA_CLIENTE' %}
-                          <span class="badge text-bg-secondary">{% trans "Cancelada" %}</span>
-                        {% else %}
-                          <span class="badge text-bg-light text-dark">{{ cotizacion.get_estado_display }}</span>
-                        {% endif %}
-                      </td>
-                      <td>${{ cotizacion.total }}</td>
-                      <td>{{ cotizacion.items.count }}</td>
-                      <td class="text-end">
-                        <a href="{% url 'cliente_cotizacion_recibida_detalle' cotizacion.token_cliente %}" class="btn btn-sm {% if cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}btn-yellow{% elif cotizacion.estado == 'CONFIRMADA_CLIENTE' %}btn-outline-success{% else %}btn-outline-primary{% endif %}">
-                          {% if cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}
-                            {% trans "Revisar y confirmar" %}
-                          {% elif cotizacion.estado == 'CONFIRMADA_CLIENTE' %}
-                            {% trans "Ver resumen" %}
-                          {% else %}
-                            {% trans "Ver detalle" %}
-                          {% endif %}
-                        </a>
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          {% else %}
-            <div class="alert alert-info mb-0">
-              {% trans "Todavía no tienes cotizaciones enviadas por BackOffice." %}
-            </div>
-          {% endif %}
+          <div class="table-responsive">
+            <table class="table align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>{% trans "Quote" %}</th>
+                  <th>{% trans "Status" %}</th>
+                  <th>{% trans "Total" %}</th>
+                  <th>{% trans "Products" %}</th>
+                  <th class="text-end">{% trans "Action" %}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for cotizacion in cotizaciones %}
+                <tr>
+                  <td>
+                    <div class="fw-semibold">#{{ cotizacion.id }}</div>
+                    <small class="text-muted">{{ cotizacion.fecha|date:"d/m/Y H:i" }}</small>
+                  </td>
+                  <td>
+                    {% if cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}
+                    <span class="badge text-bg-warning">{% trans "Pending confirmation" %}</span>
+                    {% elif cotizacion.estado == 'CONFIRMADA_CLIENTE' %}
+                    <span class="badge text-bg-success">{% trans "Confirmed" %}</span>
+                    {% elif cotizacion.estado == 'CANCELADA_CLIENTE' %}
+                    <span class="badge text-bg-secondary">{% trans "Cancelled" %}</span>
+                    {% else %}
+                    <span class="badge text-bg-light text-dark">{{ cotizacion.get_estado_display }}</span>
+                    {% endif %}
+                  </td>
+                  <td>${{ cotizacion.total }}</td>
+                  <td>{{ cotizacion.items.count }}</td>
+                  <td class="text-end">
+                    <a href="{% url 'cliente_cotizacion_recibida_detalle' cotizacion.token_cliente %}" class="btn btn-sm {% if cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}btn-yellow{% elif cotizacion.estado == 'CONFIRMADA_CLIENTE' %}btn-outline-success{% else %}btn-outline-primary{% endif %}">
+                      {% if cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}
+                      {% trans "Review and confirm" %}
+                      {% elif cotizacion.estado == 'CONFIRMADA_CLIENTE' %}
+                      {% trans "View summary" %}
+                      {% else %}
+                      {% trans "View details" %}
+                      {% endif %}
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="alert alert-info mb-0">
+        {% trans "You do not have any quotes from BackOffice yet." %}
+      </div>
+      {% endif %}
         </div>
       </div>
     </div>

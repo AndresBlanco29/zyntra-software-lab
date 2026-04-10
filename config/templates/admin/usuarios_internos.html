@@ -1,13 +1,14 @@
 {% extends "bases/base_vendedor.html" %}
+{% load i18n %}
 
 {% block title %}
-Usuarios Internos
+{% trans "Internal Users" %}
 {% endblock %}
 
 {% block content %}
 
 <h2 class="mb-4 admin-toolbar">
-<span>Usuarios Internos</span>
+<span>{% trans "Internal Users" %}</span>
 <div class="admin-toolbar-filters admin-toolbar-filters-wide">
   <div class="row g-2">
     <div class="col-12 col-md-6">
@@ -15,13 +16,13 @@ Usuarios Internos
         type="text"
         id="buscadorUsuarios"
         class="form-control"
-        placeholder="Buscar por nombre o email..."
+        placeholder="{% trans 'Search by name or email...' %}"
       >
     </div>
     <div class="col-12 col-md-6">
       <select id="filtroRol" class="form-select">
-        <option value="">Todos los roles</option>
-        <option value="vendedor">Vendedor</option>
+        <option value="">{% trans "All roles" %}</option>
+        <option value="vendedor">{% trans "Vendor" %}</option>
         <option value="backoffice">BackOffice</option>
       </select>
     </div>
@@ -30,11 +31,8 @@ Usuarios Internos
 </h2>
 
 <div class="d-flex gap-2 mb-3">
-  <a href="{% url 'crear_vendedor' %}" class="btn btn-primary">
-    Crear Vendedor
-  </a>
-  <a href="{% url 'crear_backoffice' %}" class="btn btn-outline-primary">
-    Crear BackOffice
+  <a href="{% url 'crear_usuario_interno' %}" class="btn btn-primary">
+    {% trans "Create Internal User" %}
   </a>
 </div>
 
@@ -42,12 +40,13 @@ Usuarios Internos
 <table class="table table-striped">
   <thead>
     <tr>
-      <th>Nombre</th>
-      <th>Email</th>
-      <th>Teléfono</th>
-      <th>Rol</th>
-      <th>Estado</th>
-      <th>Acciones</th>
+      <th>{% trans "Name" %}</th>
+      <th>{% trans "Email" %}</th>
+      <th>{% trans "Phone" %}</th>
+      <th>{% trans "Role" %}</th>
+      <th>{% trans "Permissions" %}</th>
+      <th>{% trans "Status" %}</th>
+      <th>{% trans "Actions" %}</th>
     </tr>
   </thead>
   <tbody>
@@ -61,43 +60,50 @@ Usuarios Internos
       <td>{{ usuario.telefono }}</td>
       <td>
         {% if usuario.role == 'vendedor' %}
-          <span class="badge bg-primary">Vendedor</span>
+          <span class="badge bg-primary">{% trans "Vendor" %}</span>
         {% else %}
           <span class="badge bg-warning text-dark">BackOffice</span>
         {% endif %}
       </td>
       <td>
+        {% for label in usuario.permission_summary_labels %}
+          <span class="badge rounded-pill bg-light text-dark border me-1 mb-1">{{ label }}</span>
+        {% empty %}
+          <span class="text-muted">{% trans "No enabled modules" %}</span>
+        {% endfor %}
+      </td>
+      <td>
         {% if usuario.is_active %}
-          <span class="badge bg-success">Activo</span>
+          <span class="badge bg-success">{% trans "Active" %}</span>
         {% else %}
-          <span class="badge bg-secondary">Inactivo</span>
+          <span class="badge bg-secondary">{% trans "Inactive" %}</span>
         {% endif %}
       </td>
       <td>
         {% if usuario.role == 'vendedor' %}
-          <a href="{% url 'editar_vendedor' usuario.id %}" class="btn btn-sm btn-warning">Editar</a>
+          <a href="{% url 'editar_usuario_interno' usuario.id %}" class="btn btn-sm btn-warning">{% trans "Edit" %}</a>
           {% if usuario.is_active %}
-            <a href="{% url 'desactivar_vendedor' usuario.id %}" class="btn btn-sm btn-danger">Desactivar</a>
+            <a href="{% url 'desactivar_usuario_interno' usuario.id %}" class="btn btn-sm btn-danger">{% trans "Deactivate" %}</a>
           {% else %}
-            <a href="{% url 'activar_vendedor' usuario.id %}" class="btn btn-sm btn-success">Activar</a>
+            <a href="{% url 'activar_usuario_interno' usuario.id %}" class="btn btn-sm btn-success">{% trans "Activate" %}</a>
           {% endif %}
         {% else %}
-          <a href="{% url 'editar_backoffice' usuario.id %}" class="btn btn-sm btn-warning">Editar</a>
+          <a href="{% url 'editar_usuario_interno' usuario.id %}" class="btn btn-sm btn-warning">{% trans "Edit" %}</a>
           {% if usuario.is_active %}
-            <a href="{% url 'desactivar_backoffice' usuario.id %}" class="btn btn-sm btn-danger">Desactivar</a>
+            <a href="{% url 'desactivar_usuario_interno' usuario.id %}" class="btn btn-sm btn-danger">{% trans "Deactivate" %}</a>
           {% else %}
-            <a href="{% url 'activar_backoffice' usuario.id %}" class="btn btn-sm btn-success">Activar</a>
+            <a href="{% url 'activar_usuario_interno' usuario.id %}" class="btn btn-sm btn-success">{% trans "Activate" %}</a>
           {% endif %}
         {% endif %}
       </td>
     </tr>
     {% empty %}
     <tr id="sinUsuariosRow">
-      <td colspan="6" class="text-center text-muted py-4">No hay usuarios internos registrados.</td>
+      <td colspan="7" class="text-center text-muted py-4">{% trans "No internal users have been registered yet." %}</td>
     </tr>
     {% endfor %}
     <tr id="sinResultadosRow" style="display:none;">
-      <td colspan="6" class="text-center text-muted py-4">No hay resultados para el filtro aplicado.</td>
+      <td colspan="7" class="text-center text-muted py-4">{% trans "No results match the selected filters." %}</td>
     </tr>
   </tbody>
 </table>

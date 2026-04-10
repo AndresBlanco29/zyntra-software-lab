@@ -2,13 +2,13 @@
 {% load i18n %}
 
 {% block title %}
-Productos
+{% trans "Products" %}
 {% endblock %}
 
 {% block content %}
 
 <h2 class="mb-4 admin-toolbar">
-<span>{% trans "Productos" %}</span>
+<span>{% trans "Products" %}</span>
 <div class="admin-toolbar-filters admin-toolbar-filters-wide">
   <div class="row g-2">
     <div class="col-12 col-md-4">
@@ -57,6 +57,10 @@ Productos
 {% trans "Crear Producto" %}
 </a>
 
+<a href="{% url 'configurar_precios' %}" class="btn btn-outline-dark mb-3 ms-2">
+{% trans "Configure percentages" %}
+</a>
+
 <a href="{% url 'crear_categoria' %}" class="btn btn-outline-primary mb-3 ms-2">
 {% trans "Crear Categoria" %}
 </a>
@@ -68,6 +72,10 @@ Productos
 <a href="{% url 'lista_marcas' %}" class="btn btn-outline-secondary mb-3 ms-2">
 {% trans "Gestionar Marcas" %}
 </a>
+
+<div class="alert alert-light border small">
+{% trans "Active margins" %}: P1 {{ price_margins.0 }}%, P2 {{ price_margins.1 }}%, P3 {{ price_margins.2 }}%, P4 {{ price_margins.3 }}%, P5 {{ price_margins.4 }}%
+</div>
 
 <!-- Tabla de Productos -->
 
@@ -82,7 +90,7 @@ Productos
 <th>{% trans "Codigo de Barras" %}</th>
 <th>{% trans "Marca" %}</th>
 <th>{% trans "Categoria" %}</th>
-<th>{% trans "Estado" %}</th>
+<th>{% trans "State" %}</th>
 <th>{% trans "Acciones" %}</th>
 </tr>
 </thead>

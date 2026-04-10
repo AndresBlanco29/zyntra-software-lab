@@ -55,6 +55,24 @@
 {{ cliente.pais }}
 </div>
 
+<div class="col-md-6 mb-3">
+<strong>{% trans "Tax declaration accepted:" %}</strong><br>
+{% if cliente.declaracion_fiscal_aceptada %}
+	<span class="badge bg-success">{% trans "Yes" %}</span>
+{% else %}
+	<span class="badge bg-secondary">{% trans "No" %}</span>
+{% endif %}
+</div>
+
+<div class="col-md-6 mb-3">
+<strong>{% trans "Tax declaration accepted on:" %}</strong><br>
+{% if cliente.declaracion_fiscal_aceptada_en %}
+	{{ cliente.declaracion_fiscal_aceptada_en|date:"d/m/Y H:i" }}
+{% else %}
+	<span class="text-muted">{% trans "No record" %}</span>
+{% endif %}
+</div>
+
 </div>
 
 <hr>

@@ -1,5 +1,5 @@
 from django.db import OperationalError, ProgrammingError, connection, models
-from django.utils.translation import get_language
+from django.utils.translation import get_language, gettext
 
 
 class Testimonio(models.Model):
@@ -152,8 +152,10 @@ class HomeContenido(models.Model):
         ordering = ["-actualizado"]
 
     def _translated(self, es_value, en_value):
-        if get_language().startswith("en") and en_value:
-            return en_value
+        if get_language().startswith("en"):
+            if en_value:
+                return en_value
+            return gettext(es_value)
         return es_value
 
     @property

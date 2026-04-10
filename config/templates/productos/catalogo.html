@@ -46,6 +46,14 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
 
             <div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">
               {% if can_quote %}
+              {% if can_view_received_quotes %}
+              <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-light">
+                {% trans "Quotes Received" %}
+                {% if pendientes_cotizaciones %}
+                <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
+                {% endif %}
+              </a>
+              {% endif %}
                 <a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">
                     {% trans "Cotización" %} (<span id="contadorCarrito">{{ carrito|length }}</span>)
                 </a>
@@ -87,6 +95,14 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                     <a href="{% url 'ver_cotizacion' %}" class="list-group-item">
                         {% trans "Mi Cotización" %}
                     </a>
+                    {% if can_view_received_quotes %}
+                    <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="list-group-item">
+                      {% trans "Quotes Received" %}
+                      {% if pendientes_cotizaciones %}
+                      <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
+                      {% endif %}
+                    </a>
+                    {% endif %}
                     {% else %}
                     <button type="button" class="list-group-item list-group-item-action text-start" onclick="new bootstrap.Modal(document.getElementById('loginModal')).show()">
                         <i class="bi bi-lock me-2"></i>{% trans "Inicia sesión" %}

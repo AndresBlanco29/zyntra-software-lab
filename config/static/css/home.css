@@ -4111,7 +4111,7 @@ background:rgba(255,255,255,.25);
 }
 
 .install-tutorial-dialog {
-    max-width: 1060px;
+    max-width: 960px;
 }
 
 .install-tutorial-modal-content {
@@ -4123,8 +4123,8 @@ background:rgba(255,255,255,.25);
 
 .install-tutorial-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1.3fr) minmax(320px, 0.7fr);
-    min-height: 560px;
+    grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+    min-height: 500px;
 }
 
 .install-tutorial-video-panel {
@@ -4133,9 +4133,10 @@ background:rgba(255,255,255,.25);
 }
 
 .install-video-frame {
-    width: 100%;
+    width: min(100%, 560px);
     height: 100%;
-    min-height: 420px;
+    min-height: 360px;
+    margin: 0 auto;
     border-radius: 24px;
     background:
         radial-gradient(circle at top right, rgba(255, 212, 0, 0.18), transparent 28%),

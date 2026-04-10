@@ -12,11 +12,17 @@ from django.utils import timezone
 import pytz
 from django.contrib import messages
 import logging
+from django.contrib.auth.decorators import login_required
+
+from config.pedidos.services import crear_pedido_desde_items, notificar_backoffice_pedido
+from config.usuarios.permissions import internal_permission_required
 
 
 logger = logging.getLogger(__name__)
 
 
+@login_required
+@internal_permission_required('vendor.customers.manage')
 def crear_cliente(request):
 
     if request.method == "POST":
@@ -39,6 +45,10 @@ def crear_cliente(request):
             messages.error(request, "Debes adjuntar el certificado tax para crear el cliente.")
             return render(request, "vendedores/crear_cliente.html")
 
+        if not request.POST.get("confirmacion"):
+            messages.error(request, "Debes aceptar la declaración sobre la veracidad de la información fiscal.")
+            return render(request, "vendedores/crear_cliente.html")
+
         # crear usuario
         username = f"user_{uuid.uuid4().hex[:8]}"
 
@@ -58,13 +68,17 @@ def crear_cliente(request):
             ciudad=ciudad,
             estado=estado,
             sales_tax_number=sales_tax,
-            certificado_tax=certificado
+            certificado_tax=certificado,
+            declaracion_fiscal_aceptada=True,
+            declaracion_fiscal_aceptada_en=timezone.now(),
         )
 
         return redirect("vendedores_clientes")
 
     return render(request, "vendedores/crear_cliente.html")
 
+@login_required
+@internal_permission_required('vendor.customers.view')
 def clientes(request):
 
     clientes = Cliente.objects.select_related('usuario').all()
@@ -75,6 +89,8 @@ def clientes(request):
 
     return render(request, "vendedores/clientes.html", context)
 
+@login_required
+@internal_permission_required('vendor.orders.view')
 def tomar_pedido(request):
 
     clientes = Cliente.objects.filter(aprobado=True).select_related("usuario")
@@ -85,6 +101,8 @@ def tomar_pedido(request):
 
     return render(request, "vendedores/tomar_pedido.html", context)
 
+@login_required
+@internal_permission_required('vendor.orders.view')
 def catalogo_vendedor(request, cliente_id):
 
     request.session["cliente_id"] = cliente_id
@@ -116,6 +134,8 @@ def catalogo_vendedor(request, cliente_id):
 
     return render(request, "vendedores/tomar_pedido_catalogo.html", context)
 
+@login_required
+@internal_permission_required('vendor.orders.manage')
 def agregar_producto_pedido(request):
 
     if request.method == "POST":
@@ -168,6 +188,8 @@ def agregar_producto_pedido(request):
             "total": total
         })
 
+@login_required
+@internal_permission_required('vendor.orders.view')
 def ver_pedido(request):
 
     carrito = request.session.get("pedido", {})
@@ -217,6 +239,8 @@ def ver_pedido(request):
     )
 
 @require_POST
+@login_required
+@internal_permission_required('vendor.orders.manage')
 def eliminar_producto_pedido(request):
 
     producto_id = request.POST.get("producto_id")
@@ -238,6 +262,8 @@ def eliminar_producto_pedido(request):
 
 @require_POST
 @require_POST
+@login_required
+@internal_permission_required('vendor.orders.manage')
 def actualizar_cantidad_pedido(request):
 
     producto_id = request.POST.get("producto_id")
@@ -302,6 +328,8 @@ def actualizar_cantidad_pedido(request):
         "total": total
     })
 
+@login_required
+@internal_permission_required('vendor.orders.manage')
 def enviar_pedido(request):
 
     carrito = request.session.get("pedido", {})
@@ -314,61 +342,50 @@ def enviar_pedido(request):
             "error": "Debe indicar cómo se tomó la orden"
     })
 
+    if not carrito or not cliente_id:
+        return JsonResponse({
+            "success": False,
+            "error": "No hay productos ni cliente seleccionados para generar el pedido."
+        }, status=400)
+
     cliente = Cliente.objects.get(id=cliente_id)
 
-    items = []
-    total = 0
+    items_payload = []
 
     for item in carrito.values():
 
         presentacion = Presentacion.objects.get(id=item["presentacion_id"])
-
-        subtotal = item["precio"] * item["cantidad"]
-
-        total += subtotal
-
-        items.append({
+        items_payload.append({
             "presentacion": presentacion,
             "cantidad": item["cantidad"],
             "precio": item["precio"],
-            "subtotal": subtotal
         })
 
-    context = {
-        "cliente": cliente,
-        "items": items,
-        "total": total,
-        "vendedor": request.user.get_full_name(),
-        "fecha": timezone.now().astimezone(pytz.timezone('America/New_York')),
-        "tipo_orden": tipo_orden
-    }
-
-    # Renderizar HTML
-    html_content = render_to_string(
-        "emails/pedido_vendedor.html",
-        context
+    pedido = crear_pedido_desde_items(
+        cliente=cliente,
+        items_payload=items_payload,
+        origen='VENDEDOR',
+        vendedor=request.user,
+        nota_cliente=(request.POST.get('nota') or '').strip(),
+        acepta_terminos=False,
+        canal_toma=tipo_orden,
     )
 
-    email = EmailMultiAlternatives(
-        subject=f"Nuevo Pedido - {cliente.nombre_empresa}",
-        body="Nuevo pedido generado en el sistema.",
-        from_email=settings.DEFAULT_FROM_EMAIL or settings.EMAIL_HOST_USER,
-        to=[settings.ORDERS_NOTIFICATION_EMAIL]
-    )
+    warning = None
 
     try:
-        email.attach_alternative(html_content, "text/html")
-        email.send(fail_silently=False)
+        notificar_backoffice_pedido(pedido)
     except Exception as exc:
-        logger.exception("Error enviando correo de pedido para cliente %s: %s", cliente.id, exc)
-        return JsonResponse({
-            "success": False,
-            "error": "El pedido se generó, pero no se pudo enviar el correo de notificación."
-        }, status=500)
+        logger.exception("Error enviando notificacion del pedido %s: %s", pedido.id, exc)
+        warning = "El pedido se generó, pero no se pudo enviar el correo de notificación."
 
     request.session["pedido"] = {}
+    request.session.pop("cliente_id", None)
 
-    return JsonResponse({"success": True})
+    response = {"success": True, "pedido_id": pedido.id}
+    if warning:
+        response["warning"] = warning
+    return JsonResponse(response)
 
 
 def editar_cliente(request):

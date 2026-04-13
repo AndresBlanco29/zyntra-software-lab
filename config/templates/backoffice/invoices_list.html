@@ -1,0 +1,63 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Invoices" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="mb-1">{% trans "Invoices" %}</h2>
+    <p class="text-muted mb-0">{% trans "Generated from verified picking quantities." %}</p>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>{% trans "Invoice" %}</th>
+            <th>{% trans "Order" %}</th>
+            <th>{% trans "Customer" %}</th>
+            <th>{% trans "Delivery method" %}</th>
+            <th>{% trans "Driver" %}</th>
+            <th>{% trans "Dispatch" %}</th>
+            <th>{% trans "Balance" %}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for invoice in invoices %}
+          <tr>
+            <td>
+              <strong>{{ invoice.numero }}</strong>
+              <div class="small text-muted">{{ invoice.creada_en|date:"d/m/Y H:i" }}</div>
+            </td>
+            <td>#{{ invoice.pedido_id }}</td>
+            <td>{{ invoice.cliente.nombre_empresa }}</td>
+            <td>{{ invoice.get_metodo_entrega_display }}</td>
+            <td>{% if invoice.driver %}{% firstof invoice.driver.get_full_name invoice.driver.username %}{% else %}-{% endif %}</td>
+            <td>
+              {% if invoice.despachador_notificado %}
+                <span class="badge bg-success">{% trans "Ready" %}</span>
+              {% else %}
+                <span class="badge bg-secondary">{% trans "Pending" %}</span>
+              {% endif %}
+            </td>
+            <td>${{ invoice.saldo_cliente }}</td>
+            <td class="text-end">
+              <a href="{% url 'backoffice_invoice_detail' invoice.id %}" class="btn btn-sm btn-outline-primary">{% trans "Open" %}</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-center text-muted py-4">{% trans "No invoices have been generated yet." %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

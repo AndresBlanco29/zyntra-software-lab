@@ -2,6 +2,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from config.usuarios.models import Usuario
+from config.usuarios.permissions import get_redirect_url_for_user
 
 
 class InternalPermissionTests(TestCase):
@@ -58,3 +59,25 @@ class InternalPermissionTests(TestCase):
 
 		self.assertEqual(response.status_code, 302)
 		self.assertEqual(response.url, reverse('vendedores_clientes'))
+
+	def test_selector_role_gets_default_permissions_and_redirect(self):
+		user = Usuario.objects.create_user(
+			username='selector-default',
+			password='secret123',
+			role='seleccionador',
+		)
+
+		self.assertTrue(user.has_internal_permission('selector.picking.view'))
+		self.assertTrue(user.has_internal_permission('selector.picking.manage'))
+		self.assertEqual(get_redirect_url_for_user(user), reverse('selector_picking_list'))
+
+	def test_driver_role_gets_default_permissions_and_redirect(self):
+		user = Usuario.objects.create_user(
+			username='driver-default',
+			password='secret123',
+			role='driver',
+		)
+
+		self.assertTrue(user.has_internal_permission('driver.delivery.view'))
+		self.assertTrue(user.has_internal_permission('driver.delivery.manage'))
+		self.assertEqual(get_redirect_url_for_user(user), reverse('driver_delivery_list'))

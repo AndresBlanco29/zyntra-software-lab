@@ -13,6 +13,7 @@
         <tr>
           <th>ID</th>
           <th>{% trans "Customer" %}</th>
+          <th>{% trans "Selector" %}</th>
           <th>{% trans "Origin" %}</th>
           <th>{% trans "Status" %}</th>
           <th>{% trans "Total" %}</th>
@@ -25,6 +26,7 @@
         <tr>
           <td>#{{ pedido.id }}</td>
           <td>{{ pedido.cliente.nombre_empresa }}</td>
+          <td>{% if pedido.seleccionador %}{% firstof pedido.seleccionador.get_full_name pedido.seleccionador.username %}{% else %}<span class="text-muted">-</span>{% endif %}</td>
           <td>{{ pedido.origen_label }}</td>
           <td><span class="badge bg-info text-dark">{{ pedido.estado_label }}</span></td>
           <td>${{ pedido.total }}</td>
@@ -35,7 +37,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="7" class="text-center text-muted py-4">{% trans "No purchase orders have been registered yet." %}</td>
+          <td colspan="8" class="text-center text-muted py-4">{% trans "No purchase orders have been registered yet." %}</td>
         </tr>
         {% endfor %}
       </tbody>

@@ -2,12 +2,17 @@ from django.db import migrations
 
 
 def ensure_canal_toma(apps, schema_editor):
+    table_name = 'pedidos_pedidocompra'
     with schema_editor.connection.cursor() as cursor:
-        cursor.execute('SHOW COLUMNS FROM pedidos_pedidocompra LIKE %s', ['canal_toma'])
-        exists = cursor.fetchone()
+        existing_tables = set(schema_editor.connection.introspection.table_names(cursor))
+        if table_name not in existing_tables:
+            return
+
+        description = schema_editor.connection.introspection.get_table_description(cursor, table_name)
+        exists = any(column.name == 'canal_toma' for column in description)
         if not exists:
             cursor.execute(
-                "ALTER TABLE pedidos_pedidocompra ADD COLUMN canal_toma varchar(20) NOT NULL DEFAULT ''"
+                f"ALTER TABLE {schema_editor.quote_name(table_name)} ADD COLUMN canal_toma varchar(20) NOT NULL DEFAULT ''"
             )
 
 

@@ -51,3 +51,13 @@ def crear_notificacion_backoffice(titulo, mensaje, tipo, url='', usuario=None):
 		url=url,
 		usuario=usuario or _get_fallback_notification_user(),
 	)
+
+
+def crear_notificacion_usuario(*, usuario, titulo, mensaje, tipo, url=''):
+	return Notificacion.objects.create(
+		tipo=tipo,
+		titulo=titulo,
+		mensaje=mensaje,
+		url=url,
+		usuario=usuario,
+	)

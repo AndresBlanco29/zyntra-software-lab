@@ -24,6 +24,8 @@
         <option value="">{% trans "All roles" %}</option>
         <option value="vendedor">{% trans "Vendor" %}</option>
         <option value="backoffice">BackOffice</option>
+        <option value="seleccionador">{% trans "Selector" %}</option>
+        <option value="driver">{% trans "Driver" %}</option>
       </select>
     </div>
   </div>
@@ -61,6 +63,10 @@
       <td>
         {% if usuario.role == 'vendedor' %}
           <span class="badge bg-primary">{% trans "Vendor" %}</span>
+        {% elif usuario.role == 'seleccionador' %}
+          <span class="badge bg-secondary">{% trans "Selector" %}</span>
+        {% elif usuario.role == 'driver' %}
+          <span class="badge bg-success">{% trans "Driver" %}</span>
         {% else %}
           <span class="badge bg-warning text-dark">BackOffice</span>
         {% endif %}

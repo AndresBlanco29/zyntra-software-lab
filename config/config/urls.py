@@ -17,6 +17,7 @@ urlpatterns = [
     path('carrito/', include('config.carrito.urls')),
     path('vendedores/', include('config.vendedores.urls')),
     path('clientes/', include('config.clientes.urls')),
+    path('facturacion/', include('config.facturacion.urls')),
     path('', include('config.usuarios.urls')),
     path('i18n/', include('django.conf.urls.i18n')),
 ]

@@ -7,6 +7,105 @@
 <h2 class="mb-3">{% trans "Purchase Order" %} #{{ pedido.id }}</h2>
 <p class="text-muted">{% trans "Customer" %}: {{ pedido.cliente.nombre_empresa }} | {% trans "Origin" %}: {{ pedido_origen_label }}</p>
 
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="row g-3 align-items-end">
+      <div class="col-lg-5">
+        <label class="form-label fw-semibold">{% trans "Assigned selector" %}</label>
+        <div>
+          {% if pedido.seleccionador %}
+            <strong>{% firstof pedido.seleccionador.get_full_name pedido.seleccionador.username %}</strong>
+          {% else %}
+            <span class="text-muted">{% trans "Not assigned" %}</span>
+          {% endif %}
+        </div>
+        {% if pedido.picking_asignado_en %}
+          <small class="text-muted d-block mt-1">{% trans "Assigned on" %}: {{ pedido.picking_asignado_en|date:"d/m/Y H:i" }}</small>
+        {% endif %}
+      </div>
+      <div class="col-lg-7">
+        <form method="post" action="{% url 'backoffice_asignar_picking' pedido.id %}" class="row g-2">
+          {% csrf_token %}
+          <div class="col-md-8">
+            <label class="form-label fw-semibold">{% trans "Send picking ticket to selector" %}</label>
+            <select name="seleccionador_id" class="form-select" required>
+              <option value="">{% trans "Select a selector..." %}</option>
+              {% for selector in selectores %}
+                <option value="{{ selector.id }}" {% if pedido.seleccionador_id == selector.id %}selected{% endif %}>{% firstof selector.get_full_name selector.username %}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button type="submit" class="btn btn-outline-primary w-100">{% trans "Send picking" %}</button>
+          </div>
+        </form>
+      </div>
+      <div class="col-12">
+        <div class="border rounded-3 p-3 bg-light-subtle">
+          <div class="d-flex flex-wrap gap-3 align-items-center">
+            <span><strong>{% trans "Selector note" %}:</strong> {{ pedido.nota_seleccionador|default:'-' }}</span>
+            <span><strong>{% trans "Resolved" %}:</strong> {% if pedido.nota_seleccionador %}{% if pedido.nota_seleccionador_resuelta %}{% trans "Yes" %}{% else %}{% trans "No" %}{% endif %}{% else %}-{% endif %}</span>
+            <span><strong>{% trans "Order lock" %}:</strong> {% if pedido.picking_bloqueado %}<span class="badge bg-danger">{% trans "Blocked" %}</span>{% else %}<span class="badge bg-success">{% trans "Unlocked" %}</span>{% endif %}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="row g-3 align-items-end">
+      <div class="col-lg-4">
+        <label class="form-label fw-semibold">{% trans "Invoice status" %}</label>
+        <div>
+          {% if invoice %}
+            <span class="badge bg-success">{% trans "Invoice generated" %}</span>
+            <div class="mt-2 small text-muted">{{ invoice.numero }} | {% trans "Balance" %}: ${{ invoice.saldo_cliente }}</div>
+          {% else %}
+            <span class="text-muted">{% trans "No invoice generated yet" %}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-lg-8">
+        {% if invoice %}
+          <div class="d-flex flex-wrap gap-2 justify-content-lg-end">
+            <a href="{% url 'backoffice_invoice_detail' invoice.id %}" class="btn btn-outline-primary">{% trans "View invoice" %}</a>
+            <a href="{% url 'backoffice_invoice_pdf' invoice.id %}" class="btn btn-success">{% trans "Export invoice PDF" %}</a>
+          </div>
+        {% elif pedido.estado == 'VERIFICADO_AJUSTADO' and not pedido.picking_bloqueado %}
+          <form method="post" action="{% url 'backoffice_generate_invoice' pedido.id %}" class="row g-2">
+            {% csrf_token %}
+            <div class="col-md-5">
+              <label class="form-label fw-semibold">{% trans "Delivery method" %}</label>
+              <select name="metodo_entrega" class="form-select" required>
+                <option value="">{% trans "Select a delivery method..." %}</option>
+                <option value="RUTA_DRIVER">{% trans "Route with driver" %}</option>
+                <option value="LTG">LTG</option>
+                <option value="CUSTOMER_PICK_UP">{% trans "Customer Pick Up" %}</option>
+              </select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label fw-semibold">{% trans "Driver" %}</label>
+              <select name="driver_id" class="form-select">
+                <option value="">{% trans "No driver required" %}</option>
+                {% for driver in drivers %}
+                  <option value="{{ driver.id }}">{% firstof driver.get_full_name driver.username %}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button type="submit" class="btn btn-primary w-100">{% trans "Generate invoice" %}</button>
+            </div>
+          </form>
+        {% else %}
+          <div class="alert alert-warning mb-0">{% trans "The order must be verified and unlocked before generating the invoice." %}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
 {% if messages %}
   {% for message in messages %}
   <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
@@ -29,6 +128,12 @@
         <label class="form-label fw-semibold">{% trans "BackOffice note" %}</label>
         <input name="nota_backoffice" class="form-control" value="{{ pedido.nota_backoffice }}">
       </div>
+      {% if pedido.picking_verificado_en %}
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">{% trans "Verified on" %}</label>
+        <div>{{ pedido.picking_verificado_en|date:"d/m/Y H:i" }}</div>
+      </div>
+      {% endif %}
       <div class="col-md-4">
         <label class="form-label fw-semibold">{% trans "Customer order authorization" %}</label>
         <div>
@@ -58,6 +163,7 @@
           <tr>
             <th>{% trans "Product" %}</th>
             <th>{% trans "Presentation" %}</th>
+            <th>{% trans "Requested qty." %}</th>
             <th>{% trans "Quantity" %}</th>
             <th>{% trans "Price" %}</th>
             <th>{% trans "Subtotal" %}</th>
@@ -69,21 +175,32 @@
           <tr>
             <td>{{ item.presentacion.producto.nombre }}</td>
             <td>{{ item.presentacion.nombre }}</td>
-            <td><input type="number" min="1" class="form-control form-control-sm" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}"></td>
-            <td><input type="number" min="0" step="0.01" class="form-control form-control-sm" name="precio_{{ item.id }}" value="{{ item.precio }}"></td>
+            <td>{{ item.cantidad_solicitada }}</td>
+            <td><input type="number" min="1" class="form-control form-control-sm" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}></td>
+            <td><input type="number" min="0" step="0.01" class="form-control form-control-sm" name="precio_{{ item.id }}" value="{{ item.precio }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}></td>
             <td>${{ item.subtotal }}</td>
-            <td><input type="checkbox" class="form-check-input" name="eliminar_{{ item.id }}"></td>
+            <td><input type="checkbox" class="form-check-input" name="eliminar_{{ item.id }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}></td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
 
+    {% if lineas_bloqueadas_para_picking %}
+    <div class="alert alert-warning mt-3 mb-0">
+      {% if invoice %}
+        {% trans "Order lines are locked because this order already has an invoice generated." %}
+      {% else %}
+        {% trans "Order lines are locked while the selector verification workflow is active. Quantities can only be adjusted from the selector panel." %}
+      {% endif %}
+    </div>
+    {% endif %}
+
     <hr>
     <h6 class="mb-3">{% trans "Add a new product to this order" %}</h6>
     <div class="row g-2 mb-3">
       <div class="col-md-6">
-        <select name="presentacion_nueva" class="form-select">
+        <select name="presentacion_nueva" class="form-select" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
           <option value="">{% trans "Select a presentation..." %}</option>
           {% for p in presentaciones %}
           <option value="{{ p.id }}">{{ p.producto.nombre }} - {{ p.nombre }}</option>
@@ -91,10 +208,10 @@
         </select>
       </div>
       <div class="col-md-2">
-        <input type="number" min="1" name="cantidad_nueva" class="form-control" placeholder="{% trans 'Qty.' %}">
+        <input type="number" min="1" name="cantidad_nueva" class="form-control" placeholder="{% trans 'Qty.' %}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
       </div>
       <div class="col-md-2">
-        <input type="number" min="0" step="0.01" name="precio_nuevo" class="form-control" placeholder="{% trans 'Price' %}">
+        <input type="number" min="0" step="0.01" name="precio_nuevo" class="form-control" placeholder="{% trans 'Price' %}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
       </div>
     </div>
 

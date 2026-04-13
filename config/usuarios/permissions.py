@@ -109,6 +109,40 @@ PERMISSION_SECTIONS = (
             },
         ),
     },
+    {
+        'key': 'selector_access',
+        'title': _('Picking verification'),
+        'description': _('Assigned picking tickets verification and quantity adjustment workflow.'),
+        'permissions': (
+            {
+                'code': 'selector.picking.view',
+                'label': _('Assigned picking tickets'),
+                'description': _('View only the picking tickets assigned to the selector.'),
+            },
+            {
+                'code': 'selector.picking.manage',
+                'label': _('Verify and adjust picking tickets'),
+                'description': _('Update real picked quantities, register notes and finalize verification.'),
+            },
+        ),
+    },
+    {
+        'key': 'driver_access',
+        'title': _('Delivery'),
+        'description': _('Assigned deliveries, route guidance, customer signature and payment capture workflow.'),
+        'permissions': (
+            {
+                'code': 'driver.delivery.view',
+                'label': _('Assigned deliveries'),
+                'description': _('View the invoices and delivery assignments assigned to the driver.'),
+            },
+            {
+                'code': 'driver.delivery.manage',
+                'label': _('Manage deliveries'),
+                'description': _('Start routes, register signatures, capture payment and complete deliveries.'),
+            },
+        ),
+    },
 )
 
 
@@ -141,6 +175,14 @@ DEFAULT_ROLE_PERMISSIONS = {
         'backoffice.quotes.manage',
         'backoffice.orders.view',
         'backoffice.orders.manage',
+    },
+    'seleccionador': {
+        'selector.picking.view',
+        'selector.picking.manage',
+    },
+    'driver': {
+        'driver.delivery.view',
+        'driver.delivery.manage',
     },
 }
 
@@ -255,6 +297,8 @@ def get_redirect_url_for_user(user):
     candidates = (
         ('admin.dashboard.view', 'panel_admin'),
         ('backoffice.dashboard.view', 'backoffice_dashboard'),
+        ('driver.delivery.view', 'driver_delivery_list'),
+        ('selector.picking.view', 'selector_picking_list'),
         ('admin.products.view', 'lista_productos'),
         ('admin.customer_requests.view', 'clientes_pendientes'),
         ('admin.content.view', 'contenido_home'),

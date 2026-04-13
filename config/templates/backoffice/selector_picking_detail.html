@@ -1,0 +1,88 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Picking Verification" %} #{{ pedido.id }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="mb-1">{% trans "Picking Verification" %} - PO #{{ pedido.id }}</h2>
+    <p class="text-muted mb-0">{% trans "Customer" %}: {{ pedido.cliente.nombre_empresa }}</p>
+  </div>
+  <a href="{% url 'selector_picking_list' %}" class="btn btn-outline-secondary">{% trans "Back" %}</a>
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+  <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+  {% endfor %}
+{% endif %}
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <strong>{% trans "Status" %}:</strong> {{ pedido_estado_label }}
+      </div>
+      <div class="col-md-4">
+        <strong>{% trans "Assigned on" %}:</strong> {% if pedido.picking_asignado_en %}{{ pedido.picking_asignado_en|date:"d/m/Y H:i" }}{% else %}-{% endif %}
+      </div>
+      <div class="col-md-4">
+        <strong>{% trans "Order lock" %}:</strong>
+        {% if pedido.picking_bloqueado %}
+          <span class="badge bg-danger">{% trans "Blocked" %}</span>
+        {% else %}
+          <span class="badge bg-success">{% trans "Unlocked" %}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<form method="post" class="card shadow-sm">
+  {% csrf_token %}
+  <div class="card-body">
+    <h5 class="mb-3">{% trans "Real quantities by product" %}</h5>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>{% trans "Product" %}</th>
+            <th>{% trans "Presentation" %}</th>
+            <th>{% trans "Requested qty." %}</th>
+            <th>{% trans "Real qty." %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in item_rows %}
+          <tr>
+            <td>{{ item.product }}</td>
+            <td>{{ item.presentation }}</td>
+            <td>{{ item.requested_quantity }}</td>
+            <td><input type="number" min="0" class="form-control" name="cantidad_real_{{ item.id }}" value="{{ item.actual_quantity }}" required></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="row g-3 mt-1">
+      <div class="col-12">
+        <label class="form-label fw-semibold">{% trans "Note" %}</label>
+        <textarea name="nota_seleccionador" class="form-control" rows="4" required>{{ pedido.nota_seleccionador }}</textarea>
+        <div class="form-text">{% trans "This note is mandatory. If it is not resolved, the order remains blocked for BackOffice." %}</div>
+      </div>
+      <div class="col-12">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="notaResuelta" name="nota_seleccionador_resuelta" {% if pedido.nota_seleccionador_resuelta %}checked{% endif %}>
+          <label class="form-check-label" for="notaResuelta">{% trans "Note resolved" %}</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-end mt-4">
+      <button type="submit" class="btn btn-primary">{% trans "Save verification" %}</button>
+    </div>
+  </div>
+</form>
+{% endblock %}

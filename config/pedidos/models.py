@@ -1,5 +1,7 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 from config.clientes.models import Cliente
 from config.cotizaciones.models import Cotizacion
@@ -12,6 +14,9 @@ class Pedido(models.Model):
 		('RECIBIDO', 'Recibido'),
 		('EN_GESTION', 'En gestion'),
 		('LISTO_PARA_PICKING', 'Listo para picking'),
+		('PARA_VERIFICAR', 'Para verificar'),
+		('VERIFICADO_AJUSTADO', 'Verificado y ajustado'),
+		('INVOICE_GENERADA', 'Invoice generada'),
 		('DESPACHADO', 'Despachado'),
 		('CANCELADO', 'Cancelado'),
 	)
@@ -30,6 +35,14 @@ class Pedido(models.Model):
 		related_name='pedidos_generados',
 		limit_choices_to={'role': 'vendedor'},
 	)
+	seleccionador = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='picking_tickets_asignados',
+		limit_choices_to={'role': 'seleccionador'},
+	)
 	cotizacion = models.OneToOneField(
 		Cotizacion,
 		on_delete=models.SET_NULL,
@@ -42,6 +55,11 @@ class Pedido(models.Model):
 	estado = models.CharField(max_length=30, choices=ESTADO_CHOICES, default='RECIBIDO')
 	nota_cliente = models.TextField(blank=True)
 	nota_backoffice = models.TextField(blank=True)
+	nota_seleccionador = models.TextField(blank=True)
+	nota_seleccionador_resuelta = models.BooleanField(default=False)
+	picking_bloqueado = models.BooleanField(default=False)
+	picking_asignado_en = models.DateTimeField(blank=True, null=True)
+	picking_verificado_en = models.DateTimeField(blank=True, null=True)
 	acepta_terminos = models.BooleanField(default=False)
 	acepta_terminos_en = models.DateTimeField(blank=True, null=True)
 	total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
@@ -55,11 +73,30 @@ class Pedido(models.Model):
 	def __str__(self):
 		return f"Pedido #{self.id} - {self.cliente.nombre_empresa}"
 
+	@property
+	def tiene_nota_picking_pendiente(self):
+		return bool(self.nota_seleccionador.strip()) and not self.nota_seleccionador_resuelta
+
+	def clean(self):
+		if self.seleccionador_id and getattr(self.seleccionador, 'role', '') != 'seleccionador':
+			raise ValidationError({'seleccionador': _('Only selector users can be assigned to a picking ticket.')})
+		if self.nota_seleccionador_resuelta and not (self.nota_seleccionador or '').strip():
+			raise ValidationError({'nota_seleccionador_resuelta': _('A note is required before marking it as resolved.')})
+		if self.estado == 'PARA_VERIFICAR' and not self.seleccionador_id:
+			raise ValidationError({'seleccionador': _('A selector must be assigned before verification starts.')})
+
+	def save(self, *args, **kwargs):
+		self.picking_bloqueado = self.tiene_nota_picking_pendiente
+		super().save(*args, **kwargs)
+
 
 class PedidoItem(models.Model):
 
 	pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name='items')
 	presentacion = models.ForeignKey(Presentacion, on_delete=models.CASCADE)
+	cantidad_solicitada = models.PositiveIntegerField(default=1)
+	cantidad_reservada_inventario = models.PositiveIntegerField(default=0)
+	cantidad_inventario_aplicada = models.PositiveIntegerField(default=0)
 	cantidad = models.PositiveIntegerField(default=1)
 	precio = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 	subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)

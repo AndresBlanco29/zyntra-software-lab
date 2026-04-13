@@ -1,0 +1,54 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Driver Deliveries" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="mb-1">{% trans "Driver Deliveries" %}</h2>
+    <p class="text-muted mb-0">{% trans "Assigned invoices ready for route and proof of delivery." %}</p>
+  </div>
+  <a href="{% url 'driver_delivery_route' %}" class="btn btn-outline-primary">{% trans "Generate route" %}</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>{% trans "Invoice" %}</th>
+            <th>{% trans "Customer" %}</th>
+            <th>{% trans "Address" %}</th>
+            <th>{% trans "Delivery" %}</th>
+            <th>{% trans "Payment" %}</th>
+            <th>{% trans "PDF" %}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for delivery in deliveries %}
+          <tr>
+            <td>
+              <strong>{{ delivery.invoice.numero }}</strong>
+              <div class="small text-muted">PO #{{ delivery.invoice.pedido_id }}</div>
+            </td>
+            <td>{{ delivery.invoice.cliente.nombre_empresa }}</td>
+            <td>{{ delivery.route_address }}</td>
+            <td><span class="badge bg-info text-dark">{{ delivery.get_estado_display }}</span></td>
+            <td><span class="badge {% if delivery.estado_pago == 'NO_PAGADO' %}bg-danger{% elif delivery.estado_pago == 'PAGADO' %}bg-success{% else %}bg-secondary{% endif %}">{{ delivery.get_estado_pago_display }}</span></td>
+            <td><a class="btn btn-sm btn-outline-dark" href="{% url 'driver_invoice_pdf' delivery.id %}">{% trans "Download" %}</a></td>
+            <td class="text-end"><a class="btn btn-sm btn-primary" href="{% url 'driver_delivery_detail' delivery.id %}">{% trans "Open" %}</a></td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-4">{% trans "No deliveries are currently assigned to you." %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

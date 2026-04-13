@@ -7,6 +7,8 @@ class Usuario(AbstractUser):
         ('admin', 'Administrador'),
         ('vendedor', 'Vendedor'),
         ('backoffice', 'BackOffice'),
+        ('seleccionador', 'Seleccionador'),
+        ('driver', 'Driver'),
         ('cliente', 'Cliente'),
     )
 

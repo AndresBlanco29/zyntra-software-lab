@@ -1,0 +1,319 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{{ delivery.invoice.numero }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="mb-1">{{ delivery.invoice.numero }}</h2>
+    <p class="text-muted mb-0">{{ delivery.invoice.cliente.nombre_empresa }} | {{ delivery.route_address }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'driver_invoice_pdf' delivery.id %}" class="btn btn-outline-dark">{% trans "Download PDF" %}</a>
+    <a href="{{ delivery.google_maps_url }}" target="_blank" rel="noopener" class="btn btn-outline-primary">{% trans "Google Maps" %}</a>
+  </div>
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+  <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+  {% endfor %}
+{% endif %}
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">{% trans "Delivery summary" %}</h5>
+          {% if not delivery.is_completed %}
+          <form method="post" action="{% url 'driver_delivery_start_route' delivery.id %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-primary">{% trans "Start route" %}</button>
+          </form>
+          {% endif %}
+        </div>
+        <div class="row g-3">
+          <div class="col-md-4"><div class="text-muted small">{% trans "Status" %}</div><div>{{ delivery.get_estado_display }}</div></div>
+          <div class="col-md-4"><div class="text-muted small">{% trans "Payment status" %}</div><div>{{ delivery.get_estado_pago_display }}</div></div>
+          <div class="col-md-4"><div class="text-muted small">{% trans "Customer balance" %}</div><div>${{ delivery.invoice.saldo_cliente }}</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Started" %}</div><div>{% if delivery.route_started_at %}{{ delivery.route_started_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Delivered" %}</div><div>{% if delivery.delivered_at %}{{ delivery.delivered_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
+        </div>
+        <hr>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>{% trans "Product" %}</th>
+                <th>{% trans "Presentation" %}</th>
+                <th>{% trans "Qty." %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in invoice.items.all %}
+              <tr>
+                <td>{{ item.producto_nombre }}</td>
+                <td>{{ item.presentacion_nombre }}</td>
+                <td>{{ item.cantidad_facturada }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="mb-3">{% trans "Evidence" %}</h5>
+        <div class="row g-2">
+          {% for photo in delivery.evidence_photos.all %}
+          <div class="col-6">
+            <a href="{{ photo.image.url }}" target="_blank" rel="noopener">
+              <img src="{{ photo.image.url }}" alt="evidence" class="img-fluid rounded border">
+            </a>
+          </div>
+          {% empty %}
+          <div class="col-12 text-muted">{% trans "No evidence photos uploaded yet." %}</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if not delivery.is_completed %}
+<form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_complete' delivery.id %}" class="card shadow-sm">
+  {% csrf_token %}
+  <div class="card-body">
+    <h5 class="mb-3">{% trans "Complete delivery" %}</h5>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">{% trans "Payment status" %}</label>
+        <select name="estado_pago" id="paymentStatus" class="form-select" required>
+          <option value="">{% trans "Select..." %}</option>
+          <option value="PAGADO">{% trans "Paid" %}</option>
+          <option value="NO_PAGADO">{% trans "Unpaid" %}</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">{% trans "Received by" %}</label>
+        <input type="text" name="recibido_por" class="form-control" required>
+      </div>
+      <div class="col-md-4 paid-only d-none">
+        <label class="form-label fw-semibold">{% trans "Payment amount" %}</label>
+        <input type="number" min="0" step="0.01" name="monto_pagado" class="form-control" value="{{ invoice.saldo_cliente }}">
+      </div>
+
+      <div class="col-md-4 paid-only d-none">
+        <label class="form-label fw-semibold">{% trans "Payment method" %}</label>
+        <select name="metodo_pago" id="paymentMethod" class="form-select">
+          <option value="">{% trans "Select..." %}</option>
+          <option value="CASH">{% trans "Cash" %}</option>
+          <option value="CHEQUE">{% trans "Cheque" %}</option>
+          <option value="TRANSFERENCIA">{% trans "Transfer" %}</option>
+          <option value="TARJETA">{% trans "Card" %}</option>
+          <option value="ZELLE">Zelle</option>
+          <option value="ACH">ACH</option>
+        </select>
+      </div>
+
+      <div class="col-md-4 method-field method-cheque d-none">
+        <label class="form-label fw-semibold">{% trans "Cheque number" %}</label>
+        <input type="text" name="cheque_numero" class="form-control">
+      </div>
+      <div class="col-md-4 method-field method-cheque d-none">
+        <label class="form-label fw-semibold">{% trans "Cheque bank" %}</label>
+        <input type="text" name="cheque_banco" class="form-control">
+      </div>
+      <div class="col-md-4 method-field method-transferencia d-none">
+        <label class="form-label fw-semibold">{% trans "Transfer reference" %}</label>
+        <input type="text" name="transferencia_referencia" class="form-control">
+      </div>
+      <div class="col-md-4 method-field method-tarjeta d-none">
+        <label class="form-label fw-semibold">{% trans "Card last 4" %}</label>
+        <input type="text" name="tarjeta_ultimos_4" maxlength="4" class="form-control">
+      </div>
+      <div class="col-md-4 method-field method-tarjeta d-none">
+        <label class="form-label fw-semibold">{% trans "Authorization code" %}</label>
+        <input type="text" name="tarjeta_autorizacion" class="form-control">
+      </div>
+      <div class="col-md-4 method-field method-zelle d-none">
+        <label class="form-label fw-semibold">{% trans "Zelle reference" %}</label>
+        <input type="text" name="zelle_referencia" class="form-control">
+      </div>
+      <div class="col-md-4 method-field method-zelle d-none">
+        <label class="form-label fw-semibold">{% trans "Zelle sender" %}</label>
+        <input type="text" name="zelle_remitente" class="form-control">
+      </div>
+      <div class="col-md-4 method-field method-ach d-none">
+        <label class="form-label fw-semibold">{% trans "ACH reference" %}</label>
+        <input type="text" name="ach_referencia" class="form-control">
+      </div>
+      <div class="col-md-4 method-field method-ach d-none">
+        <label class="form-label fw-semibold">{% trans "ACH account last 4" %}</label>
+        <input type="text" name="ach_cuenta_ultimos_4" maxlength="4" class="form-control">
+      </div>
+
+      <div class="col-12 unpaid-only d-none">
+        <label class="form-label fw-semibold">{% trans "Reason for non-payment" %}</label>
+        <textarea name="motivo_no_pago" class="form-control" rows="3"></textarea>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold">{% trans "Driver notes" %}</label>
+        <textarea name="notas_driver" class="form-control" rows="3"></textarea>
+      </div>
+      <div class="col-12 unpaid-only d-none">
+        <label class="form-label fw-semibold">{% trans "Evidence photos" %}</label>
+        <input type="file" name="evidence_photos" class="form-control" accept="image/*" multiple>
+        <div class="form-text">{% trans "At least one photo is required when the customer does not pay." %}</div>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold">{% trans "Customer signature" %}</label>
+        <div class="border rounded p-2 bg-light">
+          <canvas id="signatureCanvas" class="w-100" height="220" style="touch-action:none;background:#fff;"></canvas>
+        </div>
+        <input type="hidden" name="firma_cliente_data" id="signatureData">
+        <div class="d-flex justify-content-end mt-2">
+          <button type="button" id="clearSignature" class="btn btn-sm btn-outline-secondary">{% trans "Clear signature" %}</button>
+        </div>
+      </div>
+    </div>
+    <div class="d-flex justify-content-end mt-4">
+      <button type="submit" class="btn btn-primary">{% trans "Save delivery" %}</button>
+    </div>
+  </div>
+</form>
+{% else %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="mb-3">{% trans "Notification log" %}</h5>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>{% trans "Channel" %}</th>
+            <th>{% trans "Status" %}</th>
+            <th>{% trans "Target" %}</th>
+            <th>{% trans "Error" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in delivery.notification_logs.all %}
+          <tr>
+            <td>{{ log.get_channel_display }}</td>
+            <td>{{ log.get_status_display }}</td>
+            <td>{{ log.target|default:'-' }}</td>
+            <td>{{ log.error_message|default:'-' }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-center text-muted py-3">{% trans "No notification attempts recorded yet." %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+  (function () {
+    const paymentStatus = document.getElementById('paymentStatus');
+    const paymentMethod = document.getElementById('paymentMethod');
+    const paidFields = document.querySelectorAll('.paid-only');
+    const unpaidFields = document.querySelectorAll('.unpaid-only');
+    const methodFields = document.querySelectorAll('.method-field');
+    const canvas = document.getElementById('signatureCanvas');
+    const signatureInput = document.getElementById('signatureData');
+    const clearSignature = document.getElementById('clearSignature');
+    if (!canvas || !signatureInput || !paymentStatus) {
+      return;
+    }
+
+    const context = canvas.getContext('2d');
+    context.lineWidth = 2;
+    context.lineCap = 'round';
+    let drawing = false;
+    let signed = false;
+
+    function resizeCanvas() {
+      const ratio = window.devicePixelRatio || 1;
+      const width = canvas.offsetWidth || canvas.parentElement.offsetWidth;
+      canvas.width = width * ratio;
+      canvas.height = 220 * ratio;
+      context.scale(ratio, ratio);
+      context.lineWidth = 2;
+      context.lineCap = 'round';
+    }
+
+    function pointFromEvent(event) {
+      const rect = canvas.getBoundingClientRect();
+      const source = event.touches ? event.touches[0] : event;
+      return { x: source.clientX - rect.left, y: source.clientY - rect.top };
+    }
+
+    function startDrawing(event) {
+      drawing = true;
+      const point = pointFromEvent(event);
+      context.beginPath();
+      context.moveTo(point.x, point.y);
+      event.preventDefault();
+    }
+
+    function draw(event) {
+      if (!drawing) {
+        return;
+      }
+      const point = pointFromEvent(event);
+      context.lineTo(point.x, point.y);
+      context.stroke();
+      signed = true;
+      signatureInput.value = canvas.toDataURL('image/png');
+      event.preventDefault();
+    }
+
+    function stopDrawing() {
+      drawing = false;
+    }
+
+    function togglePaymentSections() {
+      const status = paymentStatus.value;
+      paidFields.forEach((element) => element.classList.toggle('d-none', status !== 'PAGADO'));
+      unpaidFields.forEach((element) => element.classList.toggle('d-none', status !== 'NO_PAGADO'));
+      toggleMethodFields();
+    }
+
+    function toggleMethodFields() {
+      const method = (paymentMethod ? paymentMethod.value : '').toLowerCase();
+      methodFields.forEach((element) => {
+        const shouldShow = paymentStatus.value === 'PAGADO' && element.classList.contains(`method-${method}`);
+        element.classList.toggle('d-none', !shouldShow);
+      });
+    }
+
+    clearSignature.addEventListener('click', function () {
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      signatureInput.value = '';
+      signed = false;
+    });
+
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mousemove', draw);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mouseleave', stopDrawing);
+    canvas.addEventListener('touchstart', startDrawing, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    canvas.addEventListener('touchend', stopDrawing);
+    paymentStatus.addEventListener('change', togglePaymentSections);
+    if (paymentMethod) {
+      paymentMethod.addEventListener('change', toggleMethodFields);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    togglePaymentSections();
+  })();
+</script>
+{% endblock %}

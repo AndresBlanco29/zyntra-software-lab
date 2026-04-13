@@ -101,6 +101,10 @@ La Tortilla Grocery
     {% trans "Administrador" %}: {% firstof request.user.get_full_name request.user.username %}
   {% elif request.user.role == "backoffice" %}
     {% trans "BackOffice" %}: {% firstof request.user.get_full_name request.user.username %}
+  {% elif request.user.role == "seleccionador" %}
+    {% trans "Selector" %}: {% firstof request.user.get_full_name request.user.username %}
+  {% elif request.user.role == "driver" %}
+    {% trans "Driver" %}: {% firstof request.user.get_full_name request.user.username %}
   {% else %}
     {% firstof request.user.get_full_name request.user.username %}
   {% endif %}
@@ -160,6 +164,24 @@ La Tortilla Grocery
   <a href="{% url 'backoffice_pedidos' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' %}active{% endif %}">
     {% trans "Purchase Orders" %}
+  </a>
+  {% endif %}
+  {% if request.user|has_internal_permission:'backoffice.orders.view' %}
+  <a href="{% url 'backoffice_invoices_list' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' %}active{% endif %}">
+    {% trans "Invoices" %}
+  </a>
+  {% endif %}
+  {% if request.user|has_internal_permission:'driver.delivery.view' %}
+  <a href="{% url 'driver_delivery_list' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'driver_delivery_list' or request.resolver_match.url_name == 'driver_delivery_detail' %}active{% endif %}">
+    {% trans "Driver Deliveries" %}
+  </a>
+  {% endif %}
+  {% if request.user|has_internal_permission:'selector.picking.view' %}
+  <a href="{% url 'selector_picking_list' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'selector_picking_list' or request.resolver_match.url_name == 'selector_picking_detail' %}active{% endif %}">
+    {% trans "Assigned Picking Tickets" %}
   </a>
   {% endif %}
   {% if not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'vendor.customers.manage' %}

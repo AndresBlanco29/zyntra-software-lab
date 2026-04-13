@@ -1,0 +1,296 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{{ invoice.numero }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="mb-1">{{ invoice.numero }}</h2>
+    <p class="text-muted mb-0">{% trans "Invoice generated from verified picking quantities." %}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'backoffice_invoices_list' %}" class="btn btn-outline-secondary">{% trans "Back to list" %}</a>
+    <a href="{% url 'backoffice_invoice_pdf' invoice.id %}" class="btn btn-success">{% trans "Export PDF" %}</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-8">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="text-muted small">{% trans "Customer" %}</div>
+            <div class="fw-semibold">{{ invoice.cliente.nombre_empresa }}</div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-muted small">{% trans "Purchase order" %}</div>
+            <div class="fw-semibold">#{{ invoice.pedido_id }}</div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-muted small">{% trans "Status" %}</div>
+            <div><span class="badge bg-primary">{{ invoice.get_estado_display }}</span></div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-muted small">{% trans "Delivery method" %}</div>
+            <div class="fw-semibold">{{ invoice.get_metodo_entrega_display }}</div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-muted small">{% trans "Driver" %}</div>
+            <div class="fw-semibold">{% if invoice.driver %}{% firstof invoice.driver.get_full_name invoice.driver.username %}{% else %}-{% endif %}</div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-muted small">{% trans "Dispatch status" %}</div>
+            <div>
+              {% if invoice.despachador_notificado %}
+                <span class="badge bg-success">{% trans "Ready for dispatch" %}</span>
+              {% else %}
+                <span class="badge bg-secondary">{% trans "Pending dispatch" %}</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between mb-2"><span>{% trans "Subtotal" %}</span><strong>${{ invoice.subtotal }}</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span>{% trans "Credit notes" %}</span><strong class="text-danger">-${{ invoice.total_creditos }}</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span>{% trans "Debit notes" %}</span><strong class="text-success">+${{ invoice.total_debitos }}</strong></div>
+        <hr>
+        <div class="d-flex justify-content-between"><span>{% trans "Customer balance" %}</span><strong>${{ invoice.saldo_cliente }}</strong></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if invoice.delivery %}
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0">{% trans "Delivery" %}</h5>
+      <div class="d-flex gap-2">
+        <a href="{{ invoice.delivery.google_maps_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">{% trans "Open in Google Maps" %}</a>
+      </div>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-3">
+        <div class="text-muted small">{% trans "Driver" %}</div>
+        <div class="fw-semibold">{% firstof invoice.delivery.driver.get_full_name invoice.delivery.driver.username %}</div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-muted small">{% trans "Delivery status" %}</div>
+        <div><span class="badge bg-info text-dark">{{ invoice.delivery.get_estado_display }}</span></div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-muted small">{% trans "Payment status" %}</div>
+        <div><span class="badge {% if invoice.delivery.estado_pago == 'NO_PAGADO' %}bg-danger{% elif invoice.delivery.estado_pago == 'PAGADO' %}bg-success{% else %}bg-secondary{% endif %}">{{ invoice.delivery.get_estado_pago_display }}</span></div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-muted small">{% trans "Customer hold" %}</div>
+        <div>
+          {% if invoice.cliente.credit_hold %}
+            <span class="badge bg-danger">{% trans "Blocked" %}</span>
+          {% else %}
+            <span class="badge bg-success">{% trans "Unlocked" %}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="text-muted small">{% trans "Delivery address" %}</div>
+        <div>{{ invoice.delivery.route_address }}</div>
+      </div>
+      <div class="col-md-6">
+        <div class="text-muted small">{% trans "Recipient" %}</div>
+        <div>{{ invoice.delivery.recibido_por|default:'-' }}</div>
+      </div>
+      {% if invoice.delivery.client_blocked_on_delivery and invoice.cliente.credit_hold %}
+      <div class="col-12">
+        <form method="post" action="{% url 'backoffice_unlock_delivery_client' invoice.delivery.id %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-warning">{% trans "Unlock customer" %}</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h5 class="mb-3">{% trans "Invoice lines" %}</h5>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>{% trans "Product" %}</th>
+            <th>{% trans "Presentation" %}</th>
+            <th>{% trans "Qty." %}</th>
+            <th>{% trans "Unit price" %}</th>
+            <th>{% trans "Subtotal" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in invoice.items.all %}
+          <tr>
+            <td>{{ item.producto_nombre }}</td>
+            <td>{{ item.presentacion_nombre }}</td>
+            <td>{{ item.cantidad_facturada }}</td>
+            <td>${{ item.precio_unitario }}</td>
+            <td>${{ item.subtotal }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">{% trans "Credit and debit notes" %}</h5>
+        </div>
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th>{% trans "Number" %}</th>
+                <th>{% trans "Type" %}</th>
+                <th>{% trans "Status" %}</th>
+                <th>{% trans "Reason" %}</th>
+                <th>{% trans "Inventory" %}</th>
+                <th>{% trans "Total" %}</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for nota in invoice.notas_ajuste.all %}
+              <tr>
+                <td>
+                  <strong>{{ nota.numero }}</strong>
+                  <div class="small text-muted">{{ nota.creada_en|date:"d/m/Y H:i" }}</div>
+                </td>
+                <td>{{ nota.get_tipo_documento_display }}</td>
+                <td>
+                  {% if nota.estado == 'APROBADA' %}
+                    <span class="badge bg-success">{{ nota.get_estado_display }}</span>
+                  {% elif nota.estado == 'ANULADA' %}
+                    <span class="badge bg-secondary">{{ nota.get_estado_display }}</span>
+                  {% else %}
+                    <span class="badge bg-warning text-dark">{{ nota.get_estado_display }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {{ nota.get_motivo_display }}
+                  {% if nota.tipo_credito %}
+                    <div class="small text-muted">{{ nota.get_tipo_credito_display }}</div>
+                  {% endif %}
+                </td>
+                <td>{{ nota.get_inventario_estado_display }}</td>
+                <td>${{ nota.total }}</td>
+                <td class="text-end">
+                  {% if nota.estado == 'BORRADOR' %}
+                    <div class="d-flex gap-2 justify-content-end">
+                      <form method="post" action="{% url 'backoffice_invoice_approve_note' nota.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-success">{% trans "Approve" %}</button>
+                      </form>
+                      <form method="post" action="{% url 'backoffice_invoice_cancel_note' nota.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Void" %}</button>
+                      </form>
+                    </div>
+                  {% elif nota.estado == 'APROBADA' %}
+                    <form method="post" action="{% url 'backoffice_invoice_cancel_note' nota.id %}">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Void" %}</button>
+                    </form>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="7" class="text-center text-muted py-4">{% trans "No adjustment notes created yet." %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="mb-3">{% trans "Create adjustment note" %}</h5>
+        <form method="post" action="{% url 'backoffice_invoice_create_note' invoice.id %}">
+          {% csrf_token %}
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">{% trans "Type" %}</label>
+              <select name="tipo_documento" class="form-select" required>
+                <option value="">{% trans "Select..." %}</option>
+                <option value="CREDITO">{% trans "Credit note" %}</option>
+                <option value="DEBITO">{% trans "Debit note" %}</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">{% trans "Reason" %}</label>
+              <select name="motivo" class="form-select" required>
+                <option value="">{% trans "Select..." %}</option>
+                <option value="DAMAGE">{% trans "Damage" %}</option>
+                <option value="DEFECT">{% trans "Defect" %}</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">{% trans "Credit type" %}</label>
+              <select name="tipo_credito" class="form-select">
+                <option value="">{% trans "Only required for credit notes" %}</option>
+                <option value="CREDIT_DUMP">{% trans "Credit Dump" %}</option>
+                <option value="CREDIT_RETURN">{% trans "Credit Return" %}</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">{% trans "Description" %}</label>
+              <textarea name="descripcion" rows="3" class="form-control"></textarea>
+            </div>
+          </div>
+
+          <div class="table-responsive mb-3">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>{% trans "Line" %}</th>
+                  <th>{% trans "Qty." %}</th>
+                  <th>{% trans "Amount" %}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in invoice.items.all %}
+                <tr>
+                  <td>
+                    {{ item.producto_nombre }}
+                    <div class="small text-muted">{{ item.presentacion_nombre }} | {% trans "Max" %}: {{ item.cantidad_facturada }}</div>
+                  </td>
+                  <td><input type="number" min="0" max="{{ item.cantidad_facturada }}" name="note_qty_{{ item.id }}" class="form-control form-control-sm" value="0"></td>
+                  <td><input type="number" min="0" step="0.01" name="note_amount_{{ item.id }}" class="form-control form-control-sm" value="{{ item.precio_unitario }}"></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100">{% trans "Save draft note" %}</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

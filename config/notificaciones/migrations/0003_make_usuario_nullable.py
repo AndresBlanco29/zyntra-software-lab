@@ -14,6 +14,15 @@ def make_usuario_nullable(apps, schema_editor):
 
     existing_columns = {column.name for column in description}
     if 'usuario_id' not in existing_columns:
+        field = models.ForeignKey(
+            Usuario,
+            on_delete=django.db.models.deletion.SET_NULL,
+            null=True,
+            blank=True,
+            related_name='notificaciones+',
+        )
+        field.set_attributes_from_name('usuario')
+        schema_editor.add_field(Notificacion, field)
         return
 
     old_field = models.ForeignKey(

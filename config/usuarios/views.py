@@ -187,13 +187,15 @@ def _is_backoffice_user(user):
 
 
 def _get_allowed_internal_roles():
-    return {'vendedor', 'backoffice'}
+    return {'vendedor', 'backoffice', 'seleccionador', 'driver'}
 
 
 def _get_internal_role_label(role):
     return {
         'vendedor': _('Vendor'),
         'backoffice': _('BackOffice'),
+        'seleccionador': _('Selector'),
+        'driver': _('Driver'),
     }.get(role, _('Internal user'))
 
 

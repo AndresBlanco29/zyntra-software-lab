@@ -172,6 +172,12 @@ La Tortilla Grocery
     {% trans "Invoices" %}
   </a>
   {% endif %}
+  {% if request.user|has_internal_permission:'backoffice.orders.view' %}
+  <a href="{% url 'backoffice_inventory_list' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' %}active{% endif %}">
+    {% trans "Inventory" %}
+  </a>
+  {% endif %}
   {% if request.user|has_internal_permission:'driver.delivery.view' %}
   <a href="{% url 'driver_delivery_list' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'driver_delivery_list' or request.resolver_match.url_name == 'driver_delivery_detail' %}active{% endif %}">

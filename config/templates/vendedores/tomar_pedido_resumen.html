@@ -29,6 +29,10 @@
 data-eliminar-url="{% url 'eliminar_producto_pedido' %}"
 data-enviar-url="{% url 'enviar_pedido' %}"
 data-csrf="{{ csrf_token %}"
+data-msg-order-type="{% trans 'Debes indicar cómo se tomó la orden' %}"
+data-msg-submit-error="{% trans 'No se pudo generar el pedido.' %}"
+data-msg-remove-error="{% trans 'No se pudo eliminar el producto del pedido.' %}"
+data-msg-request-error="{% trans 'Ocurrió un error procesando la solicitud.' %}"
 style="margin: 0; padding: 0;">
 
 <!-- NAVBAR -->
@@ -94,6 +98,8 @@ La Tortilla Grocery
 <h3 class="fw-bold mb-3">
 {% trans "Resumen del Pedido" %}
 </h3>
+
+<div id="pedidoFeedback" class="alert alert-danger d-none mb-3" role="alert"></div>
 
 <hr>
 

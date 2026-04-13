@@ -46,6 +46,15 @@
       </div>
     </div>
   </div>
+
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100 border-warning">
+      <div class="card-body text-center">
+        <h3 class="mb-1">{{ inventario_agotado }}</h3>
+        <p class="mb-0">{% trans "Products without available stock" %}</p>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="card shadow-sm">
@@ -54,6 +63,7 @@
     <div class="d-flex flex-wrap gap-2">
       <a href="{% url 'backoffice_cotizaciones' %}" class="btn btn-primary">{% trans "Manage quotes" %}</a>
       <a href="{% url 'backoffice_pedidos' %}" class="btn btn-warning">{% trans "Manage purchase orders" %}</a>
+      <a href="{% url 'backoffice_inventory_list' %}" class="btn btn-outline-dark">{% trans "Manage inventory" %}</a>
     </div>
   </div>
 </div>

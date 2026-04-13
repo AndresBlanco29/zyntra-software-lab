@@ -21,6 +21,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 from config.cotizaciones.models import Cotizacion
 from config.notificaciones.models import Notificacion
 from config.productos.models import Presentacion
+from config.inventario.models import StockPresentacion
 
 from .models import Pedido, PedidoItem
 from .services import (
@@ -117,6 +118,7 @@ def backoffice_dashboard(request):
 		'ordenes_recibidas': Pedido.objects.count(),
 		'ordenes_en_gestion': Pedido.objects.filter(estado='EN_GESTION').count(),
 		'ordenes_listas_picking': Pedido.objects.filter(estado='LISTO_PARA_PICKING').count(),
+		'inventario_agotado': StockPresentacion.objects.filter(stock_disponible__lte=0).count(),
 		'notificaciones': Notificacion.objects.all()[:8],
 	}
 	return render(request, 'backoffice/dashboard.html', context)

@@ -1,0 +1,102 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Operational Inventory" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+  <div>
+    <h2 class="mb-1">{% trans "Operational Inventory" %}</h2>
+    <p class="text-muted mb-0">{% trans "Review physical, reserved and available stock per presentation." %}</p>
+  </div>
+  <form method="get" class="d-flex gap-2">
+    <input type="search" name="q" value="{{ search_term }}" class="form-control" placeholder="{% trans 'Search product or presentation' %}">
+    <button type="submit" class="btn btn-outline-secondary">{% trans "Search" %}</button>
+  </form>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">{% trans "Presentations" %}</div>
+        <div class="display-6 fw-semibold">{{ product_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">{% trans "Physical stock" %}</div>
+        <div class="display-6 fw-semibold">{{ total_fisico }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">{% trans "Reserved stock" %}</div>
+        <div class="display-6 fw-semibold">{{ total_reservado }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100 border-warning">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">{% trans "Without stock" %}</div>
+        <div class="display-6 fw-semibold">{{ zero_stock_count }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-striped align-middle mb-0">
+      <thead>
+        <tr>
+          <th>{% trans "Product" %}</th>
+          <th>{% trans "Presentation" %}</th>
+          <th>{% trans "Physical" %}</th>
+          <th>{% trans "Reserved" %}</th>
+          <th>{% trans "Available" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th>{% trans "Action" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td>
+            <div class="fw-semibold">{{ row.presentacion.producto.nombre_traducido }}</div>
+            {% if row.presentacion.producto.categoria %}
+            <div class="text-muted small">{{ row.presentacion.producto.categoria.nombre_traducido }}</div>
+            {% endif %}
+          </td>
+          <td>{{ row.presentacion.nombre_traducido }}</td>
+          <td>{{ row.stock_fisico }}</td>
+          <td>{{ row.stock_reservado }}</td>
+          <td>{{ row.stock_disponible }}</td>
+          <td>
+            {% if row.stock_disponible <= 0 %}
+            <span class="badge bg-danger">{% trans "Out of stock" %}</span>
+            {% elif row.stock_disponible <= 5 %}
+            <span class="badge bg-warning text-dark">{% trans "Low stock" %}</span>
+            {% else %}
+            <span class="badge bg-success">{% trans "Available" %}</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{% url 'backoffice_inventory_detail' row.presentacion.id %}" class="btn btn-sm btn-outline-primary">{% trans "View detail" %}</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-4">{% trans "No inventory presentations match the current filter." %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

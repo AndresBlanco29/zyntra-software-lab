@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.urls import reverse
 
 from config.clientes.models import Cliente
 from config.facturacion.services import aprobar_nota_ajuste, anular_nota_ajuste, crear_nota_ajuste_desde_invoice, generar_invoice_desde_picking
@@ -152,3 +153,60 @@ class InventarioOperativoTests(TestCase):
 		stock.refresh_from_db()
 		self.assertEqual(stock.stock_fisico, 8)
 		self.assertTrue(InventarioMovimiento.objects.filter(nota_ajuste=nota, tipo='REVERSO_NOTA_CREDITO').exists())
+
+
+class InventarioBackofficeViewsTests(TestCase):
+	def setUp(self):
+		self.backoffice = Usuario.objects.create_user(username='bo-stock-view', password='secret123', role='backoffice')
+		categoria = Categoria.objects.create(nombre='Categoria Vista Stock')
+		marca = Marca.objects.create(nombre='Marca Vista Stock')
+		producto = Producto.objects.create(nombre='Producto Vista Stock', categoria=categoria, marca=marca)
+		self.presentacion = Presentacion.objects.create(
+			producto=producto,
+			nombre='Caja',
+			unidades=1,
+			tipo_contenido='caja',
+			precio_1=Decimal('15.00'),
+		)
+		self.presentacion_sin_stock = Presentacion.objects.create(
+			producto=producto,
+			nombre='Unidad',
+			unidades=1,
+			tipo_contenido='unidad',
+			precio_1=Decimal('2.00'),
+		)
+		registrar_entrada_manual(presentacion=self.presentacion, cantidad=6, observacion='Initial stock', creado_por=self.backoffice)
+
+	def test_inventory_list_view_displays_presentations(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_inventory_list'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Producto Vista Stock')
+		self.assertContains(response, self.presentacion.nombre_traducido)
+		self.assertContains(response, self.presentacion_sin_stock.nombre_traducido)
+
+	def test_inventory_detail_post_records_manual_entry(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(
+			reverse('backoffice_inventory_detail', args=[self.presentacion.id]),
+			{
+				'action': 'entrada',
+				'cantidad': '4',
+				'observacion': 'Restock warehouse',
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		self.assertEqual(stock.stock_fisico, 10)
+		self.assertEqual(stock.stock_disponible, 10)
+		self.assertTrue(
+			InventarioMovimiento.objects.filter(
+				presentacion=self.presentacion,
+				tipo='ENTRADA_MANUAL',
+				observacion='Restock warehouse',
+			).exists()
+		)

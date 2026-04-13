@@ -9,6 +9,7 @@ from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.conf import settings
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 import pytz
 from django.contrib import messages
 import logging
@@ -361,15 +362,22 @@ def enviar_pedido(request):
             "precio": item["precio"],
         })
 
-    pedido = crear_pedido_desde_items(
-        cliente=cliente,
-        items_payload=items_payload,
-        origen='VENDEDOR',
-        vendedor=request.user,
-        nota_cliente=(request.POST.get('nota') or '').strip(),
-        acepta_terminos=False,
-        canal_toma=tipo_orden,
-    )
+    try:
+        pedido = crear_pedido_desde_items(
+            cliente=cliente,
+            items_payload=items_payload,
+            origen='VENDEDOR',
+            vendedor=request.user,
+            nota_cliente=(request.POST.get('nota') or '').strip(),
+            acepta_terminos=False,
+            canal_toma=tipo_orden,
+        )
+    except ValidationError as exc:
+        error_message = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
+        return JsonResponse({
+            "success": False,
+            "error": error_message,
+        }, status=409)
 
     warning = None
 

@@ -42,7 +42,10 @@
   </div>
   <div class="col-md-6">
     <label class="form-label">{% trans "Role" %}</label>
-    <select name="role" class="form-select" {% if is_role_locked %}disabled{% endif %}>
+    <select id="internalRoleSelect" name="role" class="form-select" {% if is_role_locked %}disabled{% endif %}>
+      {% if not is_role_locked %}
+      <option value="" {% if not selected_role %}selected{% endif %}>{% trans "Select a role" %}</option>
+      {% endif %}
       {% for role_value, role_label in role_choices %}
       <option value="{{ role_value }}" {% if role_value == selected_role %}selected{% endif %}>{{ role_label }}</option>
       {% endfor %}
@@ -100,7 +103,33 @@
 
 </form>
 
+{{ role_permission_defaults|json_script:"internal-role-permission-defaults" }}
+
 </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const roleSelect = document.getElementById('internalRoleSelect');
+  const defaultsNode = document.getElementById('internal-role-permission-defaults');
+  const permissionInputs = Array.from(document.querySelectorAll('input[name="permissions"]'));
+
+  if (!roleSelect || !defaultsNode || !permissionInputs.length) {
+    return;
+  }
+
+  const rolePermissionDefaults = JSON.parse(defaultsNode.textContent || '{}');
+
+  function syncPermissionsForRole() {
+    const activePermissions = new Set(rolePermissionDefaults[roleSelect.value] || []);
+
+    permissionInputs.forEach(function (input) {
+      input.checked = activePermissions.has(input.value);
+    });
+  }
+
+  roleSelect.addEventListener('change', syncPermissionsForRole);
+});
+</script>
 
 {% endblock %}

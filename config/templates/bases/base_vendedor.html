@@ -8,7 +8,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<title>{% block title %}{% trans "Sistema" %}{% endblock %}</title>
+<title>{% block title %}{% trans "System" %}{% endblock %}</title>
 
 <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
 <link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
@@ -29,7 +29,7 @@
 
 <div class="container-fluid">
 
-<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="sidebarToggleBtn" aria-label="{% trans 'Abrir menu' %}">
+<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="sidebarToggleBtn" aria-label="{% trans 'Open menu' %}">
 ☰
 </button>
 
@@ -41,9 +41,26 @@ La Tortilla Grocery
 
 {% block navbar_right %}
 
-<button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#logoutModal" style="font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
-<i class="bi bi-box-arrow-right"></i> {% trans "Cerrar sesion" %}
+<div class="navbar-actions">
+{% if request.user.is_superuser or request.user.role == 'admin' %}
+<a
+  href="{% url 'perfil_admin' %}"
+  class="navbar-profile-link{% if request.resolver_match.url_name == 'perfil_admin' %} is-active{% endif %}"
+  title="{% trans 'My Profile' %}"
+  aria-label="{% trans 'My Profile' %}">
+  <span class="navbar-profile-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" focusable="false">
+      <path d="M12 12a4.5 4.5 0 1 0-4.5-4.5A4.5 4.5 0 0 0 12 12Zm0 2.25c-3.83 0-6.75 2.56-6.75 5.25a.75.75 0 0 0 1.5 0c0-1.68 2.16-3.75 5.25-3.75s5.25 2.07 5.25 3.75a.75.75 0 0 0 1.5 0c0-2.69-2.92-5.25-6.75-5.25Z"></path>
+    </svg>
+  </span>
+  <span class="navbar-profile-text">{% trans "My Profile" %}</span>
+</a>
+{% endif %}
+
+<button class="btn btn-danger navbar-logout-button" data-bs-toggle="modal" data-bs-target="#logoutModal">
+<i class="bi bi-box-arrow-right"></i> {% trans "Log out" %}
 </button>
+</div>
 
 {% endblock %}
 
@@ -63,11 +80,11 @@ La Tortilla Grocery
         </div>
         
         <h5 class="modal-title mb-2" style="color: #0b3d91; font-weight: 700; font-size: 1.5rem;">
-          {% trans "Estas seguro de salir?" %}
+          {% trans "Are you sure you want to log out?" %}
         </h5>
         
         <p class="text-muted mb-0" style="font-size: 1rem;">
-          {% trans "Se cerrara tu sesion en" %} <strong>La Tortilla Grocery</strong>
+          {% trans "You will be logged out of" %} <strong>La Tortilla Grocery</strong>
         </p>
       </div>
       
@@ -77,7 +94,7 @@ La Tortilla Grocery
         </button>
         
         <a href="{% url 'logout' %}" class="btn btn-danger" style="font-weight: 600; padding: 0.5rem 1.5rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
-          <i class="bi bi-box-arrow-right"></i> {% trans "Si, salir" %}
+          <i class="bi bi-box-arrow-right"></i> {% trans "Yes, log out" %}
         </a>
       </div>
     </div>
@@ -114,99 +131,197 @@ La Tortilla Grocery
 <div class="list-group list-group-flush">
 {% get_current_language as CURRENT_LANGUAGE %}
 
-{% if request.user|has_internal_permission:'admin.dashboard.view' %}
+{% if request.user.is_superuser or request.user.role == 'admin' %}
+  <div class="sidebar-section-title">{% trans "Administration" %}</div>
+
+  {% if request.user|has_internal_permission:'admin.dashboard.view' %}
   <a href="{% url 'panel_admin' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'panel_admin' %}active{% endif %}">
     {% trans "Admin Dashboard" %}
   </a>
-{% endif %}
-{% if request.user.is_superuser or request.user.role == 'admin' %}
-  <a href="{% url 'perfil_admin' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'perfil_admin' %}active{% endif %}">
-    {% trans "Mi perfil" %}
-  </a>
+  {% endif %}
+
   <a href="{% url 'lista_usuarios_internos' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_usuarios_internos' or request.resolver_match.url_name == 'crear_usuario_interno' or request.resolver_match.url_name == 'editar_usuario_interno' or request.resolver_match.url_name == 'crear_vendedor' or request.resolver_match.url_name == 'editar_vendedor' or request.resolver_match.url_name == 'crear_backoffice' or request.resolver_match.url_name == 'editar_backoffice' %}active{% endif %}">
     {% trans "Internal Users" %}
   </a>
-  {% endif %}
+
   {% if request.user|has_internal_permission:'admin.customer_requests.view' %}
   <a href="{% url 'clientes_pendientes' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' or request.resolver_match.url_name == 'ver_certificado_cliente' %}active{% endif %}">
     {% trans "Requests" %}
   </a>
   {% endif %}
+
   {% if request.user|has_internal_permission:'admin.products.view' %}
   <a href="{% url 'lista_productos' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_productos' or request.resolver_match.url_name == 'crear_producto' or request.resolver_match.url_name == 'crear_categoria' or request.resolver_match.url_name == 'crear_marca' or request.resolver_match.url_name == 'lista_marcas' or request.resolver_match.url_name == 'editar_marca' or request.resolver_match.url_name == 'editar_producto' %}active{% endif %}">
     {% trans "Products" %}
   </a>
   {% endif %}
+
   {% if request.user|has_internal_permission:'admin.content.view' %}
   <a href="{% url 'contenido_home' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'contenido_home' or request.resolver_match.url_name == 'editar_home_contenido' or request.resolver_match.url_name == 'lista_testimonios' or request.resolver_match.url_name == 'crear_testimonio' or request.resolver_match.url_name == 'editar_testimonio' %}active{% endif %}">
     {% trans "Home Content" %}
   </a>
   {% endif %}
-  {% if request.user|has_internal_permission:'backoffice.dashboard.view' %}
-  <a href="{% url 'backoffice_dashboard' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_dashboard' %}active{% endif %}">
-    {% trans "BackOffice" %}
-  </a>
+
+  {% if request.user|has_internal_permission:'backoffice.dashboard.view' or request.user|has_internal_permission:'backoffice.quotes.view' or request.user|has_internal_permission:'backoffice.orders.view' or request.user|has_internal_permission:'driver.delivery.view' or request.user|has_internal_permission:'selector.picking.view' %}
+  <details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'backoffice_dashboard' or request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' or request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' or request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' or request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' or request.resolver_match.url_name == 'driver_delivery_list' or request.resolver_match.url_name == 'driver_delivery_detail' or request.resolver_match.url_name == 'driver_delivery_tracking' or request.resolver_match.url_name == 'selector_picking_list' or request.resolver_match.url_name == 'selector_picking_detail' %}open{% endif %}>
+    <summary class="sidebar-collapsible-summary">{% trans "Operations" %}</summary>
+    <div class="sidebar-collapsible-links">
+      {% if request.user|has_internal_permission:'backoffice.dashboard.view' %}
+      <a href="{% url 'backoffice_dashboard' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_dashboard' %}active{% endif %}">
+        {% trans "BackOffice" %}
+      </a>
+      {% endif %}
+
+      {% if request.user|has_internal_permission:'backoffice.quotes.view' %}
+      <a href="{% url 'backoffice_cotizaciones' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' %}active{% endif %}">
+        {% trans "Quotes" %}
+      </a>
+      {% endif %}
+
+      {% if request.user|has_internal_permission:'backoffice.orders.view' %}
+      <a href="{% url 'backoffice_pedidos' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' %}active{% endif %}">
+        {% trans "Purchase Orders" %}
+      </a>
+      <a href="{% url 'backoffice_live_drivers' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' %}active{% endif %}">
+        {% trans "Live Drivers" %}
+      </a>
+      <a href="{% url 'backoffice_invoices_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' %}active{% endif %}">
+        {% trans "Invoices" %}
+      </a>
+      <a href="{% url 'backoffice_inventory_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' %}active{% endif %}">
+        {% trans "Inventory" %}
+      </a>
+      {% endif %}
+
+      {% if request.user|has_internal_permission:'driver.delivery.view' %}
+      <a href="{% url 'driver_delivery_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'driver_delivery_list' or request.resolver_match.url_name == 'driver_delivery_detail' or request.resolver_match.url_name == 'driver_delivery_tracking' %}active{% endif %}">
+        {% trans "Driver Deliveries" %}
+      </a>
+      {% endif %}
+
+      {% if request.user|has_internal_permission:'selector.picking.view' %}
+      <a href="{% url 'selector_picking_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'selector_picking_list' or request.resolver_match.url_name == 'selector_picking_detail' %}active{% endif %}">
+        {% trans "Assigned Picking Tickets" %}
+      </a>
+      {% endif %}
+    </div>
+  </details>
   {% endif %}
-  {% if request.user|has_internal_permission:'backoffice.quotes.view' %}
-  <a href="{% url 'backoffice_cotizaciones' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' %}active{% endif %}">
-    {% trans "Quotes" %}
-  </a>
-  {% endif %}
-  {% if request.user|has_internal_permission:'backoffice.orders.view' %}
-  <a href="{% url 'backoffice_pedidos' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' %}active{% endif %}">
-    {% trans "Purchase Orders" %}
-  </a>
-  {% endif %}
-  {% if request.user|has_internal_permission:'backoffice.orders.view' %}
-  <a href="{% url 'backoffice_invoices_list' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' %}active{% endif %}">
-    {% trans "Invoices" %}
-  </a>
-  {% endif %}
-  {% if request.user|has_internal_permission:'backoffice.orders.view' %}
-  <a href="{% url 'backoffice_inventory_list' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' %}active{% endif %}">
-    {% trans "Inventory" %}
-  </a>
-  {% endif %}
-  {% if request.user|has_internal_permission:'driver.delivery.view' %}
-  <a href="{% url 'driver_delivery_list' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'driver_delivery_list' or request.resolver_match.url_name == 'driver_delivery_detail' %}active{% endif %}">
-    {% trans "Driver Deliveries" %}
-  </a>
-  {% endif %}
-  {% if request.user|has_internal_permission:'selector.picking.view' %}
-  <a href="{% url 'selector_picking_list' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'selector_picking_list' or request.resolver_match.url_name == 'selector_picking_detail' %}active{% endif %}">
-    {% trans "Assigned Picking Tickets" %}
-  </a>
-  {% endif %}
-  {% if not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'vendor.customers.manage' %}
+
+  {% if request.user|has_internal_permission:'vendor.customers.manage' or request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' %}
+  <div class="sidebar-section-title">{% trans "Sales" %}</div>
+
+  {% if request.user|has_internal_permission:'vendor.customers.manage' %}
   <a href="{% url 'crear_cliente' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'crear_cliente' %}active{% endif %}">
     {% trans "Create Customer" %}
   </a>
   {% endif %}
-  {% if not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'vendor.customers.view' %}
+
+  <a href="{% url 'vendedores_clientes' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'vendedores_clientes' %}active{% endif %}">
+    {% trans "Customers" %}
+  </a>
+
+  {% if request.user|has_internal_permission:'vendor.orders.view' %}
+  <a href="{% url 'tomar_pedido' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'catalogo_vendedor' or request.resolver_match.url_name == 'ver_pedido' %}active{% endif %}">
+    {% trans "Take Order" %}
+  </a>
+  {% endif %}
+  {% endif %}
+{% else %}
+  {% if request.user|has_internal_permission:'backoffice.dashboard.view' or request.user|has_internal_permission:'backoffice.quotes.view' or request.user|has_internal_permission:'backoffice.orders.view' or request.user|has_internal_permission:'driver.delivery.view' or request.user|has_internal_permission:'selector.picking.view' %}
+  <details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'backoffice_dashboard' or request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' or request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' or request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' or request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' or request.resolver_match.url_name == 'driver_delivery_list' or request.resolver_match.url_name == 'driver_delivery_detail' or request.resolver_match.url_name == 'driver_delivery_tracking' or request.resolver_match.url_name == 'selector_picking_list' or request.resolver_match.url_name == 'selector_picking_detail' %}open{% endif %}>
+    <summary class="sidebar-collapsible-summary">{% trans "Operations" %}</summary>
+    <div class="sidebar-collapsible-links">
+      {% if request.user|has_internal_permission:'backoffice.dashboard.view' %}
+      <a href="{% url 'backoffice_dashboard' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_dashboard' %}active{% endif %}">
+        {% trans "BackOffice" %}
+      </a>
+      {% endif %}
+
+      {% if request.user|has_internal_permission:'backoffice.quotes.view' %}
+      <a href="{% url 'backoffice_cotizaciones' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' %}active{% endif %}">
+        {% trans "Quotes" %}
+      </a>
+      {% endif %}
+
+      {% if request.user|has_internal_permission:'backoffice.orders.view' %}
+      <a href="{% url 'backoffice_pedidos' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' %}active{% endif %}">
+        {% trans "Purchase Orders" %}
+      </a>
+      <a href="{% url 'backoffice_live_drivers' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' %}active{% endif %}">
+        {% trans "Live Drivers" %}
+      </a>
+      <a href="{% url 'backoffice_invoices_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' %}active{% endif %}">
+        {% trans "Invoices" %}
+      </a>
+      <a href="{% url 'backoffice_inventory_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' %}active{% endif %}">
+        {% trans "Inventory" %}
+      </a>
+      {% endif %}
+
+      {% if request.user|has_internal_permission:'driver.delivery.view' %}
+      <a href="{% url 'driver_delivery_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'driver_delivery_list' or request.resolver_match.url_name == 'driver_delivery_detail' or request.resolver_match.url_name == 'driver_delivery_tracking' %}active{% endif %}">
+        {% trans "Driver Deliveries" %}
+      </a>
+      {% endif %}
+
+      {% if request.user|has_internal_permission:'selector.picking.view' %}
+      <a href="{% url 'selector_picking_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'selector_picking_list' or request.resolver_match.url_name == 'selector_picking_detail' %}active{% endif %}">
+        {% trans "Assigned Picking Tickets" %}
+      </a>
+      {% endif %}
+    </div>
+  </details>
+  {% endif %}
+
+  {% if request.user|has_internal_permission:'vendor.customers.manage' or request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' %}
+  <div class="sidebar-section-title">{% trans "Sales" %}</div>
+
+  {% if request.user|has_internal_permission:'vendor.customers.manage' %}
+  <a href="{% url 'crear_cliente' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'crear_cliente' %}active{% endif %}">
+    {% trans "Create Customer" %}
+  </a>
+  {% endif %}
+
+  {% if request.user|has_internal_permission:'vendor.customers.view' %}
   <a href="{% url 'vendedores_clientes' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'vendedores_clientes' %}active{% endif %}">
     {% trans "Customers" %}
   </a>
   {% endif %}
-  {% if not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'vendor.orders.view' %}
+
+  {% if request.user|has_internal_permission:'vendor.orders.view' %}
   <a href="{% url 'tomar_pedido' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'catalogo_vendedor' or request.resolver_match.url_name == 'ver_pedido' %}active{% endif %}">
     {% trans "Take Order" %}
   </a>
+  {% endif %}
+  {% endif %}
 {% endif %}
 
 </div>
@@ -258,11 +373,13 @@ La Tortilla Grocery
 {% if messages %}
 <div id="flashMessages" class="d-none">
   {% for message in messages %}
+  {% if 'client-only' not in message.tags or request.user.role == 'cliente' %}
   <div
     class="flash-message-item"
     data-tags="{{ message.tags|default:'' }}"
     data-text="{{ message|striptags|escape }}">
   </div>
+  {% endif %}
   {% endfor %}
 </div>
 
@@ -270,15 +387,15 @@ La Tortilla Grocery
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0" style="border-radius: 12px; overflow: hidden;">
       <div class="modal-header border-0" id="feedbackModalHeader" style="background: linear-gradient(135deg, #0b3d91, #2f77d1); color: #fff;">
-        <h5 class="modal-title fw-bold" id="feedbackModalTitle">{% trans "Notificacion" %}</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% trans 'Cerrar' %}"></button>
+        <h5 class="modal-title fw-bold" id="feedbackModalTitle">{% trans "Notification" %}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
       </div>
       <div class="modal-body text-center py-4" style="background: #ffffff;">
         <p id="feedbackModalMessage" class="mb-0" style="font-size: 1rem; color: #1f2937;"></p>
       </div>
       <div class="modal-footer border-0 pt-0" style="justify-content: center;">
         <button type="button" class="btn" data-bs-dismiss="modal" style="background: #0b3d91; color: #fff; font-weight: 600; padding: 0.45rem 1.2rem; border-radius: 8px;">
-          {% trans "Entendido" %}
+          {% trans "Understood" %}
         </button>
       </div>
     </div>
@@ -309,6 +426,38 @@ document.addEventListener('DOMContentLoaded', function () {
   const backdrop = document.getElementById('sidebarBackdrop');
   const languageToggle = document.querySelector('.language-toggle');
   const languageMenu = document.getElementById('languageMenu');
+  const sidebarScrollStorageKey = 'ltg-panel-sidebar-scroll-{{ request.user.id|default:"anon" }}';
+
+  function restoreSidebarScroll() {
+    if (!sidebar) {
+      return;
+    }
+
+    try {
+      const savedScrollTop = window.sessionStorage.getItem(sidebarScrollStorageKey);
+      if (savedScrollTop === null) {
+        return;
+      }
+
+      sidebar.scrollTop = Number.parseInt(savedScrollTop, 10) || 0;
+    } catch (error) {
+      // Ignore storage failures and keep default sidebar behavior.
+    }
+  }
+
+  function persistSidebarScroll() {
+    if (!sidebar) {
+      return;
+    }
+
+    try {
+      window.sessionStorage.setItem(sidebarScrollStorageKey, String(sidebar.scrollTop));
+    } catch (error) {
+      // Ignore storage failures and keep default sidebar behavior.
+    }
+  }
+
+  restoreSidebarScroll();
 
   function closeLanguageMenu() {
     if (!languageMenu || !languageToggle) {
@@ -340,6 +489,9 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
+  sidebar.addEventListener('scroll', persistSidebarScroll, { passive: true });
+  window.addEventListener('beforeunload', persistSidebarScroll);
+
   function closeSidebar() {
     sidebar.classList.remove('show');
     backdrop.classList.remove('show');
@@ -353,7 +505,10 @@ document.addEventListener('DOMContentLoaded', function () {
   backdrop.addEventListener('click', closeSidebar);
 
   sidebar.querySelectorAll('a').forEach(function (link) {
-    link.addEventListener('click', closeSidebar);
+    link.addEventListener('click', function () {
+      persistSidebarScroll();
+      closeSidebar();
+    });
   });
 
   window.addEventListener('resize', function () {

@@ -12,6 +12,9 @@ from config.pedidos.models import Pedido, PedidoItem
 from config.productos.models import Presentacion
 
 
+COUNTRY_ALIASES_USA = {'usa', 'us', 'eeuu', 'estados unidos', 'united states'}
+
+
 class Invoice(models.Model):
 	DELIVERY_METHOD_CHOICES = (
 		('RUTA_DRIVER', _('Route with driver')),
@@ -129,6 +132,12 @@ class Delivery(models.Model):
 	delivery_state = models.CharField(max_length=100)
 	delivery_postal_code = models.CharField(max_length=20, blank=True)
 	delivery_country = models.CharField(max_length=100, default='USA')
+	current_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+	current_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+	current_accuracy_meters = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+	current_speed_mps = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+	current_heading = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
+	location_updated_at = models.DateTimeField(blank=True, null=True)
 	client_blocked_on_delivery = models.BooleanField(default=False)
 	client_unlocked_by = models.ForeignKey(
 		settings.AUTH_USER_MODEL,
@@ -156,8 +165,28 @@ class Delivery(models.Model):
 		return ', '.join(part for part in parts if part)
 
 	@property
+	def route_query_address(self):
+		country = (self.delivery_country or '').strip()
+		parts = [self.delivery_address, self.delivery_city, self.delivery_state]
+		if (country or '').strip().lower() in COUNTRY_ALIASES_USA and self.delivery_postal_code:
+			parts.append(self.delivery_postal_code)
+		if country:
+			parts.append(country)
+		return ', '.join(part for part in parts if part)
+
+	@property
 	def google_maps_url(self):
-		return f'https://www.google.com/maps/dir/?api=1&destination={quote_plus(self.route_address)}&travelmode=driving'
+		return f'https://www.google.com/maps/dir/?api=1&destination={quote_plus(self.route_query_address)}&travelmode=driving'
+
+	@property
+	def has_live_location(self):
+		return self.current_latitude is not None and self.current_longitude is not None
+
+	@property
+	def live_google_maps_url(self):
+		if self.has_live_location:
+			return f'https://www.google.com/maps?q={self.current_latitude},{self.current_longitude}'
+		return self.google_maps_url
 
 	@property
 	def is_completed(self):
@@ -261,6 +290,7 @@ class InvoiceItem(models.Model):
 	presentacion_nombre = models.CharField(max_length=120)
 	cantidad_facturada = models.PositiveIntegerField(default=1)
 	precio_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+	precio_venta_sugerido_unitario = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 	subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
 
 	class Meta:

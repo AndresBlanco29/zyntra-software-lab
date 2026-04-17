@@ -1,4 +1,4 @@
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from io import BytesIO
 
 from django.contrib import messages
@@ -19,6 +19,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from config.cotizaciones.models import Cotizacion
+from config.facturacion.services import resolve_presentacion_suggested_unit_price
 from config.notificaciones.models import Notificacion
 from config.productos.models import Presentacion
 from config.inventario.models import StockPresentacion
@@ -64,6 +65,27 @@ def _parse_non_negative_quantity(value, default=0):
 	except (TypeError, ValueError):
 		quantity = default
 	return max(quantity, 0)
+
+
+def _quantize_money(value):
+	return Decimal(str(value or '0')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def _calculate_margin_percentage(base_price, target_price):
+	base_decimal = _parse_decimal(base_price, 0)
+	target_decimal = _parse_decimal(target_price, 0)
+	if target_decimal <= 0:
+		return Decimal('0.00')
+	percentage = (Decimal('1') - (base_decimal / target_decimal)) * Decimal('100')
+	return percentage.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def _pedido_item_customer_unit_price(item):
+	case_price = _parse_decimal(item.precio, 0)
+	units = getattr(item.presentacion, 'unidades', 0) or 0
+	if units <= 0:
+		return _quantize_money(case_price)
+	return (case_price / Decimal(str(units))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
 def _pedido_state_label(state):
@@ -205,6 +227,25 @@ def backoffice_pedido_detalle(request, pedido_id):
 		'selectores': Usuario.objects.filter(role='seleccionador', is_active=True).order_by('first_name', 'last_name', 'username'),
 		'lineas_bloqueadas_para_picking': bool(pedido.seleccionador_id and pedido.estado in {'PARA_VERIFICAR', 'VERIFICADO_AJUSTADO'}) or hasattr(pedido, 'invoice'),
 		'presentaciones': Presentacion.objects.select_related('producto').filter(producto__activo=True).order_by('producto__nombre', 'nombre'),
+		'invoice_suggested_price_rows': [
+			{
+				'item_id': item.id,
+				'product_name': item.presentacion.producto.nombre,
+				'presentation_name': item.presentacion.nombre,
+				'quantity': item.cantidad,
+				'base_unit_value': format(_pedido_item_customer_unit_price(item), '.2f'),
+				'default_value': format(resolve_presentacion_suggested_unit_price(presentacion=item.presentacion, base_case_price=item.precio), '.2f'),
+				'default_percentage': format(
+					_calculate_margin_percentage(
+						_pedido_item_customer_unit_price(item),
+						resolve_presentacion_suggested_unit_price(presentacion=item.presentacion, base_case_price=item.precio),
+					),
+					'.2f',
+				),
+			}
+			for item in pedido.items.select_related('presentacion__producto')
+			if item.cantidad > 0
+		],
 	}
 	return render(request, 'backoffice/pedido_detalle.html', context)
 
@@ -295,10 +336,22 @@ def selector_picking_list(request):
 	if not _is_selector_user(request.user):
 		return redirect('login')
 
-	pedidos = _selector_pedidos_queryset(request.user)
+	base_queryset = _selector_pedidos_queryset(request.user)
+	view_mode = request.GET.get('view')
+	if view_mode == 'completed':
+		pedidos = base_queryset.exclude(estado='PARA_VERIFICAR')
+	else:
+		view_mode = 'active'
+		pedidos = base_queryset.filter(estado='PARA_VERIFICAR')
+
 	for pedido in pedidos:
 		pedido.estado_label = _pedido_state_label(pedido.estado)
-	return render(request, 'backoffice/selector_picking_list.html', {'pedidos': pedidos})
+	return render(request, 'backoffice/selector_picking_list.html', {
+		'pedidos': pedidos,
+		'view_mode': view_mode,
+		'active_count': base_queryset.filter(estado='PARA_VERIFICAR').count(),
+		'completed_count': base_queryset.exclude(estado='PARA_VERIFICAR').count(),
+	})
 
 
 @login_required
@@ -329,7 +382,7 @@ def selector_picking_detail(request, pedido_id):
 			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 		else:
 			messages.success(request, _('Picking ticket verified successfully.'))
-			return redirect('selector_picking_detail', pedido_id=pedido.id)
+			return redirect('selector_picking_list')
 
 	context = {
 		'pedido': pedido,

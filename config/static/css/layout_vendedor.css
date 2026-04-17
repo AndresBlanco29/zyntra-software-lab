@@ -101,6 +101,70 @@ width:100%;
     letter-spacing: 0.5px;
 }
 
+.navbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.navbar-profile-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.5rem 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 999px;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.12);
+    text-decoration: none;
+    transition: background-color 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+
+.navbar-profile-link:hover,
+.navbar-profile-link:focus {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.2);
+    border-color: #fff;
+    transform: translateY(-1px);
+}
+
+.navbar-profile-link.is-active {
+    background: rgba(255, 255, 255, 0.24);
+    border-color: #fff;
+}
+
+.navbar-profile-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+}
+
+.navbar-profile-icon svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+.navbar-profile-text {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+}
+
+.navbar-logout-button {
+    font-weight: 600;
+    padding: 0.5rem 1.2rem;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
 /* sidebar estilos */
 
 
@@ -116,6 +180,53 @@ width:100%;
     font-size: 18px;
 }
 
+.sidebar-section-title {
+    padding: 10px 16px 6px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #64748b;
+}
+
+.sidebar-collapsible {
+    margin: 6px 0 10px;
+}
+
+.sidebar-collapsible-summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 12px 16px;
+    font-weight: 700;
+    color: #0f172a;
+    text-align: center;
+    position: relative;
+}
+
+.sidebar-collapsible-summary::-webkit-details-marker {
+    display: none;
+}
+
+.sidebar-collapsible-summary::after {
+    content: "▾";
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    color: #64748b;
+    transition: transform 0.2s ease;
+}
+
+.sidebar-collapsible[open] .sidebar-collapsible-summary::after {
+    transform: translateY(-50%) rotate(180deg);
+}
+
+.sidebar-collapsible-links .list-group-item {
+    padding-left: 22px;
+    padding-right: 16px;
+}
+
         /* BOTONES GENERALES */
 /* BOTONES GENERALES */
 .sidebar .list-group-item {
@@ -125,6 +236,7 @@ width:100%;
     text-align: center; /* 🔥 centra los no activos */
     padding: 14px 10px;
     transition: 0.3s;
+    position: relative;
 }
 
 .sidebar .active {
@@ -133,20 +245,19 @@ width:100%;
     color: white !important;
     text-align: center;
     font-weight: bold;
-    padding: 12px;
+    padding: 12px 12px 12px 24px;
     font-size: 18px;
 }
 
 .sidebar .active::before {
     content: "";
     position: absolute;
-    left: 40px; /* 🔥 mueve la barra hacia la derecha */
-    top: 50%;
-    transform: translateY(-50%);
+    left: 0;
+    top: 0;
     width: 7px; /* grosor */
-    height: 70%;
+    height: 100%;
     background-color: #ffd400;
-    border-radius: 10px;
+    border-radius: 0 10px 10px 0;
 }
 
 .sidebar-backdrop {
@@ -430,6 +541,18 @@ width:100%;
         margin-left: 0 !important;
     }
 
+    .navbar-actions {
+        gap: 8px;
+    }
+
+    .navbar-profile-link {
+        padding: 0.45rem 0.7rem;
+    }
+
+    .navbar-profile-text {
+        display: none;
+    }
+
     .navbar-custom .ms-auto .btn {
         padding: 4px 8px !important;
         font-size: 12px !important;
@@ -461,10 +584,32 @@ width:100%;
         margin-bottom: 18px;
     }
 
-    .sidebar .list-group-item,
-    .sidebar .active {
+    .sidebar .list-group-item {
         font-size: 15px;
         padding: 12px 10px;
+    }
+
+    .sidebar .active {
+        padding: 12px 10px 12px 20px;
+    }
+
+    .sidebar-section-title {
+        padding: 8px 14px 4px;
+        font-size: 11px;
+    }
+
+    .sidebar-collapsible-summary {
+        padding: 10px 14px;
+        font-size: 14px;
+    }
+
+    .sidebar-collapsible-summary::after {
+        right: 12px;
+    }
+
+    .sidebar-collapsible-links .list-group-item {
+        padding-left: 18px;
+        padding-right: 12px;
     }
 
     /* Toolbar mobile */

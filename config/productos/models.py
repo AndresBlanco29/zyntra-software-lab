@@ -1,6 +1,7 @@
 import unicodedata
 from decimal import Decimal, ROUND_HALF_UP
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import get_language, gettext_lazy as _
 
@@ -79,6 +80,15 @@ def _calculate_price_from_margin(cost, margin_percentage):
         return Decimal("0.00")
 
     return _quantize_money(cost_decimal / divisor)
+
+
+def _validate_margin_percentage(value):
+    percentage = Decimal(str(value or 0))
+    if percentage < 0:
+        raise ValidationError(_('Utility percentages must be zero or greater.'))
+    if percentage >= 100:
+        raise ValidationError(_('Utility percentages must be less than 100 because the formula is cost / (1 - percentage).'))
+    return percentage.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 class Categoria(models.Model):
 
@@ -235,8 +245,16 @@ class ConfiguracionPrecios(models.Model):
         verbose_name = _("Price configuration")
         verbose_name_plural = _("Price configuration")
 
+    def clean(self):
+        self.porcentaje_1 = _validate_margin_percentage(self.porcentaje_1)
+        self.porcentaje_2 = _validate_margin_percentage(self.porcentaje_2)
+        self.porcentaje_3 = _validate_margin_percentage(self.porcentaje_3)
+        self.porcentaje_4 = _validate_margin_percentage(self.porcentaje_4)
+        self.porcentaje_5 = _validate_margin_percentage(self.porcentaje_5)
+
     def save(self, *args, **kwargs):
         self.pk = 1
+        self.full_clean()
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):

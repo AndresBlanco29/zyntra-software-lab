@@ -1,5 +1,5 @@
 import logging
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from urllib.parse import quote
 
 from django.conf import settings
@@ -19,7 +19,7 @@ from config.clientes.models import Cliente
 from config.notificaciones.models import crear_notificacion_backoffice
 from config.pedidos.models import Pedido
 from config.pedidos.services import crear_pedido_desde_items, notificar_backoffice_pedido, notificar_cliente_pedido
-from config.productos.models import Presentacion
+from config.productos.models import ConfiguracionPrecios, Presentacion
 from config.usuarios.permissions import internal_permission_required
 
 from .models import Cotizacion, CotizacionItem
@@ -27,6 +27,28 @@ from django.utils.translation import gettext as _
 
 
 logger = logging.getLogger(__name__)
+
+QUOTE_SEND_READY_SESSION_KEY = 'backoffice_quote_send_ready'
+MIN_BACKOFFICE_QUOTE_PRICE = Decimal('1.00')
+
+
+def _quote_send_ready_map(session):
+    return dict(session.get(QUOTE_SEND_READY_SESSION_KEY, {}))
+
+
+def _set_quote_send_ready(session, cotizacion_id, ready):
+    ready_map = _quote_send_ready_map(session)
+    key = str(cotizacion_id)
+    if ready:
+        ready_map[key] = True
+    else:
+        ready_map.pop(key, None)
+    session[QUOTE_SEND_READY_SESSION_KEY] = ready_map
+    session.modified = True
+
+
+def _is_quote_send_ready(session, cotizacion_id):
+    return bool(_quote_send_ready_map(session).get(str(cotizacion_id)))
 
 
 def _is_backoffice_user(user):
@@ -49,6 +71,94 @@ def _parse_quantity(value, default=1):
     except (TypeError, ValueError):
         quantity = default
     return max(quantity, 1)
+
+
+def _calculate_quote_utility_percentage(cost, price):
+    if cost is None:
+        return None
+
+    cost_decimal = _parse_decimal(cost, 0)
+    price_decimal = _parse_decimal(price, 0)
+    if price_decimal <= 0:
+        return None
+
+    percentage = (Decimal('1') - (cost_decimal / price_decimal)) * Decimal('100')
+    return percentage.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def _default_backoffice_quote_price(item, cotizacion):
+    current_price = _parse_decimal(item.precio, 0)
+    if cotizacion.backoffice_pricing_confirmed:
+        return current_price
+
+    default_price = _parse_decimal(getattr(item.presentacion, 'precio_5', 0), 0)
+    if default_price > 0:
+        return default_price
+    return current_price
+
+
+def _validate_backoffice_quote_price(*, item, price):
+    product_label = f'{item.presentacion.producto.nombre} ({item.presentacion.nombre})'
+    cost = item.presentacion.costo
+
+    if price <= MIN_BACKOFFICE_QUOTE_PRICE:
+        return _('The price for %(product)s must be greater than $1.00.') % {
+            'product': product_label,
+        }
+
+    if cost is not None:
+        cost_decimal = _parse_decimal(cost, 0)
+        if price < cost_decimal:
+            return _('The price for %(product)s cannot be lower than cost ($%(cost)s) because it would generate a loss.') % {
+                'product': product_label,
+                'cost': cost_decimal.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
+            }
+
+    return ''
+
+
+def _build_quote_item_rows(cotizacion):
+    margin_values = ConfiguracionPrecios.obtener().porcentajes_lista()
+    rows = []
+    display_total = Decimal('0.00')
+
+    for item in cotizacion.items.select_related('presentacion__producto'):
+        current_price = _default_backoffice_quote_price(item, cotizacion)
+        display_subtotal = (current_price * Decimal(str(item.cantidad))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        price_options = []
+        selected_option = ''
+
+        for index, margin in enumerate(margin_values, start=1):
+            option_key = f'precio_{index}'
+            option_value = _parse_decimal(getattr(item.presentacion, option_key), 0)
+            if option_value == current_price:
+                selected_option = option_key
+            price_options.append({
+                'key': option_key,
+                'label': _('Price %(number)s (%(percentage)s%%)') % {
+                    'number': index,
+                    'percentage': margin,
+                },
+                'value': option_value,
+                'margin': margin,
+            })
+
+        rows.append({
+            'item': item,
+            'price_options': price_options,
+            'selected_option': selected_option,
+            'current_price': current_price,
+            'display_subtotal': display_subtotal,
+            'cost': item.presentacion.costo,
+            'minimum_price': max(
+                (_parse_decimal(item.presentacion.costo, 0) if item.presentacion.costo is not None else Decimal('0.00')),
+                Decimal('1.01'),
+            ),
+            'current_utility_percentage': _calculate_quote_utility_percentage(item.presentacion.costo, current_price),
+        })
+        display_total += display_subtotal
+
+    return rows, display_total
 
 
 def _cliente_from_user(user):
@@ -277,7 +387,7 @@ def guardar_cotizacion(request):
     try:
         email.attach_alternative(html_content, "text/html")
         email.send(fail_silently=False)
-        messages.success(request, _('Your quote request was sent successfully.'))
+        messages.success(request, _('Your quote request was sent successfully.'), extra_tags='client-only')
     except Exception as exc:
         logger.exception("Error enviando correo de cotización %s: %s", cotizacion.id, exc)
         messages.warning(
@@ -309,11 +419,24 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
         if not request.user.has_internal_permission('backoffice.quotes.manage'):
             messages.error(request, _('You do not have permission to update this quote.'))
             return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
+
+        updated_items = []
+        validation_error = ''
+        for item in cotizacion.items.select_related('presentacion__producto'):
+            cantidad = _parse_quantity(request.POST.get(f'cantidad_{item.id}'), item.cantidad)
+            precio = _parse_decimal(request.POST.get(f'precio_{item.id}'), item.precio)
+            validation_error = _validate_backoffice_quote_price(item=item, price=precio)
+            if validation_error:
+                break
+            updated_items.append((item, cantidad, precio))
+
+        if validation_error:
+            messages.error(request, validation_error)
+            return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
+
         with transaction.atomic():
             total = Decimal('0')
-            for item in cotizacion.items.select_related('presentacion__producto'):
-                cantidad = _parse_quantity(request.POST.get(f'cantidad_{item.id}'), item.cantidad)
-                precio = _parse_decimal(request.POST.get(f'precio_{item.id}'), item.precio)
+            for item, cantidad, precio in updated_items:
                 item.cantidad = cantidad
                 item.precio = precio
                 item.subtotal = precio * cantidad
@@ -322,15 +445,27 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
 
             cotizacion.nota_backoffice = (request.POST.get('nota_backoffice') or '').strip()
             cotizacion.total = total
-            cotizacion.save(update_fields=['nota_backoffice', 'total'])
+            cotizacion.backoffice_pricing_confirmed = True
+            cotizacion.save(update_fields=['nota_backoffice', 'total', 'backoffice_pricing_confirmed'])
 
+        _set_quote_send_ready(request.session, cotizacion.id, True)
         messages.success(request, _('Quote updated successfully.'))
-        return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
+        return redirect(f"{reverse('backoffice_cotizacion_detalle', args=[cotizacion.id])}?saved=1")
+
+    if request.GET.get('saved') == '1':
+        _set_quote_send_ready(request.session, cotizacion.id, True)
+    else:
+        _set_quote_send_ready(request.session, cotizacion.id, False)
 
     confirm_url, telefono_contacto, whatsapp_link, outbound_message = _get_whatsapp_contact_data(cotizacion, request)
+    cotizacion_item_rows, display_total = _build_quote_item_rows(cotizacion)
+    can_send_customer_quote = _is_quote_send_ready(request.session, cotizacion.id)
 
     context = {
         'cotizacion': cotizacion,
+        'cotizacion_item_rows': cotizacion_item_rows,
+        'display_total': display_total,
+        'can_send_customer_quote': can_send_customer_quote,
         'confirm_url': confirm_url,
         'telefono_contacto': telefono_contacto,
         'whatsapp_link': whatsapp_link,
@@ -350,6 +485,10 @@ def enviar_cotizacion_cliente(request, cotizacion_id):
 
     if not cotizacion.items.exists():
         messages.error(request, _('The quote has no products to send to the customer.'))
+        return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
+
+    if not _is_quote_send_ready(request.session, cotizacion.id):
+        messages.warning(request, _('Save the quote changes before sending it to the customer.'))
         return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
     confirm_url, telefono_contacto, whatsapp_link, outbound_message = _get_whatsapp_contact_data(cotizacion, request)
@@ -416,6 +555,7 @@ def enviar_cotizacion_cliente(request, cotizacion_id):
     else:
         messages.warning(request, _('The quote was marked as ready to confirm, but the email could not be sent.'))
 
+    _set_quote_send_ready(request.session, cotizacion.id, False)
     return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
 
@@ -425,6 +565,10 @@ def abrir_whatsapp_manual_cotizacion(request, cotizacion_id):
     cotizacion = get_object_or_404(Cotizacion.objects.select_related('cliente__usuario'), id=cotizacion_id)
     confirm_url, phone_number, whatsapp_link, outbound_message = _get_whatsapp_contact_data(cotizacion, request)
 
+    if not _is_quote_send_ready(request.session, cotizacion.id):
+        messages.warning(request, _('Save the quote changes before opening WhatsApp for the customer.'))
+        return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
+
     if not whatsapp_link:
         messages.warning(request, _('No valid phone number available to open WhatsApp manually.'))
         return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
@@ -432,6 +576,7 @@ def abrir_whatsapp_manual_cotizacion(request, cotizacion_id):
     cotizacion.whatsapp_manual_abierto = True
     cotizacion.whatsapp_manual_abierto_en = timezone.now()
     cotizacion.save(update_fields=['whatsapp_manual_abierto', 'whatsapp_manual_abierto_en'])
+    _set_quote_send_ready(request.session, cotizacion.id, False)
     return HttpResponseRedirect(whatsapp_link)
 
 
@@ -537,6 +682,8 @@ def cliente_cotizacion_recibida_detalle(request, token):
                 nota_cliente=nota_cliente,
                 acepta_terminos=True,
                 canal_toma='portal',
+                bypass_stock_check=True,
+                reservar_inventario=False,
             )
 
             cotizacion.estado = 'CONFIRMADA_CLIENTE'
@@ -563,5 +710,5 @@ def cliente_cotizacion_recibida_detalle(request, token):
     }
     return render(request, 'cotizaciones/cliente_confirmar_cotizacion.html', context)
 
-    
+
 

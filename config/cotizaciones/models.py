@@ -12,7 +12,7 @@ class Cotizacion(models.Model):
 
     ESTADO_CHOICES = (
         ('BORRADOR', _('Draft')),
-        ('ENVIADA', _('Sent')),
+        ('ENVIADA', _('Sent by client')),
         ('LISTA_PARA_CONFIRMACION', _('Ready for confirmation')),
         ('CONFIRMADA_CLIENTE', _('Confirmed by client')),
         ('CANCELADA_CLIENTE', _('Canceled by client')),
@@ -47,6 +47,7 @@ class Cotizacion(models.Model):
     nota_cliente = models.TextField(blank=True)
     nota_confirmacion_cliente = models.TextField(blank=True)
     nota_backoffice = models.TextField(blank=True)
+    backoffice_pricing_confirmed = models.BooleanField(default=False)
     token_cliente = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     correo_enviado = models.BooleanField(default=False)
     correo_enviado_en = models.DateTimeField(null=True, blank=True)

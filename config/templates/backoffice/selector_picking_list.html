@@ -4,13 +4,41 @@
 {% block title %}{% trans "Assigned Picking Tickets" %}{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">{% trans "Assigned Picking Tickets" %}</h2>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="mb-1">
+      {% if view_mode == 'completed' %}
+      {% trans "Processed Picking Tickets" %}
+      {% else %}
+      {% trans "Assigned Picking Tickets" %}
+      {% endif %}
+    </h2>
+    <p class="text-muted mb-0">
+      {% if view_mode == 'completed' %}
+      {% trans "Review the picking tickets you already verified or that already moved forward in the workflow." %}
+      {% else %}
+      {% trans "Only pending picking tickets assigned to you are shown here." %}
+      {% endif %}
+    </p>
+  </div>
+</div>
 
 {% if messages %}
   {% for message in messages %}
   <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
   {% endfor %}
 {% endif %}
+
+<div class="btn-group mb-3" role="group" aria-label="{% trans 'Picking views' %}">
+  <a href="{% url 'selector_picking_list' %}" class="btn {% if view_mode == 'active' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+    {% trans "Pending Picking Tickets" %}
+    <span class="badge {% if view_mode == 'active' %}bg-light text-primary{% else %}bg-primary{% endif %} ms-1">{{ active_count }}</span>
+  </a>
+  <a href="{% url 'selector_picking_list' %}?view=completed" class="btn {% if view_mode == 'completed' %}btn-success{% else %}btn-outline-success{% endif %}">
+    {% trans "Processed Picking Tickets" %}
+    <span class="badge {% if view_mode == 'completed' %}bg-light text-success{% else %}bg-success{% endif %} ms-1">{{ completed_count }}</span>
+  </a>
+</div>
 
 <div class="card shadow-sm">
   <div class="table-responsive">
@@ -39,11 +67,25 @@
             {% endif %}
           </td>
           <td>{% if pedido.picking_asignado_en %}{{ pedido.picking_asignado_en|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
-          <td><a href="{% url 'selector_picking_detail' pedido.id %}" class="btn btn-sm btn-primary">{% trans "Verify" %}</a></td>
+          <td>
+            <a href="{% url 'selector_picking_detail' pedido.id %}" class="btn btn-sm {% if view_mode == 'completed' %}btn-success{% else %}btn-primary{% endif %}">
+              {% if view_mode == 'completed' %}
+              {% trans "View summary" %}
+              {% else %}
+              {% trans "Verify" %}
+              {% endif %}
+            </a>
+          </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="6" class="text-center text-muted py-4">{% trans "No picking tickets are currently assigned to you." %}</td>
+          <td colspan="6" class="text-center text-muted py-4">
+            {% if view_mode == 'completed' %}
+            {% trans "No processed picking tickets are available yet." %}
+            {% else %}
+            {% trans "No pending picking tickets are currently assigned to you." %}
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>

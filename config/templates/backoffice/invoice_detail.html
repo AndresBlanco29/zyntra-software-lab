@@ -74,6 +74,7 @@
       <h5 class="mb-0">{% trans "Delivery" %}</h5>
       <div class="d-flex gap-2">
         <a href="{{ invoice.delivery.google_maps_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">{% trans "Open in Google Maps" %}</a>
+          <a href="{% url 'backoffice_invoice_live_tracking' invoice.id %}" class="btn btn-sm btn-primary">{% trans "Track driver live" %}</a>
       </div>
     </div>
     <div class="row g-3">
@@ -107,6 +108,83 @@
         <div class="text-muted small">{% trans "Recipient" %}</div>
         <div>{{ invoice.delivery.recibido_por|default:'-' }}</div>
       </div>
+      <div class="col-md-3">
+        <div class="text-muted small">{% trans "Payment method" %}</div>
+        <div>
+          {% if invoice.delivery.metodo_pago %}
+            {{ invoice.delivery.get_metodo_pago_display }}
+          {% else %}
+            -
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-muted small">{% trans "Amount received" %}</div>
+        <div>${{ invoice.delivery.monto_pagado }}</div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-muted small">{% trans "Delivered at" %}</div>
+        <div>{% if invoice.delivery.delivered_at %}{{ invoice.delivery.delivered_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-muted small">{% trans "Signature received" %}</div>
+        <div>{% if invoice.delivery.firma_recibida_en %}{{ invoice.delivery.firma_recibida_en|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-muted small">{% trans "Last live signal" %}</div>
+        <div>{% if invoice.delivery.location_updated_at %}{{ invoice.delivery.location_updated_at|date:"d/m/Y H:i:s" }}{% else %}-{% endif %}</div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-muted small">{% trans "Current coordinates" %}</div>
+        <div>
+          {% if invoice.delivery.has_live_location %}
+            {{ invoice.delivery.current_latitude }}, {{ invoice.delivery.current_longitude }}
+          {% else %}
+            -
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="text-muted small">{% trans "Driver notes" %}</div>
+        <div>{{ invoice.delivery.notas_driver|default:'-' }}</div>
+      </div>
+      <div class="col-md-6">
+        <div class="text-muted small">{% trans "Non-payment reason" %}</div>
+        <div>{{ invoice.delivery.motivo_no_pago|default:'-' }}</div>
+      </div>
+      {% if invoice.delivery.firma_cliente %}
+      <div class="col-lg-6">
+        <div class="border rounded-3 p-3 bg-light h-100">
+          <div class="d-flex justify-content-between align-items-center mb-2 gap-2 flex-wrap">
+            <div>
+              <h6 class="mb-1">{% trans "Customer signature proof" %}</h6>
+              <p class="text-muted small mb-0">{% trans "Stored when the driver closes the delivery and records the payment outcome." %}</p>
+            </div>
+            <a href="{{ invoice.delivery.firma_cliente.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">{% trans "Open signature" %}</a>
+          </div>
+          <a href="{{ invoice.delivery.firma_cliente.url }}" target="_blank" rel="noopener">
+            <img src="{{ invoice.delivery.firma_cliente.url }}" alt="{% trans 'Customer signature proof' %}" class="img-fluid rounded border bg-white w-100">
+          </a>
+        </div>
+      </div>
+      {% endif %}
+      {% if invoice.delivery.evidence_photos.all %}
+      <div class="col-lg-6">
+        <div class="border rounded-3 p-3 h-100">
+          <h6 class="mb-1">{% trans "Delivery evidence photos" %}</h6>
+          <p class="text-muted small mb-3">{% trans "Photos uploaded by the driver during delivery closure." %}</p>
+          <div class="row g-2">
+            {% for photo in invoice.delivery.evidence_photos.all %}
+            <div class="col-6">
+              <a href="{{ photo.image.url }}" target="_blank" rel="noopener">
+                <img src="{{ photo.image.url }}" alt="{% trans 'Delivery evidence photo' %}" class="img-fluid rounded border">
+              </a>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
       {% if invoice.delivery.client_blocked_on_delivery and invoice.cliente.credit_hold %}
       <div class="col-12">
         <form method="post" action="{% url 'backoffice_unlock_delivery_client' invoice.delivery.id %}">
@@ -131,6 +209,7 @@
             <th>{% trans "Presentation" %}</th>
             <th>{% trans "Qty." %}</th>
             <th>{% trans "Unit price" %}</th>
+            <th>{% trans "Suggested retail / unit" %}</th>
             <th>{% trans "Subtotal" %}</th>
           </tr>
         </thead>
@@ -141,6 +220,7 @@
             <td>{{ item.presentacion_nombre }}</td>
             <td>{{ item.cantidad_facturada }}</td>
             <td>${{ item.precio_unitario }}</td>
+            <td>${{ item.precio_venta_sugerido_unitario|default:'0.00' }}</td>
             <td>${{ item.subtotal }}</td>
           </tr>
           {% endfor %}

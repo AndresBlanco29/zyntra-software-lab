@@ -1,0 +1,125 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Track Driver" %} - {{ invoice.numero }}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <h2 class="mb-1">{% trans "Driver live tracking" %}</h2>
+    <p class="text-muted mb-0">{{ invoice.numero }} | {{ invoice.cliente.nombre_empresa }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'backoffice_live_drivers' %}" class="btn btn-outline-primary">{% trans "View all live drivers" %}</a>
+    <a href="{% url 'backoffice_invoice_detail' invoice.id %}" class="btn btn-outline-secondary">{% trans "Back to invoice" %}</a>
+    <a href="{{ delivery.live_google_maps_url }}" target="_blank" rel="noopener" class="btn btn-primary" id="adminTrackingMapsButton">{% trans "Open live location" %}</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">{% trans "Vehicle position" %}</h5>
+          <span class="badge bg-secondary" id="adminTrackingFreshness">{% trans "Waiting for signal" %}</span>
+        </div>
+        <div class="ratio ratio-16x9 border rounded overflow-hidden bg-light">
+          <iframe id="adminTrackingMap" src="https://maps.google.com/maps?q={{ delivery.route_address|urlencode }}&z=13&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="mb-3">{% trans "Live feed" %}</h5>
+        <div class="row g-3">
+          <div class="col-12"><div class="text-muted small">{% trans "Driver" %}</div><div id="trackingDriverName">{% firstof delivery.driver.get_full_name delivery.driver.username %}</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Delivery status" %}</div><div id="trackingStatus">{{ delivery.get_estado_display }}</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Payment status" %}</div><div id="trackingPaymentStatus">{{ delivery.get_estado_pago_display }}</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Last signal" %}</div><div id="trackingUpdatedAt">{% if delivery.location_updated_at %}{{ delivery.location_updated_at|date:"d/m/Y H:i:s" }}{% else %}-{% endif %}</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Signal age" %}</div><div id="trackingAge">-</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Accuracy" %}</div><div id="trackingAccuracy">-</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Speed" %}</div><div id="trackingSpeed">-</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Heading" %}</div><div id="trackingHeading">-</div></div>
+          <div class="col-12"><div class="text-muted small">{% trans "Coordinates" %}</div><div id="trackingCoordinates">-</div></div>
+          <div class="col-12"><div class="text-muted small">{% trans "Destination" %}</div><div>{{ delivery.route_address }}</div></div>
+          <div class="col-12"><div class="small text-muted" id="trackingHelp">{% trans "This page refreshes automatically while the driver keeps the tracking screen open." %}</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const dataUrl = "{% url 'backoffice_invoice_tracking_data' invoice.id %}";
+    const mapFrame = document.getElementById('adminTrackingMap');
+    const mapsButton = document.getElementById('adminTrackingMapsButton');
+    const freshness = document.getElementById('adminTrackingFreshness');
+    const updatedAt = document.getElementById('trackingUpdatedAt');
+    const age = document.getElementById('trackingAge');
+    const accuracy = document.getElementById('trackingAccuracy');
+    const speed = document.getElementById('trackingSpeed');
+    const heading = document.getElementById('trackingHeading');
+    const coordinates = document.getElementById('trackingCoordinates');
+    const status = document.getElementById('trackingStatus');
+    const paymentStatus = document.getElementById('trackingPaymentStatus');
+    const help = document.getElementById('trackingHelp');
+
+    function setFreshness(text, className) {
+      freshness.textContent = text;
+      freshness.className = 'badge ' + className;
+    }
+
+    function refreshView(tracking) {
+      status.textContent = tracking.status;
+      paymentStatus.textContent = tracking.payment_status;
+      updatedAt.textContent = tracking.location_updated_label || '-';
+      accuracy.textContent = tracking.accuracy_meters !== null ? `${tracking.accuracy_meters.toFixed(2)} m` : '-';
+      speed.textContent = tracking.speed_mps !== null ? `${tracking.speed_mps.toFixed(2)} m/s` : '-';
+      heading.textContent = tracking.heading !== null ? `${tracking.heading.toFixed(2)}°` : '-';
+      mapsButton.href = tracking.maps_url;
+
+      if (tracking.has_location) {
+        coordinates.textContent = `${tracking.latitude.toFixed(6)}, ${tracking.longitude.toFixed(6)}`;
+        mapFrame.src = `https://maps.google.com/maps?q=${tracking.latitude},${tracking.longitude}&z=16&output=embed`;
+        const ageSeconds = tracking.location_age_seconds === null ? null : tracking.location_age_seconds;
+        age.textContent = ageSeconds === null ? '-' : `${ageSeconds}s`;
+        if (ageSeconds !== null && ageSeconds <= 30) {
+          setFreshness('{% trans "Live now" %}', 'bg-success');
+          help.textContent = '{% trans "The driver is still sending fresh GPS positions." %}';
+        } else {
+          setFreshness('{% trans "Last known position" %}', 'bg-warning text-dark');
+          help.textContent = '{% trans "The map shows the last position received from the driver." %}';
+        }
+      } else {
+        coordinates.textContent = '-';
+        age.textContent = '-';
+        mapFrame.src = `https://maps.google.com/maps?q=${encodeURIComponent(tracking.destination_address)}&z=13&output=embed`;
+        setFreshness('{% trans "Waiting for signal" %}', 'bg-secondary');
+        help.textContent = '{% trans "No live GPS signal has been received yet." %}';
+      }
+    }
+
+    function fetchTracking() {
+      fetch(dataUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok || !data.success) {
+            throw new Error(data.message || '{% trans "Unable to load driver tracking." %}');
+          }
+          refreshView(data.tracking);
+        })
+        .catch((error) => {
+          setFreshness('{% trans "Tracking unavailable" %}', 'bg-danger');
+          help.textContent = error.message;
+        });
+    }
+
+    fetchTracking();
+    window.setInterval(fetchTracking, 10000);
+  })();
+</script>
+{% endblock %}

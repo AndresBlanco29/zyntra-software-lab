@@ -5,11 +5,13 @@ from config.usuarios.models import Usuario
 from config.productos.models import Producto, Presentacion, Categoria, Marca
 from django.views.decorators.http import require_POST
 import uuid
+import json
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.conf import settings
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.utils.translation import gettext as _
 import pytz
 from django.contrib import messages
 import logging
@@ -17,9 +19,55 @@ from django.contrib.auth.decorators import login_required
 
 from config.pedidos.services import crear_pedido_desde_items, notificar_backoffice_pedido
 from config.usuarios.permissions import internal_permission_required
+from config.usuarios.us_locations import US_STATE_CITIES, match_state_name, match_city_for_state
 
 
 logger = logging.getLogger(__name__)
+
+
+USA_COUNTRY_ALIASES = {'usa', 'us', 'eeuu', 'estados unidos', 'united states'}
+
+
+def _normalize_customer_location_payload(data):
+    direccion = (data.get('direccion') or '').strip()
+    ciudad = (data.get('ciudad') or '').strip()
+    estado = (data.get('estado') or '').strip()
+    codigo_postal = (data.get('codigo_postal') or '').strip()
+    pais = (data.get('pais') or 'USA').strip()
+    manual_location = bool(data.get('manual_location'))
+
+    if not direccion:
+        raise ValidationError(_('La direccion es obligatoria.'))
+    if not ciudad:
+        raise ValidationError(_('La ciudad es obligatoria.'))
+    if not estado:
+        raise ValidationError(_('El estado o departamento es obligatorio.'))
+    if not pais:
+        raise ValidationError(_('El pais es obligatorio.'))
+
+    normalized_country = pais.lower()
+    is_usa = normalized_country in USA_COUNTRY_ALIASES
+
+    if is_usa and not manual_location:
+        matched_state = match_state_name(estado)
+        if not matched_state:
+            raise ValidationError(_('Debes seleccionar un estado valido.'))
+
+        matched_city = match_city_for_state(matched_state, ciudad)
+        if not matched_city:
+            raise ValidationError(_('Debes seleccionar una ciudad valida para el estado elegido.'))
+
+        estado = matched_state
+        ciudad = matched_city
+        pais = 'USA'
+
+    return {
+        'direccion': direccion,
+        'ciudad': ciudad,
+        'estado': estado,
+        'codigo_postal': codigo_postal,
+        'pais': pais,
+    }
 
 
 @login_required
@@ -85,7 +133,9 @@ def clientes(request):
     clientes = Cliente.objects.select_related('usuario').all()
 
     context = {
-        "clientes": clientes
+        "clientes": clientes,
+        'us_locations_json': json.dumps(US_STATE_CITIES),
+        'us_states': sorted(US_STATE_CITIES.keys()),
     }
 
     return render(request, "vendedores/clientes.html", context)
@@ -396,42 +446,52 @@ def enviar_pedido(request):
     return JsonResponse(response)
 
 
+@login_required
+@require_POST
 def editar_cliente(request):
     """Vista para editar los datos del cliente"""
-    
-    if request.method == 'POST':
-        import json
-        
-        try:
-            data = json.loads(request.body)
-            cliente_id = data.get('cliente_id')
-            empresa = data.get('empresa')
-            correo = data.get('correo')
-            telefono = data.get('telefono')
-            
-            # Obtener el cliente
-            cliente = Cliente.objects.get(id=cliente_id)
-            
-            # Verificar que el vendedor es el que intenta editar
-            # (puedes agregar validación si es necesario)
-            
-            # Actualizar datos del cliente
-            cliente.nombre_empresa = empresa
-            cliente.telefono = telefono
-            cliente.save()
-            
-            # Actualizar email del usuario
-            cliente.usuario.email = correo
-            cliente.usuario.save()
-            
-            return JsonResponse({'success': True, 'message': 'Cliente actualizado correctamente'})
-            
-        except Cliente.DoesNotExist:
-            return JsonResponse({'success': False, 'message': 'Cliente no encontrado'})
-        except Exception as e:
-            return JsonResponse({'success': False, 'message': str(e)})
-    
-    return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=400)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': _('Solicitud invalida.')}, status=400)
+
+    cliente_id = data.get('cliente_id')
+    empresa = (data.get('empresa') or '').strip()
+    correo = (data.get('correo') or '').strip()
+    telefono = (data.get('telefono') or '').strip()
+
+    if not cliente_id:
+        return JsonResponse({'success': False, 'message': _('Cliente no encontrado')}, status=404)
+    if not empresa or not correo or not telefono:
+        return JsonResponse({'success': False, 'message': _('Por favor completa todos los campos requeridos.')}, status=400)
+    if len(telefono) != 10 or not telefono.isdigit():
+        return JsonResponse({'success': False, 'message': _('El telefono debe tener exactamente 10 digitos.')}, status=400)
+
+    try:
+        location_payload = _normalize_customer_location_payload(data)
+        cliente = Cliente.objects.select_related('usuario').get(id=cliente_id)
+
+        cliente.nombre_empresa = empresa
+        cliente.telefono = telefono
+        cliente.direccion = location_payload['direccion']
+        cliente.ciudad = location_payload['ciudad']
+        cliente.estado = location_payload['estado']
+        cliente.codigo_postal = location_payload['codigo_postal']
+        cliente.pais = location_payload['pais']
+        cliente.save(update_fields=['nombre_empresa', 'telefono', 'direccion', 'ciudad', 'estado', 'codigo_postal', 'pais'])
+
+        cliente.usuario.email = correo
+        cliente.usuario.save(update_fields=['email'])
+
+        return JsonResponse({'success': True, 'message': _('Cliente actualizado correctamente')})
+
+    except Cliente.DoesNotExist:
+        return JsonResponse({'success': False, 'message': _('Cliente no encontrado')}, status=404)
+    except ValidationError as exc:
+        return JsonResponse({'success': False, 'message': exc.messages[0] if getattr(exc, 'messages', None) else str(exc)}, status=400)
+    except Exception as exc:
+        return JsonResponse({'success': False, 'message': str(exc)}, status=400)
 
 
 @require_POST

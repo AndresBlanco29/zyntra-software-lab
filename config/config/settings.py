@@ -65,7 +65,7 @@ for _host in (railway_domain, CANONICAL_DOMAIN, f'www.{CANONICAL_DOMAIN}'):
         ALLOWED_HOSTS.append(_host)
 
 if DEBUG:
-    for host in ('127.0.0.1', 'localhost'):
+    for host in ('127.0.0.1', 'localhost' , '192.168.26.6', '.ngrok-free.dev', '.ngrok-free.app'):
         if host not in ALLOWED_HOSTS:
             ALLOWED_HOSTS.append(host)
 
@@ -80,6 +80,11 @@ for _origin in (
 ):
     if _origin not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(_origin)
+
+if DEBUG:
+    for _origin in ('https://*.ngrok-free.dev', 'https://*.ngrok-free.app'):
+        if _origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(_origin)
 
 # ---- HTTPS ----
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

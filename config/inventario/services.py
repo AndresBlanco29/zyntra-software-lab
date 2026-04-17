@@ -106,7 +106,11 @@ def _apply_inventory_change(
 
 
 @transaction.atomic
-def validar_disponibilidad_para_items(items_payload):
+def validar_disponibilidad_para_items(items_payload, bypass_stock_check=False):
+	if bypass_stock_check:
+		# Skip stock validation if bypass flag is set
+		return
+
 	stock_map = _lock_stock_records(item['presentacion'].id for item in items_payload)
 	for item in items_payload:
 		cantidad = max(int(item['cantidad']), 1)
@@ -243,17 +247,18 @@ def aplicar_verificacion_picking_inventario(*, pedido, pedido_item_ids, creado_p
 		aplicado_previo = int(item.cantidad_inventario_aplicada or 0)
 		nuevo_real = int(item.cantidad or 0)
 		delta_real = nuevo_real - aplicado_previo
+		reserva_a_liberar = min(reservado_pendiente, int(stock.stock_reservado or 0))
 
-		if reservado_pendiente:
+		if reserva_a_liberar:
 			_apply_inventory_change(
 				stock=stock,
 				categoria='RESERVA',
 				tipo='LIBERACION_PEDIDO',
-				cantidad=reservado_pendiente,
+				cantidad=reserva_a_liberar,
 				delta_fisico=0,
-				delta_reservado=-reservado_pendiente,
+				delta_reservado=-reserva_a_liberar,
 				referencia=f'PO-{pedido.id}',
-				idempotency_key=f'PICK-LIBERA-{item.id}-{reservado_pendiente}-{nuevo_real}',
+				idempotency_key=f'PICK-LIBERA-{item.id}-{reserva_a_liberar}-{nuevo_real}',
 				pedido=pedido,
 				pedido_item=item,
 				creado_por=creado_por,

@@ -6,12 +6,96 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
-    <h2 class="mb-1">{% trans "Driver Deliveries" %}</h2>
-    <p class="text-muted mb-0">{% trans "Assigned invoices ready for route and proof of delivery." %}</p>
+    <h2 class="mb-1">
+      {% if view_mode == 'completed' %}
+      {% trans "Delivered Invoices" %}
+      {% else %}
+      {% trans "Driver Deliveries" %}
+      {% endif %}
+    </h2>
+    <p class="text-muted mb-0">
+      {% if view_mode == 'completed' %}
+      {% trans "Review all invoices already completed by the driver." %}
+      {% else %}
+      {% trans "Assigned invoices ready for route and proof of delivery." %}
+      {% endif %}
+    </p>
   </div>
-  <a href="{% url 'driver_delivery_route' %}" class="btn btn-outline-primary">{% trans "Generate route" %}</a>
 </div>
 
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div class="btn-group" role="group" aria-label="{% trans 'Delivery views' %}">
+    <a href="{% url 'driver_delivery_list' %}" class="btn {% if view_mode == 'active' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+      {% trans "Driver Deliveries" %}
+      <span class="badge {% if view_mode == 'active' %}bg-light text-primary{% else %}bg-primary{% endif %} ms-1">{{ active_count }}</span>
+    </a>
+    <a href="{% url 'driver_delivery_list' %}?view=completed" class="btn {% if view_mode == 'completed' %}btn-success{% else %}btn-outline-success{% endif %}">
+      {% trans "Delivered Invoices" %}
+      <span class="badge {% if view_mode == 'completed' %}bg-light text-success{% else %}bg-success{% endif %} ms-1">{{ completed_count }}</span>
+    </a>
+  </div>
+
+  {% if view_mode == 'active' %}
+  <button type="submit" class="btn btn-outline-primary" id="generateRouteButton" form="driverSelectionTableForm" disabled>{% trans "Generate route" %}</button>
+  {% endif %}
+</div>
+
+{% if view_mode == 'active' %}
+<form method="get" action="{% url 'driver_delivery_route' %}" id="driverSelectionTableForm">
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th class="text-center" style="width: 56px;">
+              <input type="checkbox" class="form-check-input" id="selectAllDeliveries" aria-label="{% trans 'Select all deliveries' %}">
+            </th>
+            <th>{% trans "Invoice" %}</th>
+            <th>{% trans "Customer" %}</th>
+            <th>{% trans "Address" %}</th>
+            <th>{% trans "Delivery" %}</th>
+            <th>{% trans "Payment" %}</th>
+            <th>{% trans "PDF" %}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for delivery in deliveries %}
+          <tr>
+            <td class="text-center">
+              {% if delivery.estado == 'ASIGNADA' or delivery.estado == 'EN_RUTA' %}
+              <input type="checkbox" class="form-check-input delivery-route-checkbox" name="delivery_ids" value="{{ delivery.id }}" aria-label="{% blocktrans with invoice=delivery.invoice.numero %}Select invoice {{ invoice }}{% endblocktrans %}">
+              {% else %}
+              <span class="text-muted small">-</span>
+              {% endif %}
+            </td>
+            <td>
+              <strong>{{ delivery.invoice.numero }}</strong>
+              <div class="small text-muted">PO #{{ delivery.invoice.pedido_id }}</div>
+            </td>
+            <td>{{ delivery.invoice.cliente.nombre_empresa }}</td>
+            <td>
+              <div>{{ delivery.route_address }}</div>
+              <div class="small text-muted">{% trans "Maps query:" %} {{ delivery.route_query_address }}</div>
+            </td>
+            <td><span class="badge bg-info text-dark">{{ delivery.get_estado_display }}</span></td>
+            <td><span class="badge {% if delivery.estado_pago == 'NO_PAGADO' %}bg-danger{% elif delivery.estado_pago == 'PAGADO' %}bg-success{% else %}bg-secondary{% endif %}">{{ delivery.get_estado_pago_display }}</span></td>
+            <td><a class="btn btn-sm btn-outline-dark" href="{% url 'driver_invoice_pdf' delivery.id %}">{% trans "Download" %}</a></td>
+            <td class="text-end"><a class="btn btn-sm btn-primary" href="{% url 'driver_delivery_detail' delivery.id %}">{% trans "Open" %}</a></td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-center text-muted py-4">{% trans "No deliveries are currently assigned to you." %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</form>
+{% else %}
 <div class="card shadow-sm">
   <div class="card-body">
     <div class="table-responsive">
@@ -35,15 +119,18 @@
               <div class="small text-muted">PO #{{ delivery.invoice.pedido_id }}</div>
             </td>
             <td>{{ delivery.invoice.cliente.nombre_empresa }}</td>
-            <td>{{ delivery.route_address }}</td>
+            <td>
+              <div>{{ delivery.route_address }}</div>
+              <div class="small text-muted">{% trans "Maps query:" %} {{ delivery.route_query_address }}</div>
+            </td>
             <td><span class="badge bg-info text-dark">{{ delivery.get_estado_display }}</span></td>
             <td><span class="badge {% if delivery.estado_pago == 'NO_PAGADO' %}bg-danger{% elif delivery.estado_pago == 'PAGADO' %}bg-success{% else %}bg-secondary{% endif %}">{{ delivery.get_estado_pago_display }}</span></td>
             <td><a class="btn btn-sm btn-outline-dark" href="{% url 'driver_invoice_pdf' delivery.id %}">{% trans "Download" %}</a></td>
-            <td class="text-end"><a class="btn btn-sm btn-primary" href="{% url 'driver_delivery_detail' delivery.id %}">{% trans "Open" %}</a></td>
+            <td class="text-end"><a class="btn btn-sm btn-success" href="{% url 'driver_delivery_detail' delivery.id %}">{% trans "View summary" %}</a></td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="7" class="text-center text-muted py-4">{% trans "No deliveries are currently assigned to you." %}</td>
+            <td colspan="7" class="text-center text-muted py-4">{% trans "No delivered invoices are available yet." %}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -51,4 +138,42 @@
     </div>
   </div>
 </div>
+{% endif %}
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('driverSelectionTableForm');
+    if (!form) {
+      return;
+    }
+
+    const selectAll = document.getElementById('selectAllDeliveries');
+    const generateButton = document.getElementById('generateRouteButton');
+    const deliveryCheckboxes = Array.from(form.querySelectorAll('.delivery-route-checkbox'));
+
+    function syncRouteButtonState() {
+      const selectedCount = deliveryCheckboxes.filter((checkbox) => checkbox.checked).length;
+      generateButton.disabled = selectedCount === 0;
+      if (selectAll) {
+        selectAll.checked = selectedCount > 0 && selectedCount === deliveryCheckboxes.length;
+        selectAll.indeterminate = selectedCount > 0 && selectedCount < deliveryCheckboxes.length;
+      }
+    }
+
+    if (selectAll) {
+      selectAll.addEventListener('change', function () {
+        deliveryCheckboxes.forEach((checkbox) => {
+          checkbox.checked = selectAll.checked;
+        });
+        syncRouteButtonState();
+      });
+    }
+
+    deliveryCheckboxes.forEach((checkbox) => {
+      checkbox.addEventListener('change', syncRouteButtonState);
+    });
+
+    syncRouteButtonState();
+  });
+</script>
 {% endblock %}

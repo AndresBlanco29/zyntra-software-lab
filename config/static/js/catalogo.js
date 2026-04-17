@@ -3,6 +3,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const lang = document.body.dataset.lang.slice(0,2);
     const agregarUrl = document.body.dataset.agregarUrl;
     const csrfToken = document.body.dataset.csrf;
+    const buttonCopy = {
+        added: { es: 'Añadido ✔', en: 'Added ✔' },
+    };
 
     const traducciones = {
 
@@ -76,6 +79,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /* AGREGAR AL CARRITO */
     document.querySelectorAll(".agregar-btn").forEach(btn => {
+        if (!btn.dataset.defaultLabel) {
+            btn.dataset.defaultLabel = btn.textContent.trim();
+        }
+
         btn.addEventListener("click", function () {
             // Verificar si el usuario está autenticado
             const isAuthenticated = document.body.dataset.auth === 'true';
@@ -109,9 +116,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById("contadorCarrito").textContent = data.total_items;
 
                         // Animación visual
-                        btn.textContent = "Añadido ✔";
+                        btn.textContent = buttonCopy.added[lang] || buttonCopy.added.es;
                         setTimeout(() => {
-                            btn.textContent = "Añadir a cotización";
+                            btn.textContent = btn.dataset.defaultLabel;
                         }, 1200);
                     }
                 });

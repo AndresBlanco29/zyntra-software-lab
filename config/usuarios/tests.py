@@ -81,3 +81,46 @@ class InternalPermissionTests(TestCase):
 		self.assertTrue(user.has_internal_permission('driver.delivery.view'))
 		self.assertTrue(user.has_internal_permission('driver.delivery.manage'))
 		self.assertEqual(get_redirect_url_for_user(user), reverse('driver_delivery_list'))
+
+
+class InternalUserAdminViewTests(TestCase):
+	def setUp(self):
+		self.admin_user = Usuario.objects.create_user(
+			username='admin-internal-users',
+			password='secret123',
+			role='admin',
+		)
+		self.client.force_login(self.admin_user)
+
+	def test_generic_create_form_starts_without_preselected_role(self):
+		response = self.client.get(reverse('crear_usuario_interno'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context['selected_role'], '')
+		self.assertContains(response, 'Select a role')
+		self.assertFalse(
+			any(
+				permission['checked']
+				for section in response.context['permission_sections']
+				for permission in section['permissions']
+			)
+		)
+
+	def test_post_without_role_does_not_create_vendor_user(self):
+		response = self.client.post(
+			reverse('crear_usuario_interno'),
+			{
+				'nombre': 'Driver',
+				'apellido': 'Without Role',
+				'username': 'driver-without-role',
+				'email': 'driver-without-role@example.com',
+				'password': 'secret123',
+				'telefono': '5551234',
+			},
+			follow=True,
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertFalse(Usuario.objects.filter(username='driver-without-role').exists())
+		messages = list(response.context['messages'])
+		self.assertTrue(any('Select a role for the internal user.' in str(message) for message in messages))

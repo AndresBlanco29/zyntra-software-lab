@@ -97,6 +97,77 @@
             <div class="col-md-2 d-flex align-items-end">
               <button type="submit" class="btn btn-primary w-100">{% trans "Generate invoice" %}</button>
             </div>
+            <div class="col-12">
+              <div class="border rounded-3 p-3 bg-light-subtle mt-2">
+                <div class="fw-semibold mb-2">{% trans "Suggested resale price per unit for the final customer" %}</div>
+                <div class="small text-muted mb-3">{% trans "Leave any field as-is to keep the automatic suggested value. You can customize it before the invoice is generated." %}</div>
+                <div class="small text-muted mb-3">{% trans "You can enter a margin percentage or the final resale value. The system syncs both using: resale value = customer unit cost / (1 - percentage/100). Example: 20% = divide by 0.80." %}</div>
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>{% trans "Product" %}</th>
+                        <th>{% trans "Presentation" %}</th>
+                        <th>{% trans "Qty." %}</th>
+                        <th>{% trans "Suggested retail / unit" %}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for row in invoice_suggested_price_rows %}
+                        <tr>
+                          <td>{{ row.product_name }}</td>
+                          <td>{{ row.presentation_name }}</td>
+                          <td>{{ row.quantity }}</td>
+                          <td style="min-width: 360px; max-width: 420px;">
+                            <div class="small text-muted mb-2">{% trans "Customer unit cost" %}: ${{ row.base_unit_value }}</div>
+                            <div class="row g-2">
+                              <div class="col-md-5">
+                                <label class="form-label form-label-sm mb-1">{% trans "Margin %" %}</label>
+                                <div class="input-group input-group-sm">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    max="99.99"
+                                    class="form-control suggested-margin-input"
+                                    name="suggested_margin_percentage_{{ row.item_id }}"
+                                    value="{{ row.default_percentage }}"
+                                    data-base-unit-price="{{ row.base_unit_value }}"
+                                    data-value-target="suggested_value_{{ row.item_id }}"
+                                    data-summary-target="suggested_summary_{{ row.item_id }}"
+                                  >
+                                  <span class="input-group-text">%</span>
+                                </div>
+                              </div>
+                              <div class="col-md-7">
+                                <label class="form-label form-label-sm mb-1">{% trans "Retail / unit" %}</label>
+                                <div class="input-group input-group-sm">
+                                  <span class="input-group-text">$</span>
+                                  <input
+                                    id="suggested_value_{{ row.item_id }}"
+                                    type="number"
+                                    min="0.01"
+                                    step="0.01"
+                                    class="form-control suggested-value-input"
+                                    name="suggested_unit_price_{{ row.item_id }}"
+                                    value="{{ row.default_value }}"
+                                    data-base-unit-price="{{ row.base_unit_value }}"
+                                    data-margin-target="suggested_margin_percentage_{{ row.item_id }}"
+                                    data-summary-target="suggested_summary_{{ row.item_id }}"
+                                  >
+                                </div>
+                              </div>
+                            </div>
+                            <div id="suggested_summary_{{ row.item_id }}" class="small text-muted mt-2">
+                              {% trans "Suggested resale synced from percentage and value." %}
+                            </div>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </form>
         {% else %}
           <div class="alert alert-warning mb-0">{% trans "The order must be verified and unlocked before generating the invoice." %}</div>
@@ -226,4 +297,94 @@
   <a class="btn btn-outline-dark" href="{% url 'backoffice_picking_ticket' pedido.id %}">{% trans "Generate Picking Ticket" %}</a>
   <a class="btn btn-success" href="{% url 'backoffice_picking_pdf' pedido.id %}">{% trans "Export PDF" %}</a>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const marginInputs = Array.from(document.querySelectorAll('.suggested-margin-input'));
+  const valueInputs = Array.from(document.querySelectorAll('.suggested-value-input'));
+  let syncing = false;
+
+  function parseNumber(value) {
+    const normalized = String(value || '').trim().replace(',', '.');
+    if (!normalized) {
+      return null;
+    }
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function formatNumber(value) {
+    return Number(value).toFixed(2);
+  }
+
+  function updateSummary(input, message) {
+    const targetId = input.dataset.summaryTarget;
+    if (!targetId) {
+      return;
+    }
+    const summary = document.getElementById(targetId);
+    if (summary) {
+      summary.textContent = message;
+    }
+  }
+
+  function syncFromMargin(input) {
+    const baseUnitPrice = parseNumber(input.dataset.baseUnitPrice);
+    const margin = parseNumber(input.value);
+    const targetId = input.dataset.valueTarget;
+    const valueInput = targetId ? document.getElementById(targetId) : null;
+    if (!valueInput || baseUnitPrice === null || baseUnitPrice <= 0 || margin === null) {
+      updateSummary(input, '');
+      return;
+    }
+
+    const divisor = 1 - (margin / 100);
+    if (divisor <= 0) {
+      updateSummary(input, 'Percentage must be lower than 100 to calculate a resale value.');
+      return;
+    }
+
+    syncing = true;
+    const retailValue = baseUnitPrice / divisor;
+    valueInput.value = formatNumber(retailValue);
+    updateSummary(input, `Customer unit cost $${formatNumber(baseUnitPrice)} -> resale $${formatNumber(retailValue)} at ${formatNumber(margin)}%`);
+    syncing = false;
+  }
+
+  function syncFromValue(input) {
+    const baseUnitPrice = parseNumber(input.dataset.baseUnitPrice);
+    const retailValue = parseNumber(input.value);
+    const marginInput = document.querySelector(`[name="${input.dataset.marginTarget}"]`);
+    if (!marginInput || baseUnitPrice === null || baseUnitPrice <= 0 || retailValue === null || retailValue <= 0) {
+      updateSummary(input, '');
+      return;
+    }
+
+    syncing = true;
+    const percentage = (1 - (baseUnitPrice / retailValue)) * 100;
+    marginInput.value = formatNumber(percentage);
+    updateSummary(input, `Customer unit cost $${formatNumber(baseUnitPrice)} -> resale $${formatNumber(retailValue)} at ${formatNumber(percentage)}%`);
+    syncing = false;
+  }
+
+  marginInputs.forEach((input) => {
+    input.addEventListener('input', function () {
+      if (syncing) {
+        return;
+      }
+      syncFromMargin(input);
+    });
+    syncFromMargin(input);
+  });
+
+  valueInputs.forEach((input) => {
+    input.addEventListener('input', function () {
+      if (syncing) {
+        return;
+      }
+      syncFromValue(input);
+    });
+  });
+});
+</script>
 {% endblock %}

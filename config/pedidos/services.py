@@ -39,11 +39,13 @@ def crear_pedido_desde_items(
     nota_cliente='',
     acepta_terminos=False,
     canal_toma='',
+    bypass_stock_check=False,
+    reservar_inventario=True,
 ):
     if getattr(cliente, 'credit_hold', False):
         raise ValidationError(_('This customer is blocked for new purchases until BackOffice removes the hold.'))
 
-    validar_disponibilidad_para_items(items_payload)
+    validar_disponibilidad_para_items(items_payload, bypass_stock_check=bypass_stock_check)
 
     pedido = Pedido.objects.create(
         cliente=cliente,
@@ -80,7 +82,8 @@ def crear_pedido_desde_items(
 
     pedido.total = total
     pedido.save(update_fields=['total'])
-    reservar_stock_para_pedido_items(pedido=pedido, pedido_items=created_items, creado_por=vendedor)
+    if reservar_inventario:
+        reservar_stock_para_pedido_items(pedido=pedido, pedido_items=created_items, creado_por=vendedor)
     return pedido
 
 

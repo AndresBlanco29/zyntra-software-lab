@@ -122,8 +122,18 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 
 <td>
 
-<button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editarClienteModal" 
-  onclick="abrirEditarCliente({{ cliente.id }}, '{{ cliente.usuario.first_name|escapejs }} {{ cliente.usuario.last_name|escapejs }}', '{{ cliente.nombre_empresa|escapejs }}', '{{ cliente.usuario.email|escapejs }}', '{{ cliente.telefono|escapejs }}')">
+<button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editarClienteModal"
+  data-cliente-id="{{ cliente.id }}"
+  data-cliente-nombre="{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}"
+  data-cliente-empresa="{{ cliente.nombre_empresa }}"
+  data-cliente-correo="{{ cliente.usuario.email }}"
+  data-cliente-telefono="{{ cliente.telefono }}"
+  data-cliente-direccion="{{ cliente.direccion }}"
+  data-cliente-ciudad="{{ cliente.ciudad }}"
+  data-cliente-estado="{{ cliente.estado }}"
+  data-cliente-codigo-postal="{{ cliente.codigo_postal|default:'' }}"
+  data-cliente-pais="{{ cliente.pais|default:'USA' }}"
+  onclick="abrirEditarCliente(this)">
 {% trans "Editar" %}
 </button>
 
@@ -160,7 +170,7 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 
 <!-- MODAL EDITAR CLIENTE -->
 <div class="modal fade" id="editarClienteModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);">
       <div class="modal-header border-0" style="background: linear-gradient(135deg, #0b3d91, #1565c0); border-radius: 12px 12px 0 0;">
         <h5 class="modal-title text-white fw-bold">{% trans "Editar Cliente" %}</h5>
@@ -190,6 +200,57 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
             <label class="form-label fw-bold">{% trans "Teléfono" %}</label>
             <input type="text" class="form-control" id="telefonoCliente" name="telefono" placeholder="10 dígitos" maxlength="10" inputmode="numeric" required>
             <small class="text-muted">{% trans "Exactamente 10 dígitos" %}</small>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">{% trans "Direccion" %}</label>
+            <input type="text" class="form-control" id="direccionCliente" name="direccion" required>
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">{% trans "Codigo Postal" %}</label>
+              <input type="text" class="form-control" id="codigoPostalCliente" name="codigo_postal">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">{% trans "Pais" %}</label>
+              <input type="text" class="form-control" id="paisCliente" name="pais" value="USA" required>
+              <small class="text-muted">{% trans "Usa USA para selector guiado o escribe Colombia para pruebas manuales." %}</small>
+            </div>
+          </div>
+
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="usarDireccionManual">
+            <label class="form-check-label fw-semibold" for="usarDireccionManual">{% trans "Ingresar ciudad y estado manualmente" %}</label>
+          </div>
+
+          <div id="guidedLocationGroup" class="row" data-location-group>
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">{% trans "Estado" %}</label>
+              <select class="form-select" id="estadoClienteSelect" data-state-select>
+                <option value="">{% trans "Selecciona un estado" %}</option>
+                {% for state_name in us_states %}
+                <option value="{{ state_name }}">{{ state_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">{% trans "Ciudad" %}</label>
+              <select class="form-select" id="ciudadClienteSelect" data-city-select disabled data-placeholder-enabled="{% trans 'Selecciona una ciudad' %}">
+                <option value="">{% trans "Selecciona primero un estado" %}</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="manualLocationGroup" class="row d-none">
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">{% trans "Estado / Departamento" %}</label>
+              <input type="text" class="form-control" id="estadoClienteManual">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">{% trans "Ciudad" %}</label>
+              <input type="text" class="form-control" id="ciudadClienteManual">
+            </div>
           </div>
         </form>
       </div>
@@ -264,6 +325,10 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
   </div>
 </div>
 
+<script>
+window.__LTG_US_LOCATIONS = {{ us_locations_json|safe }};
+</script>
+<script src="{% static 'js/state-selector.js' %}"></script>
 <script src="{% static 'js/clientes.js' %}"></script>
 
 {% endblock %}

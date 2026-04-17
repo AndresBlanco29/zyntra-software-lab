@@ -9,6 +9,7 @@ from .models import Usuario
 from .permissions import (
     build_permission_overrides_for_role,
     build_permission_sections,
+    get_default_permissions_for_role,
     get_permission_summary_labels,
     get_redirect_url_for_user,
     internal_permission_required,
@@ -223,6 +224,13 @@ def _build_internal_permission_context(role, overrides=None):
     return {
         'permission_sections': build_permission_sections(role=role, overrides=overrides or {}),
         'all_permission_codes': [permission['code'] for permission in build_permission_sections(role=role, overrides=overrides or {}) for permission in permission['permissions']],
+    }
+
+
+def _get_internal_role_permission_defaults():
+    return {
+        role: sorted(get_default_permissions_for_role(role))
+        for role in sorted(_get_allowed_internal_roles())
     }
 
 
@@ -967,13 +975,18 @@ def crear_usuario_interno(request, preset_role=None):
 
     if request.method == 'POST':
 
-        role = _resolve_internal_role(request.POST.get('role'), fallback=preset_role or 'vendedor')
+        role = _resolve_internal_role(request.POST.get('role'), fallback=preset_role or '')
         username = (request.POST.get('username') or '').strip()
         email = (request.POST.get('email') or '').strip()
         password = request.POST.get('password') or ''
         nombre = (request.POST.get('nombre') or '').strip()
         apellido = (request.POST.get('apellido') or '').strip()
         telefono = (request.POST.get('telefono') or '').strip()
+
+        if not role:
+            messages.error(request, _('Select a role for the internal user.'))
+            return redirect(request.path)
+
         permission_overrides = build_permission_overrides_for_role(role, request.POST.getlist('permissions'))
 
         if not username:
@@ -1009,9 +1022,10 @@ def crear_usuario_interno(request, preset_role=None):
         return redirect('lista_usuarios_internos')
 
     context = {
-        'selected_role': _resolve_internal_role(preset_role or 'vendedor'),
+        'selected_role': _resolve_internal_role(preset_role or '', fallback=''),
         'role_choices': [(role, _get_internal_role_label(role)) for role in sorted(_get_allowed_internal_roles())],
         'is_role_locked': bool(preset_role),
+        'role_permission_defaults': _get_internal_role_permission_defaults(),
     }
     context.update(_build_internal_permission_context(context['selected_role']))
     return render(request, 'admin/crear_usuario_interno.html', context)

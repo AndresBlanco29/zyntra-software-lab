@@ -7,11 +7,15 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
     <h2 class="mb-1">{{ delivery.invoice.numero }}</h2>
-    <p class="text-muted mb-0">{{ delivery.invoice.cliente.nombre_empresa }} | {{ delivery.route_address }}</p>
+    <p class="text-muted mb-1">{{ delivery.invoice.cliente.nombre_empresa }} | {{ delivery.route_address }}</p>
+    <div class="small text-muted">{% trans "Maps query:" %} {{ delivery.route_query_address }}</div>
   </div>
   <div class="d-flex gap-2">
     <a href="{% url 'driver_invoice_pdf' delivery.id %}" class="btn btn-outline-dark">{% trans "Download PDF" %}</a>
     <a href="{{ delivery.google_maps_url }}" target="_blank" rel="noopener" class="btn btn-outline-primary">{% trans "Google Maps" %}</a>
+    {% if delivery.estado == 'EN_RUTA' %}
+    <a href="{% url 'driver_delivery_tracking' delivery.id %}" class="btn btn-primary">{% trans "Live tracking" %}</a>
+    {% endif %}
   </div>
 </div>
 
@@ -38,6 +42,7 @@
           <div class="col-md-4"><div class="text-muted small">{% trans "Status" %}</div><div>{{ delivery.get_estado_display }}</div></div>
           <div class="col-md-4"><div class="text-muted small">{% trans "Payment status" %}</div><div>{{ delivery.get_estado_pago_display }}</div></div>
           <div class="col-md-4"><div class="text-muted small">{% trans "Customer balance" %}</div><div>${{ delivery.invoice.saldo_cliente }}</div></div>
+          <div class="col-12"><div class="text-muted small">{% trans "Google Maps query" %}</div><div>{{ delivery.route_query_address }}</div></div>
           <div class="col-md-6"><div class="text-muted small">{% trans "Started" %}</div><div>{% if delivery.route_started_at %}{{ delivery.route_started_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
           <div class="col-md-6"><div class="text-muted small">{% trans "Delivered" %}</div><div>{% if delivery.delivered_at %}{{ delivery.delivered_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
         </div>
@@ -68,7 +73,14 @@
   <div class="col-lg-5">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <h5 class="mb-3">{% trans "Evidence" %}</h5>
+        <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+          <h5 class="mb-0">{% trans "Evidence" %}</h5>
+          <form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_upload_evidence' delivery.id %}" class="d-flex flex-wrap align-items-center gap-2">
+            {% csrf_token %}
+            <input type="file" name="evidence_photos" class="form-control form-control-sm" accept="image/*" multiple style="max-width: 230px;">
+            <button type="submit" class="btn btn-sm btn-outline-primary">{% trans "Upload evidence" %}</button>
+          </form>
+        </div>
         <div class="row g-2">
           {% for photo in delivery.evidence_photos.all %}
           <div class="col-6">
@@ -80,6 +92,7 @@
           <div class="col-12 text-muted">{% trans "No evidence photos uploaded yet." %}</div>
           {% endfor %}
         </div>
+        <div class="form-text mt-3">{% trans "You can upload delivery photos before or after closing the invoice." %}</div>
       </div>
     </div>
   </div>

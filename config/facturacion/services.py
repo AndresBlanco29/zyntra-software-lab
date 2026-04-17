@@ -22,6 +22,37 @@ from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, In
 logger = logging.getLogger(__name__)
 
 
+def resolve_presentacion_suggested_unit_price(*, presentacion, base_case_price):
+	base_price = _to_decimal(base_case_price).quantize(Decimal('0.01'))
+	if not presentacion:
+		return base_price
+
+	configured_prices = sorted({
+		Decimal(str(price or '0')).quantize(Decimal('0.01'))
+		for price in (
+			presentacion.precio_1,
+			presentacion.precio_2,
+			presentacion.precio_3,
+			presentacion.precio_4,
+			presentacion.precio_5,
+		)
+		if Decimal(str(price or '0')) > 0
+	})
+
+	suggested_case_price = base_price
+	for configured_price in configured_prices:
+		if configured_price > base_price:
+			suggested_case_price = configured_price
+			break
+	else:
+		if configured_prices:
+			suggested_case_price = configured_prices[-1]
+
+	if not getattr(presentacion, 'unidades', 0):
+		return suggested_case_price
+	return (suggested_case_price / Decimal(str(presentacion.unidades))).quantize(Decimal('0.01'))
+
+
 def _to_decimal(value, default='0'):
 	text = str(value if value is not None else default).strip().replace(',', '.')
 	if not text:
@@ -86,16 +117,19 @@ def ensure_delivery_for_invoice(invoice):
 
 
 def build_google_maps_route_url(deliveries):
-	addresses = [delivery.route_address for delivery in deliveries if delivery.route_address]
+	addresses = [delivery.route_query_address for delivery in deliveries if delivery.route_query_address]
 	if not addresses:
 		raise ValidationError(_('No delivery addresses are available to build the route.'))
 	params = {
 		'api': 1,
-		'destination': addresses[-1],
 		'travelmode': 'driving',
 	}
-	if len(addresses) > 1:
-		params['waypoints'] = '|'.join(addresses[:-1])
+	if len(addresses) == 1:
+		params['destination'] = addresses[0]
+		return f'https://www.google.com/maps/dir/?{urlencode(params)}'
+
+	params['destination'] = addresses[-1]
+	params['waypoints'] = '|'.join(addresses[:-1])
 	return f'https://www.google.com/maps/dir/?{urlencode(params)}'
 
 
@@ -222,7 +256,7 @@ def _send_client_delivery_notifications(delivery):
 
 
 @transaction.atomic
-def generar_invoice_desde_picking(*, pedido, metodo_entrega, driver, usuario):
+def generar_invoice_desde_picking(*, pedido, metodo_entrega, driver, usuario, suggested_unit_prices=None):
 	if pedido.estado != 'VERIFICADO_AJUSTADO':
 		raise ValidationError(_('The order must be verified and adjusted before generating an invoice.'))
 	if pedido.picking_bloqueado:
@@ -233,6 +267,8 @@ def generar_invoice_desde_picking(*, pedido, metodo_entrega, driver, usuario):
 		raise ValidationError(_('Route delivery requires an active driver assignment.'))
 	if metodo_entrega != 'RUTA_DRIVER':
 		driver = None
+
+	suggested_unit_prices = suggested_unit_prices or {}
 
 	items = list(pedido.items.select_related('presentacion__producto').all())
 	facturables = [item for item in items if item.cantidad > 0]
@@ -250,6 +286,12 @@ def generar_invoice_desde_picking(*, pedido, metodo_entrega, driver, usuario):
 	invoice.save()
 
 	for item in facturables:
+		suggested_unit_price = suggested_unit_prices.get(item.id)
+		if suggested_unit_price is None:
+			suggested_unit_price = resolve_presentacion_suggested_unit_price(
+				presentacion=item.presentacion,
+				base_case_price=item.precio,
+			)
 		InvoiceItem.objects.create(
 			invoice=invoice,
 			pedido_item=item,
@@ -258,6 +300,7 @@ def generar_invoice_desde_picking(*, pedido, metodo_entrega, driver, usuario):
 			presentacion_nombre=item.presentacion.nombre,
 			cantidad_facturada=item.cantidad,
 			precio_unitario=item.precio,
+			precio_venta_sugerido_unitario=suggested_unit_price,
 			subtotal=item.subtotal,
 		)
 

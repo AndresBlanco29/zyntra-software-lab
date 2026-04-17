@@ -7,7 +7,8 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
 from django.utils.translation import gettext as _
-from decimal import Decimal, InvalidOperation
+from django.core.exceptions import ValidationError
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from config.clientes.models import Cliente
 from config.cotizaciones.models import Cotizacion
@@ -26,9 +27,13 @@ def _parse_decimal(value, default="0"):
     if not text:
         text = str(default)
     try:
-        return Decimal(text)
+        return Decimal(text).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     except (InvalidOperation, ValueError):
-        return Decimal(str(default))
+        return Decimal(str(default)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _format_decimal(value):
+    return format(_parse_decimal(value), ".2f")
 
 
 def _parse_optional_decimal(value):
@@ -46,7 +51,17 @@ def _get_price_margin_config():
 
 
 def _get_price_margin_values():
-    return [str(porcentaje) for porcentaje in _get_price_margin_config().porcentajes_lista()]
+    return [_format_decimal(porcentaje) for porcentaje in _get_price_margin_config().porcentajes_lista()]
+
+
+def _get_margin_values_from_config(configuracion):
+    return [
+        _format_decimal(configuracion.porcentaje_1),
+        _format_decimal(configuracion.porcentaje_2),
+        _format_decimal(configuracion.porcentaje_3),
+        _format_decimal(configuracion.porcentaje_4),
+        _format_decimal(configuracion.porcentaje_5),
+    ]
 
 
 def _recalcular_presentaciones_con_costo():
@@ -287,6 +302,7 @@ def crear_producto(request):
 @internal_permission_required('admin.products.manage')
 def configurar_precios(request):
     configuracion = _get_price_margin_config()
+    price_margins = _get_margin_values_from_config(configuracion)
 
     if request.method == "POST":
         configuracion.porcentaje_1 = _parse_decimal(request.POST.get("porcentaje_1"), configuracion.porcentaje_1)
@@ -294,14 +310,23 @@ def configurar_precios(request):
         configuracion.porcentaje_3 = _parse_decimal(request.POST.get("porcentaje_3"), configuracion.porcentaje_3)
         configuracion.porcentaje_4 = _parse_decimal(request.POST.get("porcentaje_4"), configuracion.porcentaje_4)
         configuracion.porcentaje_5 = _parse_decimal(request.POST.get("porcentaje_5"), configuracion.porcentaje_5)
-        configuracion.save()
+        price_margins = _get_margin_values_from_config(configuracion)
+        try:
+            configuracion.save()
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+            return render(request, "admin/configurar_precios.html", {
+                "configuracion": configuracion,
+                "price_margins": price_margins,
+            })
+
         _recalcular_presentaciones_con_costo()
         messages.success(request, _("Price percentages updated successfully"))
         return redirect("configurar_precios")
 
     return render(request, "admin/configurar_precios.html", {
         "configuracion": configuracion,
-        "price_margins": [str(porcentaje) for porcentaje in configuracion.porcentajes_lista()],
+        "price_margins": price_margins,
     })
 
 

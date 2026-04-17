@@ -1,0 +1,174 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Live Drivers" %}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <h2 class="mb-1">{% trans "Live Drivers" %}</h2>
+    <p class="text-muted mb-0">{% trans "Monitor every driver currently on route and watch their vehicle move in real time." %}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <span class="badge bg-primary fs-6" id="liveDriversCountBadge">{{ tracking_payloads|length }} {% trans "active" %}</span>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card shadow-sm h-100">
+      <div class="card-body p-0">
+        <div id="liveDriversMap" style="height: 620px; border-radius: 0.75rem;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">{% trans "Active drivers" %}</h5>
+          <span class="small text-muted" id="liveDriversRefreshStatus">{% trans "Auto refresh every 10 seconds" %}</span>
+        </div>
+        <div id="liveDriversList" class="d-grid gap-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ tracking_payloads|json_script:"liveDriversInitialData" }}
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
+<script>
+  (function () {
+    const dataUrl = "{% url 'backoffice_live_drivers_data' %}";
+    const initialData = JSON.parse(document.getElementById('liveDriversInitialData').textContent || '[]');
+    const listContainer = document.getElementById('liveDriversList');
+    const countBadge = document.getElementById('liveDriversCountBadge');
+    const refreshStatus = document.getElementById('liveDriversRefreshStatus');
+    const map = L.map('liveDriversMap');
+    const markers = new Map();
+    const layerGroup = L.layerGroup().addTo(map);
+    let selectedDeliveryId = null;
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    map.setView([39.8283, -98.5795], 4);
+
+    function freshnessBadge(ageSeconds) {
+      if (ageSeconds === null || ageSeconds === undefined) {
+        return '<span class="badge bg-secondary">{% trans "No signal" %}</span>';
+      }
+      if (ageSeconds <= 30) {
+        return '<span class="badge bg-success">{% trans "Live" %}</span>';
+      }
+      return '<span class="badge bg-warning text-dark">{% trans "Last known" %}</span>';
+    }
+
+    function popupHtml(driver) {
+      return `
+        <div style="min-width:220px;">
+          <div style="font-weight:700;">${driver.driver_name}</div>
+          <div>${driver.invoice_number}</div>
+          <div style="font-size:0.9rem;color:#6c757d;">${driver.customer_name}</div>
+          <div style="margin-top:6px;">${driver.destination_address}</div>
+          <div style="margin-top:8px;"><a href="${driver.invoice_tracking_url}">{% trans "Open tracking" %}</a></div>
+        </div>
+      `;
+    }
+
+    function renderList(drivers) {
+      listContainer.innerHTML = '';
+      countBadge.textContent = `${drivers.length} {% trans "active" %}`;
+      if (!drivers.length) {
+        listContainer.innerHTML = `<div class="text-muted">{% trans "No drivers are currently on route." %}</div>`;
+        return;
+      }
+
+      drivers.forEach((driver) => {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'btn btn-outline-secondary text-start p-3';
+        card.innerHTML = `
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div>
+              <div class="fw-semibold">${driver.driver_name}</div>
+              <div class="small text-muted">${driver.invoice_number} | ${driver.customer_name}</div>
+            </div>
+            ${freshnessBadge(driver.location_age_seconds)}
+          </div>
+          <div class="small mt-2">${driver.destination_address}</div>
+          <div class="small text-muted mt-1">{% trans "Last signal" %}: ${driver.location_updated_label || '-'}</div>
+        `;
+        card.addEventListener('click', function () {
+          selectedDeliveryId = driver.delivery_id;
+          if (driver.has_location) {
+            map.setView([driver.latitude, driver.longitude], 15);
+            const marker = markers.get(driver.delivery_id);
+            if (marker) {
+              marker.openPopup();
+            }
+          }
+        });
+        listContainer.appendChild(card);
+      });
+    }
+
+    function renderMap(drivers) {
+      layerGroup.clearLayers();
+      markers.clear();
+      const bounds = [];
+
+      drivers.forEach((driver) => {
+        if (!driver.has_location) {
+          return;
+        }
+        const marker = L.marker([driver.latitude, driver.longitude]).bindPopup(popupHtml(driver));
+        marker.addTo(layerGroup);
+        markers.set(driver.delivery_id, marker);
+        bounds.push([driver.latitude, driver.longitude]);
+      });
+
+      if (selectedDeliveryId && markers.has(selectedDeliveryId)) {
+        markers.get(selectedDeliveryId).openPopup();
+        map.setView(markers.get(selectedDeliveryId).getLatLng(), 15);
+        return;
+      }
+
+      if (bounds.length === 1) {
+        map.setView(bounds[0], 15);
+      } else if (bounds.length > 1) {
+        map.fitBounds(bounds, { padding: [30, 30] });
+      } else {
+        map.setView([39.8283, -98.5795], 4);
+      }
+    }
+
+    function applyDrivers(drivers) {
+      renderList(drivers);
+      renderMap(drivers);
+    }
+
+    function fetchDrivers() {
+      fetch(dataUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok || !data.success) {
+            throw new Error(data.message || '{% trans "Unable to load live drivers." %}');
+          }
+          refreshStatus.textContent = '{% trans "Updated just now" %}';
+          applyDrivers(data.drivers || []);
+        })
+        .catch((error) => {
+          refreshStatus.textContent = error.message;
+        });
+    }
+
+    applyDrivers(initialData);
+    window.setInterval(fetchDrivers, 10000);
+  })();
+</script>
+{% endblock %}

@@ -65,6 +65,24 @@ class InventarioOperativoTests(TestCase):
 				origen='CLIENTE',
 			)
 
+	def test_customer_overorder_can_be_created_without_stock_reservation(self):
+		pedido = crear_pedido_desde_items(
+			cliente=self.cliente,
+			items_payload=[{'presentacion': self.presentacion, 'cantidad': 15, 'precio': Decimal('10.00')}],
+			origen='CLIENTE',
+			bypass_stock_check=True,
+			reservar_inventario=False,
+		)
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		item = pedido.items.get()
+
+		self.assertEqual(pedido.total, Decimal('150.00'))
+		self.assertEqual(stock.stock_fisico, 10)
+		self.assertEqual(stock.stock_reservado, 0)
+		self.assertEqual(stock.stock_disponible, 10)
+		self.assertEqual(item.cantidad_reservada_inventario, 0)
+		self.assertEqual(item.cantidad_inventario_aplicada, 0)
+
 	def test_picking_consumes_real_quantity_and_releases_difference(self):
 		pedido = crear_pedido_desde_items(
 			cliente=self.cliente,
@@ -91,6 +109,39 @@ class InventarioOperativoTests(TestCase):
 		self.assertEqual(stock.stock_disponible, 7)
 		self.assertEqual(item.cantidad_inventario_aplicada, 3)
 		self.assertEqual(item.cantidad_reservada_inventario, 0)
+
+	def test_picking_verification_handles_legacy_unreserved_order_after_manual_restock(self):
+		pedido = crear_pedido_desde_items(
+			cliente=self.cliente,
+			items_payload=[{'presentacion': self.presentacion, 'cantidad': 12, 'precio': Decimal('10.00')}],
+			origen='CLIENTE',
+			bypass_stock_check=True,
+			reservar_inventario=False,
+		)
+		pedido.seleccionador = self.selector
+		pedido.estado = 'PARA_VERIFICAR'
+		pedido.save(update_fields=['seleccionador', 'estado'])
+		item = pedido.items.get()
+		item.cantidad_reservada_inventario = 12
+		item.save(update_fields=['cantidad_reservada_inventario'])
+
+		registrar_entrada_manual(presentacion=self.presentacion, cantidad=5, observacion='Restock before verification', creado_por=self.backoffice)
+
+		guardar_verificacion_picking(
+			pedido=pedido,
+			seleccionador=self.selector,
+			cantidades_reales={item.id: 12},
+			nota='Stock was replenished before verification.',
+			nota_resuelta=True,
+		)
+
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		item.refresh_from_db()
+		self.assertEqual(stock.stock_fisico, 3)
+		self.assertEqual(stock.stock_reservado, 0)
+		self.assertEqual(stock.stock_disponible, 3)
+		self.assertEqual(item.cantidad_reservada_inventario, 0)
+		self.assertEqual(item.cantidad_inventario_aplicada, 12)
 
 	def test_cancelled_order_restores_reserved_and_applied_stock(self):
 		pedido = crear_pedido_desde_items(

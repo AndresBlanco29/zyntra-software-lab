@@ -1,0 +1,181 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Live Tracking" %} - {{ invoice.numero }}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <h2 class="mb-1">{% trans "Live route tracking" %}</h2>
+    <p class="text-muted mb-0">{{ invoice.numero }} | {{ delivery.invoice.cliente.nombre_empresa }}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'driver_delivery_detail' delivery.id %}" class="btn btn-outline-secondary">{% trans "Back to delivery" %}</a>
+    <a href="{{ delivery.google_maps_url }}" target="_blank" rel="noopener" class="btn btn-primary">{% trans "Open Google Maps" %}</a>
+  </div>
+</div>
+
+<div class="alert alert-info">
+  {% trans "Keep this page open while driving so the system can send your live position to admin in real time." %}
+</div>
+
+<div class="alert alert-warning">
+  {% trans "If you hide this page, lock the phone, or switch fully into another app, the browser can pause GPS updates. Open Maps in a separate tab and keep this tracking screen visible whenever possible." %}
+</div>
+
+<form id="driverTrackingCsrfForm">{% csrf_token %}</form>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0">{% trans "Current position" %}</h5>
+          <span class="badge bg-secondary" id="trackingStateBadge">{% trans "Waiting for GPS" %}</span>
+        </div>
+        <div class="ratio ratio-4x3 border rounded overflow-hidden bg-light">
+          <iframe id="driverTrackingMap" src="https://maps.google.com/maps?q={{ delivery.route_address|urlencode }}&z=13&output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="mb-3">{% trans "Tracking status" %}</h5>
+        <div class="row g-3">
+          <div class="col-12"><div class="text-muted small">{% trans "Destination" %}</div><div class="fw-semibold">{{ delivery.route_address }}</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Driver" %}</div><div id="trackingDriverName">{% firstof delivery.driver.get_full_name delivery.driver.username %}</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Delivery status" %}</div><div id="trackingDeliveryStatus">{{ delivery.get_estado_display }}</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Last sent" %}</div><div id="trackingLastSent">-</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Accuracy" %}</div><div id="trackingAccuracy">-</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Speed" %}</div><div id="trackingSpeed">-</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Heading" %}</div><div id="trackingHeading">-</div></div>
+          <div class="col-12"><div class="text-muted small">{% trans "Coordinates" %}</div><div id="trackingCoordinates">-</div></div>
+          <div class="col-12"><div class="small text-muted" id="trackingMessage">{% trans "Request location permission in your browser to start live tracking." %}</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const updateUrl = "{% url 'driver_delivery_update_location' delivery.id %}";
+    const csrfToken = document.querySelector('#driverTrackingCsrfForm input[name="csrfmiddlewaretoken"]')?.value || '';
+    const mapFrame = document.getElementById('driverTrackingMap');
+    const stateBadge = document.getElementById('trackingStateBadge');
+    const lastSent = document.getElementById('trackingLastSent');
+    const accuracy = document.getElementById('trackingAccuracy');
+    const speed = document.getElementById('trackingSpeed');
+    const heading = document.getElementById('trackingHeading');
+    const coordinates = document.getElementById('trackingCoordinates');
+    const message = document.getElementById('trackingMessage');
+    const geolocationOptions = {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 5000,
+    };
+    let lastSentAt = 0;
+    let sending = false;
+
+    function setBadge(text, className) {
+      stateBadge.textContent = text;
+      stateBadge.className = 'badge ' + className;
+    }
+
+    function updateMap(latitude, longitude) {
+      mapFrame.src = `https://maps.google.com/maps?q=${latitude},${longitude}&z=16&output=embed`;
+    }
+
+    function updateLocalMetrics(payload) {
+      const tracking = payload.tracking || payload;
+      if (tracking.latitude !== null && tracking.longitude !== null) {
+        coordinates.textContent = `${tracking.latitude.toFixed(6)}, ${tracking.longitude.toFixed(6)}`;
+        updateMap(tracking.latitude, tracking.longitude);
+      }
+      lastSent.textContent = tracking.location_updated_label || '-';
+      accuracy.textContent = tracking.accuracy_meters !== null ? `${tracking.accuracy_meters.toFixed(2)} m` : '-';
+      speed.textContent = tracking.speed_mps !== null ? `${tracking.speed_mps.toFixed(2)} m/s` : '-';
+      heading.textContent = tracking.heading !== null ? `${tracking.heading.toFixed(2)}°` : '-';
+    }
+
+    function handleGeolocationError(error) {
+      setBadge('{% trans "GPS blocked" %}', 'bg-danger');
+      message.textContent = error && error.message ? error.message : '{% trans "Location permission was denied." %}';
+    }
+
+    function sendPosition(position) {
+      const now = Date.now();
+      if (sending || now - lastSentAt < 5000) {
+        return;
+      }
+      sending = true;
+      setBadge('{% trans "Sending" %}', 'bg-warning text-dark');
+      message.textContent = '{% trans "Sending current GPS position..." %}';
+
+      const body = new URLSearchParams({
+        latitude: String(position.coords.latitude),
+        longitude: String(position.coords.longitude),
+        accuracy_meters: position.coords.accuracy ? String(position.coords.accuracy) : '',
+        speed_mps: position.coords.speed != null ? String(position.coords.speed) : '',
+        heading: position.coords.heading != null ? String(position.coords.heading) : '',
+      });
+
+      fetch(updateUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+          'X-CSRFToken': csrfToken,
+        },
+        body,
+      })
+        .then((response) => response.json().then((data) => ({ ok: response.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok || !data.success) {
+            throw new Error(data.message || '{% trans "Live tracking update failed." %}');
+          }
+          lastSentAt = Date.now();
+          updateLocalMetrics(data);
+          setBadge('{% trans "Live" %}', 'bg-success');
+          message.textContent = '{% trans "Admin can now see your vehicle moving in real time." %}';
+        })
+        .catch((error) => {
+          setBadge('{% trans "Tracking error" %}', 'bg-danger');
+          message.textContent = error.message;
+        })
+        .finally(() => {
+          sending = false;
+        });
+    }
+
+    function requestCurrentPosition() {
+      if (document.visibilityState === 'hidden') {
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(sendPosition, handleGeolocationError, geolocationOptions);
+    }
+
+    if (!('geolocation' in navigator)) {
+      setBadge('{% trans "GPS unavailable" %}', 'bg-danger');
+      message.textContent = '{% trans "This device does not support browser geolocation." %}';
+      return;
+    }
+
+    setBadge('{% trans "Starting" %}', 'bg-primary');
+    message.textContent = '{% trans "Waiting for your first GPS fix..." %}';
+    navigator.geolocation.watchPosition(sendPosition, handleGeolocationError, geolocationOptions);
+    window.setInterval(requestCurrentPosition, 15000);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') {
+        setBadge('{% trans "Tracking paused" %}', 'bg-warning text-dark');
+        message.textContent = '{% trans "Bring this page back to the front to keep sending live GPS updates." %}';
+        return;
+      }
+      setBadge('{% trans "Resuming" %}', 'bg-primary');
+      message.textContent = '{% trans "Refreshing your GPS position..." %}';
+      requestCurrentPosition();
+    });
+  })();
+</script>
+{% endblock %}

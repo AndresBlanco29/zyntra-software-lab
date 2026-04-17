@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n %}
+{% load i18n l10n %}
 
 {% block title %}{% trans "Quote" %} #{{ cotizacion.id }}{% endblock %}
 
@@ -15,7 +15,7 @@
 
 <div class="row g-4">
   <div class="col-lg-8">
-    <form method="post" class="card shadow-sm">
+    <form method="post" class="card shadow-sm" id="quoteUpdateForm" data-send-ready-initial="{{ can_send_customer_quote|yesno:'true,false' }}">
       {% csrf_token %}
       <div class="card-body">
         <h5 class="mb-3">{% trans "Quoted Products" %}</h5>
@@ -31,18 +31,35 @@
               </tr>
             </thead>
             <tbody>
-              {% for item in cotizacion.items.all %}
+              {% for row in cotizacion_item_rows %}
+              {% with item=row.item %}
               <tr>
                 <td>{{ item.presentacion.producto.nombre }}</td>
                 <td>{{ item.presentacion.nombre }}</td>
                 <td>
-                  <input type="number" min="1" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" class="form-control form-control-sm">
+                  <input type="number" min="1" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" class="form-control form-control-sm quote-quantity-input" data-item-id="{{ item.id }}">
                 </td>
                 <td>
-                  <input type="number" min="0" step="0.01" name="precio_{{ item.id }}" value="{{ item.precio }}" class="form-control form-control-sm">
+                  <select class="form-select form-select-sm mb-2 preset-price-select" data-target-input="precio_{{ item.id }}">
+                    <option value="">{% trans "Manual price" %}</option>
+                    {% for option in row.price_options %}
+                    <option value="{{ option.value|unlocalize }}" {% if row.selected_option == option.key %}selected{% endif %}>
+                      {{ option.label }} - ${{ option.value }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                  <input type="number" min="1.01" step="0.01" id="precio_{{ item.id }}" name="precio_{{ item.id }}" value="{{ row.current_price|unlocalize }}" class="form-control form-control-sm customer-price-input" data-item-id="{{ item.id }}" data-product-name="{{ item.presentacion.producto.nombre|escape }}" data-presentation-name="{{ item.presentacion.nombre|escape }}" data-cost="{% if row.cost is not None %}{{ row.cost|unlocalize }}{% endif %}" data-min-price="{{ row.minimum_price|unlocalize }}" data-margin-target="margin_{{ item.id }}">
+                  <div id="margin_{{ item.id }}" class="small text-muted mt-1 utility-indicator">
+                    {% if row.current_utility_percentage is not None %}
+                      {% blocktrans with percentage=row.current_utility_percentage %}Utility: {{ percentage }}%{% endblocktrans %}
+                    {% else %}
+                      {% trans "Utility: unavailable because this presentation has no cost configured." %}
+                    {% endif %}
+                  </div>
                 </td>
-                <td>${{ item.subtotal }}</td>
+                <td><span class="quote-subtotal" data-item-id="{{ item.id }}">${{ row.display_subtotal }}</span></td>
               </tr>
+              {% endwith %}
               {% endfor %}
             </tbody>
           </table>
@@ -59,7 +76,7 @@
         </div>
 
         <div class="d-flex justify-content-between align-items-center">
-          <strong>{% trans "Updated total" %}: ${{ cotizacion.total }}</strong>
+          <strong>{% trans "Updated total" %}: <span id="quoteTotalValue">${{ display_total }}</span></strong>
           <button type="submit" class="btn btn-primary">{% trans "Save changes" %}</button>
         </div>
       </div>
@@ -74,8 +91,12 @@
 
         <form method="post" action="{% url 'enviar_cotizacion_cliente' cotizacion.id %}">
           {% csrf_token %}
-          <button type="submit" class="btn btn-warning w-100">{% trans "Send quote to customer" %}</button>
+          <button type="submit" class="btn btn-warning w-100 quote-send-email-button" {% if not can_send_customer_quote %}disabled{% endif %}>{% trans "Send quote to customer" %}</button>
         </form>
+
+        {% if not can_send_customer_quote %}
+        <div class="small text-muted mt-2">{% trans "Save the quote changes first to enable the official email delivery." %}</div>
+        {% endif %}
 
         <div class="mt-3 small">
           <div class="d-flex justify-content-between align-items-center mb-1">
@@ -94,42 +115,6 @@
             {% endif %}
           </div>
         </div>
-
-        <div class="mt-3 small">
-          <div class="d-flex justify-content-between align-items-center mb-1">
-            <span class="fw-semibold">SMS</span>
-            {% if cotizacion.sms_enviado %}
-            <span class="badge text-bg-success">{% trans "Sent" %}</span>
-            {% else %}
-            <span class="badge text-bg-secondary">{% trans "Pending" %}</span>
-            {% endif %}
-          </div>
-          <div class="text-muted">
-            {% if cotizacion.sms_enviado_en %}
-            {% trans "Last sent" %}: {{ cotizacion.sms_enviado_en|date:"d/m/Y h:i A" }}
-            {% else %}
-            {% trans "Automatic SMS has not been sent yet." %}
-            {% endif %}
-          </div>
-        </div>
-
-        <div class="mt-3 small">
-          <div class="d-flex justify-content-between align-items-center mb-1">
-            <span class="fw-semibold">{% trans "Automatic WhatsApp" %}</span>
-            {% if cotizacion.whatsapp_enviado %}
-            <span class="badge text-bg-success">{% trans "Sent" %}</span>
-            {% else %}
-            <span class="badge text-bg-secondary">{% trans "Pending" %}</span>
-            {% endif %}
-          </div>
-          <div class="text-muted">
-            {% if cotizacion.whatsapp_enviado_en %}
-            {% trans "Last sent" %}: {{ cotizacion.whatsapp_enviado_en|date:"d/m/Y h:i A" }}
-            {% else %}
-            {% trans "Automatic WhatsApp has not been sent yet." %}
-            {% endif %}
-          </div>
-        </div>
       </div>
     </div>
 
@@ -139,7 +124,11 @@
         <p class="small text-muted mb-2">{% trans "WhatsApp is used as a manual follow-up channel for commercial contact." %}</p>
         <p class="small text-muted mb-2">{% trans "Detected contact number" %}: {% if telefono_contacto %}+{{ telefono_contacto }}{% else %}{% trans "Not configured" %}{% endif %}</p>
 
-        <a class="btn btn-outline-success w-100 mb-2 {% if not whatsapp_link %}disabled{% endif %}" href="{% url 'abrir_whatsapp_manual_cotizacion' cotizacion.id %}" target="_blank">{% trans "Open WhatsApp manually" %}</a>
+        <a class="btn btn-outline-success w-100 mb-2 quote-send-whatsapp-button {% if not whatsapp_link or not can_send_customer_quote %}disabled{% endif %}" href="{% if whatsapp_link and can_send_customer_quote %}{% url 'abrir_whatsapp_manual_cotizacion' cotizacion.id %}{% else %}#{% endif %}" {% if whatsapp_link and can_send_customer_quote %}target="_blank"{% endif %} aria-disabled="{% if not whatsapp_link or not can_send_customer_quote %}true{% else %}false{% endif %}" tabindex="{% if not whatsapp_link or not can_send_customer_quote %}-1{% else %}0{% endif %}">{% trans "Open WhatsApp manually" %}</a>
+
+        {% if not can_send_customer_quote %}
+        <div class="small text-muted mb-2">{% trans "Save the quote changes first to enable the WhatsApp follow-up action." %}</div>
+        {% endif %}
 
         <div class="small mt-2">
           <div class="d-flex justify-content-between align-items-center mb-1">
@@ -164,4 +153,218 @@
     </div>
   </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const quoteForm = document.getElementById('quoteUpdateForm');
+  const presetSelects = document.querySelectorAll('.preset-price-select');
+  const priceInputs = document.querySelectorAll('.customer-price-input');
+  const quantityInputs = document.querySelectorAll('.quote-quantity-input');
+  const noteInput = quoteForm ? quoteForm.querySelector('textarea[name="nota_backoffice"]') : null;
+  const emailButton = document.querySelector('.quote-send-email-button');
+  const whatsappButton = document.querySelector('.quote-send-whatsapp-button');
+  const whatsappOriginalHref = whatsappButton ? whatsappButton.getAttribute('href') : '#';
+  const missingCostMessage = 'Utility: unavailable because this presentation has no cost configured.';
+  const totalElement = document.getElementById('quoteTotalValue');
+  let canSendCustomerQuote = quoteForm ? quoteForm.dataset.sendReadyInitial === 'true' : false;
+  const priceValidationMessages = {
+    minimum: "{% trans 'The price for %(product)s must be greater than $1.00.' %}".replace('%(product)s', '{product}'),
+    loss: "{% trans 'The price for %(product)s cannot be lower than cost ($%(cost)s) because it would generate a loss.' %}".replace('%(product)s', '{product}').replace('%(cost)s', '{cost}')
+  };
+
+  function syncSendActions() {
+    if (emailButton) {
+      emailButton.disabled = !canSendCustomerQuote;
+    }
+
+    if (whatsappButton) {
+      whatsappButton.classList.toggle('disabled', !canSendCustomerQuote || whatsappOriginalHref === '#');
+      whatsappButton.setAttribute('aria-disabled', (!canSendCustomerQuote || whatsappOriginalHref === '#') ? 'true' : 'false');
+      whatsappButton.setAttribute('tabindex', (!canSendCustomerQuote || whatsappOriginalHref === '#') ? '-1' : '0');
+      whatsappButton.setAttribute('href', canSendCustomerQuote && whatsappOriginalHref !== '#' ? whatsappOriginalHref : '#');
+      if (!canSendCustomerQuote || whatsappOriginalHref === '#') {
+        whatsappButton.removeAttribute('target');
+      } else {
+        whatsappButton.setAttribute('target', '_blank');
+      }
+    }
+  }
+
+  function markQuoteAsDirty() {
+    canSendCustomerQuote = false;
+    syncSendActions();
+  }
+
+  syncSendActions();
+
+  function parseDecimal(value) {
+    const normalized = String(value || '').trim().replace(',', '.');
+    const parsed = Number.parseFloat(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function formatPercentage(value) {
+    return value.toFixed(2).replace(/\.00$/, '');
+  }
+
+  function formatCurrency(value) {
+    return `$${value.toFixed(2)}`;
+  }
+
+  function validateQuotePrices(showAlert) {
+    for (const input of priceInputs) {
+      const price = parseDecimal(input.value);
+      const cost = parseDecimal(input.dataset.cost);
+      const productName = `${input.dataset.productName} (${input.dataset.presentationName})`;
+
+      if (price === null || price <= 1) {
+        if (showAlert) {
+          window.alert(priceValidationMessages.minimum.replace('{product}', productName));
+          input.focus();
+        }
+        return false;
+      }
+
+      if (cost !== null && price < cost) {
+        if (showAlert) {
+          window.alert(
+            priceValidationMessages.loss
+              .replace('{product}', productName)
+              .replace('{cost}', cost.toFixed(2))
+          );
+          input.focus();
+        }
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function updateSubtotal(itemId) {
+    const quantityInput = document.querySelector(`.quote-quantity-input[data-item-id="${itemId}"]`);
+    const priceInput = document.querySelector(`.customer-price-input[data-item-id="${itemId}"]`);
+    const subtotalElement = document.querySelector(`.quote-subtotal[data-item-id="${itemId}"]`);
+    if (!quantityInput || !priceInput || !subtotalElement) {
+      return 0;
+    }
+
+    const quantity = Math.max(parseInt(quantityInput.value || '1', 10) || 1, 1);
+    const price = parseDecimal(priceInput.value) || 0;
+    const subtotal = quantity * price;
+    subtotalElement.textContent = formatCurrency(subtotal);
+    return subtotal;
+  }
+
+  function updateQuoteTotal() {
+    if (!totalElement) {
+      return;
+    }
+
+    let total = 0;
+    document.querySelectorAll('.quote-subtotal').forEach(function (subtotalElement) {
+      const itemId = subtotalElement.dataset.itemId;
+      total += updateSubtotal(itemId);
+    });
+    totalElement.textContent = formatCurrency(total);
+  }
+
+  function updateUtilityIndicator(input) {
+    const indicator = document.getElementById(input.dataset.marginTarget);
+    if (!indicator) {
+      return;
+    }
+
+    const cost = parseDecimal(input.dataset.cost);
+    const price = parseDecimal(input.value);
+    if (cost === null || price === null || price <= 0) {
+      indicator.textContent = missingCostMessage;
+      return;
+    }
+
+    const percentage = (1 - (cost / price)) * 100;
+    indicator.textContent = `Utility: ${formatPercentage(percentage)}%`;
+  }
+
+  presetSelects.forEach(function (select) {
+    select.addEventListener('change', function () {
+      const targetInput = document.getElementById(select.dataset.targetInput);
+      if (!targetInput) {
+        return;
+      }
+      if (select.value) {
+        targetInput.value = select.value;
+      }
+      updateUtilityIndicator(targetInput);
+      updateSubtotal(targetInput.dataset.itemId);
+      updateQuoteTotal();
+      markQuoteAsDirty();
+    });
+  });
+
+  quantityInputs.forEach(function (input) {
+    input.addEventListener('input', function () {
+      if (!input.value || parseInt(input.value, 10) < 1) {
+        input.value = '1';
+      }
+      updateSubtotal(input.dataset.itemId);
+      updateQuoteTotal();
+      markQuoteAsDirty();
+    });
+  });
+
+  priceInputs.forEach(function (input) {
+    const relatedSelect = document.querySelector(`.preset-price-select[data-target-input="${input.id}"]`);
+
+    function syncState() {
+      if (relatedSelect) {
+        const inputValue = parseDecimal(input.value);
+        let matchedValue = '';
+
+        Array.from(relatedSelect.options).forEach(function (option) {
+          if (!option.value) {
+            return;
+          }
+          const optionValue = parseDecimal(option.value);
+          if (inputValue !== null && optionValue !== null && optionValue === inputValue) {
+            matchedValue = option.value;
+          }
+        });
+
+        relatedSelect.value = matchedValue;
+      }
+
+      updateUtilityIndicator(input);
+      updateSubtotal(input.dataset.itemId);
+      updateQuoteTotal();
+    }
+
+    input.addEventListener('input', syncState);
+    input.addEventListener('input', markQuoteAsDirty);
+    syncState();
+  });
+
+  if (noteInput) {
+    noteInput.addEventListener('input', markQuoteAsDirty);
+  }
+
+  if (quoteForm) {
+    quoteForm.addEventListener('submit', function (event) {
+      if (!validateQuotePrices(true)) {
+        event.preventDefault();
+      }
+    });
+  }
+
+  if (whatsappButton) {
+    whatsappButton.addEventListener('click', function (event) {
+      if (!canSendCustomerQuote || whatsappOriginalHref === '#') {
+        event.preventDefault();
+      }
+    });
+  }
+
+  updateQuoteTotal();
+});
+</script>
 {% endblock %}

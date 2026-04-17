@@ -1,31 +1,45 @@
-import logging
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
+from config.inventario.services import (
+    aplicar_verificacion_picking_inventario,
+    reservar_stock_para_pedido_items,
+    validar_disponibilidad_para_items,
+)
 from config.notificaciones.models import crear_notificacion_backoffice, crear_notificacion_usuario
-from config.inventario.services import aplicar_verificacion_picking_inventario, reservar_stock_para_pedido_items, validar_disponibilidad_para_items
 
 from .models import Pedido, PedidoItem
 
 
-logger = logging.getLogger(__name__)
-
-
 def _to_decimal(value, default='0'):
-    text = str(value if value is not None else default).strip().replace(',', '.')
-    if not text:
-        text = str(default)
     try:
-        return Decimal(text)
-    except (InvalidOperation, ValueError, TypeError):
+        return Decimal(str(value if value is not None else default))
+    except Exception:
         return Decimal(str(default))
+
+
+def _quantize_money(value):
+    return _to_decimal(value, '0').quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def recalcular_pedido(pedido):
+    total = Decimal('0.00')
+    for item in pedido.items.all():
+        item.subtotal = _quantize_money(_to_decimal(item.precio) * Decimal(str(item.cantidad or 0)))
+        item.save(update_fields=['subtotal'])
+        total += item.subtotal
+    pedido.total = _quantize_money(total)
+    pedido.save(update_fields=['total', 'actualizada_en'])
+    return pedido
 
 
 @transaction.atomic
@@ -42,166 +56,97 @@ def crear_pedido_desde_items(
     bypass_stock_check=False,
     reservar_inventario=True,
 ):
-    if getattr(cliente, 'credit_hold', False):
-        raise ValidationError(_('This customer is blocked for new purchases until BackOffice removes the hold.'))
+    if not items_payload:
+        raise ValidationError(_('You must add at least one item to create the purchase order.'))
 
-    validar_disponibilidad_para_items(items_payload, bypass_stock_check=bypass_stock_check)
+    if reservar_inventario:
+        validar_disponibilidad_para_items(items_payload, bypass_stock_check=bypass_stock_check)
 
     pedido = Pedido.objects.create(
         cliente=cliente,
-        vendedor=vendedor if getattr(vendedor, 'role', '') == 'vendedor' else None,
+        vendedor=vendedor,
         cotizacion=cotizacion,
         origen=origen,
-        canal_toma=canal_toma,
-        nota_cliente=nota_cliente,
-        acepta_terminos=acepta_terminos,
+        canal_toma=(canal_toma or '').strip(),
+        estado='RECIBIDO',
+        nota_cliente=(nota_cliente or '').strip(),
+        acepta_terminos=bool(acepta_terminos),
         acepta_terminos_en=timezone.now() if acepta_terminos else None,
-        total=Decimal('0'),
+        total=Decimal('0.00'),
     )
 
-    total = Decimal('0')
-    created_items = []
-
-    for item in items_payload:
-        presentacion = item['presentacion']
-        cantidad = max(int(item['cantidad']), 1)
-        precio = _to_decimal(item['precio'])
-        subtotal = precio * cantidad
-
-        pedido_item = PedidoItem.objects.create(
-            pedido=pedido,
-            presentacion=presentacion,
-            cantidad_solicitada=cantidad,
-            cantidad=cantidad,
-            precio=precio,
-            subtotal=subtotal,
+    pedido_items = []
+    total = Decimal('0.00')
+    for payload in items_payload:
+        presentacion = payload['presentacion']
+        cantidad = max(int(payload.get('cantidad') or 1), 1)
+        precio = _quantize_money(payload.get('precio', 0))
+        subtotal = _quantize_money(precio * Decimal(str(cantidad)))
+        pedido_items.append(
+            PedidoItem(
+                pedido=pedido,
+                presentacion=presentacion,
+                cantidad_solicitada=cantidad,
+                cantidad=cantidad,
+                precio=precio,
+                subtotal=subtotal,
+            )
         )
-        created_items.append(pedido_item)
-
         total += subtotal
 
-    pedido.total = total
-    pedido.save(update_fields=['total'])
-    if reservar_inventario:
+    created_items = list(PedidoItem.objects.bulk_create(pedido_items))
+    pedido.total = _quantize_money(total)
+    pedido.save(update_fields=['total', 'actualizada_en'])
+
+    if reservar_inventario and created_items:
         reservar_stock_para_pedido_items(pedido=pedido, pedido_items=created_items, creado_por=vendedor)
+
     return pedido
 
 
-def recalcular_pedido(pedido):
-    total = Decimal('0')
-
-    for item in pedido.items.all():
-        item.subtotal = _to_decimal(item.precio) * item.cantidad
-        item.save(update_fields=['subtotal'])
-        total += item.subtotal
-
-    pedido.total = total
-    pedido.save(update_fields=['total', 'actualizada_en'])
-    return total
-
-
-def _validate_selector_user(usuario):
-    if not usuario or not getattr(usuario, 'is_active', False) or getattr(usuario, 'role', '') != 'seleccionador':
-        raise ValidationError(_('The selected user is not a valid selector.'))
-
-
 def validar_estado_backoffice_con_bloqueo(pedido, nuevo_estado):
-    if pedido.estado == 'CANCELADO' and nuevo_estado != 'CANCELADO':
-        raise ValidationError(_('Cancelled orders cannot be reactivated. Create a new order instead.'))
-    if pedido.picking_bloqueado and nuevo_estado not in {'PARA_VERIFICAR', 'VERIFICADO_AJUSTADO'}:
-        raise ValidationError(_('This order is locked by an unresolved selector note. Resolve it before moving to another status.'))
+    if pedido.picking_bloqueado and nuevo_estado != pedido.estado:
+        raise ValidationError(_('This purchase order is blocked by an unresolved picking note.'))
 
 
 @transaction.atomic
 def asignar_picking_a_seleccionador(*, pedido, seleccionador):
-    _validate_selector_user(seleccionador)
-
-    if pedido.estado in {'DESPACHADO', 'CANCELADO'}:
-        raise ValidationError(_('Only active orders can be sent to selector verification.'))
-
-    items = list(pedido.items.select_related('presentacion__producto').all())
-    if not items:
-        raise ValidationError(_('The order must contain at least one product before sending the picking ticket.'))
-
-    timestamp = timezone.now()
+    if getattr(seleccionador, 'role', '') != 'seleccionador':
+        raise ValidationError(_('Only selector users can be assigned to a picking ticket.'))
+    if pedido.estado not in {'RECIBIDO', 'EN_GESTION', 'LISTO_PARA_PICKING', 'PARA_VERIFICAR'}:
+        raise ValidationError(_('This purchase order cannot be assigned to picking in its current status.'))
 
     pedido.seleccionador = seleccionador
     pedido.estado = 'PARA_VERIFICAR'
-    pedido.picking_asignado_en = timestamp
-    pedido.picking_verificado_en = None
-    pedido.nota_seleccionador = ''
-    pedido.nota_seleccionador_resuelta = False
-    pedido.picking_bloqueado = False
-    pedido.save(update_fields=[
-        'seleccionador',
-        'estado',
-        'picking_asignado_en',
-        'picking_verificado_en',
-        'nota_seleccionador',
-        'nota_seleccionador_resuelta',
-        'picking_bloqueado',
-        'actualizada_en',
-    ])
-
-    for item in items:
-        item.cantidad_solicitada = item.cantidad
-        item.save(update_fields=['cantidad_solicitada'])
+    pedido.picking_asignado_en = timezone.now()
+    pedido.save(update_fields=['seleccionador', 'estado', 'picking_asignado_en', 'actualizada_en'])
 
     crear_notificacion_usuario(
         usuario=seleccionador,
-        titulo=f'{_("New picking ticket assigned")} #{pedido.id}',
-        mensaje=_("You received a picking ticket for %(customer)s.") % {'customer': pedido.cliente.nombre_empresa},
+        titulo=_('Picking ticket assigned for PO #%(id)s') % {'id': pedido.id},
+        mensaje=_('You have a new picking ticket assigned for %(client)s.') % {'client': pedido.cliente.nombre_empresa},
         tipo='PEDIDO',
-        url=f'/pedidos/seleccionador/picking/{pedido.id}/',
+        url=reverse('selector_picking_detail', args=[pedido.id]),
     )
+
     return pedido
 
 
 @transaction.atomic
 def guardar_verificacion_picking(*, pedido, seleccionador, cantidades_reales, nota, nota_resuelta):
-    if pedido.seleccionador_id != getattr(seleccionador, 'id', None):
-        raise PermissionDenied(_('You can only verify picking tickets assigned to you.'))
+    if pedido.seleccionador_id != seleccionador.id:
+        raise PermissionDenied(_('You are not assigned to this picking ticket.'))
 
-    if pedido.estado not in {'PARA_VERIFICAR', 'VERIFICADO_AJUSTADO'}:
-        raise ValidationError(_('This picking ticket is not available for verification.'))
+    nota_texto = (nota or '').strip()
+    if not nota_texto:
+        raise ValidationError(_('A picking note is required before saving the verification.'))
 
-    nota_limpia = (nota or '').strip()
-    if not nota_limpia:
-        raise ValidationError(_('A selector note is required before saving the verification.'))
-
-    total = Decimal('0')
-    items = list(pedido.items.select_for_update().select_related('presentacion__producto'))
+    items = list(pedido.items.select_for_update().select_related('presentacion__producto').all())
     for item in items:
-        if item.id not in cantidades_reales:
-            raise ValidationError(_('Every product must include a verified quantity.'))
-
-        cantidad_real = cantidades_reales[item.id]
-        if cantidad_real < 0:
-            raise ValidationError(_('Verified quantities cannot be negative.'))
-
-        if not item.cantidad_solicitada:
-            item.cantidad_solicitada = item.cantidad
-
+        cantidad_real = max(int(cantidades_reales.get(item.id, item.cantidad) or 0), 0)
         item.cantidad = cantidad_real
-        item.subtotal = _to_decimal(item.precio) * cantidad_real
-        item.save(update_fields=['cantidad_solicitada', 'cantidad', 'subtotal'])
-        total += item.subtotal
-
-    pedido.total = total
-    pedido.estado = 'VERIFICADO_AJUSTADO'
-    pedido.nota_seleccionador = nota_limpia
-    pedido.nota_seleccionador_resuelta = bool(nota_resuelta)
-    pedido.picking_bloqueado = bool(nota_limpia and not nota_resuelta)
-    pedido.picking_verificado_en = timezone.now()
-    pedido.save(update_fields=[
-        'total',
-        'estado',
-        'nota_seleccionador',
-        'nota_seleccionador_resuelta',
-        'picking_bloqueado',
-        'picking_verificado_en',
-        'actualizada_en',
-    ])
+        item.subtotal = _quantize_money(_to_decimal(item.precio) * Decimal(str(cantidad_real)))
+        item.save(update_fields=['cantidad', 'subtotal'])
 
     aplicar_verificacion_picking_inventario(
         pedido=pedido,
@@ -209,63 +154,92 @@ def guardar_verificacion_picking(*, pedido, seleccionador, cantidades_reales, no
         creado_por=seleccionador,
     )
 
+    recalcular_pedido(pedido)
+    pedido.estado = 'VERIFICADO_AJUSTADO'
+    pedido.nota_seleccionador = nota_texto
+    pedido.nota_seleccionador_resuelta = bool(nota_resuelta)
+    pedido.picking_verificado_en = timezone.now()
+    pedido.save(update_fields=[
+        'estado',
+        'nota_seleccionador',
+        'nota_seleccionador_resuelta',
+        'picking_verificado_en',
+        'picking_bloqueado',
+        'actualizada_en',
+    ])
+
     crear_notificacion_backoffice(
-        titulo=f'{_("Picking verification completed")} #{pedido.id}',
-        mensaje=_("%(selector)s finished the picking verification for %(customer)s.") % {
+        titulo=_('Picking verification completed for PO #%(id)s') % {'id': pedido.id},
+        mensaje=_('%(selector)s completed the picking verification for %(client)s.') % {
             'selector': seleccionador.get_full_name() or seleccionador.username,
-            'customer': pedido.cliente.nombre_empresa,
+            'client': pedido.cliente.nombre_empresa,
         },
         tipo='PEDIDO',
-        url=f'/pedidos/backoffice/{pedido.id}/',
+        url=reverse('backoffice_pedido_detalle', args=[pedido.id]),
     )
+
     return pedido
 
 
-def construir_contexto_pedido(pedido):
-    items = pedido.items.select_related('presentacion__producto')
-    return {
-        'pedido': pedido,
-        'cliente': pedido.cliente,
-        'items': items,
-    }
-
-
 def notificar_backoffice_pedido(pedido):
-    context = construir_contexto_pedido(pedido)
-    html_content = render_to_string('emails/pedido_backoffice.html', context)
-
-    email = EmailMultiAlternatives(
-        subject=f"Nueva orden de compra #{pedido.id}",
-        body='Se ha recibido una nueva orden de compra en el sistema.',
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[settings.ORDERS_NOTIFICATION_EMAIL],
+    crear_notificacion_backoffice(
+        titulo=_('New purchase order #%(id)s') % {'id': pedido.id},
+        mensaje=_('%(client)s submitted a new purchase order.') % {'client': pedido.cliente.nombre_empresa},
+        tipo='PEDIDO',
+        url=reverse('backoffice_pedido_detalle', args=[pedido.id]),
     )
 
+    user_model = get_user_model()
+    backoffice_emails = list(
+        user_model.objects.filter(role__in=['admin', 'backoffice'], is_active=True)
+        .exclude(email='')
+        .values_list('email', flat=True)
+        .distinct()
+    )
+    if not backoffice_emails:
+        return
+
+    html_content = render_to_string(
+        'emails/pedido_backoffice.html',
+        {
+            'pedido': pedido,
+            'cliente': pedido.cliente,
+            'items': pedido.items.select_related('presentacion__producto').all(),
+        },
+    )
+    text_content = _('A new purchase order #%(id)s was created for %(client)s.') % {
+        'id': pedido.id,
+        'client': pedido.cliente.nombre_empresa,
+    }
+    email = EmailMultiAlternatives(
+        subject=_('New purchase order #%(id)s') % {'id': pedido.id},
+        body=text_content,
+        from_email=settings.DEFAULT_FROM_EMAIL or settings.SERVER_EMAIL,
+        to=backoffice_emails,
+    )
     email.attach_alternative(html_content, 'text/html')
     email.send(fail_silently=False)
 
-    crear_notificacion_backoffice(
-        titulo=f'Nueva orden de compra #{pedido.id}',
-        mensaje=f'{pedido.cliente.nombre_empresa} envio una orden con total ${pedido.total}.',
-        tipo='PEDIDO',
-        url=f'/pedidos/backoffice/{pedido.id}/',
-    )
-
 
 def notificar_cliente_pedido(pedido):
-    destinatario = pedido.cliente.usuario.email
-    if not destinatario:
+    cliente_email = getattr(getattr(pedido.cliente, 'usuario', None), 'email', '')
+    if not cliente_email:
         return
 
-    context = construir_contexto_pedido(pedido)
-    html_content = render_to_string('emails/pedido_cliente_confirmado.html', context)
-
-    email = EmailMultiAlternatives(
-        subject=f"Orden de compra recibida #{pedido.id}",
-        body='Tu orden de compra fue recibida correctamente.',
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[destinatario],
+    html_content = render_to_string(
+        'emails/pedido_cliente_confirmado.html',
+        {
+            'pedido': pedido,
+            'cliente': pedido.cliente,
+            'items': pedido.items.select_related('presentacion__producto').all(),
+        },
     )
-
+    text_content = _('Your purchase order #%(id)s was received successfully.') % {'id': pedido.id}
+    email = EmailMultiAlternatives(
+        subject=_('Purchase order received #%(id)s') % {'id': pedido.id},
+        body=text_content,
+        from_email=settings.DEFAULT_FROM_EMAIL or settings.SERVER_EMAIL,
+        to=[cliente_email],
+    )
     email.attach_alternative(html_content, 'text/html')
     email.send(fail_silently=False)

@@ -2,7 +2,6 @@ from django.urls import path
 
 from . import views
 
-
 urlpatterns = [
     path('backoffice/', views.backoffice_dashboard, name='backoffice_dashboard'),
     path('backoffice/ordenes/', views.backoffice_pedidos, name='backoffice_pedidos'),

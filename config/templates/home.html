@@ -1148,112 +1148,248 @@ data-video-src="{% static 'video/video_tutorial.mp4' %}">
 </div>
 
 <script>
+function getLoginFetchUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const nextUrl = params.get('next');
+  return nextUrl
+    ? `{% url "login" %}?next=${encodeURIComponent(nextUrl)}`
+    : '{% url "login" %}';
+}
+
+function loadAuthModalContent(fetchUrl, onLoaded, errorMessage) {
+  const container = document.getElementById('loginFormContainer');
+
+  if (!container) {
+    return;
+  }
+
+  const timeoutId = setTimeout(function() {
+    container.innerHTML = '<div class="alert alert-warning">{% trans "El formulario está tardando mucho." %} <button onclick="location.reload()">{% trans "Recarga" %}</button></div>';
+  }, 8000);
+
+  fetch(fetchUrl, {
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest'
+    }
+  })
+    .then(function(response) {
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        throw new Error('Error ' + response.status);
+      }
+      return response.text();
+    })
+    .then(function(html) {
+      if (!html || html.trim().length === 0) {
+        throw new Error('Respuesta vacía');
+      }
+
+      container.innerHTML = html;
+
+      if (typeof onLoaded === 'function') {
+        onLoaded(container);
+      }
+    })
+    .catch(function(error) {
+      clearTimeout(timeoutId);
+      console.error('Error:', error);
+      container.innerHTML = `<div class="alert alert-danger">${errorMessage}</div>`;
+    });
+}
+
+function bindLoginForm(container) {
+  const form = container.querySelector('form');
+  if (!form || form.dataset.listenerAttached === 'true') {
+    return;
+  }
+
+  form.dataset.listenerAttached = 'true';
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    fetch('{% url "login" %}', {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: formData
+    })
+    .then(function(response) {
+      return response.json();
+    })
+    .then(function(data) {
+      if (data.success) {
+        window.location.href = data.redirect;
+      } else {
+        let mensajeError = '{% trans "Credenciales incorrectas" %}';
+
+        if (data.error === 'user_not_found') {
+          mensajeError = '{% trans "El usuario no existe en la base de datos" %}';
+        } else if (data.error === 'password_incorrect') {
+          mensajeError = '{% trans "Contraseña incorrecta" %}';
+        }
+
+        const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+        if (loginModal) {
+          loginModal.hide();
+        }
+
+        document.getElementById('loginErrorMessage').textContent = mensajeError;
+        const errorModal = new bootstrap.Modal(document.getElementById('loginErrorModal'));
+        errorModal.show();
+      }
+    })
+    .catch(function(err) {
+      console.error('Error:', err);
+      container.innerHTML = '<div class="alert alert-danger">{% trans "Error al procesar. Intenta de nuevo." %}</div>';
+    });
+  });
+}
+
+function cargarLogin() {
+  loadAuthModalContent(
+    getLoginFetchUrl(),
+    function(container) {
+      bindLoginForm(container);
+    },
+    '{% trans "Error al cargar" %}'
+  );
+}
+
+function bindPasswordResetForm(container) {
+  const form = container.querySelector('#passwordResetModalForm');
+  if (!form || form.dataset.listenerAttached === 'true') {
+    return;
+  }
+
+  form.dataset.listenerAttached = 'true';
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    fetch('{% url "password_reset_modal" %}', {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: formData
+    })
+    .then(function(response) {
+      return response.json().then(function(data) {
+        return {
+          ok: response.ok,
+          data: data,
+        };
+      });
+    })
+    .then(function(result) {
+      if (result.data.html) {
+        container.innerHTML = result.data.html;
+      }
+
+      if (!result.ok) {
+        bindPasswordResetForm(container);
+      }
+    })
+    .catch(function(err) {
+      console.error('Error:', err);
+      container.innerHTML = '<div class="alert alert-danger">{% trans "Error al procesar. Intenta de nuevo." %}</div>';
+    });
+  });
+}
+
+function cargarRecuperacionContrasena() {
+  const loginModalElement = document.getElementById('loginModal');
+  if (loginModalElement && !loginModalElement.classList.contains('show')) {
+    loginModalElement.dataset.preserveContentOnShow = 'true';
+    const loginModal = new bootstrap.Modal(loginModalElement);
+    loginModal.show();
+  }
+
+  loadAuthModalContent(
+    '{% url "password_reset_modal" %}',
+    function(container) {
+      bindPasswordResetForm(container);
+    },
+    '{% trans "Error al cargar el formulario de recuperación" %}'
+  );
+}
+
+function bindPasswordResetConfirmForm(container, uidb64, token) {
+  const form = container.querySelector('#passwordResetConfirmModalForm');
+  if (!form || form.dataset.listenerAttached === 'true') {
+    return;
+  }
+
+  form.dataset.listenerAttached = 'true';
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    fetch(`/password-reset/confirm-modal/${uidb64}/${token}/`, {
+      method: 'POST',
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      },
+      body: formData
+    })
+    .then(function(response) {
+      return response.json().then(function(data) {
+        return {
+          ok: response.ok,
+          data: data,
+        };
+      });
+    })
+    .then(function(result) {
+      if (result.data.html) {
+        container.innerHTML = result.data.html;
+      }
+
+      if (!result.ok) {
+        bindPasswordResetConfirmForm(container, uidb64, token);
+      }
+    })
+    .catch(function(err) {
+      console.error('Error:', err);
+      container.innerHTML = '<div class="alert alert-danger">{% trans "Error al procesar. Intenta de nuevo." %}</div>';
+    });
+  });
+}
+
+function cargarConfirmacionRecuperacion(uidb64, token) {
+  const loginModalElement = document.getElementById('loginModal');
+  if (loginModalElement && !loginModalElement.classList.contains('show')) {
+    loginModalElement.dataset.preserveContentOnShow = 'true';
+    const loginModal = new bootstrap.Modal(loginModalElement);
+    loginModal.show();
+  }
+
+  loadAuthModalContent(
+    `/password-reset/confirm-modal/${uidb64}/${token}/`,
+    function(container) {
+      bindPasswordResetConfirmForm(container, uidb64, token);
+    },
+    '{% trans "Error al cargar el formulario para cambiar la contraseña" %}'
+  );
+}
+
 // Cargar el formulario de login cuando se abre el modal
 document.addEventListener('DOMContentLoaded', function() {
   const loginModal = document.getElementById('loginModal');
-  
+
   if (!loginModal) {
     return;
   }
-  
-  loginModal.addEventListener('show.bs.modal', function() {
-    const container = document.getElementById('loginFormContainer');
 
+  loginModal.addEventListener('show.bs.modal', function() {
     if (loginModal.dataset.preserveContentOnShow === 'true') {
       loginModal.dataset.preserveContentOnShow = 'false';
       return;
     }
-    
-    if (!container) {
-      return;
-    }
-    
-    // Crear timeout
-    const timeoutId = setTimeout(function() {
-      container.innerHTML = '<div class="alert alert-warning">{% trans "El formulario está tardando mucho." %} <button onclick="location.reload()">{% trans "Recarga" %}</button></div>';
-    }, 8000);
 
-    const params = new URLSearchParams(window.location.search);
-    const nextUrl = params.get('next');
-    const loginFetchUrl = nextUrl
-      ? `{% url "login" %}?next=${encodeURIComponent(nextUrl)}`
-      : '{% url "login" %}';
-    
-    fetch(loginFetchUrl, {
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest'
-      }
-    })
-      .then(function(response) {
-        clearTimeout(timeoutId);
-        if (!response.ok) {
-          throw new Error('Error ' + response.status);
-        }
-        return response.text();
-      })
-      .then(function(html) {
-        if (!html || html.trim().length === 0) {
-          throw new Error('Respuesta vacía');
-        }
-        container.innerHTML = html;
-        
-        // Interceptar submit
-        setTimeout(function() {
-          const form = container.querySelector('form');
-          if (form) {
-            form.addEventListener('submit', function(e) {
-              e.preventDefault();
-              
-              const formData = new FormData(form);
-              fetch('{% url "login" %}', {
-                method: 'POST',
-                headers: {
-                  'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: formData
-              })
-              .then(function(response) {
-                return response.json();
-              })
-              .then(function(data) {
-                if (data.success) {
-                  // Login exitoso, redirigir
-                  window.location.href = data.redirect;
-                } else {
-                  // Login falló, mostrar modal de error con mensaje específico
-                  let mensajeError = '{% trans "Credenciales incorrectas" %}';
-                  
-                  if (data.error === 'user_not_found') {
-                    mensajeError = '{% trans "El usuario no existe en la base de datos" %}';
-                  } else if (data.error === 'password_incorrect') {
-                    mensajeError = '{% trans "Contraseña incorrecta" %}';
-                  }
-                  
-                  // Cerrar modal de login
-                  const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
-                  if (loginModal) {
-                    loginModal.hide();
-                  }
-                  
-                  // Mostrar modal de error
-                  document.getElementById('loginErrorMessage').textContent = mensajeError;
-                  const errorModal = new bootstrap.Modal(document.getElementById('loginErrorModal'));
-                  errorModal.show();
-                }
-              })
-              .catch(function(err) { 
-                console.error('Error:', err);
-                // Si hay error en la petición, intentar cargar el formulario nuevamente
-                container.innerHTML = '<div class="alert alert-danger">{% trans "Error al procesar. Intenta de nuevo." %}</div>';
-              });
-            });
-          }
-        }, 100);
-      })
-      .catch(function(error) {
-        clearTimeout(timeoutId);
-        container.innerHTML = '<div class="alert alert-danger">{% trans "Error al cargar" %}</div>';
-      });
+    cargarLogin();
   });
 });
 </script>
@@ -1469,11 +1605,33 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
 
+    const targetAuthView = params.get('auth_view');
+    if (targetAuthView) {
+      loginModalElement.dataset.preserveContentOnShow = 'true';
+    }
+
     const loginModal = new bootstrap.Modal(loginModalElement);
     loginModal.show();
 
+    if (targetAuthView === 'password_reset') {
+      setTimeout(function() {
+        cargarRecuperacionContrasena();
+      }, 250);
+    } else if (targetAuthView === 'password_reset_confirm') {
+      const uidb64 = params.get('uidb64');
+      const token = params.get('token');
+      if (uidb64 && token) {
+        setTimeout(function() {
+          cargarConfirmacionRecuperacion(uidb64, token);
+        }, 250);
+      }
+    }
+
     // Limpia el parámetro para evitar reabrir el modal al recargar.
     params.delete('show_login');
+    params.delete('auth_view');
+    params.delete('uidb64');
+    params.delete('token');
     const newQuery = params.toString();
     const newUrl = newQuery ? `${window.location.pathname}?${newQuery}` : window.location.pathname;
     window.history.replaceState({}, document.title, newUrl);

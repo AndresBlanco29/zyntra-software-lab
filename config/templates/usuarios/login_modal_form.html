@@ -38,6 +38,12 @@
 
 <div class="text-center mt-3">
   <small style="color: #475569; font-size: 14px;">
+    <a href="{% url 'password_reset' %}" class="fw-bold" style="color: #0b3d91; text-decoration: none;" onclick="cargarRecuperacionContrasena(); return false;">{% trans "¿Olvidaste tu contraseña?" %}</a>
+  </small>
+</div>
+
+<div class="text-center mt-3">
+  <small style="color: #475569; font-size: 14px;">
     {% trans "¿No tienes cuenta?" %}
     <a href="#" class="fw-bold" style="color: #0b3d91; text-decoration: none;" onclick="cargarRegistro(); return false;">{% trans "Regístrate" %}</a>
   </small>

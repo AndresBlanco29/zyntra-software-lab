@@ -1,10 +1,49 @@
-from django.urls import path
-from django.contrib.auth.views import LogoutView
-from .views import login_view, registro_view, panel_admin, perfil_admin, clientes_pendientes, aprobar_cliente, ver_cliente, ver_certificado_cliente, rechazar_cliente, lista_vendedores, crear_vendedor, editar_vendedor, desactivar_vendedor, activar_vendedor, login_form_modal, registro_form_modal, verificar_username, logout_view, contenido_home, lista_testimonios, crear_testimonio, editar_testimonio, desactivar_testimonio, activar_testimonio, editar_home_contenido, lista_usuarios_internos, crear_usuario_interno, editar_usuario_interno, desactivar_usuario_interno, activar_usuario_interno, crear_backoffice, editar_backoffice, desactivar_backoffice, activar_backoffice
+from django.contrib.auth import views as auth_views
+from django.urls import path, reverse_lazy
+
+from .forms import CustomerPasswordResetForm, CustomerSetPasswordForm
+from .views import login_view, registro_view, panel_admin, perfil_admin, clientes_pendientes, aprobar_cliente, ver_cliente, ver_certificado_cliente, rechazar_cliente, lista_vendedores, crear_vendedor, editar_vendedor, desactivar_vendedor, activar_vendedor, login_form_modal, password_reset_form_modal, password_reset_confirm_modal, registro_form_modal, verificar_username, logout_view, contenido_home, lista_testimonios, crear_testimonio, editar_testimonio, desactivar_testimonio, activar_testimonio, editar_home_contenido, lista_usuarios_internos, crear_usuario_interno, editar_usuario_interno, desactivar_usuario_interno, activar_usuario_interno, crear_backoffice, editar_backoffice, desactivar_backoffice, activar_backoffice
 
 urlpatterns = [
     path('login/', login_view, name='login'),
+    path(
+        'password-reset/',
+        auth_views.PasswordResetView.as_view(
+            form_class=CustomerPasswordResetForm,
+            template_name='usuarios/password_reset_form.html',
+            email_template_name='emails/password_reset_email.txt',
+            html_email_template_name='emails/password_reset_email.html',
+            subject_template_name='emails/password_reset_subject.txt',
+            success_url=reverse_lazy('password_reset_done'),
+        ),
+        name='password_reset',
+    ),
+    path(
+        'password-reset/done/',
+        auth_views.PasswordResetDoneView.as_view(
+            template_name='usuarios/password_reset_done.html',
+        ),
+        name='password_reset_done',
+    ),
+    path(
+        'reset/<uidb64>/<token>/',
+        auth_views.PasswordResetConfirmView.as_view(
+            form_class=CustomerSetPasswordForm,
+            template_name='usuarios/password_reset_confirm.html',
+            success_url=reverse_lazy('password_reset_complete'),
+        ),
+        name='password_reset_confirm',
+    ),
+    path(
+        'reset/done/',
+        auth_views.PasswordResetCompleteView.as_view(
+            template_name='usuarios/password_reset_complete.html',
+        ),
+        name='password_reset_complete',
+    ),
     path('login-modal/', login_form_modal, name='login_modal'),
+    path('password-reset/modal/', password_reset_form_modal, name='password_reset_modal'),
+    path('password-reset/confirm-modal/<uidb64>/<token>/', password_reset_confirm_modal, name='password_reset_confirm_modal'),
     path('registro-modal/', registro_form_modal, name='registro_modal'),
     path('registro/', registro_view, name='registro_usuario'),
     path('verificar-username/', verificar_username, name='verificar_username'),

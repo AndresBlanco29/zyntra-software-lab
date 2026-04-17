@@ -1,4 +1,5 @@
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
+from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth.password_validation import validate_password
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
@@ -25,6 +26,8 @@ from django.core.mail import EmailMultiAlternatives
 from django.http import JsonResponse, FileResponse, Http404, HttpResponse
 from django.template.loader import render_to_string
 from django.urls import reverse
+from django.utils.encoding import force_str
+from django.utils.http import urlsafe_base64_decode
 from django.utils.translation import gettext as _
 from django.utils import timezone
 from django.db import transaction
@@ -37,6 +40,8 @@ import urllib.request
 import urllib.error
 import logging
 import json
+
+from .forms import CustomerPasswordResetForm, CustomerSetPasswordForm
 
 logger = logging.getLogger(__name__)
 
@@ -1604,6 +1609,71 @@ def login_form_modal(request):
     
     # GET - Devolver solo el formulario
     return render(request, 'usuarios/login_modal.html')
+
+
+def password_reset_form_modal(request):
+    """Devuelve y procesa el formulario de recuperacion para usarlo dentro del modal del home."""
+    if request.method == 'POST':
+        form = CustomerPasswordResetForm(request.POST)
+        if form.is_valid():
+            form.save(
+                request=request,
+                use_https=request.is_secure(),
+                from_email=settings.DEFAULT_FROM_EMAIL or settings.SERVER_EMAIL or None,
+                email_template_name='emails/password_reset_email.txt',
+                html_email_template_name='emails/password_reset_email.html',
+                subject_template_name='emails/password_reset_subject.txt',
+            )
+            html = render_to_string('usuarios/password_reset_modal_done.html', request=request)
+            return JsonResponse({'success': True, 'html': html})
+
+        html = render_to_string(
+            'usuarios/password_reset_modal_form.html',
+            {'form': form},
+            request=request,
+        )
+        return JsonResponse({'success': False, 'html': html}, status=400)
+
+    form = CustomerPasswordResetForm()
+    return render(request, 'usuarios/password_reset_modal_form.html', {'form': form})
+
+
+def _get_password_reset_user(uidb64):
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        return Usuario._default_manager.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, Usuario.DoesNotExist):
+        return None
+
+
+def password_reset_confirm_modal(request, uidb64, token):
+    """Procesa el cambio de contrasena dentro del modal del home usando el token del correo."""
+    user = _get_password_reset_user(uidb64)
+    validlink = bool(user and default_token_generator.check_token(user, token))
+
+    if not validlink:
+        context = {'validlink': False, 'form': None}
+        if request.method == 'POST':
+            html = render_to_string('usuarios/password_reset_modal_confirm.html', context, request=request)
+            return JsonResponse({'success': False, 'html': html}, status=400)
+        return render(request, 'usuarios/password_reset_modal_confirm.html', context)
+
+    if request.method == 'POST':
+        form = CustomerSetPasswordForm(user, request.POST)
+        if form.is_valid():
+            form.save()
+            html = render_to_string('usuarios/password_reset_modal_complete.html', request=request)
+            return JsonResponse({'success': True, 'html': html})
+        context = {'validlink': True, 'form': form}
+        html = render_to_string('usuarios/password_reset_modal_confirm.html', context, request=request)
+        return JsonResponse({'success': False, 'html': html}, status=400)
+
+    form = CustomerSetPasswordForm(user)
+    return render(
+        request,
+        'usuarios/password_reset_modal_confirm.html',
+        {'validlink': True, 'form': form},
+    )
 
 
 def registro_form_modal(request):

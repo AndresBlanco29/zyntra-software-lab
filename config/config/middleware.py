@@ -46,6 +46,8 @@ class ProtectedAreaLoginMiddleware:
         "/media/",
         "/login/",
         "/login-modal/",
+        "/password-reset/",
+        "/reset/",
         "/registro/",
         "/registro-modal/",
         "/verificar-username/",

@@ -1,4 +1,7 @@
-from django.test import TestCase
+import re
+
+from django.core import mail
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from config.usuarios.models import Usuario
@@ -124,3 +127,105 @@ class InternalUserAdminViewTests(TestCase):
 		self.assertFalse(Usuario.objects.filter(username='driver-without-role').exists())
 		messages = list(response.context['messages'])
 		self.assertTrue(any('Select a role for the internal user.' in str(message) for message in messages))
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class PasswordResetFlowTests(TestCase):
+	def setUp(self):
+		self.user = Usuario.objects.create_user(
+			username='cliente-reset',
+			email='cliente-reset@example.com',
+			password='ClaveAnterior123!',
+			role='cliente',
+			is_active=True,
+		)
+
+	def test_password_reset_request_sends_email(self):
+		response = self.client.post(
+			reverse('password_reset'),
+			{'email': self.user.email},
+		)
+
+		self.assertRedirects(response, reverse('password_reset_done'))
+		self.assertEqual(len(mail.outbox), 1)
+		email = mail.outbox[0]
+		self.assertIn(self.user.email, email.to)
+		self.assertIn('show_login=1&auth_view=password_reset_confirm', email.body)
+
+	def test_password_can_be_reset_from_email_link(self):
+		self.client.post(reverse('password_reset'), {'email': self.user.email})
+		self.assertEqual(len(mail.outbox), 1)
+
+		body = mail.outbox[0].body
+		match = re.search(r'uidb64=(?P<uidb64>[^&\s]+)&token=(?P<token>[^\s]+)', body)
+		self.assertIsNotNone(match)
+		uidb64 = match.group('uidb64')
+		token = match.group('token')
+
+		response = self.client.get(reverse('password_reset_confirm_modal', args=[uidb64, token]))
+		self.assertEqual(response.status_code, 200)
+
+		post_response = self.client.post(
+			reverse('password_reset_confirm_modal', args=[uidb64, token]),
+			{
+				'new_password1': 'NuevaClaveSegura123!',
+				'new_password2': 'NuevaClaveSegura123!',
+			},
+			HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+		)
+
+		self.assertEqual(post_response.status_code, 200)
+		self.assertIn('Tu contraseña fue actualizada', post_response.json()['html'])
+		self.user.refresh_from_db()
+		self.assertTrue(self.user.check_password('NuevaClaveSegura123!'))
+		self.assertTrue(self.client.login(username=self.user.username, password='NuevaClaveSegura123!'))
+
+	def test_unknown_email_does_not_send_email(self):
+		response = self.client.post(
+			reverse('password_reset'),
+			{'email': 'desconocido@example.com'},
+		)
+
+		self.assertRedirects(response, reverse('password_reset_done'))
+		self.assertEqual(len(mail.outbox), 0)
+
+	def test_password_reset_modal_get_returns_partial_form(self):
+		response = self.client.get(
+			reverse('password_reset_modal'),
+			HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'passwordResetModalForm')
+
+	def test_password_reset_modal_post_sends_email_and_returns_success_html(self):
+		response = self.client.post(
+			reverse('password_reset_modal'),
+			{'email': self.user.email},
+			HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertJSONEqual(
+			response.content,
+			{
+				'success': True,
+				'html': response.json()['html'],
+			},
+		)
+		self.assertIn('Revisa tu correo', response.json()['html'])
+		self.assertEqual(len(mail.outbox), 1)
+
+	def test_password_reset_confirm_modal_returns_form_for_valid_token(self):
+		self.client.post(reverse('password_reset'), {'email': self.user.email})
+		body = mail.outbox[0].body
+		match = re.search(r'uidb64=(?P<uidb64>[^&\s]+)&token=(?P<token>[^\s]+)', body)
+		self.assertIsNotNone(match)
+
+		response = self.client.get(
+			reverse('password_reset_confirm_modal', args=[match.group('uidb64'), match.group('token')]),
+			HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'passwordResetConfirmModalForm')

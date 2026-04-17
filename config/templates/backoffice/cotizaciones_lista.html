@@ -6,6 +6,25 @@
 {% block content %}
 <h2 class="mb-4">{% trans "Quotes Received" %}</h2>
 
+<div class="btn-group mb-3" role="group" aria-label="{% trans 'Quote views' %}">
+  <a href="{% url 'backoffice_cotizaciones' %}" class="btn {% if view_mode == 'pending' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+    {% trans "Pending Quotes" %}
+    <span class="badge {% if view_mode == 'pending' %}bg-light text-primary{% else %}bg-primary{% endif %} ms-1">{{ pending_count }}</span>
+  </a>
+  <a href="{% url 'backoffice_cotizaciones' %}?view=confirmed" class="btn {% if view_mode == 'confirmed' %}btn-success{% else %}btn-outline-success{% endif %}">
+    {% trans "Confirmed Quotes" %}
+    <span class="badge {% if view_mode == 'confirmed' %}bg-light text-success{% else %}bg-success{% endif %} ms-1">{{ confirmed_count }}</span>
+  </a>
+  <a href="{% url 'backoffice_cotizaciones' %}?view=cancelled" class="btn {% if view_mode == 'cancelled' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+    {% trans "Cancelled Quotes" %}
+    <span class="badge {% if view_mode == 'cancelled' %}bg-light text-secondary{% else %}bg-secondary{% endif %} ms-1">{{ cancelled_count }}</span>
+  </a>
+  <a href="{% url 'backoffice_cotizaciones' %}?view=processed" class="btn {% if view_mode == 'processed' %}btn-dark{% else %}btn-outline-dark{% endif %}">
+    {% trans "Processed Quotes" %}
+    <span class="badge {% if view_mode == 'processed' %}bg-light text-dark{% else %}bg-dark{% endif %} ms-1">{{ processed_count }}</span>
+  </a>
+</div>
+
 <div class="card shadow-sm">
   <div class="table-responsive">
     <table class="table table-striped align-middle mb-0">
@@ -26,7 +45,7 @@
           <td>{{ cotizacion.cliente.nombre_empresa }}</td>
           <td>{{ cotizacion.fecha|date:"d/m/Y H:i" }}</td>
           <td>
-            <span class="badge bg-primary">{{ cotizacion.get_estado_display }}</span>
+            <span class="badge {% if cotizacion.estado == 'CONFIRMADA_CLIENTE' %}bg-success{% elif cotizacion.estado == 'CANCELADA_CLIENTE' %}bg-secondary{% elif cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}bg-warning text-dark{% elif cotizacion.estado == 'RECHAZADA' %}bg-danger{% elif cotizacion.estado == 'APROBADA' %}bg-dark{% else %}bg-primary{% endif %}">{{ cotizacion.get_estado_display }}</span>
           </td>
           <td>${{ cotizacion.total }}</td>
           <td>

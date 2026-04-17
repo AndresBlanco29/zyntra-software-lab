@@ -403,8 +403,29 @@ def guardar_cotizacion(request):
 @login_required
 @internal_permission_required('backoffice.quotes.view')
 def backoffice_cotizaciones(request):
-    cotizaciones = Cotizacion.objects.select_related('cliente__usuario').prefetch_related('items').order_by('-fecha')
-    return render(request, 'backoffice/cotizaciones_lista.html', {'cotizaciones': cotizaciones})
+    base_queryset = Cotizacion.objects.select_related('cliente__usuario').prefetch_related('items').order_by('-fecha')
+    pending_statuses = ['ENVIADA', 'LISTA_PARA_CONFIRMACION']
+    processed_statuses = ['APROBADA', 'RECHAZADA', 'BORRADOR']
+    view_mode = request.GET.get('view')
+
+    if view_mode == 'confirmed':
+        cotizaciones = base_queryset.filter(estado='CONFIRMADA_CLIENTE')
+    elif view_mode == 'cancelled':
+        cotizaciones = base_queryset.filter(estado='CANCELADA_CLIENTE')
+    elif view_mode == 'processed':
+        cotizaciones = base_queryset.filter(estado__in=processed_statuses)
+    else:
+        view_mode = 'pending'
+        cotizaciones = base_queryset.filter(estado__in=pending_statuses)
+
+    return render(request, 'backoffice/cotizaciones_lista.html', {
+        'cotizaciones': cotizaciones,
+        'view_mode': view_mode,
+        'pending_count': base_queryset.filter(estado__in=pending_statuses).count(),
+        'confirmed_count': base_queryset.filter(estado='CONFIRMADA_CLIENTE').count(),
+        'cancelled_count': base_queryset.filter(estado='CANCELADA_CLIENTE').count(),
+        'processed_count': base_queryset.filter(estado__in=processed_statuses).count(),
+    })
 
 
 @login_required
@@ -589,12 +610,27 @@ def cliente_cotizaciones_recibidas(request):
         return _redirect_to_home_login(request)
 
     cliente = _cliente_from_user(request.user)
-    cotizaciones = Cotizacion.objects.filter(cliente=cliente).prefetch_related('items').order_by('-fecha')
+    base_queryset = Cotizacion.objects.filter(
+        cliente=cliente,
+        estado__in=['LISTA_PARA_CONFIRMACION', 'CONFIRMADA_CLIENTE', 'CANCELADA_CLIENTE'],
+    ).prefetch_related('items').order_by('-fecha')
+    view_mode = request.GET.get('view')
+
+    if view_mode == 'confirmed':
+        cotizaciones = base_queryset.filter(estado='CONFIRMADA_CLIENTE')
+    elif view_mode == 'cancelled':
+        cotizaciones = base_queryset.filter(estado='CANCELADA_CLIENTE')
+    else:
+        view_mode = 'pending'
+        cotizaciones = base_queryset.filter(estado='LISTA_PARA_CONFIRMACION')
 
     context = {
         'cotizaciones': cotizaciones,
         'pendientes_cotizaciones': _cotizaciones_pendientes_cliente(cliente),
-        'pendientes_count': cotizaciones.filter(estado='LISTA_PARA_CONFIRMACION').count(),
+        'pendientes_count': base_queryset.filter(estado='LISTA_PARA_CONFIRMACION').count(),
+        'confirmed_count': base_queryset.filter(estado='CONFIRMADA_CLIENTE').count(),
+        'cancelled_count': base_queryset.filter(estado='CANCELADA_CLIENTE').count(),
+        'view_mode': view_mode,
     }
     return render(request, 'cotizaciones/cliente_cotizaciones_recibidas.html', context)
 

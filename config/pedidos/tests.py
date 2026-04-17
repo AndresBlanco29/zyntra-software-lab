@@ -280,3 +280,68 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'Customer unit cost')
 		self.assertContains(response, f'name="suggested_margin_percentage_{self.item.id}"', html=False)
 		self.assertContains(response, f'name="suggested_unit_price_{self.item.id}"', html=False)
+
+	def test_backoffice_order_list_defaults_to_pending_orders(self):
+		in_progress_order = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='EN_GESTION',
+			total=Decimal('15.00'),
+		)
+		completed_order = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='DESPACHADO',
+			total=Decimal('18.00'),
+		)
+		cancelled_order = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='CANCELADO',
+			total=Decimal('21.00'),
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedidos'))
+		visible_ids = [pedido.id for pedido in response.context['pedidos']]
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Pending Orders')
+		self.assertEqual(visible_ids, [self.pedido.id])
+		self.assertNotIn(in_progress_order.id, visible_ids)
+		self.assertNotIn(completed_order.id, visible_ids)
+		self.assertNotIn(cancelled_order.id, visible_ids)
+
+	def test_backoffice_order_list_can_filter_in_progress_completed_and_cancelled(self):
+		in_progress_order = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='PARA_VERIFICAR',
+			total=Decimal('15.00'),
+		)
+		completed_order = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='DESPACHADO',
+			total=Decimal('18.00'),
+		)
+		cancelled_order = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='CANCELADO',
+			total=Decimal('21.00'),
+		)
+
+		self.client.force_login(self.backoffice)
+
+		in_progress_response = self.client.get(reverse('backoffice_pedidos'), {'view': 'in-progress'})
+		self.assertContains(in_progress_response, 'Orders in progress')
+		self.assertEqual([pedido.id for pedido in in_progress_response.context['pedidos']], [in_progress_order.id])
+
+		completed_response = self.client.get(reverse('backoffice_pedidos'), {'view': 'completed'})
+		self.assertContains(completed_response, 'Completed Orders')
+		self.assertEqual([pedido.id for pedido in completed_response.context['pedidos']], [completed_order.id])
+
+		cancelled_response = self.client.get(reverse('backoffice_pedidos'), {'view': 'cancelled'})
+		self.assertContains(cancelled_response, 'Cancelled Orders')
+		self.assertEqual([pedido.id for pedido in cancelled_response.context['pedidos']], [cancelled_order.id])

@@ -346,8 +346,46 @@ def _live_driver_deliveries_queryset():
 @login_required
 @internal_permission_required('backoffice.orders.view')
 def backoffice_invoices_list(request):
-	invoices = Invoice.objects.select_related('pedido__cliente', 'driver', 'creada_por').prefetch_related('items', 'notas_ajuste').order_by('-creada_en')
-	return render(request, 'backoffice/invoices_list.html', {'invoices': invoices})
+	base_queryset = Invoice.objects.select_related('pedido__cliente', 'driver', 'creada_por', 'delivery').prefetch_related('items', 'notas_ajuste').order_by('-creada_en')
+	view_mode = request.GET.get('view', 'pending')
+
+	pending_queryset = base_queryset.filter(
+		estado='GENERADA',
+		despachador_notificado=False,
+	).exclude(
+		delivery__estado__in=['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'],
+	)
+	ready_queryset = base_queryset.filter(
+		estado='GENERADA',
+		despachador_notificado=True,
+	).exclude(
+		delivery__estado__in=['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'],
+	)
+	delivered_queryset = base_queryset.filter(
+		estado='GENERADA',
+		delivery__estado__in=['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'],
+	)
+	cancelled_queryset = base_queryset.filter(estado='ANULADA')
+
+	querysets = {
+		'pending': pending_queryset,
+		'ready': ready_queryset,
+		'delivered': delivered_queryset,
+		'cancelled': cancelled_queryset,
+	}
+	if view_mode not in querysets:
+		view_mode = 'pending'
+
+	invoices = querysets[view_mode]
+
+	return render(request, 'backoffice/invoices_list.html', {
+		'invoices': invoices,
+		'view_mode': view_mode,
+		'pending_count': pending_queryset.count(),
+		'ready_count': ready_queryset.count(),
+		'delivered_count': delivered_queryset.count(),
+		'cancelled_count': cancelled_queryset.count(),
+	})
 
 
 @login_required

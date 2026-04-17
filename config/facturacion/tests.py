@@ -83,6 +83,32 @@ class InvoiceFlowTests(TestCase):
 		)
 		registrar_entrada_manual(presentacion=self.presentacion, cantidad=25, observacion='Seed stock')
 
+	def _create_verified_order(self, *, total='15.00', quantity=1):
+		pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='VERIFICADO_AJUSTADO',
+			total=Decimal(total),
+		)
+		PedidoItem.objects.create(
+			pedido=pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=quantity,
+			cantidad=quantity,
+			precio=Decimal(total) / Decimal(quantity),
+			subtotal=Decimal(total),
+		)
+		return pedido
+
+	def _create_invoice(self, *, metodo_entrega='LTG', driver=None, total='15.00'):
+		pedido = self._create_verified_order(total=total)
+		return generar_invoice_desde_picking(
+			pedido=pedido,
+			metodo_entrega=metodo_entrega,
+			driver=driver,
+			usuario=self.backoffice,
+		)
+
 	def test_generate_invoice_uses_verified_quantities(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
@@ -310,6 +336,86 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(detail_response.status_code, 200)
 		self.assertEqual(pdf_response.status_code, 200)
 		self.assertEqual(pdf_response['Content-Type'], 'application/pdf')
+
+	def test_backoffice_invoice_list_defaults_to_pending_dispatch(self):
+		pending_invoice = self._create_invoice(metodo_entrega='LTG', total='10.00')
+		pending_invoice.despachador_notificado = False
+		pending_invoice.save(update_fields=['despachador_notificado'])
+
+		ready_invoice = self._create_invoice(metodo_entrega='LTG', total='20.00')
+		cancelled_invoice = self._create_invoice(metodo_entrega='LTG', total='30.00')
+		cancelled_invoice.estado = 'ANULADA'
+		cancelled_invoice.save(update_fields=['estado'])
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_invoices_list'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context['view_mode'], 'pending')
+		self.assertEqual(list(response.context['invoices'].values_list('id', flat=True)), [pending_invoice.id])
+		self.assertEqual(response.context['pending_count'], 1)
+		self.assertEqual(response.context['ready_count'], 1)
+		self.assertEqual(response.context['cancelled_count'], 1)
+
+	def test_backoffice_invoice_list_can_filter_ready_delivered_and_cancelled(self):
+		pending_invoice = self._create_invoice(metodo_entrega='LTG', total='10.00')
+		pending_invoice.despachador_notificado = False
+		pending_invoice.save(update_fields=['despachador_notificado'])
+
+		ready_invoice = self._create_invoice(metodo_entrega='LTG', total='20.00')
+
+		delivered_invoice = self._create_invoice(metodo_entrega='RUTA_DRIVER', driver=self.driver, total='30.00')
+		complete_driver_delivery(
+			delivery=delivered_invoice.delivery,
+			driver_user=self.driver,
+			payload={
+				'estado_pago': 'PAGADO',
+				'metodo_pago': 'CASH',
+				'monto_pagado': '30.00',
+				'recibido_por': 'Cliente factura',
+				'firma_cliente_data': self.signature_data,
+			},
+			evidence_files=[],
+		)
+
+		cancelled_invoice = self._create_invoice(metodo_entrega='LTG', total='40.00')
+		cancelled_invoice.estado = 'ANULADA'
+		cancelled_invoice.save(update_fields=['estado'])
+
+		self.client.force_login(self.backoffice)
+
+		ready_response = self.client.get(reverse('backoffice_invoices_list'), {'view': 'ready'})
+		delivered_response = self.client.get(reverse('backoffice_invoices_list'), {'view': 'delivered'})
+		cancelled_response = self.client.get(reverse('backoffice_invoices_list'), {'view': 'cancelled'})
+
+		self.assertEqual(list(ready_response.context['invoices'].values_list('id', flat=True)), [ready_invoice.id])
+		self.assertEqual(list(delivered_response.context['invoices'].values_list('id', flat=True)), [delivered_invoice.id])
+		self.assertEqual(list(cancelled_response.context['invoices'].values_list('id', flat=True)), [cancelled_invoice.id])
+
+	def test_backoffice_invoice_list_renders_in_spanish_when_selected(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		invoice.despachador_notificado = False
+		invoice.save(update_fields=['despachador_notificado'])
+		self.client.force_login(self.backoffice)
+		self.client.cookies[settings.LANGUAGE_COOKIE_NAME] = 'es'
+
+		response = self.client.get(reverse('backoffice_invoices_list'), HTTP_ACCEPT_LANGUAGE='es')
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '<title>Facturas</title>', html=False)
+		self.assertContains(response, 'Generadas a partir de cantidades verificadas en picking.', html=False)
+		self.assertContains(response, 'Pendientes de despacho')
+		self.assertContains(response, 'Facturas listas')
+		self.assertContains(response, 'Facturas entregadas')
+		self.assertContains(response, 'Facturas anuladas')
+		self.assertContains(response, 'Despacho')
+		self.assertContains(response, 'Pendiente')
+		self.assertContains(response, invoice.numero)
 
 	def test_invoice_pdf_item_data_exposes_barcode_and_suggested_retail(self):
 		invoice = generar_invoice_desde_picking(

@@ -171,6 +171,91 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertContains(spanish_response, '¿Estás seguro de salir?')
 		self.assertContains(spanish_response, 'Enviada por el cliente')
 
+	def test_backoffice_quote_list_defaults_to_pending_filters(self):
+		ready_quote = Cotizacion.objects.create(cliente=self.cliente, estado='LISTA_PARA_CONFIRMACION', total=Decimal('25.00'))
+		CotizacionItem.objects.create(
+			cotizacion=ready_quote,
+			presentacion=self.presentacion,
+			cantidad=1,
+			precio=Decimal('25.00'),
+			subtotal=Decimal('25.00'),
+		)
+		confirmed_quote = Cotizacion.objects.create(cliente=self.cliente, estado='CONFIRMADA_CLIENTE', total=Decimal('35.00'))
+		CotizacionItem.objects.create(
+			cotizacion=confirmed_quote,
+			presentacion=self.presentacion,
+			cantidad=1,
+			precio=Decimal('35.00'),
+			subtotal=Decimal('35.00'),
+		)
+		cancelled_quote = Cotizacion.objects.create(cliente=self.cliente, estado='CANCELADA_CLIENTE', total=Decimal('15.00'))
+		CotizacionItem.objects.create(
+			cotizacion=cancelled_quote,
+			presentacion=self.presentacion,
+			cantidad=1,
+			precio=Decimal('15.00'),
+			subtotal=Decimal('15.00'),
+		)
+		processed_quote = Cotizacion.objects.create(cliente=self.cliente, estado='APROBADA', total=Decimal('45.00'))
+		CotizacionItem.objects.create(
+			cotizacion=processed_quote,
+			presentacion=self.presentacion,
+			cantidad=1,
+			precio=Decimal('45.00'),
+			subtotal=Decimal('45.00'),
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_cotizaciones'))
+		visible_ids = [cotizacion.id for cotizacion in response.context['cotizaciones']]
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Pending Quotes')
+		self.assertEqual(visible_ids, [ready_quote.id, self.cotizacion.id])
+
+	def test_backoffice_quote_list_can_filter_confirmed_cancelled_and_processed(self):
+		confirmed_quote = Cotizacion.objects.create(cliente=self.cliente, estado='CONFIRMADA_CLIENTE', total=Decimal('35.00'))
+		CotizacionItem.objects.create(
+			cotizacion=confirmed_quote,
+			presentacion=self.presentacion,
+			cantidad=1,
+			precio=Decimal('35.00'),
+			subtotal=Decimal('35.00'),
+		)
+		cancelled_quote = Cotizacion.objects.create(cliente=self.cliente, estado='CANCELADA_CLIENTE', total=Decimal('15.00'))
+		CotizacionItem.objects.create(
+			cotizacion=cancelled_quote,
+			presentacion=self.presentacion,
+			cantidad=1,
+			precio=Decimal('15.00'),
+			subtotal=Decimal('15.00'),
+		)
+		processed_quote = Cotizacion.objects.create(cliente=self.cliente, estado='RECHAZADA', total=Decimal('45.00'))
+		CotizacionItem.objects.create(
+			cotizacion=processed_quote,
+			presentacion=self.presentacion,
+			cantidad=1,
+			precio=Decimal('45.00'),
+			subtotal=Decimal('45.00'),
+		)
+
+		self.client.force_login(self.backoffice)
+
+		confirmed_response = self.client.get(reverse('backoffice_cotizaciones'), {'view': 'confirmed'})
+		confirmed_ids = [cotizacion.id for cotizacion in confirmed_response.context['cotizaciones']]
+		self.assertContains(confirmed_response, 'Confirmed Quotes')
+		self.assertEqual(confirmed_ids, [confirmed_quote.id])
+
+		cancelled_response = self.client.get(reverse('backoffice_cotizaciones'), {'view': 'cancelled'})
+		cancelled_ids = [cotizacion.id for cotizacion in cancelled_response.context['cotizaciones']]
+		self.assertContains(cancelled_response, 'Cancelled Quotes')
+		self.assertEqual(cancelled_ids, [cancelled_quote.id])
+
+		processed_response = self.client.get(reverse('backoffice_cotizaciones'), {'view': 'processed'})
+		processed_ids = [cotizacion.id for cotizacion in processed_response.context['cotizaciones']]
+		self.assertContains(processed_response, 'Processed Quotes')
+		self.assertEqual(processed_ids, [processed_quote.id])
+
 	def test_backoffice_cannot_save_quote_below_cost(self):
 		self.client.force_login(self.backoffice)
 		item = self.cotizacion.items.first()
@@ -184,3 +269,100 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertRedirects(response, reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]))
 		item.refresh_from_db()
 		self.assertEqual(item.precio, self.presentacion.precio_1)
+
+
+class CustomerReceivedQuotesViewTests(TestCase):
+	def setUp(self):
+		self.customer_user = Usuario.objects.create_user(username='cliente-recibidas', password='secret123', role='cliente')
+		self.cliente = Cliente.objects.create(
+			usuario=self.customer_user,
+			nombre_empresa='Cliente Recibidas',
+			telefono='5551234567',
+			direccion='123 Main St',
+			ciudad='Dallas',
+			estado='TX',
+			codigo_postal='75001',
+			pais='USA',
+			sales_tax_number='TX-COT-2',
+			certificado_tax='certificados/test.pdf',
+		)
+		categoria = Categoria.objects.create(nombre='Bebidas')
+		marca = Marca.objects.create(nombre='Marca Recibidas')
+		producto = Producto.objects.create(nombre='Producto Recibidas', categoria=categoria, marca=marca)
+		self.presentacion = Presentacion.objects.create(
+			producto=producto,
+			nombre='Caja',
+			unidades=1,
+			tipo_contenido='caja',
+			precio_1=Decimal('12.00'),
+		)
+		self.pending_quote = Cotizacion.objects.create(cliente=self.cliente, estado='LISTA_PARA_CONFIRMACION', total=Decimal('24.00'))
+		CotizacionItem.objects.create(cotizacion=self.pending_quote, presentacion=self.presentacion, cantidad=2, precio=Decimal('12.00'), subtotal=Decimal('24.00'))
+		self.confirmed_quote = Cotizacion.objects.create(cliente=self.cliente, estado='CONFIRMADA_CLIENTE', total=Decimal('12.00'))
+		CotizacionItem.objects.create(cotizacion=self.confirmed_quote, presentacion=self.presentacion, cantidad=1, precio=Decimal('12.00'), subtotal=Decimal('12.00'))
+		self.cancelled_quote = Cotizacion.objects.create(cliente=self.cliente, estado='CANCELADA_CLIENTE', total=Decimal('36.00'))
+		CotizacionItem.objects.create(cotizacion=self.cancelled_quote, presentacion=self.presentacion, cantidad=3, precio=Decimal('12.00'), subtotal=Decimal('36.00'))
+		self.sent_by_client_quote = Cotizacion.objects.create(cliente=self.cliente, estado='ENVIADA', total=Decimal('0.00'))
+		CotizacionItem.objects.create(cotizacion=self.sent_by_client_quote, presentacion=self.presentacion, cantidad=1, precio=Decimal('0.00'), subtotal=Decimal('0.00'))
+
+	def test_received_quotes_defaults_to_pending_only(self):
+		self.client.force_login(self.customer_user)
+
+		response = self.client.get(reverse('cliente_cotizaciones_recibidas'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Pending Quotes')
+		self.assertContains(response, 'Pending: 1')
+		self.assertContains(response, f'#{self.pending_quote.id}')
+		self.assertNotContains(response, f'#{self.confirmed_quote.id}')
+		self.assertNotContains(response, f'#{self.cancelled_quote.id}')
+		self.assertNotContains(response, f'#{self.sent_by_client_quote.id}')
+
+	def test_received_quotes_can_filter_confirmed(self):
+		self.client.force_login(self.customer_user)
+
+		response = self.client.get(reverse('cliente_cotizaciones_recibidas'), {'view': 'confirmed'})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Confirmed Quotes')
+		self.assertContains(response, f'#{self.confirmed_quote.id}')
+		self.assertNotContains(response, f'#{self.pending_quote.id}')
+		self.assertNotContains(response, f'#{self.cancelled_quote.id}')
+
+	def test_received_quotes_can_filter_cancelled(self):
+		self.client.force_login(self.customer_user)
+
+		response = self.client.get(reverse('cliente_cotizaciones_recibidas'), {'view': 'cancelled'})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Cancelled Quotes')
+		self.assertContains(response, f'#{self.cancelled_quote.id}')
+		self.assertNotContains(response, f'#{self.pending_quote.id}')
+		self.assertNotContains(response, f'#{self.confirmed_quote.id}')
+
+	def test_my_quote_page_renders_in_spanish_when_selected(self):
+		session = self.client.session
+		session['carrito'] = {
+			str(self.presentacion.id): {
+				'presentacion_id': self.presentacion.id,
+				'cantidad': 2,
+				'precio': str(self.presentacion.precio_1),
+			}
+		}
+		session.save()
+		self.client.force_login(self.customer_user)
+		self.client.cookies[settings.LANGUAGE_COOKIE_NAME] = 'es'
+
+		response = self.client.get(reverse('ver_cotizacion'), HTTP_ACCEPT_LANGUAGE='es')
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '<title>Mi cotización</title>', html=False)
+		self.assertContains(response, 'Catálogo')
+		self.assertContains(response, 'Mi cotización')
+		self.assertContains(response, 'Cotizaciones recibidas')
+		self.assertContains(response, 'Revisa los productos antes de enviar tu solicitud', html=False)
+		self.assertContains(response, 'Total de productos: 1', html=False)
+		self.assertContains(response, 'Resumen de la cotización')
+		self.assertContains(response, 'Nota opcional')
+		self.assertContains(response, 'La cotización se enviará para validación de precios.', html=False)
+		self.assertContains(response, 'Enviar solicitud de cotización')

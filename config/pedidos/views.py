@@ -149,11 +149,34 @@ def backoffice_dashboard(request):
 @login_required
 @internal_permission_required('backoffice.orders.view')
 def backoffice_pedidos(request):
-	pedidos = Pedido.objects.select_related('cliente__usuario', 'vendedor', 'seleccionador').prefetch_related('items').order_by('-creada_en')
+	base_queryset = Pedido.objects.select_related('cliente__usuario', 'vendedor', 'seleccionador').prefetch_related('items').order_by('-creada_en')
+	pending_statuses = {'RECIBIDO', 'LISTO_PARA_PICKING'}
+	in_progress_statuses = {'EN_GESTION', 'PARA_VERIFICAR', 'VERIFICADO_AJUSTADO', 'INVOICE_GENERADA'}
+	completed_statuses = {'DESPACHADO'}
+	cancelled_statuses = {'CANCELADO'}
+	view_mode = request.GET.get('view')
+
+	if view_mode == 'in-progress':
+		pedidos = base_queryset.filter(estado__in=in_progress_statuses)
+	elif view_mode == 'completed':
+		pedidos = base_queryset.filter(estado__in=completed_statuses)
+	elif view_mode == 'cancelled':
+		pedidos = base_queryset.filter(estado__in=cancelled_statuses)
+	else:
+		view_mode = 'pending'
+		pedidos = base_queryset.filter(estado__in=pending_statuses)
+
 	for pedido in pedidos:
 		pedido.estado_label = _pedido_state_label(pedido.estado)
 		pedido.origen_label = _pedido_origin_label(pedido.origen)
-	return render(request, 'backoffice/pedidos_lista.html', {'pedidos': pedidos})
+	return render(request, 'backoffice/pedidos_lista.html', {
+		'pedidos': pedidos,
+		'view_mode': view_mode,
+		'pending_count': base_queryset.filter(estado__in=pending_statuses).count(),
+		'in_progress_count': base_queryset.filter(estado__in=in_progress_statuses).count(),
+		'completed_count': base_queryset.filter(estado__in=completed_statuses).count(),
+		'cancelled_count': base_queryset.filter(estado__in=cancelled_statuses).count(),
+	})
 
 
 @login_required

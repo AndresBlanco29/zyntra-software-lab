@@ -63,11 +63,43 @@
     <div class="container-fluid">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <div>
-          <h3 class="fw-bold mb-1">{% trans "Received Quotes" %}</h3>
-          <p class="text-muted mb-0">{% trans "Review the quotes sent by BackOffice and confirm when you're ready." %}</p>
+          <h3 class="fw-bold mb-1">
+            {% if view_mode == 'confirmed' %}
+            {% trans "Confirmed Quotes" %}
+            {% elif view_mode == 'cancelled' %}
+            {% trans "Cancelled Quotes" %}
+            {% else %}
+            {% trans "Pending Quotes" %}
+            {% endif %}
+          </h3>
+          <p class="text-muted mb-0">
+            {% if view_mode == 'confirmed' %}
+            {% trans "Review the quotes you already confirmed with BackOffice." %}
+            {% elif view_mode == 'cancelled' %}
+            {% trans "Review the quotes you cancelled and keep as reference." %}
+            {% else %}
+            {% trans "Review the quotes pending your confirmation from BackOffice." %}
+            {% endif %}
+          </p>
         </div>
         <span class="badge text-bg-warning px-3 py-2">{% trans "Pending" %}: {{ pendientes_count }}</span>
       </div>
+
+      <div class="btn-group mb-3" role="group" aria-label="{% trans 'Quote views' %}">
+        <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn {% if view_mode == 'pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+          {% trans "Pending Quotes" %}
+          <span class="badge {% if view_mode == 'pending' %}bg-light text-dark{% else %}bg-warning text-dark{% endif %} ms-1">{{ pendientes_count }}</span>
+        </a>
+        <a href="{% url 'cliente_cotizaciones_recibidas' %}?view=confirmed" class="btn {% if view_mode == 'confirmed' %}btn-success{% else %}btn-outline-success{% endif %}">
+          {% trans "Confirmed Quotes" %}
+          <span class="badge {% if view_mode == 'confirmed' %}bg-light text-success{% else %}bg-success{% endif %} ms-1">{{ confirmed_count }}</span>
+        </a>
+        <a href="{% url 'cliente_cotizaciones_recibidas' %}?view=cancelled" class="btn {% if view_mode == 'cancelled' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+          {% trans "Cancelled Quotes" %}
+          <span class="badge {% if view_mode == 'cancelled' %}bg-light text-secondary{% else %}bg-secondary{% endif %} ms-1">{{ cancelled_count }}</span>
+        </a>
+      </div>
+
       {% if cotizaciones %}
       <div class="card custom-card">
         <div class="card-body">
@@ -122,7 +154,13 @@
       </div>
       {% else %}
       <div class="alert alert-info mb-0">
-        {% trans "You do not have any quotes from BackOffice yet." %}
+        {% if view_mode == 'confirmed' %}
+        {% trans "You do not have any confirmed quotes yet." %}
+        {% elif view_mode == 'cancelled' %}
+        {% trans "You do not have any cancelled quotes yet." %}
+        {% else %}
+        {% trans "You do not have any pending quotes from BackOffice." %}
+        {% endif %}
       </div>
       {% endif %}
         </div>

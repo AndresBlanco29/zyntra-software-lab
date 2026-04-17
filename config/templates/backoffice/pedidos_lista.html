@@ -6,6 +6,25 @@
 {% block content %}
 <h2 class="mb-4">{% trans "Received Purchase Orders" %}</h2>
 
+<div class="btn-group mb-3" role="group" aria-label="{% trans 'Order views' %}">
+  <a href="{% url 'backoffice_pedidos' %}" class="btn {% if view_mode == 'pending' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+    {% trans "Pending Orders" %}
+    <span class="badge {% if view_mode == 'pending' %}bg-light text-primary{% else %}bg-primary{% endif %} ms-1">{{ pending_count }}</span>
+  </a>
+  <a href="{% url 'backoffice_pedidos' %}?view=in-progress" class="btn {% if view_mode == 'in-progress' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+    {% trans "Orders in progress" %}
+    <span class="badge {% if view_mode == 'in-progress' %}bg-light text-dark{% else %}bg-warning text-dark{% endif %} ms-1">{{ in_progress_count }}</span>
+  </a>
+  <a href="{% url 'backoffice_pedidos' %}?view=completed" class="btn {% if view_mode == 'completed' %}btn-success{% else %}btn-outline-success{% endif %}">
+    {% trans "Completed Orders" %}
+    <span class="badge {% if view_mode == 'completed' %}bg-light text-success{% else %}bg-success{% endif %} ms-1">{{ completed_count }}</span>
+  </a>
+  <a href="{% url 'backoffice_pedidos' %}?view=cancelled" class="btn {% if view_mode == 'cancelled' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+    {% trans "Cancelled Orders" %}
+    <span class="badge {% if view_mode == 'cancelled' %}bg-light text-secondary{% else %}bg-secondary{% endif %} ms-1">{{ cancelled_count }}</span>
+  </a>
+</div>
+
 <div class="card shadow-sm">
   <div class="table-responsive">
     <table class="table table-striped align-middle mb-0">
@@ -28,7 +47,7 @@
           <td>{{ pedido.cliente.nombre_empresa }}</td>
           <td>{% if pedido.seleccionador %}{% firstof pedido.seleccionador.get_full_name pedido.seleccionador.username %}{% else %}<span class="text-muted">-</span>{% endif %}</td>
           <td>{{ pedido.origen_label }}</td>
-          <td><span class="badge bg-info text-dark">{{ pedido.estado_label }}</span></td>
+          <td><span class="badge {% if pedido.estado == 'DESPACHADO' %}bg-success{% elif pedido.estado == 'CANCELADO' %}bg-secondary{% elif pedido.estado == 'EN_GESTION' or pedido.estado == 'PARA_VERIFICAR' or pedido.estado == 'VERIFICADO_AJUSTADO' or pedido.estado == 'INVOICE_GENERADA' %}bg-warning text-dark{% else %}bg-info text-dark{% endif %}">{{ pedido.estado_label }}</span></td>
           <td>${{ pedido.total }}</td>
           <td>{{ pedido.creada_en|date:"d/m/Y H:i" }}</td>
           <td>

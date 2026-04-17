@@ -1,4 +1,4 @@
-{% load static i18n %}
+{% load static i18n safe_static %}
 {% get_current_language as CURRENT_LANGUAGE %}
 <!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
@@ -761,7 +761,7 @@ class="btn install-app-primary-btn"
 data-bs-toggle="modal"
 data-bs-target="#installTutorialModal"
 data-install-video-trigger
-data-video-src="{% static 'video/video_tutorial.mp4' %}">
+data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 {% trans "Watch video tutorial" %}
 </button>
 
@@ -803,7 +803,7 @@ class="iphone-preview-play"
 data-bs-toggle="modal"
 data-bs-target="#installTutorialModal"
 data-install-video-trigger
-data-video-src="{% static 'video/video_tutorial.mp4' %}">
+data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 <i class="bi bi-play-fill"></i>
 {% trans "See how to install it" %}
 </button>

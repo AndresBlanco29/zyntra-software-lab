@@ -175,7 +175,7 @@ class PasswordResetFlowTests(TestCase):
 		)
 
 		self.assertEqual(post_response.status_code, 200)
-		self.assertIn('Tu contraseña fue actualizada', post_response.json()['html'])
+		self.assertIn('Your password has been updated', post_response.json()['html'])
 		self.user.refresh_from_db()
 		self.assertTrue(self.user.check_password('NuevaClaveSegura123!'))
 		self.assertTrue(self.client.login(username=self.user.username, password='NuevaClaveSegura123!'))
@@ -213,7 +213,7 @@ class PasswordResetFlowTests(TestCase):
 				'html': response.json()['html'],
 			},
 		)
-		self.assertIn('Revisa tu correo', response.json()['html'])
+		self.assertIn('Check your email', response.json()['html'])
 		self.assertEqual(len(mail.outbox), 1)
 
 	def test_password_reset_confirm_modal_returns_form_for_valid_token(self):

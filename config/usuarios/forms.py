@@ -1,14 +1,15 @@
 from django import forms
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
+from django.utils.translation import gettext_lazy as _
 
 
 class CustomerPasswordResetForm(PasswordResetForm):
 	email = forms.EmailField(
-		label='Correo electronico',
+		label=_('Email address'),
 		max_length=254,
 		widget=forms.EmailInput(attrs={
 			'class': 'form-control form-control-lg',
-			'placeholder': 'Ingresa tu correo registrado',
+			'placeholder': _('Enter your registered email'),
 			'autocomplete': 'email',
 		}),
 	)
@@ -16,20 +17,20 @@ class CustomerPasswordResetForm(PasswordResetForm):
 
 class CustomerSetPasswordForm(SetPasswordForm):
 	new_password1 = forms.CharField(
-		label='Nueva contrasena',
+		label=_('New password'),
 		strip=False,
 		widget=forms.PasswordInput(attrs={
 			'class': 'form-control form-control-lg',
-			'placeholder': 'Ingresa tu nueva contrasena',
+			'placeholder': _('Enter your new password'),
 			'autocomplete': 'new-password',
 		}),
 	)
 	new_password2 = forms.CharField(
-		label='Confirma tu nueva contrasena',
+		label=_('Confirm new password'),
 		strip=False,
 		widget=forms.PasswordInput(attrs={
 			'class': 'form-control form-control-lg',
-			'placeholder': 'Repite tu nueva contrasena',
+			'placeholder': _('Repeat your new password'),
 			'autocomplete': 'new-password',
 		}),
 	)

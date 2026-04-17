@@ -22,6 +22,24 @@ from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, In
 logger = logging.getLogger(__name__)
 
 
+def _notify_backoffice_driver_adjustment_note(nota):
+	created_by = getattr(nota, 'creada_por', None)
+	if created_by is None or getattr(created_by, 'role', '') != 'driver':
+		return
+
+	driver_name = created_by.get_full_name().strip() or created_by.username
+	crear_notificacion_backoffice(
+		titulo=_('Adjustment note %(note)s requires review') % {'note': nota.numero},
+		mensaje=_('Driver %(driver)s created adjustment note %(note)s for invoice %(invoice)s. BackOffice must review it to approve or reject.') % {
+			'driver': driver_name,
+			'note': nota.numero,
+			'invoice': nota.invoice.numero,
+		},
+		tipo='NOTA_AJUSTE',
+		url=f'/facturacion/backoffice/invoices/{nota.invoice_id}/',
+	)
+
+
 def resolve_presentacion_suggested_unit_price(*, presentacion, base_case_price):
 	base_price = _to_decimal(base_case_price).quantize(Decimal('0.01'))
 	if not presentacion:
@@ -93,12 +111,13 @@ def _build_delivery_snapshot(invoice):
 	}
 
 
-def ensure_delivery_for_invoice(invoice):
+def ensure_delivery_for_invoice(invoice, *, estimated_delivery_at=None):
 	if invoice.metodo_entrega != 'RUTA_DRIVER' or not invoice.driver_id:
 		return None
 
 	defaults = {
 		'driver': invoice.driver,
+		'estimated_delivery_at': estimated_delivery_at,
 		**_build_delivery_snapshot(invoice),
 	}
 	delivery, created = Delivery.objects.get_or_create(invoice=invoice, defaults=defaults)
@@ -111,6 +130,9 @@ def ensure_delivery_for_invoice(invoice):
 			if getattr(delivery, field_name) != value:
 				setattr(delivery, field_name, value)
 				updated_fields.append(field_name)
+		if estimated_delivery_at is not None and delivery.estimated_delivery_at != estimated_delivery_at:
+			delivery.estimated_delivery_at = estimated_delivery_at
+			updated_fields.append('estimated_delivery_at')
 		if updated_fields:
 			delivery.save(update_fields=updated_fields + ['updated_at'])
 	return delivery
@@ -256,7 +278,7 @@ def _send_client_delivery_notifications(delivery):
 
 
 @transaction.atomic
-def generar_invoice_desde_picking(*, pedido, metodo_entrega, driver, usuario, suggested_unit_prices=None):
+def generar_invoice_desde_picking(*, pedido, metodo_entrega, driver, usuario, suggested_unit_prices=None, estimated_delivery_at=None):
 	if pedido.estado != 'VERIFICADO_AJUSTADO':
 		raise ValidationError(_('The order must be verified and adjusted before generating an invoice.'))
 	if pedido.picking_bloqueado:
@@ -267,6 +289,7 @@ def generar_invoice_desde_picking(*, pedido, metodo_entrega, driver, usuario, su
 		raise ValidationError(_('Route delivery requires an active driver assignment.'))
 	if metodo_entrega != 'RUTA_DRIVER':
 		driver = None
+		estimated_delivery_at = None
 
 	suggested_unit_prices = suggested_unit_prices or {}
 
@@ -327,7 +350,7 @@ def generar_invoice_desde_picking(*, pedido, metodo_entrega, driver, usuario, su
 			mensaje=_("Invoice %(invoice)s was assigned to you for route delivery.") % {'invoice': invoice.numero},
 			tipo='PEDIDO',
 		)
-		ensure_delivery_for_invoice(invoice)
+		ensure_delivery_for_invoice(invoice, estimated_delivery_at=estimated_delivery_at)
 
 	return invoice
 
@@ -381,6 +404,7 @@ def crear_nota_ajuste_desde_invoice(*, invoice, tipo_documento, motivo, tipo_cre
 	nota.impacto_saldo = total if tipo_documento == 'CREDITO' else total
 	nota.inventario_estado = 'PENDIENTE' if tipo_documento == 'CREDITO' and tipo_credito == 'CREDIT_RETURN' else 'NO_APLICA'
 	nota.save(update_fields=['total', 'impacto_saldo', 'inventario_estado'])
+	_notify_backoffice_driver_adjustment_note(nota)
 	return nota
 
 

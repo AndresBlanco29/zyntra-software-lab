@@ -19,6 +19,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from config.cotizaciones.models import Cotizacion
+from config.facturacion.models import NotaAjuste
 from config.facturacion.services import resolve_presentacion_suggested_unit_price
 from config.notificaciones.models import Notificacion
 from config.productos.models import Presentacion
@@ -141,6 +142,8 @@ def backoffice_dashboard(request):
 		'ordenes_en_gestion': Pedido.objects.filter(estado='EN_GESTION').count(),
 		'ordenes_listas_picking': Pedido.objects.filter(estado='LISTO_PARA_PICKING').count(),
 		'inventario_agotado': StockPresentacion.objects.filter(stock_disponible__lte=0).count(),
+		'pending_adjustment_notes_count': NotaAjuste.objects.filter(estado='BORRADOR').count(),
+		'unread_adjustment_notifications_count': Notificacion.objects.filter(tipo='NOTA_AJUSTE', leida=False).count(),
 		'notificaciones': Notificacion.objects.all()[:8],
 	}
 	return render(request, 'backoffice/dashboard.html', context)

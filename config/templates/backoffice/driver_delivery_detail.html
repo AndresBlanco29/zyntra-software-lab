@@ -43,6 +43,7 @@
           <div class="col-md-4"><div class="text-muted small">{% trans "Payment status" %}</div><div>{{ delivery.get_estado_pago_display }}</div></div>
           <div class="col-md-4"><div class="text-muted small">{% trans "Customer balance" %}</div><div>${{ delivery.invoice.saldo_cliente }}</div></div>
           <div class="col-12"><div class="text-muted small">{% trans "Google Maps query" %}</div><div>{{ delivery.route_query_address }}</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Estimated delivery" %}</div><div>{% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
           <div class="col-md-6"><div class="text-muted small">{% trans "Started" %}</div><div>{% if delivery.route_started_at %}{{ delivery.route_started_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
           <div class="col-md-6"><div class="text-muted small">{% trans "Delivered" %}</div><div>{% if delivery.delivered_at %}{{ delivery.delivered_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
         </div>
@@ -179,6 +180,75 @@
         <label class="form-label fw-semibold">{% trans "Driver notes" %}</label>
         <textarea name="notas_driver" class="form-control" rows="3"></textarea>
       </div>
+      <div class="col-12">
+        <div class="border rounded-3 p-3 bg-light-subtle">
+          <div class="mb-3">
+            <h6 class="mb-1">{% trans "Adjustment note during delivery" %}</h6>
+            <p class="text-muted small mb-0">{% trans "Optional. Save a draft credit or debit note for BackOffice review while closing the delivery." %}</p>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">{% trans "Type" %}</label>
+              <select name="driver_note_tipo_documento" id="driverNoteType" class="form-select">
+                <option value="">{% trans "No adjustment note" %}</option>
+                <option value="CREDITO">{% trans "Credit note" %}</option>
+                <option value="DEBITO">{% trans "Debit note" %}</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">{% trans "Reason" %}</label>
+              <select name="driver_note_motivo" class="form-select">
+                <option value="">{% trans "Select..." %}</option>
+                <option value="DAMAGE">{% trans "Damage" %}</option>
+                <option value="DEFECT">{% trans "Defect" %}</option>
+              </select>
+            </div>
+            <div class="col-md-4 driver-credit-type d-none">
+              <label class="form-label fw-semibold">{% trans "Credit type" %}</label>
+              <select name="driver_note_tipo_credito" class="form-select">
+                <option value="">{% trans "Only required for credit notes" %}</option>
+                <option value="CREDIT_DUMP">{% trans "Credit Dump" %}</option>
+                <option value="CREDIT_RETURN">{% trans "Credit Return" %}</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">{% trans "Description" %}</label>
+              <textarea name="driver_note_descripcion" class="form-control" rows="2"></textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
+              <input type="file" name="driver_note_evidence_photos" class="form-control" accept="image/*" multiple>
+              <div class="form-text">{% trans "Optional photos that support the credit or debit note created during delivery." %}</div>
+            </div>
+            <div class="col-12">
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>{% trans "Product" %}</th>
+                      <th>{% trans "Presentation" %}</th>
+                      <th>{% trans "Invoiced qty." %}</th>
+                      <th>{% trans "Note qty." %}</th>
+                      <th>{% trans "Unit amount" %}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for item in invoice.items.all %}
+                    <tr>
+                      <td>{{ item.producto_nombre }}</td>
+                      <td>{{ item.presentacion_nombre }}</td>
+                      <td>{{ item.cantidad_facturada }}</td>
+                      <td><input type="number" min="0" max="{{ item.cantidad_facturada }}" name="driver_note_qty_{{ item.id }}" class="form-control form-control-sm" value="0"></td>
+                      <td><input type="number" min="0" step="0.01" name="driver_note_amount_{{ item.id }}" class="form-control form-control-sm" placeholder="{{ item.precio_unitario }}"></td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="col-12 unpaid-only d-none">
         <label class="form-label fw-semibold">{% trans "Evidence photos" %}</label>
         <input type="file" name="evidence_photos" class="form-control" accept="image/*" multiple>
@@ -201,6 +271,127 @@
   </div>
 </form>
 {% else %}
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h5 class="mb-3">{% trans "Create adjustment note" %}</h5>
+    <form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_create_note' delivery.id %}">
+      {% csrf_token %}
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{% trans "Type" %}</label>
+          <select name="driver_note_tipo_documento" id="driverNoteTypePostDelivery" class="form-select">
+            <option value="">{% trans "No adjustment note" %}</option>
+            <option value="CREDITO">{% trans "Credit note" %}</option>
+            <option value="DEBITO">{% trans "Debit note" %}</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{% trans "Reason" %}</label>
+          <select name="driver_note_motivo" class="form-select">
+            <option value="">{% trans "Select..." %}</option>
+            <option value="DAMAGE">{% trans "Damage" %}</option>
+            <option value="DEFECT">{% trans "Defect" %}</option>
+          </select>
+        </div>
+        <div class="col-md-4 driver-credit-type-post d-none">
+          <label class="form-label fw-semibold">{% trans "Credit type" %}</label>
+          <select name="driver_note_tipo_credito" class="form-select">
+            <option value="">{% trans "Only required for credit notes" %}</option>
+            <option value="CREDIT_DUMP">{% trans "Credit Dump" %}</option>
+            <option value="CREDIT_RETURN">{% trans "Credit Return" %}</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">{% trans "Description" %}</label>
+          <textarea name="driver_note_descripcion" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
+          <input type="file" name="driver_note_evidence_photos" class="form-control" accept="image/*" multiple>
+          <div class="form-text">{% trans "Optional photos that support the credit or debit note created during delivery." %}</div>
+        </div>
+        <div class="col-12">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>{% trans "Product" %}</th>
+                  <th>{% trans "Presentation" %}</th>
+                  <th>{% trans "Invoiced qty." %}</th>
+                  <th>{% trans "Note qty." %}</th>
+                  <th>{% trans "Unit amount" %}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in invoice.items.all %}
+                <tr>
+                  <td>{{ item.producto_nombre }}</td>
+                  <td>{{ item.presentacion_nombre }}</td>
+                  <td>{{ item.cantidad_facturada }}</td>
+                  <td><input type="number" min="0" max="{{ item.cantidad_facturada }}" name="driver_note_qty_{{ item.id }}" class="form-control form-control-sm" value="0"></td>
+                  <td><input type="number" min="0" step="0.01" name="driver_note_amount_{{ item.id }}" class="form-control form-control-sm" placeholder="{{ item.precio_unitario }}"></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="d-flex justify-content-end mt-3">
+        <button type="submit" class="btn btn-primary">{% trans "Save draft note" %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h5 class="mb-3">{% trans "Adjustment notes" %}</h5>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>{% trans "Number" %}</th>
+            <th>{% trans "Type" %}</th>
+            <th>{% trans "Status" %}</th>
+            <th>{% trans "Reason" %}</th>
+            <th>{% trans "Total" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for nota in invoice.notas_ajuste.all %}
+          <tr>
+            <td>
+              {{ nota.numero }}
+              {% if nota.evidence_photos.all %}
+              <div class="small text-muted mt-1">{% blocktrans count total=nota.evidence_photos.all|length %}1 evidence photo{% plural %}{{ total }} evidence photos{% endblocktrans %}</div>
+              {% endif %}
+            </td>
+            <td>{{ nota.get_tipo_documento_display }}</td>
+            <td>{{ nota.get_estado_display }}</td>
+            <td>{{ nota.get_motivo_display }}</td>
+            <td>${{ nota.total }}</td>
+          </tr>
+          {% if nota.evidence_photos.all %}
+          <tr>
+            <td colspan="5">
+              <div class="d-flex flex-wrap gap-2">
+                {% for photo in nota.evidence_photos.all %}
+                <a href="{{ photo.image.url }}" target="_blank" rel="noopener">
+                  <img src="{{ photo.image.url }}" alt="{% trans 'Adjustment note evidence photo' %}" class="img-fluid rounded border" style="max-width: 130px; max-height: 130px;">
+                </a>
+                {% endfor %}
+              </div>
+            </td>
+          </tr>
+          {% endif %}
+          {% empty %}
+          <tr><td colspan="5" class="text-center text-muted py-3">{% trans "No adjustment notes created yet." %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 <div class="card shadow-sm">
   <div class="card-body">
     <h5 class="mb-3">{% trans "Notification log" %}</h5>
@@ -236,9 +427,13 @@
   (function () {
     const paymentStatus = document.getElementById('paymentStatus');
     const paymentMethod = document.getElementById('paymentMethod');
+    const driverNoteType = document.getElementById('driverNoteType');
+    const driverNoteTypePostDelivery = document.getElementById('driverNoteTypePostDelivery');
     const paidFields = document.querySelectorAll('.paid-only');
     const unpaidFields = document.querySelectorAll('.unpaid-only');
     const methodFields = document.querySelectorAll('.method-field');
+    const creditTypeFields = document.querySelectorAll('.driver-credit-type');
+    const creditTypePostFields = document.querySelectorAll('.driver-credit-type-post');
     const canvas = document.getElementById('signatureCanvas');
     const signatureInput = document.getElementById('signatureData');
     const clearSignature = document.getElementById('clearSignature');
@@ -307,6 +502,16 @@
       });
     }
 
+    function toggleDriverNoteFields() {
+      const isCredit = driverNoteType && driverNoteType.value === 'CREDITO';
+      creditTypeFields.forEach((element) => element.classList.toggle('d-none', !isCredit));
+    }
+
+    function toggleDriverNotePostFields() {
+      const isCredit = driverNoteTypePostDelivery && driverNoteTypePostDelivery.value === 'CREDITO';
+      creditTypePostFields.forEach((element) => element.classList.toggle('d-none', !isCredit));
+    }
+
     clearSignature.addEventListener('click', function () {
       context.clearRect(0, 0, canvas.width, canvas.height);
       signatureInput.value = '';
@@ -324,9 +529,17 @@
     if (paymentMethod) {
       paymentMethod.addEventListener('change', toggleMethodFields);
     }
+    if (driverNoteType) {
+      driverNoteType.addEventListener('change', toggleDriverNoteFields);
+    }
+    if (driverNoteTypePostDelivery) {
+      driverNoteTypePostDelivery.addEventListener('change', toggleDriverNotePostFields);
+    }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
     togglePaymentSections();
+    toggleDriverNoteFields();
+    toggleDriverNotePostFields();
   })();
 </script>
 {% endblock %}

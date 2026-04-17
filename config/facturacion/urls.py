@@ -24,5 +24,6 @@ urlpatterns = [
 	path('driver/deliveries/<int:delivery_id>/tracking/update/', views.driver_delivery_update_location, name='driver_delivery_update_location'),
 	path('driver/deliveries/<int:delivery_id>/start-route/', views.driver_delivery_start_route, name='driver_delivery_start_route'),
 	path('driver/deliveries/<int:delivery_id>/complete/', views.driver_delivery_complete, name='driver_delivery_complete'),
+	path('driver/deliveries/<int:delivery_id>/notes/create/', views.driver_delivery_create_note, name='driver_delivery_create_note'),
 	path('driver/deliveries/<int:delivery_id>/invoice-pdf/', views.driver_invoice_pdf, name='driver_invoice_pdf'),
 ]

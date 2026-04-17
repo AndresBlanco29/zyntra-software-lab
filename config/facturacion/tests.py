@@ -1,4 +1,5 @@
 import base64
+from datetime import datetime
 from decimal import Decimal
 
 from django.conf import settings
@@ -15,6 +16,7 @@ from config.facturacion.services import aprobar_nota_ajuste, build_google_maps_r
 from config.facturacion.views import _build_invoice_pdf_item_data, _resolve_invoice_suggested_unit_price
 from config.inventario.models import InventarioMovimiento, StockPresentacion
 from config.inventario.services import registrar_entrada_manual
+from config.notificaciones.models import Notificacion
 from config.pedidos.models import Pedido, PedidoItem
 from config.productos.models import Categoria, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
@@ -158,6 +160,18 @@ class InvoiceFlowTests(TestCase):
 				usuario=self.backoffice,
 			)
 
+	def test_generate_invoice_stores_estimated_delivery_for_driver_route(self):
+		estimated_delivery_at = timezone.make_aware(datetime(2026, 4, 18, 9, 30), timezone.get_current_timezone())
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+			estimated_delivery_at=estimated_delivery_at,
+		)
+
+		self.assertEqual(invoice.delivery.estimated_delivery_at, estimated_delivery_at)
+
 	def test_credit_note_updates_balance(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
@@ -287,6 +301,242 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(delivery.estado, 'ENTREGADA_SIN_PAGO')
 		self.assertTrue(delivery.invoice.cliente.credit_hold)
 		self.assertEqual(delivery.evidence_photos.count(), 1)
+
+	def test_driver_complete_view_can_create_credit_note_draft(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.post(reverse('driver_delivery_complete', args=[invoice.delivery.id]), {
+			'estado_pago': 'PAGADO',
+			'metodo_pago': 'CASH',
+			'monto_pagado': '45.00',
+			'recibido_por': 'Juan Perez',
+			'firma_cliente_data': self.signature_data,
+			'driver_note_tipo_documento': 'CREDITO',
+			'driver_note_motivo': 'DAMAGE',
+			'driver_note_tipo_credito': 'CREDIT_RETURN',
+			'driver_note_descripcion': 'Caja dañada al entregar',
+			f'driver_note_qty_{invoice.items.first().id}': '1',
+			f'driver_note_amount_{invoice.items.first().id}': '15.00',
+		})
+
+		invoice.refresh_from_db()
+		nota = invoice.notas_ajuste.get()
+		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertEqual(invoice.delivery.estado, 'ENTREGADA_PAGADA')
+		self.assertEqual(nota.estado, 'BORRADOR')
+		self.assertEqual(nota.tipo_documento, 'CREDITO')
+		self.assertEqual(nota.tipo_credito, 'CREDIT_RETURN')
+		self.assertEqual(nota.creada_por, self.driver)
+		self.assertEqual(nota.total, Decimal('15.00'))
+		notificacion = Notificacion.objects.filter(titulo__icontains=nota.numero).latest('creada_en')
+		self.assertIn('requires review', notificacion.titulo)
+		self.assertIn('approve or reject', notificacion.mensaje)
+		self.assertEqual(notificacion.url, f'/facturacion/backoffice/invoices/{invoice.id}/')
+
+	def test_driver_complete_view_can_attach_evidence_to_adjustment_note(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.post(
+			reverse('driver_delivery_complete', args=[invoice.delivery.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'metodo_pago': 'CASH',
+				'monto_pagado': '45.00',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+				'driver_note_tipo_documento': 'CREDITO',
+				'driver_note_motivo': 'DAMAGE',
+				'driver_note_tipo_credito': 'CREDIT_RETURN',
+				'driver_note_descripcion': 'Caja dañada al entregar',
+				f'driver_note_qty_{invoice.items.first().id}': '1',
+				f'driver_note_amount_{invoice.items.first().id}': '15.00',
+				'driver_note_evidence_photos': self.photo_file,
+			},
+			format='multipart',
+		)
+
+		invoice.refresh_from_db()
+		nota = invoice.notas_ajuste.get()
+		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertEqual(nota.evidence_photos.count(), 1)
+		self.assertIn('invoice-notes/evidence/', nota.evidence_photos.first().image.name)
+
+		self.client.force_login(self.backoffice)
+		backoffice_response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertContains(backoffice_response, nota.evidence_photos.first().image.url)
+
+	def test_driver_can_create_adjustment_note_after_delivery(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		complete_driver_delivery(
+			delivery=invoice.delivery,
+			driver_user=self.driver,
+			payload={
+				'estado_pago': 'PAGADO',
+				'metodo_pago': 'CASH',
+				'monto_pagado': '45.00',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+			},
+			evidence_files=[],
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.post(reverse('driver_delivery_create_note', args=[invoice.delivery.id]), {
+			'driver_note_tipo_documento': 'DEBITO',
+			'driver_note_motivo': 'DEFECT',
+			'driver_note_descripcion': 'Cargo adicional después de la entrega',
+			f'driver_note_qty_{invoice.items.first().id}': '1',
+			f'driver_note_amount_{invoice.items.first().id}': '5.00',
+		})
+
+		invoice.refresh_from_db()
+		nota = invoice.notas_ajuste.get()
+		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertEqual(nota.tipo_documento, 'DEBITO')
+		self.assertEqual(nota.estado, 'BORRADOR')
+		self.assertEqual(nota.creada_por, self.driver)
+		notificacion = Notificacion.objects.filter(titulo__icontains=nota.numero).latest('creada_en')
+		self.assertIn('requires review', notificacion.titulo)
+		self.assertIn('approve or reject', notificacion.mensaje)
+		self.assertEqual(notificacion.url, f'/facturacion/backoffice/invoices/{invoice.id}/')
+
+	def test_backoffice_invoice_detail_highlights_driver_created_notes(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		crear_nota_ajuste_desde_invoice(
+			invoice=invoice,
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Driver created note',
+			usuario=self.driver,
+			items_payload=[{
+				'invoice_item': invoice.items.first(),
+				'cantidad': 1,
+				'monto_unitario': Decimal('15.00'),
+			}],
+		)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+
+		self.assertContains(response, 'Driver-created adjustment notes detected.')
+		self.assertContains(response, 'Created by driver')
+
+	def test_backoffice_dashboard_shows_pending_adjustment_note_counter(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		crear_nota_ajuste_desde_invoice(
+			invoice=invoice,
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Pending review note',
+			usuario=self.driver,
+			items_payload=[{
+				'invoice_item': invoice.items.first(),
+				'cantidad': 1,
+				'monto_unitario': Decimal('15.00'),
+			}],
+		)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_dashboard'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context['pending_adjustment_notes_count'], 1)
+		self.assertEqual(response.context['unread_adjustment_notifications_count'], 1)
+		self.assertContains(response, 'Adjustment notes pending approval')
+		self.assertContains(response, 'unread adjustment note alerts')
+
+	def test_backoffice_invoice_detail_marks_adjustment_review_notifications_as_read(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		crear_nota_ajuste_desde_invoice(
+			invoice=invoice,
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Read tracking note',
+			usuario=self.driver,
+			items_payload=[{
+				'invoice_item': invoice.items.first(),
+				'cantidad': 1,
+				'monto_unitario': Decimal('15.00'),
+			}],
+		)
+		adjustment_notification = Notificacion.objects.filter(tipo='NOTA_AJUSTE', url=f'/facturacion/backoffice/invoices/{invoice.id}/').latest('creada_en')
+		invoice_notification = Notificacion.objects.filter(tipo='PEDIDO', url=f'/facturacion/backoffice/invoices/{invoice.id}/').latest('creada_en')
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+
+		adjustment_notification.refresh_from_db()
+		invoice_notification.refresh_from_db()
+		self.assertEqual(response.status_code, 200)
+		self.assertTrue(adjustment_notification.leida)
+		self.assertFalse(invoice_notification.leida)
+
+	def test_driver_complete_view_can_create_debit_note_draft(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.post(reverse('driver_delivery_complete', args=[invoice.delivery.id]), {
+			'estado_pago': 'PAGADO',
+			'metodo_pago': 'CASH',
+			'monto_pagado': '45.00',
+			'recibido_por': 'Juan Perez',
+			'firma_cliente_data': self.signature_data,
+			'driver_note_tipo_documento': 'DEBITO',
+			'driver_note_motivo': 'DEFECT',
+			'driver_note_descripcion': 'Cargo adicional operativo',
+			f'driver_note_qty_{invoice.items.first().id}': '1',
+			f'driver_note_amount_{invoice.items.first().id}': '5.00',
+		})
+
+		invoice.refresh_from_db()
+		nota = invoice.notas_ajuste.get()
+		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertEqual(invoice.delivery.estado, 'ENTREGADA_PAGADA')
+		self.assertEqual(nota.estado, 'BORRADOR')
+		self.assertEqual(nota.tipo_documento, 'DEBITO')
+		self.assertEqual(nota.tipo_credito, '')
+		self.assertEqual(nota.creada_por, self.driver)
+		self.assertEqual(nota.total, Decimal('5.00'))
 
 	def test_backoffice_can_unlock_blocked_customer(self):
 		invoice = generar_invoice_desde_picking(
@@ -446,6 +696,20 @@ class InvoiceFlowTests(TestCase):
 		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
 		self.assertEqual(invoice.items.first().precio_venta_sugerido_unitario, Decimal('2.75'))
 
+	def test_backoffice_generate_invoice_view_saves_estimated_delivery(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('backoffice_generate_invoice', args=[self.pedido.id]), {
+			'metodo_entrega': 'RUTA_DRIVER',
+			'driver_id': str(self.driver.id),
+			'estimated_delivery_at': '2026-04-18T09:30',
+			f'suggested_unit_price_{self.pedido_item.id}': '2.75',
+		})
+
+		invoice = Invoice.objects.get(pedido=self.pedido)
+		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertEqual(timezone.localtime(invoice.delivery.estimated_delivery_at).strftime('%Y-%m-%d %H:%M'), '2026-04-18 09:30')
+
 	def test_invoice_pdf_suggested_retail_uses_next_price_tier(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
@@ -487,6 +751,75 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(response, 'Customer signature proof')
 		self.assertContains(response, 'Carlos Cliente')
 		self.assertContains(response, delivery.firma_cliente.url)
+
+	def test_invoice_pdf_includes_customer_signature_section_when_signed(self):
+		unsigned_invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		pedido_signed = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='VERIFICADO_AJUSTADO',
+			total=Decimal('45.00'),
+		)
+		PedidoItem.objects.create(
+			pedido=pedido_signed,
+			presentacion=self.presentacion,
+			cantidad_solicitada=4,
+			cantidad=3,
+			precio=Decimal('15.00'),
+			subtotal=Decimal('45.00'),
+		)
+		invoice = generar_invoice_desde_picking(
+			pedido=pedido_signed,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		complete_driver_delivery(
+			delivery=invoice.delivery,
+			driver_user=self.driver,
+			payload={
+				'estado_pago': 'PAGADO',
+				'metodo_pago': 'CASH',
+				'monto_pagado': '45.00',
+				'recibido_por': 'Carlos Cliente',
+				'firma_cliente_data': self.signature_data,
+			},
+			evidence_files=[],
+		)
+
+		self.client.force_login(self.backoffice)
+		unsigned_response = self.client.get(reverse('backoffice_invoice_pdf', args=[unsigned_invoice.id]))
+		response = self.client.get(reverse('backoffice_invoice_pdf', args=[invoice.id]))
+
+		self.assertEqual(unsigned_response.status_code, 200)
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response['Content-Type'], 'application/pdf')
+		self.assertGreater(len(response.content), len(unsigned_response.content))
+
+	def test_backoffice_and_driver_delivery_details_show_estimated_delivery(self):
+		estimated_delivery_at = timezone.make_aware(datetime(2026, 4, 18, 9, 30), timezone.get_current_timezone())
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+			estimated_delivery_at=estimated_delivery_at,
+		)
+
+		self.client.force_login(self.backoffice)
+		backoffice_response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.client.force_login(self.driver)
+		driver_response = self.client.get(reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+
+		self.assertContains(backoffice_response, 'Estimated delivery')
+		self.assertContains(backoffice_response, '18/04/2026 09:30')
+		self.assertContains(driver_response, 'Estimated delivery')
+		self.assertContains(driver_response, '18/04/2026 09:30')
 
 	def test_driver_views_render(self):
 		invoice = generar_invoice_desde_picking(
@@ -1011,6 +1344,108 @@ class InvoiceFlowTests(TestCase):
 		self.assertIn('111+Alpha+St', response['Location'])
 		self.assertIn('333+Gamma+St', response['Location'])
 		self.assertNotIn('222+Beta+St', response['Location'])
+
+	def test_driver_delivery_list_orders_active_deliveries_by_estimated_delivery(self):
+		invoice_1 = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+			estimated_delivery_at=timezone.make_aware(datetime(2026, 4, 18, 10, 0), timezone.get_current_timezone()),
+		)
+		pedido_2 = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='VERIFICADO_AJUSTADO',
+			total=Decimal('30.00'),
+		)
+		PedidoItem.objects.create(
+			pedido=pedido_2,
+			presentacion=self.presentacion,
+			cantidad_solicitada=2,
+			cantidad=2,
+			precio=Decimal('15.00'),
+			subtotal=Decimal('30.00'),
+		)
+		invoice_2 = generar_invoice_desde_picking(
+			pedido=pedido_2,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+			estimated_delivery_at=timezone.make_aware(datetime(2026, 4, 18, 9, 0), timezone.get_current_timezone()),
+		)
+		pedido_3 = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='VERIFICADO_AJUSTADO',
+			total=Decimal('15.00'),
+		)
+		PedidoItem.objects.create(
+			pedido=pedido_3,
+			presentacion=self.presentacion,
+			cantidad_solicitada=1,
+			cantidad=1,
+			precio=Decimal('15.00'),
+			subtotal=Decimal('15.00'),
+		)
+		invoice_3 = generar_invoice_desde_picking(
+			pedido=pedido_3,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+
+		self.client.force_login(self.driver)
+		response = self.client.get(reverse('driver_delivery_list'))
+
+		self.assertEqual(
+			list(response.context['deliveries'].values_list('id', flat=True)),
+			[invoice_2.delivery.id, invoice_1.delivery.id, invoice_3.delivery.id],
+		)
+
+	def test_driver_route_uses_assigned_delivery_order(self):
+		invoice_1 = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+			estimated_delivery_at=timezone.make_aware(datetime(2026, 4, 18, 10, 0), timezone.get_current_timezone()),
+		)
+		pedido_2 = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='VERIFICADO_AJUSTADO',
+			total=Decimal('30.00'),
+		)
+		PedidoItem.objects.create(
+			pedido=pedido_2,
+			presentacion=self.presentacion,
+			cantidad_solicitada=2,
+			cantidad=2,
+			precio=Decimal('15.00'),
+			subtotal=Decimal('30.00'),
+		)
+		invoice_2 = generar_invoice_desde_picking(
+			pedido=pedido_2,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+			estimated_delivery_at=timezone.make_aware(datetime(2026, 4, 18, 9, 0), timezone.get_current_timezone()),
+		)
+
+		invoice_1.delivery.delivery_address = '111 Alpha St'
+		invoice_1.delivery.save(update_fields=['delivery_address', 'updated_at'])
+		invoice_2.delivery.delivery_address = '222 Beta St'
+		invoice_2.delivery.save(update_fields=['delivery_address', 'updated_at'])
+
+		self.client.force_login(self.driver)
+		response = self.client.get(reverse('driver_delivery_route'), {
+			'delivery_ids': [invoice_1.delivery.id, invoice_2.delivery.id],
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.assertIn('destination=111+Alpha+St', response['Location'])
+		self.assertIn('waypoints=222+Beta+St', response['Location'])
 
 	def test_google_maps_route_url_optimizes_intermediate_stops(self):
 		invoice_1 = generar_invoice_desde_picking(

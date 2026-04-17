@@ -78,6 +78,7 @@
             <td>
               <div>{{ delivery.route_address }}</div>
               <div class="small text-muted">{% trans "Maps query:" %} {{ delivery.route_query_address }}</div>
+              <div class="small text-muted">{% trans "Estimated delivery" %}: {% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
             </td>
             <td><span class="badge bg-info text-dark">{{ delivery.get_estado_display }}</span></td>
             <td><span class="badge {% if delivery.estado_pago == 'NO_PAGADO' %}bg-danger{% elif delivery.estado_pago == 'PAGADO' %}bg-success{% else %}bg-secondary{% endif %}">{{ delivery.get_estado_pago_display }}</span></td>
@@ -122,6 +123,7 @@
             <td>
               <div>{{ delivery.route_address }}</div>
               <div class="small text-muted">{% trans "Maps query:" %} {{ delivery.route_query_address }}</div>
+              <div class="small text-muted">{% trans "Estimated delivery" %}: {% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
             </td>
             <td><span class="badge bg-info text-dark">{{ delivery.get_estado_display }}</span></td>
             <td><span class="badge {% if delivery.estado_pago == 'NO_PAGADO' %}bg-danger{% elif delivery.estado_pago == 'PAGADO' %}bg-success{% else %}bg-secondary{% endif %}">{{ delivery.get_estado_pago_display }}</span></td>

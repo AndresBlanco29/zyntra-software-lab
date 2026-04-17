@@ -9,6 +9,7 @@ class Notificacion(models.Model):
 	TIPO_CHOICES = (
 		('COTIZACION', 'Cotizacion'),
 		('PEDIDO', 'Pedido'),
+		('NOTA_AJUSTE', 'Nota de ajuste'),
 	)
 
 	tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)

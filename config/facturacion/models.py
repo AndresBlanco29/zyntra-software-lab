@@ -147,6 +147,7 @@ class Delivery(models.Model):
 		related_name='deliveries_unlocked',
 	)
 	client_unlocked_at = models.DateTimeField(blank=True, null=True)
+	estimated_delivery_at = models.DateTimeField(blank=True, null=True)
 	route_started_at = models.DateTimeField(blank=True, null=True)
 	delivered_at = models.DateTimeField(blank=True, null=True)
 	notifications_sent_at = models.DateTimeField(blank=True, null=True)
@@ -380,3 +381,15 @@ class NotaAjusteItem(models.Model):
 
 	def __str__(self):
 		return f'{self.descripcion} x {self.cantidad}'
+
+
+class NotaAjusteEvidencePhoto(models.Model):
+	nota = models.ForeignKey(NotaAjuste, on_delete=models.CASCADE, related_name='evidence_photos')
+	image = models.ImageField(upload_to='invoice-notes/evidence/')
+	uploaded_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		ordering = ('uploaded_at', 'id',)
+
+	def __str__(self):
+		return f'{self.nota.numero} evidence {self.pk}'

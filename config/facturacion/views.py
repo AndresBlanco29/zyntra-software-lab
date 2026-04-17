@@ -4,22 +4,26 @@ from io import BytesIO
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.db.models import Case, IntegerField, Value, When
 from django.http import HttpResponse, JsonResponse
 from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from reportlab.graphics.barcode import code128
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape, letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from config.notificaciones.models import Notificacion
 from config.pedidos.models import Pedido
 from config.usuarios.models import Usuario
 from config.usuarios.permissions import internal_permission_required
 
-from .models import Delivery, DeliveryEvidencePhoto, Invoice, NotaAjuste
+from .models import Delivery, DeliveryEvidencePhoto, Invoice, NotaAjuste, NotaAjusteEvidencePhoto
 from .services import (
 	aprobar_nota_ajuste,
 	anular_nota_ajuste,
@@ -115,6 +119,59 @@ def _extract_invoice_suggested_unit_prices(pedido, post_data):
 		if suggested_price is not None:
 			suggested_prices[item.id] = suggested_price
 	return suggested_prices
+
+
+def _extract_adjustment_note_request(invoice, post_data, *, field_prefix=''):
+	tipo_documento = (post_data.get(f'{field_prefix}tipo_documento') or '').strip()
+	motivo = (post_data.get(f'{field_prefix}motivo') or '').strip()
+	tipo_credito = (post_data.get(f'{field_prefix}tipo_credito') or '').strip()
+	descripcion = (post_data.get(f'{field_prefix}descripcion') or '').strip()
+	items_payload = []
+	has_item_data = False
+
+	for item in invoice.items.all():
+		quantity_value = post_data.get(f'{field_prefix}qty_{item.id}')
+		amount_value = post_data.get(f'{field_prefix}amount_{item.id}')
+		quantity = _parse_non_negative_quantity(quantity_value)
+		amount_text = str(amount_value or '').strip()
+		if quantity > 0 or amount_text:
+			has_item_data = True
+		items_payload.append({
+			'invoice_item': item,
+			'cantidad': quantity,
+			'monto_unitario': amount_value,
+		})
+
+	has_note_request = bool(tipo_documento or motivo or tipo_credito or descripcion or has_item_data)
+	if not has_note_request:
+		return None
+	if not tipo_documento:
+		raise ValidationError(_('Select a note type to save the adjustment.'))
+
+	return {
+		'tipo_documento': tipo_documento,
+		'motivo': motivo,
+		'tipo_credito': tipo_credito,
+		'descripcion': descripcion,
+		'items_payload': items_payload,
+	}
+
+
+def _save_adjustment_note_evidence_files(nota, uploaded_files):
+	for uploaded_file in uploaded_files:
+		NotaAjusteEvidencePhoto.objects.create(nota=nota, image=uploaded_file)
+
+
+def _parse_estimated_delivery_at(value):
+	text = str(value or '').strip()
+	if not text:
+		return None
+	parsed = parse_datetime(text)
+	if parsed is None:
+		raise ValidationError(_('Estimated delivery date must be a valid date and time.'))
+	if timezone.is_naive(parsed):
+		parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+	return parsed
 
 
 def _build_invoice_pdf_item_data(invoice):
@@ -267,6 +324,23 @@ def _invoice_pdf_response(invoice):
 		totals_table,
 	])
 
+	if hasattr(invoice, 'delivery') and invoice.delivery.firma_cliente:
+		try:
+			with invoice.delivery.firma_cliente.open('rb') as signature_file:
+				signature_bytes = signature_file.read()
+		except Exception:
+			signature_bytes = None
+		if signature_bytes:
+			signature_image = Image(BytesIO(signature_bytes), width=180, height=70)
+			signature_image.hAlign = 'LEFT'
+			content.extend([
+				Spacer(1, 18),
+				Paragraph(_('Customer signature'), section_title_style),
+				Paragraph(_('Signed electronically by the customer during delivery confirmation.'), note_style),
+				Spacer(1, 6),
+				signature_image,
+			])
+
 	document.build(content)
 	pdf = buffer.getvalue()
 	buffer.close()
@@ -343,6 +417,16 @@ def _live_driver_deliveries_queryset():
 	return Delivery.objects.select_related('invoice__cliente__usuario', 'driver').filter(estado='EN_RUTA').order_by('-location_updated_at', '-route_started_at', 'created_at')
 
 
+def _ordered_driver_deliveries(queryset):
+	return queryset.annotate(
+		estimated_delivery_sort=Case(
+			When(estimated_delivery_at__isnull=True, then=Value(1)),
+			default=Value(0),
+			output_field=IntegerField(),
+		),
+	).order_by('estimated_delivery_sort', 'estimated_delivery_at', 'created_at')
+
+
 @login_required
 @internal_permission_required('backoffice.orders.view')
 def backoffice_invoices_list(request):
@@ -397,11 +481,14 @@ def backoffice_generate_invoice(request, pedido_id):
 
 	metodo_entrega = request.POST.get('metodo_entrega') or ''
 	driver = None
+	estimated_delivery_at = None
 	driver_id = request.POST.get('driver_id') or ''
 	if driver_id:
 		driver = get_object_or_404(Usuario, id=driver_id, role='driver', is_active=True)
 
 	try:
+		if metodo_entrega == 'RUTA_DRIVER':
+			estimated_delivery_at = _parse_estimated_delivery_at(request.POST.get('estimated_delivery_at'))
 		suggested_unit_prices = _extract_invoice_suggested_unit_prices(pedido, request.POST)
 		invoice = generar_invoice_desde_picking(
 			pedido=pedido,
@@ -409,6 +496,7 @@ def backoffice_generate_invoice(request, pedido_id):
 			driver=driver,
 			usuario=request.user,
 			suggested_unit_prices=suggested_unit_prices,
+			estimated_delivery_at=estimated_delivery_at,
 		)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
@@ -422,14 +510,21 @@ def backoffice_generate_invoice(request, pedido_id):
 @internal_permission_required('backoffice.orders.view')
 def backoffice_invoice_detail(request, invoice_id):
 	invoice = get_object_or_404(
-		Invoice.objects.select_related('pedido__cliente__usuario', 'driver', 'creada_por').prefetch_related('items__presentacion__producto', 'notas_ajuste__items', 'delivery__evidence_photos', 'delivery__notification_logs'),
+		Invoice.objects.select_related('pedido__cliente__usuario', 'driver', 'creada_por').prefetch_related('items__presentacion__producto', 'notas_ajuste__items', 'notas_ajuste__evidence_photos', 'notas_ajuste__creada_por', 'delivery__evidence_photos', 'delivery__notification_logs'),
 		id=invoice_id,
 	)
 	if invoice.metodo_entrega == 'RUTA_DRIVER' and invoice.driver_id:
 		ensure_delivery_for_invoice(invoice)
 		invoice.refresh_from_db()
+	Notificacion.objects.filter(
+		tipo='NOTA_AJUSTE',
+		url=f'/facturacion/backoffice/invoices/{invoice.id}/',
+		leida=False,
+	).update(leida=True)
+	driver_created_notes_count = invoice.notas_ajuste.filter(creada_por__role='driver').count()
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
+		'driver_created_notes_count': driver_created_notes_count,
 	})
 
 
@@ -490,23 +585,19 @@ def backoffice_invoice_create_note(request, invoice_id):
 		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
 
 	try:
-		items_payload = [
-			{
-				'invoice_item': item,
-				'cantidad': _parse_non_negative_quantity(request.POST.get(f'note_qty_{item.id}')),
-				'monto_unitario': request.POST.get(f'note_amount_{item.id}'),
-			}
-			for item in invoice.items.all()
-		]
+		note_request = _extract_adjustment_note_request(invoice, request.POST, field_prefix='note_')
+		if note_request is None:
+			raise ValidationError(_('Add note details before saving the adjustment.'))
 		nota = crear_nota_ajuste_desde_invoice(
 			invoice=invoice,
-			tipo_documento=request.POST.get('tipo_documento') or '',
-			motivo=request.POST.get('motivo') or '',
-			tipo_credito=request.POST.get('tipo_credito') or '',
-			descripcion=request.POST.get('descripcion') or '',
+			tipo_documento=note_request['tipo_documento'],
+			motivo=note_request['motivo'],
+			tipo_credito=note_request['tipo_credito'],
+			descripcion=note_request['descripcion'],
 			usuario=request.user,
-			items_payload=items_payload,
+			items_payload=note_request['items_payload'],
 		)
+		_save_adjustment_note_evidence_files(nota, request.FILES.getlist('note_evidence_photos'))
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:
@@ -575,7 +666,7 @@ def driver_delivery_list(request):
 		deliveries = base_queryset.filter(estado__in=completed_statuses).order_by('-delivered_at', '-updated_at', '-created_at')
 	else:
 		view_mode = 'active'
-		deliveries = base_queryset.exclude(estado__in=completed_statuses).order_by('estado', 'created_at')
+		deliveries = _ordered_driver_deliveries(base_queryset.exclude(estado__in=completed_statuses))
 	return render(request, 'backoffice/driver_delivery_list.html', {
 		'deliveries': deliveries,
 		'view_mode': view_mode,
@@ -588,7 +679,7 @@ def driver_delivery_list(request):
 @internal_permission_required('driver.delivery.view')
 def driver_delivery_detail(request, delivery_id):
 	delivery = get_object_or_404(
-		Delivery.objects.select_related('invoice__cliente__usuario', 'driver').prefetch_related('invoice__items', 'evidence_photos', 'notification_logs'),
+		Delivery.objects.select_related('invoice__cliente__usuario', 'driver').prefetch_related('invoice__items', 'invoice__notas_ajuste__evidence_photos', 'evidence_photos', 'notification_logs'),
 		id=delivery_id,
 		driver=request.user,
 	)
@@ -692,11 +783,11 @@ def driver_delivery_route(request):
 		messages.error(request, _('Select at least one assigned invoice to generate the route.'))
 		return redirect('driver_delivery_list')
 
-	deliveries = Delivery.objects.filter(
+	deliveries = _ordered_driver_deliveries(Delivery.objects.filter(
 		driver=request.user,
 		estado__in={'ASIGNADA', 'EN_RUTA'},
 		id__in=selected_delivery_ids,
-	).order_by('created_at')
+	))
 	if not deliveries.exists():
 		messages.error(request, _('The selected invoices are no longer available for route generation.'))
 		return redirect('driver_delivery_list')
@@ -711,8 +802,13 @@ def driver_delivery_route(request):
 
 @login_required
 @internal_permission_required('driver.delivery.manage')
+@transaction.atomic
 def driver_delivery_complete(request, delivery_id):
-	delivery = get_object_or_404(Delivery.objects.select_related('invoice__cliente__usuario'), id=delivery_id, driver=request.user)
+	delivery = get_object_or_404(
+		Delivery.objects.select_related('invoice__cliente__usuario').prefetch_related('invoice__items__presentacion__producto', 'invoice__notas_ajuste__items'),
+		id=delivery_id,
+		driver=request.user,
+	)
 	if request.method != 'POST':
 		return redirect('driver_delivery_detail', delivery_id=delivery.id)
 	try:
@@ -722,10 +818,65 @@ def driver_delivery_complete(request, delivery_id):
 			payload=request.POST,
 			evidence_files=request.FILES.getlist('evidence_photos'),
 		)
+		nota = None
+		note_request = _extract_adjustment_note_request(delivery.invoice, request.POST, field_prefix='driver_note_')
+		note_evidence_files = request.FILES.getlist('driver_note_evidence_photos')
+		if note_request is None and note_evidence_files:
+			raise ValidationError(_('Select a note type before uploading adjustment evidence.'))
+		if note_request is not None:
+			nota = crear_nota_ajuste_desde_invoice(
+				invoice=delivery.invoice,
+				tipo_documento=note_request['tipo_documento'],
+				motivo=note_request['motivo'],
+				tipo_credito=note_request['tipo_credito'],
+				descripcion=note_request['descripcion'],
+				usuario=request.user,
+				items_payload=note_request['items_payload'],
+			)
+			_save_adjustment_note_evidence_files(nota, note_evidence_files)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:
 		messages.success(request, _('Delivery saved successfully.'))
+		if nota is not None:
+			messages.success(request, _('Adjustment note %(note)s saved as draft for BackOffice review.') % {'note': nota.numero})
+	return redirect('driver_delivery_detail', delivery_id=delivery.id)
+
+
+@login_required
+@internal_permission_required('driver.delivery.manage')
+@transaction.atomic
+def driver_delivery_create_note(request, delivery_id):
+	delivery = get_object_or_404(
+		Delivery.objects.select_related('invoice__cliente__usuario').prefetch_related('invoice__items__presentacion__producto', 'invoice__notas_ajuste__items', 'invoice__notas_ajuste__evidence_photos'),
+		id=delivery_id,
+		driver=request.user,
+	)
+	if request.method != 'POST':
+		return redirect('driver_delivery_detail', delivery_id=delivery.id)
+	if not delivery.is_completed:
+		messages.error(request, _('You can only create adjustment notes after completing the delivery.'))
+		return redirect('driver_delivery_detail', delivery_id=delivery.id)
+
+	try:
+		note_request = _extract_adjustment_note_request(delivery.invoice, request.POST, field_prefix='driver_note_')
+		note_evidence_files = request.FILES.getlist('driver_note_evidence_photos')
+		if note_request is None:
+			raise ValidationError(_('Add note details before saving the adjustment.'))
+		nota = crear_nota_ajuste_desde_invoice(
+			invoice=delivery.invoice,
+			tipo_documento=note_request['tipo_documento'],
+			motivo=note_request['motivo'],
+			tipo_credito=note_request['tipo_credito'],
+			descripcion=note_request['descripcion'],
+			usuario=request.user,
+			items_payload=note_request['items_payload'],
+		)
+		_save_adjustment_note_evidence_files(nota, note_evidence_files)
+	except ValidationError as exc:
+		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+	else:
+		messages.success(request, _('Adjustment note %(note)s saved as draft for BackOffice review.') % {'note': nota.numero})
 	return redirect('driver_delivery_detail', delivery_id=delivery.id)
 
 

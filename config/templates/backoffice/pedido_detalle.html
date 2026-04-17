@@ -76,7 +76,7 @@
         {% elif pedido.estado == 'VERIFICADO_AJUSTADO' and not pedido.picking_bloqueado %}
           <form method="post" action="{% url 'backoffice_generate_invoice' pedido.id %}" class="row g-2">
             {% csrf_token %}
-            <div class="col-md-5">
+            <div class="col-md-4">
               <label class="form-label fw-semibold">{% trans "Delivery method" %}</label>
               <select name="metodo_entrega" class="form-select" required>
                 <option value="">{% trans "Select a delivery method..." %}</option>
@@ -85,7 +85,7 @@
                 <option value="CUSTOMER_PICK_UP">{% trans "Customer Pick Up" %}</option>
               </select>
             </div>
-            <div class="col-md-5">
+            <div class="col-md-4">
               <label class="form-label fw-semibold">{% trans "Driver" %}</label>
               <select name="driver_id" class="form-select">
                 <option value="">{% trans "No driver required" %}</option>
@@ -93,6 +93,11 @@
                   <option value="{{ driver.id }}">{% firstof driver.get_full_name driver.username %}</option>
                 {% endfor %}
               </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold">{% trans "Estimated delivery" %}</label>
+              <input type="datetime-local" name="estimated_delivery_at" class="form-control">
+              <div class="form-text">{% trans "Optional. Only used for driver routes." %}</div>
             </div>
             <div class="col-md-2 d-flex align-items-end">
               <button type="submit" class="btn btn-primary w-100">{% trans "Generate invoice" %}</button>

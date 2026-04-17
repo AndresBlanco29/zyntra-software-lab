@@ -4,6 +4,14 @@
 {% block title %}{{ invoice.numero }}{% endblock %}
 
 {% block content %}
+{% if driver_created_notes_count %}
+<div class="alert alert-warning d-flex justify-content-between align-items-center gap-3 mb-3">
+  <div>
+    <strong>{% trans "Driver-created adjustment notes detected." %}</strong>
+    <div class="small mb-0">{% blocktrans count total=driver_created_notes_count %}1 draft or historical note was created by a driver on this invoice.{% plural %}{{ total }} draft or historical notes were created by drivers on this invoice.{% endblocktrans %}</div>
+  </div>
+</div>
+{% endif %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
     <h2 class="mb-1">{{ invoice.numero }}</h2>
@@ -50,6 +58,12 @@
               {% endif %}
             </div>
           </div>
+          {% if invoice.delivery %}
+          <div class="col-md-4">
+            <div class="text-muted small">{% trans "Estimated delivery" %}</div>
+            <div class="fw-semibold">{% if invoice.delivery.estimated_delivery_at %}{{ invoice.delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>
@@ -125,6 +139,10 @@
       <div class="col-md-3">
         <div class="text-muted small">{% trans "Delivered at" %}</div>
         <div>{% if invoice.delivery.delivered_at %}{{ invoice.delivery.delivered_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-muted small">{% trans "Estimated delivery" %}</div>
+        <div>{% if invoice.delivery.estimated_delivery_at %}{{ invoice.delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
       </div>
       <div class="col-md-3">
         <div class="text-muted small">{% trans "Signature received" %}</div>
@@ -256,6 +274,12 @@
                 <td>
                   <strong>{{ nota.numero }}</strong>
                   <div class="small text-muted">{{ nota.creada_en|date:"d/m/Y H:i" }}</div>
+                  {% if nota.creada_por and nota.creada_por.role == 'driver' %}
+                    <div class="mt-1"><span class="badge bg-warning text-dark">{% trans "Created by driver" %}</span></div>
+                  {% endif %}
+                  {% if nota.evidence_photos.all %}
+                    <div class="small text-muted">{% blocktrans count total=nota.evidence_photos.all|length %}1 evidence photo{% plural %}{{ total }} evidence photos{% endblocktrans %}</div>
+                  {% endif %}
                 </td>
                 <td>{{ nota.get_tipo_documento_display }}</td>
                 <td>
@@ -295,6 +319,20 @@
                   {% endif %}
                 </td>
               </tr>
+              {% if nota.evidence_photos.all %}
+              <tr>
+                <td colspan="7">
+                  <div class="small text-muted mb-2">{% trans "Adjustment note evidence" %}</div>
+                  <div class="d-flex flex-wrap gap-2">
+                    {% for photo in nota.evidence_photos.all %}
+                    <a href="{{ photo.image.url }}" target="_blank" rel="noopener">
+                      <img src="{{ photo.image.url }}" alt="{% trans 'Adjustment note evidence photo' %}" class="img-fluid rounded border" style="max-width: 130px; max-height: 130px;">
+                    </a>
+                    {% endfor %}
+                  </div>
+                </td>
+              </tr>
+              {% endif %}
               {% empty %}
               <tr>
                 <td colspan="7" class="text-center text-muted py-4">{% trans "No adjustment notes created yet." %}</td>
@@ -310,7 +348,7 @@
     <div class="card shadow-sm h-100">
       <div class="card-body">
         <h5 class="mb-3">{% trans "Create adjustment note" %}</h5>
-        <form method="post" action="{% url 'backoffice_invoice_create_note' invoice.id %}">
+        <form method="post" enctype="multipart/form-data" action="{% url 'backoffice_invoice_create_note' invoice.id %}">
           {% csrf_token %}
           <div class="row g-2 mb-3">
             <div class="col-md-6">
@@ -340,6 +378,11 @@
             <div class="col-12">
               <label class="form-label fw-semibold">{% trans "Description" %}</label>
               <textarea name="descripcion" rows="3" class="form-control"></textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
+              <input type="file" name="note_evidence_photos" class="form-control" accept="image/*" multiple>
+              <div class="form-text">{% trans "Optional photos or evidence that support this adjustment note." %}</div>
             </div>
           </div>
 

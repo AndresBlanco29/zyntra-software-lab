@@ -17,7 +17,7 @@ _schema_repair_running = False
 def _iter_managed_models():
     for model in apps.get_models():
         meta = model._meta
-        if meta.proxy or meta.swapped or not meta.managed:
+        if meta.proxy or meta.swapped or not meta.managed or meta.auto_created:
             continue
         yield model
 
@@ -93,6 +93,11 @@ def _add_missing_field(connection, model, field):
         schema_editor.add_field(model, field)
 
 
+def _create_missing_table(connection, model):
+    with connection.schema_editor() as schema_editor:
+        schema_editor.create_model(model)
+
+
 def ensure_runtime_schema():
     global _schema_repair_completed, _schema_repair_running
 
@@ -115,6 +120,12 @@ def ensure_runtime_schema():
         for model in _iter_managed_models():
             table_name = model._meta.db_table
             if table_name not in table_names:
+                _create_missing_table(connection, model)
+                table_names.add(table_name)
+                logger.warning(
+                    "Runtime schema repair created missing table %s",
+                    table_name,
+                )
                 continue
 
             for field in _iter_missing_concrete_fields(connection, model):
@@ -130,7 +141,7 @@ def ensure_runtime_schema():
             _schema_repair_completed = True
     except (OperationalError, ProgrammingError) as exc:
         message = str(exc).lower()
-        if 'duplicate column' in message or '1060' in message:
+        if 'duplicate column' in message or '1060' in message or 'already exists' in message or '1050' in message:
             return
         logger.exception(
             "Runtime schema repair failed: %s",

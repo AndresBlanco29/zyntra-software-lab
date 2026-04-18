@@ -98,6 +98,66 @@ def _create_missing_table(connection, model):
         schema_editor.create_model(model)
 
 
+def _should_defer_table_creation(exc):
+    message = str(exc).lower()
+    return 'failed to open the referenced table' in message or '1824' in message
+
+
+def _create_missing_tables(connection, table_names):
+    pending_models = [model for model in _iter_managed_models() if model._meta.db_table not in table_names]
+
+    while pending_models:
+        remaining_models = []
+        progress_made = False
+
+        for model in pending_models:
+            table_name = model._meta.db_table
+            try:
+                _create_missing_table(connection, model)
+                table_names.add(table_name)
+                progress_made = True
+                logger.warning(
+                    "Runtime schema repair created missing table %s",
+                    table_name,
+                )
+            except (OperationalError, ProgrammingError) as exc:
+                if _should_defer_table_creation(exc):
+                    remaining_models.append(model)
+                    continue
+
+                message = str(exc).lower()
+                if 'already exists' in message or '1050' in message:
+                    table_names.add(table_name)
+                    progress_made = True
+                    continue
+
+                logger.exception(
+                    "Runtime schema repair failed creating table %s: %s",
+                    table_name,
+                    exc,
+                )
+
+            except Exception as exc:
+                logger.exception(
+                    "Runtime schema repair failed creating table %s: %s",
+                    table_name,
+                    exc,
+                )
+
+        if not remaining_models:
+            return
+
+        if not progress_made:
+            unresolved_tables = ', '.join(model._meta.db_table for model in remaining_models)
+            logger.warning(
+                "Runtime schema repair could not yet create tables due to unresolved dependencies: %s",
+                unresolved_tables,
+            )
+            return
+
+        pending_models = remaining_models
+
+
 def ensure_runtime_schema():
     global _schema_repair_completed, _schema_repair_running
 
@@ -117,15 +177,11 @@ def ensure_runtime_schema():
         with connection.cursor() as cursor:
             table_names = set(connection.introspection.table_names(cursor))
 
+        _create_missing_tables(connection, table_names)
+
         for model in _iter_managed_models():
             table_name = model._meta.db_table
             if table_name not in table_names:
-                _create_missing_table(connection, model)
-                table_names.add(table_name)
-                logger.warning(
-                    "Runtime schema repair created missing table %s",
-                    table_name,
-                )
                 continue
 
             for field in _iter_missing_concrete_fields(connection, model):

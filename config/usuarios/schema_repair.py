@@ -3,7 +3,7 @@ import threading
 from copy import copy
 
 from django.apps import apps
-from django.db import connections
+from django.db import connections, models
 from django.db.utils import IntegrityError, OperationalError, ProgrammingError
 
 
@@ -37,6 +37,34 @@ def _iter_missing_concrete_fields(connection, model):
         if field.column in existing_columns:
             continue
         yield field
+
+
+def _get_table_description_map(connection, table_name):
+    with connection.cursor() as cursor:
+        return {
+            column.name: column
+            for column in connection.introspection.get_table_description(cursor, table_name)
+        }
+
+
+def _iter_fields_needing_alter(connection, model):
+    description_map = _get_table_description_map(connection, model._meta.db_table)
+
+    for field in model._meta.concrete_fields:
+        if field.primary_key or field.many_to_many or not field.column:
+            continue
+
+        column = description_map.get(field.column)
+        if column is None:
+            continue
+
+        if isinstance(field, models.CharField):
+            current_length = getattr(column, 'internal_size', None)
+            target_length = getattr(field, 'max_length', None)
+            if current_length and target_length and current_length < target_length:
+                previous_field = copy(field)
+                previous_field.max_length = current_length
+                yield previous_field, field
 
 
 def _build_relaxed_field(field):
@@ -91,6 +119,11 @@ def _add_missing_field(connection, model, field):
 
     with connection.schema_editor() as schema_editor:
         schema_editor.add_field(model, field)
+
+
+def _alter_existing_field(connection, model, old_field, new_field):
+    with connection.schema_editor() as schema_editor:
+        schema_editor.alter_field(model, old_field, new_field, strict=False)
 
 
 def _create_missing_table(connection, model):
@@ -191,6 +224,14 @@ def ensure_runtime_schema():
                     "Runtime schema repair added missing %s.%s column",
                     table_name,
                     field.column,
+                )
+
+            for old_field, new_field in _iter_fields_needing_alter(connection, model):
+                _alter_existing_field(connection, model, old_field, new_field)
+                logger.warning(
+                    "Runtime schema repair altered %s.%s to match the model definition",
+                    table_name,
+                    new_field.column,
                 )
 
         with _schema_repair_lock:

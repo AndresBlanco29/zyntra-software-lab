@@ -28,6 +28,24 @@ const csrf = (
 const actualizarURL = document.body.dataset.actualizarUrl
 const eliminarURL = document.body.dataset.eliminarUrl
 const enviarURL = document.body.dataset.enviarUrl
+const orderTypeMessage = document.body.dataset.msgOrderType || 'Debes indicar cómo se tomó la orden'
+const submitErrorMessage = document.body.dataset.msgSubmitError || 'No se pudo generar el pedido.'
+const removeErrorMessage = document.body.dataset.msgRemoveError || 'No se pudo eliminar el producto del pedido.'
+const requestErrorMessage = document.body.dataset.msgRequestError || 'Ocurrió un error procesando la solicitud.'
+const feedbackBox = document.getElementById('pedidoFeedback')
+
+function hideFeedback() {
+    if (!feedbackBox) return
+    feedbackBox.classList.add('d-none')
+    feedbackBox.textContent = ''
+}
+
+function showFeedback(message) {
+    if (!feedbackBox) return
+    feedbackBox.textContent = message
+    feedbackBox.classList.remove('d-none')
+    feedbackBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+}
 
 console.log('CSRF Token:', csrf)
 console.log('Eliminar URL:', eliminarURL)
@@ -60,14 +78,15 @@ document.addEventListener('click', function(e) {
         .then(data => {
             console.log('Respuesta completa:', data)
             if(data.success) {
+                hideFeedback()
                 location.reload()
             } else {
-                alert('Error al eliminar: ' + (data.message || 'Error desconocido'))
+                showFeedback(data.message || removeErrorMessage)
             }
         })
         .catch(error => {
             console.error('Error completo:', error)
-            alert('Error en la petición: ' + error.message)
+            showFeedback(error.message || requestErrorMessage)
         })
     }
 })
@@ -81,10 +100,12 @@ let tipoOrden = document.querySelector('input[name="tipo_orden"]:checked')
 
 if(!tipoOrden){
 
-alert("Debes indicar cómo se tomó la orden")
+showFeedback(orderTypeMessage)
 return
 
 }
+
+hideFeedback()
 
 fetch(enviarURL,{
 
@@ -98,10 +119,20 @@ headers:{
 body:`tipo_orden=${tipoOrden.value}`
 
 })
-.then(res=>res.json())
+.then(async res => {
+const data = await res.json()
+
+if(!res.ok || !data.success){
+throw new Error(data.error || data.message || submitErrorMessage)
+}
+
+return data
+})
 .then(data=>{
 
 console.log(data)
+
+hideFeedback()
 
 const toast = document.getElementById("toastPedido")
 
@@ -114,7 +145,10 @@ window.location.href = "/vendedores/tomar-pedido/"
 },1500)
 
 })
-.catch(error => console.error('Error:', error))
+.catch(error => {
+console.error('Error:', error)
+showFeedback(error.message || submitErrorMessage)
+})
 })
 
 

@@ -42,37 +42,126 @@ document.addEventListener("DOMContentLoaded", function () {
 let clienteEstadoId = null;
 let accionEstadoCliente = null;
 let nombreEstadoCliente = "";
+const USA_COUNTRY_ALIASES = ['usa', 'us', 'eeuu', 'estados unidos', 'united states'];
+
+function isUsaCountry(value) {
+    return USA_COUNTRY_ALIASES.includes((value || '').trim().toLowerCase());
+}
+
+function getEditLocationElements() {
+    return {
+        countryInput: document.getElementById('paisCliente'),
+        manualToggle: document.getElementById('usarDireccionManual'),
+        guidedGroup: document.getElementById('guidedLocationGroup'),
+        manualGroup: document.getElementById('manualLocationGroup'),
+        stateSelect: document.getElementById('estadoClienteSelect'),
+        citySelect: document.getElementById('ciudadClienteSelect'),
+        stateManual: document.getElementById('estadoClienteManual'),
+        cityManual: document.getElementById('ciudadClienteManual')
+    };
+}
+
+function findSelectOptionValue(selectElement, expectedValue) {
+    const normalizedValue = (expectedValue || '').trim().toLowerCase();
+    const match = Array.from(selectElement.options).find((option) => option.value.trim().toLowerCase() === normalizedValue);
+    return match ? match.value : '';
+}
+
+function syncEditLocationMode() {
+    const elements = getEditLocationElements();
+    if (!elements.countryInput || !elements.manualToggle) {
+        return;
+    }
+
+    const forceManual = !isUsaCountry(elements.countryInput.value);
+    const useManual = forceManual || elements.manualToggle.checked;
+
+    elements.manualToggle.checked = useManual;
+    elements.manualToggle.disabled = forceManual;
+
+    elements.guidedGroup.classList.toggle('d-none', useManual);
+    elements.manualGroup.classList.toggle('d-none', !useManual);
+
+    elements.stateSelect.required = !useManual;
+    elements.citySelect.required = !useManual;
+    elements.stateManual.required = useManual;
+    elements.cityManual.required = useManual;
+}
+
+function setGuidedLocation(stateValue, cityValue) {
+    const elements = getEditLocationElements();
+    if (!elements.stateSelect || !elements.citySelect) {
+        return false;
+    }
+
+    const matchedState = findSelectOptionValue(elements.stateSelect, stateValue);
+    if (!matchedState) {
+        return false;
+    }
+
+    elements.stateSelect.value = matchedState;
+    if (elements.guidedGroup && typeof elements.guidedGroup._ltgSyncLocation === 'function') {
+        elements.guidedGroup._ltgSyncLocation();
+    } else {
+        elements.stateSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    const matchedCity = findSelectOptionValue(elements.citySelect, cityValue);
+    elements.citySelect.value = matchedCity;
+    return Boolean(matchedCity);
+}
+
+function collectLocationValues() {
+    const elements = getEditLocationElements();
+    const useManual = elements.manualToggle.checked || !isUsaCountry(elements.countryInput.value);
+
+    return {
+        manual_location: useManual,
+        pais: elements.countryInput.value.trim(),
+        estado: useManual ? elements.stateManual.value.trim() : elements.stateSelect.value.trim(),
+        ciudad: useManual ? elements.cityManual.value.trim() : elements.citySelect.value.trim()
+    };
+}
 
 // Función para abrir el modal de editar cliente
-function abrirEditarCliente(clienteId, nombre, empresa, correo, telefono) {
-    document.getElementById('clienteId').value = clienteId;
-    document.getElementById('nombreCliente').value = nombre;
-    document.getElementById('empresaCliente').value = empresa;
-    document.getElementById('correoCliente').value = correo;
-    document.getElementById('telefonoCliente').value = telefono;
-    
-    // Agregar filtro de solo números al input de teléfono
-    const telefonoInput = document.getElementById('telefonoCliente');
-    telefonoInput.addEventListener('input', function(e) {
-        // Solo permitir números
-        this.value = this.value.replace(/[^0-9]/g, '');
-        // Limitar a 10 dígitos
-        if (this.value.length > 10) {
-            this.value = this.value.slice(0, 10);
-        }
-    });
+function abrirEditarCliente(button) {
+    const elements = getEditLocationElements();
+    const clientCountry = button.dataset.clientePais || 'USA';
+    const clientState = button.dataset.clienteEstado || '';
+    const clientCity = button.dataset.clienteCiudad || '';
+
+    document.getElementById('clienteId').value = button.dataset.clienteId;
+    document.getElementById('nombreCliente').value = button.dataset.clienteNombre;
+    document.getElementById('empresaCliente').value = button.dataset.clienteEmpresa;
+    document.getElementById('correoCliente').value = button.dataset.clienteCorreo;
+    document.getElementById('telefonoCliente').value = button.dataset.clienteTelefono;
+    document.getElementById('direccionCliente').value = button.dataset.clienteDireccion || '';
+    document.getElementById('codigoPostalCliente').value = button.dataset.clienteCodigoPostal || '';
+    elements.countryInput.value = clientCountry;
+    elements.stateManual.value = clientState;
+    elements.cityManual.value = clientCity;
+
+    const canUseGuidedLocation = isUsaCountry(clientCountry) && setGuidedLocation(clientState, clientCity);
+    elements.manualToggle.checked = !canUseGuidedLocation;
+    syncEditLocationMode();
+
+    if (canUseGuidedLocation) {
+        setGuidedLocation(clientState, clientCity);
+    }
 }
 
 // Función para guardar los cambios del cliente
 function guardarEditarCliente() {
-    const form = document.getElementById('formEditarCliente');
     const clienteId = document.getElementById('clienteId').value;
     const empresa = document.getElementById('empresaCliente').value;
     const correo = document.getElementById('correoCliente').value;
     const telefono = document.getElementById('telefonoCliente').value;
+    const direccion = document.getElementById('direccionCliente').value;
+    const codigoPostal = document.getElementById('codigoPostalCliente').value;
+    const locationValues = collectLocationValues();
 
     // Validaciones básicas
-    if (!empresa || !correo || !telefono) {
+    if (!empresa || !correo || !telefono || !direccion || !locationValues.estado || !locationValues.ciudad || !locationValues.pais) {
         alert('Por favor completa todos los campos');
         return;
     }
@@ -101,7 +190,13 @@ function guardarEditarCliente() {
             cliente_id: clienteId,
             empresa: empresa,
             correo: correo,
-            telefono: telefono
+            telefono: telefono,
+            direccion: direccion,
+            codigo_postal: codigoPostal,
+            pais: locationValues.pais,
+            estado: locationValues.estado,
+            ciudad: locationValues.ciudad,
+            manual_location: locationValues.manual_location
         })
     })
     .then(response => response.json())
@@ -218,3 +313,25 @@ function confirmarCambioEstadoCliente() {
 
 window.abrirModalEstadoCliente = abrirModalEstadoCliente;
 window.confirmarCambioEstadoCliente = confirmarCambioEstadoCliente;
+window.abrirEditarCliente = abrirEditarCliente;
+
+const telefonoInput = document.getElementById('telefonoCliente');
+if (telefonoInput) {
+    telefonoInput.addEventListener('input', function() {
+        this.value = this.value.replace(/[^0-9]/g, '');
+        if (this.value.length > 10) {
+            this.value = this.value.slice(0, 10);
+        }
+    });
+}
+
+const countryInput = document.getElementById('paisCliente');
+const manualLocationToggle = document.getElementById('usarDireccionManual');
+if (countryInput) {
+    countryInput.addEventListener('input', syncEditLocationMode);
+    countryInput.addEventListener('change', syncEditLocationMode);
+}
+if (manualLocationToggle) {
+    manualLocationToggle.addEventListener('change', syncEditLocationMode);
+}
+syncEditLocationMode();

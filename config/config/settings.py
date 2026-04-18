@@ -143,6 +143,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'config.config.middleware.RuntimeSchemaRepairMiddleware',
     'config.config.middleware.WwwRedirectMiddleware',
     #'config.middleware.NoCacheMiddleware',
     'corsheaders.middleware.CorsMiddleware',

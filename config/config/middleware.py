@@ -2,6 +2,8 @@ from django.conf import settings
 from django.http import HttpResponsePermanentRedirect, HttpResponseRedirect
 from urllib.parse import quote
 
+from config.usuarios.schema_repair import ensure_runtime_schema
+
 
 class WwwRedirectMiddleware:
     """Redirige www.CANONICAL_DOMAIN → CANONICAL_DOMAIN (301 permanente).
@@ -92,3 +94,13 @@ class ProtectedAreaLoginMiddleware:
 
     def _is_protected_path(self, path):
         return any(path.startswith(prefix) for prefix in self.PROTECTED_PATH_PREFIXES)
+
+
+class RuntimeSchemaRepairMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if not request.path.startswith('/static/') and not request.path.startswith('/media/'):
+            ensure_runtime_schema()
+        return self.get_response(request)

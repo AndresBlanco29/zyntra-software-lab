@@ -1,4 +1,5 @@
 import logging
+import threading
 
 from django.apps import apps
 from django.db import connections
@@ -7,49 +8,66 @@ from django.db.utils import OperationalError, ProgrammingError
 
 logger = logging.getLogger(__name__)
 
+_schema_repair_lock = threading.Lock()
+_schema_repair_attempted = False
 
-def ensure_permission_overrides_column_on_startup():
+
+REPAIRS = (
+    ('usuarios', 'Usuario', 'permission_overrides'),
+    ('clientes', 'Cliente', 'declaracion_fiscal_aceptada'),
+    ('clientes', 'Cliente', 'declaracion_fiscal_aceptada_en'),
+)
+
+
+def ensure_runtime_schema():
+    global _schema_repair_attempted
+
+    with _schema_repair_lock:
+        if _schema_repair_attempted:
+            return
+        _schema_repair_attempted = True
+
     connection = connections['default']
     if connection.vendor != 'mysql':
         return
-
-    usuario_model = apps.get_model('usuarios', 'Usuario')
-    table_name = usuario_model._meta.db_table
 
     try:
         with connection.cursor() as cursor:
             table_names = set(connection.introspection.table_names(cursor))
 
-        if table_name not in table_names:
-            return
+        for app_label, model_name, field_name in REPAIRS:
+            model = apps.get_model(app_label, model_name)
+            table_name = model._meta.db_table
+            if table_name not in table_names:
+                continue
 
-        with connection.cursor() as cursor:
-            existing_columns = {
-                column.name
-                for column in connection.introspection.get_table_description(cursor, table_name)
-            }
+            with connection.cursor() as cursor:
+                existing_columns = {
+                    column.name
+                    for column in connection.introspection.get_table_description(cursor, table_name)
+                }
 
-        if 'permission_overrides' in existing_columns:
-            return
+            if field_name in existing_columns:
+                continue
 
-        with connection.cursor() as cursor:
-            cursor.execute(
-                f"ALTER TABLE `{table_name}` ADD COLUMN `permission_overrides` JSON NULL"
+            field = model._meta.get_field(field_name)
+            with connection.schema_editor() as schema_editor:
+                schema_editor.add_field(model, field)
+
+            logger.warning(
+                "Runtime schema repair added missing %s.%s column",
+                table_name,
+                field_name,
             )
-            cursor.execute(
-                f"UPDATE `{table_name}` SET `permission_overrides` = JSON_OBJECT() WHERE `permission_overrides` IS NULL"
-            )
-
-        logger.warning(
-            "Runtime schema repair added missing %s.permission_overrides column",
-            table_name,
-        )
     except (OperationalError, ProgrammingError) as exc:
         message = str(exc).lower()
         if 'duplicate column' in message or '1060' in message:
             return
         logger.exception(
-            "Runtime schema repair failed for %s.permission_overrides: %s",
-            table_name,
+            "Runtime schema repair failed: %s",
             exc,
         )
+
+
+def ensure_permission_overrides_column_on_startup():
+    ensure_runtime_schema()

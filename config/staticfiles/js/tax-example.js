@@ -1,5 +1,8 @@
 ;(function(){
-  var highlightRect = { x: 54.5, y: 43.5, w: 18.9, h: 9.5 };
+  var highlightRects = {
+    salesTax: { x: 50.2, y: 42.6, w: 18.9, h: 9.5, labelPosition: 'right' },
+    georgia: { x: 39.2, y: 19.0, w: 17.1, h: 6.8, labelPosition: 'right' }
+  };
   var backdropEl = null;
   var currentExampleMode = 'number';
 
@@ -53,7 +56,6 @@
     var titleEl = document.getElementById('taxExampleLabel');
     var noteEl = document.getElementById('taxExampleNote');
     var labelEl = document.getElementById('taxLabel');
-    var highlightEl = document.getElementById('taxHighlight');
 
     currentExampleMode = opener && opener.dataset.taxExampleMode ? opener.dataset.taxExampleMode : 'number';
 
@@ -69,9 +71,9 @@
       labelEl.textContent = opener.dataset.taxExampleLabel;
     }
 
-    if(highlightEl){
+    document.querySelectorAll('[data-tax-highlight]').forEach(function(highlightEl){
       highlightEl.style.display = currentExampleMode === 'certificate' ? 'none' : 'block';
-    }
+    });
   }
 
   function focusSalesTaxInput(){
@@ -84,26 +86,37 @@
   }
 
   function positionHighlight(){
-    var highlight = document.getElementById('taxHighlight');
-    if(!highlight) return;
+    document.querySelectorAll('[data-tax-highlight]').forEach(function(highlight){
+      var key = highlight.getAttribute('data-tax-highlight');
+      var rect = highlightRects[key];
+      if(!rect) return;
 
-    highlight.style.left = highlightRect.x + '%';
-    highlight.style.top = highlightRect.y + '%';
-    highlight.style.width = highlightRect.w + '%';
-    highlight.style.height = highlightRect.h + '%';
+      highlight.style.left = rect.x + '%';
+      highlight.style.top = rect.y + '%';
+      highlight.style.width = rect.w + '%';
+      highlight.style.height = rect.h + '%';
 
-    var label = highlight.querySelector('.tax-label');
-    if(!label) return;
+      var label = highlight.querySelector('.tax-label');
+      if(!label) return;
 
-    if(window.innerWidth <= 576){
-      label.style.left = '50%';
-      label.style.top = '-30px';
-      label.style.transform = 'translateX(-50%)';
-    } else {
+      if(window.innerWidth <= 576){
+        label.style.left = '50%';
+        label.style.top = '-30px';
+        label.style.transform = 'translateX(-50%)';
+        return;
+      }
+
+      if(rect.labelPosition === 'top'){
+        label.style.left = '50%';
+        label.style.top = '-42px';
+        label.style.transform = 'translateX(-50%)';
+        return;
+      }
+
       label.style.left = 'calc(100% + 14px)';
       label.style.top = '50%';
       label.style.transform = 'translateY(-50%)';
-    }
+    });
   }
 
   function initTaxExample(){

@@ -100,7 +100,7 @@
                   id="id_negocio"
                   type="text"
                   class="form-control form-control-lg"
-                  placeholder="{% trans 'ID Negocio (9 Dígitos)*' %}"
+                  placeholder="{% trans 'ID Negocio o ID personal*' %}"
                   name="id_cliente"
                   pattern="[0-9]{9}"
                   maxlength="9"
@@ -393,8 +393,11 @@
                 <div class="tax-example-container">
                   <img id="taxExampleImg" src="{% static 'img/examples/sales_tax_example.png' %}" alt="Ejemplo Sales Tax" class="img-fluid" />
                   <div class="tax-overlay">
-                    <div class="tax-highlight" id="taxHighlight">
+                    <div class="tax-highlight" id="taxHighlight" data-tax-highlight="salesTax">
                       <div class="tax-label" id="taxLabel">{% if CURRENT_LANGUAGE == 'es' %}Aquí va el número de impuesto{% else %}Enter this sales tax number{% endif %}</div>
+                    </div>
+                    <div class="tax-highlight" data-tax-highlight="georgia">
+                      <div class="tax-label">State of Georgia</div>
                     </div>
                   </div>
                 </div>

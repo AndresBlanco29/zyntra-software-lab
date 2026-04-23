@@ -30,7 +30,7 @@
     </div>
 
     <div class="mb-3">
-      <input id="id_negocio_modal" type="text" class="form-control form-control-lg" placeholder="{% trans 'ID Negocio (9 Dígitos)*' %}" name="id_cliente" pattern="[0-9]{9}" maxlength="9" inputmode="numeric" required />
+      <input id="id_negocio_modal" type="text" class="form-control form-control-lg" placeholder="{% if CURRENT_LANGUAGE == 'es' %}ID negocio o ID personal*{% else %}Business ID or personal ID*{% endif %}" name="id_cliente" pattern="[0-9]{9}" maxlength="9" inputmode="numeric" required />
     </div>
 
     <div class="mb-3">
@@ -201,8 +201,11 @@
         <div class="tax-example-container" style="position:relative;">
           <img id="taxExampleImg" src="{% static 'img/examples/sales_tax_example.png' %}" alt="Ejemplo Sales Tax" class="img-fluid" />
           <div class="tax-overlay" style="position:absolute;inset:0;pointer-events:none;">
-            <div class="tax-highlight" id="taxHighlight" style="position:absolute;border:3px solid rgba(255,99,71,0.95);box-shadow:0 8px 24px rgba(0,0,0,0.25);background:rgba(255,99,71,0.06);border-radius:6px;">
+            <div class="tax-highlight" id="taxHighlight" data-tax-highlight="salesTax" style="position:absolute;border:3px solid rgba(255,99,71,0.95);box-shadow:0 8px 24px rgba(0,0,0,0.25);background:rgba(255,99,71,0.06);border-radius:6px;">
               <div class="tax-label" id="taxLabel" style="position:absolute;top:50%;left:calc(100% + 14px);transform:translateY(-50%);padding:6px 10px;background:rgba(255,99,71,0.95);color:#fff;border-radius:6px;font-weight:600;font-size:0.9rem;white-space:nowrap">{% if CURRENT_LANGUAGE == 'es' %}Aquí va el número de impuesto{% else %}Enter this sales tax number{% endif %}</div>
+            </div>
+            <div class="tax-highlight" data-tax-highlight="georgia" style="position:absolute;border:3px solid rgba(25,135,84,0.95);box-shadow:0 8px 24px rgba(0,0,0,0.2);background:rgba(25,135,84,0.08);border-radius:6px;">
+              <div class="tax-label" style="position:absolute;padding:6px 10px;background:rgba(25,135,84,0.95);color:#fff;border-radius:6px;font-weight:600;font-size:0.9rem;white-space:nowrap">State of Georgia</div>
             </div>
           </div>
         </div>
@@ -424,45 +427,4 @@ window.mostrarMensajeExito = function() {
   }
 };
 
-// Position the highlight box over the example image when modal opens
-;(function(){
-  var modalEl = null;
-  try{ modalEl = document.getElementById('taxExampleModal'); }catch(e){}
-  if(!modalEl) return;
-
-  var highlightRect = { x: 54.5, y: 43.5, w: 18.9, h: 9.5 };
-
-  function positionHighlight(){
-    var img = document.getElementById('taxExampleImg');
-    var highlight = document.getElementById('taxHighlight');
-    if(!img || !highlight) return;
-
-    highlight.style.left = highlightRect.x + '%';
-    highlight.style.top = highlightRect.y + '%';
-    highlight.style.width = highlightRect.w + '%';
-    highlight.style.height = highlightRect.h + '%';
-  }
-
-  modalEl.addEventListener('shown.bs.modal', function(){
-    positionHighlight();
-  });
-
-  modalEl.addEventListener('hidden.bs.modal', function(){
-    var activeParentModal = document.querySelector('.modal.show:not(#taxExampleModal)');
-    if (activeParentModal) {
-      document.body.classList.add('modal-open');
-    }
-
-    window.setTimeout(function(){
-      var targetInput = document.getElementById('id_sales_tax_modal') || document.getElementById('id_sales_tax');
-      if (targetInput) {
-        targetInput.focus();
-      }
-    }, 150);
-  });
-  window.addEventListener('resize', function(){
-    var inst = bootstrap.Modal.getInstance(modalEl);
-    if(inst && inst._isShown){ positionHighlight(); }
-  });
-})();
 </script>

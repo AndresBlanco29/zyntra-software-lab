@@ -1,29 +1,24 @@
-<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"></head>
-<body style="font-family: Arial, sans-serif; background:#f5f7fb; padding:24px;">
-  <table width="100%" cellpadding="0" cellspacing="0">
-    <tr><td align="center">
-      <table width="700" style="background:#ffffff; border-radius:10px; overflow:hidden;">
-        <tr>
-          <td style="padding:20px; background:#0b3d91; color:#fff; text-align:center;">
-            <h2 style="margin:0;">Pedido Listo para Confirmar</h2>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:20px;">
-            <p>Hola {{ cliente.usuario.first_name|default:cliente.nombre_empresa }},</p>
-            <p>Tu pedido <strong>#{{ cotizacion.id }}</strong> ya tiene precios definidos y esta listo para continuar con la orden de compra.</p>
-            <p>
-              <a href="{{ confirm_url }}" style="display:inline-block; background:#ffd400; color:#1f2937; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;">Ir a Pedidos Recibidos</a>
-            </p>
-            <p>En el panel de cliente, entra a <strong>Pedidos Recibidos</strong> y revisa el pedido para confirmarlo o cancelarlo.</p>
-            <p>Tambien puedes copiar este enlace en tu navegador:</p>
-            <p style="word-break:break-all; color:#334155;">{{ confirm_url }}</p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>
+{% extends "emails/base_email.html" %}
+
+{% block preheader %}Tu pedido #{{ cotizacion.id }} ya está listo para revisión y confirmación.{% endblock %}
+{% block header_title %}Pedido listo para confirmar{% endblock %}
+{% block header_subtitle %}Revisa tu pedido y confirma si todo está correcto para generar la orden de compra.{% endblock %}
+
+{% block content %}
+<p style="margin:0 0 14px 0; font-size:15px; line-height:1.7;">Hola {{ cliente.usuario.first_name|default:cliente.nombre_empresa }},</p>
+<p style="margin:0 0 16px 0; font-size:15px; line-height:1.7;">Tu pedido <strong>#{{ cotizacion.id }}</strong> ya tiene precios definidos y está listo para continuar con la orden de compra.</p>
+
+<div style="margin:22px 0; text-align:center;">
+  <a href="{{ confirm_url }}" style="display:inline-block; background:#ffd400; color:#1e293b; padding:14px 24px; text-decoration:none; border-radius:10px; font-size:14px; font-weight:700;">Ir a Pedidos Recibidos</a>
+</div>
+
+<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px 18px; margin-top:20px;">
+  <div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-bottom:8px;">Siguiente paso</div>
+  <div style="font-size:14px; line-height:1.7; color:#1e293b;">En el panel de cliente entra a <strong>Pedidos Recibidos</strong> y revisa el pedido para confirmarlo o cancelarlo.</div>
+</div>
+
+<div style="margin-top:20px; font-size:14px; line-height:1.7; color:#475569;">
+  <div style="margin-bottom:8px;"><strong>Enlace directo:</strong></div>
+  <div style="word-break:break-all; color:#0b3d91;">{{ confirm_url }}</div>
+</div>
+{% endblock %}

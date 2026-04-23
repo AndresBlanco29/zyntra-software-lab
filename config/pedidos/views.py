@@ -9,13 +9,21 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.db import transaction
 from django.utils.translation import gettext as _
 
+from config.core.pdf_branding import (
+	BRAND_BORDER,
+	BRAND_MUTED_TEXT,
+	BRAND_PRIMARY,
+	BRAND_SURFACE,
+	BRAND_TEXT,
+	build_pdf_brand_banner,
+)
 from config.usuarios.permissions import internal_permission_required
 from config.usuarios.models import Usuario
 from config.inventario.services import ajustar_reserva_item_pedido, cancelar_pedido_con_inventario, eliminar_item_pedido_con_inventario, reservar_stock_para_pedido_items
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from config.cotizaciones.models import Cotizacion
@@ -314,16 +322,29 @@ def backoffice_picking_pdf(request, pedido_id):
 	buffer = BytesIO()
 	document = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36)
 	styles = getSampleStyleSheet()
+	summary_label_style = ParagraphStyle('PickingSummaryLabel', parent=styles['BodyText'], fontName='Helvetica-Bold', fontSize=9, textColor=BRAND_MUTED_TEXT, leading=11)
+	summary_value_style = ParagraphStyle('PickingSummaryValue', parent=styles['BodyText'], fontSize=10, textColor=BRAND_TEXT, leading=12)
 
 	content = [
-		Paragraph(f'{_("Picking Ticket")} - PO #{pedido.id}', styles['Title']),
+		build_pdf_brand_banner(styles=styles, title=_("Picking Ticket"), subtitle=f'PO #{pedido.id}', total_width=540),
 		Spacer(1, 12),
-		Paragraph(f'{_("Customer")}: {pedido.cliente.nombre_empresa}', styles['Normal']),
-		Paragraph(f'{_("Contact")}: {pedido.cliente.usuario.get_full_name() or pedido.cliente.usuario.username}', styles['Normal']),
-		Paragraph(f'{_("Status")}: {_pedido_state_label(pedido.estado)}', styles['Normal']),
-		Paragraph(f'{_("Customer note")}: {pedido.nota_cliente or "-"}', styles['Normal']),
+		Table([
+			[Paragraph(_("Customer"), summary_label_style), Paragraph(pedido.cliente.nombre_empresa, summary_value_style)],
+			[Paragraph(_("Contact"), summary_label_style), Paragraph(pedido.cliente.usuario.get_full_name() or pedido.cliente.usuario.username, summary_value_style)],
+			[Paragraph(_("Status"), summary_label_style), Paragraph(_pedido_state_label(pedido.estado), summary_value_style)],
+			[Paragraph(_("Customer note"), summary_label_style), Paragraph(pedido.nota_cliente or '-', summary_value_style)],
+		], colWidths=[120, 384]),
 		Spacer(1, 16),
 	]
+	content[2].setStyle(TableStyle([
+		('BOX', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('INNERGRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('BACKGROUND', (0, 0), (-1, -1), BRAND_SURFACE),
+		('LEFTPADDING', (0, 0), (-1, -1), 10),
+		('RIGHTPADDING', (0, 0), (-1, -1), 10),
+		('TOPPADDING', (0, 0), (-1, -1), 8),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+	]))
 
 	rows = [[_('Product'), _('Presentation'), _('Quantity'), _('Warehouse check')]]
 	for item in pedido.items.all():
@@ -336,11 +357,11 @@ def backoffice_picking_pdf(request, pedido_id):
 
 	table = Table(rows, colWidths=[180, 140, 70, 120])
 	table.setStyle(TableStyle([
-		('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0b3d91')),
+		('BACKGROUND', (0, 0), (-1, 0), BRAND_PRIMARY),
 		('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
 		('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-		('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
-		('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
+		('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, BRAND_SURFACE]),
 		('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
 		('BOTTOMPADDING', (0, 0), (-1, -1), 8),
 		('TOPPADDING', (0, 0), (-1, -1), 8),

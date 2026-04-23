@@ -169,6 +169,45 @@ def _build_quote_item_rows(cotizacion):
     return rows, display_total
 
 
+def _get_generated_order_from_quote(cotizacion):
+    try:
+        return cotizacion.pedido_generado
+    except Pedido.DoesNotExist:
+        return None
+
+
+def _build_order_items_payload_from_quote(cotizacion):
+    items_payload = []
+    for item in cotizacion.items.select_related('presentacion__producto'):
+        items_payload.append({
+            'presentacion': item.presentacion,
+            'cantidad': item.cantidad,
+            'precio': item.precio,
+        })
+    return items_payload
+
+
+def _create_purchase_order_from_quote(*, cotizacion, items_payload, nota_cliente, origen, canal_toma, acepta_terminos):
+    pedido = crear_pedido_desde_items(
+        cliente=cotizacion.cliente,
+        items_payload=items_payload,
+        origen=origen,
+        vendedor=cotizacion.vendedor,
+        cotizacion=cotizacion,
+        nota_cliente=nota_cliente,
+        acepta_terminos=acepta_terminos,
+        canal_toma=canal_toma,
+        bypass_stock_check=True,
+        reservar_inventario=False,
+    )
+
+    cotizacion.estado = 'CONFIRMADA_CLIENTE'
+    cotizacion.total = pedido.total
+    cotizacion.nota_confirmacion_cliente = nota_cliente
+    cotizacion.save(update_fields=['estado', 'total', 'nota_confirmacion_cliente'])
+    return pedido
+
+
 def _cliente_from_user(user):
     return get_object_or_404(Cliente.objects.select_related('usuario'), usuario=user)
 
@@ -447,6 +486,7 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
         Cotizacion.objects.select_related('cliente__usuario').prefetch_related('items__presentacion__producto'),
         id=cotizacion_id,
     )
+    pedido_existente = _get_generated_order_from_quote(cotizacion)
 
     if request.method == 'POST':
         if not request.user.has_internal_permission('backoffice.quotes.manage'):
@@ -493,12 +533,17 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
     confirm_url, telefono_contacto, whatsapp_link, outbound_message = _get_whatsapp_contact_data(cotizacion, request)
     cotizacion_item_rows, display_total = _build_quote_item_rows(cotizacion)
     can_send_customer_quote = _is_quote_send_ready(request.session, cotizacion.id)
+    can_generate_backoffice_order = bool(
+        cotizacion.backoffice_pricing_confirmed and cotizacion.items.exists() and pedido_existente is None
+    )
 
     context = {
         'cotizacion': cotizacion,
+        'pedido_existente': pedido_existente,
         'cotizacion_item_rows': cotizacion_item_rows,
         'display_total': display_total,
         'can_send_customer_quote': can_send_customer_quote,
+        'can_generate_backoffice_order': can_generate_backoffice_order,
         'confirm_url': confirm_url,
         'telefono_contacto': telefono_contacto,
         'whatsapp_link': whatsapp_link,
@@ -613,6 +658,77 @@ def abrir_whatsapp_manual_cotizacion(request, cotizacion_id):
     return HttpResponseRedirect(whatsapp_link)
 
 
+@login_required
+@require_POST
+@internal_permission_required('backoffice.orders.manage')
+def generar_pedido_desde_cotizacion(request, cotizacion_id):
+    cotizacion = get_object_or_404(
+        Cotizacion.objects.select_related('cliente__usuario').prefetch_related('items__presentacion__producto'),
+        id=cotizacion_id,
+    )
+
+    pedido_existente = _get_generated_order_from_quote(cotizacion)
+    if pedido_existente is not None:
+        messages.info(
+            request,
+            _('This quote already has purchase order #%(id)s generated.') % {'id': pedido_existente.id},
+        )
+        return redirect('backoffice_pedido_detalle', pedido_id=pedido_existente.id)
+
+    if not cotizacion.items.exists():
+        messages.error(request, _('The order has no products to generate a purchase order.'))
+        return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
+
+    if not cotizacion.backoffice_pricing_confirmed:
+        messages.warning(request, _('Save and confirm the quote pricing before generating the purchase order.'))
+        return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
+
+    items_payload = _build_order_items_payload_from_quote(cotizacion)
+    if not items_payload:
+        messages.error(request, _('You must leave at least one product to create the purchase order.'))
+        return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
+
+    nota_cliente = (cotizacion.nota_confirmacion_cliente or '').strip()
+    if not nota_cliente:
+        nota_cliente = _('Order confirmed with the customer by BackOffice.')
+
+    with transaction.atomic():
+        pedido = _create_purchase_order_from_quote(
+            cotizacion=cotizacion,
+            items_payload=items_payload,
+            nota_cliente=nota_cliente,
+            origen='CLIENTE',
+            canal_toma='backoffice',
+            acepta_terminos=True,
+        )
+
+    try:
+        notificar_backoffice_pedido(pedido)
+    except Exception as exc:
+        logger.exception('Error notificando pedido generado desde BackOffice %s: %s', pedido.id, exc)
+
+    cliente_notificado = False
+    try:
+        cliente_notificado = notificar_cliente_pedido(pedido)
+    except Exception as exc:
+        logger.exception('Error notificando al cliente sobre el pedido %s generado desde BackOffice: %s', pedido.id, exc)
+
+    _set_quote_send_ready(request.session, cotizacion.id, False)
+
+    if cliente_notificado:
+        messages.success(
+            request,
+            _('Purchase order #%(id)s was generated successfully and the customer was notified.') % {'id': pedido.id},
+        )
+    else:
+        messages.warning(
+            request,
+            _('Purchase order #%(id)s was generated, but the customer email could not be sent.') % {'id': pedido.id},
+        )
+
+    return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+
 def cliente_cotizaciones_recibidas(request):
     if not request.user.is_authenticated:
         return _redirect_to_home_login(request)
@@ -662,10 +778,7 @@ def cliente_cotizacion_recibida_detalle(request, token):
         cliente=cliente,
     )
 
-    try:
-        pedido_existente = cotizacion.pedido_generado
-    except Pedido.DoesNotExist:
-        pedido_existente = None
+    pedido_existente = _get_generated_order_from_quote(cotizacion)
 
     puede_editar = cotizacion.estado == 'LISTA_PARA_CONFIRMACION' and pedido_existente is None
 
@@ -721,21 +834,14 @@ def cliente_cotizacion_recibida_detalle(request, token):
                 messages.error(request, _('You must accept the terms and prices to continue with the order.'))
                 return redirect('cliente_cotizacion_recibida_detalle', token=cotizacion.token_cliente)
 
-            pedido = crear_pedido_desde_items(
-                cliente=cliente,
-                items_payload=items_payload,
-                origen='CLIENTE',
-                vendedor=cotizacion.vendedor,
+            pedido = _create_purchase_order_from_quote(
                 cotizacion=cotizacion,
+                items_payload=items_payload,
                 nota_cliente=nota_cliente,
-                acepta_terminos=True,
+                origen='CLIENTE',
                 canal_toma='portal',
-                bypass_stock_check=True,
-                reservar_inventario=False,
+                acepta_terminos=True,
             )
-
-            cotizacion.estado = 'CONFIRMADA_CLIENTE'
-            cotizacion.save(update_fields=['estado', 'total', 'nota_confirmacion_cliente'])
 
         try:
             notificar_backoffice_pedido(pedido)

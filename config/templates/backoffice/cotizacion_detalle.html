@@ -94,8 +94,24 @@
           <button type="submit" class="btn btn-warning w-100 quote-send-email-button" {% if not can_send_customer_quote %}disabled{% endif %}>{% trans "Send quote to customer" %}</button>
         </form>
 
+        <form method="post" action="{% url 'generar_pedido_desde_cotizacion' cotizacion.id %}" class="mt-2">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-success w-100" {% if not can_generate_backoffice_order %}disabled{% endif %}>{% trans "Generate purchase order" %}</button>
+        </form>
+
         {% if not can_send_customer_quote %}
         <div class="small text-muted mt-2">{% trans "Save the quote changes first to enable the official email delivery." %}</div>
+        {% endif %}
+
+        {% if not can_generate_backoffice_order and not pedido_existente %}
+        <div class="small text-muted mt-2">{% trans "Save and confirm the quote pricing first to generate the purchase order from BackOffice." %}</div>
+        {% endif %}
+
+        {% if pedido_existente %}
+        <div class="alert alert-success mt-3 mb-0">
+          {% blocktrans with pedido_id=pedido_existente.id %}Purchase order #{{ pedido_id }} has already been generated for this quote.{% endblocktrans %}
+          <a href="{% url 'backoffice_pedido_detalle' pedido_existente.id %}" class="alert-link">{% trans "Open order" %}</a>
+        </div>
         {% endif %}
 
         <div class="mt-3 small">

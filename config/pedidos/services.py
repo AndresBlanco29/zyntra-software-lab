@@ -224,7 +224,7 @@ def notificar_backoffice_pedido(pedido):
 def notificar_cliente_pedido(pedido):
     cliente_email = getattr(getattr(pedido.cliente, 'usuario', None), 'email', '')
     if not cliente_email:
-        return
+        return False
 
     html_content = render_to_string(
         'emails/pedido_cliente_confirmado.html',
@@ -234,12 +234,15 @@ def notificar_cliente_pedido(pedido):
             'items': pedido.items.select_related('presentacion__producto').all(),
         },
     )
-    text_content = _('Your purchase order #%(id)s was received successfully.') % {'id': pedido.id}
+    text_content = _('Your purchase order #%(id)s was generated successfully and is now being prepared for dispatch.') % {
+        'id': pedido.id,
+    }
     email = EmailMultiAlternatives(
-        subject=_('Purchase order received #%(id)s') % {'id': pedido.id},
+        subject=_('Purchase order in process #%(id)s') % {'id': pedido.id},
         body=text_content,
         from_email=settings.DEFAULT_FROM_EMAIL or settings.SERVER_EMAIL,
         to=[cliente_email],
     )
     email.attach_alternative(html_content, 'text/html')
     email.send(fail_silently=False)
+    return True

@@ -18,6 +18,15 @@ from reportlab.lib.pagesizes import landscape, letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from config.core.pdf_branding import (
+	BRAND_BORDER,
+	BRAND_MUTED_TEXT,
+	BRAND_PRIMARY,
+	BRAND_SOFT_BLUE,
+	BRAND_SURFACE,
+	BRAND_TEXT,
+	build_pdf_brand_banner,
+)
 from config.notificaciones.models import Notificacion
 from config.pedidos.models import Pedido
 from config.usuarios.models import Usuario
@@ -194,10 +203,10 @@ def _invoice_pdf_response(invoice):
 	buffer = BytesIO()
 	document = SimpleDocTemplate(buffer, pagesize=landscape(letter), leftMargin=28, rightMargin=28, topMargin=28, bottomMargin=28)
 	styles = getSampleStyleSheet()
-	meta_label_style = ParagraphStyle('InvoiceMetaLabel', parent=styles['BodyText'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#475569'), leading=11)
-	meta_value_style = ParagraphStyle('InvoiceMetaValue', parent=styles['BodyText'], fontSize=10, leading=12)
-	section_title_style = ParagraphStyle('InvoiceSectionTitle', parent=styles['Heading4'], fontName='Helvetica-Bold', fontSize=10, textColor=colors.HexColor('#0f172a'), spaceAfter=4)
-	note_style = ParagraphStyle('InvoiceNote', parent=styles['BodyText'], fontSize=8, textColor=colors.HexColor('#64748b'), leading=10)
+	meta_label_style = ParagraphStyle('InvoiceMetaLabel', parent=styles['BodyText'], fontName='Helvetica-Bold', fontSize=9, textColor=BRAND_MUTED_TEXT, leading=11)
+	meta_value_style = ParagraphStyle('InvoiceMetaValue', parent=styles['BodyText'], fontSize=10, leading=12, textColor=BRAND_TEXT)
+	section_title_style = ParagraphStyle('InvoiceSectionTitle', parent=styles['Heading4'], fontName='Helvetica-Bold', fontSize=10, textColor=BRAND_TEXT, spaceAfter=4)
+	note_style = ParagraphStyle('InvoiceNote', parent=styles['BodyText'], fontSize=8, textColor=BRAND_MUTED_TEXT, leading=10)
 
 	sales_rep = '-'
 	if invoice.pedido.vendedor_id:
@@ -213,32 +222,26 @@ def _invoice_pdf_response(invoice):
 	item_rows = _build_invoice_pdf_item_data(invoice)
 
 	content = []
-
-	header_table = Table([
-		[
-			Paragraph(f'<font size="20"><b>Invoice</b></font><br/><font size="12">{invoice.numero}</font>', styles['BodyText']),
-			Table([
-				[Paragraph(_('Customer no.'), meta_label_style), Paragraph(str(invoice.cliente_id), meta_value_style), Paragraph(_('Date'), meta_label_style), Paragraph(timezone.localtime(invoice.creada_en).strftime('%m/%d/%Y'), meta_value_style)],
-				[Paragraph(_('Order no.'), meta_label_style), Paragraph(str(invoice.pedido_id), meta_value_style), Paragraph(_('Generated on'), meta_label_style), Paragraph(timezone.localtime(invoice.creada_en).strftime('%m/%d/%Y %H:%M'), meta_value_style)],
-				[Paragraph(_('Sales rep'), meta_label_style), Paragraph(sales_rep, meta_value_style), Paragraph(_('Driver'), meta_label_style), Paragraph(driver_name, meta_value_style)],
-			], colWidths=[72, 120, 78, 120]),
-		],
-	], colWidths=[220, 470])
-	header_table.setStyle(TableStyle([
-		('VALIGN', (0, 0), (-1, -1), 'TOP'),
-		('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#0b3d91')),
-		('TEXTCOLOR', (0, 0), (0, 0), colors.white),
-		('LEFTPADDING', (0, 0), (0, 0), 14),
-		('RIGHTPADDING', (0, 0), (0, 0), 14),
-		('TOPPADDING', (0, 0), (0, 0), 12),
-		('BOTTOMPADDING', (0, 0), (0, 0), 12),
-		('BOX', (1, 0), (1, 0), 0.5, colors.HexColor('#cbd5e1')),
-		('LEFTPADDING', (1, 0), (1, 0), 10),
-		('RIGHTPADDING', (1, 0), (1, 0), 10),
-		('TOPPADDING', (1, 0), (1, 0), 8),
-		('BOTTOMPADDING', (1, 0), (1, 0), 8),
+	meta_table = Table([
+		[Paragraph(_('Customer no.'), meta_label_style), Paragraph(str(invoice.cliente_id), meta_value_style), Paragraph(_('Date'), meta_label_style), Paragraph(timezone.localtime(invoice.creada_en).strftime('%m/%d/%Y'), meta_value_style)],
+		[Paragraph(_('Order no.'), meta_label_style), Paragraph(str(invoice.pedido_id), meta_value_style), Paragraph(_('Generated on'), meta_label_style), Paragraph(timezone.localtime(invoice.creada_en).strftime('%m/%d/%Y %H:%M'), meta_value_style)],
+		[Paragraph(_('Sales rep'), meta_label_style), Paragraph(sales_rep, meta_value_style), Paragraph(_('Driver'), meta_label_style), Paragraph(driver_name, meta_value_style)],
+	], colWidths=[72, 120, 78, 120])
+	meta_table.setStyle(TableStyle([
+		('BOX', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('INNERGRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('BACKGROUND', (0, 0), (-1, -1), BRAND_SURFACE),
+		('LEFTPADDING', (0, 0), (-1, -1), 10),
+		('RIGHTPADDING', (0, 0), (-1, -1), 10),
+		('TOPPADDING', (0, 0), (-1, -1), 8),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 8),
 	]))
-	content.extend([header_table, Spacer(1, 12)])
+	content.extend([
+		build_pdf_brand_banner(styles=styles, title=_('Invoice'), subtitle=f'{invoice.numero}', total_width=736),
+		Spacer(1, 12),
+		meta_table,
+		Spacer(1, 12),
+	])
 
 	party_table = Table([
 		[
@@ -257,9 +260,9 @@ def _invoice_pdf_response(invoice):
 		],
 	], colWidths=[235, 235, 220])
 	party_table.setStyle(TableStyle([
-		('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
-		('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
-		('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f8fafc')),
+		('BOX', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('INNERGRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('BACKGROUND', (0, 0), (-1, -1), BRAND_SURFACE),
 		('VALIGN', (0, 0), (-1, -1), 'TOP'),
 		('LEFTPADDING', (0, 0), (-1, -1), 10),
 		('RIGHTPADDING', (0, 0), (-1, -1), 10),
@@ -288,11 +291,11 @@ def _invoice_pdf_response(invoice):
 
 	table = Table(rows, colWidths=[130, 200, 95, 42, 82, 94, 78], repeatRows=1)
 	table.setStyle(TableStyle([
-		('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0b3d91')),
+		('BACKGROUND', (0, 0), (-1, 0), BRAND_PRIMARY),
 		('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
 		('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-		('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
-		('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8fafc')]),
+		('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, BRAND_SURFACE]),
 		('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
 		('ALIGN', (3, 1), (-1, -1), 'CENTER'),
 		('BOTTOMPADDING', (0, 0), (-1, -1), 8),
@@ -308,10 +311,10 @@ def _invoice_pdf_response(invoice):
 		[Paragraph(_('Customer balance'), section_title_style), Paragraph(f'<b>{_format_pdf_money(invoice.saldo_cliente)}</b>', styles['BodyText'])],
 	], colWidths=[110, 120])
 	totals_table.setStyle(TableStyle([
-		('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e1')),
-		('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
-		('BACKGROUND', (0, 0), (-1, -2), colors.HexColor('#f8fafc')),
-		('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#dbeafe')),
+		('BOX', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('INNERGRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('BACKGROUND', (0, 0), (-1, -2), BRAND_SURFACE),
+		('BACKGROUND', (0, -1), (-1, -1), BRAND_SOFT_BLUE),
 		('LEFTPADDING', (0, 0), (-1, -1), 10),
 		('RIGHTPADDING', (0, 0), (-1, -1), 10),
 		('TOPPADDING', (0, 0), (-1, -1), 7),

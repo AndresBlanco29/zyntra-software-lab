@@ -1,20 +1,32 @@
 from decimal import Decimal
 
 from django.conf import settings
+from django.core import mail
 from django.test import TestCase
 from django.urls import reverse
 from django.contrib.messages import get_messages
 
 from config.clientes.models import Cliente
 from config.cotizaciones.models import Cotizacion, CotizacionItem
+from config.pedidos.models import Pedido
 from config.productos.models import Categoria, ConfiguracionPrecios, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
 
 
 class BackofficeQuotePricingTests(TestCase):
 	def setUp(self):
-		self.backoffice = Usuario.objects.create_user(username='backoffice-quote-prices', password='secret123', role='backoffice')
-		self.customer_user = Usuario.objects.create_user(username='cliente-quote-prices', password='secret123', role='cliente')
+		self.backoffice = Usuario.objects.create_user(
+			username='backoffice-quote-prices',
+			password='secret123',
+			role='backoffice',
+			email='backoffice-quotes@example.com',
+		)
+		self.customer_user = Usuario.objects.create_user(
+			username='cliente-quote-prices',
+			password='secret123',
+			role='cliente',
+			email='cliente-quotes@example.com',
+		)
 		self.cliente = Cliente.objects.create(
 			usuario=self.customer_user,
 			nombre_empresa='Cliente Cotizacion',
@@ -317,6 +329,49 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertRedirects(response, reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]))
 		item.refresh_from_db()
 		self.assertEqual(item.precio, self.presentacion.precio_1)
+
+	def test_backoffice_can_generate_purchase_order_from_quote_and_notify_customer(self):
+		self.client.force_login(self.backoffice)
+		item = self.cotizacion.items.first()
+
+		update_response = self.client.post(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]), {
+			f'cantidad_{item.id}': '2',
+			f'precio_{item.id}': '142.86',
+			'nota_backoffice': 'Cliente confirmo por telefono',
+		})
+
+		self.assertRedirects(update_response, f"{reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id])}?saved=1")
+
+		response = self.client.post(reverse('generar_pedido_desde_cotizacion', args=[self.cotizacion.id]))
+
+		pedido = Pedido.objects.get(cotizacion=self.cotizacion)
+		self.assertRedirects(response, reverse('backoffice_pedido_detalle', args=[pedido.id]))
+		self.cotizacion.refresh_from_db()
+		self.assertEqual(self.cotizacion.estado, 'CONFIRMADA_CLIENTE')
+		self.assertEqual(self.cotizacion.total, pedido.total)
+		self.assertEqual(pedido.origen, 'CLIENTE')
+		self.assertEqual(pedido.canal_toma, 'backoffice')
+		self.assertTrue(pedido.acepta_terminos)
+		self.assertEqual(len(mail.outbox), 2)
+		self.assertIn('Purchase order in process', mail.outbox[-1].subject)
+		self.assertIn('generated successfully', mail.outbox[-1].body)
+
+	def test_backoffice_cannot_generate_duplicate_purchase_order_from_quote(self):
+		pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			vendedor=self.cotizacion.vendedor,
+			cotizacion=self.cotizacion,
+			origen='CLIENTE',
+			canal_toma='portal',
+			estado='RECIBIDO',
+			total=Decimal('25.00'),
+		)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('generar_pedido_desde_cotizacion', args=[self.cotizacion.id]))
+
+		self.assertRedirects(response, reverse('backoffice_pedido_detalle', args=[pedido.id]))
+		self.assertEqual(Pedido.objects.filter(cotizacion=self.cotizacion).count(), 1)
 
 
 class CustomerReceivedQuotesViewTests(TestCase):

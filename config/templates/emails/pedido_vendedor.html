@@ -1,167 +1,50 @@
-<!DOCTYPE html>
+{% extends "emails/base_email.html" %}
 
-<html>
-<head>
-<meta charset="UTF-8">
-</head>
+{% block preheader %}Nuevo pedido registrado para el cliente {{ cliente.nombre_empresa }}.{% endblock %}
+{% block header_title %}Nuevo pedido registrado{% endblock %}
+{% block header_subtitle %}Resumen del pedido generado desde el sistema de ventas.{% endblock %}
 
-<body style="font-family: Arial, sans-serif; background:#f4f6f9; padding:30px;">
+{% block content %}
+<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px 18px; margin-bottom:22px;">
+	<div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-bottom:10px;">Datos del cliente</div>
+	<table width="100%" cellspacing="0" cellpadding="0" role="presentation" style="font-size:14px; color:#1e293b;">
+		<tr><td style="padding:5px 0; width:120px;"><strong>Cliente:</strong></td><td>{{ cliente.nombre_empresa }}</td></tr>
+		<tr><td style="padding:5px 0;"><strong>Contacto:</strong></td><td>{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}</td></tr>
+		<tr><td style="padding:5px 0;"><strong>Teléfono:</strong></td><td>{{ cliente.telefono }}</td></tr>
+		<tr><td style="padding:5px 0;"><strong>Email:</strong></td><td>{{ cliente.usuario.email }}</td></tr>
+		<tr><td style="padding:5px 0;"><strong>Vendedor:</strong></td><td>{{ vendedor }}</td></tr>
+		<tr>
+			<td style="padding:5px 0;"><strong>Tipo de orden:</strong></td>
+			<td>{% if tipo_orden == "telefono" %}Orden telefónica{% elif tipo_orden == "personal" %}Orden tomada en persona{% else %}-{% endif %}</td>
+		</tr>
+		<tr><td style="padding:5px 0;"><strong>Fecha:</strong></td><td>{{ fecha|date:"F d, Y - h:i A" }}</td></tr>
+	</table>
+</div>
 
-<table width="100%" cellspacing="0" cellpadding="0">
-<tr>
-<td align="center">
-
-<table width="700" style="background:white;border-radius:10px;overflow:hidden;box-shadow:0px 10px 25px rgba(0,0,0,0.1);">
-
-<!-- HEADER -->
-
-<tr>
-<td style="background:linear-gradient(90deg,#023B82,#0C64CF,#3F89DA); padding:25px; text-align:center; color:white;">
-
-<h2 style="margin:0;">La Tortilla Grocery</h2>
-<p style="margin:5px 0 0 0;">Nuevo pedido registrado</p>
-
-</td>
-</tr>
-
-<!-- DATOS DEL CLIENTE -->
-
-<tr>
-<td style="padding:25px;">
-
-<h3 style="margin-top:0;">Datos del cliente</h3>
-
-<table width="100%" style="font-size:14px">
-
-<tr>
-<td style="padding:5px;"><strong>Cliente:</strong></td>
-<td>{{ cliente.nombre_empresa }}</td>
-</tr>
-
-<tr>
-<td style="padding:5px;"><strong>Contacto:</strong></td>
-<td>{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}</td>
-</tr>
-
-<tr>
-<td style="padding:5px;"><strong>Teléfono:</strong></td>
-<td>{{ cliente.telefono }}</td>
-</tr>
-
-<tr>
-<td style="padding:5px;"><strong>Email:</strong></td>
-<td>{{ cliente.usuario.email }}</td>
-</tr>
-
-<tr>
-<td style="padding:5px;"><strong>Vendedor:</strong></td>
-<td>{{ vendedor }}</td>
-</tr>
-
-<tr>
-<td style="padding:6px 0;"><strong>Tipo de orden:</strong></td>
-<td>
-{% if tipo_orden == "telefono" %}
-Orden telefónica
-{% else %}
-	{% if tipo_orden == "personal" %}
-		Orden tomada en persona
-	{% endif %}
-{% endif %}
-</td>
-</tr>
-
-<tr>
-<td style="padding:5px;"><strong>Fecha:</strong></td>
-<td>{{ fecha|date:"F d, Y - h:i A" }}</td>
-</tr>
-
+<table width="100%" cellpadding="10" cellspacing="0" role="presentation" style="border-collapse:collapse; font-size:14px; border:1px solid #cbd5e1; border-radius:12px; overflow:hidden;">
+	<tr style="background:#0b3d91; color:#ffffff;">
+		<th align="left">Producto</th>
+		<th align="center">Presentación</th>
+		<th align="center">Cantidad</th>
+		<th align="center">Precio</th>
+		<th align="center">Subtotal</th>
+	</tr>
+	{% for item in items %}
+	<tr style="border-bottom:1px solid #e2e8f0; background:{% cycle '#ffffff' '#f8fafc' %};">
+		<td><strong>{{ item.presentacion.producto.nombre }}</strong></td>
+		<td align="center">{{ item.presentacion.nombre }}<br><span style="font-size:12px; color:#64748b;">{{ item.presentacion.unidades }} {{ item.presentacion.tipo_contenido }}</span></td>
+		<td align="center">{{ item.cantidad }}</td>
+		<td align="center">${{ item.precio|floatformat:2 }}</td>
+		<td align="center">${{ item.subtotal }}</td>
+	</tr>
+	{% endfor %}
+	<tr style="background:#dbeafe;">
+		<td colspan="4" align="right" style="padding-top:15px;"><strong>Total del pedido:</strong></td>
+		<td align="center" style="padding-top:15px;"><strong>${{ total }}</strong></td>
+	</tr>
 </table>
+{% endblock %}
 
-</td>
-</tr>
-
-<!-- PRODUCTOS -->
-
-<tr>
-<td style="padding:25px;">
-
-<h3>Productos del pedido</h3>
-
-<table width="100%" cellpadding="10" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
-
-<tr style="background:#f1f1f1;">
-<th align="left">Producto</th>
-<th align="center">Presentación</th>
-<th align="center">Cantidad</th>
-<th align="center">Precio</th>
-<th align="center">Subtotal</th>
-</tr>
-
-{% for item in items %}
-
-<tr style="border-bottom:1px solid #e5e5e5;">
-
-<td>
-<strong>{{ item.presentacion.producto.nombre }}</strong>
-</td>
-
-<td align="center">
-{{ item.presentacion.nombre }}<br>
-<small>
-{{ item.presentacion.unidades }} {{ item.presentacion.tipo_contenido }}
-</small>
-</td>
-
-<td align="center">
-{{ item.cantidad }}
-</td>
-
-<td align="center">
-${{ item.precio|floatformat:2 }}
-</td>
-
-<td align="center">
-${{ item.subtotal }}
-</td>
-
-</tr>
-
-{% endfor %}
-
-<tr>
-<td colspan="4" align="right" style="padding-top:15px;">
-<strong>Total del pedido:</strong>
-</td>
-
-<td align="center" style="padding-top:15px;">
-<strong>${{ total }}</strong>
-</td>
-</tr>
-
-</table>
-
-</td>
-</tr>
-
-<!-- FOOTER -->
-
-<tr>
-<td style="background:#f8f8f8;padding:20px;text-align:center;font-size:12px;color:#666;">
-
-<p style="margin:0;">
-Este pedido fue generado desde el sistema de ventas de <strong>La Tortilla Grocery</strong>.
-</p>
-
-
-</td>
-</tr>
-
-</table>
-
-</td>
-</tr>
-</table>
-
-</body>
-</html>
+{% block footer_note %}
+Este pedido fue generado desde el sistema de ventas de La Tortilla Grocery.
+{% endblock %}

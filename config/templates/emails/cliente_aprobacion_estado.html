@@ -1,69 +1,39 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-</head>
-<body style="font-family: Arial, sans-serif; background:#f4f6f9; padding:30px; color:#1e293b;">
+{% extends "emails/base_email.html" %}
 
-<table width="100%" cellspacing="0" cellpadding="0">
-<tr>
-<td align="center">
+{% block preheader %}{{ preview_text }}{% endblock %}
+{% block header_title %}{% if approved %}Wholesale account approved{% else %}Wholesale account update{% endif %}{% endblock %}
+{% block header_subtitle %}{{ preview_text }}{% endblock %}
 
-<table width="700" style="background:white;border-radius:10px;overflow:hidden;box-shadow:0px 10px 25px rgba(0,0,0,0.1);">
-
-<tr>
-<td style="background:linear-gradient(90deg,#023B82,#0C64CF,#3F89DA); padding:25px; text-align:center; color:white;">
-<h2 style="margin:0;">La Tortilla Grocery</h2>
-<p style="margin:5px 0 0 0;">{{ preview_text }}</p>
-</td>
-</tr>
-
-<tr>
-<td style="padding:25px;">
-<h3 style="margin-top:0;">Hello {{ client_name }},</h3>
+{% block content %}
+<h3 style="margin:0 0 14px 0; font-size:20px; color:#1e293b;">Hello {{ client_name }},</h3>
 
 {% if approved %}
-<p>Your wholesale account request has been approved.</p>
-<p>You can now sign in with the credentials you created during registration.</p>
+<p style="margin:0 0 12px 0; font-size:15px; line-height:1.7;">Your wholesale account request has been approved.</p>
+<p style="margin:0 0 18px 0; font-size:15px; line-height:1.7;">You can now sign in with the credentials you created during registration.</p>
 {% else %}
-<p>Your wholesale account request needs a correction before it can be approved.</p>
+<p style="margin:0 0 12px 0; font-size:15px; line-height:1.7;">Your wholesale account request needs a correction before it can be approved.</p>
 {% if rejection_reason %}
-<div style="background:#fff7ed;border:1px solid #fdba74;padding:14px 16px;border-radius:8px;margin:18px 0;">
-<strong>Reason for rejection:</strong><br>
-{{ rejection_reason|linebreaksbr }}
+<div style="background:#fff7ed; border:1px solid #fdba74; padding:14px 16px; border-radius:12px; margin:18px 0; font-size:14px; line-height:1.7;">
+	<strong>Reason for rejection:</strong><br>
+	{{ rejection_reason|linebreaksbr }}
 </div>
 {% endif %}
 {% if correction_url %}
-<p>You can update the same request using the following secure link:</p>
-<p><a href="{{ correction_url }}" style="display:inline-block;background:#0b3d91;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700;">Correct my request</a></p>
-<p style="font-size:13px;color:#64748b;">If the button does not work, copy and paste this URL into your browser:<br>{{ correction_url }}</p>
+<div style="margin:22px 0; text-align:center;">
+	<a href="{{ correction_url }}" style="display:inline-block; background:#ffd400; color:#1e293b; text-decoration:none; padding:14px 24px; border-radius:10px; font-size:14px; font-weight:700;">Correct my request</a>
+</div>
+<p style="font-size:13px; color:#64748b; line-height:1.7; word-break:break-all;">If the button does not work, copy and paste this URL into your browser:<br>{{ correction_url }}</p>
 {% endif %}
 {% if has_rejection_example %}
-<p>We also attached an optional reference image so you can see how the missing document or information should look.</p>
+<p style="margin:16px 0 0 0; font-size:15px; line-height:1.7;">We also attached an optional reference image so you can see how the missing document or information should look.</p>
 {% endif %}
 {% endif %}
 
 {% if company_name %}
-<div style="background:#f8fafc;border:1px solid #e2e8f0;padding:14px 16px;border-radius:8px;margin:18px 0;">
-<strong>Company:</strong> {{ company_name }}
+<div style="background:#f8fafc; border:1px solid #e2e8f0; padding:14px 16px; border-radius:12px; margin:18px 0; font-size:14px; color:#1e293b;">
+	<strong>Company:</strong> {{ company_name }}
 </div>
 {% endif %}
 
-<p style="margin-bottom:0;">Thank you for your interest in La Tortilla Grocery.</p>
-</td>
-</tr>
-
-<tr>
-<td style="background:#f8f8f8;padding:20px;text-align:center;font-size:12px;color:#666;">
-<p style="margin:0;">This message was sent automatically from the La Tortilla Grocery platform.</p>
-</td>
-</tr>
-
-</table>
-
-</td>
-</tr>
-</table>
-
-</body>
-</html>
+<p style="margin:18px 0 0 0; font-size:15px; line-height:1.7;">Thank you for your interest in La Tortilla Grocery.</p>
+{% endblock %}

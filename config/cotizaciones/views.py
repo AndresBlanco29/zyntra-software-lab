@@ -87,14 +87,22 @@ def _calculate_quote_utility_percentage(cost, price):
 
 
 def _default_backoffice_quote_price(item, cotizacion):
-    current_price = _parse_decimal(item.precio, 0)
-    if cotizacion.backoffice_pricing_confirmed:
-        return current_price
+    return _parse_decimal(item.precio, 0)
 
-    default_price = _parse_decimal(getattr(item.presentacion, 'precio_5', 0), 0)
-    if default_price > 0:
-        return default_price
-    return current_price
+
+def _quote_item_price_for_customer(*, cliente, presentacion, session_price):
+    session_price_decimal = _parse_decimal(session_price, 0)
+    if not cliente or cliente.estado_revision != Cliente.REVIEW_STATUS_APPROVED:
+        return session_price_decimal
+
+    assigned_price = _parse_decimal(
+        presentacion.get_price_for_tier(cliente.get_nivel_precio_normalizado()),
+        session_price_decimal,
+    )
+    if assigned_price > 0:
+        return assigned_price
+
+    return session_price_decimal
 
 
 def _validate_backoffice_quote_price(*, item, price):
@@ -190,8 +198,8 @@ def _normalize_phone(phone_number):
 
 def _build_quote_message(cotizacion, confirm_url):
     return (
-        f"Hola {cotizacion.cliente.nombre_empresa}, tu cotizacion #{cotizacion.id} "
-        f"ya esta lista para confirmacion. Ingresa aqui: {confirm_url}"
+        f"Hola {cotizacion.cliente.nombre_empresa}, tu pedido #{cotizacion.id} "
+        f"ya esta listo para confirmacion. Ingresa aqui: {confirm_url}"
     )
 
 
@@ -322,7 +330,7 @@ def eliminar_producto(request):
 def guardar_cotizacion(request):
     carrito = request.session.get('carrito', {})
     if not carrito:
-        messages.error(request, _('You must add at least one product before sending the quote request.'))
+        messages.error(request, _('You must add at least one product before sending the order request.'))
         return redirect('ver_cotizacion')
 
     nota = request.POST.get("nota", "")
@@ -343,7 +351,11 @@ def guardar_cotizacion(request):
 
         presentacion = Presentacion.objects.get(id=item["presentacion_id"])
         cantidad = item["cantidad"]
-        precio = _parse_decimal(item.get("precio", 0))
+        precio = _quote_item_price_for_customer(
+            cliente=cliente,
+            presentacion=presentacion,
+            session_price=item.get("precio", 0),
+        )
         subtotal = precio * cantidad
 
         CotizacionItem.objects.create(
@@ -362,8 +374,8 @@ def guardar_cotizacion(request):
     items = cotizacion.items.all()
 
     crear_notificacion_backoffice(
-        titulo=f'New quote #{cotizacion.id}',
-        mensaje=f'{cliente.nombre_empresa} requested a new quote.',
+        titulo=f'New order request #{cotizacion.id}',
+        mensaje=f'{cliente.nombre_empresa} requested a new order.',
         tipo='COTIZACION',
         url=f'/cotizaciones/backoffice/{cotizacion.id}/',
     )
@@ -378,8 +390,8 @@ def guardar_cotizacion(request):
     )
 
     email = EmailMultiAlternatives(
-        subject=f"New quote request #{cotizacion.id}",
-        body=_("A new quote request has been received."),
+        subject=f"New order request #{cotizacion.id}",
+        body=_("A new order request has been received."),
         from_email=settings.DEFAULT_FROM_EMAIL or settings.EMAIL_HOST_USER,
         to=[settings.ORDERS_NOTIFICATION_EMAIL]
     )
@@ -387,12 +399,12 @@ def guardar_cotizacion(request):
     try:
         email.attach_alternative(html_content, "text/html")
         email.send(fail_silently=False)
-        messages.success(request, _('Your quote request was sent successfully.'), extra_tags='client-only')
+        messages.success(request, _('Your order request was sent successfully.'), extra_tags='client-only')
     except Exception as exc:
         logger.exception("Error enviando correo de cotización %s: %s", cotizacion.id, exc)
         messages.warning(
             request,
-            _('The quote was saved, but the notification email could not be sent.')
+            _('The order request was saved, but the notification email could not be sent.')
         )
 
     request.session['carrito'] = {}
@@ -505,11 +517,11 @@ def enviar_cotizacion_cliente(request, cotizacion_id):
     )
 
     if not cotizacion.items.exists():
-        messages.error(request, _('The quote has no products to send to the customer.'))
+        messages.error(request, _('The order has no products to send to the customer.'))
         return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
     if not _is_quote_send_ready(request.session, cotizacion.id):
-        messages.warning(request, _('Save the quote changes before sending it to the customer.'))
+        messages.warning(request, _('Save the order changes before sending it to the customer.'))
         return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
     confirm_url, telefono_contacto, whatsapp_link, outbound_message = _get_whatsapp_contact_data(cotizacion, request)
@@ -528,8 +540,8 @@ def enviar_cotizacion_cliente(request, cotizacion_id):
         )
 
         email = EmailMultiAlternatives(
-            subject=_('Quote ready to confirm #{id}').format(id=cotizacion.id),
-            body=_('Your quote is ready to confirm: {url}').format(url=confirm_url),
+            subject=_('Order ready to confirm #{id}').format(id=cotizacion.id),
+            body=_('Your order is ready to confirm: {url}').format(url=confirm_url),
             from_email=settings.DEFAULT_FROM_EMAIL,
             to=[cotizacion.cliente.usuario.email],
         )
@@ -567,14 +579,14 @@ def enviar_cotizacion_cliente(request, cotizacion_id):
     cotizacion.save(update_fields=list(dict.fromkeys(updates)))
 
     if cotizacion.correo_enviado:
-        success_message = _('The quote was sent to the customer by email.')
+        success_message = _('The order was sent to the customer by email.')
         if sms_sent or whatsapp_sent:
             success_message += ' ' + _('Additional automatic channels were processed.')
         elif telefono_contacto and whatsapp_link:
             success_message += ' ' + _('The manual WhatsApp link is available as a fallback.')
         messages.success(request, success_message)
     else:
-        messages.warning(request, _('The quote was marked as ready to confirm, but the email could not be sent.'))
+        messages.warning(request, _('The order was marked as ready to confirm, but the email could not be sent.'))
 
     _set_quote_send_ready(request.session, cotizacion.id, False)
     return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
@@ -587,7 +599,7 @@ def abrir_whatsapp_manual_cotizacion(request, cotizacion_id):
     confirm_url, phone_number, whatsapp_link, outbound_message = _get_whatsapp_contact_data(cotizacion, request)
 
     if not _is_quote_send_ready(request.session, cotizacion.id):
-        messages.warning(request, _('Save the quote changes before opening WhatsApp for the customer.'))
+        messages.warning(request, _('Save the order changes before opening WhatsApp for the customer.'))
         return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
     if not whatsapp_link:
@@ -659,7 +671,7 @@ def cliente_cotizacion_recibida_detalle(request, token):
 
     if request.method == 'POST':
         if not puede_editar:
-            messages.info(request, _('This quote can no longer be edited.'))
+            messages.info(request, _('This order can no longer be edited.'))
             return redirect('cliente_cotizacion_recibida_detalle', token=cotizacion.token_cliente)
 
         accion = (request.POST.get('accion') or '').strip()

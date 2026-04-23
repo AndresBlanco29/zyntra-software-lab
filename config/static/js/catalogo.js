@@ -139,6 +139,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const select = card.querySelector(".presentacion-select");
         const infoTexto = card.querySelector(".info-presentacion");
+        const priceText = card.querySelector(".product-price");
 
         select.addEventListener("change", function () {
 
@@ -153,6 +154,10 @@ document.addEventListener('DOMContentLoaded', function() {
             let por = lang === "en" ? "per" : "por";
 
             infoTexto.textContent = `${unidades} ${tipoTraducido} ${por} ${nombre}`;
+
+            if (priceText && option.dataset.price) {
+                priceText.textContent = `$${option.dataset.price}`;
+            }
 
         });
 

@@ -1,7 +1,25 @@
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+from config.clientes.models import Cliente
 from config.productos.models import Producto, Presentacion
 from django.shortcuts import render
+
+
+def _get_request_price_tier(request):
+    if not getattr(request.user, "is_authenticated", False):
+        return 1
+    if getattr(request.user, "role", "") != "cliente":
+        return 1
+
+    try:
+        cliente = Cliente.objects.only("nivel_precio", "estado_revision").get(usuario=request.user)
+    except Cliente.DoesNotExist:
+        return 1
+
+    if cliente.estado_revision != Cliente.REVIEW_STATUS_APPROVED:
+        return 1
+
+    return cliente.get_nivel_precio_normalizado()
 
 def ver_cotizacion(request):
 
@@ -84,12 +102,13 @@ def cambiar_presentacion(request):
     if producto_id in carrito:
 
         presentacion = Presentacion.objects.get(id=presentacion_id)
+        precio_actual = float(presentacion.get_price_for_tier(_get_request_price_tier(request)))
 
         carrito[producto_id]["presentacion_id"] = presentacion.id
-        carrito[producto_id]["precio"] = float(presentacion.precio_1)
+        carrito[producto_id]["precio"] = precio_actual
 
         cantidad = carrito[producto_id]["cantidad"]
-        subtotal = float(presentacion.precio_1) * cantidad
+        subtotal = precio_actual * cantidad
 
         carrito[producto_id]["subtotal"] = subtotal
         request.session["carrito"] = carrito
@@ -100,7 +119,7 @@ def cambiar_presentacion(request):
         )
 
         return JsonResponse({
-            "precio": presentacion.precio_1,
+            "precio": precio_actual,
             "subtotal": subtotal,
             "total": total
         })
@@ -135,6 +154,7 @@ def agregar_carrito(request):
 
     producto = Producto.objects.get(id= producto_id)
     presentacion = Presentacion.objects.get(id = presentacion_id)
+    precio_actual = float(presentacion.get_price_for_tier(_get_request_price_tier(request)))
 
     carrito = request.session.get("carrito", {})
 
@@ -148,7 +168,7 @@ def agregar_carrito(request):
             "nombre": producto.nombre,
             "presentacion_id": presentacion_id,
             "presentacion_nombre": presentacion.nombre,
-            "precio": float(presentacion.precio_1),
+            "precio": precio_actual,
             "cantidad": cantidad,
         }
 

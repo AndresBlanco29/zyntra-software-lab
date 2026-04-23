@@ -2,7 +2,7 @@ from django.core.cache import cache
 from django.db.models import Prefetch
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from .models import Producto, Categoria, Marca, Presentacion, ConfiguracionPrecios
+from .models import Producto, Categoria, Marca, Presentacion, ConfiguracionPrecios, normalize_price_tier
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
@@ -80,8 +80,30 @@ def _presentaciones_prefetch():
             "unidades",
             "tipo_contenido",
             "tipo_contenido_en",
+            "precio_1",
+            "precio_2",
+            "precio_3",
+            "precio_4",
+            "precio_5",
         ).order_by("id"),
     )
+
+
+def _get_cliente_price_tier(user):
+    if not getattr(user, 'is_authenticated', False):
+        return None
+    if getattr(user, 'role', '') != 'cliente':
+        return None
+
+    try:
+        cliente = Cliente.objects.only('nivel_precio', 'estado_revision').get(usuario=user)
+    except Cliente.DoesNotExist:
+        return None
+
+    if cliente.estado_revision != Cliente.REVIEW_STATUS_APPROVED:
+        return None
+
+    return normalize_price_tier(cliente.nivel_precio)
 
 
 def _hydrate_productos(productos):
@@ -163,6 +185,7 @@ def catalogo(request):
         catalogo_url = f"{catalogo_url}?guest=1"
 
     productos = _get_cached_catalogo_productos()
+    client_price_tier = _get_cliente_price_tier(request.user)
 
     categorias = _get_cached_catalogo_categorias()
 
@@ -177,6 +200,8 @@ def catalogo(request):
         'can_view_received_quotes': can_view_received_quotes,
         'pendientes_cotizaciones': pendientes_cotizaciones,
         'catalogo_url': catalogo_url,
+        'client_price_tier': client_price_tier,
+        'show_client_prices': bool(client_price_tier),
     }
 
     response = render(request, 'productos/catalogo.html', context)

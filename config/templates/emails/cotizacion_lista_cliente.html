@@ -7,17 +7,17 @@
       <table width="700" style="background:#ffffff; border-radius:10px; overflow:hidden;">
         <tr>
           <td style="padding:20px; background:#0b3d91; color:#fff; text-align:center;">
-            <h2 style="margin:0;">Cotizacion Lista para Confirmar</h2>
+            <h2 style="margin:0;">Pedido Listo para Confirmar</h2>
           </td>
         </tr>
         <tr>
           <td style="padding:20px;">
             <p>Hola {{ cliente.usuario.first_name|default:cliente.nombre_empresa }},</p>
-            <p>Tu cotizacion <strong>#{{ cotizacion.id }}</strong> ya tiene precios definidos y esta lista para continuar con la orden de compra.</p>
+            <p>Tu pedido <strong>#{{ cotizacion.id }}</strong> ya tiene precios definidos y esta listo para continuar con la orden de compra.</p>
             <p>
-              <a href="{{ confirm_url }}" style="display:inline-block; background:#ffd400; color:#1f2937; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;">Ir a Cotizaciones Recibidas</a>
+              <a href="{{ confirm_url }}" style="display:inline-block; background:#ffd400; color:#1f2937; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;">Ir a Pedidos Recibidos</a>
             </p>
-            <p>En el panel de cliente, entra a <strong>Cotizaciones Recibidas</strong> y revisa la cotizacion para confirmarla o cancelarla.</p>
+            <p>En el panel de cliente, entra a <strong>Pedidos Recibidos</strong> y revisa el pedido para confirmarlo o cancelarlo.</p>
             <p>Tambien puedes copiar este enlace en tu navegador:</p>
             <p style="word-break:break-all; color:#334155;">{{ confirm_url }}</p>
           </td>

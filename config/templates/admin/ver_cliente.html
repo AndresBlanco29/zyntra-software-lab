@@ -66,6 +66,11 @@
 </div>
 
 <div class="col-md-6 mb-3">
+<strong>{% trans "Assigned price tier:" %}</strong><br>
+{{ cliente.get_nivel_precio_display }}
+</div>
+
+<div class="col-md-6 mb-3">
 <strong>{% trans "Tax declaration accepted:" %}</strong><br>
 {% if cliente.declaracion_fiscal_aceptada %}
 	<span class="badge bg-success">{% trans "Yes" %}</span>
@@ -124,8 +129,22 @@
 <form method="post" action="{% url 'aprobar_cliente' cliente.id %}" class="d-inline">
 {% csrf_token %}
 <input type="hidden" name="view" value="{{ view_mode }}">
+
+<div class="mb-3">
+	<label for="nivelPrecio" class="form-label fw-bold">{% trans "Customer price tier" %}</label>
+	<select id="nivelPrecio" name="nivel_precio" class="form-select">
+		{% for value, label in price_tier_choices %}
+		<option value="{{ value }}" {% if cliente.nivel_precio == value %}selected{% endif %}>{{ label }}</option>
+		{% endfor %}
+	</select>
+</div>
+
 <button type="submit" class="btn btn-success">
+{% if cliente.estado_revision == 'APROBADO' %}
+{% trans "Update customer pricing" %}
+{% else %}
 {% trans "Approve customer" %}
+{% endif %}
 </button>
 </form>
 

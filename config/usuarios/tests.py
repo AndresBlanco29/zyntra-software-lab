@@ -358,7 +358,7 @@ class CustomerRequestReviewWorkflowTests(TestCase):
 
 		response = self.client.post(
 			reverse('aprobar_cliente', args=[self.cliente.id]),
-			{'view': 'rejected'},
+			{'view': 'rejected', 'nivel_precio': '4'},
 		)
 
 		self.assertEqual(response.status_code, 302)
@@ -366,4 +366,5 @@ class CustomerRequestReviewWorkflowTests(TestCase):
 		self.customer_user.refresh_from_db()
 		self.assertEqual(self.cliente.estado_revision, Cliente.REVIEW_STATUS_APPROVED)
 		self.assertTrue(self.cliente.aprobado)
+		self.assertEqual(self.cliente.nivel_precio, 4)
 		self.assertTrue(self.customer_user.is_active)

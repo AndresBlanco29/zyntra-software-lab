@@ -65,6 +65,8 @@ DEFAULT_PRICE_MARGIN_PERCENTAGES = (
     Decimal("50"),
 )
 
+DEFAULT_CUSTOMER_PRICE_TIER = 1
+
 
 def _quantize_money(value):
     return Decimal(value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
@@ -89,6 +91,17 @@ def _validate_margin_percentage(value):
     if percentage >= 100:
         raise ValidationError(_('Utility percentages must be less than 100 because the formula is cost / (1 - percentage).'))
     return percentage.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def normalize_price_tier(value, default=DEFAULT_CUSTOMER_PRICE_TIER):
+    try:
+        tier = int(value)
+    except (TypeError, ValueError):
+        return default
+
+    if 1 <= tier <= 5:
+        return tier
+    return default
 
 class Categoria(models.Model):
 
@@ -228,6 +241,10 @@ class Presentacion(models.Model):
         ]
 
         self.precio_1, self.precio_2, self.precio_3, self.precio_4, self.precio_5 = precios
+
+    def get_price_for_tier(self, tier=DEFAULT_CUSTOMER_PRICE_TIER):
+        normalized_tier = normalize_price_tier(tier)
+        return getattr(self, f'precio_{normalized_tier}', self.precio_1)
 
     def save(self, *args, **kwargs):
         self.recalcular_precios()

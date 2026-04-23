@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% trans "Received Quotes" %}</title>
+<title>{% if LANGUAGE_CODE == 'es' %}Pedidos recibidos{% else %}Received Orders{% endif %}</title>
 
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
 <link rel="stylesheet" href="{% static 'css/ver_cotizacion.css' %}">
@@ -25,9 +25,9 @@
 
     <div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">
       <a href="{% url 'catalogo' %}" class="btn btn-outline-light">{% trans "Catálogo" %}</a>
-      <a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">{% trans "Mi Cotización" %}</a>
+      <a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">{% if LANGUAGE_CODE == 'es' %}Mi pedido{% else %}My Order{% endif %}</a>
       <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-light">
-        {% trans "Quotes Received" %}
+        {% if LANGUAGE_CODE == 'es' %}Pedidos recibidos{% else %}Orders Received{% endif %}
         {% if pendientes_cotizaciones %}
         <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
         {% endif %}
@@ -47,9 +47,9 @@
 
     <div class="list-group list-group-flush">
       <a href="{% url 'catalogo' %}" class="list-group-item">{% trans "Catálogo" %}</a>
-      <a href="{% url 'ver_cotizacion' %}" class="list-group-item">{% trans "Mi Cotización" %}</a>
+      <a href="{% url 'ver_cotizacion' %}" class="list-group-item">{% if LANGUAGE_CODE == 'es' %}Mi pedido{% else %}My Order{% endif %}</a>
       <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="list-group-item active">
-        {% trans "Quotes Received" %}
+        {% if LANGUAGE_CODE == 'es' %}Pedidos recibidos{% else %}Orders Received{% endif %}
         {% if pendientes_cotizaciones %}
         <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
         {% endif %}
@@ -65,37 +65,37 @@
         <div>
           <h3 class="fw-bold mb-1">
             {% if view_mode == 'confirmed' %}
-            {% trans "Confirmed Quotes" %}
+            {% if LANGUAGE_CODE == 'es' %}Pedidos confirmados{% else %}Confirmed Orders{% endif %}
             {% elif view_mode == 'cancelled' %}
-            {% trans "Cancelled Quotes" %}
+            {% if LANGUAGE_CODE == 'es' %}Pedidos cancelados{% else %}Cancelled Orders{% endif %}
             {% else %}
-            {% trans "Pending Quotes" %}
+            {% if LANGUAGE_CODE == 'es' %}Pedidos pendientes{% else %}Pending Orders{% endif %}
             {% endif %}
           </h3>
           <p class="text-muted mb-0">
             {% if view_mode == 'confirmed' %}
-            {% trans "Review the quotes you already confirmed with BackOffice." %}
+            {% if LANGUAGE_CODE == 'es' %}Revisa los pedidos que ya confirmaste con BackOffice.{% else %}Review the orders you already confirmed with BackOffice.{% endif %}
             {% elif view_mode == 'cancelled' %}
-            {% trans "Review the quotes you cancelled and keep as reference." %}
+            {% if LANGUAGE_CODE == 'es' %}Revisa los pedidos que cancelaste y consérvalos como referencia.{% else %}Review the orders you cancelled and keep as reference.{% endif %}
             {% else %}
-            {% trans "Review the quotes pending your confirmation from BackOffice." %}
+            {% if LANGUAGE_CODE == 'es' %}Revisa los pedidos pendientes de tu confirmación enviados por BackOffice.{% else %}Review the orders pending your confirmation from BackOffice.{% endif %}
             {% endif %}
           </p>
         </div>
         <span class="badge text-bg-warning px-3 py-2">{% trans "Pending" %}: {{ pendientes_count }}</span>
       </div>
 
-      <div class="btn-group mb-3" role="group" aria-label="{% trans 'Quote views' %}">
+      <div class="btn-group mb-3" role="group" aria-label="{% if LANGUAGE_CODE == 'es' %}Vistas de pedidos{% else %}Order views{% endif %}">
         <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn {% if view_mode == 'pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">
-          {% trans "Pending Quotes" %}
+          {% if LANGUAGE_CODE == 'es' %}Pedidos pendientes{% else %}Pending Orders{% endif %}
           <span class="badge {% if view_mode == 'pending' %}bg-light text-dark{% else %}bg-warning text-dark{% endif %} ms-1">{{ pendientes_count }}</span>
         </a>
         <a href="{% url 'cliente_cotizaciones_recibidas' %}?view=confirmed" class="btn {% if view_mode == 'confirmed' %}btn-success{% else %}btn-outline-success{% endif %}">
-          {% trans "Confirmed Quotes" %}
+          {% if LANGUAGE_CODE == 'es' %}Pedidos confirmados{% else %}Confirmed Orders{% endif %}
           <span class="badge {% if view_mode == 'confirmed' %}bg-light text-success{% else %}bg-success{% endif %} ms-1">{{ confirmed_count }}</span>
         </a>
         <a href="{% url 'cliente_cotizaciones_recibidas' %}?view=cancelled" class="btn {% if view_mode == 'cancelled' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-          {% trans "Cancelled Quotes" %}
+          {% if LANGUAGE_CODE == 'es' %}Pedidos cancelados{% else %}Cancelled Orders{% endif %}
           <span class="badge {% if view_mode == 'cancelled' %}bg-light text-secondary{% else %}bg-secondary{% endif %} ms-1">{{ cancelled_count }}</span>
         </a>
       </div>
@@ -107,7 +107,7 @@
             <table class="table align-middle mb-0">
               <thead>
                 <tr>
-                  <th>{% trans "Quote" %}</th>
+                  <th>{% if LANGUAGE_CODE == 'es' %}Pedido{% else %}Order{% endif %}</th>
                   <th>{% trans "Status" %}</th>
                   <th>{% trans "Total" %}</th>
                   <th>{% trans "Products" %}</th>
@@ -155,11 +155,11 @@
       {% else %}
       <div class="alert alert-info mb-0">
         {% if view_mode == 'confirmed' %}
-        {% trans "You do not have any confirmed quotes yet." %}
+        {% if LANGUAGE_CODE == 'es' %}Aún no tienes pedidos confirmados.{% else %}You do not have any confirmed orders yet.{% endif %}
         {% elif view_mode == 'cancelled' %}
-        {% trans "You do not have any cancelled quotes yet." %}
+        {% if LANGUAGE_CODE == 'es' %}Aún no tienes pedidos cancelados.{% else %}You do not have any cancelled orders yet.{% endif %}
         {% else %}
-        {% trans "You do not have any pending quotes from BackOffice." %}
+        {% if LANGUAGE_CODE == 'es' %}No tienes pedidos pendientes de BackOffice.{% else %}You do not have any pending orders from BackOffice.{% endif %}
         {% endif %}
       </div>
       {% endif %}

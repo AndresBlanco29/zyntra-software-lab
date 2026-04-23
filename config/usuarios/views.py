@@ -42,6 +42,7 @@ import logging
 import json
 
 from .forms import CustomerPasswordResetForm, CustomerSetPasswordForm
+from config.productos.models import normalize_price_tier
 
 logger = logging.getLogger(__name__)
 
@@ -1251,12 +1252,14 @@ def aprobar_cliente(request, cliente_id):
 
     cliente = get_object_or_404(Cliente, id=cliente_id)
     redirect_view = (request.POST.get('view') or 'pending').strip().lower()
+    nivel_precio = normalize_price_tier(request.POST.get('nivel_precio'), cliente.nivel_precio)
 
     cliente.aprobado = True
     cliente.estado_revision = Cliente.REVIEW_STATUS_APPROVED
     cliente.aprobado_en = timezone.now()
     cliente.aprobado_por = request.user
-    cliente.save(update_fields=['aprobado', 'estado_revision', 'aprobado_en', 'aprobado_por'])
+    cliente.nivel_precio = nivel_precio
+    cliente.save(update_fields=['aprobado', 'estado_revision', 'aprobado_en', 'aprobado_por', 'nivel_precio'])
 
     # activar usuario
     usuario = cliente.usuario
@@ -1363,6 +1366,7 @@ def ver_cliente(request, cliente_id):
     context = {
         'cliente': cliente,
         'view_mode': (request.GET.get('view') or 'pending').strip().lower(),
+        'price_tier_choices': Cliente.PRICE_TIER_CHOICES,
     }
 
     return render(request, 'admin/ver_cliente.html', context)

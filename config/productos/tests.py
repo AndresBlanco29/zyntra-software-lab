@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.test import TestCase
 from django.urls import reverse
 
+from config.clientes.models import Cliente
 from config.productos.models import Categoria, ConfiguracionPrecios, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
 
@@ -77,3 +78,51 @@ class ConfiguracionPreciosTests(TestCase):
 		self.assertContains(response, 'value="14.10"')
 		self.assertContains(response, 'value="15.68"')
 		self.assertContains(response, 'value="17.00"')
+
+
+class CatalogCustomerPriceTierTests(TestCase):
+	def setUp(self):
+		categoria = Categoria.objects.create(nombre='Snacks Test')
+		marca = Marca.objects.create(nombre='Marca Catalogo')
+		self.producto = Producto.objects.create(nombre='Totopos', categoria=categoria, marca=marca, activo=True)
+		self.presentacion = Presentacion.objects.create(
+			producto=self.producto,
+			nombre='Caja',
+			unidades=12,
+			tipo_contenido='caja',
+			costo=Decimal('100.00'),
+		)
+		self.usuario = Usuario.objects.create_user(
+			username='cliente-precio',
+			password='secret123',
+			role='cliente',
+			is_active=True,
+		)
+		Cliente.objects.create(
+			usuario=self.usuario,
+			nombre_empresa='Cliente Precio LLC',
+			telefono='1234567890',
+			direccion='123 Main St',
+			ciudad='Houston',
+			estado='Texas',
+			codigo_postal='77001',
+			pais='USA',
+			sales_tax_number='99887766',
+			certificado_tax='certificados/test.pdf',
+			declaracion_fiscal_aceptada=True,
+			aprobado=True,
+			estado_revision=Cliente.REVIEW_STATUS_APPROVED,
+			nivel_precio=3,
+		)
+
+	def test_presentacion_returns_price_for_assigned_tier(self):
+		self.assertEqual(self.presentacion.get_price_for_tier(3), self.presentacion.precio_3)
+
+	def test_catalog_shows_customer_assigned_price(self):
+		self.client.force_login(self.usuario)
+
+		response = self.client.get(reverse('catalogo'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Your price')
+		self.assertContains(response, f'data-price="{self.presentacion.precio_3}"')

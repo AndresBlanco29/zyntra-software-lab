@@ -65,12 +65,60 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertContains(response, 'Price 1 (30.00%)')
 		self.assertContains(response, 'Price 2 (20.00%)')
 		self.assertContains(response, 'Manual price')
-		self.assertContains(response, 'value="101.01"', html=False)
+		self.assertContains(response, 'value="142.86"', html=False)
 		self.assertContains(response, 'Price 5 (1.00%) - $101.01')
-		self.assertContains(response, 'Utility: 1.00%')
-		self.assertContains(response, 'Updated total: <span id="quoteTotalValue">$101.01</span>', html=False)
+		self.assertContains(response, 'Utility: 30.00%')
+		self.assertContains(response, 'Updated total: <span id="quoteTotalValue">$142.86</span>', html=False)
 		self.assertContains(response, 'data-send-ready-initial="false"')
 		self.assertContains(response, 'quote-send-email-button" disabled', html=False)
+
+	def test_backoffice_quote_detail_uses_customer_assigned_price_when_request_arrives(self):
+		self.cliente.estado_revision = Cliente.REVIEW_STATUS_APPROVED
+		self.cliente.nivel_precio = 3
+		self.cliente.save(update_fields=['estado_revision', 'nivel_precio'])
+
+		assigned_price = self.presentacion.get_price_for_tier(self.cliente.get_nivel_precio_normalizado())
+		self.cotizacion.total = assigned_price
+		self.cotizacion.save(update_fields=['total'])
+		item = self.cotizacion.items.first()
+		item.precio = assigned_price
+		item.subtotal = assigned_price
+		item.save(update_fields=['precio', 'subtotal'])
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Price 3 (10.00%) - $111.11')
+		self.assertContains(response, 'value="111.11"', html=False)
+		self.assertContains(response, 'Updated total: <span id="quoteTotalValue">$111.11</span>', html=False)
+
+	def test_guardar_cotizacion_persists_customer_assigned_price_for_backoffice(self):
+		self.cliente.estado_revision = Cliente.REVIEW_STATUS_APPROVED
+		self.cliente.nivel_precio = 3
+		self.cliente.save(update_fields=['estado_revision', 'nivel_precio'])
+
+		self.client.force_login(self.customer_user)
+		session = self.client.session
+		session['carrito'] = {
+			str(self.presentacion.producto.id): {
+				'presentacion_id': self.presentacion.id,
+				'cantidad': 2,
+				'precio': str(self.presentacion.precio_1),
+			}
+		}
+		session.save()
+
+		response = self.client.post(reverse('guardar_cotizacion'), {'nota': 'Usar precio asignado'})
+
+		self.assertRedirects(response, reverse('catalogo'))
+		created_quote = Cotizacion.objects.exclude(id=self.cotizacion.id).latest('id')
+		created_item = created_quote.items.get()
+		assigned_price = self.presentacion.get_price_for_tier(3)
+
+		self.assertEqual(created_item.precio, assigned_price)
+		self.assertEqual(created_item.subtotal, assigned_price * 2)
+		self.assertEqual(created_quote.total, assigned_price * 2)
 
 	def test_customer_quote_success_message_is_not_rendered_for_backoffice(self):
 		self.client.force_login(self.customer_user)
@@ -88,14 +136,14 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertEqual(response.status_code, 302)
 
 		stored_messages = [message.message for message in get_messages(response.wsgi_request)]
-		self.assertIn('Your quote request was sent successfully.', stored_messages)
+		self.assertIn('Your order request was sent successfully.', stored_messages)
 
 		self.client.logout()
 		self.client.force_login(self.backoffice)
 		backoffice_response = self.client.get(reverse('backoffice_dashboard'))
 
 		self.assertEqual(backoffice_response.status_code, 200)
-		self.assertNotContains(backoffice_response, 'Your quote request was sent successfully.')
+		self.assertNotContains(backoffice_response, 'Your order request was sent successfully.')
 
 	def test_backoffice_cannot_send_quote_without_saving_changes_first(self):
 		self.client.force_login(self.backoffice)
@@ -311,7 +359,7 @@ class CustomerReceivedQuotesViewTests(TestCase):
 		response = self.client.get(reverse('cliente_cotizaciones_recibidas'))
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'Pending Quotes')
+		self.assertContains(response, 'Pending Orders')
 		self.assertContains(response, 'Pending: 1')
 		self.assertContains(response, f'#{self.pending_quote.id}')
 		self.assertNotContains(response, f'#{self.confirmed_quote.id}')
@@ -324,7 +372,7 @@ class CustomerReceivedQuotesViewTests(TestCase):
 		response = self.client.get(reverse('cliente_cotizaciones_recibidas'), {'view': 'confirmed'})
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'Confirmed Quotes')
+		self.assertContains(response, 'Confirmed Orders')
 		self.assertContains(response, f'#{self.confirmed_quote.id}')
 		self.assertNotContains(response, f'#{self.pending_quote.id}')
 		self.assertNotContains(response, f'#{self.cancelled_quote.id}')
@@ -335,7 +383,7 @@ class CustomerReceivedQuotesViewTests(TestCase):
 		response = self.client.get(reverse('cliente_cotizaciones_recibidas'), {'view': 'cancelled'})
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'Cancelled Quotes')
+		self.assertContains(response, 'Cancelled Orders')
 		self.assertContains(response, f'#{self.cancelled_quote.id}')
 		self.assertNotContains(response, f'#{self.pending_quote.id}')
 		self.assertNotContains(response, f'#{self.confirmed_quote.id}')
@@ -356,13 +404,13 @@ class CustomerReceivedQuotesViewTests(TestCase):
 		response = self.client.get(reverse('ver_cotizacion'), HTTP_ACCEPT_LANGUAGE='es')
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, '<title>Mi cotización</title>', html=False)
+		self.assertContains(response, '<title>Mi pedido</title>', html=False)
 		self.assertContains(response, 'Catálogo')
-		self.assertContains(response, 'Mi cotización')
-		self.assertContains(response, 'Cotizaciones recibidas')
+		self.assertContains(response, 'Mi pedido')
+		self.assertContains(response, 'Pedidos recibidos')
 		self.assertContains(response, 'Revisa los productos antes de enviar tu solicitud', html=False)
 		self.assertContains(response, 'Total de productos: 1', html=False)
-		self.assertContains(response, 'Resumen de la cotización')
+		self.assertContains(response, 'Resumen del pedido')
 		self.assertContains(response, 'Nota opcional')
-		self.assertContains(response, 'La cotización se enviará para validación de precios.', html=False)
-		self.assertContains(response, 'Enviar solicitud de cotización')
+		self.assertContains(response, 'El pedido se enviará para revisión y validación.', html=False)
+		self.assertContains(response, 'Enviar solicitud de pedido')

@@ -48,14 +48,14 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
               {% if can_quote %}
               {% if can_view_received_quotes %}
               <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-light">
-                {% trans "Quotes Received" %}
+                {% if LANGUAGE_CODE == 'es' %}Pedidos recibidos{% else %}Orders Received{% endif %}
                 {% if pendientes_cotizaciones %}
                 <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
                 {% endif %}
               </a>
               {% endif %}
                 <a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">
-                    {% trans "Cotización" %} (<span id="contadorCarrito">{{ carrito|length }}</span>)
+                    {% if LANGUAGE_CODE == 'es' %}Mi pedido{% else %}My Order{% endif %} (<span id="contadorCarrito">{{ carrito|length }}</span>)
                 </a>
                 <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#logoutModal" style="font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
                     <i class="bi bi-box-arrow-right"></i> {% trans "Cerrar Sesión" %}
@@ -93,11 +93,11 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                     </a>
                   {% if can_quote %}
                     <a href="{% url 'ver_cotizacion' %}" class="list-group-item">
-                        {% trans "Mi Cotización" %}
+                        {% if LANGUAGE_CODE == 'es' %}Mi pedido{% else %}My Order{% endif %}
                     </a>
                     {% if can_view_received_quotes %}
                     <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="list-group-item">
-                      {% trans "Quotes Received" %}
+                      {% if LANGUAGE_CODE == 'es' %}Pedidos recibidos{% else %}Orders Received{% endif %}
                       {% if pendientes_cotizaciones %}
                       <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
                       {% endif %}
@@ -205,6 +205,16 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                                 {% endif %}
                                 </div>
 
+                                {% if show_client_prices and producto.primera_presentacion %}
+                                <div class="mb-3 text-center">
+                                  <div class="fw-semibold small">{% trans "Your price" %}</div>
+                                  <div class="fs-5 fw-bold text-success product-price">
+                                    ${% if client_price_tier == 1 %}{{ producto.primera_presentacion.precio_1 }}{% elif client_price_tier == 2 %}{{ producto.primera_presentacion.precio_2 }}{% elif client_price_tier == 3 %}{{ producto.primera_presentacion.precio_3 }}{% elif client_price_tier == 4 %}{{ producto.primera_presentacion.precio_4 }}{% else %}{{ producto.primera_presentacion.precio_5 }}{% endif %}
+                                  </div>
+                                  <div class="small text-muted product-price-tier">{% trans "Assigned tier" %}: {{ client_price_tier }}</div>
+                                </div>
+                                {% endif %}
+
                                 <div class="mb-2">
                                     <label class="fw-bold small">
                                         {% trans "Presentación" %}:
@@ -216,6 +226,9 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                                                 value="{{ p.id }}"
                                                 data-unidades="{{ p.unidades }}"
                                                 data-tipo="{{ p.tipo_contenido_traducido|lower }}"
+                                              {% if show_client_prices %}
+                                              data-price="{% if client_price_tier == 1 %}{{ p.precio_1 }}{% elif client_price_tier == 2 %}{{ p.precio_2 }}{% elif client_price_tier == 3 %}{{ p.precio_3 }}{% elif client_price_tier == 4 %}{{ p.precio_4 }}{% else %}{{ p.precio_5 }}{% endif %}"
+                                              {% endif %}
                                             >
                                                 {{ p.nombre_traducido }}
                                             </option>

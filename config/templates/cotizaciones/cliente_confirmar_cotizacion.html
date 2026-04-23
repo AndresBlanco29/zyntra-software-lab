@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% trans "Confirm Quote" %} #{{ cotizacion.id }}</title>
+<title>{% if LANGUAGE_CODE == 'es' %}Confirmar pedido{% else %}Confirm Order{% endif %} #{{ cotizacion.id }}</title>
 
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
 <link rel="stylesheet" href="{% static 'css/ver_cotizacion.css' %}">
@@ -25,7 +25,7 @@
 
     <div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">
       <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-light">
-        {% trans "Quotes Received" %}
+        {% if LANGUAGE_CODE == 'es' %}Pedidos recibidos{% else %}Orders Received{% endif %}
         {% if pendientes_cotizaciones %}
         <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
         {% endif %}
@@ -45,9 +45,9 @@
 
     <div class="list-group list-group-flush">
       <a href="{% url 'catalogo' %}" class="list-group-item">{% trans "Catálogo" %}</a>
-      <a href="{% url 'ver_cotizacion' %}" class="list-group-item">{% trans "Mi Cotización" %}</a>
+      <a href="{% url 'ver_cotizacion' %}" class="list-group-item">{% if LANGUAGE_CODE == 'es' %}Mi pedido{% else %}My Order{% endif %}</a>
       <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="list-group-item active">
-        {% trans "Cotizaciones Recibidas" %}
+        {% if LANGUAGE_CODE == 'es' %}Pedidos recibidos{% else %}Orders Received{% endif %}
         {% if pendientes_cotizaciones %}
         <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
         {% endif %}
@@ -61,10 +61,10 @@
     <div class="container-fluid">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <div>
-          <h3 class="fw-bold mb-1">{% trans "Quote" %} #{{ cotizacion.id }}</h3>
+          <h3 class="fw-bold mb-1">{% if LANGUAGE_CODE == 'es' %}Pedido{% else %}Order{% endif %} #{{ cotizacion.id }}</h3>
           <p class="text-muted mb-0">{% trans "Validate prices, adjust quantities if needed and confirm your order." %}</p>
         </div>
-        <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-secondary">{% trans "Back to received quotes" %}</a>
+        <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-secondary">{% if LANGUAGE_CODE == 'es' %}Volver a pedidos recibidos{% else %}Back to received orders{% endif %}</a>
       </div>
 
       {% if messages %}
@@ -116,7 +116,7 @@
               {% csrf_token %}
           {% else %}
             <h5 class="mb-3">{% trans "Order summary" %}</h5>
-            <div class="alert alert-info">{% trans "This quote already has an order generated or finished. You can only review the summary." %}</div>
+            <div class="alert alert-info">{% if LANGUAGE_CODE == 'es' %}Este pedido ya tiene una orden generada o finalizada. Solo puedes revisar el resumen.{% else %}This order already has an order generated or finished. You can only review the summary.{% endif %}</div>
           {% endif %}
 
           <div class="table-responsive mb-3">

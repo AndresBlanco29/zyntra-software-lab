@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% trans "My Quote" %}</title>
+<title>{% if LANGUAGE_CODE == 'es' %}Mi pedido{% else %}My Order{% endif %}</title>
 
 <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
 <link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
@@ -38,11 +38,11 @@ La Tortilla Grocery
 <div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">
 <a href="{% url 'catalogo' %}" class="btn btn-outline-light">{% trans "Catalog" %}</a>
 <a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">
-{% trans "My Quote" %}
+{% if LANGUAGE_CODE == 'es' %}Mi pedido{% else %}My Order{% endif %}
 <span class="badge text-bg-light ms-1" id="contadorCarritoDesktop">{{ carrito|length }}</span>
 </a>
 <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-light">
-{% trans "Quotes Received" %}
+{% if LANGUAGE_CODE == 'es' %}Pedidos recibidos{% else %}Orders Received{% endif %}
 {% if pendientes_cotizaciones %}
 <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
 {% endif %}
@@ -71,12 +71,12 @@ La Tortilla Grocery
 </a>
 
 <a href="{% url 'ver_cotizacion' %}" class="list-group-item active">
-{% trans "My Quote" %}
+{% if LANGUAGE_CODE == 'es' %}Mi pedido{% else %}My Order{% endif %}
 <span class="badge text-bg-light ms-1" id="contadorCarrito">{{ carrito|length }}</span>
 </a>
 
 <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="list-group-item">
-{% trans "Quotes Received" %}
+{% if LANGUAGE_CODE == 'es' %}Pedidos recibidos{% else %}Orders Received{% endif %}
 {% if pendientes_cotizaciones %}
 <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
 {% endif %}
@@ -99,7 +99,7 @@ La Tortilla Grocery
             <div class="col-12 col-lg-9 order-2 order-lg-1">
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
   <div>
-    <h3 class="fw-bold mb-1">{% trans "My Quote" %}</h3>
+    <h3 class="fw-bold mb-1">{% if LANGUAGE_CODE == 'es' %}Mi pedido{% else %}My Order{% endif %}</h3>
     <p class="text-muted mb-0">{% trans "Review the products before submitting your request" %}</p>
   </div>
   <span class="badge text-bg-primary px-3 py-2">{% trans "Total products" %}: {{ carrito|length }}</span>
@@ -222,7 +222,7 @@ data-tipo="{{ p.tipo_contenido_traducido|lower }}"
 
 <div class="alert alert-info">
  <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
-   <span>{% trans "No products in the quote." %}</span>
+   <span>{% if LANGUAGE_CODE == 'es' %}No hay productos en el pedido.{% else %}No products in the order.{% endif %}</span>
    <a href="{% url 'catalogo' %}" class="btn btn-sm btn-outline-primary">{% trans "Go to Catalog" %}</a>
  </div>
 </div>
@@ -252,7 +252,7 @@ placeholder="{% trans "Search products..." %}">
 
 <div class="card-body">
 
-<h6 class="fw-semibold mb-3">{% trans "Quote summary" %}</h6>
+<h6 class="fw-semibold mb-3">{% if LANGUAGE_CODE == 'es' %}Resumen del pedido{% else %}Order summary{% endif %}</h6>
 
 <h6 class="text-muted" id="totalProductos">
 {% trans "Total products" %}: {{ carrito|length }}
@@ -273,12 +273,12 @@ placeholder="{% trans "Search products..." %}">
 
 
 <div class="alert alert-info mt-3">
-{% trans "The quote will be sent for price validation." %}
+{% if LANGUAGE_CODE == 'es' %}El pedido se enviará para revisión y validación.{% else %}The order will be sent for review and validation.{% endif %}
 </div>
 
 
 <button type="submit" class="btn btn-yellow w-100 mt-3" id="btnEnviarCotizacion">
-{% trans "Send Quote Request" %}
+{% if LANGUAGE_CODE == 'es' %}Enviar solicitud de pedido{% else %}Send Order Request{% endif %}
 </button>
 
 </form>
@@ -305,7 +305,7 @@ placeholder="{% trans "Search products..." %}">
           </div>
           <h3 style="color: #0b3d91; font-weight: 700; margin-bottom: 0.5rem;">{% trans "Request Sent!" %}</h3>
           <p style="color: #475569; margin-bottom: 1.5rem; line-height: 1.6;">
-            {% trans "Your quote request has been received successfully." %}
+            {% if LANGUAGE_CODE == 'es' %}Tu solicitud de pedido fue recibida correctamente.{% else %}Your order request has been received successfully.{% endif %}
           </p>
         </div>
         <div style="background: #f0f7ff; border-left: 4px solid #ffd400; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; text-align: left;">
@@ -313,7 +313,7 @@ placeholder="{% trans "Search products..." %}">
             📋 {% trans "Important information" %}
           </p>
           <p style="color: #475569; font-size: 14px; margin: 0;">
-            {% trans "Our team will review your request and contact you to confirm prices and availability." %}
+            {% if LANGUAGE_CODE == 'es' %}Nuestro equipo revisará tu solicitud y te contactará si hace falta algún ajuste antes de procesarla.{% else %}Our team will review your request and contact you if any adjustment is needed before processing.{% endif %}
           </p>
         </div>
         <button type="button" class="btn w-100" onclick="irAlCatalogo()" style="background: linear-gradient(to right, #ffe600, #c7c700); border: none; color: #1e293b; font-weight: 700; padding: 12px 20px; border-radius: 8px;">
@@ -335,15 +335,15 @@ placeholder="{% trans "Search products..." %}">
           </div>
           <h3 style="color: #0b3d91; font-weight: 700; margin-bottom: 0.5rem;">{% trans "No Products" %}</h3>
           <p style="color: #475569; margin-bottom: 1.5rem; line-height: 1.6;">
-            {% trans "You must add at least one product before sending the quote request." %}
+            {% if LANGUAGE_CODE == 'es' %}Debes agregar al menos un producto antes de enviar la solicitud de pedido.{% else %}You must add at least one product before sending the order request.{% endif %}
           </p>
         </div>
         <div style="background: #fff5f5; border-left: 4px solid #d32f2f; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; text-align: left;">
           <p style="color: #d32f2f; font-weight: 600; margin: 0 0 0.5rem 0;">
-            ⚠️ {% trans "Empty Quote" %}
+            ⚠️ {% if LANGUAGE_CODE == 'es' %}Pedido vacío{% else %}Empty Order{% endif %}
           </p>
           <p style="color: #475569; font-size: 14px; margin: 0;">
-            {% trans "Please go to the catalog and add products to your quote." %}
+            {% if LANGUAGE_CODE == 'es' %}Ve al catálogo y agrega productos a tu pedido.{% else %}Please go to the catalog and add products to your order.{% endif %}
           </p>
         </div>
         <button type="button" class="btn w-100" onclick="irAlCatalogo()" style="background: linear-gradient(to right, #ffe600, #c7c700); border: none; color: #1e293b; font-weight: 700; padding: 12px 20px; border-radius: 8px;">
@@ -393,12 +393,12 @@ document.addEventListener('DOMContentLoaded', function() {
           const modal = new bootstrap.Modal(document.getElementById('cotizacionExitoModal'));
           modal.show();
         } else {
-          alert('{% trans "Error sending quote" %}');
+          alert('{% if LANGUAGE_CODE == 'es' %}Error al enviar el pedido{% else %}Error sending order{% endif %}');
         }
       })
       .catch(error => {
         console.error('Error:', error);
-        alert('{% trans "Error sending quote" %}');
+        alert('{% if LANGUAGE_CODE == 'es' %}Error al enviar el pedido{% else %}Error sending order{% endif %}');
       });
     });
   }

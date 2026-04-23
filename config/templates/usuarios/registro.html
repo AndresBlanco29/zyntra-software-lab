@@ -226,7 +226,7 @@
             
               <h6 class="fw-bold text-center mb-3">{% if CURRENT_LANGUAGE == 'es' %}Datos de la empresa (Obligatorio){% else %}Business details (Required){% endif %}</h6>
 
-              <div class="row g-3" data-location-group>
+              <div class="row g-3">
                 <div class="col-md-6">
                   <input
                     type="text"
@@ -306,18 +306,21 @@
                 </div>
 
                 <div class="col-md-6">
-                  <select class="form-select form-control-lg" name="estado" data-state-select required>
-                    <option value="">{% if CURRENT_LANGUAGE == 'es' %}Selecciona un estado{% else %}Select a state{% endif %}</option>
-                    {% for state_name in us_states %}
-                    <option value="{{ state_name }}">{{ state_name }}</option>
-                    {% endfor %}
-                  </select>
+                  <input
+                    type="text"
+                    class="form-control form-control-lg"
+                    name="estado"
+                    placeholder="{% if CURRENT_LANGUAGE == 'es' %}Estado / Departamento{% else %}State / Department{% endif %}"
+                    required/>
                 </div>
 
                 <div class="col-md-6">
-                  <select class="form-select form-control-lg" name="ciudad" data-city-select disabled required>
-                    <option value="">{% if CURRENT_LANGUAGE == 'es' %}Selecciona primero un estado{% else %}Select a state first{% endif %}</option>
-                  </select>
+                  <input
+                    type="text"
+                    class="form-control form-control-lg"
+                    name="ciudad"
+                    placeholder="{% if CURRENT_LANGUAGE == 'es' %}Ciudad{% else %}City{% endif %}"
+                    required/>
                 </div>
 
                 <div class="col-md-6">
@@ -431,12 +434,8 @@
       </div>  
     </div>
 
-    <script>
-      window.__LTG_US_LOCATIONS = {{ us_locations_json|safe }};
-    </script>
     <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
     <script src="{%static 'js/registro.js'%}"></script>
     <script src="{% static 'js/tax-example.js' %}"></script>
-    <script src="{% static 'js/state-selector.js' %}"></script>
   </body>
 </html>

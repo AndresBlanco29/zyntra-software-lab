@@ -2,7 +2,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import path, reverse_lazy
 
 from .forms import CustomerPasswordResetForm, CustomerSetPasswordForm
-from .views import login_view, registro_view, panel_admin, perfil_admin, clientes_pendientes, aprobar_cliente, ver_cliente, ver_certificado_cliente, rechazar_cliente, lista_vendedores, crear_vendedor, editar_vendedor, desactivar_vendedor, activar_vendedor, login_form_modal, password_reset_form_modal, password_reset_confirm_modal, registro_form_modal, verificar_username, logout_view, contenido_home, lista_testimonios, crear_testimonio, editar_testimonio, desactivar_testimonio, activar_testimonio, editar_home_contenido, lista_usuarios_internos, crear_usuario_interno, editar_usuario_interno, desactivar_usuario_interno, activar_usuario_interno, crear_backoffice, editar_backoffice, desactivar_backoffice, activar_backoffice
+from .views import login_view, registro_view, panel_admin, perfil_admin, clientes_pendientes, aprobar_cliente, ver_cliente, ver_certificado_cliente, rechazar_cliente, lista_vendedores, crear_vendedor, editar_vendedor, desactivar_vendedor, activar_vendedor, login_form_modal, password_reset_form_modal, password_reset_confirm_modal, registro_form_modal, verificar_username, logout_view, contenido_home, lista_testimonios, crear_testimonio, editar_testimonio, desactivar_testimonio, activar_testimonio, editar_home_contenido, lista_usuarios_internos, crear_usuario_interno, editar_usuario_interno, desactivar_usuario_interno, activar_usuario_interno, crear_backoffice, editar_backoffice, desactivar_backoffice, activar_backoffice, corregir_solicitud_cliente
 
 urlpatterns = [
     path('login/', login_view, name='login'),
@@ -46,6 +46,7 @@ urlpatterns = [
     path('password-reset/confirm-modal/<uidb64>/<token>/', password_reset_confirm_modal, name='password_reset_confirm_modal'),
     path('registro-modal/', registro_form_modal, name='registro_modal'),
     path('registro/', registro_view, name='registro_usuario'),
+    path('registro/correccion/<uuid:correction_token>/', corregir_solicitud_cliente, name='corregir_solicitud_cliente'),
     path('verificar-username/', verificar_username, name='verificar_username'),
 
     path('panel-admin/', panel_admin, name='panel_admin'),

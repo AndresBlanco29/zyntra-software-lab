@@ -9,6 +9,16 @@
 
 <h2 class="mb-4">{% trans "Detalle del Cliente" %}</h2>
 
+<div class="mb-3">
+{% if cliente.estado_revision == 'PENDIENTE' %}
+	<span class="badge bg-warning text-dark">{% trans "Pending review" %}</span>
+{% elif cliente.estado_revision == 'RECHAZADO' %}
+	<span class="badge bg-danger">{% trans "Rejected" %}</span>
+{% else %}
+	<span class="badge bg-success">{% trans "Approved" %}</span>
+{% endif %}
+</div>
+
 <div class="card shadow-sm">
 
 <div class="card-body">
@@ -87,23 +97,87 @@
 <p>{% trans "No se subio certificado" %}</p>
 {% endif %}
 
+{% if cliente.nota_rechazo %}
+<hr>
+
+<h5 class="mb-3">{% trans "Last rejection note" %}</h5>
+
+<div class="alert alert-warning">
+	<p class="mb-2">{{ cliente.nota_rechazo|linebreaksbr }}</p>
+	{% if cliente.adjunto_rechazo %}
+	<a href="{{ cliente.adjunto_rechazo.url }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+		{% trans "Open attached example" %}
+	</a>
+	{% endif %}
+	{% if cliente.rechazado_en %}
+	<div class="small text-muted mt-2">
+		{% trans "Rejected on" %}: {{ cliente.rechazado_en|date:"d/m/Y H:i" }}
+	</div>
+	{% endif %}
+</div>
+{% endif %}
+
 <hr>
 
 <div class="mt-3">
 
-<a href="{% url 'aprobar_cliente' cliente.id %}" class="btn btn-success">
-{% trans "Aprobar cliente" %}
-</a>
+<form method="post" action="{% url 'aprobar_cliente' cliente.id %}" class="d-inline">
+{% csrf_token %}
+<input type="hidden" name="view" value="{{ view_mode }}">
+<button type="submit" class="btn btn-success">
+{% trans "Approve customer" %}
+</button>
+</form>
 
-<a href="{% url 'rechazar_cliente' cliente.id %}" class="btn btn-danger">
-{% trans "Rechazar cliente" %}
-</a>
-
-<a href="{% url 'clientes_pendientes' %}" class="btn btn-secondary">
+<a href="{% url 'clientes_pendientes' %}?view={{ view_mode|default:'pending' }}" class="btn btn-secondary">
 {% trans "Volver" %}
 </a>
 
 </div>
+
+{% if cliente.estado_revision != 'APROBADO' %}
+<hr>
+
+<h5 class="mb-3">{% trans "Reject request" %}</h5>
+<p class="text-muted">{% trans "Write the correction the client must make. This note is required and will be sent by email." %}</p>
+
+<form method="post" action="{% url 'rechazar_cliente' cliente.id %}" enctype="multipart/form-data" id="rejectClientForm">
+{% csrf_token %}
+<input type="hidden" name="view" value="{{ view_mode }}">
+
+<div class="mb-3">
+	<label for="notaRechazo" class="form-label fw-bold">{% trans "Rejection note" %}</label>
+	<textarea id="notaRechazo" name="nota_rechazo" class="form-control" rows="5" required>{% if cliente.estado_revision == 'RECHAZADO' %}{{ cliente.nota_rechazo }}{% endif %}</textarea>
+</div>
+
+<div class="mb-3">
+	<label for="adjuntoRechazo" class="form-label fw-bold">{% trans "Attach example image (optional)" %}</label>
+	<input id="adjuntoRechazo" type="file" name="adjunto_rechazo" class="form-control" accept="image/*">
+</div>
+
+<button type="submit" class="btn btn-danger" id="rejectClientButton" disabled>
+	{% trans "Reject customer" %}
+</button>
+</form>
+
+<script>
+(function () {
+	const noteField = document.getElementById('notaRechazo');
+	const rejectButton = document.getElementById('rejectClientButton');
+
+	if (!noteField || !rejectButton) {
+		return;
+	}
+
+	function syncRejectButton() {
+		rejectButton.disabled = !noteField.value.trim();
+	}
+
+	noteField.addEventListener('input', syncRejectButton);
+	syncRejectButton();
+})();
+</script>
+{% endif %}
 
 </div>
 

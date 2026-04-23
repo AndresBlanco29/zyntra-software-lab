@@ -7,7 +7,19 @@ Clientes Pendientes
 
 {% block content %}
 
-<h2 class="mb-4">{% trans "Clientes Pendientes" %}</h2>
+<h2 class="mb-4">{% trans "Customer Requests" %}</h2>
+
+<div class="d-flex flex-wrap gap-2 mb-4">
+	<a href="{% url 'clientes_pendientes' %}?view=pending" class="btn {% if view_mode == 'pending' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+		{% trans "Pending" %} ({{ pending_count }})
+	</a>
+	<a href="{% url 'clientes_pendientes' %}?view=rejected" class="btn {% if view_mode == 'rejected' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+		{% trans "Rejected customers" %} ({{ rejected_count }})
+	</a>
+	<a href="{% url 'clientes_pendientes' %}?view=approved" class="btn {% if view_mode == 'approved' %}btn-success{% else %}btn-outline-success{% endif %}">
+		{% trans "Approved" %} ({{ approved_count }})
+	</a>
+</div>
 
 <div class="table-responsive">
 
@@ -16,10 +28,12 @@ Clientes Pendientes
 <thead>
 <tr>
 <th>{% trans "Empresa" %}</th>
+<th>{% trans "Status" %}</th>
 <th>{% trans "Ciudad" %}</th>
 <th>{% trans "Telefono" %}</th>
 <th>{% trans "Sales Tax" %}</th>
 <th>{% trans "Certificado" %}</th>
+<th>{% trans "Admin note" %}</th>
 <th>{% trans "Acciones" %}</th>
 </tr>
 </thead>
@@ -31,6 +45,15 @@ Clientes Pendientes
 <tr>
 
 <td>{{ cliente.nombre_empresa }}</td>
+<td>
+	{% if cliente.estado_revision == 'PENDIENTE' %}
+	<span class="badge bg-warning text-dark">{% trans "Pending" %}</span>
+	{% elif cliente.estado_revision == 'RECHAZADO' %}
+	<span class="badge bg-danger">{% trans "Rejected" %}</span>
+	{% else %}
+	<span class="badge bg-success">{% trans "Approved" %}</span>
+	{% endif %}
+</td>
 <td>{{ cliente.ciudad }}</td>
 <td>{{ cliente.telefono }}</td>
 <td>{{ cliente.sales_tax_number }}</td>
@@ -47,19 +70,36 @@ Clientes Pendientes
 
 </td>
 
+<td style="min-width: 240px;">
+	{% if cliente.nota_rechazo %}
+	<small class="text-muted d-block">{{ cliente.nota_rechazo|truncatechars:140 }}</small>
+	{% if cliente.adjunto_rechazo %}
+	<a href="{{ cliente.adjunto_rechazo.url }}" target="_blank" class="small">{% trans "See attached example" %}</a>
+	{% endif %}
+	{% else %}
+	<span class="text-muted">{% trans "No note" %}</span>
+	{% endif %}
+</td>
+
 <td>
 
 <a href="{% url 'ver_cliente' cliente.id %}" class="btn btn-secondary btn-sm">
-{% trans "Ver" %}
+{% trans "Review" %}
 </a>
 
-<a href="{% url 'aprobar_cliente' cliente.id %}" class="btn btn-success btn-sm">
-{% trans "Aprobar" %}
-</a>
+{% if cliente.estado_revision != 'APROBADO' %}
+<form method="post" action="{% url 'aprobar_cliente' cliente.id %}" class="d-inline">
+{% csrf_token %}
+<input type="hidden" name="view" value="{{ view_mode }}">
+<button type="submit" class="btn btn-success btn-sm">
+{% trans "Approve" %}
+</button>
+</form>
+{% endif %}
 
-<a href="{% url 'rechazar_cliente' cliente.id %}" class="btn btn-danger btn-sm">
-{% trans "Rechazar" %}
-</a>
+{% if cliente.estado_revision == 'RECHAZADO' %}
+<span class="badge bg-light text-dark border ms-1">{% trans "Waiting correction" %}</span>
+{% endif %}
 
 </td>
 
@@ -68,7 +108,15 @@ Clientes Pendientes
 {% empty %}
 
 <tr>
-<td colspan="6">{% trans "No hay clientes pendientes" %}</td>
+<td colspan="8">
+	{% if view_mode == 'rejected' %}
+	{% trans "There are no rejected customers." %}
+	{% elif view_mode == 'approved' %}
+	{% trans "There are no approved customers." %}
+	{% else %}
+	{% trans "No pending customer requests." %}
+	{% endif %}
+</td>
 </tr>
 
 {% endfor %}

@@ -1394,6 +1394,14 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<script>
+function limpiarModalTaxExample() {
+  if (typeof window.resetTaxExampleModal === 'function') {
+    window.resetTaxExampleModal();
+  }
+}
+</script>
+
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
 
 <script>
@@ -1668,6 +1676,7 @@ function cargarRegistro() {
       if (!html || html.trim().length === 0) {
         throw new Error('Respuesta vacía');
       }
+      limpiarModalTaxExample();
       container.innerHTML = html;
       
       // Ejecutar scripts que vienen en el HTML
@@ -1885,6 +1894,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     loginModal.addEventListener('hide.bs.modal', function() {
+      limpiarModalTaxExample();
       // Cuando se cierra el modal, también reemplazar el estado
       window.history.replaceState(null, null, window.location.href);
     });

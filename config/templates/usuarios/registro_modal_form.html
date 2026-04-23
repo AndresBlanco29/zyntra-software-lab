@@ -96,7 +96,7 @@
 
     <!-- DATOS DE LA EMPRESA -->
     <h6 class="fw-bold text-center mb-3" style="font-size: 14px;">{% if CURRENT_LANGUAGE == 'es' %}Datos de la empresa{% else %}Business details{% endif %}</h6>
-    <div class="row g-2" data-location-group>
+    <div class="row g-2">
       <div class="col-12">
         <input type="text" class="form-control form-control-lg" name="empresa" placeholder="{% if CURRENT_LANGUAGE == 'es' %}Nombre legal de la empresa{% else %}Legal business name{% endif %}" required />
       </div>
@@ -124,7 +124,7 @@
 
     <!-- DIRECCIÓN COMERCIAL -->
     <h6 class="fw-bold text-center mb-3" style="font-size: 14px;">{% if CURRENT_LANGUAGE == 'es' %}Dirección Comercial{% else %}Business address{% endif %}</h6>
-    <div class="row g-2" data-location-group>
+    <div class="row g-2">
       <div class="col-12">
         <input type="text" class="form-control form-control-lg" name="direccion" placeholder="{% if CURRENT_LANGUAGE == 'es' %}Dirección Principal{% else %}Primary address{% endif %}" required />
       </div>
@@ -132,17 +132,10 @@
         <input type="text" class="form-control form-control-lg" name="direccion2" placeholder="{% if CURRENT_LANGUAGE == 'es' %}Dirección 2 (opcional){% else %}Address line 2 (optional){% endif %}" />
       </div>
       <div class="col-6">
-        <select class="form-select form-control-lg" name="estado" data-state-select required>
-          <option value="">{% if CURRENT_LANGUAGE == 'es' %}Selecciona un estado{% else %}Select a state{% endif %}</option>
-          {% for state_name in us_states %}
-          <option value="{{ state_name }}">{{ state_name }}</option>
-          {% endfor %}
-        </select>
+        <input type="text" class="form-control form-control-lg" name="estado" placeholder="{% if CURRENT_LANGUAGE == 'es' %}Estado / Departamento{% else %}State / Department{% endif %}" required />
       </div>
       <div class="col-6">
-        <select class="form-select form-control-lg" name="ciudad" data-city-select disabled required>
-          <option value="">{% if CURRENT_LANGUAGE == 'es' %}Selecciona primero un estado{% else %}Select a state first{% endif %}</option>
-        </select>
+        <input type="text" class="form-control form-control-lg" name="ciudad" placeholder="{% if CURRENT_LANGUAGE == 'es' %}Ciudad{% else %}City{% endif %}" required />
       </div>
       <div class="col-6">
         <input type="text" class="form-control form-control-lg" name="codigo_postal" placeholder="{% if CURRENT_LANGUAGE == 'es' %}Código Postal{% else %}ZIP code{% endif %}" required />
@@ -217,10 +210,6 @@
     </div>
   </div>
 </div>
-
-<script>
-window.__LTG_US_LOCATIONS = {{ us_locations_json|safe }};
-</script>
 
 <style>
   .btn-continuar {

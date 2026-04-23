@@ -7,7 +7,36 @@
   var currentExampleMode = 'number';
 
   function getModalEl(){
-    return document.getElementById('taxExampleModal');
+    var modals = document.querySelectorAll('#taxExampleModal');
+    if(!modals.length) return null;
+    return modals[modals.length - 1];
+  }
+
+  function removeDuplicateModals(activeModalEl){
+    document.querySelectorAll('#taxExampleModal').forEach(function(modalEl){
+      if(modalEl !== activeModalEl){
+        modalEl.remove();
+      }
+    });
+  }
+
+  function resetTaxExampleState(){
+    document.body.classList.remove('tax-example-open');
+
+    if(backdropEl && document.body.contains(backdropEl)){
+      backdropEl.classList.remove('show');
+      backdropEl.remove();
+    }
+
+    backdropEl = null;
+    window._taxExampleParentModalId = null;
+    window._taxExampleLastTrigger = null;
+
+    document.querySelectorAll('#taxExampleModal').forEach(function(modalEl){
+      modalEl.classList.remove('show');
+      modalEl.setAttribute('aria-hidden', 'true');
+      modalEl.style.display = 'none';
+    });
   }
 
   function moveModalToBody(modalEl){
@@ -124,6 +153,7 @@
     if(!modalEl || modalEl.dataset.taxExampleReady === 'true') return;
 
     modalEl = moveModalToBody(modalEl);
+    removeDuplicateModals(modalEl);
 
     modalEl.dataset.taxExampleReady = 'true';
 
@@ -141,6 +171,7 @@
     }
 
     modalEl = moveModalToBody(modalEl);
+    removeDuplicateModals(modalEl);
     initTaxExample();
 
     var opener = event && event.currentTarget ? event.currentTarget : document.activeElement;
@@ -157,6 +188,7 @@
   window.closeTaxExample = function(){
     var modalEl = getModalEl();
     if(!modalEl){
+      resetTaxExampleState();
       return;
     }
 
@@ -179,6 +211,11 @@
     if(currentExampleMode === 'number'){
       focusSalesTaxInput();
     }
+  };
+
+  window.resetTaxExampleModal = function(){
+    resetTaxExampleState();
+    removeDuplicateModals(getModalEl());
   };
 
   window.addEventListener('resize', function(){

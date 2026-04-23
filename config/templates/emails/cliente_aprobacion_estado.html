@@ -26,8 +26,21 @@
 <p>Your wholesale account request has been approved.</p>
 <p>You can now sign in with the credentials you created during registration.</p>
 {% else %}
-<p>Your wholesale account request was not approved at this time.</p>
-<p>If you want to continue the process, please contact our team or submit a new request with updated information.</p>
+<p>Your wholesale account request needs a correction before it can be approved.</p>
+{% if rejection_reason %}
+<div style="background:#fff7ed;border:1px solid #fdba74;padding:14px 16px;border-radius:8px;margin:18px 0;">
+<strong>Reason for rejection:</strong><br>
+{{ rejection_reason|linebreaksbr }}
+</div>
+{% endif %}
+{% if correction_url %}
+<p>You can update the same request using the following secure link:</p>
+<p><a href="{{ correction_url }}" style="display:inline-block;background:#0b3d91;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;font-weight:700;">Correct my request</a></p>
+<p style="font-size:13px;color:#64748b;">If the button does not work, copy and paste this URL into your browser:<br>{{ correction_url }}</p>
+{% endif %}
+{% if has_rejection_example %}
+<p>We also attached an optional reference image so you can see how the missing document or information should look.</p>
+{% endif %}
 {% endif %}
 
 {% if company_name %}

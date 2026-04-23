@@ -1,0 +1,115 @@
+{% load i18n static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% trans "Correct request" %} | La Tortilla Grocery</title>
+  <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
+</head>
+<body style="background:#f8fafc; color:#1e293b;">
+  <div class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+          <div class="card-body p-4 p-md-5">
+            <div class="text-center mb-4">
+              <img src="{% static 'img/logo.png' %}" alt="La Tortilla Grocery" style="width:88px;height:auto;">
+              <h1 class="h3 mt-3 mb-2">{% trans "Correct your wholesale request" %}</h1>
+              <p class="text-muted mb-0">{% trans "Update the information requested by the administrator and resubmit the same application." %}</p>
+            </div>
+
+            {% if correction_success %}
+            <div class="alert alert-success">
+              <h2 class="h5">{% trans "Request resubmitted" %}</h2>
+              <p class="mb-0">{% trans "Your information was updated successfully. Our team will review your request again." %}</p>
+            </div>
+            {% elif not correction_available %}
+            <div class="alert alert-info">
+              <h2 class="h5">{% trans "This correction link is no longer active" %}</h2>
+              <p class="mb-0">{% trans "The request is no longer in rejected status. If you need help, please contact La Tortilla Grocery support." %}</p>
+            </div>
+            {% else %}
+              {% if messages %}
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+                {% endfor %}
+              {% endif %}
+
+              {% if cliente.nota_rechazo %}
+              <div class="alert alert-warning">
+                <h2 class="h6">{% trans "Reason for rejection" %}</h2>
+                <p class="mb-0">{{ cliente.nota_rechazo|linebreaksbr }}</p>
+              </div>
+              {% endif %}
+
+              {% if cliente.adjunto_rechazo %}
+              <div class="mb-4">
+                <a href="{{ cliente.adjunto_rechazo.url }}" target="_blank" class="btn btn-outline-secondary btn-sm">{% trans "Open reference image" %}</a>
+              </div>
+              {% endif %}
+
+              <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <h2 class="h5 mb-3">{% trans "Business details" %}</h2>
+                <div class="row g-3 mb-4">
+                  <div class="col-md-6">
+                    <label class="form-label">{% trans "Legal business name" %}</label>
+                    <input type="text" name="empresa" class="form-control" value="{{ cliente.nombre_empresa }}" required>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">{% trans "Sales tax number" %}</label>
+                    <input type="text" name="sales_tax" class="form-control" value="{{ cliente.sales_tax_number }}" required>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">{% trans "Business phone" %}</label>
+                    <input type="text" name="telefono_comercial" class="form-control" value="{{ cliente.telefono }}" required>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">{% trans "Contact email" %}</label>
+                    <input type="email" class="form-control" value="{{ cliente.usuario.email }}" readonly>
+                  </div>
+                </div>
+
+                <h2 class="h5 mb-3">{% trans "Business address" %}</h2>
+                <div class="row g-3 mb-4">
+                  <div class="col-md-6">
+                    <label class="form-label">{% trans "Primary address" %}</label>
+                    <input type="text" name="direccion" class="form-control" value="{{ cliente.direccion }}" required>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">{% trans "State / Department" %}</label>
+                    <input type="text" name="estado" class="form-control" value="{{ cliente.estado }}" required>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">{% trans "City" %}</label>
+                    <input type="text" name="ciudad" class="form-control" value="{{ cliente.ciudad }}" required>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">{% trans "ZIP code" %}</label>
+                    <input type="text" name="codigo_postal" class="form-control" value="{{ cliente.codigo_postal|default:'' }}">
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">{% trans "Country" %}</label>
+                    <input type="text" name="pais" class="form-control" value="{{ cliente.pais }}" required>
+                  </div>
+                </div>
+
+                <h2 class="h5 mb-3">{% trans "Tax certificate" %}</h2>
+                <div class="mb-3">
+                  <label class="form-label">{% trans "Upload a replacement file if needed" %}</label>
+                  <input type="file" name="certificado" class="form-control" accept=".pdf,.jpg,.jpeg,.png,image/*">
+                  <div class="form-text">{% trans "Leave this empty if the current certificate is still valid and you only need to correct another field." %}</div>
+                </div>
+
+                <button type="submit" class="btn btn-primary">{% trans "Resubmit request" %}</button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

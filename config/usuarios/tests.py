@@ -1,9 +1,11 @@
 import re
 
 from django.core import mail
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from config.clientes.models import Cliente
 from config.usuarios.models import Usuario
 from config.usuarios.permissions import get_redirect_url_for_user
 
@@ -229,3 +231,139 @@ class PasswordResetFlowTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, 'passwordResetConfirmModalForm')
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class CustomerRequestReviewWorkflowTests(TestCase):
+	def setUp(self):
+		self.admin_user = Usuario.objects.create_user(
+			username='admin-customer-review',
+			password='secret123',
+			role='admin',
+			is_active=True,
+		)
+		self.customer_user = Usuario.objects.create_user(
+			username='pending-customer',
+			email='pending-customer@example.com',
+			password='secret123',
+			first_name='Pending',
+			last_name='Customer',
+			role='cliente',
+			is_active=False,
+		)
+		self.cliente = Cliente.objects.create(
+			usuario=self.customer_user,
+			nombre_empresa='Pending Foods LLC',
+			telefono='1234567890',
+			direccion='123 Main St',
+			ciudad='Houston',
+			estado='Texas',
+			codigo_postal='77001',
+			pais='USA',
+			sales_tax_number='99887766',
+			certificado_tax=SimpleUploadedFile('certificado.pdf', b'pdf-bytes', content_type='application/pdf'),
+			declaracion_fiscal_aceptada=True,
+			estado_revision=Cliente.REVIEW_STATUS_PENDING,
+		)
+		self.client.force_login(self.admin_user)
+
+	def test_reject_requires_note_and_keeps_request_pending(self):
+		response = self.client.post(
+			reverse('rechazar_cliente', args=[self.cliente.id]),
+			{'view': 'pending', 'nota_rechazo': '   '},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		self.cliente.refresh_from_db()
+		self.customer_user.refresh_from_db()
+		self.assertEqual(self.cliente.estado_revision, Cliente.REVIEW_STATUS_PENDING)
+		self.assertFalse(self.cliente.nota_rechazo)
+		self.assertFalse(self.customer_user.is_active)
+		self.assertEqual(len(mail.outbox), 0)
+
+	def test_reject_persists_customer_and_sends_email_with_reason_and_attachment(self):
+		reference_image = SimpleUploadedFile('example.png', b'image-bytes', content_type='image/png')
+
+		response = self.client.post(
+			reverse('rechazar_cliente', args=[self.cliente.id]),
+			{
+				'view': 'pending',
+				'nota_rechazo': 'Your certificate is missing the state Department of Revenue heading.',
+				'adjunto_rechazo': reference_image,
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		self.assertTrue(Cliente.objects.filter(id=self.cliente.id).exists())
+		self.assertTrue(Usuario.objects.filter(id=self.customer_user.id).exists())
+
+		self.cliente.refresh_from_db()
+		self.customer_user.refresh_from_db()
+		self.assertEqual(self.cliente.estado_revision, Cliente.REVIEW_STATUS_REJECTED)
+		self.assertEqual(self.cliente.nota_rechazo, 'Your certificate is missing the state Department of Revenue heading.')
+		self.assertTrue(bool(self.cliente.adjunto_rechazo))
+		self.assertFalse(self.cliente.aprobado)
+		self.assertFalse(self.customer_user.is_active)
+		self.assertEqual(len(mail.outbox), 1)
+
+		email = mail.outbox[0]
+		self.assertIn('needs corrections', email.body)
+		self.assertIn('Reason: Your certificate is missing the state Department of Revenue heading.', email.body)
+		self.assertIn(str(self.cliente.correction_token), email.body)
+		self.assertEqual(len(email.attachments), 1)
+
+	def test_rejected_customer_appears_in_rejected_requests_filter(self):
+		self.cliente.estado_revision = Cliente.REVIEW_STATUS_REJECTED
+		self.cliente.nota_rechazo = 'Missing certificate page.'
+		self.cliente.save(update_fields=['estado_revision', 'nota_rechazo'])
+
+		response = self.client.get(reverse('clientes_pendientes') + '?view=rejected')
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Rejected customers')
+		self.assertContains(response, self.cliente.nombre_empresa)
+		self.assertContains(response, 'Missing certificate page.')
+
+	def test_customer_can_correct_rejected_request_and_resubmit(self):
+		self.cliente.estado_revision = Cliente.REVIEW_STATUS_REJECTED
+		self.cliente.nota_rechazo = 'Update the sales tax certificate and city.'
+		self.cliente.save(update_fields=['estado_revision', 'nota_rechazo'])
+
+		response = self.client.post(
+			reverse('corregir_solicitud_cliente', args=[self.cliente.correction_token]),
+			{
+				'empresa': 'Pending Foods LLC Updated',
+				'sales_tax': '11223344',
+				'telefono_comercial': '0987654321',
+				'direccion': '456 Updated Ave',
+				'estado': 'Georgia',
+				'ciudad': 'Atlanta',
+				'codigo_postal': '30301',
+				'pais': 'USA',
+			},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.cliente.refresh_from_db()
+		self.assertEqual(self.cliente.estado_revision, Cliente.REVIEW_STATUS_PENDING)
+		self.assertEqual(self.cliente.nombre_empresa, 'Pending Foods LLC Updated')
+		self.assertEqual(self.cliente.sales_tax_number, '11223344')
+		self.assertEqual(self.cliente.ciudad, 'Atlanta')
+		self.assertContains(response, 'Request resubmitted')
+
+	def test_admin_can_approve_previously_rejected_customer(self):
+		self.cliente.estado_revision = Cliente.REVIEW_STATUS_REJECTED
+		self.cliente.nota_rechazo = 'Initial rejection note.'
+		self.cliente.save(update_fields=['estado_revision', 'nota_rechazo'])
+
+		response = self.client.post(
+			reverse('aprobar_cliente', args=[self.cliente.id]),
+			{'view': 'rejected'},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		self.cliente.refresh_from_db()
+		self.customer_user.refresh_from_db()
+		self.assertEqual(self.cliente.estado_revision, Cliente.REVIEW_STATUS_APPROVED)
+		self.assertTrue(self.cliente.aprobado)
+		self.assertTrue(self.customer_user.is_active)

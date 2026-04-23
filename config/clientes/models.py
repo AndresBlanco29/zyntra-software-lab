@@ -1,7 +1,19 @@
+import uuid
+
 from django.db import models
 from config.usuarios.models import Usuario
 
 class Cliente(models.Model):
+
+    REVIEW_STATUS_PENDING = 'PENDIENTE'
+    REVIEW_STATUS_APPROVED = 'APROBADO'
+    REVIEW_STATUS_REJECTED = 'RECHAZADO'
+
+    REVIEW_STATUS_CHOICES = (
+        (REVIEW_STATUS_PENDING, 'Pendiente'),
+        (REVIEW_STATUS_APPROVED, 'Aprobado'),
+        (REVIEW_STATUS_REJECTED, 'Rechazado'),
+    )
 
     usuario = models.OneToOneField(
         Usuario,
@@ -71,6 +83,66 @@ class Cliente(models.Model):
 
     aprobado = models.BooleanField(
         default=False
+    )
+
+    estado_revision = models.CharField(
+        max_length=20,
+        choices=REVIEW_STATUS_CHOICES,
+        default=REVIEW_STATUS_PENDING,
+        db_index=True,
+    )
+
+    nota_rechazo = models.TextField(
+        blank=True,
+        default=''
+    )
+
+    adjunto_rechazo = models.FileField(
+        upload_to='certificados/rechazos/',
+        blank=True,
+        null=True
+    )
+
+    rechazado_en = models.DateTimeField(
+        blank=True,
+        null=True
+    )
+
+    rechazado_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='clientes_rechazados_admin'
+    )
+
+    aprobado_en = models.DateTimeField(
+        blank=True,
+        null=True
+    )
+
+    aprobado_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='clientes_aprobados_admin'
+    )
+
+    correction_token = models.UUIDField(
+        default=uuid.uuid4,
+        unique=True,
+        editable=False
+    )
+
+    correction_requested_at = models.DateTimeField(
+        blank=True,
+        null=True
+    )
+
+    corrected_at = models.DateTimeField(
+        blank=True,
+        null=True
     )
 
     credit_hold = models.BooleanField(

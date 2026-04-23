@@ -15,7 +15,7 @@ from .permissions import (
     get_redirect_url_for_user,
     internal_permission_required,
 )
-from .us_locations import US_STATE_CITIES, match_state_name, match_city_for_state
+from .us_locations import US_STATE_CITIES
 from config.clientes.models import Cliente
 from config.core.models import Testimonio, HomeContenido, ensure_homecontenido_quienes_schema
 from config.productos.models import Producto, Marca
@@ -55,7 +55,32 @@ def _registration_context(**extra):
     return context
 
 
-def _send_client_decision_email(*, client_email, client_name, approved, company_name):
+def _build_client_correction_url(request, cliente):
+    return request.build_absolute_uri(reverse('corregir_solicitud_cliente', args=[str(cliente.correction_token)]))
+
+
+def _attach_filefield_to_email(email, field_file):
+    if not field_file:
+        return False
+
+    filename = os.path.basename(field_file.name) or 'attachment'
+    content_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+
+    try:
+        field_file.open('rb')
+        email.attach(filename, field_file.read(), content_type)
+        return True
+    except Exception as exc:
+        logger.warning('No se pudo adjuntar archivo %s al correo: %s', filename, exc)
+        return False
+    finally:
+        try:
+            field_file.close()
+        except Exception:
+            pass
+
+
+def _send_client_decision_email(*, client_email, client_name, approved, company_name, rejection_reason='', correction_url='', rejection_example=None):
     if not client_email:
         return 'no-email'
 
@@ -75,7 +100,7 @@ def _send_client_decision_email(*, client_email, client_name, approved, company_
     preview_text = (
         'Your wholesale account has been approved.'
         if approved
-        else 'Your wholesale account request was not approved.'
+        else 'Your wholesale account request needs corrections before it can be approved.'
     )
     html_content = render_to_string(
         'emails/cliente_aprobacion_estado.html',
@@ -84,6 +109,9 @@ def _send_client_decision_email(*, client_email, client_name, approved, company_
             'company_name': company_name,
             'approved': approved,
             'preview_text': preview_text,
+            'rejection_reason': rejection_reason,
+            'correction_url': correction_url,
+            'has_rejection_example': bool(rejection_example),
         },
     )
     text_content = (
@@ -92,10 +120,11 @@ def _send_client_decision_email(*, client_email, client_name, approved, company_
             'Your wholesale account request for La Tortilla Grocery has been approved. '
             'You can now sign in with the credentials you registered.'
             if approved
-            else 'Your wholesale account request for La Tortilla Grocery was not approved at this time. '
-            'If you believe this was a mistake, please contact our team or submit a new request with updated information.'
+            else 'Your wholesale account request for La Tortilla Grocery needs corrections before it can be approved.'
         )
         + (f'\n\nCompany: {company_name}' if company_name else '')
+        + (f'\n\nReason: {rejection_reason}' if rejection_reason else '')
+        + (f'\n\nCorrection link: {correction_url}' if correction_url else '')
         + '\n\nLa Tortilla Grocery'
     )
 
@@ -106,6 +135,10 @@ def _send_client_decision_email(*, client_email, client_name, approved, company_
         to=[client_email],
     )
     email.attach_alternative(html_content, 'text/html')
+
+    if not approved:
+        _attach_filefield_to_email(email, rejection_example)
+
     email.send(fail_silently=False)
     return 'sent'
 
@@ -589,8 +622,8 @@ def _build_inline_file_response(file_obj_or_bytes, content_type, file_name, use_
 @internal_permission_required('admin.dashboard.view')
 def panel_admin(request):
 
-    clientes_pendientes = Cliente.objects.filter(aprobado=False).count()
-    clientes_aprobados = Cliente.objects.filter(aprobado=True).count()
+    clientes_pendientes = Cliente.objects.filter(estado_revision=Cliente.REVIEW_STATUS_PENDING).count()
+    clientes_aprobados = Cliente.objects.filter(estado_revision=Cliente.REVIEW_STATUS_APPROVED).count()
     vendedores = Usuario.objects.filter(role='vendedor').count()
     productos = Producto.objects.count()
 
@@ -1187,10 +1220,23 @@ def activar_usuario_interno(request, usuario_id, preset_role=None):
 @internal_permission_required('admin.customer_requests.view')
 def clientes_pendientes(request):
 
-    clientes = Cliente.objects.filter(aprobado=False)
+    view_mode = (request.GET.get('view') or 'pending').strip().lower()
+    base_queryset = Cliente.objects.select_related('usuario', 'rechazado_por', 'aprobado_por').order_by('-creado_en')
+
+    if view_mode == 'rejected':
+        clientes = base_queryset.filter(estado_revision=Cliente.REVIEW_STATUS_REJECTED)
+    elif view_mode == 'approved':
+        clientes = base_queryset.filter(estado_revision=Cliente.REVIEW_STATUS_APPROVED)
+    else:
+        view_mode = 'pending'
+        clientes = base_queryset.filter(estado_revision=Cliente.REVIEW_STATUS_PENDING)
 
     context = {
-        'clientes': clientes
+        'clientes': clientes,
+        'view_mode': view_mode,
+        'pending_count': base_queryset.filter(estado_revision=Cliente.REVIEW_STATUS_PENDING).count(),
+        'rejected_count': base_queryset.filter(estado_revision=Cliente.REVIEW_STATUS_REJECTED).count(),
+        'approved_count': base_queryset.filter(estado_revision=Cliente.REVIEW_STATUS_APPROVED).count(),
     }
 
     return render(request, 'admin/clientes_pendientes.html', context)
@@ -1199,15 +1245,23 @@ def clientes_pendientes(request):
 @internal_permission_required('admin.customer_requests.manage')
 def aprobar_cliente(request, cliente_id):
 
+    if request.method != 'POST':
+        messages.error(request, _('Debes enviar la aprobacion desde el formulario del administrador.'))
+        return redirect('ver_cliente', cliente_id=cliente_id)
+
     cliente = get_object_or_404(Cliente, id=cliente_id)
+    redirect_view = (request.POST.get('view') or 'pending').strip().lower()
 
     cliente.aprobado = True
-    cliente.save()
+    cliente.estado_revision = Cliente.REVIEW_STATUS_APPROVED
+    cliente.aprobado_en = timezone.now()
+    cliente.aprobado_por = request.user
+    cliente.save(update_fields=['aprobado', 'estado_revision', 'aprobado_en', 'aprobado_por'])
 
     # activar usuario
     usuario = cliente.usuario
     usuario.is_active = True
-    usuario.save()
+    usuario.save(update_fields=['is_active'])
 
     try:
         email_sent = _send_client_decision_email(
@@ -1227,19 +1281,55 @@ def aprobar_cliente(request, cliente_id):
         logger.exception('Error enviando correo de aprobación para cliente %s: %s', cliente.id, exc)
         messages.warning(request, _('Cliente aprobado, pero no se pudo enviar el correo al cliente.'))
 
-    return redirect('clientes_pendientes')
+    return redirect(f"{reverse('clientes_pendientes')}?view={redirect_view}")
 
 @login_required
 @internal_permission_required('admin.customer_requests.manage')
 def rechazar_cliente(request, cliente_id):
 
+    if request.method != 'POST':
+        messages.error(request, _('Debes enviar el rechazo desde el formulario del administrador.'))
+        return redirect('ver_cliente', cliente_id=cliente_id)
+
     cliente = get_object_or_404(Cliente, id=cliente_id)
+    redirect_view = (request.POST.get('view') or 'rejected').strip().lower()
+    rejection_reason = (request.POST.get('nota_rechazo') or '').strip()
+
+    if not rejection_reason:
+        messages.error(request, _('Debes escribir una nota explicando por que se rechazo la solicitud.'))
+        return redirect(f"{reverse('ver_cliente', args=[cliente.id])}?view={redirect_view}")
 
     usuario = cliente.usuario
+    rejection_example = request.FILES.get('adjunto_rechazo')
+
+    cliente.aprobado = False
+    cliente.estado_revision = Cliente.REVIEW_STATUS_REJECTED
+    cliente.nota_rechazo = rejection_reason
+    if rejection_example:
+        cliente.adjunto_rechazo = rejection_example
+    cliente.rechazado_en = timezone.now()
+    cliente.rechazado_por = request.user
+    cliente.correction_requested_at = timezone.now()
+
+    update_fields = [
+        'aprobado',
+        'estado_revision',
+        'nota_rechazo',
+        'rechazado_en',
+        'rechazado_por',
+        'correction_requested_at',
+    ]
+    if rejection_example:
+        update_fields.append('adjunto_rechazo')
+
+    cliente.save(update_fields=update_fields)
+    usuario.is_active = False
+    usuario.save(update_fields=['is_active'])
 
     client_email = usuario.email
     client_name = (usuario.first_name or usuario.username or 'Client').strip()
     company_name = cliente.nombre_empresa
+    correction_url = _build_client_correction_url(request, cliente)
 
     try:
         email_sent = _send_client_decision_email(
@@ -1247,6 +1337,9 @@ def rechazar_cliente(request, cliente_id):
             client_name=client_name,
             approved=False,
             company_name=company_name,
+            rejection_reason=rejection_reason,
+            correction_url=correction_url,
+            rejection_example=cliente.adjunto_rechazo,
         )
         if email_sent == 'sent':
             messages.success(request, _('Cliente rechazado y correo enviado al cliente.'))
@@ -1259,10 +1352,7 @@ def rechazar_cliente(request, cliente_id):
         logger.exception('Error enviando correo de rechazo para cliente %s: %s', cliente.id, exc)
         messages.warning(request, _('Cliente rechazado, pero no se pudo enviar el correo al cliente.'))
 
-    cliente.delete()
-    usuario.delete()
-
-    return redirect('clientes_pendientes')
+    return redirect(f"{reverse('clientes_pendientes')}?view={redirect_view}")
 
 @login_required
 @internal_permission_required('admin.customer_requests.view')
@@ -1271,7 +1361,8 @@ def ver_cliente(request, cliente_id):
     cliente = get_object_or_404(Cliente, id=cliente_id)
 
     context = {
-        'cliente': cliente
+        'cliente': cliente,
+        'view_mode': (request.GET.get('view') or 'pending').strip().lower(),
     }
 
     return render(request, 'admin/ver_cliente.html', context)
@@ -1488,17 +1579,15 @@ def registro_view(request):
         submitted_state = request.POST.get('estado', '').strip()
         submitted_city = request.POST.get('ciudad', '').strip()
 
-        matched_state = match_state_name(submitted_state)
-        if not matched_state:
-            message = _("Debes seleccionar un estado valido.")
+        if not submitted_state:
+            message = _("Debes ingresar un estado o departamento.")
             if is_ajax:
                 return JsonResponse({'success': False, 'error': 'invalid_state', 'message': message}, status=400)
             messages.error(request, message)
             return redirect('registro')
 
-        matched_city = match_city_for_state(matched_state, submitted_city)
-        if not matched_city:
-            message = _("Debes seleccionar una ciudad valida para el estado elegido.")
+        if not submitted_city:
+            message = _("Debes ingresar una ciudad.")
             if is_ajax:
                 return JsonResponse({'success': False, 'error': 'invalid_city', 'message': message}, status=400)
             messages.error(request, message)
@@ -1539,14 +1628,15 @@ def registro_view(request):
                     nombre_empresa=request.POST.get('empresa'),
                     telefono=request.POST.get('telefono_comercial'),
                     direccion=request.POST.get('direccion'),
-                    ciudad=matched_city,
-                    estado=matched_state,
+                    ciudad=submitted_city,
+                    estado=submitted_state,
                     codigo_postal=request.POST.get('codigo_postal'),
                     pais=request.POST.get('pais'),
                     sales_tax_number=request.POST.get('sales_tax'),
                     certificado_tax=certificado,
                     declaracion_fiscal_aceptada=True,
                     declaracion_fiscal_aceptada_en=timezone.now(),
+                    estado_revision=Cliente.REVIEW_STATUS_PENDING,
                 )
 
                 # asegurar que el grupo exista
@@ -1577,6 +1667,73 @@ def registro_view(request):
         return render(request, 'usuarios/login.html', {'registration_notice': success_message})
 
     return render(request, 'usuarios/registro.html', _registration_context())
+
+
+def corregir_solicitud_cliente(request, correction_token):
+    cliente = get_object_or_404(Cliente.objects.select_related('usuario'), correction_token=correction_token)
+
+    if cliente.estado_revision != Cliente.REVIEW_STATUS_REJECTED:
+        return render(request, 'usuarios/corregir_solicitud.html', {
+            'cliente': cliente,
+            'correction_available': False,
+        })
+
+    if request.method == 'POST':
+        submitted_state = (request.POST.get('estado') or '').strip()
+        submitted_city = (request.POST.get('ciudad') or '').strip()
+
+        if not submitted_state or not submitted_city:
+            messages.error(request, _('Debes completar ciudad y estado para reenviar la solicitud.'))
+            return render(request, 'usuarios/corregir_solicitud.html', {
+                'cliente': cliente,
+                'correction_available': True,
+            })
+
+        certificado_actualizado = request.FILES.get('certificado')
+
+        cliente.nombre_empresa = (request.POST.get('empresa') or '').strip()
+        cliente.telefono = (request.POST.get('telefono_comercial') or '').strip()
+        cliente.direccion = (request.POST.get('direccion') or '').strip()
+        cliente.ciudad = submitted_city
+        cliente.estado = submitted_state
+        cliente.codigo_postal = (request.POST.get('codigo_postal') or '').strip()
+        cliente.pais = (request.POST.get('pais') or '').strip() or cliente.pais
+        cliente.sales_tax_number = (request.POST.get('sales_tax') or '').strip()
+        if certificado_actualizado:
+            cliente.certificado_tax = certificado_actualizado
+
+        cliente.aprobado = False
+        cliente.estado_revision = Cliente.REVIEW_STATUS_PENDING
+        cliente.corrected_at = timezone.now()
+
+        update_fields = [
+            'nombre_empresa',
+            'telefono',
+            'direccion',
+            'ciudad',
+            'estado',
+            'codigo_postal',
+            'pais',
+            'sales_tax_number',
+            'aprobado',
+            'estado_revision',
+            'corrected_at',
+        ]
+        if certificado_actualizado:
+            update_fields.append('certificado_tax')
+
+        cliente.save(update_fields=update_fields)
+
+        return render(request, 'usuarios/corregir_solicitud.html', {
+            'cliente': cliente,
+            'correction_available': False,
+            'correction_success': True,
+        })
+
+    return render(request, 'usuarios/corregir_solicitud.html', {
+        'cliente': cliente,
+        'correction_available': True,
+    })
 
 
 def login_form_modal(request):

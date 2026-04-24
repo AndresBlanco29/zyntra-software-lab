@@ -316,6 +316,7 @@ class NotaAjuste(models.Model):
 	REASON_CHOICES = (
 		('DAMAGE', _('Damage')),
 		('DEFECT', _('Defect')),
+		('MISSING_ITEM', _('Missing item')),
 	)
 
 	CREDIT_TYPE_CHOICES = (

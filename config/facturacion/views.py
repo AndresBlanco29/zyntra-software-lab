@@ -185,16 +185,31 @@ def _parse_estimated_delivery_at(value):
 
 def _build_invoice_pdf_item_data(invoice):
 	items = []
-	for item in invoice.items.select_related('presentacion__producto').all():
+	for item in invoice.items.select_related('presentacion__producto', 'pedido_item').all():
 		barcode = _resolve_invoice_barcode(item)
+		requested_quantity = item.cantidad_facturada
+		if item.pedido_item_id:
+			requested_quantity = item.pedido_item.cantidad_solicitada or item.cantidad_facturada
+		suggested_unit_price = _resolve_invoice_suggested_unit_price(item)
+		customer_unit_price = Decimal(str(item.precio_unitario or '0')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+		if item.presentacion and item.presentacion.unidades:
+			customer_unit_price = (customer_unit_price / Decimal(str(item.presentacion.unidades))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+		profit_percentage = Decimal('0.00')
+		if suggested_unit_price and customer_unit_price and suggested_unit_price > 0:
+			try:
+				profit_percentage = ((suggested_unit_price - customer_unit_price) / suggested_unit_price * Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+			except (ArithmeticError, InvalidOperation, TypeError, ValueError):
+				profit_percentage = Decimal('0.00')
 		items.append({
 			'barcode': barcode,
 			'product_name': item.producto_nombre,
 			'pack_size': _resolve_invoice_pack_size(item),
-			'quantity': str(item.cantidad_facturada),
+			'requested_quantity': str(requested_quantity),
+			'dispatched_quantity': str(item.cantidad_facturada),
 			'customer_price': _format_pdf_money(item.precio_unitario),
-			'suggested_unit_price': _format_pdf_money(_resolve_invoice_suggested_unit_price(item)),
+			'suggested_unit_price': _format_pdf_money(suggested_unit_price),
 			'subtotal': _format_pdf_money(item.subtotal),
+			'profit_percentage': f'{profit_percentage:.2f}%',
 		})
 	return items
 
@@ -271,10 +286,10 @@ def _invoice_pdf_response(invoice):
 	]))
 	content.extend([party_table, Spacer(1, 12)])
 
-	content.append(Paragraph(_('Line items with barcode, customer case price and a suggested resale value per unit.'), note_style))
+	content.append(Paragraph(_('Line items with barcode, ordered quantity, dispatched quantity and abbreviated pricing references.'), note_style))
 	content.append(Spacer(1, 8))
 
-	rows = [[_('Barcode'), _('Product'), _('Pack / size'), _('Qty'), _('Customer price'), _('Suggested retail / unit'), _('Subtotal')]]
+	rows = [[_('Barcode'), _('Description'), _('U/M'), _('Qty ord'), _('Qty dsp'), _('Cust. / unit'), _('Subtotal'), _('Sug. rtl / unit'), _('Profit %')]]
 	for item in item_rows:
 		barcode_cell = Paragraph('-', styles['BodyText'])
 		if item['barcode']:
@@ -283,13 +298,15 @@ def _invoice_pdf_response(invoice):
 			barcode_cell,
 			Paragraph(item['product_name'], styles['BodyText']),
 			Paragraph(item['pack_size'], styles['BodyText']),
-			item['quantity'],
+			item['requested_quantity'],
+			item['dispatched_quantity'],
 			item['customer_price'],
-			item['suggested_unit_price'],
 			item['subtotal'],
+			item['suggested_unit_price'],
+			item['profit_percentage'],
 		])
 
-	table = Table(rows, colWidths=[130, 200, 95, 42, 82, 94, 78], repeatRows=1)
+	table = Table(rows, colWidths=[108, 158, 74, 48, 48, 72, 68, 84, 58], repeatRows=1)
 	table.setStyle(TableStyle([
 		('BACKGROUND', (0, 0), (-1, 0), BRAND_PRIMARY),
 		('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -322,7 +339,7 @@ def _invoice_pdf_response(invoice):
 	]))
 	content.extend([
 		Paragraph(_('Pricing note'), section_title_style),
-		Paragraph(_('Suggested retail per unit uses the next configured presentation price tier when available. It is a reference for resale, not a mandatory selling price.'), note_style),
+		Paragraph(_('Suggested retail per unit defaults to a 30%% profit suggestion over the customer unit cost. It is a reference for resale, not a mandatory selling price.'), note_style),
 		Spacer(1, 8),
 		totals_table,
 	])
@@ -513,7 +530,7 @@ def backoffice_generate_invoice(request, pedido_id):
 @internal_permission_required('backoffice.orders.view')
 def backoffice_invoice_detail(request, invoice_id):
 	invoice = get_object_or_404(
-		Invoice.objects.select_related('pedido__cliente__usuario', 'driver', 'creada_por').prefetch_related('items__presentacion__producto', 'notas_ajuste__items', 'notas_ajuste__evidence_photos', 'notas_ajuste__creada_por', 'delivery__evidence_photos', 'delivery__notification_logs'),
+		Invoice.objects.select_related('pedido__cliente__usuario', 'driver', 'creada_por').prefetch_related('items__presentacion__producto', 'notas_ajuste__items__presentacion', 'notas_ajuste__evidence_photos', 'notas_ajuste__creada_por', 'notas_ajuste__aprobada_por', 'delivery__evidence_photos', 'delivery__notification_logs'),
 		id=invoice_id,
 	)
 	if invoice.metodo_entrega == 'RUTA_DRIVER' and invoice.driver_id:

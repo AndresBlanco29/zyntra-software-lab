@@ -223,11 +223,11 @@
       <table class="table align-middle mb-0">
         <thead>
           <tr>
-            <th>{% trans "Product" %}</th>
-            <th>{% trans "Presentation" %}</th>
+            <th>{% trans "Description" %}</th>
+            <th>{% trans "U/M" %}</th>
             <th>{% trans "Qty." %}</th>
             <th>{% trans "Unit price" %}</th>
-            <th>{% trans "Suggested retail / unit" %}</th>
+            <th>{% trans "Sug. rtl / unit" %}</th>
             <th>{% trans "Subtotal" %}</th>
           </tr>
         </thead>
@@ -319,6 +319,80 @@
                   {% endif %}
                 </td>
               </tr>
+              <tr>
+                <td colspan="7" class="bg-light-subtle" data-note-details="{{ nota.id }}">
+                  <div class="row g-3 py-2">
+                    <div class="col-lg-4">
+                      <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Action taken" %}</div>
+                      <div class="small">
+                        {% if nota.tipo_documento == 'DEBITO' %}
+                          {% trans "Customer balance increased with an additional charge." %}
+                        {% elif nota.tipo_credito == 'CREDIT_RETURN' %}
+                          {% if nota.estado == 'APROBADA' and nota.inventario_estado == 'PROCESADO' %}
+                            {% trans "Product returned and inventory was restocked." %}
+                          {% elif nota.estado == 'ANULADA' %}
+                            {% trans "Return was voided and inventory impact was reversed when applicable." %}
+                          {% else %}
+                            {% trans "Product return registered and waiting for final inventory processing." %}
+                          {% endif %}
+                        {% else %}
+                          {% if nota.estado == 'ANULADA' %}
+                            {% trans "Credit without product return was voided." %}
+                          {% else %}
+                            {% trans "Credit applied without returning product to inventory." %}
+                          {% endif %}
+                        {% endif %}
+                      </div>
+                    </div>
+                    <div class="col-lg-4">
+                      <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Note details" %}</div>
+                      {% if nota.descripcion %}
+                        <div class="small mb-2">{{ nota.descripcion }}</div>
+                      {% else %}
+                        <div class="small text-muted mb-2">{% trans "No additional description was provided." %}</div>
+                      {% endif %}
+                      <div class="small"><span class="text-muted">{% trans "Balance impact" %}:</span> ${{ nota.impacto_saldo }}</div>
+                      {% if nota.aprobada_en %}
+                        <div class="small"><span class="text-muted">{% trans "Approved on" %}:</span> {{ nota.aprobada_en|date:"d/m/Y H:i" }}</div>
+                      {% endif %}
+                      {% if nota.anulada_en %}
+                        <div class="small"><span class="text-muted">{% trans "Voided on" %}:</span> {{ nota.anulada_en|date:"d/m/Y H:i" }}</div>
+                      {% endif %}
+                    </div>
+                    <div class="col-lg-4">
+                      <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Products affected" %}</div>
+                      {% if nota.items.all %}
+                        <div class="table-responsive">
+                          <table class="table table-sm table-borderless align-middle mb-0">
+                            <thead>
+                              <tr>
+                                <th>{% trans "Product" %}</th>
+                                <th>{% trans "U/M" %}</th>
+                                <th>{% trans "Qty." %}</th>
+                                <th>{% trans "Amount" %}</th>
+                                <th>{% trans "Total" %}</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {% for item in nota.items.all %}
+                              <tr>
+                                <td>{{ item.descripcion }}</td>
+                                <td>{% if item.presentacion %}{{ item.presentacion.nombre }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                                <td>{{ item.cantidad }}</td>
+                                <td>${{ item.monto_unitario }}</td>
+                                <td>${{ item.total }}</td>
+                              </tr>
+                              {% endfor %}
+                            </tbody>
+                          </table>
+                        </div>
+                      {% else %}
+                        <div class="small text-muted">{% trans "This note does not have item lines." %}</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </td>
+              </tr>
               {% if nota.evidence_photos.all %}
               <tr>
                 <td colspan="7">
@@ -353,7 +427,7 @@
           <div class="row g-2 mb-3">
             <div class="col-md-6">
               <label class="form-label fw-semibold">{% trans "Type" %}</label>
-              <select name="tipo_documento" class="form-select" required>
+              <select name="note_tipo_documento" id="backofficeNoteType" class="form-select" required>
                 <option value="">{% trans "Select..." %}</option>
                 <option value="CREDITO">{% trans "Credit note" %}</option>
                 <option value="DEBITO">{% trans "Debit note" %}</option>
@@ -361,15 +435,16 @@
             </div>
             <div class="col-md-6">
               <label class="form-label fw-semibold">{% trans "Reason" %}</label>
-              <select name="motivo" class="form-select" required>
+              <select name="note_motivo" class="form-select" required>
                 <option value="">{% trans "Select..." %}</option>
                 <option value="DAMAGE">{% trans "Damage" %}</option>
                 <option value="DEFECT">{% trans "Defect" %}</option>
+                <option value="MISSING_ITEM">{% trans "Missing item" %}</option>
               </select>
             </div>
-            <div class="col-12">
+            <div class="col-12 d-none" id="backofficeCreditTypeWrapper">
               <label class="form-label fw-semibold">{% trans "Credit type" %}</label>
-              <select name="tipo_credito" class="form-select">
+              <select name="note_tipo_credito" id="backofficeCreditType" class="form-select" disabled>
                 <option value="">{% trans "Only required for credit notes" %}</option>
                 <option value="CREDIT_DUMP">{% trans "Credit Dump" %}</option>
                 <option value="CREDIT_RETURN">{% trans "Credit Return" %}</option>
@@ -377,7 +452,7 @@
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold">{% trans "Description" %}</label>
-              <textarea name="descripcion" rows="3" class="form-control"></textarea>
+              <textarea name="note_descripcion" rows="3" class="form-control"></textarea>
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
@@ -416,4 +491,27 @@
     </div>
   </div>
 </div>
+<script>
+  (function () {
+    const noteType = document.getElementById('backofficeNoteType');
+    const creditTypeWrapper = document.getElementById('backofficeCreditTypeWrapper');
+    const creditType = document.getElementById('backofficeCreditType');
+
+    if (!noteType || !creditTypeWrapper || !creditType) {
+      return;
+    }
+
+    function syncCreditTypeVisibility() {
+      const isCredit = noteType.value === 'CREDITO';
+      creditTypeWrapper.classList.toggle('d-none', !isCredit);
+      creditType.disabled = !isCredit;
+      if (!isCredit) {
+        creditType.value = '';
+      }
+    }
+
+    noteType.addEventListener('change', syncCreditTypeVisibility);
+    syncCreditTypeVisibility();
+  })();
+</script>
 {% endblock %}

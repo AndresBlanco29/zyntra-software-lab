@@ -122,9 +122,9 @@ La Tortilla Grocery
 
 
 
-<div class="tabla-productos mb-4 table-responsive">
+<div class="tabla-productos mb-4 mobile-stack-responsive">
 
-<table class="table align-middle">
+<table class="table align-middle mobile-stack-table mobile-stack-table--pedido-resumen">
 
 <thead>
 
@@ -182,9 +182,9 @@ selected
 
 </td>
 
-<td data-label="{% trans "Cantidad" %}">
+<td data-label="{% trans "Cantidad" %}" class="mobile-stack-table__input-cell">
 
-<div class="d-flex align-items-center gap-2">
+<div class="cantidad-control">
 
 <button class="qty-btn restar" data-id="{{ item.id }}">−</button>
 
@@ -243,15 +243,23 @@ min="1"
 </td>
 
 <td data-label="{% trans "Subtotal" %}" id="subtotal-{{ item.id }}">
-${{ item.subtotal }}
+${{ item.subtotal|floatformat:2 }}
 </td>
 
-<td data-label="{% trans "Acción" %}">
+<td data-label="{% trans "Acción" %}" class="mobile-stack-table__action">
 
 <button class="accion eliminar" data-id="{{ item.id }}">🗑️</button>
 
 </td>
 
+</tr>
+
+{% empty %}
+
+<tr>
+<td colspan="6" class="text-center text-muted py-4 mobile-stack-table__empty">
+{% trans "No hay productos en el pedido." %}
+</td>
 </tr>
 
 {% endfor %}
@@ -302,7 +310,7 @@ ${{ item.subtotal }}
 
 <span>{% trans "Subtotal" %}:</span>
 
-<strong id="totalPedido">${{ total }}</strong>
+<strong id="totalPedido">${{ total|floatformat:2 }}</strong>
 
 </div>
 
@@ -322,7 +330,7 @@ ${{ item.subtotal }}
 
 <span>{% trans "Total" %}:</span>
 
-<strong id="totalFinal">${{ total }}</strong>
+<strong id="totalFinal">${{ total|floatformat:2 }}</strong>
 
 </div>
 

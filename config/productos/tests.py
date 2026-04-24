@@ -114,6 +114,28 @@ class CatalogCustomerPriceTierTests(TestCase):
 			estado_revision=Cliente.REVIEW_STATUS_APPROVED,
 			nivel_precio=3,
 		)
+		self.usuario_sin_precios = Usuario.objects.create_user(
+			username='cliente-sin-precio',
+			password='secret123',
+			role='cliente',
+			is_active=True,
+		)
+		Cliente.objects.create(
+			usuario=self.usuario_sin_precios,
+			nombre_empresa='Cliente Sin Precio LLC',
+			telefono='1234567891',
+			direccion='456 Main St',
+			ciudad='Houston',
+			estado='Texas',
+			codigo_postal='77002',
+			pais='USA',
+			sales_tax_number='11223344',
+			certificado_tax='certificados/test-no-price.pdf',
+			declaracion_fiscal_aceptada=True,
+			aprobado=True,
+			estado_revision=Cliente.REVIEW_STATUS_APPROVED,
+			nivel_precio=Cliente.PRICE_TIER_UNASSIGNED,
+		)
 
 	def test_presentacion_returns_price_for_assigned_tier(self):
 		self.assertEqual(self.presentacion.get_price_for_tier(3), self.presentacion.precio_3)
@@ -126,3 +148,14 @@ class CatalogCustomerPriceTierTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, 'Your price')
 		self.assertContains(response, f'data-price="{self.presentacion.precio_3}"')
+
+	def test_catalog_hides_prices_when_customer_has_no_assigned_tier(self):
+		self.client.force_login(self.usuario_sin_precios)
+
+		response = self.client.get(reverse('catalogo'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertNotContains(response, 'Your price')
+		self.assertNotContains(response, 'Assigned tier')
+		self.assertContains(response, 'agregar-btn')
+		self.assertNotContains(response, 'Pending price assignment')

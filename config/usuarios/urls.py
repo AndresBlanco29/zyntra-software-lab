@@ -2,7 +2,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import path, reverse_lazy
 
 from .forms import CustomerPasswordResetForm, CustomerSetPasswordForm
-from .views import login_view, registro_view, panel_admin, perfil_admin, clientes_pendientes, aprobar_cliente, ver_cliente, ver_certificado_cliente, rechazar_cliente, lista_vendedores, crear_vendedor, editar_vendedor, desactivar_vendedor, activar_vendedor, login_form_modal, password_reset_form_modal, password_reset_confirm_modal, registro_form_modal, verificar_username, logout_view, contenido_home, lista_testimonios, crear_testimonio, editar_testimonio, desactivar_testimonio, activar_testimonio, editar_home_contenido, lista_usuarios_internos, crear_usuario_interno, editar_usuario_interno, desactivar_usuario_interno, activar_usuario_interno, crear_backoffice, editar_backoffice, desactivar_backoffice, activar_backoffice, corregir_solicitud_cliente
+from .views import login_view, registro_view, panel_admin, perfil_admin, clientes_pendientes, aprobar_cliente, actualizar_precio_cliente, ver_cliente, ver_certificado_cliente, rechazar_cliente, lista_vendedores, crear_vendedor, editar_vendedor, desactivar_vendedor, activar_vendedor, login_form_modal, password_reset_form_modal, password_reset_confirm_modal, registro_form_modal, verificar_username, logout_view, contenido_home, lista_testimonios, crear_testimonio, editar_testimonio, desactivar_testimonio, activar_testimonio, editar_home_contenido, lista_usuarios_internos, crear_usuario_interno, editar_usuario_interno, desactivar_usuario_interno, activar_usuario_interno, crear_backoffice, editar_backoffice, desactivar_backoffice, activar_backoffice, corregir_solicitud_cliente
 
 urlpatterns = [
     path('login/', login_view, name='login'),
@@ -53,6 +53,7 @@ urlpatterns = [
     path('panel-admin/mi-perfil/', perfil_admin, name='perfil_admin'),
     path('panel-admin/clientes-pendientes/', clientes_pendientes, name='clientes_pendientes'),
     path('panel-admin/aprobar-cliente/<int:cliente_id>/', aprobar_cliente, name='aprobar_cliente'),
+    path('panel-admin/actualizar-precio-cliente/<int:cliente_id>/', actualizar_precio_cliente, name='actualizar_precio_cliente'),
     path('panel-admin/rechazar-cliente/<int:cliente_id>/', rechazar_cliente, name='rechazar_cliente'),
     path('panel-admin/ver-cliente/<int:cliente_id>/', ver_cliente, name='ver_cliente'),
     path('panel-admin/ver-certificado/<int:cliente_id>/', ver_certificado_cliente, name='ver_certificado_cliente'),

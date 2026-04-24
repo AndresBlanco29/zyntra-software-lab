@@ -81,6 +81,7 @@ class PickingVerificationFlowTests(TestCase):
 
 	def test_verification_requires_note(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=0)
 
 		with self.assertRaises(ValidationError):
 			guardar_verificacion_picking(
@@ -91,8 +92,22 @@ class PickingVerificationFlowTests(TestCase):
 				nota_resuelta=False,
 			)
 
+	def test_verification_requires_picker_approval_when_stock_is_available(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+
+		with self.assertRaises(ValidationError):
+			guardar_verificacion_picking(
+				pedido=self.pedido,
+				seleccionador=self.selector,
+				cantidades_reales={self.item.id: 2},
+				nota='',
+				nota_resuelta=False,
+			)
+
 	def test_verification_updates_quantities_and_blocks_when_unresolved(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=0)
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
 
 		guardar_verificacion_picking(
 			pedido=self.pedido,
@@ -109,7 +124,10 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertTrue(self.pedido.picking_bloqueado)
 		self.assertEqual(self.item.cantidad, 1)
 		self.assertEqual(self.pedido.total, Decimal('12.00'))
-		self.assertTrue(Notificacion.objects.filter(titulo__icontains='verification completed').exists())
+		stock.refresh_from_db()
+		self.assertEqual(stock.stock_fisico, 0)
+		self.assertEqual(stock.stock_reservado, 2)
+		self.assertTrue(Notificacion.objects.filter(titulo__icontains='stock shortage').exists())
 
 	def test_selector_only_sees_assigned_picking_tickets(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
@@ -228,12 +246,12 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'Desbloqueado')
 		self.assertContains(response, 'Cantidades reales por producto')
 		self.assertContains(response, 'Producto')
-		self.assertContains(response, 'Presentación')
-		self.assertContains(response, 'Cant. solicitada')
-		self.assertContains(response, 'Cant. real')
+		self.assertContains(response, 'U/M')
+		self.assertContains(response, 'QTY ORD')
+		self.assertContains(response, 'QTY PICK')
 		self.assertContains(response, 'Nota')
-		self.assertContains(response, 'Esta nota es obligatoria. Si no se resuelve, el pedido permanece bloqueado para BackOffice.', html=False)
-		self.assertContains(response, 'Nota resuelta')
+		self.assertContains(response, 'Si hay stock fisico disponible, la aprobacion del picker es obligatoria para guardar esta verificacion como desbloqueada.', html=False)
+		self.assertContains(response, 'Aprobado por el picker')
 		self.assertContains(response, 'Guardar verificación')
 
 	def test_selector_post_verification_redirects_to_assigned_list(self):
@@ -249,8 +267,42 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(response.status_code, 302)
 		self.assertEqual(response.url, reverse('selector_picking_list'))
 
+	def test_selector_post_with_stock_error_preserves_typed_quantities_and_note(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=0)
+
+		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			f'cantidad_real_{self.item.id}': '2',
+			'nota_seleccionador': 'Mantener cantidad digitada',
+			'nota_seleccionador_resuelta': 'on',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.assertEqual(response.url, reverse('selector_picking_list'))
+		self.pedido.refresh_from_db()
+		self.item.refresh_from_db()
+		self.assertTrue(self.pedido.picking_bloqueado)
+		self.assertEqual(self.pedido.nota_seleccionador, 'Mantener cantidad digitada')
+		self.assertFalse(self.pedido.nota_seleccionador_resuelta)
+		self.assertEqual(self.item.cantidad, 2)
+
+	def test_selector_detail_disables_picker_approval_when_physical_stock_is_insufficient(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=0)
+
+		response = self.client.get(reverse('selector_picking_detail', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Physical stock is insufficient. A note is required and the order will remain blocked for BackOffice review.', html=False)
+		self.assertContains(response, 'name="nota_seleccionador_resuelta"', html=False)
+		self.assertContains(response, 'disabled>', html=False)
+		self.assertContains(response, 'badge bg-danger', html=False)
+
 	def test_backoffice_cannot_move_blocked_order_forward(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=0)
 		guardar_verificacion_picking(
 			pedido=self.pedido,
 			seleccionador=self.selector,
@@ -269,6 +321,25 @@ class PickingVerificationFlowTests(TestCase):
 		self.pedido.refresh_from_db()
 		self.assertEqual(self.pedido.estado, 'VERIFICADO_AJUSTADO')
 
+	def test_backoffice_detail_shows_explicit_picker_shortage_alert(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=0)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 2},
+			nota='Sin stock fisico en bodega.',
+			nota_resuelta=False,
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Picker reported physical stock shortage')
+		self.assertContains(response, 'This order stays blocked until BackOffice reviews the shortage reported during picking.')
+		self.assertContains(response, 'BackOffice action required: the picker reported insufficient physical stock for one or more items.')
+
 	def test_backoffice_detail_shows_suggested_resale_inputs_by_percentage_and_value(self):
 		self.pedido.estado = 'VERIFICADO_AJUSTADO'
 		self.pedido.save(update_fields=['estado', 'actualizada_en'])
@@ -280,6 +351,8 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'Customer unit cost')
 		self.assertContains(response, f'name="suggested_margin_percentage_{self.item.id}"', html=False)
 		self.assertContains(response, f'name="suggested_unit_price_{self.item.id}"', html=False)
+		self.assertContains(response, 'Profit %')
+		self.assertContains(response, 'value="30.00"', html=False)
 
 	def test_backoffice_order_list_defaults_to_pending_orders(self):
 		in_progress_order = Pedido.objects.create(

@@ -1,10 +1,12 @@
 import uuid
 
 from django.db import models
-from config.productos.models import DEFAULT_CUSTOMER_PRICE_TIER, normalize_price_tier
+from config.productos.models import normalize_price_tier
 from config.usuarios.models import Usuario
 
 class Cliente(models.Model):
+
+    PRICE_TIER_UNASSIGNED = 0
 
     REVIEW_STATUS_PENDING = 'PENDIENTE'
     REVIEW_STATUS_APPROVED = 'APROBADO'
@@ -17,6 +19,7 @@ class Cliente(models.Model):
     )
 
     PRICE_TIER_CHOICES = (
+        (PRICE_TIER_UNASSIGNED, 'Sin precios'),
         (1, 'Precio 1'),
         (2, 'Precio 2'),
         (3, 'Precio 3'),
@@ -96,7 +99,8 @@ class Cliente(models.Model):
 
     nivel_precio = models.PositiveSmallIntegerField(
         choices=PRICE_TIER_CHOICES,
-        default=DEFAULT_CUSTOMER_PRICE_TIER,
+        blank=True,
+        default=PRICE_TIER_UNASSIGNED,
     )
 
     estado_revision = models.CharField(
@@ -168,7 +172,10 @@ class Cliente(models.Model):
     )
 
     def get_nivel_precio_normalizado(self):
-        return normalize_price_tier(self.nivel_precio)
+        return normalize_price_tier(self.nivel_precio, default=None)
+
+    def has_assigned_price_tier(self):
+        return self.get_nivel_precio_normalizado() is not None
 
     def __str__(self):
         return self.nombre_empresa

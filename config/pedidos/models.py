@@ -80,8 +80,6 @@ class Pedido(models.Model):
 	def clean(self):
 		if self.seleccionador_id and getattr(self.seleccionador, 'role', '') != 'seleccionador':
 			raise ValidationError({'seleccionador': _('Only selector users can be assigned to a picking ticket.')})
-		if self.nota_seleccionador_resuelta and not (self.nota_seleccionador or '').strip():
-			raise ValidationError({'nota_seleccionador_resuelta': _('A note is required before marking it as resolved.')})
 		if self.estado == 'PARA_VERIFICAR' and not self.seleccionador_id:
 			raise ValidationError({'seleccionador': _('A selector must be assigned before verification starts.')})
 

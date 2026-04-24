@@ -48,25 +48,30 @@
           {% csrf_token %}
           <div>
             <label class="form-label">{% trans "Action" %}</label>
-            <select name="action" class="form-select" required>
+            <select name="action" class="form-select" id="inventoryActionSelect" required>
               <option value="entrada">{% trans "Manual entry" %}</option>
               <option value="salida">{% trans "Manual exit" %}</option>
               <option value="ajuste">{% trans "Adjustment" %}</option>
             </select>
+            <div class="form-text" id="inventoryActionHelp"
+              data-entry-help="{% trans 'Manual entry and manual exit use the Quantity field only.' %}"
+              data-adjustment-help="{% trans 'Adjustment uses only Adjustment delta. Positive numbers add stock and negative numbers subtract stock.' %}">
+              {% trans "Manual entry and manual exit use the Quantity field only." %}
+            </div>
           </div>
           <div>
             <label class="form-label">{% trans "Quantity" %}</label>
-            <input type="number" name="cantidad" min="1" value="1" class="form-control">
+            <input type="number" name="cantidad" min="1" value="1" class="form-control" id="inventoryQuantityInput">
             <div class="form-text">{% trans "Use this field for entries and exits." %}</div>
           </div>
           <div>
             <label class="form-label">{% trans "Adjustment delta" %}</label>
-            <input type="number" name="delta_cantidad" value="0" class="form-control">
+            <input type="number" name="delta_cantidad" value="0" class="form-control" id="inventoryAdjustmentInput" disabled>
             <div class="form-text">{% trans "Use positive or negative values for adjustments, for example 5 or -3." %}</div>
           </div>
           <div>
             <label class="form-label">{% trans "Observation" %}</label>
-            <textarea name="observacion" rows="3" class="form-control" placeholder="{% trans 'Reason or reference for the movement' %}"></textarea>
+            <textarea name="observacion" rows="3" class="form-control" placeholder="{% trans 'Reason or reference for the movement' %}" required></textarea>
           </div>
           <button type="submit" class="btn btn-primary">{% trans "Save movement" %}</button>
         </form>
@@ -117,4 +122,29 @@
     </div>
   </div>
 </div>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var actionSelect = document.getElementById('inventoryActionSelect');
+    var quantityInput = document.getElementById('inventoryQuantityInput');
+    var adjustmentInput = document.getElementById('inventoryAdjustmentInput');
+    var actionHelp = document.getElementById('inventoryActionHelp');
+
+    if (!actionSelect || !quantityInput || !adjustmentInput || !actionHelp) {
+      return;
+    }
+
+    function syncInventoryActionForm() {
+      var isAdjustment = actionSelect.value === 'ajuste';
+
+      quantityInput.disabled = isAdjustment;
+      quantityInput.required = !isAdjustment;
+      adjustmentInput.disabled = !isAdjustment;
+      adjustmentInput.required = isAdjustment;
+      actionHelp.textContent = isAdjustment ? actionHelp.dataset.adjustmentHelp : actionHelp.dataset.entryHelp;
+    }
+
+    actionSelect.addEventListener('change', syncInventoryActionForm);
+    syncInventoryActionForm();
+  });
+</script>
 {% endblock %}

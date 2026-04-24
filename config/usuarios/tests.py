@@ -368,3 +368,48 @@ class CustomerRequestReviewWorkflowTests(TestCase):
 		self.assertTrue(self.cliente.aprobado)
 		self.assertEqual(self.cliente.nivel_precio, 4)
 		self.assertTrue(self.customer_user.is_active)
+
+	def test_admin_can_approve_customer_without_assigning_prices_yet(self):
+		response = self.client.post(
+			reverse('aprobar_cliente', args=[self.cliente.id]),
+			{'view': 'pending', 'nivel_precio': '0'},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		self.cliente.refresh_from_db()
+		self.customer_user.refresh_from_db()
+		self.assertEqual(self.cliente.estado_revision, Cliente.REVIEW_STATUS_APPROVED)
+		self.assertTrue(self.cliente.aprobado)
+		self.assertEqual(self.cliente.nivel_precio, Cliente.PRICE_TIER_UNASSIGNED)
+		self.assertTrue(self.customer_user.is_active)
+
+	def test_admin_can_update_customer_pricing_without_sending_approval_email(self):
+		self.cliente.estado_revision = Cliente.REVIEW_STATUS_APPROVED
+		self.cliente.aprobado = True
+		self.cliente.nivel_precio = 2
+		self.cliente.save(update_fields=['estado_revision', 'aprobado', 'nivel_precio'])
+		mail.outbox = []
+
+		response = self.client.post(
+			reverse('actualizar_precio_cliente', args=[self.cliente.id]),
+			{'view': 'approved', 'nivel_precio': '4'},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		self.assertRedirects(response, reverse('clientes_pendientes') + '?view=approved')
+		self.cliente.refresh_from_db()
+		self.assertEqual(self.cliente.nivel_precio, 4)
+		self.assertEqual(len(mail.outbox), 0)
+
+	def test_approved_customers_list_shows_quick_pricing_update_form(self):
+		self.cliente.estado_revision = Cliente.REVIEW_STATUS_APPROVED
+		self.cliente.aprobado = True
+		self.cliente.nivel_precio = 2
+		self.cliente.save(update_fields=['estado_revision', 'aprobado', 'nivel_precio'])
+
+		response = self.client.get(reverse('clientes_pendientes') + '?view=approved')
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, reverse('actualizar_precio_cliente', args=[self.cliente.id]))
+		self.assertContains(response, 'Update customer pricing')
+		self.assertContains(response, 'name="nivel_precio"', html=False)

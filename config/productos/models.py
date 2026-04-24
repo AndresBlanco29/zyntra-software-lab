@@ -93,7 +93,7 @@ def _validate_margin_percentage(value):
     return percentage.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-def normalize_price_tier(value, default=DEFAULT_CUSTOMER_PRICE_TIER):
+def normalize_price_tier(value, default=None):
     try:
         tier = int(value)
     except (TypeError, ValueError):
@@ -242,8 +242,10 @@ class Presentacion(models.Model):
 
         self.precio_1, self.precio_2, self.precio_3, self.precio_4, self.precio_5 = precios
 
-    def get_price_for_tier(self, tier=DEFAULT_CUSTOMER_PRICE_TIER):
-        normalized_tier = normalize_price_tier(tier)
+    def get_price_for_tier(self, tier=None):
+        normalized_tier = normalize_price_tier(tier, default=None)
+        if normalized_tier is None:
+            return None
         return getattr(self, f'precio_{normalized_tier}', self.precio_1)
 
     def save(self, *args, **kwargs):

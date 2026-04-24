@@ -51,8 +51,8 @@
 </div>
 
 <div class="card shadow-sm">
-  <div class="table-responsive">
-    <table class="table table-striped align-middle mb-0">
+  <div class="table-responsive mobile-stack-responsive">
+    <table class="table table-striped align-middle mb-0 mobile-stack-table mobile-stack-table--list">
       <thead>
         <tr>
           <th>{% trans "Product" %}</th>
@@ -67,17 +67,17 @@
       <tbody>
         {% for row in rows %}
         <tr>
-          <td>
+          <td data-label="{% trans 'Product' %}">
             <div class="fw-semibold">{{ row.presentacion.producto.nombre_traducido }}</div>
             {% if row.presentacion.producto.categoria %}
             <div class="text-muted small">{{ row.presentacion.producto.categoria.nombre_traducido }}</div>
             {% endif %}
           </td>
-          <td>{{ row.presentacion.nombre_traducido }}</td>
-          <td>{{ row.stock_fisico }}</td>
-          <td>{{ row.stock_reservado }}</td>
-          <td>{{ row.stock_disponible }}</td>
-          <td>
+          <td data-label="{% trans 'Presentation' %}">{{ row.presentacion.nombre_traducido }}</td>
+          <td data-label="{% trans 'Physical' %}">{{ row.stock_fisico }}</td>
+          <td data-label="{% trans 'Reserved' %}">{{ row.stock_reservado }}</td>
+          <td data-label="{% trans 'Available' %}">{{ row.stock_disponible }}</td>
+          <td data-label="{% trans 'Status' %}">
             {% if row.stock_disponible <= 0 %}
             <span class="badge bg-danger">{% trans "Out of stock" %}</span>
             {% elif row.stock_disponible <= 5 %}
@@ -86,13 +86,13 @@
             <span class="badge bg-success">{% trans "Available" %}</span>
             {% endif %}
           </td>
-          <td>
+          <td data-label="{% trans 'Action' %}" class="mobile-stack-table__action">
             <a href="{% url 'backoffice_inventory_detail' row.presentacion.id %}" class="btn btn-sm btn-outline-primary">{% trans "View detail" %}</a>
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="7" class="text-center text-muted py-4">{% trans "No inventory presentations match the current filter." %}</td>
+          <td colspan="7" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No inventory presentations match the current filter." %}</td>
         </tr>
         {% endfor %}
       </tbody>

@@ -101,6 +101,21 @@ Clientes Pendientes
 <span class="badge bg-light text-dark border ms-1">{% trans "Waiting correction" %}</span>
 {% endif %}
 
+{% if cliente.estado_revision == 'APROBADO' and view_mode == 'approved' %}
+<form method="post" action="{% url 'actualizar_precio_cliente' cliente.id %}" class="mt-2 d-flex gap-2 align-items-center flex-wrap">
+{% csrf_token %}
+<input type="hidden" name="view" value="{{ view_mode }}">
+<select name="nivel_precio" class="form-select form-select-sm" style="max-width: 150px;">
+	{% for value, label in price_tier_choices %}
+	<option value="{{ value }}" {% if cliente.nivel_precio == value %}selected{% endif %}>{{ label }}</option>
+	{% endfor %}
+</select>
+<button type="submit" class="btn btn-outline-success btn-sm">
+	{% trans "Update customer pricing" %}
+</button>
+</form>
+{% endif %}
+
 </td>
 
 </tr>

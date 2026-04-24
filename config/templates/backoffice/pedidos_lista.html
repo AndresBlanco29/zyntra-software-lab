@@ -26,8 +26,8 @@
 </div>
 
 <div class="card shadow-sm">
-  <div class="table-responsive">
-    <table class="table table-striped align-middle mb-0">
+  <div class="table-responsive mobile-stack-responsive">
+    <table class="table table-striped align-middle mb-0 mobile-stack-table mobile-stack-table--list">
       <thead>
         <tr>
           <th>ID</th>
@@ -43,20 +43,20 @@
       <tbody>
         {% for pedido in pedidos %}
         <tr>
-          <td>#{{ pedido.id }}</td>
-          <td>{{ pedido.cliente.nombre_empresa }}</td>
-          <td>{% if pedido.seleccionador %}{% firstof pedido.seleccionador.get_full_name pedido.seleccionador.username %}{% else %}<span class="text-muted">-</span>{% endif %}</td>
-          <td>{{ pedido.origen_label }}</td>
-          <td><span class="badge {% if pedido.estado == 'DESPACHADO' %}bg-success{% elif pedido.estado == 'CANCELADO' %}bg-secondary{% elif pedido.estado == 'EN_GESTION' or pedido.estado == 'PARA_VERIFICAR' or pedido.estado == 'VERIFICADO_AJUSTADO' or pedido.estado == 'INVOICE_GENERADA' %}bg-warning text-dark{% else %}bg-info text-dark{% endif %}">{{ pedido.estado_label }}</span></td>
-          <td>${{ pedido.total }}</td>
-          <td>{{ pedido.creada_en|date:"d/m/Y H:i" }}</td>
-          <td>
+          <td data-label="ID">#{{ pedido.id }}</td>
+          <td data-label="{% trans 'Customer' %}">{{ pedido.cliente.nombre_empresa }}</td>
+          <td data-label="{% trans 'Selector' %}">{% if pedido.seleccionador %}{% firstof pedido.seleccionador.get_full_name pedido.seleccionador.username %}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+          <td data-label="{% trans 'Origin' %}">{{ pedido.origen_label }}</td>
+          <td data-label="{% trans 'Status' %}"><span class="badge {% if pedido.estado == 'DESPACHADO' %}bg-success{% elif pedido.estado == 'CANCELADO' %}bg-secondary{% elif pedido.estado == 'EN_GESTION' or pedido.estado == 'PARA_VERIFICAR' or pedido.estado == 'VERIFICADO_AJUSTADO' or pedido.estado == 'INVOICE_GENERADA' %}bg-warning text-dark{% else %}bg-info text-dark{% endif %}">{{ pedido.estado_label }}</span></td>
+          <td data-label="{% trans 'Total' %}">${{ pedido.total }}</td>
+          <td data-label="{% trans 'Date' %}">{{ pedido.creada_en|date:"d/m/Y H:i" }}</td>
+          <td data-label="{% trans 'Action' %}" class="mobile-stack-table__action">
             <a href="{% url 'backoffice_pedido_detalle' pedido.id %}" class="btn btn-sm btn-warning">{% trans "Manage" %}</a>
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="8" class="text-center text-muted py-4">{% trans "No purchase orders have been registered yet." %}</td>
+          <td colspan="8" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No purchase orders have been registered yet." %}</td>
         </tr>
         {% endfor %}
       </tbody>

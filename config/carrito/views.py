@@ -3,6 +3,7 @@ from django.views.decorators.http import require_POST
 from config.clientes.models import Cliente
 from config.productos.models import Producto, Presentacion
 from django.shortcuts import render
+from django.utils.translation import gettext as _
 
 
 def _get_request_price_tier(request):
@@ -20,6 +21,13 @@ def _get_request_price_tier(request):
         return 1
 
     return cliente.get_nivel_precio_normalizado()
+
+
+def _get_request_price_for_presentacion(request, presentacion):
+    price_tier = _get_request_price_tier(request)
+    if price_tier is None:
+        return None
+    return presentacion.get_price_for_tier(price_tier)
 
 def ver_cotizacion(request):
 
@@ -102,7 +110,13 @@ def cambiar_presentacion(request):
     if producto_id in carrito:
 
         presentacion = Presentacion.objects.get(id=presentacion_id)
-        precio_actual = float(presentacion.get_price_for_tier(_get_request_price_tier(request)))
+        assigned_price = _get_request_price_for_presentacion(request, presentacion)
+        if assigned_price is None:
+            return JsonResponse({
+                "error": True,
+                "message": _("Your account has no prices assigned yet. Contact the administrator to enable order requests."),
+            }, status=403)
+        precio_actual = float(assigned_price)
 
         carrito[producto_id]["presentacion_id"] = presentacion.id
         carrito[producto_id]["precio"] = precio_actual
@@ -154,7 +168,13 @@ def agregar_carrito(request):
 
     producto = Producto.objects.get(id= producto_id)
     presentacion = Presentacion.objects.get(id = presentacion_id)
-    precio_actual = float(presentacion.get_price_for_tier(_get_request_price_tier(request)))
+    assigned_price = _get_request_price_for_presentacion(request, presentacion)
+    if assigned_price is None:
+        return JsonResponse({
+            "error": True,
+            "message": _("Your account has no prices assigned yet. Contact the administrator to enable order requests."),
+        }, status=403)
+    precio_actual = float(assigned_price)
 
     carrito = request.session.get("carrito", {})
 

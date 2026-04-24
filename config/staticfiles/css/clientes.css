@@ -132,6 +132,12 @@ font-size:13px;
 padding:6px 14px;
 }
 
+.clientes-acciones-group {
+display:flex;
+flex-wrap:wrap;
+gap:8px;
+}
+
 /* BUSCADOR */
 
 #buscadorClientes{
@@ -284,6 +290,33 @@ transition:.2s;
 
 transform:scale(1.05);
 
+}
+
+@media (max-width: 767.98px) {
+    .clientes-toolbar {
+        align-items: stretch !important;
+        gap: 12px;
+        flex-direction: column;
+    }
+
+    .clientes-filters {
+        width: 100%;
+        flex-direction: column;
+        margin-bottom: 0 !important;
+    }
+
+    .clientes-filters > * {
+        width: 100%;
+        max-width: none !important;
+    }
+
+    .clientes-acciones-group {
+        flex-direction: column;
+    }
+
+    .clientes-acciones-group .btn {
+        width: 100%;
+    }
 }
 
 .language-current{

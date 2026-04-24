@@ -12,6 +12,26 @@ from .models import InventarioMovimiento, StockPresentacion
 from .services import registrar_ajuste_manual, registrar_entrada_manual, registrar_salida_manual
 
 
+def _parse_required_positive_integer(raw_value, error_message):
+	try:
+		value = int(raw_value)
+	except (TypeError, ValueError):
+		raise ValidationError(error_message)
+	if value <= 0:
+		raise ValidationError(error_message)
+	return value
+
+
+def _parse_required_non_zero_integer(raw_value, error_message):
+	try:
+		value = int(raw_value)
+	except (TypeError, ValueError):
+		raise ValidationError(error_message)
+	if value == 0:
+		raise ValidationError(error_message)
+	return value
+
+
 def _ensure_stock_record(presentacion):
 	stock, _created = StockPresentacion.objects.get_or_create(
 		presentacion=presentacion,
@@ -88,16 +108,27 @@ def backoffice_inventory_detail(request, presentacion_id):
 		observation = (request.POST.get('observacion') or '').strip()
 
 		try:
+			if not observation:
+				raise ValidationError(_('Observation is required for all inventory movements.'))
 			if action == 'entrada':
-				quantity = max(int(request.POST.get('cantidad') or 0), 1)
+				quantity = _parse_required_positive_integer(
+					request.POST.get('cantidad'),
+					_('Enter a quantity greater than zero for manual entries and exits.'),
+				)
 				registrar_entrada_manual(presentacion=presentacion, cantidad=quantity, observacion=observation, creado_por=request.user)
 				messages.success(request, _('Inventory entry recorded successfully.'))
 			elif action == 'salida':
-				quantity = max(int(request.POST.get('cantidad') or 0), 1)
+				quantity = _parse_required_positive_integer(
+					request.POST.get('cantidad'),
+					_('Enter a quantity greater than zero for manual entries and exits.'),
+				)
 				registrar_salida_manual(presentacion=presentacion, cantidad=quantity, observacion=observation, creado_por=request.user)
 				messages.success(request, _('Inventory exit recorded successfully.'))
 			elif action == 'ajuste':
-				delta_quantity = int(request.POST.get('delta_cantidad') or 0)
+				delta_quantity = _parse_required_non_zero_integer(
+					request.POST.get('delta_cantidad'),
+					_('Enter a positive or negative adjustment delta different from zero.'),
+				)
 				registrar_ajuste_manual(presentacion=presentacion, delta_cantidad=delta_quantity, observacion=observation, creado_por=request.user)
 				messages.success(request, _('Inventory adjustment recorded successfully.'))
 			else:

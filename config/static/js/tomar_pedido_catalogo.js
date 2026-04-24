@@ -2,6 +2,121 @@
 document.addEventListener('DOMContentLoaded', function() {
     const agregarUrl = document.body.dataset.agregarUrl;
     const csrfToken = document.body.dataset.csrf;
+    const mobilePriceMediaQuery = window.matchMedia('(max-width: 767.98px)');
+    const precioSelectorModalElement = document.getElementById('modalPrecioSelector');
+    const precioSelectorLabel = document.getElementById('modalPrecioSelectorLabel');
+    const precioSelectorOptions = document.getElementById('modalPrecioOpciones');
+    const precioSelectorModal = precioSelectorModalElement ? new bootstrap.Modal(precioSelectorModalElement) : null;
+    const longPressDelay = 1200;
+    let activePrecioCard = null;
+
+    function syncPrecioMask(card) {
+        const shell = card.querySelector('.precio-select-shell');
+        const precioSelect = card.querySelector('.precio-select');
+        const mask = card.querySelector('.precio-select-mask');
+
+        if (!shell || !precioSelect || !mask) {
+            return;
+        }
+
+        const defaultLabel = shell.dataset.labelDefault || 'Presiona para elegir precio';
+        const selectedLabel = shell.dataset.labelSelected || 'Precio seleccionado';
+        const hasSelectedPrice = Boolean(precioSelect.value);
+
+        shell.dataset.state = hasSelectedPrice ? 'selected' : 'empty';
+        mask.textContent = hasSelectedPrice ? selectedLabel : defaultLabel;
+    }
+
+    function setPrecioMaskOpen(select, isOpen) {
+        const shell = select.closest('.precio-select-shell');
+
+        if (!shell) {
+            return;
+        }
+
+        shell.dataset.open = isOpen ? 'true' : 'false';
+    }
+
+    function isMobilePriceMode() {
+        return mobilePriceMediaQuery.matches;
+    }
+
+    function clearLongPress(card) {
+        if (!card) {
+            return;
+        }
+
+        const shell = card.querySelector('.precio-select-shell');
+        const timerId = Number(card.dataset.longPressTimer || '0');
+
+        if (timerId) {
+            window.clearTimeout(timerId);
+        }
+
+        delete card.dataset.longPressTimer;
+
+        if (shell) {
+            shell.dataset.pressing = 'false';
+        }
+    }
+
+    function openPrecioModal(card) {
+        if (!precioSelectorModal || !precioSelectorOptions) {
+            return;
+        }
+
+        const shell = card.querySelector('.precio-select-shell');
+        const precioSelect = card.querySelector('.precio-select');
+        const productName = card.dataset.nombre || '';
+
+        if (!shell || !precioSelect) {
+            return;
+        }
+
+        const options = Array.from(precioSelect.options).filter(option => option.value);
+
+        if (!options.length) {
+            return;
+        }
+
+        activePrecioCard = card;
+        precioSelectorLabel.textContent = shell.dataset.pickerTitle || 'Seleccionar precio';
+        precioSelectorOptions.innerHTML = options.map(option => {
+            const isSelected = option.value === precioSelect.value ? ' precio-modal-option--selected' : '';
+            return `
+                <button type="button" class="precio-modal-option${isSelected}" data-value="${option.value}">
+                    <span class="precio-modal-option__title">${option.text}</span>
+                    <span class="precio-modal-option__product">${productName}</span>
+                </button>
+            `;
+        }).join('');
+
+        precioSelectorModal.show();
+    }
+
+    function startLongPress(card) {
+        if (!isMobilePriceMode()) {
+            return;
+        }
+
+        clearLongPress(card);
+
+        const shell = card.querySelector('.precio-select-shell');
+        if (shell) {
+            shell.dataset.pressing = 'true';
+        }
+
+        const timerId = window.setTimeout(function () {
+            if (shell) {
+                shell.dataset.pressing = 'false';
+            }
+
+            delete card.dataset.longPressTimer;
+            openPrecioModal(card);
+        }, longPressDelay);
+
+        card.dataset.longPressTimer = String(timerId);
+    }
 
     function filtrarProductos() {
         let texto = document.getElementById("buscador").value.toLowerCase();
@@ -41,6 +156,51 @@ document.addEventListener('DOMContentLoaded', function() {
     /* BOTONES + - */
     document.querySelectorAll(".producto-card").forEach(card => {
         let cantidadSpan = card.querySelector(".cantidad");
+        const precioSelect = card.querySelector('.precio-select');
+        const precioHoldTrigger = card.querySelector('.precio-hold-trigger');
+
+        syncPrecioMask(card);
+
+        if (precioSelect) {
+            precioSelect.addEventListener('focus', function () {
+                setPrecioMaskOpen(this, true);
+            });
+
+            precioSelect.addEventListener('blur', function () {
+                setPrecioMaskOpen(this, false);
+            });
+
+            precioSelect.addEventListener('change', function () {
+                syncPrecioMask(card);
+            });
+        }
+
+        if (precioHoldTrigger) {
+            ['pointerdown', 'touchstart', 'mousedown'].forEach(eventName => {
+                precioHoldTrigger.addEventListener(eventName, function (event) {
+                    if (!isMobilePriceMode()) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    startLongPress(card);
+                }, { passive: false });
+            });
+
+            ['pointerup', 'pointerleave', 'pointercancel', 'touchend', 'touchcancel', 'mouseup'].forEach(eventName => {
+                precioHoldTrigger.addEventListener(eventName, function () {
+                    clearLongPress(card);
+                });
+            });
+
+            precioHoldTrigger.addEventListener('click', function (event) {
+                if (!isMobilePriceMode()) {
+                    return;
+                }
+
+                event.preventDefault();
+            });
+        }
 
         card.querySelector(".sumar").addEventListener("click", () => {
             cantidadSpan.textContent = parseInt(cantidadSpan.textContent) + 1;
@@ -166,6 +326,35 @@ document.addEventListener('DOMContentLoaded', function() {
             infoTexto.textContent = unidades + " " + tipo + " por " + nombre.toLowerCase();
         });
     });
+
+    if (precioSelectorOptions) {
+        precioSelectorOptions.addEventListener('click', function (event) {
+            const optionButton = event.target.closest('.precio-modal-option');
+
+            if (!optionButton || !activePrecioCard) {
+                return;
+            }
+
+            const precioSelect = activePrecioCard.querySelector('.precio-select');
+
+            if (!precioSelect) {
+                return;
+            }
+
+            precioSelect.value = optionButton.dataset.value || '';
+            precioSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            precioSelectorModal.hide();
+        });
+    }
+
+    if (precioSelectorModalElement) {
+        precioSelectorModalElement.addEventListener('hidden.bs.modal', function () {
+            activePrecioCard = null;
+            if (precioSelectorOptions) {
+                precioSelectorOptions.innerHTML = '';
+            }
+        });
+    }
 });
 
 /* =========================
@@ -187,6 +376,7 @@ document.querySelectorAll(".presentacion-select").forEach(select => {
 
         const precioSelect = card.querySelector(".precio-select");
         precioSelect.innerHTML = '<option value="">Seleccionar precio</option>';
+        precioSelect.value = '';
 
         precios.forEach((precio, index) => {
             if (precio && precio !== "0.00") {
@@ -197,5 +387,18 @@ document.querySelectorAll(".presentacion-select").forEach(select => {
                 `;
             }
         });
+
+        const shell = card.querySelector('.precio-select-shell');
+        const mask = card.querySelector('.precio-select-mask');
+
+        if (shell) {
+            shell.dataset.state = 'empty';
+            shell.dataset.open = 'false';
+            shell.dataset.pressing = 'false';
+        }
+
+        if (mask) {
+            mask.textContent = shell?.dataset.labelDefault || 'Mantén oprimido 1 segundo para elegir precio';
+        }
     });
 });

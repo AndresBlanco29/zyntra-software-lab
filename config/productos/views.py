@@ -2,7 +2,7 @@ from django.core.cache import cache
 from django.db.models import Prefetch
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from .models import Producto, Categoria, Marca, Presentacion, ConfiguracionPrecios, normalize_price_tier
+from .models import Producto, Categoria, Marca, Presentacion, ConfiguracionPrecios
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
@@ -103,7 +103,7 @@ def _get_cliente_price_tier(user):
     if cliente.estado_revision != Cliente.REVIEW_STATUS_APPROVED:
         return None
 
-    return normalize_price_tier(cliente.nivel_precio)
+    return cliente.get_nivel_precio_normalizado()
 
 
 def _hydrate_productos(productos):
@@ -162,11 +162,14 @@ def _get_cached_catalogo_marcas():
 
 def catalogo(request):
     force_guest_mode = request.GET.get("guest") == "1"
-    can_quote = bool(request.user.is_authenticated and not force_guest_mode)
+    is_authenticated = bool(request.user.is_authenticated)
+    is_cliente = bool(is_authenticated and getattr(request.user, 'role', '') == 'cliente')
+    can_quote = bool(is_authenticated and not force_guest_mode)
+    client_price_tier = _get_cliente_price_tier(request.user)
     can_view_received_quotes = bool(
-        request.user.is_authenticated
+        is_authenticated
         and not force_guest_mode
-        and getattr(request.user, 'role', '') == 'cliente'
+        and is_cliente
     )
     pendientes_cotizaciones = 0
 
@@ -185,8 +188,6 @@ def catalogo(request):
         catalogo_url = f"{catalogo_url}?guest=1"
 
     productos = _get_cached_catalogo_productos()
-    client_price_tier = _get_cliente_price_tier(request.user)
-
     categorias = _get_cached_catalogo_categorias()
 
     marcas = _get_cached_catalogo_marcas()
@@ -201,7 +202,7 @@ def catalogo(request):
         'pendientes_cotizaciones': pendientes_cotizaciones,
         'catalogo_url': catalogo_url,
         'client_price_tier': client_price_tier,
-        'show_client_prices': bool(client_price_tier),
+        'show_client_prices': client_price_tier is not None,
     }
 
     response = render(request, 'productos/catalogo.html', context)

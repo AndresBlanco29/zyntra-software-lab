@@ -1238,6 +1238,7 @@ def clientes_pendientes(request):
         'pending_count': base_queryset.filter(estado_revision=Cliente.REVIEW_STATUS_PENDING).count(),
         'rejected_count': base_queryset.filter(estado_revision=Cliente.REVIEW_STATUS_REJECTED).count(),
         'approved_count': base_queryset.filter(estado_revision=Cliente.REVIEW_STATUS_APPROVED).count(),
+        'price_tier_choices': Cliente.PRICE_TIER_CHOICES,
     }
 
     return render(request, 'admin/clientes_pendientes.html', context)
@@ -1251,8 +1252,12 @@ def aprobar_cliente(request, cliente_id):
         return redirect('ver_cliente', cliente_id=cliente_id)
 
     cliente = get_object_or_404(Cliente, id=cliente_id)
+    if cliente.estado_revision == Cliente.REVIEW_STATUS_APPROVED:
+        messages.info(request, _('Use the pricing update action to change prices for approved customers.'))
+        return redirect('ver_cliente', cliente_id=cliente_id)
+
     redirect_view = (request.POST.get('view') or 'pending').strip().lower()
-    nivel_precio = normalize_price_tier(request.POST.get('nivel_precio'), cliente.nivel_precio)
+    nivel_precio = normalize_price_tier(request.POST.get('nivel_precio'), Cliente.PRICE_TIER_UNASSIGNED)
 
     cliente.aprobado = True
     cliente.estado_revision = Cliente.REVIEW_STATUS_APPROVED
@@ -1285,6 +1290,30 @@ def aprobar_cliente(request, cliente_id):
         messages.warning(request, _('Cliente aprobado, pero no se pudo enviar el correo al cliente.'))
 
     return redirect(f"{reverse('clientes_pendientes')}?view={redirect_view}")
+
+
+@login_required
+@internal_permission_required('admin.customer_requests.manage')
+def actualizar_precio_cliente(request, cliente_id):
+
+    if request.method != 'POST':
+        messages.error(request, _('Debes actualizar el precio desde el formulario del administrador.'))
+        return redirect('ver_cliente', cliente_id=cliente_id)
+
+    cliente = get_object_or_404(Cliente, id=cliente_id)
+    redirect_view = (request.POST.get('view') or '').strip().lower()
+    if cliente.estado_revision != Cliente.REVIEW_STATUS_APPROVED:
+        messages.error(request, _('Solo puedes actualizar precios para clientes aprobados.'))
+        return redirect('ver_cliente', cliente_id=cliente_id)
+
+    nivel_precio = normalize_price_tier(request.POST.get('nivel_precio'), Cliente.PRICE_TIER_UNASSIGNED)
+    cliente.nivel_precio = nivel_precio
+    cliente.save(update_fields=['nivel_precio'])
+
+    messages.success(request, _('Customer pricing updated successfully.'))
+    if redirect_view == 'approved':
+        return redirect(f"{reverse('clientes_pendientes')}?view=approved")
+    return redirect('ver_cliente', cliente_id=cliente_id)
 
 @login_required
 @internal_permission_required('admin.customer_requests.manage')

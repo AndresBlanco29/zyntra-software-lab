@@ -133,6 +133,10 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertEqual(created_quote.total, assigned_price * 2)
 
 	def test_customer_quote_success_message_is_not_rendered_for_backoffice(self):
+		self.cliente.estado_revision = Cliente.REVIEW_STATUS_APPROVED
+		self.cliente.nivel_precio = 3
+		self.cliente.save(update_fields=['estado_revision', 'nivel_precio'])
+
 		self.client.force_login(self.customer_user)
 		session = self.client.session
 		session['carrito'] = {
@@ -156,6 +160,32 @@ class BackofficeQuotePricingTests(TestCase):
 
 		self.assertEqual(backoffice_response.status_code, 200)
 		self.assertNotContains(backoffice_response, 'Your order request was sent successfully.')
+
+	def test_guardar_cotizacion_allows_customer_without_assigned_prices(self):
+		self.cliente.estado_revision = Cliente.REVIEW_STATUS_APPROVED
+		self.cliente.nivel_precio = Cliente.PRICE_TIER_UNASSIGNED
+		self.cliente.save(update_fields=['estado_revision', 'nivel_precio'])
+
+		self.client.force_login(self.customer_user)
+		session = self.client.session
+		session['carrito'] = {
+			str(self.presentacion.producto.id): {
+				'presentacion_id': self.presentacion.id,
+				'cantidad': 1,
+				'precio': str(0),
+			}
+		}
+		session.save()
+
+		response = self.client.post(reverse('guardar_cotizacion'), {'nota': 'Sin precios'}, follow=True)
+
+		self.assertRedirects(response, reverse('catalogo'))
+		self.assertContains(response, 'agregar-btn')
+		created_quote = Cotizacion.objects.exclude(id=self.cotizacion.id).latest('id')
+		created_item = created_quote.items.get()
+		self.assertEqual(created_item.precio, Decimal('0'))
+		self.assertEqual(created_item.subtotal, Decimal('0'))
+		self.assertEqual(created_quote.total, Decimal('0'))
 
 	def test_backoffice_cannot_send_quote_without_saving_changes_first(self):
 		self.client.force_login(self.backoffice)

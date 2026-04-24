@@ -261,3 +261,75 @@ class InventarioBackofficeViewsTests(TestCase):
 				observacion='Restock warehouse',
 			).exists()
 		)
+
+	def test_inventory_detail_post_records_adjustment_delta(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(
+			reverse('backoffice_inventory_detail', args=[self.presentacion.id]),
+			{
+				'action': 'ajuste',
+				'cantidad': '999',
+				'delta_cantidad': '1',
+				'observacion': 'Cycle count correction',
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		self.assertEqual(stock.stock_fisico, 7)
+		self.assertEqual(stock.stock_disponible, 7)
+		self.assertTrue(
+			InventarioMovimiento.objects.filter(
+				presentacion=self.presentacion,
+				tipo='AJUSTE_POSITIVO',
+				delta_fisico=1,
+				observacion='Cycle count correction',
+			).exists()
+		)
+
+	def test_inventory_detail_post_does_not_default_empty_entry_quantity_to_one(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(
+			reverse('backoffice_inventory_detail', args=[self.presentacion.id]),
+			{
+				'action': 'entrada',
+				'cantidad': '',
+				'delta_cantidad': '5',
+				'observacion': 'Should fail without quantity',
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		self.assertEqual(stock.stock_fisico, 6)
+		self.assertFalse(
+			InventarioMovimiento.objects.filter(
+				presentacion=self.presentacion,
+				observacion='Should fail without quantity',
+			).exists()
+		)
+
+	def test_inventory_detail_post_requires_observation_for_all_movements(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(
+			reverse('backoffice_inventory_detail', args=[self.presentacion.id]),
+			{
+				'action': 'ajuste',
+				'delta_cantidad': '2',
+				'observacion': '   ',
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		self.assertEqual(stock.stock_fisico, 6)
+		self.assertFalse(
+			InventarioMovimiento.objects.filter(
+				presentacion=self.presentacion,
+				tipo='AJUSTE_POSITIVO',
+				delta_fisico=2,
+			).exists()
+		)

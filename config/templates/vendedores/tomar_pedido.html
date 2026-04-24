@@ -22,9 +22,9 @@ class="form-control mb-3"
 placeholder="{% trans 'Buscar por nombre, empresa o documento' %}"
 >
 
-<div class="table-responsive">
+<div class="table-responsive mobile-stack-responsive">
 
-<table class="table">
+<table class="table mobile-stack-table mobile-stack-table--take-order">
 
 <thead>
 
@@ -45,15 +45,15 @@ data-nombre="{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}"
 data-empresa="{{ cliente.nombre_empresa }}"
 >
 
-<td>
+<td data-label="{% trans 'Cliente' %}">
 {{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}
 </td>
 
-<td>
+<td data-label="{% trans 'Empresa' %}">
 {{ cliente.nombre_empresa }}
 </td>
 
-<td>
+<td data-label="{% trans 'Acción' %}" class="mobile-stack-table__action">
 
 <a href="{% url 'catalogo_vendedor' cliente.id %}"
 class="btn btn-primary btn-sm">
@@ -64,6 +64,14 @@ class="btn btn-primary btn-sm">
 
 </td>
 
+</tr>
+
+{% empty %}
+
+<tr>
+<td colspan="3" class="text-center text-muted py-4 mobile-stack-table__empty">
+{% trans "No hay clientes registrados." %}
+</td>
 </tr>
 
 {% endfor %}

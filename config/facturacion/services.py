@@ -13,6 +13,9 @@ from config.notificaciones.models import crear_notificacion_backoffice
 from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, Invoice, InvoiceItem, NotaAjuste, NotaAjusteItem
 
 
+DEFAULT_SUGGESTED_PROFIT_PERCENTAGE = Decimal('30.00')
+
+
 def _to_decimal(value, default='0'):
 	try:
 		return Decimal(str(value if value is not None else default))
@@ -22,6 +25,15 @@ def _to_decimal(value, default='0'):
 
 def _quantize_money(value):
 	return _to_decimal(value, '0').quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def _calculate_suggested_unit_price_from_profit(base_unit_price, profit_percentage=DEFAULT_SUGGESTED_PROFIT_PERCENTAGE):
+	base_unit_decimal = _quantize_money(base_unit_price)
+	profit_decimal = _to_decimal(profit_percentage, DEFAULT_SUGGESTED_PROFIT_PERCENTAGE)
+	divisor = Decimal('1') - (profit_decimal / Decimal('100'))
+	if divisor <= 0:
+		return base_unit_decimal
+	return (base_unit_decimal / divisor).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
 def _validate_invoice_generation(pedido, metodo_entrega, driver):
@@ -39,22 +51,9 @@ def _validate_invoice_generation(pedido, metodo_entrega, driver):
 
 def resolve_presentacion_suggested_unit_price(*, presentacion, base_case_price):
 	case_price = _quantize_money(base_case_price)
-	if not presentacion:
-		return case_price
-	units = max(int(getattr(presentacion, 'unidades', 0) or 0), 1)
-	price_tiers = [
-		_quantize_money(value)
-		for value in (
-			getattr(presentacion, 'precio_1', None),
-			getattr(presentacion, 'precio_2', None),
-			getattr(presentacion, 'precio_3', None),
-			getattr(presentacion, 'precio_4', None),
-			getattr(presentacion, 'precio_5', None),
-		)
-		if value not in (None, '')
-	]
-	next_case_price = next((tier for tier in sorted(set(price_tiers)) if tier > case_price), case_price)
-	return (next_case_price / Decimal(str(units))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+	units = max(int(getattr(presentacion, 'unidades', 0) or 0), 1) if presentacion else 1
+	base_unit_price = (case_price / Decimal(str(units))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+	return _calculate_suggested_unit_price_from_profit(base_unit_price)
 
 
 @transaction.atomic
@@ -336,25 +335,55 @@ def crear_nota_ajuste_desde_invoice(
 	usuario,
 	items_payload,
 ):
-	if not items_payload:
+	tipo_documento = (tipo_documento or '').strip()
+	motivo = (motivo or '').strip()
+	tipo_credito = (tipo_credito or '').strip()
+	descripcion = (descripcion or '').strip()
+	if not tipo_documento:
+		raise ValidationError(_('Select a note type to save the adjustment.'))
+	if not motivo:
+		raise ValidationError(_('Select a reason to save the adjustment.'))
+
+	normalized_items = []
+	for payload in items_payload or []:
+		invoice_item = payload.get('invoice_item')
+		quantity = int(payload.get('cantidad') or 0)
+		unit_amount = _quantize_money(payload.get('monto_unitario') or '0')
+		has_quantity = quantity > 0
+		has_amount = unit_amount > 0
+		if has_quantity and not has_amount:
+			raise ValidationError(_('Enter a unit amount greater than zero for each selected adjustment item.'))
+		if has_amount and not has_quantity:
+			raise ValidationError(_('Enter a quantity greater than zero for each selected adjustment item.'))
+		if not has_quantity and not has_amount:
+			continue
+		normalized_items.append({
+			'invoice_item': invoice_item,
+			'cantidad': quantity,
+			'monto_unitario': unit_amount,
+		})
+
+	if not normalized_items:
 		raise ValidationError(_('Add at least one item before saving the adjustment.'))
 
 	inventario_estado = 'PENDIENTE' if tipo_documento == 'CREDITO' and tipo_credito == 'CREDIT_RETURN' else 'NO_APLICA'
-	nota = NotaAjuste.objects.create(
+	nota = NotaAjuste(
 		invoice=invoice,
 		tipo_documento=tipo_documento,
 		motivo=motivo,
 		tipo_credito=tipo_credito,
-		descripcion=(descripcion or '').strip(),
+		descripcion=descripcion,
 		inventario_estado=inventario_estado,
 		creada_por=usuario,
 	)
+	nota.full_clean()
+	nota.save()
 
 	total = Decimal('0.00')
-	for payload in items_payload:
+	for payload in normalized_items:
 		invoice_item = payload.get('invoice_item')
-		cantidad = max(int(payload.get('cantidad') or 0), 1)
-		monto_unitario = _quantize_money(payload.get('monto_unitario') or '0')
+		cantidad = int(payload.get('cantidad') or 0)
+		monto_unitario = payload.get('monto_unitario')
 		line_total = _quantize_money(monto_unitario * Decimal(str(cantidad)))
 		NotaAjusteItem.objects.create(
 			nota=nota,

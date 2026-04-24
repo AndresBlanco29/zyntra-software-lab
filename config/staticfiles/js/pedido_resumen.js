@@ -34,6 +34,16 @@ const removeErrorMessage = document.body.dataset.msgRemoveError || 'No se pudo e
 const requestErrorMessage = document.body.dataset.msgRequestError || 'Ocurrió un error procesando la solicitud.'
 const feedbackBox = document.getElementById('pedidoFeedback')
 
+function formatMoney(value) {
+    const numericValue = Number(value)
+
+    if (Number.isNaN(numericValue)) {
+        return '0.00'
+    }
+
+    return numericValue.toFixed(2)
+}
+
 function hideFeedback() {
     if (!feedbackBox) return
     feedbackBox.classList.add('d-none')
@@ -203,12 +213,12 @@ body:`producto_id=${id}&precio=${precio1}&accion=cambiar_precio`
 .then(res=>res.json())
 .then(data=>{
 
-document.getElementById(`subtotal-${id}`).innerText = "$"+data.subtotal
+document.getElementById(`subtotal-${id}`).innerText = "$"+formatMoney(data.subtotal)
 const total1 = document.getElementById("totalPedido")
 const total2 = document.getElementById("totalFinal")
 
-total1.innerText = "$"+data.total
-total2.innerText = "$"+data.total
+total1.innerText = "$"+formatMoney(data.total)
+total2.innerText = "$"+formatMoney(data.total)
 
 total1.classList.add("total-update")
 total2.classList.add("total-update")
@@ -248,12 +258,12 @@ body:`producto_id=${id}&precio=${precio}&accion=cambiar_precio`
 .then(res=>res.json())
 .then(data=>{
 
-document.getElementById(`subtotal-${id}`).innerText = "$"+data.subtotal
+document.getElementById(`subtotal-${id}`).innerText = "$"+formatMoney(data.subtotal)
 const total1 = document.getElementById("totalPedido")
 const total2 = document.getElementById("totalFinal")
 
-total1.innerText = "$"+data.total
-total2.innerText = "$"+data.total
+total1.innerText = "$"+formatMoney(data.total)
+total2.innerText = "$"+formatMoney(data.total)
 
 total1.classList.add("total-update")
 total2.classList.add("total-update")
@@ -325,13 +335,13 @@ body:`producto_id=${id}&accion=set&cantidad=${cantidad}`
 .then(res=>res.json())
 .then(data=>{
 
-document.getElementById(`subtotal-${id}`).innerText = "$"+data.subtotal
+document.getElementById(`subtotal-${id}`).innerText = "$"+formatMoney(data.subtotal)
 
 const total1 = document.getElementById("totalPedido")
 const total2 = document.getElementById("totalFinal")
 
-total1.innerText = "$"+data.total
-total2.innerText = "$"+data.total
+total1.innerText = "$"+formatMoney(data.total)
+total2.innerText = "$"+formatMoney(data.total)
 
 total1.classList.add("total-update")
 total2.classList.add("total-update")
@@ -370,13 +380,13 @@ body:`producto_id=${id}&accion=${accion}`
 
 document.querySelector(`.cantidad-input[data-id="${id}"]`).value = data.cantidad
 
-document.getElementById(`subtotal-${id}`).innerText = "$"+data.subtotal
+document.getElementById(`subtotal-${id}`).innerText = "$"+formatMoney(data.subtotal)
 
 const total1 = document.getElementById("totalPedido")
 const total2 = document.getElementById("totalFinal")
 
-total1.innerText = "$"+data.total
-total2.innerText = "$"+data.total
+total1.innerText = "$"+formatMoney(data.total)
+total2.innerText = "$"+formatMoney(data.total)
 
 total1.classList.add("total-update")
 total2.classList.add("total-update")

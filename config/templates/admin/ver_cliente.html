@@ -67,7 +67,11 @@
 
 <div class="col-md-6 mb-3">
 <strong>{% trans "Assigned price tier:" %}</strong><br>
+{% if cliente.nivel_precio == 0 %}
+{% trans "No prices assigned" %}
+{% else %}
 {{ cliente.get_nivel_precio_display }}
+{% endif %}
 </div>
 
 <div class="col-md-6 mb-3">
@@ -126,15 +130,25 @@
 
 <div class="mt-3">
 
+{% if cliente.estado_revision == 'APROBADO' %}
+<h5 class="mb-3">{% trans "Update customer pricing" %}</h5>
+<p class="text-muted">{% trans "Use this section only to change the assigned customer price tier. No approval email will be sent." %}</p>
+
+<form method="post" action="{% url 'actualizar_precio_cliente' cliente.id %}" class="d-inline">
+{% else %}
 <form method="post" action="{% url 'aprobar_cliente' cliente.id %}" class="d-inline">
+{% endif %}
 {% csrf_token %}
 <input type="hidden" name="view" value="{{ view_mode }}">
 
 <div class="mb-3">
 	<label for="nivelPrecio" class="form-label fw-bold">{% trans "Customer price tier" %}</label>
 	<select id="nivelPrecio" name="nivel_precio" class="form-select">
+		<option value="0" {% if cliente.nivel_precio == 0 %}selected{% endif %}>{% trans "No prices" %}</option>
 		{% for value, label in price_tier_choices %}
+		{% if value != 0 %}
 		<option value="{{ value }}" {% if cliente.nivel_precio == value %}selected{% endif %}>{{ label }}</option>
+		{% endif %}
 		{% endfor %}
 	</select>
 </div>

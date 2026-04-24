@@ -16,6 +16,7 @@ import pytz
 from django.contrib import messages
 import logging
 from django.contrib.auth.decorators import login_required
+from decimal import Decimal, ROUND_HALF_UP
 
 from config.pedidos.services import crear_pedido_desde_items, notificar_backoffice_pedido
 from config.usuarios.permissions import internal_permission_required
@@ -26,6 +27,14 @@ logger = logging.getLogger(__name__)
 
 
 USA_COUNTRY_ALIASES = {'usa', 'us', 'eeuu', 'estados unidos', 'united states'}
+
+
+def _money_decimal(value):
+    return Decimal(str(value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def _money_string(value):
+    return format(_money_decimal(value), '.2f')
 
 
 def _normalize_customer_location_payload(data):
@@ -260,7 +269,7 @@ def ver_pedido(request):
 
         presentaciones = Presentacion.objects.filter(producto=producto)
 
-        subtotal = item["precio"] * item["cantidad"]
+        subtotal = _money_decimal(item["precio"] * item["cantidad"])
 
         total += subtotal
 
@@ -276,7 +285,7 @@ def ver_pedido(request):
 
     context = {
         "productos": productos,
-        "total": total,
+        "total": _money_decimal(total),
         "cliente": cliente,
         "cliente_id": cliente_id
     }
@@ -365,18 +374,18 @@ def actualizar_cantidad_pedido(request):
     cantidad = carrito[producto_id]["cantidad"]
     precio = carrito[producto_id]["precio"]
 
-    subtotal = cantidad * precio
+    subtotal = _money_decimal(cantidad * precio)
 
     # Recalcular total
-    total = sum(
+    total = _money_decimal(sum(
         item["precio"] * item["cantidad"]
         for item in carrito.values()
-    )
+    ))
 
     return JsonResponse({
         "cantidad": cantidad,
-        "subtotal": subtotal,
-        "total": total
+        "subtotal": _money_string(subtotal),
+        "total": _money_string(total)
     })
 
 @login_required

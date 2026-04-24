@@ -15,6 +15,7 @@ from config.inventario.services import (
     reservar_stock_para_pedido_items,
     validar_disponibilidad_para_items,
 )
+from config.inventario.models import StockPresentacion
 from config.notificaciones.models import crear_notificacion_backoffice, crear_notificacion_usuario
 
 from .models import Pedido, PedidoItem
@@ -109,6 +110,33 @@ def validar_estado_backoffice_con_bloqueo(pedido, nuevo_estado):
         raise ValidationError(_('This purchase order is blocked by an unresolved picking note.'))
 
 
+def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales):
+    stock_map = {
+        stock.presentacion_id: stock
+        for stock in StockPresentacion.objects.select_related('presentacion__producto').filter(
+            presentacion_id__in={item.presentacion_id for item in pedido_items}
+        )
+    }
+    evaluation = {}
+    for item in pedido_items:
+        stock = stock_map.get(item.presentacion_id)
+        stock_fisico = int(getattr(stock, 'stock_fisico', 0) or 0)
+        cantidad_real = max(int(cantidades_reales.get(item.id, item.cantidad) or 0), 0)
+        cantidad_aplicada_previa = max(int(item.cantidad_inventario_aplicada or 0), 0)
+        cantidad_pendiente_aplicar = max(cantidad_real - cantidad_aplicada_previa, 0)
+        faltante = max(cantidad_pendiente_aplicar - stock_fisico, 0)
+
+        evaluation[item.id] = {
+            'stock_fisico': stock_fisico,
+            'cantidad_real': cantidad_real,
+            'cantidad_aplicada_previa': cantidad_aplicada_previa,
+            'cantidad_pendiente_aplicar': cantidad_pendiente_aplicar,
+            'has_shortage': faltante > 0,
+            'shortage_amount': faltante,
+        }
+    return evaluation
+
+
 @transaction.atomic
 def asignar_picking_a_seleccionador(*, pedido, seleccionador):
     if getattr(seleccionador, 'role', '') != 'seleccionador':
@@ -138,26 +166,37 @@ def guardar_verificacion_picking(*, pedido, seleccionador, cantidades_reales, no
         raise PermissionDenied(_('You are not assigned to this picking ticket.'))
 
     nota_texto = (nota or '').strip()
-    if not nota_texto:
-        raise ValidationError(_('A picking note is required before saving the verification.'))
-
     items = list(pedido.items.select_for_update().select_related('presentacion__producto').all())
+    stock_evaluation = evaluar_stock_fisico_verificacion_picking(
+        pedido_items=items,
+        cantidades_reales=cantidades_reales,
+    )
+    has_stock_shortage = any(item_result['has_shortage'] for item_result in stock_evaluation.values())
+
+    if has_stock_shortage:
+        if not nota_texto:
+            raise ValidationError(_('A picking note is required when physical stock is insufficient.'))
+        nota_resuelta = False
+    elif not nota_resuelta:
+        raise ValidationError(_('Picker approval is required when physical stock is available.'))
+
     for item in items:
         cantidad_real = max(int(cantidades_reales.get(item.id, item.cantidad) or 0), 0)
         item.cantidad = cantidad_real
         item.subtotal = _quantize_money(_to_decimal(item.precio) * Decimal(str(cantidad_real)))
         item.save(update_fields=['cantidad', 'subtotal'])
 
-    aplicar_verificacion_picking_inventario(
-        pedido=pedido,
-        pedido_item_ids=[item.id for item in items],
-        creado_por=seleccionador,
-    )
+    if not has_stock_shortage:
+        aplicar_verificacion_picking_inventario(
+            pedido=pedido,
+            pedido_item_ids=[item.id for item in items],
+            creado_por=seleccionador,
+        )
 
     recalcular_pedido(pedido)
     pedido.estado = 'VERIFICADO_AJUSTADO'
     pedido.nota_seleccionador = nota_texto
-    pedido.nota_seleccionador_resuelta = bool(nota_resuelta)
+    pedido.nota_seleccionador_resuelta = bool(nota_resuelta) and not has_stock_shortage
     pedido.picking_verificado_en = timezone.now()
     pedido.save(update_fields=[
         'estado',
@@ -168,15 +207,26 @@ def guardar_verificacion_picking(*, pedido, seleccionador, cantidades_reales, no
         'actualizada_en',
     ])
 
-    crear_notificacion_backoffice(
-        titulo=_('Picking verification completed for PO #%(id)s') % {'id': pedido.id},
-        mensaje=_('%(selector)s completed the picking verification for %(client)s.') % {
-            'selector': seleccionador.get_full_name() or seleccionador.username,
-            'client': pedido.cliente.nombre_empresa,
-        },
-        tipo='PEDIDO',
-        url=reverse('backoffice_pedido_detalle', args=[pedido.id]),
-    )
+    if has_stock_shortage:
+        crear_notificacion_backoffice(
+            titulo=_('Picking verification saved with stock shortage for PO #%(id)s') % {'id': pedido.id},
+            mensaje=_('%(selector)s reported insufficient physical stock for %(client)s. The order remains blocked for review.') % {
+                'selector': seleccionador.get_full_name() or seleccionador.username,
+                'client': pedido.cliente.nombre_empresa,
+            },
+            tipo='PEDIDO',
+            url=reverse('backoffice_pedido_detalle', args=[pedido.id]),
+        )
+    else:
+        crear_notificacion_backoffice(
+            titulo=_('Picking verification completed for PO #%(id)s') % {'id': pedido.id},
+            mensaje=_('%(selector)s completed the picking verification for %(client)s.') % {
+                'selector': seleccionador.get_full_name() or seleccionador.username,
+                'client': pedido.cliente.nombre_empresa,
+            },
+            tipo='PEDIDO',
+            url=reverse('backoffice_pedido_detalle', args=[pedido.id]),
+        )
 
     return pedido
 

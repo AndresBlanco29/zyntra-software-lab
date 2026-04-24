@@ -95,8 +95,12 @@ def _quote_item_price_for_customer(*, cliente, presentacion, session_price):
     if not cliente or cliente.estado_revision != Cliente.REVIEW_STATUS_APPROVED:
         return session_price_decimal
 
+    assigned_customer_tier = cliente.get_nivel_precio_normalizado()
+    if assigned_customer_tier is None:
+        return session_price_decimal
+
     assigned_price = _parse_decimal(
-        presentacion.get_price_for_tier(cliente.get_nivel_precio_normalizado()),
+        presentacion.get_price_for_tier(assigned_customer_tier),
         session_price_decimal,
     )
     if assigned_price > 0:
@@ -287,7 +291,6 @@ def _get_whatsapp_contact_data(cotizacion, request):
 def agregar_a_cotizacion(request):
 
     if request.method == "POST":
-
         presentacion_id = request.POST.get("presentacion_id")
         cantidad = int(request.POST.get("cantidad"))
 

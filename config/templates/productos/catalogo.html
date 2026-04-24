@@ -211,7 +211,6 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                                   <div class="fs-5 fw-bold text-success product-price">
                                     ${% if client_price_tier == 1 %}{{ producto.primera_presentacion.precio_1 }}{% elif client_price_tier == 2 %}{{ producto.primera_presentacion.precio_2 }}{% elif client_price_tier == 3 %}{{ producto.primera_presentacion.precio_3 }}{% elif client_price_tier == 4 %}{{ producto.primera_presentacion.precio_4 }}{% else %}{{ producto.primera_presentacion.precio_5 }}{% endif %}
                                   </div>
-                                  <div class="small text-muted product-price-tier">{% trans "Assigned tier" %}: {{ client_price_tier }}</div>
                                 </div>
                                 {% endif %}
 
@@ -248,7 +247,7 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                                     </div>
                                 </div>
 
-                                  {% if can_quote %}
+                                   {% if can_quote %}
                                 <button class="btn btn-yellow w-100 agregar-btn">
                                     {% trans "Añadir pedido" %}
                                 </button>

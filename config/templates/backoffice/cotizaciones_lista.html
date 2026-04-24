@@ -26,8 +26,8 @@
 </div>
 
 <div class="card shadow-sm">
-  <div class="table-responsive">
-    <table class="table table-striped align-middle mb-0">
+  <div class="table-responsive mobile-stack-responsive">
+    <table class="table table-striped align-middle mb-0 mobile-stack-table mobile-stack-table--list">
       <thead>
         <tr>
           <th>ID</th>
@@ -41,20 +41,20 @@
       <tbody>
         {% for cotizacion in cotizaciones %}
         <tr>
-          <td>#{{ cotizacion.id }}</td>
-          <td>{{ cotizacion.cliente.nombre_empresa }}</td>
-          <td>{{ cotizacion.fecha|date:"d/m/Y H:i" }}</td>
-          <td>
+          <td data-label="ID">#{{ cotizacion.id }}</td>
+          <td data-label="{% trans 'Client' %}">{{ cotizacion.cliente.nombre_empresa }}</td>
+          <td data-label="{% trans 'Date' %}">{{ cotizacion.fecha|date:"d/m/Y H:i" }}</td>
+          <td data-label="{% trans 'Status' %}">
             <span class="badge {% if cotizacion.estado == 'CONFIRMADA_CLIENTE' %}bg-success{% elif cotizacion.estado == 'CANCELADA_CLIENTE' %}bg-secondary{% elif cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}bg-warning text-dark{% elif cotizacion.estado == 'RECHAZADA' %}bg-danger{% elif cotizacion.estado == 'APROBADA' %}bg-dark{% else %}bg-primary{% endif %}">{{ cotizacion.get_estado_display }}</span>
           </td>
-          <td>${{ cotizacion.total }}</td>
-          <td>
+          <td data-label="{% trans 'Total' %}">${{ cotizacion.total }}</td>
+          <td data-label="{% trans 'Action' %}" class="mobile-stack-table__action">
             <a class="btn btn-sm btn-warning" href="{% url 'backoffice_cotizacion_detalle' cotizacion.id %}">{% trans "Manage" %}</a>
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="6" class="text-center text-muted py-4">{% trans "No quotes registered." %}</td>
+          <td colspan="6" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No quotes registered." %}</td>
         </tr>
         {% endfor %}
       </tbody>

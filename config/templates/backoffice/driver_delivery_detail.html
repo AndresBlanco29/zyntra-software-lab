@@ -78,7 +78,20 @@
           <h5 class="mb-0">{% trans "Evidence" %}</h5>
           <form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_upload_evidence' delivery.id %}" class="d-flex flex-wrap align-items-center gap-2">
             {% csrf_token %}
-            <input type="file" name="evidence_photos" class="form-control form-control-sm" accept="image/*" multiple style="max-width: 230px;">
+            <div class="camera-upload-widget" data-camera-upload>
+              <input type="file" name="evidence_photos" class="form-control form-control-sm" accept="image/*" capture="environment" multiple style="max-width: 230px;" data-camera-input>
+              <div class="d-flex flex-wrap gap-2 mt-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-camera-start>{% trans "Use camera" %}</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-capture>{% trans "Take photo" %}</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-stop>{% trans "Stop camera" %}</button>
+              </div>
+              <div class="form-text" data-camera-status>{% trans "Choose files or use the camera to attach photos." %}</div>
+              <div class="mt-2 d-none" data-camera-preview>
+                <video class="w-100 rounded border bg-dark" style="max-height: 220px; object-fit: cover;" playsinline autoplay muted data-camera-video></video>
+                <canvas class="d-none" data-camera-canvas></canvas>
+              </div>
+              <div class="row g-2 mt-2 d-none" data-file-preview></div>
+            </div>
             <button type="submit" class="btn btn-sm btn-outline-primary">{% trans "Upload evidence" %}</button>
           </form>
         </div>
@@ -105,82 +118,11 @@
   <div class="card-body">
     <h5 class="mb-3">{% trans "Complete delivery" %}</h5>
     <div class="row g-3">
-      <div class="col-md-4">
-        <label class="form-label fw-semibold">{% trans "Payment status" %}</label>
-        <select name="estado_pago" id="paymentStatus" class="form-select" required>
-          <option value="">{% trans "Select..." %}</option>
-          <option value="PAGADO">{% trans "Paid" %}</option>
-          <option value="NO_PAGADO">{% trans "Unpaid" %}</option>
-        </select>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label fw-semibold">{% trans "Received by" %}</label>
-        <input type="text" name="recibido_por" class="form-control" required>
-      </div>
-      <div class="col-md-4 paid-only d-none">
-        <label class="form-label fw-semibold">{% trans "Payment amount" %}</label>
-        <input type="number" min="0" step="0.01" name="monto_pagado" class="form-control" value="{{ invoice.saldo_cliente }}">
-      </div>
-
-      <div class="col-md-4 paid-only d-none">
-        <label class="form-label fw-semibold">{% trans "Payment method" %}</label>
-        <select name="metodo_pago" id="paymentMethod" class="form-select">
-          <option value="">{% trans "Select..." %}</option>
-          <option value="CASH">{% trans "Cash" %}</option>
-          <option value="CHEQUE">{% trans "Cheque" %}</option>
-          <option value="TRANSFERENCIA">{% trans "Transfer" %}</option>
-          <option value="TARJETA">{% trans "Card" %}</option>
-          <option value="ZELLE">Zelle</option>
-          <option value="ACH">ACH</option>
-        </select>
-      </div>
-
-      <div class="col-md-4 method-field method-cheque d-none">
-        <label class="form-label fw-semibold">{% trans "Cheque number" %}</label>
-        <input type="text" name="cheque_numero" class="form-control">
-      </div>
-      <div class="col-md-4 method-field method-cheque d-none">
-        <label class="form-label fw-semibold">{% trans "Cheque bank" %}</label>
-        <input type="text" name="cheque_banco" class="form-control">
-      </div>
-      <div class="col-md-4 method-field method-transferencia d-none">
-        <label class="form-label fw-semibold">{% trans "Transfer reference" %}</label>
-        <input type="text" name="transferencia_referencia" class="form-control">
-      </div>
-      <div class="col-md-4 method-field method-tarjeta d-none">
-        <label class="form-label fw-semibold">{% trans "Card last 4" %}</label>
-        <input type="text" name="tarjeta_ultimos_4" maxlength="4" class="form-control">
-      </div>
-      <div class="col-md-4 method-field method-tarjeta d-none">
-        <label class="form-label fw-semibold">{% trans "Authorization code" %}</label>
-        <input type="text" name="tarjeta_autorizacion" class="form-control">
-      </div>
-      <div class="col-md-4 method-field method-zelle d-none">
-        <label class="form-label fw-semibold">{% trans "Zelle reference" %}</label>
-        <input type="text" name="zelle_referencia" class="form-control">
-      </div>
-      <div class="col-md-4 method-field method-zelle d-none">
-        <label class="form-label fw-semibold">{% trans "Zelle sender" %}</label>
-        <input type="text" name="zelle_remitente" class="form-control">
-      </div>
-      <div class="col-md-4 method-field method-ach d-none">
-        <label class="form-label fw-semibold">{% trans "ACH reference" %}</label>
-        <input type="text" name="ach_referencia" class="form-control">
-      </div>
-      <div class="col-md-4 method-field method-ach d-none">
-        <label class="form-label fw-semibold">{% trans "ACH account last 4" %}</label>
-        <input type="text" name="ach_cuenta_ultimos_4" maxlength="4" class="form-control">
-      </div>
-
-      <div class="col-12 unpaid-only d-none">
-        <label class="form-label fw-semibold">{% trans "Reason for non-payment" %}</label>
-        <textarea name="motivo_no_pago" class="form-control" rows="3"></textarea>
-      </div>
       <div class="col-12">
         <label class="form-label fw-semibold">{% trans "Driver notes" %}</label>
         <textarea name="notas_driver" class="form-control" rows="3"></textarea>
       </div>
-      <div class="col-12">
+      <div class="col-12" data-driver-section="adjustment-note">
         <div class="border rounded-3 p-3 bg-light-subtle">
           <div class="mb-3">
             <h6 class="mb-1">{% trans "Adjustment note during delivery" %}</h6>
@@ -201,6 +143,7 @@
                 <option value="">{% trans "Select..." %}</option>
                 <option value="DAMAGE">{% trans "Damage" %}</option>
                 <option value="DEFECT">{% trans "Defect" %}</option>
+                <option value="MISSING_ITEM">{% trans "Missing item" %}</option>
               </select>
             </div>
             <div class="col-md-4 driver-credit-type d-none">
@@ -217,7 +160,20 @@
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
-              <input type="file" name="driver_note_evidence_photos" class="form-control" accept="image/*" multiple>
+              <div class="camera-upload-widget" data-camera-upload>
+                <input type="file" name="driver_note_evidence_photos" class="form-control" accept="image/*" capture="environment" multiple data-camera-input>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-camera-start>{% trans "Use camera" %}</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-capture>{% trans "Take photo" %}</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-stop>{% trans "Stop camera" %}</button>
+                </div>
+                <div class="form-text" data-camera-status>{% trans "Choose files or use the camera to attach photos." %}</div>
+                <div class="mt-2 d-none" data-camera-preview>
+                  <video class="w-100 rounded border bg-dark" style="max-height: 220px; object-fit: cover;" playsinline autoplay muted data-camera-video></video>
+                  <canvas class="d-none" data-camera-canvas></canvas>
+                </div>
+                <div class="row g-2 mt-2 d-none" data-file-preview></div>
+              </div>
               <div class="form-text">{% trans "Optional photos that support the credit or debit note created during delivery." %}</div>
             </div>
             <div class="col-12">
@@ -251,8 +207,102 @@
       </div>
       <div class="col-12 unpaid-only d-none">
         <label class="form-label fw-semibold">{% trans "Evidence photos" %}</label>
-        <input type="file" name="evidence_photos" class="form-control" accept="image/*" multiple>
+        <div class="camera-upload-widget" data-camera-upload>
+          <input type="file" name="evidence_photos" class="form-control" accept="image/*" capture="environment" multiple data-camera-input>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-camera-start>{% trans "Use camera" %}</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-capture>{% trans "Take photo" %}</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-stop>{% trans "Stop camera" %}</button>
+          </div>
+          <div class="form-text" data-camera-status>{% trans "Choose files or use the camera to attach photos." %}</div>
+          <div class="mt-2 d-none" data-camera-preview>
+            <video class="w-100 rounded border bg-dark" style="max-height: 220px; object-fit: cover;" playsinline autoplay muted data-camera-video></video>
+            <canvas class="d-none" data-camera-canvas></canvas>
+          </div>
+          <div class="row g-2 mt-2 d-none" data-file-preview></div>
+        </div>
         <div class="form-text">{% trans "At least one photo is required when the customer does not pay." %}</div>
+      </div>
+      <div class="col-12" data-driver-section="payment-details">
+        <div class="border rounded-3 p-3 bg-light-subtle">
+          <div class="mb-3">
+            <h6 class="mb-1">{% trans "Payment details" %}</h6>
+            <p class="text-muted small mb-0">{% trans "Complete the payment information after reviewing note details and evidence." %}</p>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">{% trans "Payment status" %}</label>
+              <select name="estado_pago" id="paymentStatus" class="form-select" required>
+                <option value="">{% trans "Select..." %}</option>
+                <option value="PAGADO">{% trans "Paid" %}</option>
+                <option value="NO_PAGADO">{% trans "Unpaid" %}</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">{% trans "Received by" %}</label>
+              <input type="text" name="recibido_por" class="form-control" required>
+            </div>
+            <div class="col-md-4 paid-only d-none">
+              <label class="form-label fw-semibold">{% trans "Payment amount" %}</label>
+              <input type="number" min="0" step="0.01" name="monto_pagado" class="form-control" value="{{ invoice.saldo_cliente }}">
+            </div>
+
+            <div class="col-md-4 paid-only d-none">
+              <label class="form-label fw-semibold">{% trans "Payment method" %}</label>
+              <select name="metodo_pago" id="paymentMethod" class="form-select">
+                <option value="">{% trans "Select..." %}</option>
+                <option value="CASH">{% trans "Cash" %}</option>
+                <option value="CHEQUE">{% trans "Cheque" %}</option>
+                <option value="TRANSFERENCIA">{% trans "Transfer" %}</option>
+                <option value="TARJETA">{% trans "Card" %}</option>
+                <option value="ZELLE">Zelle</option>
+                <option value="ACH">ACH</option>
+              </select>
+            </div>
+
+            <div class="col-md-4 method-field method-cheque d-none">
+              <label class="form-label fw-semibold">{% trans "Cheque number" %}</label>
+              <input type="text" name="cheque_numero" class="form-control">
+            </div>
+            <div class="col-md-4 method-field method-cheque d-none">
+              <label class="form-label fw-semibold">{% trans "Cheque bank" %}</label>
+              <input type="text" name="cheque_banco" class="form-control">
+            </div>
+            <div class="col-md-4 method-field method-transferencia d-none">
+              <label class="form-label fw-semibold">{% trans "Transfer reference" %}</label>
+              <input type="text" name="transferencia_referencia" class="form-control">
+            </div>
+            <div class="col-md-4 method-field method-tarjeta d-none">
+              <label class="form-label fw-semibold">{% trans "Card last 4" %}</label>
+              <input type="text" name="tarjeta_ultimos_4" maxlength="4" class="form-control">
+            </div>
+            <div class="col-md-4 method-field method-tarjeta d-none">
+              <label class="form-label fw-semibold">{% trans "Authorization code" %}</label>
+              <input type="text" name="tarjeta_autorizacion" class="form-control">
+            </div>
+            <div class="col-md-4 method-field method-zelle d-none">
+              <label class="form-label fw-semibold">{% trans "Zelle reference" %}</label>
+              <input type="text" name="zelle_referencia" class="form-control">
+            </div>
+            <div class="col-md-4 method-field method-zelle d-none">
+              <label class="form-label fw-semibold">{% trans "Zelle sender" %}</label>
+              <input type="text" name="zelle_remitente" class="form-control">
+            </div>
+            <div class="col-md-4 method-field method-ach d-none">
+              <label class="form-label fw-semibold">{% trans "ACH reference" %}</label>
+              <input type="text" name="ach_referencia" class="form-control">
+            </div>
+            <div class="col-md-4 method-field method-ach d-none">
+              <label class="form-label fw-semibold">{% trans "ACH account last 4" %}</label>
+              <input type="text" name="ach_cuenta_ultimos_4" maxlength="4" class="form-control">
+            </div>
+
+            <div class="col-12 unpaid-only d-none">
+              <label class="form-label fw-semibold">{% trans "Reason for non-payment" %}</label>
+              <textarea name="motivo_no_pago" class="form-control" rows="3"></textarea>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="col-12">
         <label class="form-label fw-semibold">{% trans "Customer signature" %}</label>
@@ -291,6 +341,7 @@
             <option value="">{% trans "Select..." %}</option>
             <option value="DAMAGE">{% trans "Damage" %}</option>
             <option value="DEFECT">{% trans "Defect" %}</option>
+            <option value="MISSING_ITEM">{% trans "Missing item" %}</option>
           </select>
         </div>
         <div class="col-md-4 driver-credit-type-post d-none">
@@ -307,7 +358,20 @@
         </div>
         <div class="col-12">
           <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
-          <input type="file" name="driver_note_evidence_photos" class="form-control" accept="image/*" multiple>
+          <div class="camera-upload-widget" data-camera-upload>
+            <input type="file" name="driver_note_evidence_photos" class="form-control" accept="image/*" capture="environment" multiple data-camera-input>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-camera-start>{% trans "Use camera" %}</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-capture>{% trans "Take photo" %}</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-stop>{% trans "Stop camera" %}</button>
+            </div>
+            <div class="form-text" data-camera-status>{% trans "Choose files or use the camera to attach photos." %}</div>
+            <div class="mt-2 d-none" data-camera-preview>
+              <video class="w-100 rounded border bg-dark" style="max-height: 220px; object-fit: cover;" playsinline autoplay muted data-camera-video></video>
+              <canvas class="d-none" data-camera-canvas></canvas>
+            </div>
+            <div class="row g-2 mt-2 d-none" data-file-preview></div>
+          </div>
           <div class="form-text">{% trans "Optional photos that support the credit or debit note created during delivery." %}</div>
         </div>
         <div class="col-12">
@@ -425,6 +489,8 @@
 
 <script>
   (function () {
+    const cameraWidgets = document.querySelectorAll('[data-camera-upload]');
+    const supportsInlineCamera = Boolean(window.isSecureContext && navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function');
     const paymentStatus = document.getElementById('paymentStatus');
     const paymentMethod = document.getElementById('paymentMethod');
     const driverNoteType = document.getElementById('driverNoteType');
@@ -437,7 +503,240 @@
     const canvas = document.getElementById('signatureCanvas');
     const signatureInput = document.getElementById('signatureData');
     const clearSignature = document.getElementById('clearSignature');
-    if (!canvas || !signatureInput || !paymentStatus) {
+    const cameraStrings = {
+      notSupported: '{% trans "Your browser does not support camera access." %}',
+      chooseFilesOnly: '{% trans "Choose files to attach photos." %}',
+      ready: '{% trans "Camera ready. Take a photo to attach it to the form." %}',
+      added: '{% trans "Photo added to the form." %}',
+      stopped: '{% trans "Camera stopped." %}',
+      selectOrCamera: '{% trans "Choose files or use the camera to attach photos." %}',
+      denied: '{% trans "Camera permission was denied or is not available." %}',
+      filesSelected: '{% trans "Files selected." %}',
+      previewTitle: '{% trans "Selected photos" %}',
+    };
+
+    function setCameraStatus(widget, message) {
+      const status = widget.querySelector('[data-camera-status]');
+      if (status) {
+        status.textContent = message;
+      }
+    }
+
+    function toggleCameraButtons(widget, active) {
+      const startButton = widget.querySelector('[data-camera-start]');
+      const captureButton = widget.querySelector('[data-camera-capture]');
+      const stopButton = widget.querySelector('[data-camera-stop]');
+      if (startButton) {
+        startButton.classList.toggle('d-none', active || !supportsInlineCamera);
+      }
+      if (captureButton) {
+        captureButton.classList.toggle('d-none', !active);
+      }
+      if (stopButton) {
+        stopButton.classList.toggle('d-none', !active);
+      }
+    }
+
+    function stopCamera(widget, options) {
+      const settings = options || {};
+      const preview = widget.querySelector('[data-camera-preview]');
+      const video = widget.querySelector('[data-camera-video]');
+      const hadStream = Boolean(widget._cameraStream);
+      if (widget._cameraStream) {
+        widget._cameraStream.getTracks().forEach((track) => track.stop());
+        widget._cameraStream = null;
+      }
+      if (video) {
+        video.srcObject = null;
+      }
+      if (preview) {
+        preview.classList.add('d-none');
+      }
+      toggleCameraButtons(widget, false);
+      if (!settings.silent && hadStream) {
+        setCameraStatus(widget, cameraStrings.stopped);
+      }
+    }
+
+    function clearFilePreview(widget) {
+      const preview = widget.querySelector('[data-file-preview]');
+      if (!preview) {
+        return;
+      }
+      if (widget._previewUrls) {
+        widget._previewUrls.forEach((url) => URL.revokeObjectURL(url));
+      }
+      widget._previewUrls = [];
+      preview.innerHTML = '';
+      preview.classList.add('d-none');
+    }
+
+    function renderFilePreview(widget, files) {
+      const preview = widget.querySelector('[data-file-preview]');
+      if (!preview) {
+        return;
+      }
+      clearFilePreview(widget);
+      const imageFiles = Array.from(files || []).filter((file) => file && String(file.type || '').startsWith('image/'));
+      if (!imageFiles.length) {
+        return;
+      }
+      widget._previewUrls = [];
+      imageFiles.forEach((file, index) => {
+        const url = URL.createObjectURL(file);
+        widget._previewUrls.push(url);
+        const col = document.createElement('div');
+        col.className = 'col-6 col-md-4';
+        col.innerHTML = `
+          <div class="border rounded p-2 h-100 bg-white">
+            <img src="${url}" alt="${cameraStrings.previewTitle} ${index + 1}" class="img-fluid rounded mb-2" style="max-height: 140px; width: 100%; object-fit: cover;">
+            <div class="small text-muted text-truncate">${file.name}</div>
+          </div>
+        `;
+        preview.appendChild(col);
+      });
+      preview.classList.remove('d-none');
+    }
+
+    async function startCamera(widget) {
+      const preview = widget.querySelector('[data-camera-preview]');
+      const video = widget.querySelector('[data-camera-video]');
+      if (!supportsInlineCamera || !video) {
+        setCameraStatus(widget, cameraStrings.notSupported);
+        return;
+      }
+
+      stopCamera(widget, { silent: true });
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false,
+        });
+        widget._cameraStream = stream;
+        video.srcObject = stream;
+        if (preview) {
+          preview.classList.remove('d-none');
+        }
+        toggleCameraButtons(widget, true);
+        setCameraStatus(widget, cameraStrings.ready);
+      } catch (error) {
+        setCameraStatus(widget, cameraStrings.denied);
+      }
+    }
+
+    function appendCapturedPhoto(widget) {
+      const input = widget.querySelector('[data-camera-input]');
+      const video = widget.querySelector('[data-camera-video]');
+      const cameraCanvas = widget.querySelector('[data-camera-canvas]');
+      if (!input || !video || !cameraCanvas || typeof DataTransfer === 'undefined') {
+        return;
+      }
+      const width = video.videoWidth || 1280;
+      const height = video.videoHeight || 720;
+      cameraCanvas.width = width;
+      cameraCanvas.height = height;
+      const cameraContext = cameraCanvas.getContext('2d');
+      cameraContext.drawImage(video, 0, 0, width, height);
+      cameraCanvas.toBlob(function (blob) {
+        if (!blob) {
+          return;
+        }
+        const dataTransfer = new DataTransfer();
+        Array.from(input.files || []).forEach((file) => dataTransfer.items.add(file));
+        dataTransfer.items.add(new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' }));
+        input.files = dataTransfer.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        setCameraStatus(widget, cameraStrings.added);
+      }, 'image/jpeg', 0.92);
+    }
+
+    cameraWidgets.forEach((widget) => {
+      const input = widget.querySelector('[data-camera-input]');
+      const startButton = widget.querySelector('[data-camera-start]');
+      const captureButton = widget.querySelector('[data-camera-capture]');
+      const stopButton = widget.querySelector('[data-camera-stop]');
+
+      toggleCameraButtons(widget, false);
+      setCameraStatus(widget, supportsInlineCamera ? cameraStrings.selectOrCamera : cameraStrings.chooseFilesOnly);
+
+      if (input) {
+        input.addEventListener('change', function () {
+          const hasFiles = input.files && input.files.length;
+          renderFilePreview(widget, input.files);
+          setCameraStatus(widget, hasFiles ? cameraStrings.filesSelected : (supportsInlineCamera ? cameraStrings.selectOrCamera : cameraStrings.chooseFilesOnly));
+        });
+      }
+      if (startButton) {
+        startButton.addEventListener('click', function () {
+          startCamera(widget);
+        });
+      }
+      if (captureButton) {
+        captureButton.addEventListener('click', function () {
+          appendCapturedPhoto(widget);
+        });
+      }
+      if (stopButton) {
+        stopButton.addEventListener('click', function () {
+          stopCamera(widget);
+        });
+      }
+    });
+
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        cameraWidgets.forEach((widget) => stopCamera(widget, { silent: true }));
+      }
+    });
+
+    function togglePaymentSections() {
+      if (!paymentStatus) {
+        return;
+      }
+      const status = paymentStatus.value;
+      paidFields.forEach((element) => element.classList.toggle('d-none', status !== 'PAGADO'));
+      unpaidFields.forEach((element) => element.classList.toggle('d-none', status !== 'NO_PAGADO'));
+      toggleMethodFields();
+    }
+
+    function toggleMethodFields() {
+      if (!paymentStatus) {
+        return;
+      }
+      const method = (paymentMethod ? paymentMethod.value : '').toLowerCase();
+      methodFields.forEach((element) => {
+        const shouldShow = paymentStatus.value === 'PAGADO' && element.classList.contains(`method-${method}`);
+        element.classList.toggle('d-none', !shouldShow);
+      });
+    }
+
+    function toggleDriverNoteFields() {
+      const isCredit = driverNoteType && driverNoteType.value === 'CREDITO';
+      creditTypeFields.forEach((element) => element.classList.toggle('d-none', !isCredit));
+    }
+
+    function toggleDriverNotePostFields() {
+      const isCredit = driverNoteTypePostDelivery && driverNoteTypePostDelivery.value === 'CREDITO';
+      creditTypePostFields.forEach((element) => element.classList.toggle('d-none', !isCredit));
+    }
+
+    if (paymentStatus) {
+      paymentStatus.addEventListener('change', togglePaymentSections);
+    }
+    if (paymentMethod) {
+      paymentMethod.addEventListener('change', toggleMethodFields);
+    }
+    if (driverNoteType) {
+      driverNoteType.addEventListener('change', toggleDriverNoteFields);
+    }
+    if (driverNoteTypePostDelivery) {
+      driverNoteTypePostDelivery.addEventListener('change', toggleDriverNotePostFields);
+    }
+    togglePaymentSections();
+    toggleDriverNoteFields();
+    toggleDriverNotePostFields();
+
+    if (!canvas || !signatureInput || !clearSignature) {
       return;
     }
 
@@ -445,7 +744,6 @@
     context.lineWidth = 2;
     context.lineCap = 'round';
     let drawing = false;
-    let signed = false;
 
     function resizeCanvas() {
       const ratio = window.devicePixelRatio || 1;
@@ -478,7 +776,6 @@
       const point = pointFromEvent(event);
       context.lineTo(point.x, point.y);
       context.stroke();
-      signed = true;
       signatureInput.value = canvas.toDataURL('image/png');
       event.preventDefault();
     }
@@ -487,35 +784,9 @@
       drawing = false;
     }
 
-    function togglePaymentSections() {
-      const status = paymentStatus.value;
-      paidFields.forEach((element) => element.classList.toggle('d-none', status !== 'PAGADO'));
-      unpaidFields.forEach((element) => element.classList.toggle('d-none', status !== 'NO_PAGADO'));
-      toggleMethodFields();
-    }
-
-    function toggleMethodFields() {
-      const method = (paymentMethod ? paymentMethod.value : '').toLowerCase();
-      methodFields.forEach((element) => {
-        const shouldShow = paymentStatus.value === 'PAGADO' && element.classList.contains(`method-${method}`);
-        element.classList.toggle('d-none', !shouldShow);
-      });
-    }
-
-    function toggleDriverNoteFields() {
-      const isCredit = driverNoteType && driverNoteType.value === 'CREDITO';
-      creditTypeFields.forEach((element) => element.classList.toggle('d-none', !isCredit));
-    }
-
-    function toggleDriverNotePostFields() {
-      const isCredit = driverNoteTypePostDelivery && driverNoteTypePostDelivery.value === 'CREDITO';
-      creditTypePostFields.forEach((element) => element.classList.toggle('d-none', !isCredit));
-    }
-
     clearSignature.addEventListener('click', function () {
       context.clearRect(0, 0, canvas.width, canvas.height);
       signatureInput.value = '';
-      signed = false;
     });
 
     canvas.addEventListener('mousedown', startDrawing);
@@ -525,21 +796,8 @@
     canvas.addEventListener('touchstart', startDrawing, { passive: false });
     canvas.addEventListener('touchmove', draw, { passive: false });
     canvas.addEventListener('touchend', stopDrawing);
-    paymentStatus.addEventListener('change', togglePaymentSections);
-    if (paymentMethod) {
-      paymentMethod.addEventListener('change', toggleMethodFields);
-    }
-    if (driverNoteType) {
-      driverNoteType.addEventListener('change', toggleDriverNoteFields);
-    }
-    if (driverNoteTypePostDelivery) {
-      driverNoteTypePostDelivery.addEventListener('change', toggleDriverNotePostFields);
-    }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
-    togglePaymentSections();
-    toggleDriverNoteFields();
-    toggleDriverNotePostFields();
   })();
 </script>
 {% endblock %}

@@ -287,7 +287,13 @@ data-precio5="{{ p.precio_5 }}"
 
 </label>
 
-<select class="form-select form-select-sm precio-select">
+<div class="precio-select-shell"
+  data-label-default="{% trans 'Mantén oprimido 1 segundo para elegir precio' %}"
+  data-label-selected="{% trans 'Precio seleccionado' %}"
+  data-hold-label="{% trans 'Mantén oprimido 1 segundo para elegir precio' %}"
+  data-picker-title="{% trans 'Seleccionar precio' %}">
+
+<select class="form-select form-select-sm precio-select" aria-label="{% trans 'Seleccionar precio del producto' %}">
 
 <option value="">
 {% trans "Seleccionar precio" %}
@@ -314,6 +320,12 @@ data-precio5="{{ p.precio_5 }}"
 </option>
 
 </select>
+
+<button type="button" class="precio-hold-trigger" aria-label="{% trans 'Mantén oprimido para mostrar los precios' %}"></button>
+
+<span class="precio-select-mask" aria-hidden="true">{% trans "Mantén oprimido 1 segundo para elegir precio" %}</span>
+
+</div>
 
 </div>
 
@@ -378,7 +390,6 @@ $<span id="pedidoTotal">{{ total }}</span>
 
 
 <div>
-
 <a href="{% url 'ver_pedido' %}" class="btn btn-warning fw-bold">
 
 {% trans "Ver Pedido" %}
@@ -387,6 +398,21 @@ $<span id="pedidoTotal">{{ total }}</span>
 
 </div>
 
+</div>
+
+<div class="modal fade" id="modalPrecioSelector" tabindex="-1" aria-labelledby="modalPrecioSelectorLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header bg-primary-corp text-white border-0">
+        <h5 class="modal-title fw-bold" id="modalPrecioSelectorLabel">{% trans "Seleccionar precio" %}</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body py-3">
+        <p class="text-muted small mb-3">{% trans "Elige el precio que se aplicará al producto para este cliente." %}</p>
+        <div id="modalPrecioOpciones" class="precio-modal-options"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL VALIDACIÓN PRECIO -->

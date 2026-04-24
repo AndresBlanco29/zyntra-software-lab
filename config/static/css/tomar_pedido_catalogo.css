@@ -128,6 +128,58 @@ transform:scale(1.05);
     line-height: 1;
 }
 
+.precio-select-shell {
+    position: relative;
+}
+
+.precio-select-mask {
+    display: none;
+}
+
+.precio-hold-trigger {
+    display: none;
+}
+
+.precio-modal-options {
+    display: grid;
+    gap: 10px;
+}
+
+.precio-modal-option {
+    width: 100%;
+    border: 1px solid #d9e2f2;
+    border-radius: 12px;
+    background: #fff;
+    padding: 14px 16px;
+    text-align: left;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.precio-modal-option:hover,
+.precio-modal-option:focus {
+    border-color: #0b3d91;
+    box-shadow: 0 0 0 0.18rem rgba(11, 61, 145, 0.12);
+    background: #f8fbff;
+}
+
+.precio-modal-option--selected {
+    border-color: #0b3d91;
+    background: #eef4ff;
+}
+
+.precio-modal-option__title {
+    display: block;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.precio-modal-option__product {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.875rem;
+    color: #6b7280;
+}
+
 @media (max-width: 992px) {
     .sidebar {
         display: block !important;
@@ -182,9 +234,55 @@ transform:scale(1.05);
     }
 }
 
-@media (max-width: 576px) {
+@media (max-width: 767.98px) {
     .col-md-10 {
         padding: 14px !important;
+    }
+
+    .precio-select-shell .precio-select {
+        color: transparent;
+        text-shadow: none;
+        pointer-events: none;
+        user-select: none;
+    }
+
+    .precio-select-shell .precio-select option {
+        color: #212529;
+    }
+
+    .precio-hold-trigger {
+        position: absolute;
+        inset: 0;
+        display: block;
+        border: 0;
+        background: transparent;
+        z-index: 2;
+        cursor: pointer;
+    }
+
+    .precio-select-mask {
+        position: absolute;
+        inset: 0 2.4rem 0 0.75rem;
+        display: flex;
+        align-items: center;
+        color: #6c757d;
+        font-size: 0.875rem;
+        font-weight: 500;
+        pointer-events: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: opacity 0.15s ease;
+        z-index: 1;
+    }
+
+    .precio-select-shell[data-state="selected"] .precio-select-mask {
+        color: #1f2937;
+    }
+
+    .precio-select-shell[data-pressing="true"] .precio-select-mask {
+        color: #0b3d91;
+        font-weight: 700;
     }
 
     .pedido-bar {

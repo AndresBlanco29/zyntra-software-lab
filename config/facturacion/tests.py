@@ -123,7 +123,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(self.pedido.estado, 'INVOICE_GENERADA')
 		self.assertEqual(invoice.items.count(), 1)
 		self.assertEqual(invoice.items.first().cantidad_facturada, 3)
-		self.assertEqual(invoice.items.first().precio_venta_sugerido_unitario, Decimal('1.33'))
+		self.assertEqual(invoice.items.first().precio_venta_sugerido_unitario, Decimal('1.79'))
 		self.assertEqual(invoice.saldo_cliente, Decimal('45.00'))
 		self.assertTrue(invoice.despachador_notificado)
 		self.assertTrue(hasattr(invoice, 'delivery'))
@@ -229,6 +229,90 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertEqual(invoice.total_debitos, Decimal('5.00'))
 		self.assertEqual(invoice.saldo_cliente, Decimal('50.00'))
+
+	def test_credit_note_requires_credit_type(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+		with self.assertRaisesMessage(ValidationError, 'A credit type is required for credit notes.'):
+			crear_nota_ajuste_desde_invoice(
+				invoice=invoice,
+				tipo_documento='CREDITO',
+				motivo='DAMAGE',
+				tipo_credito='',
+				descripcion='Producto dañado',
+				usuario=self.backoffice,
+				items_payload=[{
+					'invoice_item': invoice.items.first(),
+					'cantidad': 1,
+					'monto_unitario': Decimal('15.00'),
+				}],
+			)
+
+	def test_debit_note_rejects_credit_type(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+		with self.assertRaisesMessage(ValidationError, 'Debit notes cannot define a credit type.'):
+			crear_nota_ajuste_desde_invoice(
+				invoice=invoice,
+				tipo_documento='DEBITO',
+				motivo='DEFECT',
+				tipo_credito='CREDIT_RETURN',
+				descripcion='Recargo operativo',
+				usuario=self.backoffice,
+				items_payload=[{
+					'invoice_item': invoice.items.first(),
+					'cantidad': 1,
+					'monto_unitario': Decimal('5.00'),
+				}],
+			)
+
+	def test_adjustment_note_requires_positive_quantity_and_amount(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+		with self.assertRaisesMessage(ValidationError, 'Enter a unit amount greater than zero for each selected adjustment item.'):
+			crear_nota_ajuste_desde_invoice(
+				invoice=invoice,
+				tipo_documento='DEBITO',
+				motivo='DEFECT',
+				tipo_credito='',
+				descripcion='Recargo operativo',
+				usuario=self.backoffice,
+				items_payload=[{
+					'invoice_item': invoice.items.first(),
+					'cantidad': 1,
+					'monto_unitario': Decimal('0.00'),
+				}],
+			)
+
+		with self.assertRaisesMessage(ValidationError, 'Enter a quantity greater than zero for each selected adjustment item.'):
+			crear_nota_ajuste_desde_invoice(
+				invoice=invoice,
+				tipo_documento='DEBITO',
+				motivo='DEFECT',
+				tipo_credito='',
+				descripcion='Recargo operativo',
+				usuario=self.backoffice,
+				items_payload=[{
+					'invoice_item': invoice.items.first(),
+					'cantidad': 0,
+					'monto_unitario': Decimal('5.00'),
+				}],
+			)
 
 	def test_driver_can_complete_paid_delivery(self):
 		invoice = generar_invoice_desde_picking(
@@ -444,6 +528,38 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(response, 'Driver-created adjustment notes detected.')
 		self.assertContains(response, 'Created by driver')
 
+	def test_backoffice_invoice_detail_shows_adjustment_action_and_products(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		nota = crear_nota_ajuste_desde_invoice(
+			invoice=invoice,
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Customer returned damaged tortillas',
+			usuario=self.backoffice,
+			items_payload=[{
+				'invoice_item': invoice.items.first(),
+				'cantidad': 2,
+				'monto_unitario': Decimal('15.00'),
+			}],
+		)
+		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+
+		self.assertContains(response, 'Action taken')
+		self.assertContains(response, 'Product returned and inventory was restocked.')
+		self.assertContains(response, 'Products affected')
+		self.assertContains(response, 'Tortilla 12')
+		self.assertContains(response, 'Caja')
+		self.assertContains(response, 'Customer returned damaged tortillas')
+
 	def test_backoffice_dashboard_shows_pending_adjustment_note_counter(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
@@ -537,6 +653,75 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(nota.tipo_credito, '')
 		self.assertEqual(nota.creada_por, self.driver)
 		self.assertEqual(nota.total, Decimal('5.00'))
+
+	def test_backoffice_invoice_create_note_uses_prefixed_form_fields(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('backoffice_invoice_create_note', args=[invoice.id]), {
+			'note_tipo_documento': 'CREDITO',
+			'note_motivo': 'DAMAGE',
+			'note_tipo_credito': 'CREDIT_RETURN',
+			'note_descripcion': 'Producto dañado en entrega',
+			f'note_qty_{invoice.items.first().id}': '1',
+			f'note_amount_{invoice.items.first().id}': '15.00',
+		})
+
+		invoice.refresh_from_db()
+		nota = invoice.notas_ajuste.get()
+		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertEqual(nota.tipo_documento, 'CREDITO')
+		self.assertEqual(nota.motivo, 'DAMAGE')
+		self.assertEqual(nota.tipo_credito, 'CREDIT_RETURN')
+		self.assertEqual(nota.total, Decimal('15.00'))
+
+	def test_backoffice_invoice_create_debit_note_uses_prefixed_form_fields(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('backoffice_invoice_create_note', args=[invoice.id]), {
+			'note_tipo_documento': 'DEBITO',
+			'note_motivo': 'DEFECT',
+			'note_tipo_credito': '',
+			'note_descripcion': 'Recargo operativo en backoffice',
+			f'note_qty_{invoice.items.first().id}': '1',
+			f'note_amount_{invoice.items.first().id}': '5.00',
+		})
+
+		invoice.refresh_from_db()
+		nota = invoice.notas_ajuste.get(tipo_documento='DEBITO')
+		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertEqual(nota.tipo_documento, 'DEBITO')
+		self.assertEqual(nota.motivo, 'DEFECT')
+		self.assertEqual(nota.tipo_credito, '')
+		self.assertEqual(nota.total, Decimal('5.00'))
+
+	def test_backoffice_invoice_detail_hides_credit_type_until_credit_selected(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'id="backofficeNoteType"', html=False)
+		self.assertContains(response, 'id="backofficeCreditTypeWrapper"', html=False)
+		self.assertContains(response, 'id="backofficeCreditType"', html=False)
+		self.assertContains(response, 'syncCreditTypeVisibility', html=False)
 
 	def test_backoffice_can_unlock_blocked_customer(self):
 		invoice = generar_invoice_desde_picking(
@@ -680,8 +865,11 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(len(items), 1)
 		self.assertEqual(items[0]['barcode'], '7501234567890')
 		self.assertEqual(items[0]['pack_size'], 'Caja x 12')
+		self.assertEqual(items[0]['requested_quantity'], '4')
+		self.assertEqual(items[0]['dispatched_quantity'], '3')
 		self.assertEqual(items[0]['customer_price'], '$15.00')
-		self.assertEqual(items[0]['suggested_unit_price'], '$1.33')
+		self.assertEqual(items[0]['suggested_unit_price'], '$1.79')
+		self.assertEqual(items[0]['profit_percentage'], '30.17%')
 
 	def test_backoffice_generate_invoice_view_saves_custom_suggested_unit_price(self):
 		self.client.force_login(self.backoffice)
@@ -710,7 +898,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
 		self.assertEqual(timezone.localtime(invoice.delivery.estimated_delivery_at).strftime('%Y-%m-%d %H:%M'), '2026-04-18 09:30')
 
-	def test_invoice_pdf_suggested_retail_uses_next_price_tier(self):
+	def test_invoice_pdf_suggested_retail_uses_default_profit_suggestion(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
 			metodo_entrega='LTG',
@@ -720,7 +908,7 @@ class InvoiceFlowTests(TestCase):
 
 		suggested_unit_price = _resolve_invoice_suggested_unit_price(invoice.items.first())
 
-		self.assertEqual(suggested_unit_price, Decimal('1.33'))
+		self.assertEqual(suggested_unit_price, Decimal('1.79'))
 
 	def test_backoffice_invoice_detail_shows_saved_signature_proof(self):
 		invoice = generar_invoice_desde_picking(
@@ -886,14 +1074,20 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(response, 'Consulta de Google Maps')
 		self.assertContains(response, 'Evidencia')
 		self.assertContains(response, 'Subir evidencia')
+		self.assertContains(response, 'Usar camara')
+		self.assertContains(response, 'Tomar foto')
+		self.assertContains(response, 'Fotos seleccionadas')
 		self.assertContains(response, 'Aún no se han subido fotos de evidencia.', html=False)
 		self.assertContains(response, 'Completar entrega')
 		self.assertContains(response, 'Recibido por')
 		self.assertContains(response, 'Método de pago')
+		self.assertContains(response, 'Detalles del pago')
 		self.assertContains(response, 'Firma del cliente')
 		self.assertContains(response, 'Guardar entrega')
 		self.assertContains(response, 'Asignada')
 		self.assertContains(response, 'Pendiente')
+		content = response.content.decode('utf-8')
+		self.assertLess(content.index('data-driver-section="adjustment-note"'), content.index('data-driver-section="payment-details"'))
 
 	def test_driver_delivery_tracking_renders_in_spanish_when_selected(self):
 		invoice = generar_invoice_desde_picking(
@@ -1110,6 +1304,28 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, reverse('backoffice_invoice_live_tracking', args=[invoice.id]))
+
+	def test_backoffice_and_driver_adjustment_reason_include_missing_item(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+
+		self.client.force_login(self.backoffice)
+		backoffice_response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+
+		self.assertEqual(backoffice_response.status_code, 200)
+		self.assertContains(backoffice_response, 'value="MISSING_ITEM"', html=False)
+		self.assertContains(backoffice_response, 'Missing item')
+
+		self.client.force_login(self.driver)
+		driver_response = self.client.get(reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+
+		self.assertEqual(driver_response.status_code, 200)
+		self.assertContains(driver_response, 'value="MISSING_ITEM"', html=False)
+		self.assertContains(driver_response, 'Missing item')
 
 	def test_backoffice_live_drivers_page_lists_only_in_route_deliveries(self):
 		invoice_live = generar_invoice_desde_picking(

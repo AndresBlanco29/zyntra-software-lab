@@ -58,9 +58,9 @@ placeholder="{% trans 'Buscar por nombre, empresa o documento' %}"
 
 <div class="card-body p-0">
 
-<div class="table-responsive">
+<div class="table-responsive mobile-stack-responsive">
 
-<table class="table align-middle mb-0">
+<table class="table align-middle mb-0 mobile-stack-table mobile-stack-table--list">
 
 <thead>
 
@@ -94,15 +94,15 @@ data-telefono="{{ cliente.telefono }}"
 data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 >
 
-<td>{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}</td>
+<td data-label="{% trans 'Cliente' %}">{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}</td>
 
-<td>{{ cliente.nombre_empresa }}</td>
+<td data-label="{% trans 'Empresa' %}">{{ cliente.nombre_empresa }}</td>
 
-<td>{{ cliente.usuario.email }}</td>
+<td data-label="{% trans 'Correo Electrónico' %}">{{ cliente.usuario.email }}</td>
 
-<td>{{ cliente.telefono }}</td>
+<td data-label="{% trans 'Teléfono' %}">{{ cliente.telefono }}</td>
 
-<td>
+<td data-label="{% trans 'Estado' %}">
 
 {% if cliente.aprobado %}
 
@@ -120,7 +120,9 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 
 </td>
 
-<td>
+<td data-label="{% trans 'Acción' %}" class="mobile-stack-table__action clientes-acciones-cell">
+
+<div class="clientes-acciones-group">
 
 <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editarClienteModal"
   data-cliente-id="{{ cliente.id }}"
@@ -151,8 +153,18 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
   {% endif %}
 {% endif %}
 
+</div>
+
 </td>
 
+</tr>
+
+{% empty %}
+
+<tr>
+<td colspan="6" class="text-center text-muted py-4 mobile-stack-table__empty">
+{% trans "No hay clientes registrados." %}
+</td>
 </tr>
 
 {% endfor %}

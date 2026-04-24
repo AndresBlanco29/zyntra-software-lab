@@ -28,7 +28,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 from config.cotizaciones.models import Cotizacion
 from config.facturacion.models import NotaAjuste
-from config.facturacion.services import resolve_presentacion_suggested_unit_price
+from config.facturacion.services import DEFAULT_SUGGESTED_PROFIT_PERCENTAGE, resolve_presentacion_suggested_unit_price
 from config.notificaciones.models import Notificacion
 from config.productos.models import Presentacion
 from config.inventario.models import StockPresentacion
@@ -36,6 +36,7 @@ from config.inventario.models import StockPresentacion
 from .models import Pedido, PedidoItem
 from .services import (
 	asignar_picking_a_seleccionador,
+	evaluar_stock_fisico_verificacion_picking,
 	guardar_verificacion_picking,
 	recalcular_pedido,
 	validar_estado_backoffice_con_bloqueo,
@@ -128,15 +129,18 @@ def _selector_pedidos_queryset(user):
 	return queryset.filter(seleccionador=user)
 
 
-def _build_selector_item_rows(pedido):
+def _build_selector_item_rows(pedido, actual_quantity_overrides=None):
 	rows = []
+	actual_quantity_overrides = actual_quantity_overrides or {}
 	for item in pedido.items.select_related('presentacion__producto').all():
 		rows.append({
 			'id': item.id,
 			'product': item.presentacion.producto.nombre,
 			'presentation': item.presentacion.nombre,
 			'requested_quantity': item.cantidad_solicitada,
-			'actual_quantity': item.cantidad,
+			'actual_quantity': actual_quantity_overrides.get(item.id, item.cantidad),
+			'stock_physical': int(getattr(getattr(item.presentacion, 'stock_operativo', None), 'stock_fisico', 0) or 0),
+			'applied_quantity': int(item.cantidad_inventario_aplicada or 0),
 		})
 	return rows
 
@@ -194,9 +198,25 @@ def backoffice_pedidos(request):
 @internal_permission_required('backoffice.orders.view')
 def backoffice_pedido_detalle(request, pedido_id):
 	pedido = get_object_or_404(
-		Pedido.objects.select_related('cliente__usuario', 'vendedor', 'seleccionador', 'invoice', 'invoice__driver').prefetch_related('items__presentacion__producto'),
+		Pedido.objects.select_related('cliente__usuario', 'vendedor', 'seleccionador', 'invoice', 'invoice__driver').prefetch_related('items__presentacion__producto', 'items__presentacion__stock_operativo'),
 		id=pedido_id,
 	)
+	pedido_items = list(pedido.items.select_related('presentacion__producto', 'presentacion__stock_operativo'))
+	picker_stock_evaluation = evaluar_stock_fisico_verificacion_picking(
+		pedido_items=pedido_items,
+		cantidades_reales={item.id: item.cantidad for item in pedido_items},
+	)
+	picker_stock_shortage_rows = [
+		{
+			'product_name': item.presentacion.producto.nombre,
+			'presentation_name': item.presentacion.nombre,
+			'quantity_to_pick': item.cantidad,
+			'available_physical_stock': picker_stock_evaluation[item.id]['stock_fisico'],
+			'shortage_amount': picker_stock_evaluation[item.id]['shortage_amount'],
+		}
+		for item in pedido_items
+		if picker_stock_evaluation[item.id]['has_shortage']
+	]
 
 	if request.method == 'POST':
 		if not request.user.has_internal_permission('backoffice.orders.manage'):
@@ -254,6 +274,8 @@ def backoffice_pedido_detalle(request, pedido_id):
 	context = {
 		'pedido': pedido,
 		'invoice': getattr(pedido, 'invoice', None),
+		'picker_stock_shortage_blocked': bool(pedido.picking_bloqueado and picker_stock_shortage_rows),
+		'picker_stock_shortage_rows': picker_stock_shortage_rows,
 		'pedido_estado_label': _pedido_state_label(pedido.estado),
 		'pedido_origen_label': _pedido_origin_label(pedido.origen),
 		'state_choices': _pedido_state_choices(),
@@ -269,13 +291,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 				'quantity': item.cantidad,
 				'base_unit_value': format(_pedido_item_customer_unit_price(item), '.2f'),
 				'default_value': format(resolve_presentacion_suggested_unit_price(presentacion=item.presentacion, base_case_price=item.precio), '.2f'),
-				'default_percentage': format(
-					_calculate_margin_percentage(
-						_pedido_item_customer_unit_price(item),
-						resolve_presentacion_suggested_unit_price(presentacion=item.presentacion, base_case_price=item.precio),
-					),
-					'.2f',
-				),
+				'default_percentage': format(DEFAULT_SUGGESTED_PROFIT_PERCENTAGE, '.2f'),
 			}
 			for item in pedido.items.select_related('presentacion__producto')
 			if item.cantidad > 0
@@ -408,14 +424,31 @@ def selector_picking_detail(request, pedido_id):
 		return redirect('login')
 
 	pedido = get_object_or_404(_selector_pedidos_queryset(request.user), id=pedido_id)
+	pedido = Pedido.objects.select_related('cliente', 'seleccionador').prefetch_related('items__presentacion__producto', 'items__presentacion__stock_operativo').get(id=pedido.id)
+	posted_quantities = None
+	form_note = pedido.nota_seleccionador
+	form_note_resolved = pedido.nota_seleccionador_resuelta
+	stock_evaluation = evaluar_stock_fisico_verificacion_picking(
+		pedido_items=list(pedido.items.all()),
+		cantidades_reales={item.id: item.cantidad for item in pedido.items.all()},
+	)
+	form_has_stock_shortage = any(item_result['has_shortage'] for item_result in stock_evaluation.values())
 
 	if request.method == 'POST':
 		cantidades_reales = {
 			item.id: _parse_non_negative_quantity(request.POST.get(f'cantidad_real_{item.id}'), item.cantidad)
 			for item in pedido.items.all()
 		}
+		stock_evaluation = evaluar_stock_fisico_verificacion_picking(
+			pedido_items=list(pedido.items.all()),
+			cantidades_reales=cantidades_reales,
+		)
+		form_has_stock_shortage = any(item_result['has_shortage'] for item_result in stock_evaluation.values())
+		posted_quantities = cantidades_reales.copy()
 		nota = request.POST.get('nota_seleccionador')
-		nota_resuelta = request.POST.get('nota_seleccionador_resuelta') == 'on'
+		nota_resuelta = request.POST.get('nota_seleccionador_resuelta') == 'on' and not form_has_stock_shortage
+		form_note = nota
+		form_note_resolved = nota_resuelta
 
 		try:
 			guardar_verificacion_picking(
@@ -428,12 +461,19 @@ def selector_picking_detail(request, pedido_id):
 		except (PermissionDenied, ValidationError) as exc:
 			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 		else:
-			messages.success(request, _('Picking ticket verified successfully.'))
+			if form_has_stock_shortage:
+				messages.warning(request, _('Physical stock is insufficient. The verification was saved and the order remains blocked for BackOffice review.'))
+			else:
+				messages.success(request, _('Picking ticket verified successfully.'))
 			return redirect('selector_picking_list')
 
 	context = {
 		'pedido': pedido,
 		'pedido_estado_label': _pedido_state_label(pedido.estado),
-		'item_rows': _build_selector_item_rows(pedido),
+		'pedido_lock_preview': form_has_stock_shortage or pedido.picking_bloqueado,
+		'item_rows': _build_selector_item_rows(pedido, posted_quantities),
+		'form_note': form_note,
+		'form_note_resolved': form_note_resolved,
+		'form_has_stock_shortage': form_has_stock_shortage,
 	}
 	return render(request, 'backoffice/selector_picking_detail.html', context)

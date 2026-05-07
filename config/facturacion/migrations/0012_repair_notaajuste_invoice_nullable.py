@@ -16,6 +16,8 @@ def repair_notaajuste_invoice_nullable(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
+    atomic = False
+
     dependencies = [
         ('facturacion', '0011_notaajusteitem_contenido_fraccionado'),
     ]

@@ -260,8 +260,64 @@ def calculate_delivery_collectible_balance(*, delivery, adjustment_note=None):
 	return collectible_balance
 
 
+def _resolve_driver_delivery_payment(*, payload, collectible_balance, cheque_image_file=None):
+	metodo_pago = (payload.get('metodo_pago') or '').strip()
+	legacy_amount = _quantize_money(payload.get('monto_pagado') or '0')
+	cash_amount = _quantize_money(payload.get('monto_pagado_cash') or '0')
+	cheque_amount = _quantize_money(payload.get('monto_pagado_cheque') or '0')
+	cheque_numero = (payload.get('cheque_numero') or '').strip()
+	cheque_banco = (payload.get('cheque_banco') or '').strip()
+
+	if not metodo_pago:
+		raise ValidationError(_('A payment method is required when the delivery is paid.'))
+
+	if metodo_pago == 'MIXTO':
+		if cash_amount <= 0 or cheque_amount <= 0:
+			raise ValidationError(_('Cash + cheque payments must include both amounts greater than zero.'))
+		monto_pagado = _quantize_money(cash_amount + cheque_amount)
+	elif metodo_pago == 'CASH':
+		cash_amount = cash_amount if cash_amount > 0 else legacy_amount
+		cheque_amount = Decimal('0.00')
+		monto_pagado = cash_amount
+	elif metodo_pago == 'CHEQUE':
+		cheque_amount = cheque_amount if cheque_amount > 0 else legacy_amount
+		cash_amount = Decimal('0.00')
+		monto_pagado = cheque_amount
+	else:
+		cash_amount = Decimal('0.00')
+		cheque_amount = Decimal('0.00')
+		monto_pagado = legacy_amount
+
+	if collectible_balance > 0 and monto_pagado <= 0:
+		raise ValidationError(_('Paid deliveries must include a payment amount greater than zero.'))
+	if monto_pagado > collectible_balance:
+		raise ValidationError(_('The paid amount cannot exceed the customer balance.'))
+
+	uses_cheque = metodo_pago in {'CHEQUE', 'MIXTO'}
+	if uses_cheque:
+		if cheque_amount <= 0:
+			raise ValidationError(_('Cheque payments must include an amount greater than zero.'))
+		if not cheque_numero or not cheque_banco:
+			raise ValidationError(_('Cheque number and bank are required for cheque payments.'))
+		if cheque_image_file is None:
+			raise ValidationError(_('A cheque image is required for cheque payments.'))
+	else:
+		cheque_numero = ''
+		cheque_banco = ''
+
+	return {
+		'metodo_pago': metodo_pago,
+		'monto_pagado': monto_pagado,
+		'monto_pagado_cash': cash_amount,
+		'monto_pagado_cheque': cheque_amount,
+		'cheque_numero': cheque_numero,
+		'cheque_banco': cheque_banco,
+		'cheque_imagen': cheque_image_file,
+	}
+
+
 @transaction.atomic
-def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, adjustment_note=None):
+def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, adjustment_note=None, cheque_image_file=None):
 	if delivery.driver_id != driver_user.id:
 		raise PermissionDenied(_('You are not assigned to this delivery.'))
 	if delivery.is_completed:
@@ -269,23 +325,21 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 
 	estado_pago = (payload.get('estado_pago') or '').strip()
 	recibido_por = (payload.get('recibido_por') or '').strip()
-	metodo_pago = (payload.get('metodo_pago') or '').strip()
 	motivo_no_pago = (payload.get('motivo_no_pago') or '').strip()
-	monto_pagado = _quantize_money(payload.get('monto_pagado') or '0')
 	signature_file = _build_signature_content_file(payload.get('firma_cliente_data'), delivery.id)
 	collectible_balance = calculate_delivery_collectible_balance(delivery=delivery, adjustment_note=adjustment_note)
+	payment_details = None
 
 	if estado_pago not in {'PAGADO', 'NO_PAGADO'}:
 		raise ValidationError(_('Select a valid payment status.'))
 	if not recibido_por:
 		raise ValidationError(_('Recipient name is required for delivered orders.'))
 	if estado_pago == 'PAGADO':
-		if not metodo_pago:
-			raise ValidationError(_('A payment method is required when the delivery is paid.'))
-		if collectible_balance > 0 and monto_pagado <= 0:
-			raise ValidationError(_('Paid deliveries must include a payment amount greater than zero.'))
-		if monto_pagado > collectible_balance:
-			raise ValidationError(_('The paid amount cannot exceed the customer balance.'))
+		payment_details = _resolve_driver_delivery_payment(
+			payload=payload,
+			collectible_balance=collectible_balance,
+			cheque_image_file=cheque_image_file,
+		)
 	else:
 		if not motivo_no_pago:
 			raise ValidationError(_('A reason is required when the customer does not pay.'))
@@ -296,8 +350,10 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 		start_delivery_route(delivery=delivery, driver_user=driver_user)
 
 	delivery.estado_pago = estado_pago
-	delivery.metodo_pago = metodo_pago if estado_pago == 'PAGADO' else ''
-	delivery.monto_pagado = monto_pagado if estado_pago == 'PAGADO' else Decimal('0.00')
+	delivery.metodo_pago = payment_details['metodo_pago'] if payment_details else ''
+	delivery.monto_pagado = payment_details['monto_pagado'] if payment_details else Decimal('0.00')
+	delivery.monto_pagado_cash = payment_details['monto_pagado_cash'] if payment_details else Decimal('0.00')
+	delivery.monto_pagado_cheque = payment_details['monto_pagado_cheque'] if payment_details else Decimal('0.00')
 	delivery.recibido_por = recibido_por
 	delivery.motivo_no_pago = motivo_no_pago if estado_pago == 'NO_PAGADO' else ''
 	delivery.notas_driver = (payload.get('notas_driver') or '').strip()
@@ -305,6 +361,12 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 	delivery.firma_recibida_en = timezone.now()
 	delivery.delivered_at = timezone.now()
 	delivery.notifications_sent_at = timezone.now()
+	delivery.cheque_numero = payment_details['cheque_numero'] if payment_details else ''
+	delivery.cheque_banco = payment_details['cheque_banco'] if payment_details else ''
+	if payment_details and payment_details['cheque_imagen'] is not None:
+		delivery.cheque_imagen = payment_details['cheque_imagen']
+	elif not payment_details:
+		delivery.cheque_imagen = None
 	if estado_pago == 'PAGADO':
 		delivery.estado = 'ENTREGADA_PAGADA'
 		delivery.client_blocked_on_delivery = False
@@ -314,6 +376,8 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 	else:
 		delivery.estado = 'ENTREGADA_SIN_PAGO'
 		delivery.client_blocked_on_delivery = True
+		delivery.monto_pagado_cash = Decimal('0.00')
+		delivery.monto_pagado_cheque = Decimal('0.00')
 		delivery.invoice.cliente.credit_hold = True
 		delivery.invoice.cliente.save(update_fields=['credit_hold'])
 		_create_deliveryNotificationLogs = _create_delivery_notification_logs

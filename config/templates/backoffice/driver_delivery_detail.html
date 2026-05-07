@@ -286,9 +286,9 @@
               <input type="text" name="recibido_por" class="form-control" required>
             </div>
             <div class="col-md-4 paid-only d-none">
-              <label class="form-label fw-semibold">{% trans "Payment amount" %}</label>
+              <label class="form-label fw-semibold">{% trans "Total payment amount" %}</label>
               <input type="number" min="0" step="0.01" name="monto_pagado" id="paymentAmount" class="form-control" value="{{ delivery_collectible_balance }}" data-base-balance="{{ invoice.saldo_cliente }}">
-              <div class="form-text">{% trans "Credit and debit notes created during delivery update the suggested amount to collect." %}</div>
+              <div class="form-text">{% trans "Credit and debit notes created during delivery update the suggested amount to collect. Cash + cheque totals are calculated automatically." %}</div>
             </div>
 
             <div class="col-md-4 paid-only d-none">
@@ -297,6 +297,7 @@
                 <option value="">{% trans "Select..." %}</option>
                 <option value="CASH">{% trans "Cash" %}</option>
                 <option value="CHEQUE">{% trans "Cheque" %}</option>
+                <option value="MIXTO">{% trans "Cash + cheque" %}</option>
                 <option value="TRANSFERENCIA">{% trans "Transfer" %}</option>
                 <option value="TARJETA">{% trans "Card" %}</option>
                 <option value="ZELLE">Zelle</option>
@@ -304,13 +305,34 @@
               </select>
             </div>
 
-            <div class="col-md-4 method-field method-cheque d-none">
+            <div class="col-md-4 method-field method-mixto d-none">
+              <label class="form-label fw-semibold">{% trans "Cash amount" %}</label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input type="number" min="0" step="0.01" name="monto_pagado_cash" id="paymentCashAmount" class="form-control">
+              </div>
+            </div>
+
+            <div class="col-md-4 method-field method-mixto d-none">
+              <label class="form-label fw-semibold">{% trans "Cheque amount" %}</label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input type="number" min="0" step="0.01" name="monto_pagado_cheque" id="paymentChequeAmount" class="form-control">
+              </div>
+            </div>
+
+            <div class="col-md-4 method-field method-cheque method-mixto d-none">
               <label class="form-label fw-semibold">{% trans "Cheque number" %}</label>
               <input type="text" name="cheque_numero" class="form-control">
             </div>
-            <div class="col-md-4 method-field method-cheque d-none">
+            <div class="col-md-4 method-field method-cheque method-mixto d-none">
               <label class="form-label fw-semibold">{% trans "Cheque bank" %}</label>
               <input type="text" name="cheque_banco" class="form-control">
+            </div>
+            <div class="col-md-4 method-field method-cheque method-mixto d-none">
+              <label class="form-label fw-semibold">{% trans "Cheque image" %}</label>
+              <input type="file" name="cheque_imagen" class="form-control" accept="image/*">
+              <div class="form-text">{% trans "Upload the cheque photo as payment proof." %}</div>
             </div>
             <div class="col-md-4 method-field method-transferencia d-none">
               <label class="form-label fw-semibold">{% trans "Transfer reference" %}</label>
@@ -579,6 +601,8 @@
     const paymentStatus = document.getElementById('paymentStatus');
     const paymentMethod = document.getElementById('paymentMethod');
     const paymentAmountInput = document.getElementById('paymentAmount');
+    const paymentCashAmountInput = document.getElementById('paymentCashAmount');
+    const paymentChequeAmountInput = document.getElementById('paymentChequeAmount');
     const driverNoteType = document.getElementById('driverNoteType');
     const driverNoteTypePostDelivery = document.getElementById('driverNoteTypePostDelivery');
     const driverAdjustmentType = document.getElementById('driverAdjustmentType');
@@ -847,8 +871,28 @@
       }
       const baseBalance = Number(paymentAmountInput.dataset.baseBalance || paymentAmountInput.defaultValue || '0');
       const suggestedAmount = Math.max(baseBalance - getDriverDraftCreditAmount() + getDriverDraftDebitAmount(), 0);
-      paymentAmountInput.value = suggestedAmount.toFixed(2);
       paymentAmountInput.max = suggestedAmount.toFixed(2);
+      if (paymentMethod && paymentMethod.value === 'MIXTO') {
+        syncMixedPaymentTotal();
+        return;
+      }
+      paymentAmountInput.readOnly = false;
+      paymentAmountInput.value = suggestedAmount.toFixed(2);
+    }
+
+    function syncMixedPaymentTotal() {
+      if (!paymentAmountInput || !paymentMethod) {
+        return;
+      }
+      if (paymentMethod.value !== 'MIXTO') {
+        paymentAmountInput.readOnly = false;
+        return;
+      }
+      const cashAmount = Number((paymentCashAmountInput && paymentCashAmountInput.value) || '0');
+      const chequeAmount = Number((paymentChequeAmountInput && paymentChequeAmountInput.value) || '0');
+      const total = Math.max(cashAmount + chequeAmount, 0);
+      paymentAmountInput.readOnly = true;
+      paymentAmountInput.value = total.toFixed(2);
     }
 
     function toggleMethodFields() {
@@ -860,6 +904,7 @@
         const shouldShow = paymentStatus.value === 'PAGADO' && element.classList.contains(`method-${method}`);
         element.classList.toggle('d-none', !shouldShow);
       });
+      syncMixedPaymentTotal();
     }
 
     function toggleDriverNoteFields() {
@@ -1012,6 +1057,12 @@
     }
     if (paymentMethod) {
       paymentMethod.addEventListener('change', toggleMethodFields);
+    }
+    if (paymentCashAmountInput) {
+      paymentCashAmountInput.addEventListener('input', syncMixedPaymentTotal);
+    }
+    if (paymentChequeAmountInput) {
+      paymentChequeAmountInput.addEventListener('input', syncMixedPaymentTotal);
     }
     if (driverNoteType) {
       driverNoteType.addEventListener('change', toggleDriverNoteFields);

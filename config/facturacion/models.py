@@ -97,6 +97,7 @@ class Delivery(models.Model):
 	PAYMENT_METHOD_CHOICES = (
 		('CASH', _('Cash')),
 		('CHEQUE', _('Cheque')),
+		('MIXTO', _('Cash + cheque')),
 		('TRANSFERENCIA', _('Transfer')),
 		('TARJETA', _('Card')),
 		('ZELLE', 'Zelle'),
@@ -114,6 +115,8 @@ class Delivery(models.Model):
 	estado_pago = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='PENDIENTE')
 	metodo_pago = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, blank=True)
 	monto_pagado = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	monto_pagado_cash = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	monto_pagado_cheque = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
 	recibido_por = models.CharField(max_length=160, blank=True)
 	motivo_no_pago = models.TextField(blank=True)
 	notas_driver = models.TextField(blank=True)
@@ -121,6 +124,7 @@ class Delivery(models.Model):
 	firma_recibida_en = models.DateTimeField(blank=True, null=True)
 	cheque_numero = models.CharField(max_length=80, blank=True)
 	cheque_banco = models.CharField(max_length=120, blank=True)
+	cheque_imagen = models.ImageField(upload_to='delivery/checks/', blank=True, null=True)
 	transferencia_referencia = models.CharField(max_length=120, blank=True)
 	tarjeta_ultimos_4 = models.CharField(max_length=4, blank=True)
 	tarjeta_autorizacion = models.CharField(max_length=80, blank=True)
@@ -194,6 +198,20 @@ class Delivery(models.Model):
 	def is_completed(self):
 		return self.estado in {'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'}
 
+	@property
+	def payment_breakdown(self):
+		breakdown = []
+		if self.monto_pagado_cash > 0:
+			breakdown.append({'label': _('Cash'), 'amount': self.monto_pagado_cash})
+		if self.monto_pagado_cheque > 0:
+			breakdown.append({'label': _('Cheque'), 'amount': self.monto_pagado_cheque})
+		if breakdown:
+			return breakdown
+		if self.monto_pagado > 0:
+			label = self.get_metodo_pago_display() if self.metodo_pago else _('Payment')
+			return [{'label': label, 'amount': self.monto_pagado}]
+		return []
+
 	def clean(self):
 		if self.invoice_id:
 			if self.invoice.metodo_entrega != 'RUTA_DRIVER':
@@ -227,8 +245,15 @@ class Delivery(models.Model):
 	def _validate_payment_method_fields(self):
 		method = self.metodo_pago
 		if method == 'CHEQUE':
-			if not self.cheque_numero.strip() or not self.cheque_banco.strip():
-				raise ValidationError({'cheque_numero': _('Cheque number and bank are required for cheque payments.')})
+			if self.monto_pagado_cheque <= 0:
+				raise ValidationError({'monto_pagado_cheque': _('Cheque payments must include an amount greater than zero.')})
+			if not self.cheque_numero.strip() or not self.cheque_banco.strip() or not self.cheque_imagen:
+				raise ValidationError({'cheque_numero': _('Cheque number, bank and cheque image are required for cheque payments.')})
+		elif method == 'MIXTO':
+			if self.monto_pagado_cash <= 0 or self.monto_pagado_cheque <= 0:
+				raise ValidationError({'monto_pagado_cash': _('Cash + cheque payments must include both amounts greater than zero.')})
+			if not self.cheque_numero.strip() or not self.cheque_banco.strip() or not self.cheque_imagen:
+				raise ValidationError({'cheque_numero': _('Cheque number, bank and cheque image are required for cash + cheque payments.')})
 		elif method == 'TRANSFERENCIA':
 			if not self.transferencia_referencia.strip():
 				raise ValidationError({'transferencia_referencia': _('Transfer reference is required.')})

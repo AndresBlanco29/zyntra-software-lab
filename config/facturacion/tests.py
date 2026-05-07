@@ -124,6 +124,13 @@ class InvoiceFlowTests(TestCase):
 			usuario=self.backoffice,
 		)
 
+	def _build_test_image(self, name='evidence.png'):
+		return SimpleUploadedFile(
+			name,
+			base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO6pS7QAAAAASUVORK5CYII='),
+			content_type='image/png',
+		)
+
 	def test_generate_invoice_uses_verified_quantities(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
@@ -847,6 +854,41 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(delivery.estado, 'ENTREGADA_SIN_PAGO')
 		self.assertTrue(delivery.invoice.cliente.credit_hold)
 		self.assertEqual(delivery.evidence_photos.count(), 1)
+
+	def test_driver_can_complete_delivery_with_cash_and_cheque_split_payment(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		delivery = invoice.delivery
+
+		complete_driver_delivery(
+			delivery=delivery,
+			driver_user=self.driver,
+			payload={
+				'estado_pago': 'PAGADO',
+				'metodo_pago': 'MIXTO',
+				'monto_pagado_cash': '20.00',
+				'monto_pagado_cheque': '25.00',
+				'recibido_por': 'Juan Perez',
+				'cheque_numero': 'CHK-55',
+				'cheque_banco': 'Bank Test',
+				'firma_cliente_data': self.signature_data,
+			},
+			evidence_files=[],
+			cheque_image_file=self._build_test_image('cheque-proof.png'),
+		)
+
+		delivery.refresh_from_db()
+		invoice.refresh_from_db()
+		self.assertEqual(delivery.metodo_pago, 'MIXTO')
+		self.assertEqual(delivery.monto_pagado_cash, Decimal('20.00'))
+		self.assertEqual(delivery.monto_pagado_cheque, Decimal('25.00'))
+		self.assertEqual(delivery.monto_pagado, Decimal('45.00'))
+		self.assertTrue(bool(delivery.cheque_imagen))
+		self.assertEqual(invoice.saldo_cliente, Decimal('0.00'))
 
 	def test_driver_complete_view_can_create_credit_note_draft(self):
 		invoice = generar_invoice_desde_picking(

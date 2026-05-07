@@ -140,6 +140,28 @@
         <div class="text-muted small">{% trans "Amount received" %}</div>
         <div>${{ invoice.delivery.monto_pagado }}</div>
       </div>
+      <div class="col-md-6">
+        <div class="text-muted small">{% trans "Payment breakdown" %}</div>
+        <div>
+          {% if invoice.delivery.payment_breakdown %}
+            {% for item in invoice.delivery.payment_breakdown %}
+              <div>{{ item.label }}: ${{ item.amount }}</div>
+            {% endfor %}
+          {% else %}
+            -
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="text-muted small">{% trans "Cheque proof" %}</div>
+        <div>
+          {% if invoice.delivery.cheque_imagen %}
+            <a href="{{ invoice.delivery.cheque_imagen.url }}" target="_blank" rel="noopener">{% trans "View cheque image" %}</a>
+          {% else %}
+            -
+          {% endif %}
+        </div>
+      </div>
       <div class="col-md-3">
         <div class="text-muted small">{% trans "Delivered at" %}</div>
         <div>{% if invoice.delivery.delivered_at %}{{ invoice.delivery.delivered_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>

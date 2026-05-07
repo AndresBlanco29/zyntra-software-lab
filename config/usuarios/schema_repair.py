@@ -66,6 +66,14 @@ def _iter_fields_needing_alter(connection, model):
                 previous_field.max_length = current_length
                 yield previous_field, field
 
+        current_nullable = getattr(column, 'null_ok', None)
+        target_nullable = getattr(field, 'null', None)
+        if current_nullable is not None and target_nullable is not None and current_nullable != target_nullable:
+            previous_field = copy(field)
+            previous_field.null = current_nullable
+            previous_field.blank = current_nullable
+            yield previous_field, field
+
 
 def _build_relaxed_field(field):
     relaxed_field = copy(field)
@@ -233,6 +241,11 @@ def ensure_runtime_schema():
     if connection.vendor != 'mysql':
         with _schema_repair_lock:
             _schema_repair_completed = True
+            _schema_repair_running = False
+        return
+
+    if connection.in_atomic_block:
+        with _schema_repair_lock:
             _schema_repair_running = False
         return
 

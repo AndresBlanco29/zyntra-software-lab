@@ -1231,6 +1231,7 @@ def driver_delivery_complete(request, delivery_id):
 			driver_user=request.user,
 			payload=request.POST,
 			evidence_files=request.FILES.getlist('evidence_photos'),
+			cheque_image_file=request.FILES.get('cheque_imagen'),
 			adjustment_note=nota,
 		)
 		if nota is not None:

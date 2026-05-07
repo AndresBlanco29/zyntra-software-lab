@@ -998,6 +998,34 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(list(delivery.payments.values_list('metodo_pago', flat=True)), ['CASH', 'CHEQUE', 'TARJETA'])
 		self.assertEqual(invoice.saldo_cliente, Decimal('0.00'))
 
+	def test_driver_rejects_empty_cheque_image_before_storage_upload(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		delivery = invoice.delivery
+
+		with self.assertRaisesMessage(ValidationError, 'A cheque image is required for cheque payments.'):
+			complete_driver_delivery(
+				delivery=delivery,
+				driver_user=self.driver,
+				payload={
+					'estado_pago': 'PAGADO',
+					'recibido_por': 'Juan Perez',
+					'firma_cliente_data': self.signature_data,
+					'payment_method_1': 'CHEQUE',
+					'payment_amount_1': '45.00',
+					'payment_cheque_numero_1': 'CHK-EMPTY',
+					'payment_cheque_banco_1': 'Bank Test',
+				},
+				evidence_files=[],
+				payment_files={
+					'payment_cheque_image_1': SimpleUploadedFile('empty-cheque.png', b'', content_type='image/png'),
+				},
+			)
+
 	def test_driver_complete_view_can_create_credit_note_draft(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,

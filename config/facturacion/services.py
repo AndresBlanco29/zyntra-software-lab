@@ -33,6 +33,18 @@ def _clamp_non_negative_money(value):
 	return max(_quantize_money(value), Decimal('0.00'))
 
 
+def _normalize_uploaded_file(uploaded_file):
+	if uploaded_file is None:
+		return None
+	name = str(getattr(uploaded_file, 'name', '') or '').strip()
+	size = getattr(uploaded_file, 'size', None)
+	if not name:
+		return None
+	if size is not None and int(size) <= 0:
+		return None
+	return uploaded_file
+
+
 def _calculate_suggested_unit_price_from_profit(base_unit_price, profit_percentage=DEFAULT_SUGGESTED_PROFIT_PERCENTAGE):
 	base_unit_decimal = _quantize_money(base_unit_price)
 	profit_decimal = _to_decimal(profit_percentage, DEFAULT_SUGGESTED_PROFIT_PERCENTAGE)
@@ -338,6 +350,7 @@ def _build_driver_payment_entry(*, position, metodo_pago, monto, cheque_numero='
 	ach_referencia='', ach_cuenta_ultimos_4=''):
 	metodo_pago = (metodo_pago or '').strip()
 	monto = _quantize_money(monto or '0')
+	cheque_imagen = _normalize_uploaded_file(cheque_imagen)
 	entry = {
 		'position': position,
 		'metodo_pago': metodo_pago,
@@ -439,7 +452,7 @@ def _resolve_driver_delivery_payment(*, payload, collectible_balance, payment_de
 				monto=amount,
 				cheque_numero=payload.get(f'payment_cheque_numero_{index}'),
 				cheque_banco=payload.get(f'payment_cheque_banco_{index}'),
-				cheque_imagen=payment_files.get(f'payment_cheque_image_{index}'),
+				cheque_imagen=_normalize_uploaded_file(payment_files.get(f'payment_cheque_image_{index}')),
 				transferencia_referencia=payload.get(f'payment_transferencia_referencia_{index}'),
 				tarjeta_ultimos_4=payload.get(f'payment_tarjeta_ultimos_4_{index}'),
 				tarjeta_autorizacion=payload.get(f'payment_tarjeta_autorizacion_{index}'),
@@ -467,7 +480,7 @@ def _resolve_driver_delivery_payment(*, payload, collectible_balance, payment_de
 				monto=cheque_amount,
 				cheque_numero=payload.get('cheque_numero'),
 				cheque_banco=payload.get('cheque_banco'),
-				cheque_imagen=cheque_image_file,
+				cheque_imagen=_normalize_uploaded_file(cheque_image_file),
 			))
 		else:
 			entries.append(_build_driver_payment_entry(
@@ -476,7 +489,7 @@ def _resolve_driver_delivery_payment(*, payload, collectible_balance, payment_de
 				monto=legacy_amount,
 				cheque_numero=payload.get('cheque_numero'),
 				cheque_banco=payload.get('cheque_banco'),
-				cheque_imagen=cheque_image_file,
+				cheque_imagen=_normalize_uploaded_file(cheque_image_file),
 				transferencia_referencia=payload.get('transferencia_referencia'),
 				tarjeta_ultimos_4=payload.get('tarjeta_ultimos_4'),
 				tarjeta_autorizacion=payload.get('tarjeta_autorizacion'),
@@ -617,7 +630,9 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 			DeliveryPayment.objects.create(delivery=delivery, **entry)
 	_recalculate_invoice_balances(delivery.invoice)
 	for uploaded_file in evidence_files:
-		DeliveryEvidencePhoto.objects.create(delivery=delivery, image=uploaded_file)
+		normalized_file = _normalize_uploaded_file(uploaded_file)
+		if normalized_file is not None:
+			DeliveryEvidencePhoto.objects.create(delivery=delivery, image=normalized_file)
 
 	pedido = delivery.invoice.pedido
 	pedido.estado = 'DESPACHADO'

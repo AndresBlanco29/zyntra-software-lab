@@ -1161,7 +1161,7 @@ class InvoiceFlowTests(TestCase):
 		response = self.client.post(reverse('driver_delivery_complete', args=[invoice.delivery.id]), {
 			'estado_pago': 'PAGADO',
 			'metodo_pago': 'CASH',
-			'monto_pagado': '45.00',
+			'monto_pagado': '50.00',
 			'recibido_por': 'Juan Perez',
 			'firma_cliente_data': self.signature_data,
 			'driver_note_tipo_documento': 'DEBITO',
@@ -1180,6 +1180,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(nota.tipo_credito, '')
 		self.assertEqual(nota.creada_por, self.driver)
 		self.assertEqual(nota.total, Decimal('5.00'))
+		self.assertEqual(invoice.delivery.monto_pagado, Decimal('50.00'))
 
 	def test_driver_complete_view_can_create_financial_debit_note_draft(self):
 		invoice = generar_invoice_desde_picking(
@@ -1193,7 +1194,7 @@ class InvoiceFlowTests(TestCase):
 		response = self.client.post(reverse('driver_delivery_complete', args=[invoice.delivery.id]), {
 			'estado_pago': 'PAGADO',
 			'metodo_pago': 'CASH',
-			'monto_pagado': '45.00',
+			'monto_pagado': '52.50',
 			'recibido_por': 'Juan Perez',
 			'firma_cliente_data': self.signature_data,
 			'driver_note_tipo_documento': 'DEBITO',
@@ -1210,6 +1211,38 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(nota.tipo_ajuste, 'FINANCIERO')
 		self.assertEqual(nota.total, Decimal('7.50'))
 		self.assertEqual(nota.items.count(), 0)
+		self.assertEqual(invoice.delivery.monto_pagado, Decimal('52.50'))
+
+	def test_driver_complete_view_rejects_payment_above_debit_adjusted_balance(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.post(
+			reverse('driver_delivery_complete', args=[invoice.delivery.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'metodo_pago': 'CASH',
+				'monto_pagado': '50.01',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+				'driver_note_tipo_documento': 'DEBITO',
+				'driver_note_motivo': 'DEFECT',
+				'driver_note_descripcion': 'Cargo adicional operativo',
+				f'driver_note_qty_{invoice.items.first().id}': '1',
+				f'driver_note_amount_{invoice.items.first().id}': '5.00',
+			},
+			follow=True,
+		)
+
+		invoice.refresh_from_db()
+		self.assertEqual(invoice.delivery.estado, 'ASIGNADA')
+		self.assertEqual(invoice.notas_ajuste.count(), 0)
+		self.assertContains(response, 'The paid amount cannot exceed the customer balance.')
 
 	def test_driver_can_create_financial_debit_note_after_delivery(self):
 		invoice = generar_invoice_desde_picking(

@@ -251,8 +251,12 @@ def start_delivery_route(*, delivery, driver_user):
 
 def calculate_delivery_collectible_balance(*, delivery, adjustment_note=None):
 	collectible_balance = _clamp_non_negative_money(delivery.invoice.saldo_cliente)
-	if adjustment_note is not None and adjustment_note.tipo_documento == 'CREDITO':
-		collectible_balance = _clamp_non_negative_money(collectible_balance - Decimal(str(adjustment_note.total or '0.00')))
+	if adjustment_note is not None:
+		adjustment_total = Decimal(str(adjustment_note.total or '0.00'))
+		if adjustment_note.tipo_documento == 'CREDITO':
+			collectible_balance = _clamp_non_negative_money(collectible_balance - adjustment_total)
+		else:
+			collectible_balance = _quantize_money(collectible_balance + adjustment_total)
 	return collectible_balance
 
 

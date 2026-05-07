@@ -28,7 +28,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 from config.cotizaciones.models import Cotizacion
 from config.facturacion.models import NotaAjuste
-from config.facturacion.services import DEFAULT_SUGGESTED_PROFIT_PERCENTAGE, resolve_presentacion_suggested_unit_price
+from config.facturacion.services import DEFAULT_SUGGESTED_PROFIT_PERCENTAGE, resolve_presentacion_suggested_unit_price, summarize_pending_customer_notes
 from config.notificaciones.models import Notificacion
 from config.productos.models import Presentacion
 from config.inventario.models import StockPresentacion
@@ -301,6 +301,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
 	context = {
+		'pending_customer_notes_summary': summarize_pending_customer_notes(cliente=pedido.cliente),
 		'pedido': pedido,
 		'pedido_items': pedido_items,
 		'pedido_has_picker_changes': any(_item_has_picker_change_banner(item, pedido) for item in pedido_items),

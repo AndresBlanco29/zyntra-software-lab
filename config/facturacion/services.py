@@ -12,7 +12,7 @@ from config.inventario.services import _apply_fractional_inventory_change, _appl
 from config.notificaciones.models import crear_notificacion_backoffice
 from config.productos.models import Presentacion
 
-from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, DeliveryPayment, Invoice, InvoiceItem, NotaAjuste, NotaAjusteItem
+from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, DeliveryPayment, Invoice, InvoiceItem, NotaAjuste, NotaAjusteAplicacion, NotaAjusteItem
 
 
 DEFAULT_SUGGESTED_PROFIT_PERCENTAGE = Decimal('30.00')
@@ -145,37 +145,81 @@ def _create_invoice_notification(invoice):
 	)
 
 
-def _apply_pending_customer_notes_to_invoice(*, invoice):
-	pending_notes = list(
-		NotaAjuste.objects.select_for_update()
-		.filter(cliente=invoice.cliente, invoice__isnull=True, estado='APROBADA')
+def list_pending_customer_notes(*, cliente):
+	return list(
+		NotaAjuste.objects.select_related('creada_por', 'aprobada_por')
+		.filter(cliente=cliente, invoice__isnull=True, estado='APROBADA', monto_aplicado_cliente__gt=0)
 		.order_by('aprobada_en', 'creada_en', 'id')
 	)
-	if not pending_notes:
+
+
+def summarize_pending_customer_notes(*, cliente, notes=None):
+	notes = list(notes) if notes is not None else list_pending_customer_notes(cliente=cliente)
+	credit_total = Decimal('0.00')
+	debit_total = Decimal('0.00')
+	for nota in notes:
+		remaining_amount = _clamp_non_negative_money(nota.monto_aplicado_cliente)
+		nota.remaining_amount = remaining_amount
+		if nota.tipo_documento == 'CREDITO':
+			credit_total += remaining_amount
+		else:
+			debit_total += remaining_amount
+	available_credit_excluding_notes = _clamp_non_negative_money(_clamp_non_negative_money(cliente.balance) - credit_total)
+	return {
+		'notes': notes,
+		'credit_total': _quantize_money(credit_total),
+		'debit_total': _quantize_money(debit_total),
+		'available_credit_excluding_notes': available_credit_excluding_notes,
+	}
+
+
+def _apply_selected_customer_notes_to_invoice(*, invoice, note_applications, usuario):
+	if not note_applications:
 		return
 
-	for nota in pending_notes:
-		pending_customer_amount = _clamp_non_negative_money(nota.monto_aplicado_cliente)
+	notes = {
+		nota.id: nota
+		for nota in NotaAjuste.objects.select_for_update().filter(
+			cliente=invoice.cliente,
+			invoice__isnull=True,
+			estado='APROBADA',
+			id__in=list(note_applications.keys()),
+		)
+	}
+	if len(notes) != len(note_applications):
+		raise ValidationError(_('One or more selected customer notes are no longer available for this invoice.'))
+
+	total_selected_credits = Decimal('0.00')
+	total_selected_debits = Decimal('0.00')
+	for note_id, requested_amount in note_applications.items():
+		nota = notes[note_id]
+		amount_to_apply = _clamp_non_negative_money(requested_amount)
 		if nota.tipo_documento == 'CREDITO':
-			amount_to_invoice = min(pending_customer_amount, _remaining_invoice_balance_before_payment(invoice=invoice))
-			if amount_to_invoice <= 0:
-				continue
-			invoice.total_creditos = _quantize_money(Decimal(str(invoice.total_creditos or '0.00')) + amount_to_invoice)
-			_apply_customer_balance_delta(cliente=invoice.cliente, delta=-amount_to_invoice)
-			nota.invoice = invoice
-			nota.monto_aplicado_invoice = _quantize_money(amount_to_invoice)
-			nota.monto_aplicado_cliente = _quantize_money(pending_customer_amount - amount_to_invoice)
-			nota.save(update_fields=['invoice', 'monto_aplicado_invoice', 'monto_aplicado_cliente'])
+			total_selected_credits += amount_to_apply
 		else:
-			amount_to_invoice = pending_customer_amount
-			if amount_to_invoice <= 0:
-				continue
-			invoice.total_debitos = _quantize_money(Decimal(str(invoice.total_debitos or '0.00')) + amount_to_invoice)
-			_apply_customer_balance_delta(cliente=invoice.cliente, delta=amount_to_invoice)
-			nota.invoice = invoice
-			nota.monto_aplicado_invoice = _quantize_money(amount_to_invoice)
-			nota.monto_aplicado_cliente = Decimal('0.00')
-			nota.save(update_fields=['invoice', 'monto_aplicado_invoice', 'monto_aplicado_cliente'])
+			total_selected_debits += amount_to_apply
+	max_credit_supported = _quantize_money(Decimal(str(invoice.subtotal or '0.00')) + total_selected_debits)
+	if _quantize_money(total_selected_credits) > max_credit_supported:
+		raise ValidationError(_('Selected credit notes exceed the invoice total available after the chosen debit notes.'))
+
+	for note_id, requested_amount in note_applications.items():
+		nota = notes[note_id]
+		amount_to_apply = _clamp_non_negative_money(requested_amount)
+		remaining_amount = _clamp_non_negative_money(nota.monto_aplicado_cliente)
+		if amount_to_apply <= 0:
+			continue
+		if amount_to_apply > remaining_amount:
+			raise ValidationError(_('The selected amount exceeds the remaining amount for note %(note)s.') % {'note': nota.numero})
+		if nota.tipo_documento == 'CREDITO':
+			invoice.total_creditos = _quantize_money(Decimal(str(invoice.total_creditos or '0.00')) + amount_to_apply)
+			_apply_customer_balance_delta(cliente=invoice.cliente, delta=-amount_to_apply)
+		else:
+			invoice.total_debitos = _quantize_money(Decimal(str(invoice.total_debitos or '0.00')) + amount_to_apply)
+			_apply_customer_balance_delta(cliente=invoice.cliente, delta=amount_to_apply)
+		nota.monto_aplicado_invoice = _quantize_money(Decimal(str(nota.monto_aplicado_invoice or '0.00')) + amount_to_apply)
+		nota.monto_aplicado_cliente = _quantize_money(remaining_amount - amount_to_apply)
+		nota.save(update_fields=['monto_aplicado_invoice', 'monto_aplicado_cliente'])
+		NotaAjusteAplicacion.objects.create(nota=nota, invoice=invoice, monto=amount_to_apply, aplicada_por=usuario)
 
 
 @transaction.atomic
@@ -187,6 +231,7 @@ def generar_invoice_desde_picking(
 	usuario,
 	suggested_unit_prices=None,
 	applied_customer_credit=None,
+	selected_note_applications=None,
 	estimated_delivery_at=None,
 ):
 	_validate_invoice_generation(pedido, metodo_entrega, driver)
@@ -234,13 +279,14 @@ def generar_invoice_desde_picking(
 	InvoiceItem.objects.bulk_create(invoice_items)
 	invoice.subtotal = _quantize_money(total)
 	invoice.save(update_fields=['subtotal', 'actualizada_en'])
-	_apply_pending_customer_notes_to_invoice(invoice=invoice)
+	_apply_selected_customer_notes_to_invoice(invoice=invoice, note_applications=selected_note_applications or {}, usuario=usuario)
 	cliente_credit_available = _clamp_non_negative_money(pedido.cliente.balance)
 	applied_credit = _clamp_non_negative_money(applied_customer_credit or '0.00')
 	if applied_credit > cliente_credit_available:
 		raise ValidationError(_('The customer does not have enough available credit.'))
-	if applied_credit > total:
-		raise ValidationError(_('The applied customer credit cannot exceed the invoice subtotal.'))
+	remaining_total_after_notes = _remaining_invoice_balance_before_payment(invoice=invoice)
+	if applied_credit > remaining_total_after_notes:
+		raise ValidationError(_('The applied customer credit cannot exceed the remaining invoice total after selected notes.'))
 	if applied_credit > 0:
 		_apply_customer_balance_delta(cliente=pedido.cliente, delta=-applied_credit)
 	invoice.credito_cliente_aplicado = applied_credit

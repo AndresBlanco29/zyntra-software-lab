@@ -12,7 +12,7 @@ from django.utils import timezone
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 
 from config.clientes.models import Cliente
-from config.facturacion.models import Delivery, DeliveryNotificationLog, Invoice, NotaAjuste
+from config.facturacion.models import Delivery, DeliveryNotificationLog, Invoice, NotaAjuste, NotaAjusteAplicacion
 from config.facturacion.services import anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, generar_invoice_desde_picking, start_delivery_route, unlock_client_from_delivery
 from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_item_data, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _resolve_invoice_suggested_unit_price
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
@@ -362,7 +362,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(nota.monto_aplicado_invoice, Decimal('0.00'))
 		self.assertEqual(nota.monto_aplicado_cliente, Decimal('10.00'))
 
-	def test_next_invoice_applies_approved_general_credit_note_for_customer(self):
+	def test_general_credit_note_can_be_applied_partially_across_multiple_invoices(self):
 		nota = crear_nota_ajuste(
 			cliente=self.cliente,
 			invoice=None,
@@ -378,24 +378,44 @@ class InvoiceFlowTests(TestCase):
 
 		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
 		invoice = generar_invoice_desde_picking(
-			pedido=self.pedido,
+			pedido=self._create_verified_order(total='20.00'),
 			metodo_entrega='LTG',
 			driver=None,
 			usuario=self.backoffice,
+			selected_note_applications={nota.id: Decimal('10.00')},
 		)
 
 		nota.refresh_from_db()
 		invoice.refresh_from_db()
 		self.cliente.refresh_from_db()
 
-		self.assertEqual(nota.invoice, invoice)
+		self.assertIsNone(nota.invoice)
+		self.assertEqual(nota.monto_aplicado_invoice, Decimal('10.00'))
+		self.assertEqual(nota.monto_aplicado_cliente, Decimal('15.00'))
+		self.assertEqual(invoice.total_creditos, Decimal('10.00'))
+		self.assertEqual(invoice.saldo_cliente, Decimal('10.00'))
+		self.assertEqual(self.cliente.balance, Decimal('15.00'))
+		self.assertTrue(NotaAjusteAplicacion.objects.filter(nota=nota, invoice=invoice, monto=Decimal('10.00')).exists())
+
+		second_invoice = generar_invoice_desde_picking(
+			pedido=self._create_verified_order(total='15.00'),
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+			selected_note_applications={nota.id: Decimal('15.00')},
+		)
+
+		nota.refresh_from_db()
+		second_invoice.refresh_from_db()
+		self.cliente.refresh_from_db()
+
 		self.assertEqual(nota.monto_aplicado_invoice, Decimal('25.00'))
 		self.assertEqual(nota.monto_aplicado_cliente, Decimal('0.00'))
-		self.assertEqual(invoice.total_creditos, Decimal('25.00'))
-		self.assertEqual(invoice.saldo_cliente, Decimal('20.00'))
+		self.assertEqual(second_invoice.total_creditos, Decimal('15.00'))
+		self.assertEqual(second_invoice.saldo_cliente, Decimal('0.00'))
 		self.assertEqual(self.cliente.balance, Decimal('0.00'))
 
-	def test_next_invoice_applies_approved_general_debit_note_for_customer(self):
+	def test_general_debit_note_can_be_applied_partially_or_skipped(self):
 		nota = crear_nota_ajuste(
 			cliente=self.cliente,
 			invoice=None,
@@ -403,30 +423,45 @@ class InvoiceFlowTests(TestCase):
 			tipo_documento='DEBITO',
 			motivo='DEFECT',
 			tipo_credito='',
-			descripcion='Debito general para proxima invoice',
+			descripcion='Debito general para cobrar por partes',
 			usuario=self.backoffice,
 			items_payload=[],
-			monto=Decimal('10.00'),
+			monto=Decimal('100.00'),
 		)
 
 		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
 		invoice = generar_invoice_desde_picking(
-			pedido=self.pedido,
+			pedido=self._create_verified_order(total='45.00'),
 			metodo_entrega='LTG',
 			driver=None,
 			usuario=self.backoffice,
+			selected_note_applications={nota.id: Decimal('10.00')},
 		)
 
 		nota.refresh_from_db()
 		invoice.refresh_from_db()
 		self.cliente.refresh_from_db()
 
-		self.assertEqual(nota.invoice, invoice)
 		self.assertEqual(nota.monto_aplicado_invoice, Decimal('10.00'))
-		self.assertEqual(nota.monto_aplicado_cliente, Decimal('0.00'))
+		self.assertEqual(nota.monto_aplicado_cliente, Decimal('90.00'))
 		self.assertEqual(invoice.total_debitos, Decimal('10.00'))
 		self.assertEqual(invoice.saldo_cliente, Decimal('55.00'))
-		self.assertEqual(self.cliente.balance, Decimal('0.00'))
+		self.assertEqual(self.cliente.balance, Decimal('-90.00'))
+
+		skipped_invoice = generar_invoice_desde_picking(
+			pedido=self._create_verified_order(total='20.00'),
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+			selected_note_applications={},
+		)
+
+		nota.refresh_from_db()
+		skipped_invoice.refresh_from_db()
+
+		self.assertEqual(skipped_invoice.total_debitos, Decimal('0.00'))
+		self.assertEqual(skipped_invoice.saldo_cliente, Decimal('20.00'))
+		self.assertEqual(nota.monto_aplicado_cliente, Decimal('90.00'))
 
 	def test_product_credit_note_without_invoice_restocks_inventory_and_increases_customer_balance(self):
 		nota = crear_nota_ajuste(
@@ -2222,6 +2257,56 @@ class InvoiceFlowTests(TestCase):
 		invoice = Invoice.objects.get(pedido=self.pedido)
 		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
 		self.assertEqual(timezone.localtime(invoice.delivery.estimated_delivery_at).strftime('%Y-%m-%d %H:%M'), '2026-04-18 09:30')
+
+	def test_backoffice_generate_invoice_view_applies_selected_general_note_amounts(self):
+		nota_credito = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=None,
+			tipo_ajuste='FINANCIERO',
+			tipo_documento='CREDITO',
+			motivo='DEFECT',
+			tipo_credito='CREDIT_DUMP',
+			descripcion='Credito general editable',
+			usuario=self.backoffice,
+			items_payload=[],
+			monto=Decimal('40.00'),
+		)
+		nota_debito = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=None,
+			tipo_ajuste='FINANCIERO',
+			tipo_documento='DEBITO',
+			motivo='DEFECT',
+			tipo_credito='',
+			descripcion='Debito general editable',
+			usuario=self.backoffice,
+			items_payload=[],
+			monto=Decimal('100.00'),
+		)
+
+		aprobar_nota_ajuste(nota=nota_credito, usuario=self.backoffice)
+		aprobar_nota_ajuste(nota=nota_debito, usuario=self.backoffice)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('backoffice_generate_invoice', args=[self.pedido.id]), {
+			'metodo_entrega': 'LTG',
+			'driver_id': '',
+			f'general_note_apply_{nota_credito.id}': '10.00',
+			f'general_note_apply_{nota_debito.id}': '30.00',
+		})
+
+		invoice = Invoice.objects.get(pedido=self.pedido)
+		nota_credito.refresh_from_db()
+		nota_debito.refresh_from_db()
+		self.cliente.refresh_from_db()
+
+		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertEqual(invoice.total_creditos, Decimal('10.00'))
+		self.assertEqual(invoice.total_debitos, Decimal('30.00'))
+		self.assertEqual(invoice.saldo_cliente, Decimal('65.00'))
+		self.assertEqual(nota_credito.monto_aplicado_cliente, Decimal('30.00'))
+		self.assertEqual(nota_debito.monto_aplicado_cliente, Decimal('70.00'))
+		self.assertEqual(self.cliente.balance, Decimal('-40.00'))
 
 	def test_invoice_pdf_suggested_retail_uses_default_profit_suggestion(self):
 		invoice = generar_invoice_desde_picking(

@@ -537,3 +537,23 @@ class NotaAjusteEvidencePhoto(models.Model):
 
 	def __str__(self):
 		return f'{self.nota.numero} evidence {self.pk}'
+
+
+class NotaAjusteAplicacion(models.Model):
+	nota = models.ForeignKey(NotaAjuste, on_delete=models.CASCADE, related_name='aplicaciones')
+	invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='aplicaciones_notas_ajuste')
+	monto = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	aplicada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='aplicaciones_notas_ajuste')
+	creada_en = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		ordering = ('creada_en', 'id')
+
+	def __str__(self):
+		return f'{self.nota.numero} -> {self.invoice.numero} (${self.monto})'
+
+	def clean(self):
+		if self.monto <= 0:
+			raise ValidationError({'monto': _('Applied amount must be greater than zero.')})
+		if self.nota_id and self.invoice_id and self.nota.cliente_id != self.invoice.cliente_id:
+			raise ValidationError({'invoice': _('The selected invoice does not belong to the note customer.')})

@@ -46,7 +46,9 @@ from .services import (
 	crear_nota_ajuste_desde_invoice,
 	ensure_delivery_for_invoice,
 	generar_invoice_desde_picking,
+	list_pending_customer_notes,
 	resolve_presentacion_suggested_unit_price,
+	summarize_pending_customer_notes,
 	start_delivery_route,
 	unlock_client_from_delivery,
 )
@@ -159,15 +161,28 @@ def _parse_adjustment_amount(value):
 	return parsed.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
-def _parse_customer_credit_to_apply(cliente, post_data):
+def _parse_customer_credit_to_apply(cliente, post_data, *, available_credit=None):
 	use_credit = str(post_data.get('use_customer_credit') or '').strip().lower() in {'1', 'true', 'on', 'yes'}
 	if not use_credit:
 		return Decimal('0.00')
 	requested_credit = _parse_adjustment_amount(post_data.get('customer_credit_to_apply'))
-	available_credit = getattr(cliente, 'available_credit', Decimal('0.00'))
+	if available_credit is None:
+		available_credit = getattr(cliente, 'available_credit', Decimal('0.00'))
 	if requested_credit > available_credit:
 		raise ValidationError(_('The requested customer credit exceeds the customer available balance.'))
 	return requested_credit
+
+
+def _parse_general_note_applications(cliente, post_data):
+	note_applications = {}
+	for nota in list_pending_customer_notes(cliente=cliente):
+		requested_amount = _parse_adjustment_amount(post_data.get(f'general_note_apply_{nota.id}'))
+		remaining_amount = Decimal(str(nota.monto_aplicado_cliente or '0.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+		if requested_amount > remaining_amount:
+			raise ValidationError(_('The selected amount exceeds the remaining amount for note %(note)s.') % {'note': nota.numero})
+		if requested_amount > 0:
+			note_applications[nota.id] = requested_amount
+	return note_applications
 
 
 def _extract_adjustment_note_request(invoice, post_data, *, field_prefix=''):
@@ -870,7 +885,13 @@ def backoffice_generate_invoice(request, pedido_id):
 		if metodo_entrega == 'RUTA_DRIVER':
 			estimated_delivery_at = _parse_estimated_delivery_at(request.POST.get('estimated_delivery_at'))
 		suggested_unit_prices = _extract_invoice_suggested_unit_prices(pedido, request.POST)
-		applied_customer_credit = _parse_customer_credit_to_apply(pedido.cliente, request.POST)
+		pending_notes_summary = summarize_pending_customer_notes(cliente=pedido.cliente)
+		selected_note_applications = _parse_general_note_applications(pedido.cliente, request.POST)
+		applied_customer_credit = _parse_customer_credit_to_apply(
+			pedido.cliente,
+			request.POST,
+			available_credit=pending_notes_summary['available_credit_excluding_notes'],
+		)
 		invoice = generar_invoice_desde_picking(
 			pedido=pedido,
 			metodo_entrega=metodo_entrega,
@@ -878,6 +899,7 @@ def backoffice_generate_invoice(request, pedido_id):
 			usuario=request.user,
 			suggested_unit_prices=suggested_unit_prices,
 			applied_customer_credit=applied_customer_credit,
+			selected_note_applications=selected_note_applications,
 			estimated_delivery_at=estimated_delivery_at,
 		)
 	except ValidationError as exc:

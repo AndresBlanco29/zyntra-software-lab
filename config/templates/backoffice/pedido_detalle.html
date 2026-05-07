@@ -121,14 +121,69 @@
             <div class="col-md-2 d-flex align-items-end">
               <button type="submit" class="btn btn-primary w-100">{% trans "Generate invoice" %}</button>
             </div>
-            {% if pedido.cliente.available_credit > 0 %}
+            {% if pending_customer_notes_summary.notes %}
+            <div class="col-12">
+              <div class="border rounded-3 p-3 bg-warning-subtle">
+                <div class="d-flex flex-wrap justify-content-between gap-3 mb-3">
+                  <div>
+                    <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Pending customer notes" %}</div>
+                    <div class="fw-semibold">{{ pending_customer_notes_summary.notes|length }} {% trans "approved notes available to apply manually" %}</div>
+                  </div>
+                  <div class="text-md-end">
+                    <div class="small text-muted">{% trans "Credit notes pending" %}: ${{ pending_customer_notes_summary.credit_total }}</div>
+                    <div class="small text-muted">{% trans "Debit notes pending" %}: ${{ pending_customer_notes_summary.debit_total }}</div>
+                  </div>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>{% trans "Note" %}</th>
+                        <th>{% trans "Type" %}</th>
+                        <th>{% trans "Remaining" %}</th>
+                        <th>{% trans "Apply on this invoice" %}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for nota in pending_customer_notes_summary.notes %}
+                      <tr>
+                        <td>
+                          <div class="fw-semibold">{{ nota.numero }}</div>
+                          <div class="small text-muted">{{ nota.descripcion|default:'-' }}</div>
+                        </td>
+                        <td>
+                          <span class="badge {% if nota.tipo_documento == 'CREDITO' %}bg-success{% else %}bg-danger{% endif %}">{{ nota.get_tipo_documento_display }}</span>
+                        </td>
+                        <td>${{ nota.remaining_amount }}</td>
+                        <td style="min-width: 220px;">
+                          <div class="input-group input-group-sm">
+                            <span class="input-group-text">$</span>
+                            <input type="number" min="0" step="0.01" max="{{ nota.remaining_amount }}" name="general_note_apply_{{ nota.id }}" class="form-control" value="0.00">
+                          </div>
+                          <div class="form-text">
+                            {% if nota.tipo_documento == 'CREDITO' %}
+                              {% trans "Apply any part of this credit now, or leave 0.00 to keep it for a future invoice." %}
+                            {% else %}
+                              {% trans "Charge any part of this debit now, or leave 0.00 to keep it for a future invoice." %}
+                            {% endif %}
+                          </div>
+                        </td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+            {% if pending_customer_notes_summary.available_credit_excluding_notes > 0 %}
             <div class="col-12">
               <div class="border rounded-3 p-3 bg-success-subtle">
                 <div class="row g-3 align-items-end">
                   <div class="col-md-4">
-                    <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Customer balance" %}</div>
+                    <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Other customer balance" %}</div>
                     <div class="fw-semibold">${{ pedido.cliente.balance }}</div>
-                    <div class="small text-muted">{% trans "Available credit for this invoice" %}: ${{ pedido.cliente.available_credit }}</div>
+                    <div class="small text-muted">{% trans "Available credit not tied to pending notes" %}: ${{ pending_customer_notes_summary.available_credit_excluding_notes }}</div>
                   </div>
                   <div class="col-md-3">
                     <div class="form-check mt-4 pt-2">
@@ -140,9 +195,9 @@
                     <label class="form-label fw-semibold">{% trans "Credit to apply" %}</label>
                     <div class="input-group">
                       <span class="input-group-text">$</span>
-                      <input type="number" min="0" step="0.01" max="{{ pedido.cliente.available_credit }}" name="customer_credit_to_apply" class="form-control" value="{{ pedido.cliente.available_credit|floatformat:2 }}">
+                      <input type="number" min="0" step="0.01" max="{{ pending_customer_notes_summary.available_credit_excluding_notes }}" name="customer_credit_to_apply" class="form-control" value="{{ pending_customer_notes_summary.available_credit_excluding_notes|floatformat:2 }}">
                     </div>
-                    <div class="form-text">{% trans "Use the full amount for automatic application or edit it to apply only part of the available credit." %}</div>
+                    <div class="form-text">{% trans "Use the full amount for automatic application or edit it to apply only part of the remaining credit that is not tied to pending customer notes." %}</div>
                   </div>
                 </div>
               </div>

@@ -140,10 +140,8 @@
             </div>
             <div class="col-md-4">
               <label class="form-label fw-semibold">{% trans "Adjustment mode" %}</label>
-              <select name="driver_note_tipo_ajuste" id="driverAdjustmentType" class="form-select">
-                <option value="PRODUCTO" selected data-credit-label="{% trans 'Product return / item lines' %}" data-debit-label="{% trans 'Product to charge' %}">{% trans "Product return / item lines" %}</option>
-                <option value="FINANCIERO" data-credit-label="{% trans 'Financial amount' %}" data-debit-label="{% trans 'Amount to charge' %}">{% trans "Financial amount" %}</option>
-              </select>
+              <input type="hidden" name="driver_note_tipo_ajuste" id="driverAdjustmentType" value="PRODUCTO">
+              <div class="form-control bg-light">{% trans "Product return / item lines" %}</div>
             </div>
             <div class="col-md-4" id="driverReasonWrapper">
               <label class="form-label fw-semibold">{% trans "Reason" %}</label>
@@ -168,15 +166,6 @@
               <textarea name="driver_note_descripcion" class="form-control" rows="2"></textarea>
               <div class="form-text" id="driverDescriptionHelp" data-credit-help="{% trans 'Use this field for the manual comment, especially when the reason is Other.' %}" data-debit-help="{% trans 'Use this field to clearly explain what will be charged to the customer.' %}">{% trans "Use this field for the manual comment, especially when the reason is Other." %}</div>
             </div>
-            <div class="col-md-4" id="driverFinancialAmountWrapper">
-              <label class="form-label fw-semibold">{% trans "Amount" %}</label>
-              <div class="input-group">
-                <span class="input-group-text">$</span>
-                <input type="number" min="0" step="0.01" name="driver_note_monto" class="form-control">
-              </div>
-              <div class="form-text">{% trans "Use this for debit or credit amounts that are not tied to returned invoice lines." %}</div>
-              <div class="form-text">{% trans "Use this for credit amounts that are not tied to returned invoice lines." %}</div>
-            </div>
             <div class="col-12">
               <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
               <div class="camera-upload-widget" data-camera-upload>
@@ -197,7 +186,7 @@
             </div>
             <div class="col-12">
               <div class="alert alert-secondary small mb-0">
-                {% trans "Financial credit notes use the amount field. Product credit notes use invoice lines and approved credit returns will restock inventory." %}
+                {% trans "Driver credit notes use returned invoice lines and approved credit returns will restock inventory." %}
               </div>
             </div>
             <div class="col-12" id="driverProductLinesWrapper">
@@ -382,10 +371,8 @@
         </div>
         <div class="col-md-4">
           <label class="form-label fw-semibold">{% trans "Adjustment mode" %}</label>
-          <select name="driver_note_tipo_ajuste" id="driverAdjustmentTypePostDelivery" class="form-select">
-            <option value="PRODUCTO" selected data-credit-label="{% trans 'Product return / item lines' %}" data-debit-label="{% trans 'Product to charge' %}">{% trans "Product return / item lines" %}</option>
-            <option value="FINANCIERO" data-credit-label="{% trans 'Financial amount' %}" data-debit-label="{% trans 'Amount to charge' %}">{% trans "Financial amount" %}</option>
-          </select>
+          <input type="hidden" name="driver_note_tipo_ajuste" id="driverAdjustmentTypePostDelivery" value="PRODUCTO">
+          <div class="form-control bg-light">{% trans "Product return / item lines" %}</div>
         </div>
         <div class="col-md-4" id="driverReasonWrapperPostDelivery">
           <label class="form-label fw-semibold">{% trans "Reason" %}</label>
@@ -438,7 +425,7 @@
         </div>
         <div class="col-12">
           <div class="alert alert-secondary small mb-0">
-            {% trans "Financial credit notes use the amount field. Product credit notes use invoice lines and approved credit returns will restock inventory." %}
+            {% trans "Driver credit notes use returned invoice lines and approved credit returns will restock inventory." %}
           </div>
         </div>
         <div class="col-12" id="driverProductLinesWrapperPostDelivery">
@@ -587,8 +574,8 @@
     const driverNoteTypePostDelivery = document.getElementById('driverNoteTypePostDelivery');
     const driverAdjustmentType = document.getElementById('driverAdjustmentType');
     const driverAdjustmentTypePostDelivery = document.getElementById('driverAdjustmentTypePostDelivery');
-    const driverAdjustmentTypeOptions = driverAdjustmentType ? Array.from(driverAdjustmentType.options) : [];
-    const driverAdjustmentTypePostOptions = driverAdjustmentTypePostDelivery ? Array.from(driverAdjustmentTypePostDelivery.options) : [];
+    const driverAdjustmentTypeOptions = driverAdjustmentType && driverAdjustmentType.options ? Array.from(driverAdjustmentType.options) : [];
+    const driverAdjustmentTypePostOptions = driverAdjustmentTypePostDelivery && driverAdjustmentTypePostDelivery.options ? Array.from(driverAdjustmentTypePostDelivery.options) : [];
     const paidFields = document.querySelectorAll('.paid-only');
     const unpaidFields = document.querySelectorAll('.unpaid-only');
     const creditTypeFields = document.querySelectorAll('.driver-credit-type');

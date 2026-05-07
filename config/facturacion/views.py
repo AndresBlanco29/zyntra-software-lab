@@ -257,8 +257,12 @@ def _extract_adjustment_note_request(invoice, post_data, *, field_prefix=''):
 
 
 def _validate_driver_note_request(*, note_request):
-	if note_request is not None and note_request['tipo_documento'] != 'CREDITO':
+	if note_request is None:
+		return
+	if note_request['tipo_documento'] != 'CREDITO':
 		raise ValidationError(_('Drivers can only request credit notes.'))
+	if note_request['tipo_ajuste'] != 'PRODUCTO':
+		raise ValidationError(_('Drivers can only request product return credit notes.'))
 
 
 def _save_adjustment_note_evidence_files(nota, uploaded_files):

@@ -1455,7 +1455,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertFalse(invoice.notas_ajuste.filter(descripcion='Cargo financiero por servicio especial').exists())
 		self.assertContains(response, 'Drivers can only request credit notes.')
 
-	def test_driver_complete_view_allows_paid_delivery_without_payment_when_credit_offsets_full_balance(self):
+	def test_driver_complete_view_rejects_financial_credit_note_draft(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
 			metodo_entrega='RUTA_DRIVER',
@@ -1464,26 +1464,27 @@ class InvoiceFlowTests(TestCase):
 		)
 		self.client.force_login(self.driver)
 
-		response = self.client.post(reverse('driver_delivery_complete', args=[invoice.delivery.id]), {
-			'estado_pago': 'PAGADO',
-			'recibido_por': 'Juan Perez',
-			'firma_cliente_data': self.signature_data,
-			'driver_note_tipo_documento': 'CREDITO',
-			'driver_note_tipo_ajuste': 'FINANCIERO',
-			'driver_note_motivo': 'OTHER',
-			'driver_note_tipo_credito': 'CREDIT_DUMP',
-			'driver_note_descripcion': 'Credito total aplicado en entrega',
-			'driver_note_monto': '45.00',
-		})
+		response = self.client.post(
+			reverse('driver_delivery_complete', args=[invoice.delivery.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+				'driver_note_tipo_documento': 'CREDITO',
+				'driver_note_tipo_ajuste': 'FINANCIERO',
+				'driver_note_motivo': 'OTHER',
+				'driver_note_tipo_credito': 'CREDIT_DUMP',
+				'driver_note_descripcion': 'Credito total aplicado en entrega',
+				'driver_note_monto': '45.00',
+			},
+			follow=True,
+		)
 
 		invoice.refresh_from_db()
-		nota = invoice.notas_ajuste.get(descripcion='Credito total aplicado en entrega')
-		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
-		self.assertEqual(invoice.delivery.estado, 'ENTREGADA_PAGADA')
-		self.assertEqual(invoice.delivery.monto_pagado, Decimal('0.00'))
-		self.assertEqual(nota.total, Decimal('45.00'))
+		self.assertFalse(invoice.notas_ajuste.filter(descripcion='Credito total aplicado en entrega').exists())
+		self.assertContains(response, 'Drivers can only request product return credit notes.')
 
-	def test_driver_complete_view_rejects_collecting_payment_when_credit_requires_refund(self):
+	def test_driver_complete_view_rejects_financial_credit_refund_flow(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
 			metodo_entrega='RUTA_DRIVER',
@@ -1513,7 +1514,7 @@ class InvoiceFlowTests(TestCase):
 		invoice.refresh_from_db()
 		self.assertEqual(invoice.delivery.estado, 'ASIGNADA')
 		self.assertEqual(invoice.notas_ajuste.count(), 0)
-		self.assertContains(response, 'This delivery results in money due back to the customer. Do not record incoming payments.')
+		self.assertContains(response, 'Drivers can only request product return credit notes.')
 
 	def test_driver_complete_view_rejects_payment_above_debit_adjusted_balance(self):
 		invoice = generar_invoice_desde_picking(
@@ -2516,12 +2517,14 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertNotContains(response, 'Debit note')
+		self.assertNotContains(response, 'Financial amount')
 		self.assertContains(response, 'id="driverReasonWrapper"', html=False)
 		self.assertContains(response, 'id="driverReasonSelect"', html=False)
 		self.assertContains(response, 'id="driverDescriptionLabel"', html=False)
 		self.assertContains(response, 'id="driverDescriptionHelp"', html=False)
 		self.assertContains(response, 'Credit note')
 		self.assertContains(response, 'Product return / item lines')
+		self.assertContains(response, 'Driver credit notes use returned invoice lines and approved credit returns will restock inventory.', html=False)
 		self.assertContains(response, 'Use this field for the manual comment, especially when the reason is Other.')
 		content = response.content.decode('utf-8')
 		self.assertLess(content.index('data-driver-section="adjustment-note"'), content.index('data-driver-section="payment-details"'))

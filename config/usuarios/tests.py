@@ -107,6 +107,9 @@ class InternalUserAdminViewTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.context['selected_role'], '')
 		self.assertContains(response, 'Select a role')
+		self.assertContains(response, 'id="internalUserPassword"', html=False)
+		self.assertContains(response, 'id="toggleInternalUserPassword"', html=False)
+		self.assertContains(response, 'Show password')
 		self.assertFalse(
 			any(
 				permission['checked']

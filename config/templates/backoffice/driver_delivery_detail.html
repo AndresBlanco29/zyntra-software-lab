@@ -128,7 +128,7 @@
         <div class="border rounded-3 p-3 bg-light-subtle">
           <div class="mb-3">
             <h6 class="mb-1">{% trans "Adjustment note during delivery" %}</h6>
-            <p class="text-muted small mb-0">{% trans "Optional. Save a draft credit or debit note for BackOffice review while closing the delivery." %}</p>
+            <p class="text-muted small mb-0">{% trans "Optional. Save a draft credit note for BackOffice review while closing the delivery." %}</p>
           </div>
           <div class="row g-3">
             <div class="col-md-4">
@@ -136,7 +136,6 @@
               <select name="driver_note_tipo_documento" id="driverNoteType" class="form-select">
                 <option value="">{% trans "No adjustment note" %}</option>
                 <option value="CREDITO">{% trans "Credit note" %}</option>
-                <option value="DEBITO">{% trans "Debit note" %}</option>
               </select>
             </div>
             <div class="col-md-4">
@@ -176,6 +175,7 @@
                 <input type="number" min="0" step="0.01" name="driver_note_monto" class="form-control">
               </div>
               <div class="form-text">{% trans "Use this for debit or credit amounts that are not tied to returned invoice lines." %}</div>
+              <div class="form-text">{% trans "Use this for credit amounts that are not tied to returned invoice lines." %}</div>
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
@@ -193,11 +193,11 @@
                 </div>
                 <div class="row g-2 mt-2 d-none" data-file-preview></div>
               </div>
-              <div class="form-text">{% trans "Optional photos that support the credit or debit note created during delivery." %}</div>
+              <div class="form-text">{% trans "Optional photos that support the credit note created during delivery." %}</div>
             </div>
             <div class="col-12">
               <div class="alert alert-secondary small mb-0">
-                {% trans "Financial notes use the amount field. Product notes use invoice lines and approved credit returns will restock inventory." %}
+                {% trans "Financial credit notes use the amount field. Product credit notes use invoice lines and approved credit returns will restock inventory." %}
               </div>
             </div>
             <div class="col-12" id="driverProductLinesWrapper">
@@ -378,7 +378,6 @@
           <select name="driver_note_tipo_documento" id="driverNoteTypePostDelivery" class="form-select">
             <option value="">{% trans "No adjustment note" %}</option>
             <option value="CREDITO">{% trans "Credit note" %}</option>
-            <option value="DEBITO">{% trans "Debit note" %}</option>
           </select>
         </div>
         <div class="col-md-4">
@@ -435,11 +434,11 @@
             </div>
             <div class="row g-2 mt-2 d-none" data-file-preview></div>
           </div>
-          <div class="form-text">{% trans "Optional photos that support the credit or debit note created during delivery." %}</div>
+          <div class="form-text">{% trans "Optional photos that support the credit note created during delivery." %}</div>
         </div>
         <div class="col-12">
           <div class="alert alert-secondary small mb-0">
-            {% trans "Financial notes use the amount field. Product notes use invoice lines and approved credit returns will restock inventory." %}
+            {% trans "Financial credit notes use the amount field. Product credit notes use invoice lines and approved credit returns will restock inventory." %}
           </div>
         </div>
         <div class="col-12" id="driverProductLinesWrapperPostDelivery">

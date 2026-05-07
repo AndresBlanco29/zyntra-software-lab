@@ -1394,7 +1394,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertTrue(adjustment_notification.leida)
 		self.assertFalse(invoice_notification.leida)
 
-	def test_driver_complete_view_can_create_debit_note_draft(self):
+	def test_driver_complete_view_rejects_debit_note_draft(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
 			metodo_entrega='RUTA_DRIVER',
@@ -1403,31 +1403,29 @@ class InvoiceFlowTests(TestCase):
 		)
 		self.client.force_login(self.driver)
 
-		response = self.client.post(reverse('driver_delivery_complete', args=[invoice.delivery.id]), {
-			'estado_pago': 'PAGADO',
-			'metodo_pago': 'CASH',
-			'monto_pagado': '50.00',
-			'recibido_por': 'Juan Perez',
-			'firma_cliente_data': self.signature_data,
-			'driver_note_tipo_documento': 'DEBITO',
-			'driver_note_motivo': 'DEFECT',
-			'driver_note_descripcion': 'Cargo adicional operativo',
-			f'driver_note_qty_{invoice.items.first().id}': '1',
-			f'driver_note_amount_{invoice.items.first().id}': '5.00',
-		})
+		response = self.client.post(
+			reverse('driver_delivery_complete', args=[invoice.delivery.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'metodo_pago': 'CASH',
+				'monto_pagado': '50.00',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+				'driver_note_tipo_documento': 'DEBITO',
+				'driver_note_motivo': 'DEFECT',
+				'driver_note_descripcion': 'Cargo adicional operativo',
+				f'driver_note_qty_{invoice.items.first().id}': '1',
+				f'driver_note_amount_{invoice.items.first().id}': '5.00',
+			},
+			follow=True,
+		)
 
 		invoice.refresh_from_db()
-		nota = invoice.notas_ajuste.get()
-		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
-		self.assertEqual(invoice.delivery.estado, 'ENTREGADA_PAGADA')
-		self.assertEqual(nota.estado, 'BORRADOR')
-		self.assertEqual(nota.tipo_documento, 'DEBITO')
-		self.assertEqual(nota.tipo_credito, '')
-		self.assertEqual(nota.creada_por, self.driver)
-		self.assertEqual(nota.total, Decimal('5.00'))
-		self.assertEqual(invoice.delivery.monto_pagado, Decimal('50.00'))
+		self.assertEqual(invoice.notas_ajuste.count(), 0)
+		self.assertEqual(invoice.delivery.estado, 'ASIGNADA')
+		self.assertContains(response, 'Drivers can only request credit notes.')
 
-	def test_driver_complete_view_can_create_financial_debit_note_draft(self):
+	def test_driver_complete_view_rejects_financial_debit_note_draft(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
 			metodo_entrega='RUTA_DRIVER',
@@ -1436,27 +1434,26 @@ class InvoiceFlowTests(TestCase):
 		)
 		self.client.force_login(self.driver)
 
-		response = self.client.post(reverse('driver_delivery_complete', args=[invoice.delivery.id]), {
-			'estado_pago': 'PAGADO',
-			'metodo_pago': 'CASH',
-			'monto_pagado': '52.50',
-			'recibido_por': 'Juan Perez',
-			'firma_cliente_data': self.signature_data,
-			'driver_note_tipo_documento': 'DEBITO',
-			'driver_note_tipo_ajuste': 'FINANCIERO',
-			'driver_note_motivo': 'OTHER',
-			'driver_note_descripcion': 'Cargo financiero por servicio especial',
-			'driver_note_monto': '7.50',
-		})
+		response = self.client.post(
+			reverse('driver_delivery_complete', args=[invoice.delivery.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'metodo_pago': 'CASH',
+				'monto_pagado': '52.50',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+				'driver_note_tipo_documento': 'DEBITO',
+				'driver_note_tipo_ajuste': 'FINANCIERO',
+				'driver_note_motivo': 'OTHER',
+				'driver_note_descripcion': 'Cargo financiero por servicio especial',
+				'driver_note_monto': '7.50',
+			},
+			follow=True,
+		)
 
 		invoice.refresh_from_db()
-		nota = invoice.notas_ajuste.get(descripcion='Cargo financiero por servicio especial')
-		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
-		self.assertEqual(nota.tipo_documento, 'DEBITO')
-		self.assertEqual(nota.tipo_ajuste, 'FINANCIERO')
-		self.assertEqual(nota.total, Decimal('7.50'))
-		self.assertEqual(nota.items.count(), 0)
-		self.assertEqual(invoice.delivery.monto_pagado, Decimal('52.50'))
+		self.assertFalse(invoice.notas_ajuste.filter(descripcion='Cargo financiero por servicio especial').exists())
+		self.assertContains(response, 'Drivers can only request credit notes.')
 
 	def test_driver_complete_view_allows_paid_delivery_without_payment_when_credit_offsets_full_balance(self):
 		invoice = generar_invoice_desde_picking(
@@ -1549,7 +1546,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(invoice.notas_ajuste.count(), 0)
 		self.assertContains(response, 'The paid amount cannot exceed the customer balance.')
 
-	def test_driver_can_create_financial_debit_note_after_delivery(self):
+	def test_driver_cannot_create_financial_debit_note_after_delivery(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
 			metodo_entrega='RUTA_DRIVER',
@@ -1570,21 +1567,21 @@ class InvoiceFlowTests(TestCase):
 		)
 		self.client.force_login(self.driver)
 
-		response = self.client.post(reverse('driver_delivery_create_note', args=[invoice.delivery.id]), {
-			'driver_note_tipo_documento': 'DEBITO',
-			'driver_note_tipo_ajuste': 'FINANCIERO',
-			'driver_note_motivo': 'OTHER',
-			'driver_note_descripcion': 'Cargo financiero posterior',
-			'driver_note_monto': '6.25',
-		})
+		response = self.client.post(
+			reverse('driver_delivery_create_note', args=[invoice.delivery.id]),
+			{
+				'driver_note_tipo_documento': 'DEBITO',
+				'driver_note_tipo_ajuste': 'FINANCIERO',
+				'driver_note_motivo': 'OTHER',
+				'driver_note_descripcion': 'Cargo financiero posterior',
+				'driver_note_monto': '6.25',
+			},
+			follow=True,
+		)
 
 		invoice.refresh_from_db()
-		nota = invoice.notas_ajuste.get(descripcion='Cargo financiero posterior')
-		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
-		self.assertEqual(nota.tipo_documento, 'DEBITO')
-		self.assertEqual(nota.tipo_ajuste, 'FINANCIERO')
-		self.assertEqual(nota.total, Decimal('6.25'))
-		self.assertEqual(nota.items.count(), 0)
+		self.assertFalse(invoice.notas_ajuste.filter(descripcion='Cargo financiero posterior').exists())
+		self.assertContains(response, 'Drivers can only request credit notes.')
 
 	def test_backoffice_invoice_create_note_uses_prefixed_form_fields(self):
 		invoice = generar_invoice_desde_picking(
@@ -2506,7 +2503,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(response, 'Producto por cobrar')
 		self.assertContains(response, 'Descripcion del cobro')
 
-	def test_driver_delivery_detail_uses_charge_labels_for_debit_note_ui(self):
+	def test_driver_delivery_detail_shows_credit_only_note_ui(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
 			metodo_entrega='RUTA_DRIVER',
@@ -2518,14 +2515,14 @@ class InvoiceFlowTests(TestCase):
 		response = self.client.get(reverse('driver_delivery_detail', args=[invoice.delivery.id]))
 
 		self.assertEqual(response.status_code, 200)
+		self.assertNotContains(response, 'Debit note')
 		self.assertContains(response, 'id="driverReasonWrapper"', html=False)
 		self.assertContains(response, 'id="driverReasonSelect"', html=False)
 		self.assertContains(response, 'id="driverDescriptionLabel"', html=False)
 		self.assertContains(response, 'id="driverDescriptionHelp"', html=False)
-		self.assertContains(response, 'Amount to charge')
-		self.assertContains(response, 'Product to charge')
-		self.assertContains(response, 'Charge description')
-		self.assertContains(response, 'Use this field to clearly explain what will be charged to the customer.')
+		self.assertContains(response, 'Credit note')
+		self.assertContains(response, 'Product return / item lines')
+		self.assertContains(response, 'Use this field for the manual comment, especially when the reason is Other.')
 		content = response.content.decode('utf-8')
 		self.assertLess(content.index('data-driver-section="adjustment-note"'), content.index('data-driver-section="payment-details"'))
 

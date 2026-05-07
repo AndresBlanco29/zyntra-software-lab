@@ -256,6 +256,11 @@ def _extract_adjustment_note_request(invoice, post_data, *, field_prefix=''):
 	}
 
 
+def _validate_driver_note_request(*, note_request):
+	if note_request is not None and note_request['tipo_documento'] != 'CREDITO':
+		raise ValidationError(_('Drivers can only request credit notes.'))
+
+
 def _save_adjustment_note_evidence_files(nota, uploaded_files):
 	for uploaded_file in uploaded_files:
 		NotaAjusteEvidencePhoto.objects.create(nota=nota, image=uploaded_file)
@@ -1233,6 +1238,7 @@ def driver_delivery_complete(request, delivery_id):
 	try:
 		nota = None
 		note_request = _extract_adjustment_note_request(delivery.invoice, request.POST, field_prefix='driver_note_')
+		_validate_driver_note_request(note_request=note_request)
 		note_evidence_files = request.FILES.getlist('driver_note_evidence_photos')
 		if note_request is None and note_evidence_files:
 			raise ValidationError(_('Select a note type before uploading adjustment evidence.'))
@@ -1286,6 +1292,7 @@ def driver_delivery_create_note(request, delivery_id):
 
 	try:
 		note_request = _extract_adjustment_note_request(delivery.invoice, request.POST, field_prefix='driver_note_')
+		_validate_driver_note_request(note_request=note_request)
 		note_evidence_files = request.FILES.getlist('driver_note_evidence_photos')
 		if note_request is None:
 			raise ValidationError(_('Add note details before saving the adjustment.'))

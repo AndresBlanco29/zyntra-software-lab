@@ -19,6 +19,16 @@ PERMISSION_SECTIONS = (
                 'description': _('View the main administrative dashboard.'),
             },
             {
+                'code': 'admin.users.view',
+                'label': _('Internal users'),
+                'description': _('View internal users and their assigned permissions.'),
+            },
+            {
+                'code': 'admin.users.manage',
+                'label': _('Manage internal users'),
+                'description': _('Create, edit, activate or deactivate internal users and their permissions.'),
+            },
+            {
                 'code': 'admin.customer_requests.view',
                 'label': _('Customer requests'),
                 'description': _('View customer approvals and application details.'),
@@ -296,6 +306,7 @@ def get_redirect_url_for_user(user):
 
     candidates = (
         ('admin.dashboard.view', 'panel_admin'),
+        ('admin.users.view', 'lista_usuarios_internos'),
         ('backoffice.dashboard.view', 'backoffice_dashboard'),
         ('driver.delivery.view', 'driver_delivery_list'),
         ('selector.picking.view', 'selector_picking_list'),

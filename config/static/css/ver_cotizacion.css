@@ -72,20 +72,54 @@ body {
     color: white !important;
     text-align: center;
     font-weight: bold;
-    padding: 12px;
+    padding: 12px 12px 12px 22px;
     font-size: 18px;
 }
 
 .sidebar .active::before {
     content: "";
     position: absolute;
-    left: 40px; /* 🔥 mueve la barra hacia la derecha */
+    left: 0;
     top: 50%;
     transform: translateY(-50%);
     width: 7px; /* grosor */
     height: 70%;
     background-color: #ffd400;
     border-radius: 10px;
+}
+
+.quantity-stepper {
+    width: 100%;
+    max-width: 220px;
+    flex-wrap: nowrap;
+}
+
+.quantity-stepper__button {
+    min-width: 42px;
+    font-weight: 700;
+    border-color: #cfd8e3;
+    background: #f8fafc;
+    color: #0b3d91;
+}
+
+.quantity-stepper__button:hover {
+    background: #e8eef8;
+    color: #0b3d91;
+}
+
+.quantity-stepper__input {
+    text-align: center;
+    min-width: 0;
+}
+
+.quantity-stepper__input::-webkit-outer-spin-button,
+.quantity-stepper__input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.quantity-stepper__input[type=number] {
+    -moz-appearance: textfield;
 }
 
 .language-floating{

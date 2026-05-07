@@ -131,7 +131,7 @@ La Tortilla Grocery
 <div class="list-group list-group-flush">
 {% get_current_language as CURRENT_LANGUAGE %}
 
-{% if request.user.is_superuser or request.user|has_internal_permission:'admin.dashboard.view' or request.user|has_internal_permission:'admin.customer_requests.view' or request.user|has_internal_permission:'admin.products.view' or request.user|has_internal_permission:'admin.content.view' %}
+{% if request.user.is_superuser or request.user|has_internal_permission:'admin.dashboard.view' or request.user|has_internal_permission:'admin.users.view' or request.user|has_internal_permission:'admin.customer_requests.view' or request.user|has_internal_permission:'admin.products.view' or request.user|has_internal_permission:'admin.content.view' %}
   <div class="sidebar-section-title">{% trans "Administration" %}</div>
 
   {% if request.user|has_internal_permission:'admin.dashboard.view' %}
@@ -141,7 +141,7 @@ La Tortilla Grocery
   </a>
   {% endif %}
 
-  {% if request.user.is_superuser or request.user.role == 'admin' %}
+  {% if request.user|has_internal_permission:'admin.users.view' %}
   <a href="{% url 'lista_usuarios_internos' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_usuarios_internos' or request.resolver_match.url_name == 'crear_usuario_interno' or request.resolver_match.url_name == 'editar_usuario_interno' or request.resolver_match.url_name == 'crear_vendedor' or request.resolver_match.url_name == 'editar_vendedor' or request.resolver_match.url_name == 'crear_backoffice' or request.resolver_match.url_name == 'editar_backoffice' %}active{% endif %}">
     {% trans "Internal Users" %}

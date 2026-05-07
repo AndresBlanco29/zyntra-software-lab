@@ -141,7 +141,11 @@
                     <td>${{ item.precio }}</td>
                     <td>
                       {% if puede_editar %}
-                        <input type="number" min="1" class="form-control form-control-sm" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}">
+                        <div class="input-group quantity-stepper" data-quantity-stepper>
+                          <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="down" aria-label="{% trans 'Decrease quantity' %}">-</button>
+                          <input type="number" min="1" class="form-control form-control-sm quantity-stepper__input" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}">
+                          <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="up" aria-label="{% trans 'Increase quantity' %}">+</button>
+                        </div>
                       {% else %}
                         <span class="fw-semibold">{{ item.cantidad }}</span>
                       {% endif %}
@@ -215,6 +219,24 @@ document.addEventListener('DOMContentLoaded', function () {
     if (window.innerWidth > 992) {
       closeSidebar();
     }
+  });
+
+  document.querySelectorAll('[data-quantity-stepper]').forEach(function (stepper) {
+    var input = stepper.querySelector('.quantity-stepper__input');
+    if (!input) {
+      return;
+    }
+
+    stepper.querySelectorAll('.quantity-stepper__button').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var currentValue = parseInt(input.value || '1', 10) || 1;
+        var minValue = parseInt(input.getAttribute('min') || '1', 10) || 1;
+        var nextValue = button.dataset.step === 'down' ? currentValue - 1 : currentValue + 1;
+
+        input.value = Math.max(nextValue, minValue);
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
   });
 });
 </script>

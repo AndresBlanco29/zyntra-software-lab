@@ -1030,10 +1030,8 @@ def crear_backoffice(request):
 
 
 @login_required
+@internal_permission_required('admin.users.manage')
 def crear_usuario_interno(request, preset_role=None):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     if request.method == 'POST':
 
@@ -1099,10 +1097,8 @@ def lista_vendedores(request):
 
 
 @login_required
+@internal_permission_required('admin.users.view')
 def lista_usuarios_internos(request):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     usuarios_internos = _internal_users_queryset()
     for usuario in usuarios_internos:
@@ -1127,10 +1123,8 @@ def editar_backoffice(request, usuario_id):
 
 
 @login_required
+@internal_permission_required('admin.users.manage')
 def editar_usuario_interno(request, usuario_id, preset_role=None):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     filters = {'id': usuario_id, 'role__in': sorted(_get_allowed_internal_roles())}
     if preset_role:
@@ -1185,10 +1179,8 @@ def desactivar_backoffice(request, usuario_id):
 
 
 @login_required
+@internal_permission_required('admin.users.manage')
 def desactivar_usuario_interno(request, usuario_id, preset_role=None):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     filters = {'id': usuario_id, 'role__in': sorted(_get_allowed_internal_roles())}
     if preset_role:
@@ -1219,10 +1211,8 @@ def activar_backoffice(request, usuario_id):
 
 
 @login_required
+@internal_permission_required('admin.users.manage')
 def activar_usuario_interno(request, usuario_id, preset_role=None):
-
-    if not _is_admin_user(request.user):
-        return redirect('login')
 
     filters = {'id': usuario_id, 'role__in': sorted(_get_allowed_internal_roles())}
     if preset_role:

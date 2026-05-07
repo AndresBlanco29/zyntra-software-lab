@@ -56,17 +56,32 @@
 
           <div class="mb-3">
             <label class="form-label">{% trans "Contrasena actual" %}</label>
-            <input type="password" name="current_password" class="form-control" required>
+            <div class="position-relative">
+              <input type="password" id="currentPasswordInput" name="current_password" class="form-control pe-5" required>
+              <button type="button" class="btn btn-link position-absolute top-50 end-0 translate-middle-y text-decoration-none text-secondary px-3" onclick="toggleProfilePassword('currentPasswordInput', 'currentPasswordToggle')" aria-label="{% trans 'Mostrar u ocultar contrasena' %}">
+                <span id="currentPasswordToggle" aria-hidden="true">&#128065;</span>
+              </button>
+            </div>
           </div>
 
           <div class="mb-3">
             <label class="form-label">{% trans "Nueva contrasena" %}</label>
-            <input type="password" name="new_password" class="form-control" required>
+            <div class="position-relative">
+              <input type="password" id="newPasswordInput" name="new_password" class="form-control pe-5" required>
+              <button type="button" class="btn btn-link position-absolute top-50 end-0 translate-middle-y text-decoration-none text-secondary px-3" onclick="toggleProfilePassword('newPasswordInput', 'newPasswordToggle')" aria-label="{% trans 'Mostrar u ocultar contrasena' %}">
+                <span id="newPasswordToggle" aria-hidden="true">&#128065;</span>
+              </button>
+            </div>
           </div>
 
           <div class="mb-4">
             <label class="form-label">{% trans "Confirmar nueva contrasena" %}</label>
-            <input type="password" name="confirm_password" class="form-control" required>
+            <div class="position-relative">
+              <input type="password" id="confirmPasswordInput" name="confirm_password" class="form-control pe-5" required>
+              <button type="button" class="btn btn-link position-absolute top-50 end-0 translate-middle-y text-decoration-none text-secondary px-3" onclick="toggleProfilePassword('confirmPasswordInput', 'confirmPasswordToggle')" aria-label="{% trans 'Mostrar u ocultar contrasena' %}">
+                <span id="confirmPasswordToggle" aria-hidden="true">&#128065;</span>
+              </button>
+            </div>
           </div>
 
           <button type="submit" class="btn btn-primary">{% trans "Cambiar contrasena" %}</button>
@@ -75,5 +90,24 @@
     </div>
   </div>
 </div>
+
+<script>
+function toggleProfilePassword(inputId, toggleId) {
+  const input = document.getElementById(inputId);
+  const toggle = document.getElementById(toggleId);
+
+  if (!input || !toggle) {
+    return;
+  }
+
+  if (input.type === 'password') {
+    input.type = 'text';
+    toggle.textContent = '🙈';
+  } else {
+    input.type = 'password';
+    toggle.textContent = '👁';
+  }
+}
+</script>
 
 {% endblock %}

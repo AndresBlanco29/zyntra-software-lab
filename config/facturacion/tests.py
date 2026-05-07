@@ -14,7 +14,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, DeliveryNotificationLog, Invoice, NotaAjuste, NotaAjusteAplicacion
-from config.facturacion.services import _normalize_uploaded_file, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, generar_invoice_desde_picking, start_delivery_route, unlock_client_from_delivery
+from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, generar_invoice_desde_picking, start_delivery_route, unlock_client_from_delivery
 from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_item_data, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
 from config.inventario.services import registrar_entrada_manual, reservar_stock_para_pedido_items
@@ -985,7 +985,7 @@ class InvoiceFlowTests(TestCase):
 
 		delivery.refresh_from_db()
 		invoice.refresh_from_db()
-		self.assertEqual(delivery.metodo_pago, 'MIXTO')
+		self.assertEqual(delivery.metodo_pago, 'MULTIPLE')
 		self.assertEqual(delivery.monto_pagado_cash, Decimal('20.00'))
 		self.assertEqual(delivery.monto_pagado_cheque, Decimal('25.00'))
 		self.assertEqual(delivery.monto_pagado, Decimal('45.00'))
@@ -1255,6 +1255,14 @@ class InvoiceFlowTests(TestCase):
 				self.file = BytesIO(b'')
 
 		self.assertIsNone(_normalize_uploaded_file(UploadedWithoutSize()))
+
+	def test_rewind_uploaded_file_resets_consumed_stream(self):
+		uploaded = self._build_test_image('cheque-proof.png')
+		uploaded.read()
+
+		_rewind_uploaded_file(uploaded)
+
+		self.assertEqual(uploaded.read(1), b'\x89')
 
 	def test_driver_can_create_adjustment_note_after_delivery(self):
 		invoice = generar_invoice_desde_picking(

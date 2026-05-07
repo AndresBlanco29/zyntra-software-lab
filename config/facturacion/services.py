@@ -64,6 +64,17 @@ def _normalize_uploaded_files(uploaded_files):
 	return [normalized_file for normalized_file in (_normalize_uploaded_file(uploaded_file) for uploaded_file in (uploaded_files or [])) if normalized_file is not None]
 
 
+def _rewind_uploaded_file(uploaded_file):
+	if uploaded_file is None:
+		return None
+	stream = getattr(uploaded_file, 'file', uploaded_file)
+	if hasattr(stream, 'seek'):
+		stream.seek(0)
+	elif hasattr(uploaded_file, 'seek'):
+		uploaded_file.seek(0)
+	return uploaded_file
+
+
 def _calculate_suggested_unit_price_from_profit(base_unit_price, profit_percentage=DEFAULT_SUGGESTED_PROFIT_PERCENTAGE):
 	base_unit_decimal = _quantize_money(base_unit_price)
 	profit_decimal = _to_decimal(profit_percentage, DEFAULT_SUGGESTED_PROFIT_PERCENTAGE)
@@ -693,7 +704,9 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 	delivery.payments.all().delete()
 	if payment_details:
 		for entry in payment_details['entries']:
-			DeliveryPayment.objects.create(delivery=delivery, **entry)
+			payment_entry = entry.copy()
+			payment_entry['cheque_imagen'] = _rewind_uploaded_file(payment_entry.get('cheque_imagen'))
+			DeliveryPayment.objects.create(delivery=delivery, **payment_entry)
 	_recalculate_invoice_balances(delivery.invoice)
 	for normalized_file in evidence_files:
 		DeliveryEvidencePhoto.objects.create(delivery=delivery, image=normalized_file)

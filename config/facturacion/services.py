@@ -12,7 +12,7 @@ from config.inventario.services import _apply_fractional_inventory_change, _appl
 from config.notificaciones.models import crear_notificacion_backoffice
 from config.productos.models import Presentacion
 
-from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, Invoice, InvoiceItem, NotaAjuste, NotaAjusteItem
+from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, DeliveryPayment, Invoice, InvoiceItem, NotaAjuste, NotaAjusteItem
 
 
 DEFAULT_SUGGESTED_PROFIT_PERCENTAGE = Decimal('30.00')
@@ -260,64 +260,170 @@ def calculate_delivery_collectible_balance(*, delivery, adjustment_note=None):
 	return collectible_balance
 
 
-def _resolve_driver_delivery_payment(*, payload, collectible_balance, cheque_image_file=None):
-	metodo_pago = (payload.get('metodo_pago') or '').strip()
-	legacy_amount = _quantize_money(payload.get('monto_pagado') or '0')
-	cash_amount = _quantize_money(payload.get('monto_pagado_cash') or '0')
-	cheque_amount = _quantize_money(payload.get('monto_pagado_cheque') or '0')
-	cheque_numero = (payload.get('cheque_numero') or '').strip()
-	cheque_banco = (payload.get('cheque_banco') or '').strip()
-
+def _build_driver_payment_entry(*, position, metodo_pago, monto, cheque_numero='', cheque_banco='', cheque_imagen=None,
+	transferencia_referencia='', tarjeta_ultimos_4='', tarjeta_autorizacion='', zelle_referencia='', zelle_remitente='',
+	ach_referencia='', ach_cuenta_ultimos_4=''):
+	metodo_pago = (metodo_pago or '').strip()
+	monto = _quantize_money(monto or '0')
+	entry = {
+		'position': position,
+		'metodo_pago': metodo_pago,
+		'monto': monto,
+		'cheque_numero': (cheque_numero or '').strip(),
+		'cheque_banco': (cheque_banco or '').strip(),
+		'cheque_imagen': cheque_imagen,
+		'transferencia_referencia': (transferencia_referencia or '').strip(),
+		'tarjeta_ultimos_4': (tarjeta_ultimos_4 or '').strip(),
+		'tarjeta_autorizacion': (tarjeta_autorizacion or '').strip(),
+		'zelle_referencia': (zelle_referencia or '').strip(),
+		'zelle_remitente': (zelle_remitente or '').strip(),
+		'ach_referencia': (ach_referencia or '').strip(),
+		'ach_cuenta_ultimos_4': (ach_cuenta_ultimos_4 or '').strip(),
+	}
 	if not metodo_pago:
-		raise ValidationError(_('A payment method is required when the delivery is paid.'))
+		raise ValidationError(_('Select a payment method for each payment entry with an amount.'))
+	if metodo_pago in {'MIXTO', 'MULTIPLE'}:
+		raise ValidationError(_('Each payment entry must use a specific payment method.'))
+	if monto <= 0:
+		raise ValidationError(_('Each payment entry must include an amount greater than zero.'))
+	if metodo_pago == 'CHEQUE':
+		if not entry['cheque_numero'] or not entry['cheque_banco']:
+			raise ValidationError(_('Cheque number and bank are required for cheque payments.'))
+		if entry['cheque_imagen'] is None:
+			raise ValidationError(_('A cheque image is required for cheque payments.'))
+	elif metodo_pago == 'TRANSFERENCIA':
+		if not entry['transferencia_referencia']:
+			raise ValidationError(_('Transfer reference is required.'))
+	elif metodo_pago == 'TARJETA':
+		if len(entry['tarjeta_ultimos_4']) != 4 or not entry['tarjeta_autorizacion']:
+			raise ValidationError(_('Card last four digits and authorization code are required.'))
+	elif metodo_pago == 'ZELLE':
+		if not entry['zelle_referencia'] or not entry['zelle_remitente']:
+			raise ValidationError(_('Zelle reference and sender are required.'))
+	elif metodo_pago == 'ACH':
+		if not entry['ach_referencia'] or len(entry['ach_cuenta_ultimos_4']) != 4:
+			raise ValidationError(_('ACH reference and account last four digits are required.'))
+	return entry
 
-	if metodo_pago == 'MIXTO':
-		if cash_amount <= 0 or cheque_amount <= 0:
-			raise ValidationError(_('Cash + cheque payments must include both amounts greater than zero.'))
-		monto_pagado = _quantize_money(cash_amount + cheque_amount)
-	elif metodo_pago == 'CASH':
-		cash_amount = cash_amount if cash_amount > 0 else legacy_amount
-		cheque_amount = Decimal('0.00')
-		monto_pagado = cash_amount
-	elif metodo_pago == 'CHEQUE':
-		cheque_amount = cheque_amount if cheque_amount > 0 else legacy_amount
-		cash_amount = Decimal('0.00')
-		monto_pagado = cheque_amount
+
+def _resolve_driver_delivery_payment(*, payload, collectible_balance, payment_files=None, cheque_image_file=None):
+	entries = []
+	if payment_files is None:
+		payment_files = {}
+	uses_new_rows = any(
+		(payload.get(f'payment_method_{index}') or '').strip()
+		or str(payload.get(f'payment_amount_{index}') or '').strip()
+		or payment_files.get(f'payment_cheque_image_{index}')
+		for index in range(1, 4)
+	)
+
+	if uses_new_rows:
+		for index in range(1, 4):
+			method = (payload.get(f'payment_method_{index}') or '').strip()
+			amount = str(payload.get(f'payment_amount_{index}') or '').strip()
+			row_has_input = any([
+				method,
+				amount,
+				str(payload.get(f'payment_cheque_numero_{index}') or '').strip(),
+				str(payload.get(f'payment_cheque_banco_{index}') or '').strip(),
+				str(payload.get(f'payment_transferencia_referencia_{index}') or '').strip(),
+				str(payload.get(f'payment_tarjeta_ultimos_4_{index}') or '').strip(),
+				str(payload.get(f'payment_tarjeta_autorizacion_{index}') or '').strip(),
+				str(payload.get(f'payment_zelle_referencia_{index}') or '').strip(),
+				str(payload.get(f'payment_zelle_remitente_{index}') or '').strip(),
+				str(payload.get(f'payment_ach_referencia_{index}') or '').strip(),
+				str(payload.get(f'payment_ach_cuenta_ultimos_4_{index}') or '').strip(),
+				payment_files.get(f'payment_cheque_image_{index}'),
+			])
+			if not row_has_input:
+				continue
+			entries.append(_build_driver_payment_entry(
+				position=index,
+				metodo_pago=method,
+				monto=amount,
+				cheque_numero=payload.get(f'payment_cheque_numero_{index}'),
+				cheque_banco=payload.get(f'payment_cheque_banco_{index}'),
+				cheque_imagen=payment_files.get(f'payment_cheque_image_{index}'),
+				transferencia_referencia=payload.get(f'payment_transferencia_referencia_{index}'),
+				tarjeta_ultimos_4=payload.get(f'payment_tarjeta_ultimos_4_{index}'),
+				tarjeta_autorizacion=payload.get(f'payment_tarjeta_autorizacion_{index}'),
+				zelle_referencia=payload.get(f'payment_zelle_referencia_{index}'),
+				zelle_remitente=payload.get(f'payment_zelle_remitente_{index}'),
+				ach_referencia=payload.get(f'payment_ach_referencia_{index}'),
+				ach_cuenta_ultimos_4=payload.get(f'payment_ach_cuenta_ultimos_4_{index}'),
+			))
 	else:
-		cash_amount = Decimal('0.00')
-		cheque_amount = Decimal('0.00')
-		monto_pagado = legacy_amount
+		metodo_pago = (payload.get('metodo_pago') or '').strip()
+		legacy_amount = _quantize_money(payload.get('monto_pagado') or '0')
+		cash_amount = _quantize_money(payload.get('monto_pagado_cash') or '0')
+		cheque_amount = _quantize_money(payload.get('monto_pagado_cheque') or '0')
+		if not metodo_pago:
+			raise ValidationError(_('A payment method is required when the delivery is paid.'))
+		if metodo_pago == 'MIXTO':
+			entries.append(_build_driver_payment_entry(
+				position=1,
+				metodo_pago='CASH',
+				monto=cash_amount,
+			))
+			entries.append(_build_driver_payment_entry(
+				position=2,
+				metodo_pago='CHEQUE',
+				monto=cheque_amount,
+				cheque_numero=payload.get('cheque_numero'),
+				cheque_banco=payload.get('cheque_banco'),
+				cheque_imagen=cheque_image_file,
+			))
+		else:
+			entries.append(_build_driver_payment_entry(
+				position=1,
+				metodo_pago=metodo_pago,
+				monto=legacy_amount,
+				cheque_numero=payload.get('cheque_numero'),
+				cheque_banco=payload.get('cheque_banco'),
+				cheque_imagen=cheque_image_file,
+				transferencia_referencia=payload.get('transferencia_referencia'),
+				tarjeta_ultimos_4=payload.get('tarjeta_ultimos_4'),
+				tarjeta_autorizacion=payload.get('tarjeta_autorizacion'),
+				zelle_referencia=payload.get('zelle_referencia'),
+				zelle_remitente=payload.get('zelle_remitente'),
+				ach_referencia=payload.get('ach_referencia'),
+				ach_cuenta_ultimos_4=payload.get('ach_cuenta_ultimos_4'),
+			))
 
-	if collectible_balance > 0 and monto_pagado <= 0:
+	if not entries:
+		raise ValidationError(_('Add at least one payment method for paid deliveries.'))
+	if len(entries) > 3:
+		raise ValidationError(_('A maximum of three payment methods is allowed per delivery.'))
+
+	total_paid = _quantize_money(sum(entry['monto'] for entry in entries))
+	if collectible_balance > 0 and total_paid <= 0:
 		raise ValidationError(_('Paid deliveries must include a payment amount greater than zero.'))
-	if monto_pagado > collectible_balance:
+	if total_paid > collectible_balance:
 		raise ValidationError(_('The paid amount cannot exceed the customer balance.'))
 
-	uses_cheque = metodo_pago in {'CHEQUE', 'MIXTO'}
-	if uses_cheque:
-		if cheque_amount <= 0:
-			raise ValidationError(_('Cheque payments must include an amount greater than zero.'))
-		if not cheque_numero or not cheque_banco:
-			raise ValidationError(_('Cheque number and bank are required for cheque payments.'))
-		if cheque_image_file is None:
-			raise ValidationError(_('A cheque image is required for cheque payments.'))
-	else:
-		cheque_numero = ''
-		cheque_banco = ''
-
+	cheque_entries = [entry for entry in entries if entry['metodo_pago'] == 'CHEQUE']
+	single_entry = entries[0] if len(entries) == 1 else None
 	return {
-		'metodo_pago': metodo_pago,
-		'monto_pagado': monto_pagado,
-		'monto_pagado_cash': cash_amount,
-		'monto_pagado_cheque': cheque_amount,
-		'cheque_numero': cheque_numero,
-		'cheque_banco': cheque_banco,
-		'cheque_imagen': cheque_image_file,
+		'entries': entries,
+		'metodo_pago': single_entry['metodo_pago'] if single_entry else 'MULTIPLE',
+		'monto_pagado': total_paid,
+		'monto_pagado_cash': _quantize_money(sum(entry['monto'] for entry in entries if entry['metodo_pago'] == 'CASH')),
+		'monto_pagado_cheque': _quantize_money(sum(entry['monto'] for entry in cheque_entries)),
+		'cheque_numero': cheque_entries[0]['cheque_numero'] if len(cheque_entries) == 1 else '',
+		'cheque_banco': cheque_entries[0]['cheque_banco'] if len(cheque_entries) == 1 else '',
+		'cheque_imagen': cheque_entries[0]['cheque_imagen'] if len(cheque_entries) == 1 else None,
+		'transferencia_referencia': single_entry['transferencia_referencia'] if single_entry else '',
+		'tarjeta_ultimos_4': single_entry['tarjeta_ultimos_4'] if single_entry else '',
+		'tarjeta_autorizacion': single_entry['tarjeta_autorizacion'] if single_entry else '',
+		'zelle_referencia': single_entry['zelle_referencia'] if single_entry else '',
+		'zelle_remitente': single_entry['zelle_remitente'] if single_entry else '',
+		'ach_referencia': single_entry['ach_referencia'] if single_entry else '',
+		'ach_cuenta_ultimos_4': single_entry['ach_cuenta_ultimos_4'] if single_entry else '',
 	}
 
 
 @transaction.atomic
-def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, adjustment_note=None, cheque_image_file=None):
+def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, adjustment_note=None, cheque_image_file=None, payment_files=None):
 	if delivery.driver_id != driver_user.id:
 		raise PermissionDenied(_('You are not assigned to this delivery.'))
 	if delivery.is_completed:
@@ -338,6 +444,7 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 		payment_details = _resolve_driver_delivery_payment(
 			payload=payload,
 			collectible_balance=collectible_balance,
+			payment_files=payment_files,
 			cheque_image_file=cheque_image_file,
 		)
 	else:
@@ -361,6 +468,13 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 	delivery.firma_recibida_en = timezone.now()
 	delivery.delivered_at = timezone.now()
 	delivery.notifications_sent_at = timezone.now()
+	delivery.transferencia_referencia = payment_details['transferencia_referencia'] if payment_details else ''
+	delivery.tarjeta_ultimos_4 = payment_details['tarjeta_ultimos_4'] if payment_details else ''
+	delivery.tarjeta_autorizacion = payment_details['tarjeta_autorizacion'] if payment_details else ''
+	delivery.zelle_referencia = payment_details['zelle_referencia'] if payment_details else ''
+	delivery.zelle_remitente = payment_details['zelle_remitente'] if payment_details else ''
+	delivery.ach_referencia = payment_details['ach_referencia'] if payment_details else ''
+	delivery.ach_cuenta_ultimos_4 = payment_details['ach_cuenta_ultimos_4'] if payment_details else ''
 	delivery.cheque_numero = payment_details['cheque_numero'] if payment_details else ''
 	delivery.cheque_banco = payment_details['cheque_banco'] if payment_details else ''
 	if payment_details and payment_details['cheque_imagen'] is not None:
@@ -378,12 +492,23 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 		delivery.client_blocked_on_delivery = True
 		delivery.monto_pagado_cash = Decimal('0.00')
 		delivery.monto_pagado_cheque = Decimal('0.00')
+		delivery.transferencia_referencia = ''
+		delivery.tarjeta_ultimos_4 = ''
+		delivery.tarjeta_autorizacion = ''
+		delivery.zelle_referencia = ''
+		delivery.zelle_remitente = ''
+		delivery.ach_referencia = ''
+		delivery.ach_cuenta_ultimos_4 = ''
 		delivery.invoice.cliente.credit_hold = True
 		delivery.invoice.cliente.save(update_fields=['credit_hold'])
 		_create_deliveryNotificationLogs = _create_delivery_notification_logs
 		_create_deliveryNotificationLogs(delivery, 'FAILED')
 
 	delivery.save()
+	delivery.payments.all().delete()
+	if payment_details:
+		for entry in payment_details['entries']:
+			DeliveryPayment.objects.create(delivery=delivery, **entry)
 	_recalculate_invoice_balances(delivery.invoice)
 	for uploaded_file in evidence_files:
 		DeliveryEvidencePhoto.objects.create(delivery=delivery, image=uploaded_file)
@@ -552,12 +677,12 @@ def crear_nota_ajuste(
 		descripcion_item = (payload.get('descripcion') or '').strip()
 		quantity = int(payload.get('cantidad') or 0)
 		loose_units = int(payload.get('cantidad_unidades') or 0)
-		unit_amount = _quantize_money(payload.get('monto_unitario') or '0')
+		line_amount = _quantize_money(payload.get('monto_unitario') or '0')
 		has_quantity = quantity > 0
 		has_loose_units = loose_units > 0
-		has_amount = unit_amount > 0
+		has_amount = line_amount > 0
 		if (has_quantity or has_loose_units) and not has_amount:
-			raise ValidationError(_('Enter a unit amount greater than zero for each selected adjustment item.'))
+			raise ValidationError(_('Enter an amount greater than zero for each selected adjustment item.'))
 		if has_amount and not (has_quantity or has_loose_units):
 			raise ValidationError(_('Enter a quantity greater than zero for each selected adjustment item.'))
 		if not has_quantity and not has_loose_units and not has_amount:
@@ -573,15 +698,34 @@ def crear_nota_ajuste(
 			additional_packages, loose_units = divmod(loose_units, units_per_package)
 			quantity += additional_packages
 
+		requested_units = (quantity * units_per_package) + loose_units
+		if requested_units <= 0:
+			continue
+
 		if invoice_item is not None:
 			max_units = int(invoice_item.cantidad_facturada or 0) * units_per_package
-			requested_units = (quantity * units_per_package) + loose_units
 			if requested_units > max_units:
 				raise ValidationError(
 					_('The returned quantity for %(product)s cannot exceed the invoiced units.') % {
 						'product': invoice_item.producto_nombre,
 					}
 				)
+
+		package_total = Decimal('0.00')
+		package_unit_amount = Decimal('0.00')
+		loose_total = Decimal('0.00')
+		loose_unit_amount = Decimal('0.00')
+		if quantity > 0 and loose_units > 0:
+			loose_total = _quantize_money(line_amount * Decimal(str(loose_units)) / Decimal(str(requested_units)))
+			package_total = _quantize_money(line_amount - loose_total)
+			package_unit_amount = _quantize_money(package_total / Decimal(str(quantity)))
+			loose_unit_amount = _quantize_money(loose_total / Decimal(str(loose_units)))
+		elif quantity > 0:
+			package_total = line_amount
+			package_unit_amount = _quantize_money(line_amount / Decimal(str(quantity)))
+		else:
+			loose_total = line_amount
+			loose_unit_amount = _quantize_money(line_amount / Decimal(str(loose_units)))
 
 		if quantity > 0:
 			normalized_items.append({
@@ -590,19 +734,20 @@ def crear_nota_ajuste(
 				'contenido_fraccionado': '',
 				'descripcion': descripcion_item,
 				'cantidad': quantity,
-				'monto_unitario': unit_amount,
+				'monto_unitario': package_unit_amount,
+				'line_total': package_total,
 			})
 
 		if loose_units > 0:
 			partial_target = _resolve_partial_return_target(presentacion)
-			unit_line_amount = (unit_amount / Decimal(str(units_per_package))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 			normalized_items.append({
 				'invoice_item': invoice_item,
 				'presentacion': partial_target['presentacion'],
 				'contenido_fraccionado': partial_target['contenido_fraccionado'],
 				'descripcion': descripcion_item,
 				'cantidad': loose_units,
-				'monto_unitario': unit_line_amount,
+				'monto_unitario': loose_unit_amount,
+				'line_total': loose_total,
 			})
 
 	if tipo_ajuste == 'PRODUCTO' and not normalized_items:
@@ -634,7 +779,7 @@ def crear_nota_ajuste(
 		presentacion = payload.get('presentacion') or _extract_note_presentacion(invoice_item)
 		cantidad = int(payload.get('cantidad') or 0)
 		monto_unitario = payload.get('monto_unitario')
-		line_total = _quantize_money(monto_unitario * Decimal(str(cantidad)))
+		line_total = _quantize_money(payload.get('line_total') or (monto_unitario * Decimal(str(cantidad))))
 		NotaAjusteItem.objects.create(
 			nota=nota,
 			invoice_item=invoice_item,

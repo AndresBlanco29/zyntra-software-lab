@@ -98,6 +98,7 @@ class Delivery(models.Model):
 		('CASH', _('Cash')),
 		('CHEQUE', _('Cheque')),
 		('MIXTO', _('Cash + cheque')),
+		('MULTIPLE', _('Multiple methods')),
 		('TRANSFERENCIA', _('Transfer')),
 		('TARJETA', _('Card')),
 		('ZELLE', 'Zelle'),
@@ -200,6 +201,18 @@ class Delivery(models.Model):
 
 	@property
 	def payment_breakdown(self):
+		if self.pk:
+			payments = list(self.payments.all())
+			if payments:
+				return [
+					{
+						'label': payment.get_metodo_pago_display(),
+						'amount': payment.monto,
+						'details': payment.payment_details_summary,
+						'proof_url': payment.cheque_imagen.url if payment.cheque_imagen else '',
+					}
+					for payment in payments
+				]
 		breakdown = []
 		if self.monto_pagado_cash > 0:
 			breakdown.append({'label': _('Cash'), 'amount': self.monto_pagado_cash})
@@ -264,6 +277,88 @@ class Delivery(models.Model):
 			if not self.zelle_referencia.strip() or not self.zelle_remitente.strip():
 				raise ValidationError({'zelle_referencia': _('Zelle reference and sender are required.')})
 		elif method == 'ACH':
+			if not self.ach_referencia.strip() or len(self.ach_cuenta_ultimos_4.strip()) != 4:
+				raise ValidationError({'ach_referencia': _('ACH reference and account last four digits are required.')})
+
+
+class DeliveryPayment(models.Model):
+	delivery = models.ForeignKey(Delivery, on_delete=models.CASCADE, related_name='payments')
+	position = models.PositiveSmallIntegerField(default=1)
+	metodo_pago = models.CharField(max_length=20, choices=Delivery.PAYMENT_METHOD_CHOICES)
+	monto = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	cheque_numero = models.CharField(max_length=80, blank=True)
+	cheque_banco = models.CharField(max_length=120, blank=True)
+	cheque_imagen = models.ImageField(upload_to='delivery/checks/', blank=True, null=True)
+	transferencia_referencia = models.CharField(max_length=120, blank=True)
+	tarjeta_ultimos_4 = models.CharField(max_length=4, blank=True)
+	tarjeta_autorizacion = models.CharField(max_length=80, blank=True)
+	zelle_referencia = models.CharField(max_length=120, blank=True)
+	zelle_remitente = models.CharField(max_length=160, blank=True)
+	ach_referencia = models.CharField(max_length=120, blank=True)
+	ach_cuenta_ultimos_4 = models.CharField(max_length=4, blank=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		ordering = ('position', 'id')
+		constraints = [
+			models.UniqueConstraint(fields=('delivery', 'position'), name='unique_delivery_payment_position'),
+		]
+
+	def __str__(self):
+		return f'{self.delivery.invoice.numero} - {self.get_metodo_pago_display()} ${self.monto}'
+
+	@property
+	def payment_details_summary(self):
+		if self.metodo_pago == 'CHEQUE':
+			parts = []
+			if self.cheque_numero:
+				parts.append(_('No. %(value)s') % {'value': self.cheque_numero})
+			if self.cheque_banco:
+				parts.append(self.cheque_banco)
+			return ' | '.join(parts)
+		if self.metodo_pago == 'TRANSFERENCIA' and self.transferencia_referencia:
+			return _('Ref. %(value)s') % {'value': self.transferencia_referencia}
+		if self.metodo_pago == 'TARJETA':
+			parts = []
+			if self.tarjeta_ultimos_4:
+				parts.append(_('****%(value)s') % {'value': self.tarjeta_ultimos_4})
+			if self.tarjeta_autorizacion:
+				parts.append(_('Auth %(value)s') % {'value': self.tarjeta_autorizacion})
+			return ' | '.join(parts)
+		if self.metodo_pago == 'ZELLE':
+			parts = []
+			if self.zelle_referencia:
+				parts.append(_('Ref. %(value)s') % {'value': self.zelle_referencia})
+			if self.zelle_remitente:
+				parts.append(self.zelle_remitente)
+			return ' | '.join(parts)
+		if self.metodo_pago == 'ACH':
+			parts = []
+			if self.ach_referencia:
+				parts.append(_('Ref. %(value)s') % {'value': self.ach_referencia})
+			if self.ach_cuenta_ultimos_4:
+				parts.append(_('Acct ****%(value)s') % {'value': self.ach_cuenta_ultimos_4})
+			return ' | '.join(parts)
+		return ''
+
+	def clean(self):
+		if self.monto <= 0:
+			raise ValidationError({'monto': _('Each payment entry must include an amount greater than zero.')})
+		if self.metodo_pago in {'MIXTO', 'MULTIPLE'}:
+			raise ValidationError({'metodo_pago': _('Payment entries must use a concrete payment method.')})
+		if self.metodo_pago == 'CHEQUE':
+			if not self.cheque_numero.strip() or not self.cheque_banco.strip() or not self.cheque_imagen:
+				raise ValidationError({'cheque_numero': _('Cheque number, bank and cheque image are required for cheque payments.')})
+		elif self.metodo_pago == 'TRANSFERENCIA':
+			if not self.transferencia_referencia.strip():
+				raise ValidationError({'transferencia_referencia': _('Transfer reference is required.')})
+		elif self.metodo_pago == 'TARJETA':
+			if len(self.tarjeta_ultimos_4.strip()) != 4 or not self.tarjeta_autorizacion.strip():
+				raise ValidationError({'tarjeta_ultimos_4': _('Card last four digits and authorization code are required.')})
+		elif self.metodo_pago == 'ZELLE':
+			if not self.zelle_referencia.strip() or not self.zelle_remitente.strip():
+				raise ValidationError({'zelle_referencia': _('Zelle reference and sender are required.')})
+		elif self.metodo_pago == 'ACH':
 			if not self.ach_referencia.strip() or len(self.ach_cuenta_ultimos_4.strip()) != 4:
 				raise ValidationError({'ach_referencia': _('ACH reference and account last four digits are required.')})
 

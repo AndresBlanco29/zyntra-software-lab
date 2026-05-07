@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, Invoice, InvoiceItem, NotaAjuste, NotaAjusteItem
+from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, DeliveryPayment, Invoice, InvoiceItem, NotaAjuste, NotaAjusteItem
 
 
 class InvoiceItemInline(admin.TabularInline):
@@ -26,6 +26,11 @@ class DeliveryNotificationLogInline(admin.TabularInline):
 	can_delete = False
 
 
+class DeliveryPaymentInline(admin.TabularInline):
+	model = DeliveryPayment
+	extra = 0
+
+
 @admin.register(Invoice)
 class InvoiceAdmin(admin.ModelAdmin):
 	list_display = ('numero', 'pedido', 'cliente', 'metodo_entrega', 'driver', 'estado', 'saldo_cliente', 'despachador_notificado', 'creada_en')
@@ -47,4 +52,4 @@ class DeliveryAdmin(admin.ModelAdmin):
 	list_display = ('invoice', 'driver', 'estado', 'estado_pago', 'metodo_pago', 'client_blocked_on_delivery', 'delivered_at')
 	search_fields = ('invoice__numero', 'driver__username', 'invoice__cliente__nombre_empresa', 'recibido_por')
 	list_filter = ('estado', 'estado_pago', 'metodo_pago', 'client_blocked_on_delivery')
-	inlines = [DeliveryEvidencePhotoInline, DeliveryNotificationLogInline]
+	inlines = [DeliveryPaymentInline, DeliveryEvidencePhotoInline, DeliveryNotificationLogInline]

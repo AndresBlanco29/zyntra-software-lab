@@ -288,79 +288,57 @@
             <div class="col-md-4 paid-only d-none">
               <label class="form-label fw-semibold">{% trans "Total payment amount" %}</label>
               <input type="number" min="0" step="0.01" name="monto_pagado" id="paymentAmount" class="form-control" value="{{ delivery_collectible_balance }}" data-base-balance="{{ invoice.saldo_cliente }}">
-              <div class="form-text">{% trans "Credit and debit notes created during delivery update the suggested amount to collect. Cash + cheque totals are calculated automatically." %}</div>
+              <div class="form-text">{% trans "Credit and debit notes created during delivery update the suggested amount to collect. The total is calculated automatically from up to three payment methods." %}</div>
             </div>
 
-            <div class="col-md-4 paid-only d-none">
-              <label class="form-label fw-semibold">{% trans "Payment method" %}</label>
-              <select name="metodo_pago" id="paymentMethod" class="form-select">
-                <option value="">{% trans "Select..." %}</option>
-                <option value="CASH">{% trans "Cash" %}</option>
-                <option value="CHEQUE">{% trans "Cheque" %}</option>
-                <option value="MIXTO">{% trans "Cash + cheque" %}</option>
-                <option value="TRANSFERENCIA">{% trans "Transfer" %}</option>
-                <option value="TARJETA">{% trans "Card" %}</option>
-                <option value="ZELLE">Zelle</option>
-                <option value="ACH">ACH</option>
-              </select>
-            </div>
-
-            <div class="col-md-4 method-field method-mixto d-none">
-              <label class="form-label fw-semibold">{% trans "Cash amount" %}</label>
-              <div class="input-group">
-                <span class="input-group-text">$</span>
-                <input type="number" min="0" step="0.01" name="monto_pagado_cash" id="paymentCashAmount" class="form-control">
+            <div class="col-12 paid-only d-none">
+              <div class="row g-3">
+                <div class="col-12">
+                  <div class="small text-muted">{% trans "You can split the payment into up to three methods, depending on how the customer wants to pay." %}</div>
+                </div>
+                <div class="col-12"><div class="border rounded-3 p-3 bg-white payment-entry" data-payment-entry="1"><div class="row g-3">
+                  <div class="col-md-4"><label class="form-label fw-semibold">{% trans "Payment method 1" %}</label><select name="payment_method_1" class="form-select js-payment-entry-method" data-entry-index="1"><option value="">{% trans "Select..." %}</option><option value="CASH">{% trans "Cash" %}</option><option value="CHEQUE">{% trans "Cheque" %}</option><option value="TRANSFERENCIA">{% trans "Transfer" %}</option><option value="TARJETA">{% trans "Card" %}</option><option value="ZELLE">Zelle</option><option value="ACH">ACH</option></select></div>
+                  <div class="col-md-4"><label class="form-label fw-semibold">{% trans "Amount 1" %}</label><div class="input-group"><span class="input-group-text">$</span><input type="number" min="0" step="0.01" name="payment_amount_1" class="form-control js-payment-entry-amount" data-entry-index="1"></div></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque number" %}</label><input type="text" name="payment_cheque_numero_1" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque bank" %}</label><input type="text" name="payment_cheque_banco_1" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque image" %}</label><input type="file" name="payment_cheque_image_1" class="form-control" accept="image/*" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="TRANSFERENCIA"><label class="form-label fw-semibold">{% trans "Transfer reference" %}</label><input type="text" name="payment_transferencia_referencia_1" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Card last 4" %}</label><input type="text" name="payment_tarjeta_ultimos_4_1" maxlength="4" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Authorization code" %}</label><input type="text" name="payment_tarjeta_autorizacion_1" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="ZELLE"><label class="form-label fw-semibold">{% trans "Zelle reference" %}</label><input type="text" name="payment_zelle_referencia_1" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="ZELLE"><label class="form-label fw-semibold">{% trans "Zelle sender" %}</label><input type="text" name="payment_zelle_remitente_1" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="ACH"><label class="form-label fw-semibold">{% trans "ACH reference" %}</label><input type="text" name="payment_ach_referencia_1" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="ACH"><label class="form-label fw-semibold">{% trans "ACH account last 4" %}</label><input type="text" name="payment_ach_cuenta_ultimos_4_1" maxlength="4" class="form-control" disabled></div>
+                </div></div></div>
+                <div class="col-12"><div class="border rounded-3 p-3 bg-white payment-entry" data-payment-entry="2"><div class="row g-3">
+                  <div class="col-md-4"><label class="form-label fw-semibold">{% trans "Payment method 2" %}</label><select name="payment_method_2" class="form-select js-payment-entry-method" data-entry-index="2"><option value="">{% trans "Select..." %}</option><option value="CASH">{% trans "Cash" %}</option><option value="CHEQUE">{% trans "Cheque" %}</option><option value="TRANSFERENCIA">{% trans "Transfer" %}</option><option value="TARJETA">{% trans "Card" %}</option><option value="ZELLE">Zelle</option><option value="ACH">ACH</option></select></div>
+                  <div class="col-md-4"><label class="form-label fw-semibold">{% trans "Amount 2" %}</label><div class="input-group"><span class="input-group-text">$</span><input type="number" min="0" step="0.01" name="payment_amount_2" class="form-control js-payment-entry-amount" data-entry-index="2"></div></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque number" %}</label><input type="text" name="payment_cheque_numero_2" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque bank" %}</label><input type="text" name="payment_cheque_banco_2" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque image" %}</label><input type="file" name="payment_cheque_image_2" class="form-control" accept="image/*" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="TRANSFERENCIA"><label class="form-label fw-semibold">{% trans "Transfer reference" %}</label><input type="text" name="payment_transferencia_referencia_2" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Card last 4" %}</label><input type="text" name="payment_tarjeta_ultimos_4_2" maxlength="4" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Authorization code" %}</label><input type="text" name="payment_tarjeta_autorizacion_2" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="ZELLE"><label class="form-label fw-semibold">{% trans "Zelle reference" %}</label><input type="text" name="payment_zelle_referencia_2" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="ZELLE"><label class="form-label fw-semibold">{% trans "Zelle sender" %}</label><input type="text" name="payment_zelle_remitente_2" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="ACH"><label class="form-label fw-semibold">{% trans "ACH reference" %}</label><input type="text" name="payment_ach_referencia_2" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="ACH"><label class="form-label fw-semibold">{% trans "ACH account last 4" %}</label><input type="text" name="payment_ach_cuenta_ultimos_4_2" maxlength="4" class="form-control" disabled></div>
+                </div></div></div>
+                <div class="col-12"><div class="border rounded-3 p-3 bg-white payment-entry" data-payment-entry="3"><div class="row g-3">
+                  <div class="col-md-4"><label class="form-label fw-semibold">{% trans "Payment method 3" %}</label><select name="payment_method_3" class="form-select js-payment-entry-method" data-entry-index="3"><option value="">{% trans "Select..." %}</option><option value="CASH">{% trans "Cash" %}</option><option value="CHEQUE">{% trans "Cheque" %}</option><option value="TRANSFERENCIA">{% trans "Transfer" %}</option><option value="TARJETA">{% trans "Card" %}</option><option value="ZELLE">Zelle</option><option value="ACH">ACH</option></select></div>
+                  <div class="col-md-4"><label class="form-label fw-semibold">{% trans "Amount 3" %}</label><div class="input-group"><span class="input-group-text">$</span><input type="number" min="0" step="0.01" name="payment_amount_3" class="form-control js-payment-entry-amount" data-entry-index="3"></div></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque number" %}</label><input type="text" name="payment_cheque_numero_3" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque bank" %}</label><input type="text" name="payment_cheque_banco_3" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque image" %}</label><input type="file" name="payment_cheque_image_3" class="form-control" accept="image/*" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="TRANSFERENCIA"><label class="form-label fw-semibold">{% trans "Transfer reference" %}</label><input type="text" name="payment_transferencia_referencia_3" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Card last 4" %}</label><input type="text" name="payment_tarjeta_ultimos_4_3" maxlength="4" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Authorization code" %}</label><input type="text" name="payment_tarjeta_autorizacion_3" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="ZELLE"><label class="form-label fw-semibold">{% trans "Zelle reference" %}</label><input type="text" name="payment_zelle_referencia_3" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="ZELLE"><label class="form-label fw-semibold">{% trans "Zelle sender" %}</label><input type="text" name="payment_zelle_remitente_3" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="ACH"><label class="form-label fw-semibold">{% trans "ACH reference" %}</label><input type="text" name="payment_ach_referencia_3" class="form-control" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="ACH"><label class="form-label fw-semibold">{% trans "ACH account last 4" %}</label><input type="text" name="payment_ach_cuenta_ultimos_4_3" maxlength="4" class="form-control" disabled></div>
+                </div></div></div>
               </div>
-            </div>
-
-            <div class="col-md-4 method-field method-mixto d-none">
-              <label class="form-label fw-semibold">{% trans "Cheque amount" %}</label>
-              <div class="input-group">
-                <span class="input-group-text">$</span>
-                <input type="number" min="0" step="0.01" name="monto_pagado_cheque" id="paymentChequeAmount" class="form-control">
-              </div>
-            </div>
-
-            <div class="col-md-4 method-field method-cheque method-mixto d-none">
-              <label class="form-label fw-semibold">{% trans "Cheque number" %}</label>
-              <input type="text" name="cheque_numero" class="form-control">
-            </div>
-            <div class="col-md-4 method-field method-cheque method-mixto d-none">
-              <label class="form-label fw-semibold">{% trans "Cheque bank" %}</label>
-              <input type="text" name="cheque_banco" class="form-control">
-            </div>
-            <div class="col-md-4 method-field method-cheque method-mixto d-none">
-              <label class="form-label fw-semibold">{% trans "Cheque image" %}</label>
-              <input type="file" name="cheque_imagen" class="form-control" accept="image/*">
-              <div class="form-text">{% trans "Upload the cheque photo as payment proof." %}</div>
-            </div>
-            <div class="col-md-4 method-field method-transferencia d-none">
-              <label class="form-label fw-semibold">{% trans "Transfer reference" %}</label>
-              <input type="text" name="transferencia_referencia" class="form-control">
-            </div>
-            <div class="col-md-4 method-field method-tarjeta d-none">
-              <label class="form-label fw-semibold">{% trans "Card last 4" %}</label>
-              <input type="text" name="tarjeta_ultimos_4" maxlength="4" class="form-control">
-            </div>
-            <div class="col-md-4 method-field method-tarjeta d-none">
-              <label class="form-label fw-semibold">{% trans "Authorization code" %}</label>
-              <input type="text" name="tarjeta_autorizacion" class="form-control">
-            </div>
-            <div class="col-md-4 method-field method-zelle d-none">
-              <label class="form-label fw-semibold">{% trans "Zelle reference" %}</label>
-              <input type="text" name="zelle_referencia" class="form-control">
-            </div>
-            <div class="col-md-4 method-field method-zelle d-none">
-              <label class="form-label fw-semibold">{% trans "Zelle sender" %}</label>
-              <input type="text" name="zelle_remitente" class="form-control">
-            </div>
-            <div class="col-md-4 method-field method-ach d-none">
-              <label class="form-label fw-semibold">{% trans "ACH reference" %}</label>
-              <input type="text" name="ach_referencia" class="form-control">
-            </div>
-            <div class="col-md-4 method-field method-ach d-none">
-              <label class="form-label fw-semibold">{% trans "ACH account last 4" %}</label>
-              <input type="text" name="ach_cuenta_ultimos_4" maxlength="4" class="form-control">
             </div>
 
             <div class="col-12 unpaid-only d-none">
@@ -599,10 +577,9 @@
     const cameraWidgets = document.querySelectorAll('[data-camera-upload]');
     const supportsInlineCamera = Boolean(window.isSecureContext && navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function');
     const paymentStatus = document.getElementById('paymentStatus');
-    const paymentMethod = document.getElementById('paymentMethod');
     const paymentAmountInput = document.getElementById('paymentAmount');
-    const paymentCashAmountInput = document.getElementById('paymentCashAmount');
-    const paymentChequeAmountInput = document.getElementById('paymentChequeAmount');
+    const paymentEntryMethods = Array.from(document.querySelectorAll('.js-payment-entry-method'));
+    const paymentEntryAmounts = Array.from(document.querySelectorAll('.js-payment-entry-amount'));
     const driverNoteType = document.getElementById('driverNoteType');
     const driverNoteTypePostDelivery = document.getElementById('driverNoteTypePostDelivery');
     const driverAdjustmentType = document.getElementById('driverAdjustmentType');
@@ -611,7 +588,6 @@
     const driverAdjustmentTypePostOptions = driverAdjustmentTypePostDelivery ? Array.from(driverAdjustmentTypePostDelivery.options) : [];
     const paidFields = document.querySelectorAll('.paid-only');
     const unpaidFields = document.querySelectorAll('.unpaid-only');
-    const methodFields = document.querySelectorAll('.method-field');
     const creditTypeFields = document.querySelectorAll('.driver-credit-type');
     const creditTypePostFields = document.querySelectorAll('.driver-credit-type-post');
     const driverCreditType = document.getElementById('driverNoteCreditType');
@@ -830,7 +806,7 @@
       paidFields.forEach((element) => element.classList.toggle('d-none', status !== 'PAGADO'));
       unpaidFields.forEach((element) => element.classList.toggle('d-none', status !== 'NO_PAGADO'));
       updatePaymentAmountSuggestion();
-      toggleMethodFields();
+      togglePaymentEntryFields();
     }
 
     function getDriverDraftCreditAmount() {
@@ -872,39 +848,38 @@
       const baseBalance = Number(paymentAmountInput.dataset.baseBalance || paymentAmountInput.defaultValue || '0');
       const suggestedAmount = Math.max(baseBalance - getDriverDraftCreditAmount() + getDriverDraftDebitAmount(), 0);
       paymentAmountInput.max = suggestedAmount.toFixed(2);
-      if (paymentMethod && paymentMethod.value === 'MIXTO') {
-        syncMixedPaymentTotal();
-        return;
-      }
-      paymentAmountInput.readOnly = false;
-      paymentAmountInput.value = suggestedAmount.toFixed(2);
+      paymentAmountInput.readOnly = true;
+      syncPaymentEntriesTotal();
     }
 
-    function syncMixedPaymentTotal() {
-      if (!paymentAmountInput || !paymentMethod) {
+    function syncPaymentEntriesTotal() {
+      if (!paymentAmountInput) {
         return;
       }
-      if (paymentMethod.value !== 'MIXTO') {
-        paymentAmountInput.readOnly = false;
-        return;
-      }
-      const cashAmount = Number((paymentCashAmountInput && paymentCashAmountInput.value) || '0');
-      const chequeAmount = Number((paymentChequeAmountInput && paymentChequeAmountInput.value) || '0');
-      const total = Math.max(cashAmount + chequeAmount, 0);
-      paymentAmountInput.readOnly = true;
+      const total = paymentEntryAmounts.reduce((sum, input) => sum + Number(input.value || '0'), 0);
       paymentAmountInput.value = total.toFixed(2);
     }
 
-    function toggleMethodFields() {
+    function togglePaymentEntryFields() {
       if (!paymentStatus) {
         return;
       }
-      const method = (paymentMethod ? paymentMethod.value : '').toLowerCase();
-      methodFields.forEach((element) => {
-        const shouldShow = paymentStatus.value === 'PAGADO' && element.classList.contains(`method-${method}`);
-        element.classList.toggle('d-none', !shouldShow);
+      paymentEntryMethods.forEach((select) => {
+        const index = select.dataset.entryIndex;
+        const method = select.value;
+        document.querySelectorAll(`.payment-entry-field[data-entry-index="${index}"]`).forEach((element) => {
+          const methods = (element.dataset.methods || '').split(',').map((value) => value.trim()).filter(Boolean);
+          const shouldShow = paymentStatus.value === 'PAGADO' && method && methods.includes(method);
+          element.classList.toggle('d-none', !shouldShow);
+          element.querySelectorAll('input, select, textarea').forEach((field) => {
+            field.disabled = !shouldShow;
+            if (!shouldShow && field.type !== 'file') {
+              field.value = '';
+            }
+          });
+        });
       });
-      syncMixedPaymentTotal();
+      syncPaymentEntriesTotal();
     }
 
     function toggleDriverNoteFields() {
@@ -1055,15 +1030,8 @@
     if (paymentStatus) {
       paymentStatus.addEventListener('change', togglePaymentSections);
     }
-    if (paymentMethod) {
-      paymentMethod.addEventListener('change', toggleMethodFields);
-    }
-    if (paymentCashAmountInput) {
-      paymentCashAmountInput.addEventListener('input', syncMixedPaymentTotal);
-    }
-    if (paymentChequeAmountInput) {
-      paymentChequeAmountInput.addEventListener('input', syncMixedPaymentTotal);
-    }
+    paymentEntryMethods.forEach((field) => field.addEventListener('change', togglePaymentEntryFields));
+    paymentEntryAmounts.forEach((field) => field.addEventListener('input', syncPaymentEntriesTotal));
     if (driverNoteType) {
       driverNoteType.addEventListener('change', toggleDriverNoteFields);
       driverNoteType.addEventListener('change', toggleDriverAdjustmentMode);

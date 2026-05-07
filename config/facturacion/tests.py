@@ -377,7 +377,7 @@ class InvoiceFlowTests(TestCase):
 				'presentacion': self.presentacion,
 				'descripcion': 'Tortilla 12',
 				'cantidad': 2,
-				'monto_unitario': Decimal('15.00'),
+				'monto_unitario': Decimal('30.00'),
 			}],
 			monto=Decimal('0.00'),
 		)
@@ -405,7 +405,7 @@ class InvoiceFlowTests(TestCase):
 				'presentacion': self.presentacion,
 				'cantidad': 1,
 				'cantidad_unidades': 1,
-				'monto_unitario': Decimal('15.00'),
+				'monto_unitario': Decimal('16.25'),
 			}],
 			monto=Decimal('0.00'),
 		)
@@ -446,7 +446,7 @@ class InvoiceFlowTests(TestCase):
 				'presentacion': presentacion_caja,
 				'cantidad': 0,
 				'cantidad_unidades': 10,
-				'monto_unitario': Decimal('15.00'),
+				'monto_unitario': Decimal('12.50'),
 			}],
 			monto=Decimal('0.00'),
 		)
@@ -484,7 +484,7 @@ class InvoiceFlowTests(TestCase):
 				'presentacion': presentacion_caja,
 				'cantidad': 0,
 				'cantidad_unidades': 15,
-				'monto_unitario': Decimal('20.00'),
+				'monto_unitario': Decimal('15.00'),
 			}],
 			monto=Decimal('0.00'),
 		)
@@ -504,7 +504,7 @@ class InvoiceFlowTests(TestCase):
 				'presentacion': presentacion_caja,
 				'cantidad': 0,
 				'cantidad_unidades': 5,
-				'monto_unitario': Decimal('20.00'),
+				'monto_unitario': Decimal('5.00'),
 			}],
 			monto=Decimal('0.00'),
 		)
@@ -544,7 +544,7 @@ class InvoiceFlowTests(TestCase):
 				'presentacion': pallet,
 				'cantidad': 0,
 				'cantidad_unidades': 5,
-				'monto_unitario': Decimal('300.00'),
+				'monto_unitario': Decimal('50.00'),
 			}],
 			monto=Decimal('0.00'),
 		)
@@ -888,6 +888,48 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(delivery.monto_pagado_cheque, Decimal('25.00'))
 		self.assertEqual(delivery.monto_pagado, Decimal('45.00'))
 		self.assertTrue(bool(delivery.cheque_imagen))
+		self.assertEqual(delivery.payments.count(), 2)
+		self.assertEqual(invoice.saldo_cliente, Decimal('0.00'))
+
+	def test_driver_can_complete_delivery_with_three_payment_methods(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		delivery = invoice.delivery
+
+		complete_driver_delivery(
+			delivery=delivery,
+			driver_user=self.driver,
+			payload={
+				'estado_pago': 'PAGADO',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+				'payment_method_1': 'CASH',
+				'payment_amount_1': '10.00',
+				'payment_method_2': 'CHEQUE',
+				'payment_amount_2': '20.00',
+				'payment_cheque_numero_2': 'CHK-77',
+				'payment_cheque_banco_2': 'Bank Test',
+				'payment_method_3': 'TARJETA',
+				'payment_amount_3': '15.00',
+				'payment_tarjeta_ultimos_4_3': '1234',
+				'payment_tarjeta_autorizacion_3': 'AUTH-9',
+			},
+			evidence_files=[],
+			payment_files={
+				'payment_cheque_image_2': self._build_test_image('cheque-proof-2.png'),
+			},
+		)
+
+		delivery.refresh_from_db()
+		invoice.refresh_from_db()
+		self.assertEqual(delivery.metodo_pago, 'MULTIPLE')
+		self.assertEqual(delivery.monto_pagado, Decimal('45.00'))
+		self.assertEqual(delivery.payments.count(), 3)
+		self.assertEqual(list(delivery.payments.values_list('metodo_pago', flat=True)), ['CASH', 'CHEQUE', 'TARJETA'])
 		self.assertEqual(invoice.saldo_cliente, Decimal('0.00'))
 
 	def test_driver_complete_view_can_create_credit_note_draft(self):
@@ -1114,7 +1156,7 @@ class InvoiceFlowTests(TestCase):
 			items_payload=[{
 				'invoice_item': invoice.items.first(),
 				'cantidad': 2,
-				'monto_unitario': Decimal('15.00'),
+				'monto_unitario': Decimal('30.00'),
 			}],
 		)
 		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
@@ -1580,7 +1622,7 @@ class InvoiceFlowTests(TestCase):
 			'note_descripcion': 'Creada desde pantalla avanzada',
 			f'note_qty_{invoice.items.first().id}': '1',
 			f'note_unit_qty_{invoice.items.first().id}': '1',
-			f'note_amount_{invoice.items.first().id}': '15.00',
+			f'note_amount_{invoice.items.first().id}': '16.25',
 		})
 
 		nota = NotaAjuste.objects.get(invoice=invoice, descripcion='Creada desde pantalla avanzada')
@@ -1605,6 +1647,30 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(response, 'Calculated amount')
 		self.assertContains(response, 'Calculated automatically from the quantities you enter.')
 		self.assertContains(response, 'Partial content')
+
+	def test_backoffice_adjustment_note_create_view_uses_line_total_for_manual_partial_return_without_invoice(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('backoffice_adjustment_note_create'), {
+			'cliente_id': str(self.cliente.id),
+			'note_tipo_documento': 'CREDITO',
+			'note_tipo_ajuste': 'PRODUCTO',
+			'note_motivo': 'DAMAGE',
+			'note_tipo_credito': 'CREDIT_RETURN',
+			'note_descripcion': 'Devolucion parcial manual calculada desde pantalla avanzada',
+			'note_manual_presentacion': [str(self.presentacion.id), '', ''],
+			'note_manual_qty': ['0', '0', '0'],
+			'note_manual_unit_qty': ['2', '0', '0'],
+			'note_manual_amount': ['2.50', '', ''],
+			'note_manual_description': ['Dos unidades manuales', '', ''],
+		})
+
+		nota = NotaAjuste.objects.get(invoice__isnull=True, descripcion='Devolucion parcial manual calculada desde pantalla avanzada')
+		self.assertRedirects(response, f"{reverse('backoffice_adjustment_note_create')}?cliente_id={self.cliente.id}")
+		self.assertEqual(nota.total, Decimal('2.50'))
+		self.assertEqual(nota.items.count(), 1)
+		self.assertEqual(nota.items.first().cantidad, 2)
+		self.assertEqual(nota.items.first().monto_unitario, Decimal('1.25'))
 
 	def test_advanced_adjustment_note_create_uses_customer_price_for_manual_lines(self):
 		self.cliente.nivel_precio = 3

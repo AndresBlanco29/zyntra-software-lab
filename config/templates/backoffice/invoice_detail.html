@@ -145,18 +145,12 @@
         <div>
           {% if invoice.delivery.payment_breakdown %}
             {% for item in invoice.delivery.payment_breakdown %}
-              <div>{{ item.label }}: ${{ item.amount }}</div>
+              <div>
+                {{ item.label }}: ${{ item.amount }}
+                {% if item.details %}<span class="small text-muted">({{ item.details }})</span>{% endif %}
+                {% if item.proof_url %}<a href="{{ item.proof_url }}" target="_blank" rel="noopener" class="ms-2">{% trans "View proof" %}</a>{% endif %}
+              </div>
             {% endfor %}
-          {% else %}
-            -
-          {% endif %}
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="text-muted small">{% trans "Cheque proof" %}</div>
-        <div>
-          {% if invoice.delivery.cheque_imagen %}
-            <a href="{{ invoice.delivery.cheque_imagen.url }}" target="_blank" rel="noopener">{% trans "View cheque image" %}</a>
           {% else %}
             -
           {% endif %}

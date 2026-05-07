@@ -1,4 +1,5 @@
 import base64
+from io import BytesIO
 from datetime import datetime
 from decimal import Decimal
 
@@ -13,7 +14,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, DeliveryNotificationLog, Invoice, NotaAjuste, NotaAjusteAplicacion
-from config.facturacion.services import anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, generar_invoice_desde_picking, start_delivery_route, unlock_client_from_delivery
+from config.facturacion.services import _normalize_uploaded_file, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, generar_invoice_desde_picking, start_delivery_route, unlock_client_from_delivery
 from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_item_data, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
 from config.inventario.services import registrar_entrada_manual, reservar_stock_para_pedido_items
@@ -1246,6 +1247,14 @@ class InvoiceFlowTests(TestCase):
 		)
 
 		self.assertEqual(nota.evidence_photos.count(), 0)
+
+	def test_normalize_uploaded_file_rejects_empty_stream_without_size(self):
+		class UploadedWithoutSize:
+			def __init__(self):
+				self.name = 'empty-upload.png'
+				self.file = BytesIO(b'')
+
+		self.assertIsNone(_normalize_uploaded_file(UploadedWithoutSize()))
 
 	def test_driver_can_create_adjustment_note_after_delivery(self):
 		invoice = generar_invoice_desde_picking(

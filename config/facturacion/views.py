@@ -38,6 +38,7 @@ from .models import Delivery, DeliveryEvidencePhoto, Invoice, NotaAjuste, NotaAj
 from .services import (
 	DEFAULT_SUGGESTED_PROFIT_PERCENTAGE,
 	_normalize_uploaded_file,
+	_normalize_uploaded_files,
 	aprobar_nota_ajuste,
 	anular_nota_ajuste,
 	build_google_maps_route_url,
@@ -267,10 +268,8 @@ def _validate_driver_note_request(*, note_request):
 
 
 def _save_adjustment_note_evidence_files(nota, uploaded_files):
-	for uploaded_file in uploaded_files:
-		normalized_file = _normalize_uploaded_file(uploaded_file)
-		if normalized_file is not None:
-			NotaAjusteEvidencePhoto.objects.create(nota=nota, image=normalized_file)
+	for normalized_file in _normalize_uploaded_files(uploaded_files):
+		NotaAjusteEvidencePhoto.objects.create(nota=nota, image=normalized_file)
 
 
 def _build_note_product_presentations(selected_client):
@@ -1246,7 +1245,7 @@ def driver_delivery_complete(request, delivery_id):
 		nota = None
 		note_request = _extract_adjustment_note_request(delivery.invoice, request.POST, field_prefix='driver_note_')
 		_validate_driver_note_request(note_request=note_request)
-		note_evidence_files = request.FILES.getlist('driver_note_evidence_photos')
+		note_evidence_files = _normalize_uploaded_files(request.FILES.getlist('driver_note_evidence_photos'))
 		if note_request is None and note_evidence_files:
 			raise ValidationError(_('Select a note type before uploading adjustment evidence.'))
 		if note_request is not None:
@@ -1265,7 +1264,7 @@ def driver_delivery_complete(request, delivery_id):
 			delivery=delivery,
 			driver_user=request.user,
 			payload=request.POST,
-			evidence_files=request.FILES.getlist('evidence_photos'),
+			evidence_files=_normalize_uploaded_files(request.FILES.getlist('evidence_photos')),
 			payment_files=request.FILES,
 			cheque_image_file=request.FILES.get('cheque_imagen'),
 			adjustment_note=nota,
@@ -1300,7 +1299,7 @@ def driver_delivery_create_note(request, delivery_id):
 	try:
 		note_request = _extract_adjustment_note_request(delivery.invoice, request.POST, field_prefix='driver_note_')
 		_validate_driver_note_request(note_request=note_request)
-		note_evidence_files = request.FILES.getlist('driver_note_evidence_photos')
+		note_evidence_files = _normalize_uploaded_files(request.FILES.getlist('driver_note_evidence_photos'))
 		if note_request is None:
 			raise ValidationError(_('Add note details before saving the adjustment.'))
 		nota = crear_nota_ajuste_desde_invoice(

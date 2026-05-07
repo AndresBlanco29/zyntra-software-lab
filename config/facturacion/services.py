@@ -42,7 +42,26 @@ def _normalize_uploaded_file(uploaded_file):
 		return None
 	if size is not None and int(size) <= 0:
 		return None
+	if size is None:
+		stream = getattr(uploaded_file, 'file', uploaded_file)
+		if hasattr(stream, 'tell') and hasattr(stream, 'seek'):
+			current_position = stream.tell()
+			stream.seek(0, 2)
+			resolved_size = stream.tell()
+			stream.seek(current_position)
+			if int(resolved_size) <= 0:
+				return None
+		elif hasattr(uploaded_file, 'read'):
+			content = uploaded_file.read()
+			if hasattr(uploaded_file, 'seek'):
+				uploaded_file.seek(0)
+			if not content:
+				return None
 	return uploaded_file
+
+
+def _normalize_uploaded_files(uploaded_files):
+	return [normalized_file for normalized_file in (_normalize_uploaded_file(uploaded_file) for uploaded_file in (uploaded_files or [])) if normalized_file is not None]
 
 
 def _calculate_suggested_unit_price_from_profit(base_unit_price, profit_percentage=DEFAULT_SUGGESTED_PROFIT_PERCENTAGE):
@@ -591,6 +610,7 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 		raise PermissionDenied(_('You are not assigned to this delivery.'))
 	if delivery.is_completed:
 		raise ValidationError(_('This delivery was already completed.'))
+	evidence_files = _normalize_uploaded_files(evidence_files)
 
 	estado_pago = (payload.get('estado_pago') or '').strip()
 	recibido_por = (payload.get('recibido_por') or '').strip()
@@ -675,10 +695,8 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 		for entry in payment_details['entries']:
 			DeliveryPayment.objects.create(delivery=delivery, **entry)
 	_recalculate_invoice_balances(delivery.invoice)
-	for uploaded_file in evidence_files:
-		normalized_file = _normalize_uploaded_file(uploaded_file)
-		if normalized_file is not None:
-			DeliveryEvidencePhoto.objects.create(delivery=delivery, image=normalized_file)
+	for normalized_file in evidence_files:
+		DeliveryEvidencePhoto.objects.create(delivery=delivery, image=normalized_file)
 
 	pedido = delivery.invoice.pedido
 	pedido.estado = 'DESPACHADO'

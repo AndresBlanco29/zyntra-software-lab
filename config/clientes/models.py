@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 
 from django.db import models
 from config.productos.models import normalize_price_tier
@@ -167,6 +168,12 @@ class Cliente(models.Model):
         default=False
     )
 
+    balance = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00')
+    )
+
     creado_en = models.DateTimeField(
         auto_now_add=True
     )
@@ -176,6 +183,10 @@ class Cliente(models.Model):
 
     def has_assigned_price_tier(self):
         return self.get_nivel_precio_normalizado() is not None
+
+    @property
+    def available_credit(self):
+        return self.balance if self.balance > 0 else Decimal('0.00')
 
     def __str__(self):
         return self.nombre_empresa

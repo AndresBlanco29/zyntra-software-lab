@@ -8,8 +8,8 @@ from django.utils.translation import gettext as _
 from config.productos.models import Presentacion
 from config.usuarios.permissions import internal_permission_required
 
-from .models import InventarioMovimiento, StockPresentacion
-from .services import registrar_ajuste_manual, registrar_entrada_manual, registrar_salida_manual
+from .models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
+from .services import _resolve_fractional_rollup_presentacion, registrar_ajuste_manual, registrar_entrada_manual, registrar_salida_manual
 
 
 def _parse_required_positive_integer(raw_value, error_message):
@@ -44,11 +44,31 @@ def _ensure_stock_record(presentacion):
 	return stock
 
 
+def _build_fractional_stock_summary(stock):
+	rollup_presentacion = _resolve_fractional_rollup_presentacion(stock.producto_id, stock.contenido)
+	if rollup_presentacion is None:
+		return {
+			'producto': stock.producto,
+			'presentacion': None,
+			'contenido': stock.contenido,
+			'stock_fisico': stock.stock_fisico,
+			'unidades_por_presentacion': None,
+		}
+	return {
+		'producto': stock.producto,
+		'presentacion': rollup_presentacion,
+		'contenido': stock.contenido,
+		'stock_fisico': stock.stock_fisico,
+		'unidades_por_presentacion': max(int(getattr(rollup_presentacion, 'unidades', 0) or 0), 1),
+	}
+
+
 @login_required
 @internal_permission_required('backoffice.orders.view')
 def backoffice_inventory_list(request):
 	search_term = (request.GET.get('q') or '').strip()
 	presentaciones = Presentacion.objects.select_related('producto', 'producto__categoria', 'stock_operativo').filter(producto__activo=True).order_by('producto__nombre', 'nombre')
+	fractional_stocks = StockProductoFraccionado.objects.select_related('producto').order_by('producto__nombre', 'contenido')
 
 	if search_term:
 		presentaciones = presentaciones.filter(
@@ -57,12 +77,29 @@ def backoffice_inventory_list(request):
 			| Q(nombre__icontains=search_term)
 			| Q(nombre_en__icontains=search_term)
 		)
+		fractional_stocks = fractional_stocks.filter(
+			Q(producto__nombre__icontains=search_term)
+			| Q(producto__nombre_en__icontains=search_term)
+			| Q(contenido__icontains=search_term)
+		)
 
 	rows = []
 	total_fisico = 0
 	total_reservado = 0
 	total_disponible = 0
 	zero_stock_count = 0
+	total_fractional_stock = 0
+	fractional_rows = []
+	fractional_by_presentacion_id = {}
+
+	for stock in fractional_stocks:
+		if stock.stock_fisico <= 0:
+			continue
+		summary = _build_fractional_stock_summary(stock)
+		fractional_rows.append(summary)
+		total_fractional_stock += stock.stock_fisico
+		if summary['presentacion'] is not None:
+			fractional_by_presentacion_id[summary['presentacion'].id] = summary
 
 	for presentacion in presentaciones:
 		stock = getattr(presentacion, 'stock_operativo', None)
@@ -71,11 +108,18 @@ def backoffice_inventory_list(request):
 		stock_disponible = stock.stock_disponible if stock else 0
 		if stock_disponible <= 0:
 			zero_stock_count += 1
+		fractional_match = fractional_by_presentacion_id.get(presentacion.id)
 		rows.append({
 			'presentacion': presentacion,
 			'stock_fisico': stock_fisico,
 			'stock_reservado': stock_reservado,
 			'stock_disponible': stock_disponible,
+			'fractional_stock': fractional_match['stock_fisico'] if fractional_match else 0,
+			'fractional_content_label': fractional_match['contenido'] if fractional_match else '',
+			'physical_summary': (
+				f"{stock_fisico} {presentacion.nombre_traducido} + {fractional_match['stock_fisico']} {fractional_match['contenido']}".strip()
+				if fractional_match and fractional_match['stock_fisico'] > 0 else f"{stock_fisico} {presentacion.nombre_traducido}"
+			),
 		})
 		total_fisico += stock_fisico
 		total_reservado += stock_reservado
@@ -83,10 +127,12 @@ def backoffice_inventory_list(request):
 
 	context = {
 		'rows': rows,
+		'fractional_rows': fractional_rows,
 		'search_term': search_term,
 		'total_fisico': total_fisico,
 		'total_reservado': total_reservado,
 		'total_disponible': total_disponible,
+		'total_fractional_stock': total_fractional_stock,
 		'zero_stock_count': zero_stock_count,
 		'product_count': len(rows),
 	}
@@ -138,10 +184,21 @@ def backoffice_inventory_detail(request, presentacion_id):
 		return redirect('backoffice_inventory_detail', presentacion_id=presentacion.id)
 
 	movements = InventarioMovimiento.objects.select_related('creado_por').filter(presentacion=presentacion).order_by('-creado_en', '-id')[:50]
+	consolidation_movements = InventarioMovimiento.objects.select_related('creado_por').filter(
+		presentacion=presentacion,
+		tipo__in=['CONSOLIDACION_FRACCIONADA', 'DESCONSOLIDACION_FRACCIONADA'],
+	).order_by('-creado_en', '-id')[:50]
+	fractional_stocks = [
+		_build_fractional_stock_summary(stock)
+		for stock in StockProductoFraccionado.objects.filter(producto=presentacion.producto).order_by('contenido')
+		if stock.stock_fisico > 0
+	]
 	stock.refresh_from_db()
 	context = {
 		'presentacion': presentacion,
 		'stock': stock,
 		'movements': movements,
+		'consolidation_movements': consolidation_movements,
+		'fractional_stocks': fractional_stocks,
 	}
 	return render(request, 'backoffice/inventory_detail.html', context)

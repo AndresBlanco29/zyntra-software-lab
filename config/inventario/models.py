@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from config.productos.models import Presentacion
+from config.productos.models import Presentacion, Producto
 
 
 class StockPresentacion(models.Model):
@@ -31,6 +31,20 @@ class StockPresentacion(models.Model):
 		super().save(*args, **kwargs)
 
 
+class StockProductoFraccionado(models.Model):
+	producto = models.ForeignKey(Producto, on_delete=models.CASCADE, related_name='stocks_fraccionados')
+	contenido = models.CharField(max_length=50)
+	stock_fisico = models.PositiveIntegerField(default=0)
+	actualizado_en = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		ordering = ('producto__nombre', 'contenido')
+		unique_together = ('producto', 'contenido')
+
+	def __str__(self):
+		return f'{self.producto} | {self.contenido}: {self.stock_fisico}'
+
+
 class InventarioMovimiento(models.Model):
 	CATEGORY_CHOICES = (
 		('ENTRADA', _('Entry')),
@@ -44,6 +58,8 @@ class InventarioMovimiento(models.Model):
 		('SALIDA_MANUAL', _('Manual exit')),
 		('AJUSTE_POSITIVO', _('Positive adjustment')),
 		('AJUSTE_NEGATIVO', _('Negative adjustment')),
+		('CONSOLIDACION_FRACCIONADA', _('Fractional stock consolidation')),
+		('DESCONSOLIDACION_FRACCIONADA', _('Fractional stock deconsolidation')),
 		('RESERVA_PEDIDO', _('Order reservation')),
 		('LIBERACION_PEDIDO', _('Order reservation release')),
 		('SALIDA_PICKING', _('Picking deduction')),

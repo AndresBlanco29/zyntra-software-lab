@@ -18,6 +18,7 @@
     <p class="text-muted mb-0">{% trans "Invoice generated from verified picking quantities." %}</p>
   </div>
   <div class="d-flex gap-2">
+    <a href="{{ advanced_adjustment_note_url }}" class="btn btn-outline-primary">{% trans "Advanced note" %}</a>
     <a href="{% url 'backoffice_invoices_list' %}" class="btn btn-outline-secondary">{% trans "Back to list" %}</a>
     <a href="{% url 'backoffice_invoice_pdf' invoice.id %}" class="btn btn-success">{% trans "Export PDF" %}</a>
   </div>
@@ -72,10 +73,12 @@
     <div class="card shadow-sm h-100">
       <div class="card-body">
         <div class="d-flex justify-content-between mb-2"><span>{% trans "Subtotal" %}</span><strong>${{ invoice.subtotal }}</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span>{% trans "Customer credit applied" %}</span><strong class="text-success">-${{ invoice.credito_cliente_aplicado }}</strong></div>
         <div class="d-flex justify-content-between mb-2"><span>{% trans "Credit notes" %}</span><strong class="text-danger">-${{ invoice.total_creditos }}</strong></div>
         <div class="d-flex justify-content-between mb-2"><span>{% trans "Debit notes" %}</span><strong class="text-success">+${{ invoice.total_debitos }}</strong></div>
         <hr>
-        <div class="d-flex justify-content-between"><span>{% trans "Customer balance" %}</span><strong>${{ invoice.saldo_cliente }}</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span>{% trans "Outstanding invoice balance" %}</span><strong>${{ invoice.saldo_cliente }}</strong></div>
+        <div class="d-flex justify-content-between"><span>{% trans "Customer available credit" %}</span><strong>${{ invoice.cliente.available_credit }}</strong></div>
       </div>
     </div>
   </div>
@@ -225,7 +228,8 @@
           <tr>
             <th>{% trans "Description" %}</th>
             <th>{% trans "U/M" %}</th>
-            <th>{% trans "Qty." %}</th>
+            <th>{% trans "Requested qty." %}</th>
+            <th>{% trans "Dispatched qty." %}</th>
             <th>{% trans "Unit price" %}</th>
             <th>{% trans "Sug. rtl / unit" %}</th>
             <th>{% trans "Subtotal" %}</th>
@@ -236,6 +240,7 @@
           <tr>
             <td>{{ item.producto_nombre }}</td>
             <td>{{ item.presentacion_nombre }}</td>
+            <td>{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
             <td>{{ item.cantidad_facturada }}</td>
             <td>${{ item.precio_unitario }}</td>
             <td>${{ item.precio_venta_sugerido_unitario|default:'0.00' }}</td>
@@ -421,7 +426,10 @@
   <div class="col-lg-5">
     <div class="card shadow-sm h-100">
       <div class="card-body">
-        <h5 class="mb-3">{% trans "Create adjustment note" %}</h5>
+        <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
+          <h5 class="mb-0">{% trans "Create adjustment note" %}</h5>
+          <a href="{{ advanced_adjustment_note_url }}" class="btn btn-sm btn-outline-primary">{% trans "Choose customer and invoice" %}</a>
+        </div>
         <form method="post" enctype="multipart/form-data" action="{% url 'backoffice_invoice_create_note' invoice.id %}">
           {% csrf_token %}
           <div class="row g-2 mb-3">
@@ -434,25 +442,41 @@
               </select>
             </div>
             <div class="col-md-6">
+              <label class="form-label fw-semibold">{% trans "Adjustment mode" %}</label>
+              <select name="note_tipo_ajuste" id="backofficeAdjustmentType" class="form-select" required>
+                <option value="PRODUCTO" data-credit-label="{% trans 'Product return / item lines' %}" data-debit-label="{% trans 'Product to charge' %}">{% trans "Product return / item lines" %}</option>
+                <option value="FINANCIERO" data-credit-label="{% trans 'Financial amount' %}" data-debit-label="{% trans 'Amount to charge' %}">{% trans "Financial amount" %}</option>
+              </select>
+            </div>
+            <div class="col-md-6" id="backofficeReasonWrapper">
               <label class="form-label fw-semibold">{% trans "Reason" %}</label>
-              <select name="note_motivo" class="form-select" required>
+              <select name="note_motivo" id="backofficeReasonSelect" class="form-select" required>
                 <option value="">{% trans "Select..." %}</option>
-                <option value="DAMAGE">{% trans "Damage" %}</option>
-                <option value="DEFECT">{% trans "Defect" %}</option>
+                <option value="DAMAGE">{% trans "Physical damage / transport" %}</option>
+                <option value="DEFECT">{% trans "Factory defect / quality issue" %}</option>
                 <option value="MISSING_ITEM">{% trans "Missing item" %}</option>
+                <option value="OTHER">{% trans "Other" %}</option>
               </select>
             </div>
             <div class="col-12 d-none" id="backofficeCreditTypeWrapper">
               <label class="form-label fw-semibold">{% trans "Credit type" %}</label>
               <select name="note_tipo_credito" id="backofficeCreditType" class="form-select" disabled>
-                <option value="">{% trans "Only required for credit notes" %}</option>
+				<option value="">{% trans "Select" %}</option>
                 <option value="CREDIT_DUMP">{% trans "Credit Dump" %}</option>
                 <option value="CREDIT_RETURN">{% trans "Credit Return" %}</option>
               </select>
             </div>
             <div class="col-12">
-              <label class="form-label fw-semibold">{% trans "Description" %}</label>
+              <label class="form-label fw-semibold" id="backofficeDescriptionLabel" data-credit-label="{% trans 'Description' %}" data-debit-label="{% trans 'Charge description' %}">{% trans "Description" %}</label>
               <textarea name="note_descripcion" rows="3" class="form-control"></textarea>
+              <div class="form-text" id="backofficeDescriptionHelp" data-credit-help="{% trans 'Use this field for the manual comment, especially when the reason is Other.' %}" data-debit-help="{% trans 'Use this field to clearly explain what will be charged to the customer.' %}">{% trans "Use this field for the manual comment, especially when the reason is Other." %}</div>
+            </div>
+            <div class="col-12 d-none" id="backofficeFinancialAmountWrapper">
+              <label class="form-label fw-semibold">{% trans "Amount" %}</label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input type="number" min="0" step="0.01" name="note_monto" class="form-control">
+              </div>
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
@@ -461,13 +485,14 @@
             </div>
           </div>
 
-          <div class="table-responsive mb-3">
+          <div class="table-responsive mb-3" id="backofficeProductLinesWrapper">
             <table class="table table-sm align-middle">
               <thead>
                 <tr>
                   <th>{% trans "Line" %}</th>
-                  <th>{% trans "Qty." %}</th>
-                  <th>{% trans "Amount" %}</th>
+                  <th>{% trans "Boxes / pallets" %}</th>
+                  <th>{% trans "Partial content" %}</th>
+                  <th>{% trans "Calculated amount" %}</th>
                 </tr>
               </thead>
               <tbody>
@@ -477,12 +502,28 @@
                     {{ item.producto_nombre }}
                     <div class="small text-muted">{{ item.presentacion_nombre }} | {% trans "Max" %}: {{ item.cantidad_facturada }}</div>
                   </td>
-                  <td><input type="number" min="0" max="{{ item.cantidad_facturada }}" name="note_qty_{{ item.id }}" class="form-control form-control-sm" value="0"></td>
-                  <td><input type="number" min="0" step="0.01" name="note_amount_{{ item.id }}" class="form-control form-control-sm" value="{{ item.precio_unitario }}"></td>
+                  <td>
+                    <label class="form-label small text-muted mb-1">{{ item.presentacion_nombre }}</label>
+                    <input type="number" min="0" max="{{ item.cantidad_facturada }}" name="note_qty_{{ item.id }}" class="form-control form-control-sm js-adjustment-package-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades|default:1 }}">
+                  </td>
+                  <td>
+                    {% if item.presentacion and item.presentacion.unidades > 1 %}
+                    <label class="form-label small text-muted mb-1">{{ item.presentacion.tipo_contenido_traducido|capfirst }}</label>
+                    <input type="number" min="0" name="note_unit_qty_{{ item.id }}" class="form-control form-control-sm js-adjustment-unit-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades }}">
+                    <div class="small text-muted">1 {{ item.presentacion_nombre|lower }} = {{ item.presentacion.unidades }} {{ item.presentacion.tipo_contenido_traducido|lower }}</div>
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <input type="number" min="0" step="0.01" name="note_amount_{{ item.id }}" class="form-control form-control-sm js-adjustment-amount" placeholder="0.00" inputmode="decimal">
+                    <div class="small text-muted">{% trans "Calculated automatically from the quantities you enter." %}</div>
+                  </td>
                 </tr>
                 {% endfor %}
               </tbody>
             </table>
+            <div class="form-text">{% trans "Partial returns are prorated from the package amount. If a child presentation exists, inventory returns there automatically. Otherwise the remainder is stored as internal product stock." %}</div>
           </div>
 
           <button type="submit" class="btn btn-primary w-100">{% trans "Save draft note" %}</button>
@@ -494,10 +535,21 @@
 <script>
   (function () {
     const noteType = document.getElementById('backofficeNoteType');
+    const adjustmentType = document.getElementById('backofficeAdjustmentType');
+    const adjustmentTypeOptions = adjustmentType ? Array.from(adjustmentType.options) : [];
     const creditTypeWrapper = document.getElementById('backofficeCreditTypeWrapper');
     const creditType = document.getElementById('backofficeCreditType');
+    const creditReturnOption = creditType ? creditType.querySelector('option[value="CREDIT_RETURN"]') : null;
+    const financialAmountWrapper = document.getElementById('backofficeFinancialAmountWrapper');
+    const productLinesWrapper = document.getElementById('backofficeProductLinesWrapper');
+    const reasonWrapper = document.getElementById('backofficeReasonWrapper');
+    const reasonSelect = document.getElementById('backofficeReasonSelect');
+    const descriptionLabel = document.getElementById('backofficeDescriptionLabel');
+    const descriptionHelp = document.getElementById('backofficeDescriptionHelp');
+    const packageInputs = document.querySelectorAll('.js-adjustment-package-qty');
+    const unitInputs = document.querySelectorAll('.js-adjustment-unit-qty');
 
-    if (!noteType || !creditTypeWrapper || !creditType) {
+    if (!noteType || !creditTypeWrapper || !creditType || !adjustmentType) {
       return;
     }
 
@@ -511,7 +563,77 @@
     }
 
     noteType.addEventListener('change', syncCreditTypeVisibility);
+    noteType.addEventListener('change', syncAdjustmentMode);
     syncCreditTypeVisibility();
+
+    function syncAdjustmentMode() {
+      const isProduct = adjustmentType.value === 'PRODUCTO';
+      const isDebit = noteType.value === 'DEBITO';
+      if (financialAmountWrapper) {
+        financialAmountWrapper.classList.toggle('d-none', isProduct);
+      }
+      if (productLinesWrapper) {
+        productLinesWrapper.classList.toggle('d-none', !isProduct);
+      }
+      if (creditReturnOption) {
+        creditReturnOption.disabled = !isProduct;
+      }
+      if (creditType && noteType.value === 'CREDITO' && !isProduct && creditType.value === 'CREDIT_RETURN') {
+        creditType.value = 'CREDIT_DUMP';
+      }
+      adjustmentTypeOptions.forEach(function (option) {
+        const nextLabel = isDebit ? option.dataset.debitLabel : option.dataset.creditLabel;
+        if (nextLabel) {
+          option.textContent = nextLabel;
+        }
+      });
+      if (reasonWrapper && reasonSelect) {
+        reasonWrapper.classList.toggle('d-none', isDebit);
+        if (isDebit) {
+          reasonSelect.value = 'OTHER';
+        }
+      }
+      if (descriptionLabel) {
+        descriptionLabel.textContent = isDebit ? descriptionLabel.dataset.debitLabel : descriptionLabel.dataset.creditLabel;
+      }
+      if (descriptionHelp) {
+        descriptionHelp.textContent = isDebit ? descriptionHelp.dataset.debitHelp : descriptionHelp.dataset.creditHelp;
+      }
+    }
+
+    adjustmentType.addEventListener('change', syncAdjustmentMode);
+    syncAdjustmentMode();
+
+    function updateCalculatedAmount(lineId) {
+      const packageInput = document.querySelector('.js-adjustment-package-qty[data-line-kind="invoice"][data-line-id="' + lineId + '"]');
+      const unitInput = document.querySelector('.js-adjustment-unit-qty[data-line-kind="invoice"][data-line-id="' + lineId + '"]');
+      if (!packageInput) {
+        return;
+      }
+      const amountName = packageInput.dataset.amountTarget;
+      const amountInput = amountName ? document.querySelector('[name="' + amountName + '"]') : null;
+      if (!amountInput) {
+        return;
+      }
+      const packagePrice = Number(packageInput.dataset.packagePrice || 0);
+      const unitsPerPackage = Math.max(Number(packageInput.dataset.unitsPerPackage || 1), 1);
+      const packageQty = Math.max(Number(packageInput.value || 0), 0);
+      const unitQty = unitInput ? Math.max(Number(unitInput.value || 0), 0) : 0;
+      const totalAmount = (packageQty * packagePrice) + (unitQty * (packagePrice / unitsPerPackage));
+      amountInput.value = totalAmount > 0 ? totalAmount.toFixed(2) : '';
+    }
+
+    packageInputs.forEach(function (input) {
+      input.addEventListener('input', function () {
+        updateCalculatedAmount(input.dataset.lineId);
+      });
+    });
+
+    unitInputs.forEach(function (input) {
+      input.addEventListener('input', function () {
+        updateCalculatedAmount(input.dataset.lineId);
+      });
+    });
   })();
 </script>
 {% endblock %}

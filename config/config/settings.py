@@ -65,7 +65,7 @@ for _host in (railway_domain, CANONICAL_DOMAIN, f'www.{CANONICAL_DOMAIN}'):
         ALLOWED_HOSTS.append(_host)
 
 if DEBUG:
-    for host in ('127.0.0.1', 'localhost' , '192.168.26.6', '.ngrok-free.dev', '.ngrok-free.app'):
+    for host in ('127.0.0.1', 'localhost' , '192.168.26.3', '.ngrok-free.dev', '.ngrok-free.app'):
         if host not in ALLOWED_HOSTS:
             ALLOWED_HOSTS.append(host)
 

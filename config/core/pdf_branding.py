@@ -3,6 +3,7 @@ from pathlib import Path
 from django.conf import settings
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.utils import ImageReader
 from reportlab.platypus import Image, Paragraph, Table, TableStyle
 
 
@@ -28,10 +29,31 @@ def get_pdf_logo_path():
     return ''
 
 
-def build_pdf_brand_banner(*, styles, title, subtitle='', total_width=540):
+def build_pdf_logo_image(*, max_width, max_height):
     logo_path = get_pdf_logo_path()
-    if logo_path:
-        logo_cell = Image(logo_path, width=94, height=52)
+    if not logo_path:
+        return None
+
+    image_reader = ImageReader(logo_path)
+    original_width, original_height = image_reader.getSize()
+    if not original_width or not original_height:
+        return None
+
+    width_ratio = max_width / float(original_width)
+    height_ratio = max_height / float(original_height)
+    scale = min(width_ratio, height_ratio)
+
+    return Image(
+        logo_path,
+        width=float(original_width) * scale,
+        height=float(original_height) * scale,
+    )
+
+
+def build_pdf_brand_banner(*, styles, title, subtitle='', total_width=540):
+    logo_cell = build_pdf_logo_image(max_width=94, max_height=52)
+    if logo_cell:
+        logo_cell.hAlign = 'LEFT'
     else:
         fallback_style = ParagraphStyle(
             'PdfBrandFallback',

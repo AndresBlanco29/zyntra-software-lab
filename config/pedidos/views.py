@@ -19,7 +19,7 @@ from config.core.pdf_branding import (
 )
 from config.usuarios.permissions import internal_permission_required
 from config.usuarios.models import Usuario
-from config.inventario.services import ajustar_reserva_item_pedido, cancelar_pedido_con_inventario, eliminar_item_pedido_con_inventario, reservar_stock_para_pedido_items
+from config.inventario.services import ajustar_cantidad_item_pedido_despues_picking, ajustar_reserva_item_pedido, cancelar_pedido_con_inventario, eliminar_item_pedido_con_inventario, reemplazar_presentacion_item_pedido, reemplazar_presentacion_item_pedido_despues_picking, reservar_stock_para_pedido_items
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
@@ -129,14 +129,24 @@ def _selector_pedidos_queryset(user):
 	return queryset.filter(seleccionador=user)
 
 
-def _build_selector_item_rows(pedido, actual_quantity_overrides=None):
+def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentation_overrides=None):
 	rows = []
 	actual_quantity_overrides = actual_quantity_overrides or {}
+	presentation_overrides = presentation_overrides or {}
 	for item in pedido.items.select_related('presentacion__producto').all():
+		product_presentations = item.presentacion.producto.presentaciones.order_by('nombre')
 		rows.append({
 			'id': item.id,
 			'product': item.presentacion.producto.nombre,
 			'presentation': item.presentacion.nombre,
+			'presentation_id': presentation_overrides.get(item.id, item.presentacion_id),
+			'presentation_options': [
+				{
+					'id': presentation.id,
+					'label': presentation.nombre_traducido,
+				}
+				for presentation in product_presentations
+			],
 			'requested_quantity': item.cantidad_solicitada,
 			'actual_quantity': actual_quantity_overrides.get(item.id, item.cantidad),
 			'stock_physical': int(getattr(getattr(item.presentacion, 'stock_operativo', None), 'stock_fisico', 0) or 0),
@@ -198,7 +208,7 @@ def backoffice_pedidos(request):
 @internal_permission_required('backoffice.orders.view')
 def backoffice_pedido_detalle(request, pedido_id):
 	pedido = get_object_or_404(
-		Pedido.objects.select_related('cliente__usuario', 'vendedor', 'seleccionador', 'invoice', 'invoice__driver').prefetch_related('items__presentacion__producto', 'items__presentacion__stock_operativo'),
+		Pedido.objects.select_related('cliente__usuario', 'vendedor', 'seleccionador', 'invoice', 'invoice__driver').prefetch_related('items__presentacion__producto', 'items__presentacion__stock_operativo', 'items__selector_original_presentacion'),
 		id=pedido_id,
 	)
 	pedido_items = list(pedido.items.select_related('presentacion__producto', 'presentacion__stock_operativo'))
@@ -217,6 +227,8 @@ def backoffice_pedido_detalle(request, pedido_id):
 		for item in pedido_items
 		if picker_stock_evaluation[item.id]['has_shortage']
 	]
+	for item in pedido_items:
+		item.presentation_options = list(item.presentacion.producto.presentaciones.order_by('nombre'))
 
 	if request.method == 'POST':
 		if not request.user.has_internal_permission('backoffice.orders.manage'):
@@ -233,7 +245,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 				pedido.nota_backoffice = (request.POST.get('nota_backoffice') or '').strip()
 				pedido.save(update_fields=['estado', 'nota_backoffice', 'actualizada_en'])
 
-				lineas_bloqueadas = bool(pedido.seleccionador_id and pedido.estado in {'PARA_VERIFICAR', 'VERIFICADO_AJUSTADO'})
+				lineas_bloqueadas = bool(pedido.seleccionador_id and pedido.estado == 'PARA_VERIFICAR')
 				if nuevo_estado == 'CANCELADO' and estado_anterior != 'CANCELADO':
 					cancelar_pedido_con_inventario(pedido=pedido, creado_por=request.user)
 				elif not lineas_bloqueadas:
@@ -242,8 +254,19 @@ def backoffice_pedido_detalle(request, pedido_id):
 							eliminar_item_pedido_con_inventario(item=item, creado_por=request.user)
 							continue
 
-						nueva_cantidad = _parse_quantity(request.POST.get(f'cantidad_{item.id}'), item.cantidad)
-						item = ajustar_reserva_item_pedido(item=item, nueva_cantidad=nueva_cantidad, creado_por=request.user)
+						nueva_presentacion_id = request.POST.get(f'presentacion_{item.id}')
+						if nueva_presentacion_id and str(item.presentacion_id) != str(nueva_presentacion_id):
+							nueva_presentacion = get_object_or_404(Presentacion.objects.select_related('producto'), id=nueva_presentacion_id)
+							if item.cantidad_inventario_aplicada:
+								item = reemplazar_presentacion_item_pedido_despues_picking(item=item, nueva_presentacion=nueva_presentacion, creado_por=request.user)
+							else:
+								item = reemplazar_presentacion_item_pedido(item=item, nueva_presentacion=nueva_presentacion, creado_por=request.user)
+
+						nueva_cantidad = _parse_non_negative_quantity(request.POST.get(f'cantidad_{item.id}'), item.cantidad)
+						if item.cantidad_inventario_aplicada:
+							item = ajustar_cantidad_item_pedido_despues_picking(item=item, nueva_cantidad=nueva_cantidad, creado_por=request.user)
+						else:
+							item = ajustar_reserva_item_pedido(item=item, nueva_cantidad=nueva_cantidad, creado_por=request.user)
 						item.precio = _parse_decimal(request.POST.get(f'precio_{item.id}'), item.precio)
 						item.subtotal = item.precio * item.cantidad
 						item.save(update_fields=['precio', 'subtotal'])
@@ -273,6 +296,8 @@ def backoffice_pedido_detalle(request, pedido_id):
 
 	context = {
 		'pedido': pedido,
+		'pedido_items': pedido_items,
+		'pedido_has_picker_changes': any(item.selector_has_changes for item in pedido_items),
 		'invoice': getattr(pedido, 'invoice', None),
 		'picker_stock_shortage_blocked': bool(pedido.picking_bloqueado and picker_stock_shortage_rows),
 		'picker_stock_shortage_rows': picker_stock_shortage_rows,
@@ -281,7 +306,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 		'state_choices': _pedido_state_choices(),
 		'drivers': Usuario.objects.filter(role='driver', is_active=True).order_by('first_name', 'last_name', 'username'),
 		'selectores': Usuario.objects.filter(role='seleccionador', is_active=True).order_by('first_name', 'last_name', 'username'),
-		'lineas_bloqueadas_para_picking': bool(pedido.seleccionador_id and pedido.estado in {'PARA_VERIFICAR', 'VERIFICADO_AJUSTADO'}) or hasattr(pedido, 'invoice'),
+		'lineas_bloqueadas_para_picking': bool(pedido.seleccionador_id and pedido.estado == 'PARA_VERIFICAR') or hasattr(pedido, 'invoice'),
 		'presentaciones': Presentacion.objects.select_related('producto').filter(producto__activo=True).order_by('producto__nombre', 'nombre'),
 		'invoice_suggested_price_rows': [
 			{
@@ -424,10 +449,12 @@ def selector_picking_detail(request, pedido_id):
 		return redirect('login')
 
 	pedido = get_object_or_404(_selector_pedidos_queryset(request.user), id=pedido_id)
-	pedido = Pedido.objects.select_related('cliente', 'seleccionador').prefetch_related('items__presentacion__producto', 'items__presentacion__stock_operativo').get(id=pedido.id)
+	pedido = Pedido.objects.select_related('cliente', 'seleccionador').prefetch_related('items__presentacion__producto__presentaciones', 'items__presentacion__stock_operativo').get(id=pedido.id)
 	posted_quantities = None
+	posted_presentations = None
 	form_note = pedido.nota_seleccionador
 	form_note_resolved = pedido.nota_seleccionador_resuelta
+	additional_item_rows = []
 	stock_evaluation = evaluar_stock_fisico_verificacion_picking(
 		pedido_items=list(pedido.items.all()),
 		cantidades_reales={item.id: item.cantidad for item in pedido.items.all()},
@@ -435,16 +462,37 @@ def selector_picking_detail(request, pedido_id):
 	form_has_stock_shortage = any(item_result['has_shortage'] for item_result in stock_evaluation.values())
 
 	if request.method == 'POST':
+		posted_presentations = {
+			item.id: int(request.POST.get(f'presentacion_{item.id}') or item.presentacion_id)
+			for item in pedido.items.all()
+		}
 		cantidades_reales = {
 			item.id: _parse_non_negative_quantity(request.POST.get(f'cantidad_real_{item.id}'), item.cantidad)
 			for item in pedido.items.all()
 		}
+		additional_items = []
+		posted_new_presentations = request.POST.getlist('presentacion_nueva[]')
+		posted_new_quantities = request.POST.getlist('cantidad_nueva[]')
+		if not posted_new_presentations and request.POST.get('presentacion_nueva'):
+			posted_new_presentations = [request.POST.get('presentacion_nueva')]
+			posted_new_quantities = [request.POST.get('cantidad_nueva') or '1']
+		for index, presentacion_id in enumerate(posted_new_presentations):
+			presentacion_id = (presentacion_id or '').strip()
+			quantity_value = posted_new_quantities[index] if index < len(posted_new_quantities) else '1'
+			quantity = max(_parse_non_negative_quantity(quantity_value, 1), 1)
+			if not presentacion_id:
+				if quantity_value:
+					additional_item_rows.append({'presentacion_id': '', 'cantidad': quantity})
+				continue
+			additional_items.append({'presentacion_id': int(presentacion_id), 'cantidad': quantity})
+			additional_item_rows.append({'presentacion_id': presentacion_id, 'cantidad': quantity})
+
 		stock_evaluation = evaluar_stock_fisico_verificacion_picking(
 			pedido_items=list(pedido.items.all()),
 			cantidades_reales=cantidades_reales,
 		)
 		form_has_stock_shortage = any(item_result['has_shortage'] for item_result in stock_evaluation.values())
-		posted_quantities = cantidades_reales.copy()
+		posted_quantities = {item_id: value for item_id, value in cantidades_reales.items() if isinstance(item_id, int)}
 		nota = request.POST.get('nota_seleccionador')
 		nota_resuelta = request.POST.get('nota_seleccionador_resuelta') == 'on' and not form_has_stock_shortage
 		form_note = nota
@@ -457,6 +505,8 @@ def selector_picking_detail(request, pedido_id):
 				cantidades_reales=cantidades_reales,
 				nota=nota,
 				nota_resuelta=nota_resuelta,
+				presentacion_updates=posted_presentations,
+				additional_items=additional_items,
 			)
 		except (PermissionDenied, ValidationError) as exc:
 			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
@@ -471,9 +521,11 @@ def selector_picking_detail(request, pedido_id):
 		'pedido': pedido,
 		'pedido_estado_label': _pedido_state_label(pedido.estado),
 		'pedido_lock_preview': form_has_stock_shortage or pedido.picking_bloqueado,
-		'item_rows': _build_selector_item_rows(pedido, posted_quantities),
+		'item_rows': _build_selector_item_rows(pedido, posted_quantities, posted_presentations),
 		'form_note': form_note,
 		'form_note_resolved': form_note_resolved,
 		'form_has_stock_shortage': form_has_stock_shortage,
+		'additional_item_rows': additional_item_rows,
+		'available_presentations': Presentacion.objects.select_related('producto', 'stock_operativo').filter(producto__activo=True).order_by('producto__nombre', 'nombre'),
 	}
 	return render(request, 'backoffice/selector_picking_detail.html', context)

@@ -54,7 +54,8 @@
               <tr>
                 <th>{% trans "Product" %}</th>
                 <th>{% trans "Presentation" %}</th>
-                <th>{% trans "Qty." %}</th>
+                <th>QTY ORD</th>
+                <th>QTY DSP</th>
               </tr>
             </thead>
             <tbody>
@@ -62,6 +63,7 @@
               <tr>
                 <td>{{ item.producto_nombre }}</td>
                 <td>{{ item.presentacion_nombre }}</td>
+                <td>{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
                 <td>{{ item.cantidad_facturada }}</td>
               </tr>
               {% endfor %}
@@ -138,25 +140,42 @@
               </select>
             </div>
             <div class="col-md-4">
+              <label class="form-label fw-semibold">{% trans "Adjustment mode" %}</label>
+              <select name="driver_note_tipo_ajuste" id="driverAdjustmentType" class="form-select">
+                <option value="FINANCIERO" data-credit-label="{% trans 'Financial amount' %}" data-debit-label="{% trans 'Amount to charge' %}">{% trans "Financial amount" %}</option>
+                <option value="PRODUCTO" data-credit-label="{% trans 'Product return / item lines' %}" data-debit-label="{% trans 'Product to charge' %}">{% trans "Product return / item lines" %}</option>
+              </select>
+            </div>
+            <div class="col-md-4" id="driverReasonWrapper">
               <label class="form-label fw-semibold">{% trans "Reason" %}</label>
-              <select name="driver_note_motivo" class="form-select">
+              <select name="driver_note_motivo" id="driverReasonSelect" class="form-select">
                 <option value="">{% trans "Select..." %}</option>
-                <option value="DAMAGE">{% trans "Damage" %}</option>
-                <option value="DEFECT">{% trans "Defect" %}</option>
+                <option value="DAMAGE">{% trans "Physical damage / transport" %}</option>
+                <option value="DEFECT">{% trans "Factory defect / quality issue" %}</option>
                 <option value="MISSING_ITEM">{% trans "Missing item" %}</option>
+                <option value="OTHER">{% trans "Other" %}</option>
               </select>
             </div>
             <div class="col-md-4 driver-credit-type d-none">
               <label class="form-label fw-semibold">{% trans "Credit type" %}</label>
-              <select name="driver_note_tipo_credito" class="form-select">
-                <option value="">{% trans "Only required for credit notes" %}</option>
+              <select name="driver_note_tipo_credito" id="driverNoteCreditType" class="form-select" disabled>
+                <option value="">{% trans "Select" %}</option>
                 <option value="CREDIT_DUMP">{% trans "Credit Dump" %}</option>
                 <option value="CREDIT_RETURN">{% trans "Credit Return" %}</option>
               </select>
             </div>
             <div class="col-12">
-              <label class="form-label fw-semibold">{% trans "Description" %}</label>
+              <label class="form-label fw-semibold" id="driverDescriptionLabel" data-credit-label="{% trans 'Description' %}" data-debit-label="{% trans 'Charge description' %}">{% trans "Description" %}</label>
               <textarea name="driver_note_descripcion" class="form-control" rows="2"></textarea>
+              <div class="form-text" id="driverDescriptionHelp" data-credit-help="{% trans 'Use this field for the manual comment, especially when the reason is Other.' %}" data-debit-help="{% trans 'Use this field to clearly explain what will be charged to the customer.' %}">{% trans "Use this field for the manual comment, especially when the reason is Other." %}</div>
+            </div>
+            <div class="col-md-4" id="driverFinancialAmountWrapper">
+              <label class="form-label fw-semibold">{% trans "Amount" %}</label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input type="number" min="0" step="0.01" name="driver_note_monto" class="form-control">
+              </div>
+              <div class="form-text">{% trans "Use this for debit or credit amounts that are not tied to returned invoice lines." %}</div>
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
@@ -177,25 +196,49 @@
               <div class="form-text">{% trans "Optional photos that support the credit or debit note created during delivery." %}</div>
             </div>
             <div class="col-12">
+              <div class="alert alert-secondary small mb-0">
+                {% trans "Financial notes use the amount field. Product notes use invoice lines and approved credit returns will restock inventory." %}
+              </div>
+            </div>
+            <div class="col-12" id="driverProductLinesWrapper">
               <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
                   <thead>
                     <tr>
-                      <th>{% trans "Product" %}</th>
-                      <th>{% trans "Presentation" %}</th>
+                      <th>{% trans "Line" %}</th>
+                      <th>{% trans "Requested qty." %}</th>
                       <th>{% trans "Invoiced qty." %}</th>
-                      <th>{% trans "Note qty." %}</th>
-                      <th>{% trans "Unit amount" %}</th>
+                      <th>{% trans "Boxes / pallets" %}</th>
+                      <th>{% trans "Partial content" %}</th>
+                      <th>{% trans "Calculated amount" %}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {% for item in invoice.items.all %}
                     <tr>
-                      <td>{{ item.producto_nombre }}</td>
-                      <td>{{ item.presentacion_nombre }}</td>
+                      <td>
+                        {{ item.producto_nombre }}
+                        <div class="small text-muted">{{ item.presentacion_nombre }}</div>
+                      </td>
+                      <td>{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
                       <td>{{ item.cantidad_facturada }}</td>
-                      <td><input type="number" min="0" max="{{ item.cantidad_facturada }}" name="driver_note_qty_{{ item.id }}" class="form-control form-control-sm" value="0"></td>
-                      <td><input type="number" min="0" step="0.01" name="driver_note_amount_{{ item.id }}" class="form-control form-control-sm" placeholder="{{ item.precio_unitario }}"></td>
+                      <td>
+                        <label class="form-label small text-muted mb-1">{{ item.presentacion_nombre }}</label>
+                        <input type="number" min="0" max="{{ item.cantidad_facturada }}" name="driver_note_qty_{{ item.id }}" class="form-control form-control-sm js-driver-adjustment-package-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="driver_note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades|default:1 }}">
+                      </td>
+                      <td>
+                        {% if item.presentacion and item.presentacion.unidades > 1 %}
+                        <label class="form-label small text-muted mb-1">{{ item.presentacion.tipo_contenido_traducido|capfirst }}</label>
+                        <input type="number" min="0" name="driver_note_unit_qty_{{ item.id }}" class="form-control form-control-sm js-driver-adjustment-unit-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="driver_note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades }}">
+                        <div class="small text-muted">1 {{ item.presentacion_nombre|lower }} = {{ item.presentacion.unidades }} {{ item.presentacion.tipo_contenido_traducido|lower }}</div>
+                        {% else %}
+                        <span class="text-muted">-</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        <input type="number" min="0" step="0.01" name="driver_note_amount_{{ item.id }}" id="driver_note_amount_{{ item.id }}" class="form-control form-control-sm js-driver-adjustment-amount" placeholder="0.00" inputmode="decimal">
+                        <div class="small text-muted">{% trans "Calculated automatically from the quantities you enter." %}</div>
+                      </td>
                     </tr>
                     {% endfor %}
                   </tbody>
@@ -336,25 +379,42 @@
           </select>
         </div>
         <div class="col-md-4">
+          <label class="form-label fw-semibold">{% trans "Adjustment mode" %}</label>
+          <select name="driver_note_tipo_ajuste" id="driverAdjustmentTypePostDelivery" class="form-select">
+            <option value="FINANCIERO" data-credit-label="{% trans 'Financial amount' %}" data-debit-label="{% trans 'Amount to charge' %}">{% trans "Financial amount" %}</option>
+            <option value="PRODUCTO" data-credit-label="{% trans 'Product return / item lines' %}" data-debit-label="{% trans 'Product to charge' %}">{% trans "Product return / item lines" %}</option>
+          </select>
+        </div>
+        <div class="col-md-4" id="driverReasonWrapperPostDelivery">
           <label class="form-label fw-semibold">{% trans "Reason" %}</label>
-          <select name="driver_note_motivo" class="form-select">
+          <select name="driver_note_motivo" id="driverReasonSelectPostDelivery" class="form-select">
             <option value="">{% trans "Select..." %}</option>
-            <option value="DAMAGE">{% trans "Damage" %}</option>
-            <option value="DEFECT">{% trans "Defect" %}</option>
+            <option value="DAMAGE">{% trans "Physical damage / transport" %}</option>
+            <option value="DEFECT">{% trans "Factory defect / quality issue" %}</option>
             <option value="MISSING_ITEM">{% trans "Missing item" %}</option>
+            <option value="OTHER">{% trans "Other" %}</option>
           </select>
         </div>
         <div class="col-md-4 driver-credit-type-post d-none">
           <label class="form-label fw-semibold">{% trans "Credit type" %}</label>
-          <select name="driver_note_tipo_credito" class="form-select">
-            <option value="">{% trans "Only required for credit notes" %}</option>
+          <select name="driver_note_tipo_credito" id="driverNoteCreditTypePostDelivery" class="form-select" disabled>
+            <option value="">{% trans "Select" %}</option>
             <option value="CREDIT_DUMP">{% trans "Credit Dump" %}</option>
             <option value="CREDIT_RETURN">{% trans "Credit Return" %}</option>
           </select>
         </div>
         <div class="col-12">
-          <label class="form-label fw-semibold">{% trans "Description" %}</label>
+          <label class="form-label fw-semibold" id="driverDescriptionLabelPostDelivery" data-credit-label="{% trans 'Description' %}" data-debit-label="{% trans 'Charge description' %}">{% trans "Description" %}</label>
           <textarea name="driver_note_descripcion" class="form-control" rows="2"></textarea>
+          <div class="form-text" id="driverDescriptionHelpPostDelivery" data-credit-help="{% trans 'Use this field for the manual comment, especially when the reason is Other.' %}" data-debit-help="{% trans 'Use this field to clearly explain what will be charged to the customer.' %}">{% trans "Use this field for the manual comment, especially when the reason is Other." %}</div>
+        </div>
+        <div class="col-md-4" id="driverFinancialAmountWrapperPostDelivery">
+          <label class="form-label fw-semibold">{% trans "Amount" %}</label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input type="number" min="0" step="0.01" name="driver_note_monto" class="form-control">
+          </div>
+          <div class="form-text">{% trans "Use this for debit or credit amounts that are not tied to returned invoice lines." %}</div>
         </div>
         <div class="col-12">
           <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
@@ -375,25 +435,49 @@
           <div class="form-text">{% trans "Optional photos that support the credit or debit note created during delivery." %}</div>
         </div>
         <div class="col-12">
+          <div class="alert alert-secondary small mb-0">
+            {% trans "Financial notes use the amount field. Product notes use invoice lines and approved credit returns will restock inventory." %}
+          </div>
+        </div>
+        <div class="col-12" id="driverProductLinesWrapperPostDelivery">
           <div class="table-responsive">
             <table class="table table-sm align-middle mb-0">
               <thead>
                 <tr>
-                  <th>{% trans "Product" %}</th>
-                  <th>{% trans "Presentation" %}</th>
+                  <th>{% trans "Line" %}</th>
+                  <th>{% trans "Requested qty." %}</th>
                   <th>{% trans "Invoiced qty." %}</th>
-                  <th>{% trans "Note qty." %}</th>
-                  <th>{% trans "Unit amount" %}</th>
+                  <th>{% trans "Boxes / pallets" %}</th>
+                  <th>{% trans "Partial content" %}</th>
+                  <th>{% trans "Calculated amount" %}</th>
                 </tr>
               </thead>
               <tbody>
                 {% for item in invoice.items.all %}
                 <tr>
-                  <td>{{ item.producto_nombre }}</td>
-                  <td>{{ item.presentacion_nombre }}</td>
+                  <td>
+                    {{ item.producto_nombre }}
+                    <div class="small text-muted">{{ item.presentacion_nombre }}</div>
+                  </td>
+                  <td>{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
                   <td>{{ item.cantidad_facturada }}</td>
-                  <td><input type="number" min="0" max="{{ item.cantidad_facturada }}" name="driver_note_qty_{{ item.id }}" class="form-control form-control-sm" value="0"></td>
-                  <td><input type="number" min="0" step="0.01" name="driver_note_amount_{{ item.id }}" class="form-control form-control-sm" placeholder="{{ item.precio_unitario }}"></td>
+                  <td>
+                    <label class="form-label small text-muted mb-1">{{ item.presentacion_nombre }}</label>
+                    <input type="number" min="0" max="{{ item.cantidad_facturada }}" name="driver_note_qty_{{ item.id }}" class="form-control form-control-sm js-driver-adjustment-package-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="driver_note_amount_post_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades|default:1 }}">
+                  </td>
+                  <td>
+                    {% if item.presentacion and item.presentacion.unidades > 1 %}
+                    <label class="form-label small text-muted mb-1">{{ item.presentacion.tipo_contenido_traducido|capfirst }}</label>
+                    <input type="number" min="0" name="driver_note_unit_qty_{{ item.id }}" class="form-control form-control-sm js-driver-adjustment-unit-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="driver_note_amount_post_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades }}">
+                    <div class="small text-muted">1 {{ item.presentacion_nombre|lower }} = {{ item.presentacion.unidades }} {{ item.presentacion.tipo_contenido_traducido|lower }}</div>
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <input type="number" min="0" step="0.01" name="driver_note_amount_{{ item.id }}" id="driver_note_amount_post_{{ item.id }}" class="form-control form-control-sm js-driver-adjustment-amount" placeholder="0.00" inputmode="decimal">
+                    <div class="small text-muted">{% trans "Calculated automatically from the quantities you enter." %}</div>
+                  </td>
                 </tr>
                 {% endfor %}
               </tbody>
@@ -495,11 +579,33 @@
     const paymentMethod = document.getElementById('paymentMethod');
     const driverNoteType = document.getElementById('driverNoteType');
     const driverNoteTypePostDelivery = document.getElementById('driverNoteTypePostDelivery');
+    const driverAdjustmentType = document.getElementById('driverAdjustmentType');
+    const driverAdjustmentTypePostDelivery = document.getElementById('driverAdjustmentTypePostDelivery');
+    const driverAdjustmentTypeOptions = driverAdjustmentType ? Array.from(driverAdjustmentType.options) : [];
+    const driverAdjustmentTypePostOptions = driverAdjustmentTypePostDelivery ? Array.from(driverAdjustmentTypePostDelivery.options) : [];
     const paidFields = document.querySelectorAll('.paid-only');
     const unpaidFields = document.querySelectorAll('.unpaid-only');
     const methodFields = document.querySelectorAll('.method-field');
     const creditTypeFields = document.querySelectorAll('.driver-credit-type');
     const creditTypePostFields = document.querySelectorAll('.driver-credit-type-post');
+    const driverCreditType = document.getElementById('driverNoteCreditType');
+    const driverCreditTypePostDelivery = document.getElementById('driverNoteCreditTypePostDelivery');
+    const driverCreditDumpOption = driverCreditType ? driverCreditType.querySelector('option[value="CREDIT_DUMP"]') : null;
+    const driverCreditReturnOption = driverCreditType ? driverCreditType.querySelector('option[value="CREDIT_RETURN"]') : null;
+    const driverCreditDumpOptionPostDelivery = driverCreditTypePostDelivery ? driverCreditTypePostDelivery.querySelector('option[value="CREDIT_DUMP"]') : null;
+    const driverCreditReturnOptionPostDelivery = driverCreditTypePostDelivery ? driverCreditTypePostDelivery.querySelector('option[value="CREDIT_RETURN"]') : null;
+    const driverFinancialAmountWrapper = document.getElementById('driverFinancialAmountWrapper');
+    const driverFinancialAmountWrapperPostDelivery = document.getElementById('driverFinancialAmountWrapperPostDelivery');
+    const driverProductLinesWrapper = document.getElementById('driverProductLinesWrapper');
+    const driverProductLinesWrapperPostDelivery = document.getElementById('driverProductLinesWrapperPostDelivery');
+    const driverReasonWrapper = document.getElementById('driverReasonWrapper');
+    const driverReasonSelect = document.getElementById('driverReasonSelect');
+    const driverReasonWrapperPostDelivery = document.getElementById('driverReasonWrapperPostDelivery');
+    const driverReasonSelectPostDelivery = document.getElementById('driverReasonSelectPostDelivery');
+    const driverDescriptionLabel = document.getElementById('driverDescriptionLabel');
+    const driverDescriptionHelp = document.getElementById('driverDescriptionHelp');
+    const driverDescriptionLabelPostDelivery = document.getElementById('driverDescriptionLabelPostDelivery');
+    const driverDescriptionHelpPostDelivery = document.getElementById('driverDescriptionHelpPostDelivery');
     const canvas = document.getElementById('signatureCanvas');
     const signatureInput = document.getElementById('signatureData');
     const clearSignature = document.getElementById('clearSignature');
@@ -713,11 +819,144 @@
     function toggleDriverNoteFields() {
       const isCredit = driverNoteType && driverNoteType.value === 'CREDITO';
       creditTypeFields.forEach((element) => element.classList.toggle('d-none', !isCredit));
+      if (driverCreditType) {
+        driverCreditType.disabled = !isCredit;
+        if (!isCredit) {
+          driverCreditType.value = '';
+        }
+      }
+      toggleDriverAdjustmentMode();
     }
 
     function toggleDriverNotePostFields() {
       const isCredit = driverNoteTypePostDelivery && driverNoteTypePostDelivery.value === 'CREDITO';
       creditTypePostFields.forEach((element) => element.classList.toggle('d-none', !isCredit));
+      if (driverCreditTypePostDelivery) {
+        driverCreditTypePostDelivery.disabled = !isCredit;
+        if (!isCredit) {
+          driverCreditTypePostDelivery.value = '';
+        }
+      }
+      toggleDriverAdjustmentModePostDelivery();
+    }
+
+    function syncDriverCreditTypeOptions(adjustmentSelect, creditSelect, dumpOption, returnOption) {
+      if (!creditSelect) {
+        return;
+      }
+      const isCredit = !creditSelect.disabled;
+      const isProduct = !adjustmentSelect || adjustmentSelect.value === 'PRODUCTO';
+      if (dumpOption) {
+        dumpOption.disabled = isProduct;
+      }
+      if (returnOption) {
+        returnOption.disabled = !isProduct;
+      }
+      if (!isCredit) {
+        creditSelect.value = '';
+        return;
+      }
+      if (isProduct) {
+        if (creditSelect.value !== 'CREDIT_RETURN') {
+          creditSelect.value = 'CREDIT_RETURN';
+        }
+      } else if (creditSelect.value !== 'CREDIT_DUMP') {
+        creditSelect.value = 'CREDIT_DUMP';
+      }
+    }
+
+    function setAdjustmentInputState(wrapper, enabled) {
+      if (!wrapper) {
+        return;
+      }
+      wrapper.classList.toggle('d-none', !enabled);
+      wrapper.querySelectorAll('input, select, textarea').forEach((field) => {
+        field.disabled = !enabled;
+        if (!enabled && field.type !== 'hidden') {
+          if (field.tagName === 'SELECT') {
+            field.selectedIndex = 0;
+          } else if (field.classList.contains('js-driver-adjustment-package-qty') || field.classList.contains('js-driver-adjustment-unit-qty')) {
+            field.value = '0';
+          } else {
+            field.value = '';
+          }
+        }
+      });
+    }
+
+    function toggleDriverAdjustmentMode() {
+      const isProduct = !driverAdjustmentType || driverAdjustmentType.value === 'PRODUCTO';
+      const isDebit = driverNoteType && driverNoteType.value === 'DEBITO';
+      setAdjustmentInputState(driverProductLinesWrapper, isProduct);
+      setAdjustmentInputState(driverFinancialAmountWrapper, !isProduct);
+      syncDriverCreditTypeOptions(driverAdjustmentType, driverCreditType, driverCreditDumpOption, driverCreditReturnOption);
+      driverAdjustmentTypeOptions.forEach((option) => {
+        const nextLabel = isDebit ? option.dataset.debitLabel : option.dataset.creditLabel;
+        if (nextLabel) {
+          option.textContent = nextLabel;
+        }
+      });
+      if (driverReasonWrapper && driverReasonSelect) {
+        driverReasonWrapper.classList.toggle('d-none', isDebit);
+        if (isDebit) {
+          driverReasonSelect.value = 'OTHER';
+        }
+      }
+      if (driverDescriptionLabel) {
+        driverDescriptionLabel.textContent = isDebit ? driverDescriptionLabel.dataset.debitLabel : driverDescriptionLabel.dataset.creditLabel;
+      }
+      if (driverDescriptionHelp) {
+        driverDescriptionHelp.textContent = isDebit ? driverDescriptionHelp.dataset.debitHelp : driverDescriptionHelp.dataset.creditHelp;
+      }
+      recalculateDriverAdjustmentAmounts();
+    }
+
+    function toggleDriverAdjustmentModePostDelivery() {
+      const isProduct = !driverAdjustmentTypePostDelivery || driverAdjustmentTypePostDelivery.value === 'PRODUCTO';
+      const isDebit = driverNoteTypePostDelivery && driverNoteTypePostDelivery.value === 'DEBITO';
+      setAdjustmentInputState(driverProductLinesWrapperPostDelivery, isProduct);
+      setAdjustmentInputState(driverFinancialAmountWrapperPostDelivery, !isProduct);
+      syncDriverCreditTypeOptions(driverAdjustmentTypePostDelivery, driverCreditTypePostDelivery, driverCreditDumpOptionPostDelivery, driverCreditReturnOptionPostDelivery);
+      driverAdjustmentTypePostOptions.forEach((option) => {
+        const nextLabel = isDebit ? option.dataset.debitLabel : option.dataset.creditLabel;
+        if (nextLabel) {
+          option.textContent = nextLabel;
+        }
+      });
+      if (driverReasonWrapperPostDelivery && driverReasonSelectPostDelivery) {
+        driverReasonWrapperPostDelivery.classList.toggle('d-none', isDebit);
+        if (isDebit) {
+          driverReasonSelectPostDelivery.value = 'OTHER';
+        }
+      }
+      if (driverDescriptionLabelPostDelivery) {
+        driverDescriptionLabelPostDelivery.textContent = isDebit ? driverDescriptionLabelPostDelivery.dataset.debitLabel : driverDescriptionLabelPostDelivery.dataset.creditLabel;
+      }
+      if (driverDescriptionHelpPostDelivery) {
+        driverDescriptionHelpPostDelivery.textContent = isDebit ? driverDescriptionHelpPostDelivery.dataset.debitHelp : driverDescriptionHelpPostDelivery.dataset.creditHelp;
+      }
+      recalculateDriverAdjustmentAmounts();
+    }
+
+    function recalculateDriverAdjustmentAmounts() {
+      document.querySelectorAll('.js-driver-adjustment-amount').forEach((amountInput) => {
+        if (amountInput.disabled) {
+          amountInput.value = '';
+          return;
+        }
+        const lineId = amountInput.id;
+        const packageInput = document.querySelector(`.js-driver-adjustment-package-qty[data-amount-target="${lineId}"]`);
+        if (!packageInput || packageInput.disabled) {
+          return;
+        }
+        const unitInput = document.querySelector(`.js-driver-adjustment-unit-qty[data-amount-target="${lineId}"]`);
+        const packagePrice = Number(packageInput.dataset.packagePrice || '0');
+        const unitsPerPackage = Math.max(Number(packageInput.dataset.unitsPerPackage || '1'), 1);
+        const packageQty = Number(packageInput.value || '0');
+        const unitQty = unitInput && !unitInput.disabled ? Number(unitInput.value || '0') : 0;
+        const total = (packageQty * packagePrice) + ((packagePrice / unitsPerPackage) * unitQty);
+        amountInput.value = total > 0 ? total.toFixed(2) : '';
+      });
     }
 
     if (paymentStatus) {
@@ -728,13 +967,26 @@
     }
     if (driverNoteType) {
       driverNoteType.addEventListener('change', toggleDriverNoteFields);
+      driverNoteType.addEventListener('change', toggleDriverAdjustmentMode);
     }
     if (driverNoteTypePostDelivery) {
       driverNoteTypePostDelivery.addEventListener('change', toggleDriverNotePostFields);
+      driverNoteTypePostDelivery.addEventListener('change', toggleDriverAdjustmentModePostDelivery);
     }
+    if (driverAdjustmentType) {
+      driverAdjustmentType.addEventListener('change', toggleDriverAdjustmentMode);
+    }
+    if (driverAdjustmentTypePostDelivery) {
+      driverAdjustmentTypePostDelivery.addEventListener('change', toggleDriverAdjustmentModePostDelivery);
+    }
+    document.querySelectorAll('.js-driver-adjustment-package-qty, .js-driver-adjustment-unit-qty').forEach((field) => {
+      field.addEventListener('input', recalculateDriverAdjustmentAmounts);
+    });
     togglePaymentSections();
     toggleDriverNoteFields();
     toggleDriverNotePostFields();
+    toggleDriverAdjustmentMode();
+    toggleDriverAdjustmentModePostDelivery();
 
     if (!canvas || !signatureInput || !clearSignature) {
       return;

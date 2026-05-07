@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Case, IntegerField, Value, When
+from django.db.models import Case, Count, IntegerField, Q, Value, When
 from django.http import HttpResponse, JsonResponse
 from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -14,10 +14,12 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 from reportlab.graphics.barcode import code128
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import landscape, letter
+from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from config.clientes.models import Cliente
+from config.productos.models import Presentacion
 from config.core.pdf_branding import (
 	BRAND_BORDER,
 	BRAND_MUTED_TEXT,
@@ -25,7 +27,7 @@ from config.core.pdf_branding import (
 	BRAND_SOFT_BLUE,
 	BRAND_SURFACE,
 	BRAND_TEXT,
-	build_pdf_brand_banner,
+	build_pdf_logo_image,
 )
 from config.notificaciones.models import Notificacion
 from config.pedidos.models import Pedido
@@ -34,10 +36,12 @@ from config.usuarios.permissions import internal_permission_required
 
 from .models import Delivery, DeliveryEvidencePhoto, Invoice, NotaAjuste, NotaAjusteEvidencePhoto
 from .services import (
+	DEFAULT_SUGGESTED_PROFIT_PERCENTAGE,
 	aprobar_nota_ajuste,
 	anular_nota_ajuste,
 	build_google_maps_route_url,
 	complete_driver_delivery,
+	crear_nota_ajuste,
 	crear_nota_ajuste_desde_invoice,
 	ensure_delivery_for_invoice,
 	generar_invoice_desde_picking,
@@ -108,6 +112,17 @@ def _resolve_invoice_suggested_unit_price(item):
 	return (suggested_case_price / Decimal(str(presentacion.unidades))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
+def _is_invoice_suggested_price_default(item, suggested_unit_price):
+	try:
+		default_unit_price = resolve_presentacion_suggested_unit_price(
+			presentacion=item.presentacion,
+			base_case_price=item.precio_unitario,
+		)
+	except Exception:
+		return False
+	return Decimal(str(suggested_unit_price or '0')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) == default_unit_price
+
+
 def _parse_invoice_suggested_unit_price(value):
 	text = str(value or '').strip().replace(',', '.')
 	if not text:
@@ -130,38 +145,97 @@ def _extract_invoice_suggested_unit_prices(pedido, post_data):
 	return suggested_prices
 
 
+def _parse_adjustment_amount(value):
+	text = str(value or '').strip().replace(',', '.')
+	if not text:
+		return Decimal('0.00')
+	try:
+		parsed = Decimal(text)
+	except (InvalidOperation, TypeError, ValueError):
+		raise ValidationError(_('Amounts must be valid numbers.'))
+	if parsed < 0:
+		raise ValidationError(_('Amounts cannot be negative.'))
+	return parsed.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def _parse_customer_credit_to_apply(cliente, post_data):
+	use_credit = str(post_data.get('use_customer_credit') or '').strip().lower() in {'1', 'true', 'on', 'yes'}
+	if not use_credit:
+		return Decimal('0.00')
+	requested_credit = _parse_adjustment_amount(post_data.get('customer_credit_to_apply'))
+	available_credit = getattr(cliente, 'available_credit', Decimal('0.00'))
+	if requested_credit > available_credit:
+		raise ValidationError(_('The requested customer credit exceeds the customer available balance.'))
+	return requested_credit
+
+
 def _extract_adjustment_note_request(invoice, post_data, *, field_prefix=''):
+	tipo_ajuste = (post_data.get(f'{field_prefix}tipo_ajuste') or 'PRODUCTO').strip().upper()
 	tipo_documento = (post_data.get(f'{field_prefix}tipo_documento') or '').strip()
 	motivo = (post_data.get(f'{field_prefix}motivo') or '').strip()
 	tipo_credito = (post_data.get(f'{field_prefix}tipo_credito') or '').strip()
 	descripcion = (post_data.get(f'{field_prefix}descripcion') or '').strip()
+	monto = _parse_adjustment_amount(post_data.get(f'{field_prefix}monto'))
 	items_payload = []
 	has_item_data = False
 
-	for item in invoice.items.all():
-		quantity_value = post_data.get(f'{field_prefix}qty_{item.id}')
-		amount_value = post_data.get(f'{field_prefix}amount_{item.id}')
-		quantity = _parse_non_negative_quantity(quantity_value)
-		amount_text = str(amount_value or '').strip()
-		if quantity > 0 or amount_text:
-			has_item_data = True
-		items_payload.append({
-			'invoice_item': item,
-			'cantidad': quantity,
-			'monto_unitario': amount_value,
-		})
+	if tipo_ajuste not in {'PRODUCTO', 'FINANCIERO'}:
+		raise ValidationError(_('Select a valid adjustment type.'))
 
-	has_note_request = bool(tipo_documento or motivo or tipo_credito or descripcion or has_item_data)
+	if invoice is not None:
+		for item in invoice.items.all():
+			quantity_value = post_data.get(f'{field_prefix}qty_{item.id}')
+			unit_quantity_value = post_data.get(f'{field_prefix}unit_qty_{item.id}')
+			amount_value = post_data.get(f'{field_prefix}amount_{item.id}')
+			quantity = _parse_non_negative_quantity(quantity_value)
+			unit_quantity = _parse_non_negative_quantity(unit_quantity_value)
+			amount_text = str(amount_value or '').strip()
+			if quantity > 0 or unit_quantity > 0 or amount_text:
+				has_item_data = True
+			items_payload.append({
+				'invoice_item': item,
+				'cantidad': quantity,
+				'cantidad_unidades': unit_quantity,
+				'monto_unitario': amount_value,
+			})
+	else:
+		for presentation_id, quantity_value, unit_quantity_value, amount_value, description in zip(
+			post_data.getlist(f'{field_prefix}manual_presentacion'),
+			post_data.getlist(f'{field_prefix}manual_qty'),
+			post_data.getlist(f'{field_prefix}manual_unit_qty'),
+			post_data.getlist(f'{field_prefix}manual_amount'),
+			post_data.getlist(f'{field_prefix}manual_description'),
+		):
+			quantity = _parse_non_negative_quantity(quantity_value)
+			unit_quantity = _parse_non_negative_quantity(unit_quantity_value)
+			amount_text = str(amount_value or '').strip()
+			presentation = None
+			if presentation_id:
+				presentation = get_object_or_404(Presentacion.objects.select_related('producto'), id=presentation_id)
+			if quantity > 0 or unit_quantity > 0 or amount_text or presentation is not None or str(description or '').strip():
+				has_item_data = True
+			items_payload.append({
+				'invoice_item': None,
+				'presentacion': presentation,
+				'descripcion': (description or '').strip(),
+				'cantidad': quantity,
+				'cantidad_unidades': unit_quantity,
+				'monto_unitario': amount_value,
+			})
+
+	has_note_request = bool(tipo_documento or motivo or tipo_credito or descripcion or has_item_data or monto > 0)
 	if not has_note_request:
 		return None
 	if not tipo_documento:
 		raise ValidationError(_('Select a note type to save the adjustment.'))
 
 	return {
+		'tipo_ajuste': tipo_ajuste,
 		'tipo_documento': tipo_documento,
 		'motivo': motivo,
 		'tipo_credito': tipo_credito,
 		'descripcion': descripcion,
+		'monto': monto,
 		'items_payload': items_payload,
 	}
 
@@ -169,6 +243,53 @@ def _extract_adjustment_note_request(invoice, post_data, *, field_prefix=''):
 def _save_adjustment_note_evidence_files(nota, uploaded_files):
 	for uploaded_file in uploaded_files:
 		NotaAjusteEvidencePhoto.objects.create(nota=nota, image=uploaded_file)
+
+
+def _build_note_product_presentations(selected_client):
+	price_tier = 1
+	if selected_client is not None and int(selected_client.nivel_precio or 0) > 0:
+		price_tier = int(selected_client.nivel_precio)
+	presentations = list(Presentacion.objects.select_related('producto').order_by('producto__nombre', 'nombre'))
+	for presentation in presentations:
+		default_amount = presentation.get_price_for_tier(price_tier) or presentation.precio_1
+		presentation.note_default_amount = default_amount
+	return presentations
+
+
+def _build_adjustment_note_creation_context(*, selected_client_id=None, selected_invoice_id=None):
+	customers = Cliente.objects.order_by('nombre_empresa')
+	invoice_queryset = Invoice.objects.select_related('cliente', 'pedido', 'driver').prefetch_related('items__presentacion__producto').filter(estado='GENERADA').order_by('-creada_en')
+
+	selected_invoice = None
+	selected_client = None
+	available_invoices = Invoice.objects.none()
+	customer_general_notes = NotaAjuste.objects.none()
+
+	if selected_invoice_id:
+		selected_invoice = get_object_or_404(invoice_queryset, id=selected_invoice_id)
+		selected_client = selected_invoice.cliente
+		available_invoices = invoice_queryset.filter(cliente=selected_client)
+	elif selected_client_id:
+		selected_client = get_object_or_404(customers, id=selected_client_id)
+		available_invoices = invoice_queryset.filter(cliente=selected_client)
+
+	if selected_client is not None:
+		customer_general_notes = (
+			NotaAjuste.objects
+			.select_related('creada_por', 'aprobada_por')
+			.prefetch_related('evidence_photos', 'items__presentacion__producto')
+			.filter(cliente=selected_client, invoice__isnull=True)
+			.order_by('-creada_en')
+		)
+
+	return {
+		'customers': customers,
+		'available_invoices': available_invoices,
+		'customer_general_notes': customer_general_notes,
+		'product_presentations': _build_note_product_presentations(selected_client),
+		'selected_client': selected_client,
+		'selected_invoice': selected_invoice,
+	}
 
 
 def _parse_estimated_delivery_at(value):
@@ -189,13 +310,15 @@ def _build_invoice_pdf_item_data(invoice):
 		barcode = _resolve_invoice_barcode(item)
 		requested_quantity = item.cantidad_facturada
 		if item.pedido_item_id:
-			requested_quantity = item.pedido_item.cantidad_solicitada or item.cantidad_facturada
+			requested_quantity = item.pedido_item.cantidad_solicitada_documentada or item.cantidad_facturada
 		suggested_unit_price = _resolve_invoice_suggested_unit_price(item)
 		customer_unit_price = Decimal(str(item.precio_unitario or '0')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 		if item.presentacion and item.presentacion.unidades:
 			customer_unit_price = (customer_unit_price / Decimal(str(item.presentacion.unidades))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 		profit_percentage = Decimal('0.00')
-		if suggested_unit_price and customer_unit_price and suggested_unit_price > 0:
+		if _is_invoice_suggested_price_default(item, suggested_unit_price):
+			profit_percentage = DEFAULT_SUGGESTED_PROFIT_PERCENTAGE.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+		elif suggested_unit_price and customer_unit_price and suggested_unit_price > 0:
 			try:
 				profit_percentage = ((suggested_unit_price - customer_unit_price) / suggested_unit_price * Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 			except (ArithmeticError, InvalidOperation, TypeError, ValueError):
@@ -214,14 +337,87 @@ def _build_invoice_pdf_item_data(invoice):
 	return items
 
 
+INVOICE_PDF_ITEMS_PER_PAGE = 10
+
+
+def _chunk_invoice_pdf_item_rows(item_rows, size=INVOICE_PDF_ITEMS_PER_PAGE):
+	if size <= 0:
+		raise ValueError('Invoice PDF chunk size must be greater than zero.')
+	rows = list(item_rows or [])
+	if not rows:
+		return [[]]
+	return [rows[index:index + size] for index in range(0, len(rows), size)]
+
+
+def _build_invoice_pdf_compact_header(*, styles, invoice_number, generated_on, total_width):
+	logo_cell = build_pdf_logo_image(max_width=36, max_height=36)
+	if logo_cell:
+		logo_cell.hAlign = 'LEFT'
+	else:
+		logo_cell = Paragraph('<b>LTG</b>', ParagraphStyle(
+			'InvoiceCompactFallback',
+			parent=styles['BodyText'],
+			fontName='Helvetica-Bold',
+			fontSize=10,
+			leading=11,
+			textColor=colors.white,
+		))
+	text_html = (
+		f'<b>La Tortilla Grocery</b><br/>'
+		f'Invoice {invoice_number}<br/>'
+		f'Generated {generated_on}'
+	)
+	header = Table(
+		[[logo_cell, Paragraph(text_html, ParagraphStyle(
+			'InvoiceCompactHeaderText',
+			parent=styles['BodyText'],
+			fontName='Helvetica',
+			fontSize=8,
+			leading=9,
+			textColor=colors.white,
+		))]],
+		colWidths=[62, max(total_width - 62, 200)],
+	)
+	header.setStyle(TableStyle([
+		('BACKGROUND', (0, 0), (-1, -1), BRAND_PRIMARY),
+		('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+		('LEFTPADDING', (0, 0), (-1, -1), 8),
+		('RIGHTPADDING', (0, 0), (-1, -1), 8),
+		('TOPPADDING', (0, 0), (-1, -1), 5),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+	]))
+	return header
+
+
+def _build_invoice_pdf_barcode(value):
+	barcode = code128.Code128(value, barHeight=18, barWidth=0.45, humanReadable=True)
+	barcode.fontName = 'Helvetica'
+	barcode.fontSize = 5.5
+	return barcode
+
+
+def _build_invoice_pdf_totals_rows(invoice, *, meta_label_style, meta_value_style, section_title_style, body_style):
+	return [
+		[Paragraph(_('Subtotal'), meta_label_style), Paragraph(_format_pdf_money(invoice.subtotal), meta_value_style)],
+		[Paragraph(_('Customer credit applied'), meta_label_style), Paragraph(_format_pdf_money(invoice.credito_cliente_aplicado), meta_value_style)],
+		[Paragraph(_('Credit notes'), meta_label_style), Paragraph(_format_pdf_money(invoice.total_creditos), meta_value_style)],
+		[Paragraph(_('Debit notes'), meta_label_style), Paragraph(_format_pdf_money(invoice.total_debitos), meta_value_style)],
+		[Paragraph(_('Outstanding invoice balance'), meta_label_style), Paragraph(_format_pdf_money(invoice.saldo_cliente), meta_value_style)],
+		[Paragraph(_('Final invoice total'), section_title_style), Paragraph(f'<b>{_format_pdf_money(invoice.total_neto)}</b>', body_style)],
+	]
+
+
 def _invoice_pdf_response(invoice):
 	buffer = BytesIO()
-	document = SimpleDocTemplate(buffer, pagesize=landscape(letter), leftMargin=28, rightMargin=28, topMargin=28, bottomMargin=28)
+	document = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=24, rightMargin=24, topMargin=20, bottomMargin=20)
 	styles = getSampleStyleSheet()
-	meta_label_style = ParagraphStyle('InvoiceMetaLabel', parent=styles['BodyText'], fontName='Helvetica-Bold', fontSize=9, textColor=BRAND_MUTED_TEXT, leading=11)
-	meta_value_style = ParagraphStyle('InvoiceMetaValue', parent=styles['BodyText'], fontSize=10, leading=12, textColor=BRAND_TEXT)
-	section_title_style = ParagraphStyle('InvoiceSectionTitle', parent=styles['Heading4'], fontName='Helvetica-Bold', fontSize=10, textColor=BRAND_TEXT, spaceAfter=4)
-	note_style = ParagraphStyle('InvoiceNote', parent=styles['BodyText'], fontSize=8, textColor=BRAND_MUTED_TEXT, leading=10)
+	meta_label_style = ParagraphStyle('InvoiceMetaLabel', parent=styles['BodyText'], fontName='Helvetica-Bold', fontSize=7, textColor=BRAND_MUTED_TEXT, leading=9)
+	meta_value_style = ParagraphStyle('InvoiceMetaValue', parent=styles['BodyText'], fontSize=8, leading=10, textColor=BRAND_TEXT)
+	section_title_style = ParagraphStyle('InvoiceSectionTitle', parent=styles['Heading4'], fontName='Helvetica-Bold', fontSize=8, textColor=BRAND_TEXT, spaceAfter=3)
+	note_style = ParagraphStyle('InvoiceNote', parent=styles['BodyText'], fontSize=6.5, textColor=BRAND_MUTED_TEXT, leading=8)
+	body_style = ParagraphStyle('InvoiceBody', parent=styles['BodyText'], fontSize=7.5, leading=9, textColor=BRAND_TEXT)
+	page_width, _page_height = letter
+	content_width = page_width - document.leftMargin - document.rightMargin
 
 	sales_rep = '-'
 	if invoice.pedido.vendedor_id:
@@ -235,112 +431,136 @@ def _invoice_pdf_response(invoice):
 		invoice.cliente.pais,
 	]))
 	item_rows = _build_invoice_pdf_item_data(invoice)
+	item_chunks = _chunk_invoice_pdf_item_rows(item_rows)
+	generated_label = timezone.localtime(invoice.creada_en).strftime('%m/%d/%Y %H:%M')
 
 	content = []
 	meta_table = Table([
 		[Paragraph(_('Customer no.'), meta_label_style), Paragraph(str(invoice.cliente_id), meta_value_style), Paragraph(_('Date'), meta_label_style), Paragraph(timezone.localtime(invoice.creada_en).strftime('%m/%d/%Y'), meta_value_style)],
 		[Paragraph(_('Order no.'), meta_label_style), Paragraph(str(invoice.pedido_id), meta_value_style), Paragraph(_('Generated on'), meta_label_style), Paragraph(timezone.localtime(invoice.creada_en).strftime('%m/%d/%Y %H:%M'), meta_value_style)],
 		[Paragraph(_('Sales rep'), meta_label_style), Paragraph(sales_rep, meta_value_style), Paragraph(_('Driver'), meta_label_style), Paragraph(driver_name, meta_value_style)],
-	], colWidths=[72, 120, 78, 120])
+	], colWidths=[58, 92, 64, 92])
 	meta_table.setStyle(TableStyle([
 		('BOX', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
 		('INNERGRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
 		('BACKGROUND', (0, 0), (-1, -1), BRAND_SURFACE),
-		('LEFTPADDING', (0, 0), (-1, -1), 10),
-		('RIGHTPADDING', (0, 0), (-1, -1), 10),
-		('TOPPADDING', (0, 0), (-1, -1), 8),
-		('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+		('LEFTPADDING', (0, 0), (-1, -1), 6),
+		('RIGHTPADDING', (0, 0), (-1, -1), 6),
+		('TOPPADDING', (0, 0), (-1, -1), 5),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 5),
 	]))
 	content.extend([
-		build_pdf_brand_banner(styles=styles, title=_('Invoice'), subtitle=f'{invoice.numero}', total_width=736),
-		Spacer(1, 12),
+		_build_invoice_pdf_compact_header(styles=styles, invoice_number=invoice.numero, generated_on=generated_label, total_width=content_width),
+		Spacer(1, 8),
 		meta_table,
-		Spacer(1, 12),
+		Spacer(1, 8),
 	])
 
 	party_table = Table([
 		[
 			Paragraph(
 				f'<b>{_("Sold to")}</b><br/>{invoice.cliente.nombre_empresa}<br/>{invoice.cliente.direccion}<br/>{invoice.cliente.ciudad}, {invoice.cliente.estado} {invoice.cliente.codigo_postal or ""}<br/>{invoice.cliente.pais}',
-				styles['BodyText'],
+				body_style,
 			),
 			Paragraph(
 				f'<b>{_("Ship to")}</b><br/>{invoice.cliente.nombre_empresa}<br/>{ship_to}',
-				styles['BodyText'],
+				body_style,
 			),
 			Paragraph(
-				f'<b>{_("Terms")}</b><br/>{_("Customer balance")}: {_format_pdf_money(invoice.saldo_cliente)}<br/>{_("Delivery method")}: {invoice.get_metodo_entrega_display()}',
-				styles['BodyText'],
+				f'<b>{_("Terms")}</b><br/>{_("Outstanding invoice balance")}: {_format_pdf_money(invoice.saldo_cliente)}<br/>{_("Final invoice total")}: {_format_pdf_money(invoice.total_neto)}<br/>{_("Customer credit applied")}: {_format_pdf_money(invoice.credito_cliente_aplicado)}<br/>{_("Delivery method")}: {invoice.get_metodo_entrega_display()}',
+				body_style,
 			),
 		],
-	], colWidths=[235, 235, 220])
+	], colWidths=[180, 180, 180])
 	party_table.setStyle(TableStyle([
 		('BOX', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
 		('INNERGRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
 		('BACKGROUND', (0, 0), (-1, -1), BRAND_SURFACE),
 		('VALIGN', (0, 0), (-1, -1), 'TOP'),
-		('LEFTPADDING', (0, 0), (-1, -1), 10),
-		('RIGHTPADDING', (0, 0), (-1, -1), 10),
-		('TOPPADDING', (0, 0), (-1, -1), 8),
-		('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+		('LEFTPADDING', (0, 0), (-1, -1), 6),
+		('RIGHTPADDING', (0, 0), (-1, -1), 6),
+		('TOPPADDING', (0, 0), (-1, -1), 5),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 5),
 	]))
-	content.extend([party_table, Spacer(1, 12)])
+	content.extend([party_table, Spacer(1, 8)])
 
 	content.append(Paragraph(_('Line items with barcode, ordered quantity, dispatched quantity and abbreviated pricing references.'), note_style))
-	content.append(Spacer(1, 8))
+	content.append(Spacer(1, 6))
 
-	rows = [[_('Barcode'), _('Description'), _('U/M'), _('Qty ord'), _('Qty dsp'), _('Cust. / unit'), _('Subtotal'), _('Sug. rtl / unit'), _('Profit %')]]
-	for item in item_rows:
-		barcode_cell = Paragraph('-', styles['BodyText'])
-		if item['barcode']:
-			barcode_cell = code128.Code128(item['barcode'], barHeight=22, barWidth=0.6, humanReadable=True)
-		rows.append([
-			barcode_cell,
-			Paragraph(item['product_name'], styles['BodyText']),
-			Paragraph(item['pack_size'], styles['BodyText']),
-			item['requested_quantity'],
-			item['dispatched_quantity'],
-			item['customer_price'],
-			item['subtotal'],
-			item['suggested_unit_price'],
-			item['profit_percentage'],
-		])
+	for index, chunk in enumerate(item_chunks):
+		if index > 0:
+			content.extend([
+				PageBreak(),
+				_build_invoice_pdf_compact_header(styles=styles, invoice_number=invoice.numero, generated_on=generated_label, total_width=content_width),
+				Spacer(1, 8),
+				Paragraph(_('Continued line items.'), note_style),
+				Spacer(1, 6),
+			])
 
-	table = Table(rows, colWidths=[108, 158, 74, 48, 48, 72, 68, 84, 58], repeatRows=1)
-	table.setStyle(TableStyle([
-		('BACKGROUND', (0, 0), (-1, 0), BRAND_PRIMARY),
-		('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-		('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-		('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
-		('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, BRAND_SURFACE]),
-		('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-		('ALIGN', (3, 1), (-1, -1), 'CENTER'),
-		('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-		('TOPPADDING', (0, 0), (-1, -1), 8),
-	]))
-	content.append(table)
-	content.append(Spacer(1, 16))
+		rows = [[_('Barcode'), _('Description'), _('U/M'), _('Qty ord'), _('Qty dsp'), _('Cust. / unit'), _('Subtotal'), _('Sug. rtl / unit'), _('Profit %')]]
+		for item in chunk:
+			barcode_cell = Paragraph('-', body_style)
+			if item['barcode']:
+				barcode_cell = _build_invoice_pdf_barcode(item['barcode'])
+			rows.append([
+				barcode_cell,
+				Paragraph(item['product_name'], body_style),
+				Paragraph(item['pack_size'], body_style),
+				item['requested_quantity'],
+				item['dispatched_quantity'],
+				item['customer_price'],
+				item['subtotal'],
+				item['suggested_unit_price'],
+				item['profit_percentage'],
+			])
 
-	totals_table = Table([
-		[Paragraph(_('Subtotal'), meta_label_style), Paragraph(_format_pdf_money(invoice.subtotal), meta_value_style)],
-		[Paragraph(_('Credits'), meta_label_style), Paragraph(_format_pdf_money(invoice.total_creditos), meta_value_style)],
-		[Paragraph(_('Debits'), meta_label_style), Paragraph(_format_pdf_money(invoice.total_debitos), meta_value_style)],
-		[Paragraph(_('Customer balance'), section_title_style), Paragraph(f'<b>{_format_pdf_money(invoice.saldo_cliente)}</b>', styles['BodyText'])],
-	], colWidths=[110, 120])
+		table = Table(rows, colWidths=[74, 108, 58, 34, 34, 56, 54, 64, 40], repeatRows=1)
+		table.setStyle(TableStyle([
+			('BACKGROUND', (0, 0), (-1, 0), BRAND_PRIMARY),
+			('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+			('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+			('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+			('FONTSIZE', (0, 0), (-1, -1), 7),
+			('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+			('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, BRAND_SURFACE]),
+			('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+			('ALIGN', (3, 1), (-1, -1), 'CENTER'),
+			('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+			('TOPPADDING', (0, 0), (-1, -1), 5),
+			('VALIGN', (0, 1), (0, -1), 'TOP'),
+			('TOPPADDING', (0, 1), (0, -1), 2),
+			('BOTTOMPADDING', (0, 1), (0, -1), 8),
+			('LEFTPADDING', (0, 0), (-1, -1), 4),
+			('RIGHTPADDING', (0, 0), (-1, -1), 4),
+		]))
+		content.append(table)
+		if index == len(item_chunks) - 1:
+			content.append(Spacer(1, 12))
+
+	totals_table = Table(
+		_build_invoice_pdf_totals_rows(
+			invoice,
+			meta_label_style=meta_label_style,
+			meta_value_style=meta_value_style,
+			section_title_style=section_title_style,
+			body_style=styles['BodyText'],
+		),
+		colWidths=[92, 110],
+	)
 	totals_table.setStyle(TableStyle([
 		('BOX', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
 		('INNERGRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
 		('BACKGROUND', (0, 0), (-1, -2), BRAND_SURFACE),
 		('BACKGROUND', (0, -1), (-1, -1), BRAND_SOFT_BLUE),
-		('LEFTPADDING', (0, 0), (-1, -1), 10),
-		('RIGHTPADDING', (0, 0), (-1, -1), 10),
-		('TOPPADDING', (0, 0), (-1, -1), 7),
-		('BOTTOMPADDING', (0, 0), (-1, -1), 7),
+		('LEFTPADDING', (0, 0), (-1, -1), 6),
+		('RIGHTPADDING', (0, 0), (-1, -1), 6),
+		('TOPPADDING', (0, 0), (-1, -1), 5),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 5),
 	]))
 	content.extend([
 		Paragraph(_('Pricing note'), section_title_style),
-		Paragraph(_('Suggested retail per unit defaults to a 30%% profit suggestion over the customer unit cost. It is a reference for resale, not a mandatory selling price.'), note_style),
-		Spacer(1, 8),
+		Paragraph(_('Suggested retail per unit defaults to a 30% profit suggestion over the customer unit cost. It is a reference for resale, not a mandatory selling price.'), note_style),
+		Spacer(1, 6),
 		totals_table,
 	])
 
@@ -354,7 +574,7 @@ def _invoice_pdf_response(invoice):
 			signature_image = Image(BytesIO(signature_bytes), width=180, height=70)
 			signature_image.hAlign = 'LEFT'
 			content.extend([
-				Spacer(1, 18),
+				Spacer(1, 12),
 				Paragraph(_('Customer signature'), section_title_style),
 				Paragraph(_('Signed electronically by the customer during delivery confirmation.'), note_style),
 				Spacer(1, 6),
@@ -493,6 +713,132 @@ def backoffice_invoices_list(request):
 
 
 @login_required
+@internal_permission_required('backoffice.orders.view')
+def backoffice_adjustment_notes_list(request):
+	query = (request.GET.get('q') or '').strip()
+	selected_customer_id = (request.GET.get('cliente_id') or '').strip()
+	selected_creator_role = (request.GET.get('creada_por') or '').strip().lower()
+	selected_document_type = (request.GET.get('tipo_documento') or '').strip().upper()
+	selected_status = (request.GET.get('estado') or '').strip().upper()
+	selected_scope = (request.GET.get('scope') or '').strip().lower()
+
+	valid_creator_roles = {'backoffice', 'driver', 'admin'}
+	valid_document_types = {'CREDITO', 'DEBITO'}
+	valid_statuses = {'BORRADOR', 'APROBADA', 'ANULADA'}
+	valid_scopes = {'invoice', 'general'}
+
+	if selected_creator_role not in valid_creator_roles:
+		selected_creator_role = ''
+	if selected_document_type not in valid_document_types:
+		selected_document_type = ''
+	if selected_status not in valid_statuses:
+		selected_status = ''
+	if selected_scope not in valid_scopes:
+		selected_scope = ''
+
+	customers = Cliente.objects.order_by('nombre_empresa')
+	notes_queryset = (
+		NotaAjuste.objects
+		.select_related('cliente', 'invoice', 'creada_por', 'aprobada_por')
+		.prefetch_related('items__presentacion__producto', 'evidence_photos')
+		.annotate(
+			item_count=Count('items', distinct=True),
+			evidence_count=Count('evidence_photos', distinct=True),
+		)
+		.order_by('-creada_en')
+	)
+
+	if query:
+		notes_queryset = notes_queryset.filter(
+			Q(numero__icontains=query)
+			| Q(cliente__nombre_empresa__icontains=query)
+			| Q(invoice__numero__icontains=query)
+			| Q(descripcion__icontains=query)
+		)
+	if selected_customer_id:
+		notes_queryset = notes_queryset.filter(cliente_id=selected_customer_id)
+	if selected_creator_role:
+		notes_queryset = notes_queryset.filter(creada_por__role=selected_creator_role)
+	if selected_document_type:
+		notes_queryset = notes_queryset.filter(tipo_documento=selected_document_type)
+	if selected_status:
+		notes_queryset = notes_queryset.filter(estado=selected_status)
+	if selected_scope == 'invoice':
+		notes_queryset = notes_queryset.filter(invoice__isnull=False)
+	elif selected_scope == 'general':
+		notes_queryset = notes_queryset.filter(invoice__isnull=True)
+
+	filtered_notes = list(notes_queryset[:200])
+	summary = {
+		'total': len(filtered_notes),
+		'credits': sum(1 for note in filtered_notes if note.tipo_documento == 'CREDITO'),
+		'debits': sum(1 for note in filtered_notes if note.tipo_documento == 'DEBITO'),
+		'drafts': sum(1 for note in filtered_notes if note.estado == 'BORRADOR'),
+		'invoice_linked': sum(1 for note in filtered_notes if note.invoice_id),
+		'general': sum(1 for note in filtered_notes if not note.invoice_id),
+		'driver_created': sum(1 for note in filtered_notes if getattr(note.creada_por, 'role', '') == 'driver'),
+	}
+
+	return render(request, 'backoffice/adjustment_notes_list.html', {
+		'notes': filtered_notes,
+		'customers': customers,
+		'query': query,
+		'selected_customer_id': selected_customer_id,
+		'selected_creator_role': selected_creator_role,
+		'selected_document_type': selected_document_type,
+		'selected_status': selected_status,
+		'selected_scope': selected_scope,
+		'summary': summary,
+	})
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_adjustment_note_create(request):
+	selected_client_id = request.GET.get('cliente_id') or request.POST.get('cliente_id') or ''
+	selected_invoice_id = request.GET.get('invoice_id') or request.POST.get('invoice_id') or ''
+	context = _build_adjustment_note_creation_context(
+		selected_client_id=selected_client_id or None,
+		selected_invoice_id=selected_invoice_id or None,
+	)
+
+	if request.method == 'POST':
+		selected_client = context.get('selected_client')
+		selected_invoice = context.get('selected_invoice')
+		if selected_client is None:
+			messages.error(request, _('Select a customer before saving the adjustment note.'))
+			return render(request, 'backoffice/adjustment_note_create.html', context)
+
+		try:
+			note_request = _extract_adjustment_note_request(selected_invoice, request.POST, field_prefix='note_')
+			if note_request is None:
+				raise ValidationError(_('Add note details before saving the adjustment.'))
+			nota = crear_nota_ajuste(
+				cliente=selected_client,
+				invoice=selected_invoice,
+				tipo_ajuste=note_request['tipo_ajuste'],
+				tipo_documento=note_request['tipo_documento'],
+				motivo=note_request['motivo'],
+				tipo_credito=note_request['tipo_credito'],
+				descripcion=note_request['descripcion'],
+				usuario=request.user,
+				items_payload=note_request['items_payload'],
+				monto=note_request['monto'],
+			)
+			_save_adjustment_note_evidence_files(nota, request.FILES.getlist('note_evidence_photos'))
+		except ValidationError as exc:
+			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+			return render(request, 'backoffice/adjustment_note_create.html', context)
+
+		messages.success(request, _('Adjustment note %(note)s saved as draft.') % {'note': nota.numero})
+		if selected_invoice is not None:
+			return redirect('backoffice_invoice_detail', invoice_id=selected_invoice.id)
+		return redirect(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={selected_client.id}")
+
+	return render(request, 'backoffice/adjustment_note_create.html', context)
+
+
+@login_required
 @internal_permission_required('backoffice.orders.manage')
 def backoffice_generate_invoice(request, pedido_id):
 	pedido = get_object_or_404(Pedido.objects.select_related('cliente__usuario').prefetch_related('items__presentacion__producto'), id=pedido_id)
@@ -510,12 +856,14 @@ def backoffice_generate_invoice(request, pedido_id):
 		if metodo_entrega == 'RUTA_DRIVER':
 			estimated_delivery_at = _parse_estimated_delivery_at(request.POST.get('estimated_delivery_at'))
 		suggested_unit_prices = _extract_invoice_suggested_unit_prices(pedido, request.POST)
+		applied_customer_credit = _parse_customer_credit_to_apply(pedido.cliente, request.POST)
 		invoice = generar_invoice_desde_picking(
 			pedido=pedido,
 			metodo_entrega=metodo_entrega,
 			driver=driver,
 			usuario=request.user,
 			suggested_unit_prices=suggested_unit_prices,
+			applied_customer_credit=applied_customer_credit,
 			estimated_delivery_at=estimated_delivery_at,
 		)
 	except ValidationError as exc:
@@ -530,7 +878,7 @@ def backoffice_generate_invoice(request, pedido_id):
 @internal_permission_required('backoffice.orders.view')
 def backoffice_invoice_detail(request, invoice_id):
 	invoice = get_object_or_404(
-		Invoice.objects.select_related('pedido__cliente__usuario', 'driver', 'creada_por').prefetch_related('items__presentacion__producto', 'notas_ajuste__items__presentacion', 'notas_ajuste__evidence_photos', 'notas_ajuste__creada_por', 'notas_ajuste__aprobada_por', 'delivery__evidence_photos', 'delivery__notification_logs'),
+		Invoice.objects.select_related('pedido__cliente__usuario', 'driver', 'creada_por').prefetch_related('items__presentacion__producto', 'items__pedido_item__movimientos_inventario', 'items__pedido_item', 'notas_ajuste__items__presentacion', 'notas_ajuste__evidence_photos', 'notas_ajuste__creada_por', 'notas_ajuste__aprobada_por', 'delivery__evidence_photos', 'delivery__notification_logs'),
 		id=invoice_id,
 	)
 	if invoice.metodo_entrega == 'RUTA_DRIVER' and invoice.driver_id:
@@ -545,6 +893,7 @@ def backoffice_invoice_detail(request, invoice_id):
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
 		'driver_created_notes_count': driver_created_notes_count,
+		'advanced_adjustment_note_url': f"{reverse('backoffice_adjustment_note_create')}?cliente_id={invoice.cliente_id}&invoice_id={invoice.id}",
 	})
 
 
@@ -610,12 +959,14 @@ def backoffice_invoice_create_note(request, invoice_id):
 			raise ValidationError(_('Add note details before saving the adjustment.'))
 		nota = crear_nota_ajuste_desde_invoice(
 			invoice=invoice,
+			tipo_ajuste=note_request['tipo_ajuste'],
 			tipo_documento=note_request['tipo_documento'],
 			motivo=note_request['motivo'],
 			tipo_credito=note_request['tipo_credito'],
 			descripcion=note_request['descripcion'],
 			usuario=request.user,
 			items_payload=note_request['items_payload'],
+			monto=note_request['monto'],
 		)
 		_save_adjustment_note_evidence_files(nota, request.FILES.getlist('note_evidence_photos'))
 	except ValidationError as exc:
@@ -629,9 +980,11 @@ def backoffice_invoice_create_note(request, invoice_id):
 @login_required
 @internal_permission_required('backoffice.orders.manage')
 def backoffice_invoice_approve_note(request, note_id):
-	nota = get_object_or_404(NotaAjuste.objects.select_related('invoice'), id=note_id)
+	nota = get_object_or_404(NotaAjuste.objects.select_related('invoice', 'cliente'), id=note_id)
 	if request.method != 'POST':
-		return redirect('backoffice_invoice_detail', invoice_id=nota.invoice_id)
+		if nota.invoice_id:
+			return redirect('backoffice_invoice_detail', invoice_id=nota.invoice_id)
+		return redirect(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}")
 
 	try:
 		aprobar_nota_ajuste(nota=nota, usuario=request.user)
@@ -639,15 +992,19 @@ def backoffice_invoice_approve_note(request, note_id):
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:
 		messages.success(request, _('Adjustment note approved successfully.'))
-	return redirect('backoffice_invoice_detail', invoice_id=nota.invoice_id)
+	if nota.invoice_id:
+		return redirect('backoffice_invoice_detail', invoice_id=nota.invoice_id)
+	return redirect(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}")
 
 
 @login_required
 @internal_permission_required('backoffice.orders.manage')
 def backoffice_invoice_cancel_note(request, note_id):
-	nota = get_object_or_404(NotaAjuste.objects.select_related('invoice'), id=note_id)
+	nota = get_object_or_404(NotaAjuste.objects.select_related('invoice', 'cliente'), id=note_id)
 	if request.method != 'POST':
-		return redirect('backoffice_invoice_detail', invoice_id=nota.invoice_id)
+		if nota.invoice_id:
+			return redirect('backoffice_invoice_detail', invoice_id=nota.invoice_id)
+		return redirect(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}")
 
 	try:
 		anular_nota_ajuste(nota=nota)
@@ -655,13 +1012,15 @@ def backoffice_invoice_cancel_note(request, note_id):
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:
 		messages.success(request, _('Adjustment note cancelled successfully.'))
-	return redirect('backoffice_invoice_detail', invoice_id=nota.invoice_id)
+	if nota.invoice_id:
+		return redirect('backoffice_invoice_detail', invoice_id=nota.invoice_id)
+	return redirect(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}")
 
 
 @login_required
 @internal_permission_required('backoffice.orders.view')
 def backoffice_invoice_pdf(request, invoice_id):
-	invoice = get_object_or_404(Invoice.objects.select_related('pedido__cliente', 'driver').prefetch_related('items', 'notas_ajuste'), id=invoice_id)
+	invoice = get_object_or_404(Invoice.objects.select_related('pedido__cliente', 'driver').prefetch_related('items__presentacion__producto', 'items__pedido_item__movimientos_inventario', 'items__pedido_item', 'notas_ajuste'), id=invoice_id)
 	return _invoice_pdf_response(invoice)
 
 
@@ -699,7 +1058,7 @@ def driver_delivery_list(request):
 @internal_permission_required('driver.delivery.view')
 def driver_delivery_detail(request, delivery_id):
 	delivery = get_object_or_404(
-		Delivery.objects.select_related('invoice__cliente__usuario', 'driver').prefetch_related('invoice__items', 'invoice__notas_ajuste__evidence_photos', 'evidence_photos', 'notification_logs'),
+		Delivery.objects.select_related('invoice__cliente__usuario', 'driver').prefetch_related('invoice__items__pedido_item__movimientos_inventario', 'invoice__items__pedido_item', 'invoice__notas_ajuste__evidence_photos', 'evidence_photos', 'notification_logs'),
 		id=delivery_id,
 		driver=request.user,
 	)
@@ -846,12 +1205,14 @@ def driver_delivery_complete(request, delivery_id):
 		if note_request is not None:
 			nota = crear_nota_ajuste_desde_invoice(
 				invoice=delivery.invoice,
+				tipo_ajuste=note_request['tipo_ajuste'],
 				tipo_documento=note_request['tipo_documento'],
 				motivo=note_request['motivo'],
 				tipo_credito=note_request['tipo_credito'],
 				descripcion=note_request['descripcion'],
 				usuario=request.user,
 				items_payload=note_request['items_payload'],
+				monto=note_request['monto'],
 			)
 			_save_adjustment_note_evidence_files(nota, note_evidence_files)
 	except ValidationError as exc:
@@ -885,12 +1246,14 @@ def driver_delivery_create_note(request, delivery_id):
 			raise ValidationError(_('Add note details before saving the adjustment.'))
 		nota = crear_nota_ajuste_desde_invoice(
 			invoice=delivery.invoice,
+			tipo_ajuste=note_request['tipo_ajuste'],
 			tipo_documento=note_request['tipo_documento'],
 			motivo=note_request['motivo'],
 			tipo_credito=note_request['tipo_credito'],
 			descripcion=note_request['descripcion'],
 			usuario=request.user,
 			items_payload=note_request['items_payload'],
+			monto=note_request['monto'],
 		)
 		_save_adjustment_note_evidence_files(nota, note_evidence_files)
 	except ValidationError as exc:
@@ -904,5 +1267,5 @@ def driver_delivery_create_note(request, delivery_id):
 @internal_permission_required('driver.delivery.view')
 def driver_invoice_pdf(request, delivery_id):
 	delivery = get_object_or_404(Delivery.objects.select_related('invoice__cliente', 'invoice__driver'), id=delivery_id, driver=request.user)
-	invoice = Invoice.objects.select_related('pedido__cliente', 'driver').prefetch_related('items', 'notas_ajuste').get(id=delivery.invoice_id)
+	invoice = Invoice.objects.select_related('pedido__cliente', 'driver').prefetch_related('items__presentacion__producto', 'items__pedido_item__movimientos_inventario', 'items__pedido_item', 'notas_ajuste').get(id=delivery.invoice_id)
 	return _invoice_pdf_response(invoice)

@@ -39,6 +39,41 @@
   </div>
 </div>
 
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <h5 class="mb-3">{% trans "Internal partial stock for this product" %}</h5>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>{% trans "Content" %}</th>
+            <th>{% trans "Physical" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for stock_item in fractional_stocks %}
+          <tr>
+            <td>
+              {% if stock_item.presentacion %}
+              {{ stock_item.presentacion.nombre_traducido }}
+              <div class="small text-muted">{{ stock_item.stock_fisico }} {{ stock_item.contenido }}</div>
+              {% else %}
+              {{ stock_item.contenido }}
+              {% endif %}
+            </td>
+            <td>{{ stock_item.stock_fisico }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="2" class="text-center text-muted py-3">{% trans "This product does not have internal partial stock yet." %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <div class="row g-4">
   <div class="col-lg-4">
     <div class="card shadow-sm">
@@ -80,6 +115,43 @@
   </div>
 
   <div class="col-lg-8">
+    <div class="card shadow-sm mb-4">
+      <div class="card-body border-bottom">
+        <h5 class="mb-0">{% trans "Package consolidation trace" %}</h5>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-striped align-middle mb-0">
+          <thead>
+            <tr>
+              <th>{% trans "Date" %}</th>
+              <th>{% trans "Type" %}</th>
+              <th>{% trans "Packages" %}</th>
+              <th>{% trans "Reference" %}</th>
+              <th>{% trans "Observation" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for movement in consolidation_movements %}
+            <tr>
+              <td>{{ movement.creado_en|date:"d/m/Y H:i" }}</td>
+              <td>{{ movement.get_tipo_display }}</td>
+              <td>{{ movement.cantidad }}</td>
+              <td>{{ movement.referencia }}</td>
+              <td>
+                <div>{{ movement.observacion|default:"-" }}</div>
+                <div class="text-muted small">{% firstof movement.creado_por.get_full_name movement.creado_por.username '-' %}</div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="text-center text-muted py-4">{% trans "No package consolidations or deconsolidations have been recorded yet." %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="card shadow-sm">
       <div class="card-body border-bottom">
         <h5 class="mb-0">{% trans "Latest movements" %}</h5>

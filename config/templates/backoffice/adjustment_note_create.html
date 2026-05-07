@@ -1,0 +1,452 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Create Adjustment Note" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+  <div>
+    <h2 class="mb-1">{% trans "Create adjustment note" %}</h2>
+    <p class="text-muted mb-0">{% trans "Assign the note to a customer, optionally apply it to an invoice, and keep financial credit available for future orders." %}</p>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'backoffice_invoices_list' %}" class="btn btn-outline-secondary">{% trans "Back to invoices" %}</a>
+    {% if selected_invoice %}
+    <a href="{% url 'backoffice_invoice_detail' selected_invoice.id %}" class="btn btn-outline-primary">{% trans "Open invoice" %}</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="mb-3">{% trans "Choose destination" %}</h5>
+        <form method="get" class="row g-3">
+          <div class="col-12">
+            <label class="form-label fw-semibold">{% trans "Customer" %}</label>
+            <select name="cliente_id" class="form-select">
+              <option value="">{% trans "Select customer..." %}</option>
+              {% for customer in customers %}
+              <option value="{{ customer.id }}" {% if selected_client and customer.id == selected_client.id %}selected{% endif %}>{{ customer.nombre_empresa }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">{% trans "Invoice to apply" %}</label>
+            <select name="invoice_id" class="form-select" {% if not selected_client and not selected_invoice %}disabled{% endif %}>
+              <option value="">{% trans "No invoice / general customer balance" %}</option>
+              {% for invoice in available_invoices %}
+              <option value="{{ invoice.id }}" {% if selected_invoice and invoice.id == selected_invoice.id %}selected{% endif %}>{{ invoice.numero }} | {{ invoice.creada_en|date:"d/m/Y" }} | ${{ invoice.saldo_cliente }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 d-grid">
+            <button type="submit" class="btn btn-primary">{% trans "Load invoice lines" %}</button>
+          </div>
+        </form>
+
+        {% if selected_client %}
+        <hr>
+        <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Selected customer" %}</div>
+        <div class="fw-semibold">{{ selected_client.nombre_empresa }}</div>
+        <div class="small text-muted">{{ selected_client.direccion }}, {{ selected_client.ciudad }}</div>
+        <div class="small mt-2"><span class="text-muted">{% trans "Current balance" %}:</span> ${{ selected_client.balance }}</div>
+        <div class="small"><span class="text-muted">{% trans "Available credit" %}:</span> ${{ selected_client.available_credit }}</div>
+
+        {% if customer_general_notes %}
+        <hr>
+        <div class="d-flex justify-content-between align-items-center mb-2 gap-2 flex-wrap">
+          <div class="small text-muted text-uppercase fw-semibold mb-0">{% trans "General customer notes" %}</div>
+          <span class="badge text-bg-light">{{ customer_general_notes|length }}</span>
+        </div>
+        <div class="small text-muted mb-2">{% trans "Approve general notes here to update the customer balance and available credit." %}</div>
+        <div class="d-grid gap-2">
+          {% for nota in customer_general_notes %}
+          <div class="border rounded p-2">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+              <div>
+                <div class="fw-semibold">{{ nota.numero }}</div>
+                <div class="small text-muted">{{ nota.get_tipo_documento_display }} · {{ nota.get_estado_display }}</div>
+              </div>
+              <div class="text-end">
+                <div class="fw-semibold">${{ nota.total }}</div>
+                <div class="small text-muted">{{ nota.creada_en|date:"d/m/Y H:i" }}</div>
+              </div>
+            </div>
+            <div class="small mb-2">{{ nota.descripcion|default:'-' }}</div>
+            {% if nota.items.all %}
+            <div class="small border rounded bg-light p-2 mb-2">
+              <div class="text-muted text-uppercase fw-semibold mb-1" style="font-size: .72rem;">{% trans "Saved product lines" %}</div>
+              <div class="d-grid gap-1">
+                {% for item in nota.items.all %}
+                <div>
+                  <span class="fw-semibold">{{ item.descripcion }}</span>
+                  <span class="text-muted">
+                    · {{ item.cantidad }}
+                    {% if item.contenido_fraccionado %}
+                    {{ item.contenido_fraccionado }}
+                    {% elif item.presentacion %}
+                    {{ item.presentacion.nombre_traducido|lower }}
+                    {% endif %}
+                    · ${{ item.total }}
+                  </span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+            {% if nota.estado == 'BORRADOR' %}
+            <div class="d-flex gap-2">
+              <form method="post" action="{% url 'backoffice_invoice_approve_note' nota.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-success">{% trans "Approve" %}</button>
+              </form>
+              <form method="post" action="{% url 'backoffice_invoice_cancel_note' nota.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Void" %}</button>
+              </form>
+            </div>
+            {% elif nota.estado == 'APROBADA' %}
+            <div class="small text-success">{% trans "This note is already approved and has already impacted the customer balance." %}</div>
+            {% else %}
+            <div class="small text-muted">{% trans "This note was voided and no longer affects the customer balance." %}</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+          <h5 class="mb-0">{% trans "Note details" %}</h5>
+          {% if selected_invoice %}
+          <span class="badge text-bg-light">{{ selected_invoice.numero }}</span>
+          {% endif %}
+        </div>
+
+        {% if not selected_client %}
+        <div class="alert alert-info mb-0">{% trans "Select a customer to create either a general financial note or an invoice-linked product adjustment." %}</div>
+        {% else %}
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <input type="hidden" name="cliente_id" value="{{ selected_client.id }}">
+          {% if selected_invoice %}<input type="hidden" name="invoice_id" value="{{ selected_invoice.id }}">{% endif %}
+
+          <div class="row g-2 mb-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">{% trans "Type" %}</label>
+              <select name="note_tipo_documento" id="advancedNoteType" class="form-select" required>
+                <option value="">{% trans "Select..." %}</option>
+                <option value="CREDITO">{% trans "Credit note" %}</option>
+                <option value="DEBITO">{% trans "Debit note" %}</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold">{% trans "Adjustment mode" %}</label>
+              <select name="note_tipo_ajuste" id="advancedAdjustmentType" class="form-select" required>
+                <option value="FINANCIERO" data-credit-label="{% trans 'Financial amount' %}" data-debit-label="{% trans 'Amount to charge' %}">{% trans "Financial amount" %}</option>
+                <option value="PRODUCTO" data-credit-label="{% trans 'Product return / item lines' %}" data-debit-label="{% trans 'Product to charge' %}">{% trans "Product return / item lines" %}</option>
+              </select>
+            </div>
+            <div class="col-md-4" id="advancedReasonWrapper">
+              <label class="form-label fw-semibold">{% trans "Reason" %}</label>
+              <select name="note_motivo" id="advancedReasonSelect" class="form-select" required>
+                <option value="">{% trans "Select..." %}</option>
+                <option value="DAMAGE">{% trans "Physical damage / transport" %}</option>
+                <option value="DEFECT">{% trans "Factory defect / quality issue" %}</option>
+                <option value="MISSING_ITEM">{% trans "Missing item" %}</option>
+                <option value="OTHER">{% trans "Other" %}</option>
+              </select>
+            </div>
+            <div class="col-md-4 d-none" id="advancedCreditTypeWrapper">
+              <label class="form-label fw-semibold">{% trans "Credit type" %}</label>
+              <select name="note_tipo_credito" id="advancedCreditType" class="form-select" disabled>
+				<option value="">{% trans "Select" %}</option>
+                <option value="CREDIT_DUMP">{% trans "Credit Dump" %}</option>
+                <option value="CREDIT_RETURN">{% trans "Credit Return" %}</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold" id="advancedDescriptionLabel" data-credit-label="{% trans 'Description' %}" data-debit-label="{% trans 'Charge description' %}">{% trans "Description" %}</label>
+              <textarea name="note_descripcion" rows="3" class="form-control"></textarea>
+              <div class="form-text" id="advancedDescriptionHelp" data-credit-help="{% trans 'Use this field for the manual comment, especially when the reason is Other.' %}" data-debit-help="{% trans 'Use this field to clearly explain what will be charged to the customer.' %}">{% trans "Use this field for the manual comment, especially when the reason is Other." %}</div>
+            </div>
+            <div class="col-md-4" id="advancedFinancialAmountWrapper">
+              <label class="form-label fw-semibold">{% trans "Amount" %}</label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input type="number" min="0" step="0.01" name="note_monto" class="form-control">
+              </div>
+              <div class="form-text">{% trans "Use this for a general credit or debt that is not tied to returned invoice lines." %}</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
+              <input type="file" name="note_evidence_photos" class="form-control" accept="image/*" multiple>
+            </div>
+          </div>
+
+          <div class="alert alert-secondary small mb-3">
+            {% trans "Financial notes can exist without invoice. Product notes can use invoice lines or manual product rows and approved credit returns will restock inventory." %}
+          </div>
+
+          <div class="alert alert-warning small d-none mb-3" id="advancedProductInvoiceWarning">
+            {% trans "No invoice is selected. Product mode will use manual product rows and will credit the customer balance directly once approved." %}
+          </div>
+
+          <div class="table-responsive mb-3" id="advancedProductLinesWrapper">
+            <table class="table table-sm align-middle">
+              <thead>
+                <tr>
+                  <th>{% trans "Line" %}</th>
+                  <th>{% trans "Requested qty." %}</th>
+                  <th>{% trans "Dispatched qty." %}</th>
+                  <th>{% trans "Boxes / pallets" %}</th>
+                  <th>{% trans "Partial content" %}</th>
+                  <th>{% trans "Calculated amount" %}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% if selected_invoice %}
+                {% for item in selected_invoice.items.all %}
+                <tr>
+                  <td>
+                    {{ item.producto_nombre }}
+                    <div class="small text-muted">{{ item.presentacion_nombre }}</div>
+                  </td>
+                  <td>{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
+                  <td>{{ item.cantidad_facturada }}</td>
+                  <td>
+                    <label class="form-label small text-muted mb-1">{{ item.presentacion_nombre }}</label>
+                    <input type="number" min="0" max="{{ item.cantidad_facturada }}" name="note_qty_{{ item.id }}" class="form-control form-control-sm js-adjustment-package-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades|default:1 }}">
+                  </td>
+                  <td>
+                    {% if item.presentacion and item.presentacion.unidades > 1 %}
+                    <label class="form-label small text-muted mb-1">{{ item.presentacion.tipo_contenido_traducido|capfirst }}</label>
+                    <input type="number" min="0" name="note_unit_qty_{{ item.id }}" class="form-control form-control-sm js-adjustment-unit-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades }}">
+                    <div class="small text-muted">1 {{ item.presentacion_nombre|lower }} = {{ item.presentacion.unidades }} {{ item.presentacion.tipo_contenido_traducido|lower }}</div>
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <input type="number" min="0" step="0.01" name="note_amount_{{ item.id }}" class="form-control form-control-sm js-adjustment-amount" placeholder="0.00" inputmode="decimal">
+                    <div class="small text-muted">{% trans "Calculated automatically from the quantities you enter." %}</div>
+                  </td>
+                </tr>
+                {% endfor %}
+                {% else %}
+                {% for _ in '123' %}
+                <tr>
+                  <td>
+                    <select name="note_manual_presentacion" class="form-select form-select-sm mb-2 js-manual-presentacion" data-line-kind="manual" data-line-id="{{ forloop.counter0 }}">
+                      <option value="">{% trans "Select product presentation..." %}</option>
+                      {% for presentation in product_presentations %}
+                      <option value="{{ presentation.id }}" data-package-price="{{ presentation.note_default_amount }}" data-units-per-package="{{ presentation.unidades }}" data-presentation-name="{{ presentation.nombre }}" data-content-label="{{ presentation.tipo_contenido_traducido }}">{{ presentation.producto.nombre }} | {{ presentation.nombre }}</option>
+                      {% endfor %}
+                    </select>
+                    <input type="text" name="note_manual_description" class="form-control form-control-sm" placeholder="{% trans 'Optional custom description' %}">
+                  </td>
+                  <td class="text-muted">-</td>
+                  <td class="text-muted">-</td>
+                  <td>
+                    <label class="form-label small text-muted mb-1 js-manual-package-label" data-line-id="{{ forloop.counter0 }}">{% trans "Selected presentation" %}</label>
+                    <input type="number" min="0" name="note_manual_qty" class="form-control form-control-sm js-adjustment-package-qty" value="0" data-line-kind="manual" data-line-id="{{ forloop.counter0 }}" data-amount-target="note_manual_amount_{{ forloop.counter0 }}">
+                  </td>
+                  <td>
+                    <label class="form-label small text-muted mb-1 js-manual-content-label" data-line-id="{{ forloop.counter0 }}">{% trans "Partial content" %}</label>
+                    <input type="number" min="0" name="note_manual_unit_qty" class="form-control form-control-sm js-adjustment-unit-qty" value="0" data-line-kind="manual" data-line-id="{{ forloop.counter0 }}" data-amount-target="note_manual_amount_{{ forloop.counter0 }}">
+                    <div class="small text-muted js-manual-unit-hint" data-line-id="{{ forloop.counter0 }}">{% trans "Select a presentation first." %}</div>
+                  </td>
+                  <td>
+                    <input type="number" min="0" step="0.01" name="note_manual_amount" id="note_manual_amount_{{ forloop.counter0 }}" class="form-control form-control-sm js-adjustment-amount" placeholder="0.00" inputmode="decimal">
+                    <div class="small text-muted">{% trans "Calculated automatically from the quantities you enter." %}</div>
+                  </td>
+                </tr>
+                {% endfor %}
+                {% endif %}
+              </tbody>
+            </table>
+            <div class="form-text">{% trans "Partial returns are prorated from the package amount. If a child presentation exists, inventory returns there automatically. Otherwise the remainder is stored as internal product stock." %}</div>
+          </div>
+
+          <button type="submit" class="btn btn-primary">{% trans "Save draft note" %}</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const noteType = document.getElementById('advancedNoteType');
+    const adjustmentType = document.getElementById('advancedAdjustmentType');
+    const adjustmentTypeOptions = adjustmentType ? Array.from(adjustmentType.options) : [];
+    const creditTypeWrapper = document.getElementById('advancedCreditTypeWrapper');
+    const creditType = document.getElementById('advancedCreditType');
+    const creditReturnOption = creditType ? creditType.querySelector('option[value="CREDIT_RETURN"]') : null;
+    const financialAmountWrapper = document.getElementById('advancedFinancialAmountWrapper');
+    const productLinesWrapper = document.getElementById('advancedProductLinesWrapper');
+    const productInvoiceWarning = document.getElementById('advancedProductInvoiceWarning');
+    const reasonWrapper = document.getElementById('advancedReasonWrapper');
+    const reasonSelect = document.getElementById('advancedReasonSelect');
+    const descriptionLabel = document.getElementById('advancedDescriptionLabel');
+    const descriptionHelp = document.getElementById('advancedDescriptionHelp');
+    const packageInputs = document.querySelectorAll('.js-adjustment-package-qty');
+    const unitInputs = document.querySelectorAll('.js-adjustment-unit-qty');
+    const manualPresentationSelects = document.querySelectorAll('.js-manual-presentacion');
+    const hasInvoice = {{ selected_invoice|yesno:"true,false" }};
+
+    if (!noteType || !creditTypeWrapper || !creditType || !adjustmentType) {
+      return;
+    }
+
+    function syncCreditTypeVisibility() {
+      const isCredit = noteType.value === 'CREDITO';
+      creditTypeWrapper.classList.toggle('d-none', !isCredit);
+      creditType.disabled = !isCredit;
+      if (!isCredit) {
+        creditType.value = '';
+      }
+    }
+
+    noteType.addEventListener('change', syncCreditTypeVisibility);
+    noteType.addEventListener('change', syncAdjustmentMode);
+    syncCreditTypeVisibility();
+
+    function syncAdjustmentMode() {
+      const isProduct = adjustmentType.value === 'PRODUCTO';
+      const isDebit = noteType.value === 'DEBITO';
+      if (financialAmountWrapper) {
+        financialAmountWrapper.classList.toggle('d-none', isProduct);
+      }
+      if (productLinesWrapper) {
+        productLinesWrapper.classList.toggle('d-none', !isProduct);
+      }
+      if (productInvoiceWarning) {
+        productInvoiceWarning.classList.toggle('d-none', !(isProduct && !hasInvoice));
+      }
+      if (creditReturnOption) {
+        creditReturnOption.disabled = !isProduct;
+      }
+      if (creditType && noteType.value === 'CREDITO' && !isProduct && creditType.value === 'CREDIT_RETURN') {
+        creditType.value = 'CREDIT_DUMP';
+      }
+      adjustmentTypeOptions.forEach(function (option) {
+        const nextLabel = isDebit ? option.dataset.debitLabel : option.dataset.creditLabel;
+        if (nextLabel) {
+          option.textContent = nextLabel;
+        }
+      });
+      if (reasonWrapper && reasonSelect) {
+        reasonWrapper.classList.toggle('d-none', isDebit);
+        if (isDebit) {
+          reasonSelect.value = 'OTHER';
+        }
+      }
+      if (descriptionLabel) {
+        descriptionLabel.textContent = isDebit ? descriptionLabel.dataset.debitLabel : descriptionLabel.dataset.creditLabel;
+      }
+      if (descriptionHelp) {
+        descriptionHelp.textContent = isDebit ? descriptionHelp.dataset.debitHelp : descriptionHelp.dataset.creditHelp;
+      }
+    }
+
+    adjustmentType.addEventListener('change', syncAdjustmentMode);
+    syncAdjustmentMode();
+
+    function getManualLineElements(lineId) {
+      return {
+        select: document.querySelector('.js-manual-presentacion[data-line-id="' + lineId + '"]'),
+        packageLabel: document.querySelector('.js-manual-package-label[data-line-id="' + lineId + '"]'),
+        contentLabel: document.querySelector('.js-manual-content-label[data-line-id="' + lineId + '"]'),
+        unitHint: document.querySelector('.js-manual-unit-hint[data-line-id="' + lineId + '"]'),
+      };
+    }
+
+    function getLineConfig(kind, lineId) {
+      const packageInput = document.querySelector('.js-adjustment-package-qty[data-line-kind="' + kind + '"][data-line-id="' + lineId + '"]');
+      const unitInput = document.querySelector('.js-adjustment-unit-qty[data-line-kind="' + kind + '"][data-line-id="' + lineId + '"]');
+      if (!packageInput) {
+        return null;
+      }
+      let packagePrice = Number(packageInput.dataset.packagePrice || 0);
+      let unitsPerPackage = Math.max(Number(packageInput.dataset.unitsPerPackage || 1), 1);
+      if (kind === 'manual') {
+        const elements = getManualLineElements(lineId);
+        const selectedOption = elements.select && elements.select.options[elements.select.selectedIndex];
+        packagePrice = Number((selectedOption && selectedOption.dataset.packagePrice) || 0);
+        unitsPerPackage = Math.max(Number((selectedOption && selectedOption.dataset.unitsPerPackage) || 1), 1);
+      }
+      return { packageInput, unitInput, packagePrice, unitsPerPackage };
+    }
+
+    function updateCalculatedAmount(kind, lineId) {
+      const config = getLineConfig(kind, lineId);
+      if (!config) {
+        return;
+      }
+      const amountName = config.packageInput.dataset.amountTarget;
+      const amountInput = amountName
+        ? document.querySelector('[name="' + amountName + '"]') || document.getElementById(amountName)
+        : null;
+      if (!amountInput) {
+        return;
+      }
+      const packageQty = Math.max(Number(config.packageInput.value || 0), 0);
+      const unitQty = config.unitInput ? Math.max(Number(config.unitInput.value || 0), 0) : 0;
+      const totalAmount = (packageQty * config.packagePrice) + (unitQty * (config.packagePrice / config.unitsPerPackage));
+      amountInput.value = totalAmount > 0 ? totalAmount.toFixed(2) : '';
+    }
+
+    function syncManualPresentationDetails(lineId) {
+      const elements = getManualLineElements(lineId);
+      if (!elements.select) {
+        return;
+      }
+      const selectedOption = elements.select.options[elements.select.selectedIndex];
+      const presentationName = selectedOption && selectedOption.dataset.presentationName ? selectedOption.dataset.presentationName : '{% trans "Selected presentation" %}';
+      const contentLabel = selectedOption && selectedOption.dataset.contentLabel ? selectedOption.dataset.contentLabel : '{% trans "Partial content" %}';
+      const unitsPerPackage = Math.max(Number((selectedOption && selectedOption.dataset.unitsPerPackage) || 1), 1);
+      if (elements.packageLabel) {
+        elements.packageLabel.textContent = presentationName;
+      }
+      if (elements.contentLabel) {
+        elements.contentLabel.textContent = contentLabel.charAt(0).toUpperCase() + contentLabel.slice(1);
+      }
+      if (elements.unitHint) {
+        elements.unitHint.textContent = selectedOption && selectedOption.value
+          ? '1 ' + presentationName.toLowerCase() + ' = ' + unitsPerPackage + ' ' + contentLabel.toLowerCase()
+          : '{% trans "Select a presentation first." %}';
+      }
+      updateCalculatedAmount('manual', lineId);
+    }
+
+    packageInputs.forEach(function (input) {
+      input.addEventListener('input', function () {
+        updateCalculatedAmount(input.dataset.lineKind, input.dataset.lineId);
+      });
+    });
+
+    unitInputs.forEach(function (input) {
+      input.addEventListener('input', function () {
+        updateCalculatedAmount(input.dataset.lineKind, input.dataset.lineId);
+      });
+    });
+
+    manualPresentationSelects.forEach(function (select) {
+      select.addEventListener('change', function () {
+        syncManualPresentationDetails(select.dataset.lineId);
+      });
+      syncManualPresentationDetails(select.dataset.lineId);
+    });
+  })();
+</script>
+{% endblock %}

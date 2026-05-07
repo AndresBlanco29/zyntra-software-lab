@@ -41,6 +41,7 @@ class Invoice(models.Model):
 	)
 	estado = models.CharField(max_length=20, choices=STATUS_CHOICES, default='GENERADA')
 	subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	credito_cliente_aplicado = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
 	total_creditos = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
 	total_debitos = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
 	total_neto = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
@@ -314,14 +315,20 @@ class NotaAjuste(models.Model):
 	)
 
 	REASON_CHOICES = (
-		('DAMAGE', _('Damage')),
-		('DEFECT', _('Defect')),
+		('DAMAGE', _('Physical damage / transport')),
+		('DEFECT', _('Factory defect / quality issue')),
 		('MISSING_ITEM', _('Missing item')),
+		('OTHER', _('Other')),
 	)
 
 	CREDIT_TYPE_CHOICES = (
 		('CREDIT_DUMP', _('Credit Dump')),
 		('CREDIT_RETURN', _('Credit Return')),
+	)
+
+	ADJUSTMENT_TYPE_CHOICES = (
+		('PRODUCTO', _('Product')),
+		('FINANCIERO', _('Financial')),
 	)
 
 	INVENTORY_STATUS_CHOICES = (
@@ -332,17 +339,23 @@ class NotaAjuste(models.Model):
 	)
 
 	numero = models.CharField(max_length=30, unique=True, blank=True)
-	invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name='notas_ajuste')
+	cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name='notas_ajuste')
+	invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name='notas_ajuste', null=True, blank=True)
 	tipo_documento = models.CharField(max_length=20, choices=DOCUMENT_TYPE_CHOICES)
+	tipo_ajuste = models.CharField(max_length=20, choices=ADJUSTMENT_TYPE_CHOICES, default='PRODUCTO')
 	estado = models.CharField(max_length=20, choices=STATUS_CHOICES, default='BORRADOR')
 	motivo = models.CharField(max_length=20, choices=REASON_CHOICES)
 	tipo_credito = models.CharField(max_length=20, choices=CREDIT_TYPE_CHOICES, blank=True)
 	descripcion = models.TextField(blank=True)
+	monto = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
 	total = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
 	impacto_saldo = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	monto_aplicado_invoice = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	monto_aplicado_cliente = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
 	inventario_estado = models.CharField(max_length=20, choices=INVENTORY_STATUS_CHOICES, default='NO_APLICA')
 	creada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='notas_ajuste_creadas')
 	aprobada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='notas_ajuste_aprobadas')
+	fecha = models.DateTimeField(default=timezone.now)
 	creada_en = models.DateTimeField(auto_now_add=True)
 	aprobada_en = models.DateTimeField(blank=True, null=True)
 	anulada_en = models.DateTimeField(blank=True, null=True)
@@ -354,6 +367,13 @@ class NotaAjuste(models.Model):
 		return self.numero or f'Adjustment #{self.pk}'
 
 	def clean(self):
+		resolved_cliente = self.cliente
+		if resolved_cliente is None and self.invoice_id:
+			resolved_cliente = self.invoice.cliente
+		if resolved_cliente is None:
+			raise ValidationError({'cliente': _('Adjustment notes must be assigned to a customer.')})
+		if self.invoice_id and resolved_cliente and self.invoice.cliente_id != resolved_cliente.id:
+			raise ValidationError({'invoice': _('The selected invoice does not belong to the selected customer.')})
 		if self.tipo_documento == 'CREDITO' and not self.tipo_credito:
 			raise ValidationError({'tipo_credito': _('A credit type is required for credit notes.')})
 		if self.tipo_documento == 'DEBITO' and self.tipo_credito:
@@ -361,6 +381,8 @@ class NotaAjuste(models.Model):
 
 	def save(self, *args, **kwargs):
 		is_new = self.pk is None
+		if self.cliente_id is None and self.invoice_id:
+			self.cliente = self.invoice.cliente
 		super().save(*args, **kwargs)
 		if is_new and not self.numero:
 			prefix = 'CRN' if self.tipo_documento == 'CREDITO' else 'DBN'
@@ -372,6 +394,7 @@ class NotaAjusteItem(models.Model):
 	nota = models.ForeignKey(NotaAjuste, on_delete=models.CASCADE, related_name='items')
 	invoice_item = models.ForeignKey(InvoiceItem, on_delete=models.SET_NULL, null=True, blank=True, related_name='notas_ajuste')
 	presentacion = models.ForeignKey(Presentacion, on_delete=models.SET_NULL, null=True, blank=True)
+	contenido_fraccionado = models.CharField(max_length=50, blank=True)
 	descripcion = models.CharField(max_length=255)
 	cantidad = models.PositiveIntegerField(default=1)
 	monto_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))

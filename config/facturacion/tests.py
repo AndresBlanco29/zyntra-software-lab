@@ -9,13 +9,14 @@ from django.test import TestCase
 from django.urls import reverse
 from django.test.utils import override_settings
 from django.utils import timezone
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, DeliveryNotificationLog, Invoice, NotaAjuste
-from config.facturacion.services import aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste_desde_invoice, generar_invoice_desde_picking, start_delivery_route, unlock_client_from_delivery
-from config.facturacion.views import _build_invoice_pdf_item_data, _resolve_invoice_suggested_unit_price
-from config.inventario.models import InventarioMovimiento, StockPresentacion
-from config.inventario.services import registrar_entrada_manual
+from config.facturacion.services import anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, generar_invoice_desde_picking, start_delivery_route, unlock_client_from_delivery
+from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_item_data, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _resolve_invoice_suggested_unit_price
+from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
+from config.inventario.services import registrar_entrada_manual, reservar_stock_para_pedido_items
 from config.notificaciones.models import Notificacion
 from config.pedidos.models import Pedido, PedidoItem
 from config.productos.models import Categoria, Marca, Presentacion, Producto
@@ -54,12 +55,23 @@ class InvoiceFlowTests(TestCase):
 			producto=producto,
 			nombre='Caja',
 			unidades=12,
-			tipo_contenido='caja',
+			tipo_contenido='unidades',
 			precio_1=Decimal('15.00'),
 			precio_2=Decimal('16.00'),
 			precio_3=Decimal('17.00'),
 			precio_4=Decimal('18.00'),
 			precio_5=Decimal('19.00'),
+		)
+		self.presentacion_unidad = Presentacion.objects.create(
+			producto=producto,
+			nombre='Unidad',
+			unidades=1,
+			tipo_contenido='unidad',
+			precio_1=Decimal('1.25'),
+			precio_2=Decimal('1.35'),
+			precio_3=Decimal('1.45'),
+			precio_4=Decimal('1.55'),
+			precio_5=Decimal('1.65'),
 		)
 		self.pedido = Pedido.objects.create(
 			cliente=self.cliente,
@@ -84,6 +96,7 @@ class InvoiceFlowTests(TestCase):
 			content_type='image/png',
 		)
 		registrar_entrada_manual(presentacion=self.presentacion, cantidad=25, observacion='Seed stock')
+		registrar_entrada_manual(presentacion=self.presentacion_unidad, cantidad=10, observacion='Seed unit stock')
 
 	def _create_verified_order(self, *, total='15.00', quantity=1):
 		pedido = Pedido.objects.create(
@@ -138,6 +151,98 @@ class InvoiceFlowTests(TestCase):
 		)
 
 		self.assertEqual(invoice.items.first().precio_venta_sugerido_unitario, Decimal('2.49'))
+
+	def test_generate_invoice_applies_customer_credit_and_reduces_customer_balance(self):
+		self.cliente.balance = Decimal('30.00')
+		self.cliente.save(update_fields=['balance'])
+
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+			applied_customer_credit=Decimal('30.00'),
+		)
+
+		self.cliente.refresh_from_db()
+		self.assertEqual(invoice.credito_cliente_aplicado, Decimal('30.00'))
+		self.assertEqual(invoice.saldo_cliente, Decimal('15.00'))
+		self.assertEqual(self.cliente.balance, Decimal('0.00'))
+
+	def test_generate_invoice_keeps_zero_quantity_lines_with_zero_subtotal(self):
+		self.pedido_item.cantidad = 0
+		self.pedido_item.subtotal = Decimal('0.00')
+		self.pedido_item.save(update_fields=['cantidad', 'subtotal'])
+		self.pedido.total = Decimal('0.00')
+		self.pedido.save(update_fields=['total', 'actualizada_en'])
+
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+		invoice_item = invoice.items.get()
+		self.assertEqual(invoice_item.cantidad_facturada, 0)
+		self.assertEqual(invoice_item.subtotal, Decimal('0.00'))
+		self.assertEqual(invoice.subtotal, Decimal('0.00'))
+		self.assertEqual(invoice.saldo_cliente, Decimal('0.00'))
+
+	def test_invoice_pdf_item_data_recovers_requested_quantity_from_reservation_history(self):
+		reservar_stock_para_pedido_items(pedido=self.pedido, pedido_items=[self.pedido_item], creado_por=self.backoffice)
+		self.pedido_item.cantidad_solicitada = 0
+		self.pedido_item.cantidad = 0
+		self.pedido_item.subtotal = Decimal('0.00')
+		self.pedido_item.save(update_fields=['cantidad_solicitada', 'cantidad', 'subtotal'])
+		self.pedido.total = Decimal('0.00')
+		self.pedido.save(update_fields=['total', 'actualizada_en'])
+
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+		rows = _build_invoice_pdf_item_data(invoice)
+		self.assertEqual(rows[0]['requested_quantity'], '4')
+		self.assertEqual(rows[0]['dispatched_quantity'], '0')
+
+	def test_invoice_pdf_item_data_uses_default_30_percent_profit_for_auto_suggested_prices(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+		rows = _build_invoice_pdf_item_data(invoice)
+		self.assertEqual(rows[0]['profit_percentage'], '30.00%')
+
+	def test_backoffice_invoice_detail_shows_requested_and_zero_dispatched_quantities(self):
+		self.client.force_login(self.backoffice)
+		self.pedido_item.cantidad = 0
+		self.pedido_item.subtotal = Decimal('0.00')
+		self.pedido_item.save(update_fields=['cantidad', 'subtotal'])
+		self.pedido.total = Decimal('0.00')
+		self.pedido.save(update_fields=['total', 'actualizada_en'])
+
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Requested qty.')
+		self.assertContains(response, 'Dispatched qty.')
+		self.assertContains(response, f'<td>{self.pedido_item.cantidad_solicitada}</td>', html=False)
+		self.assertContains(response, '<td>0</td>', html=False)
+		self.assertContains(response, '$0.00')
 
 	def test_generate_invoice_requires_verified_order(self):
 		self.pedido.estado = 'PARA_VERIFICAR'
@@ -203,6 +308,291 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, 26)
 		self.assertTrue(InventarioMovimiento.objects.filter(nota_ajuste=nota, tipo='ENTRADA_NOTA_CREDITO').exists())
 
+	def test_credit_note_without_invoice_increases_customer_balance(self):
+		nota = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=None,
+			tipo_ajuste='FINANCIERO',
+			tipo_documento='CREDITO',
+			motivo='DEFECT',
+			tipo_credito='CREDIT_DUMP',
+			descripcion='Saldo a favor general',
+			usuario=self.backoffice,
+			items_payload=[],
+			monto=Decimal('25.00'),
+		)
+
+		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
+		self.cliente.refresh_from_db()
+		nota.refresh_from_db()
+
+		self.assertEqual(self.cliente.balance, Decimal('25.00'))
+		self.assertEqual(nota.monto_aplicado_invoice, Decimal('0.00'))
+		self.assertEqual(nota.monto_aplicado_cliente, Decimal('25.00'))
+
+	def test_debit_note_without_invoice_decreases_customer_balance(self):
+		self.cliente.balance = Decimal('40.00')
+		self.cliente.save(update_fields=['balance'])
+
+		nota = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=None,
+			tipo_ajuste='FINANCIERO',
+			tipo_documento='DEBITO',
+			motivo='DEFECT',
+			tipo_credito='',
+			descripcion='Cargo financiero general',
+			usuario=self.backoffice,
+			items_payload=[],
+			monto=Decimal('10.00'),
+		)
+
+		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
+		self.cliente.refresh_from_db()
+		nota.refresh_from_db()
+
+		self.assertEqual(self.cliente.balance, Decimal('30.00'))
+		self.assertEqual(nota.monto_aplicado_invoice, Decimal('0.00'))
+		self.assertEqual(nota.monto_aplicado_cliente, Decimal('10.00'))
+
+	def test_product_credit_note_without_invoice_restocks_inventory_and_increases_customer_balance(self):
+		nota = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=None,
+			tipo_ajuste='PRODUCTO',
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Devolucion manual sin invoice',
+			usuario=self.backoffice,
+			items_payload=[{
+				'invoice_item': None,
+				'presentacion': self.presentacion,
+				'descripcion': 'Tortilla 12',
+				'cantidad': 2,
+				'monto_unitario': Decimal('15.00'),
+			}],
+			monto=Decimal('0.00'),
+		)
+
+		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
+		self.cliente.refresh_from_db()
+		nota.refresh_from_db()
+
+		self.assertEqual(self.cliente.balance, Decimal('30.00'))
+		self.assertEqual(nota.inventario_estado, 'PROCESADO')
+		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, 27)
+
+	def test_product_credit_note_can_split_case_return_into_loose_units(self):
+		nota = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=None,
+			tipo_ajuste='PRODUCTO',
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Caja abierta con una unidad dañada',
+			usuario=self.backoffice,
+			items_payload=[{
+				'invoice_item': None,
+				'presentacion': self.presentacion,
+				'cantidad': 1,
+				'cantidad_unidades': 1,
+				'monto_unitario': Decimal('15.00'),
+			}],
+			monto=Decimal('0.00'),
+		)
+
+		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
+		nota.refresh_from_db()
+		self.cliente.refresh_from_db()
+
+		self.assertEqual(nota.total, Decimal('16.25'))
+		self.assertEqual(nota.items.count(), 2)
+		self.assertEqual(self.cliente.balance, Decimal('16.25'))
+		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, 26)
+		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion_unidad).stock_fisico, 11)
+
+	def test_product_credit_note_partial_box_without_unit_presentation_uses_internal_fractional_stock(self):
+		categoria = Categoria.objects.create(nombre='Categoria sin unidad')
+		marca = Marca.objects.create(nombre='Marca sin unidad')
+		producto = Producto.objects.create(nombre='Producto sin unidad', categoria=categoria, marca=marca)
+		presentacion_caja = Presentacion.objects.create(
+			producto=producto,
+			nombre='Caja',
+			unidades=12,
+			tipo_contenido='unidades',
+			precio_1=Decimal('15.00'),
+		)
+
+		nota = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=None,
+			tipo_ajuste='PRODUCTO',
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Caja abierta con devolucion parcial',
+			usuario=self.backoffice,
+			items_payload=[{
+				'invoice_item': None,
+				'presentacion': presentacion_caja,
+				'cantidad': 0,
+				'cantidad_unidades': 10,
+				'monto_unitario': Decimal('15.00'),
+			}],
+			monto=Decimal('0.00'),
+		)
+
+		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
+		fractional_stock = StockProductoFraccionado.objects.get(producto=producto, contenido='unidades')
+
+		self.assertEqual(nota.total, Decimal('12.50'))
+		self.assertEqual(fractional_stock.stock_fisico, 10)
+		self.assertEqual(nota.items.get(contenido_fraccionado='unidades').cantidad, 10)
+
+	def test_partial_returns_promote_fractional_stock_into_full_box_and_reverse_back(self):
+		categoria = Categoria.objects.create(nombre='Categoria acumulada')
+		marca = Marca.objects.create(nombre='Marca acumulada')
+		producto = Producto.objects.create(nombre='Producto acumulado', categoria=categoria, marca=marca)
+		presentacion_caja = Presentacion.objects.create(
+			producto=producto,
+			nombre='Caja',
+			unidades=20,
+			tipo_contenido='unidades',
+			precio_1=Decimal('20.00'),
+		)
+
+		nota_primera = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=None,
+			tipo_ajuste='PRODUCTO',
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Primera devolucion parcial',
+			usuario=self.backoffice,
+			items_payload=[{
+				'invoice_item': None,
+				'presentacion': presentacion_caja,
+				'cantidad': 0,
+				'cantidad_unidades': 15,
+				'monto_unitario': Decimal('20.00'),
+			}],
+			monto=Decimal('0.00'),
+		)
+		aprobar_nota_ajuste(nota=nota_primera, usuario=self.backoffice)
+
+		nota_segunda = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=None,
+			tipo_ajuste='PRODUCTO',
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Segunda devolucion parcial',
+			usuario=self.backoffice,
+			items_payload=[{
+				'invoice_item': None,
+				'presentacion': presentacion_caja,
+				'cantidad': 0,
+				'cantidad_unidades': 5,
+				'monto_unitario': Decimal('20.00'),
+			}],
+			monto=Decimal('0.00'),
+		)
+		aprobar_nota_ajuste(nota=nota_segunda, usuario=self.backoffice)
+
+		box_stock = StockPresentacion.objects.get(presentacion=presentacion_caja)
+		fractional_stock = StockProductoFraccionado.objects.get(producto=producto, contenido='unidades')
+		self.assertEqual(box_stock.stock_fisico, 1)
+		self.assertEqual(fractional_stock.stock_fisico, 0)
+
+		anular_nota_ajuste(nota=nota_segunda)
+		box_stock.refresh_from_db()
+		fractional_stock.refresh_from_db()
+		self.assertEqual(box_stock.stock_fisico, 0)
+		self.assertEqual(fractional_stock.stock_fisico, 15)
+
+	def test_product_credit_note_partial_pallet_uses_box_presentation_automatically(self):
+		pallet = Presentacion.objects.create(
+			producto=self.presentacion.producto,
+			nombre='Pallet',
+			unidades=30,
+			tipo_contenido='cajas',
+			precio_1=Decimal('300.00'),
+		)
+
+		nota = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=None,
+			tipo_ajuste='PRODUCTO',
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Pallet con cajas devueltas',
+			usuario=self.backoffice,
+			items_payload=[{
+				'invoice_item': None,
+				'presentacion': pallet,
+				'cantidad': 0,
+				'cantidad_unidades': 5,
+				'monto_unitario': Decimal('300.00'),
+			}],
+			monto=Decimal('0.00'),
+		)
+
+		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
+
+		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, 30)
+		self.assertFalse(StockProductoFraccionado.objects.filter(producto=self.presentacion.producto, contenido='cajas').exists())
+
+	def test_credit_note_on_paid_invoice_moves_excess_to_customer_balance(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		complete_driver_delivery(
+			delivery=invoice.delivery,
+			driver_user=self.driver,
+			payload={
+				'estado_pago': 'PAGADO',
+				'metodo_pago': 'CASH',
+				'monto_pagado': '45.00',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+			},
+			evidence_files=[],
+		)
+		invoice.refresh_from_db()
+		self.assertEqual(invoice.saldo_cliente, Decimal('0.00'))
+
+		nota = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=invoice,
+			tipo_ajuste='FINANCIERO',
+			tipo_documento='CREDITO',
+			motivo='DEFECT',
+			tipo_credito='CREDIT_DUMP',
+			descripcion='Credito sobre factura ya pagada',
+			usuario=self.backoffice,
+			items_payload=[],
+			monto=Decimal('15.00'),
+		)
+
+		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
+		invoice.refresh_from_db()
+		self.cliente.refresh_from_db()
+		nota.refresh_from_db()
+
+		self.assertEqual(invoice.total_creditos, Decimal('15.00'))
+		self.assertEqual(invoice.saldo_cliente, Decimal('0.00'))
+		self.assertEqual(self.cliente.balance, Decimal('15.00'))
+		self.assertEqual(nota.monto_aplicado_invoice, Decimal('15.00'))
+		self.assertEqual(nota.monto_aplicado_cliente, Decimal('15.00'))
+
 	def test_debit_note_updates_balance_without_inventory(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
@@ -229,6 +619,76 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertEqual(invoice.total_debitos, Decimal('5.00'))
 		self.assertEqual(invoice.saldo_cliente, Decimal('50.00'))
+
+	def test_customer_assigned_credit_note_requires_matching_invoice(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		other_user = Usuario.objects.create_user(username='cliente-otro', password='secret123', role='cliente')
+		other_customer = Cliente.objects.create(
+			usuario=other_user,
+			nombre_empresa='Otro Cliente',
+			telefono='5559990000',
+			direccion='500 Market St',
+			ciudad='Houston',
+			estado='TX',
+			codigo_postal='77001',
+			pais='USA',
+			sales_tax_number='TX-555',
+			certificado_tax='certificados/otro.pdf',
+		)
+
+		with self.assertRaisesMessage(ValidationError, 'The selected invoice does not belong to the selected customer.'):
+			crear_nota_ajuste(
+				cliente=other_customer,
+				invoice=invoice,
+				tipo_documento='CREDITO',
+				motivo='DAMAGE',
+				tipo_credito='CREDIT_RETURN',
+				descripcion='Intento invalido',
+				usuario=self.backoffice,
+				items_payload=[{
+					'invoice_item': invoice.items.first(),
+					'cantidad': 1,
+					'monto_unitario': Decimal('15.00'),
+				}],
+			)
+
+	def test_customer_assigned_credit_note_can_be_created_and_return_inventory(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+		nota = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=invoice,
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Credito directo al cliente aplicado a invoice',
+			usuario=self.backoffice,
+			items_payload=[{
+				'invoice_item': invoice.items.first(),
+				'cantidad': 1,
+				'monto_unitario': Decimal('15.00'),
+			}],
+		)
+
+		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
+		invoice.refresh_from_db()
+		nota.refresh_from_db()
+
+		self.assertEqual(nota.cliente, self.cliente)
+		self.assertEqual(invoice.total_creditos, Decimal('15.00'))
+		self.assertEqual(invoice.saldo_cliente, Decimal('30.00'))
+		self.assertEqual(nota.inventario_estado, 'PROCESADO')
+		self.assertTrue(InventarioMovimiento.objects.filter(nota_ajuste=nota, tipo='ENTRADA_NOTA_CREDITO').exists())
 
 	def test_credit_note_requires_credit_type(self):
 		invoice = generar_invoice_desde_picking(
@@ -340,8 +800,10 @@ class InvoiceFlowTests(TestCase):
 		)
 
 		delivery.refresh_from_db()
+		invoice.refresh_from_db()
 		self.assertEqual(delivery.estado, 'ENTREGADA_PAGADA')
 		self.assertEqual(delivery.estado_pago, 'PAGADO')
+		self.assertEqual(invoice.saldo_cliente, Decimal('0.00'))
 		self.assertTrue(bool(delivery.firma_cliente))
 		self.assertFalse(delivery.invoice.cliente.credit_hold)
 		self.assertTrue(DeliveryNotificationLog.objects.filter(delivery=delivery).count(), 3)
@@ -422,6 +884,38 @@ class InvoiceFlowTests(TestCase):
 		self.assertIn('requires review', notificacion.titulo)
 		self.assertIn('approve or reject', notificacion.mensaje)
 		self.assertEqual(notificacion.url, f'/facturacion/backoffice/invoices/{invoice.id}/')
+
+	def test_driver_complete_view_rejects_credit_dump_for_product_return(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.post(
+			reverse('driver_delivery_complete', args=[invoice.delivery.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'metodo_pago': 'CASH',
+				'monto_pagado': '45.00',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+				'driver_note_tipo_documento': 'CREDITO',
+				'driver_note_tipo_ajuste': 'PRODUCTO',
+				'driver_note_motivo': 'DAMAGE',
+				'driver_note_tipo_credito': 'CREDIT_DUMP',
+				'driver_note_descripcion': 'Intento invalido de devolucion con dump',
+				f'driver_note_qty_{invoice.items.first().id}': '1',
+				f'driver_note_amount_{invoice.items.first().id}': '15.00',
+			},
+			follow=True,
+		)
+
+		invoice.refresh_from_db()
+		self.assertEqual(invoice.notas_ajuste.count(), 0)
+		self.assertContains(response, 'Product credit notes must use Credit Return.')
 
 	def test_driver_complete_view_can_attach_evidence_to_adjustment_note(self):
 		invoice = generar_invoice_desde_picking(
@@ -654,6 +1148,73 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(nota.creada_por, self.driver)
 		self.assertEqual(nota.total, Decimal('5.00'))
 
+	def test_driver_complete_view_can_create_financial_debit_note_draft(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.post(reverse('driver_delivery_complete', args=[invoice.delivery.id]), {
+			'estado_pago': 'PAGADO',
+			'metodo_pago': 'CASH',
+			'monto_pagado': '45.00',
+			'recibido_por': 'Juan Perez',
+			'firma_cliente_data': self.signature_data,
+			'driver_note_tipo_documento': 'DEBITO',
+			'driver_note_tipo_ajuste': 'FINANCIERO',
+			'driver_note_motivo': 'OTHER',
+			'driver_note_descripcion': 'Cargo financiero por servicio especial',
+			'driver_note_monto': '7.50',
+		})
+
+		invoice.refresh_from_db()
+		nota = invoice.notas_ajuste.get(descripcion='Cargo financiero por servicio especial')
+		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertEqual(nota.tipo_documento, 'DEBITO')
+		self.assertEqual(nota.tipo_ajuste, 'FINANCIERO')
+		self.assertEqual(nota.total, Decimal('7.50'))
+		self.assertEqual(nota.items.count(), 0)
+
+	def test_driver_can_create_financial_debit_note_after_delivery(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		complete_driver_delivery(
+			delivery=invoice.delivery,
+			driver_user=self.driver,
+			payload={
+				'estado_pago': 'PAGADO',
+				'metodo_pago': 'CASH',
+				'monto_pagado': '45.00',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+			},
+			evidence_files=[],
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.post(reverse('driver_delivery_create_note', args=[invoice.delivery.id]), {
+			'driver_note_tipo_documento': 'DEBITO',
+			'driver_note_tipo_ajuste': 'FINANCIERO',
+			'driver_note_motivo': 'OTHER',
+			'driver_note_descripcion': 'Cargo financiero posterior',
+			'driver_note_monto': '6.25',
+		})
+
+		invoice.refresh_from_db()
+		nota = invoice.notas_ajuste.get(descripcion='Cargo financiero posterior')
+		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertEqual(nota.tipo_documento, 'DEBITO')
+		self.assertEqual(nota.tipo_ajuste, 'FINANCIERO')
+		self.assertEqual(nota.total, Decimal('6.25'))
+		self.assertEqual(nota.items.count(), 0)
+
 	def test_backoffice_invoice_create_note_uses_prefixed_form_fields(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
@@ -722,6 +1283,229 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(response, 'id="backofficeCreditTypeWrapper"', html=False)
 		self.assertContains(response, 'id="backofficeCreditType"', html=False)
 		self.assertContains(response, 'syncCreditTypeVisibility', html=False)
+		self.assertContains(response, 'Other')
+		self.assertContains(response, 'Choose customer and invoice', html=False)
+		self.assertContains(response, f'data-package-price="{invoice.items.first().precio_unitario}"', html=False)
+		self.assertContains(response, 'id="backofficeReasonWrapper"', html=False)
+		self.assertContains(response, 'id="backofficeReasonSelect"', html=False)
+		self.assertContains(response, 'id="backofficeDescriptionLabel"', html=False)
+		self.assertContains(response, 'id="backofficeDescriptionHelp"', html=False)
+		self.assertContains(response, 'Amount to charge')
+		self.assertContains(response, 'Product to charge')
+		self.assertContains(response, 'Charge description')
+		self.assertContains(response, 'Use this field to clearly explain what will be charged to the customer.')
+
+	def test_backoffice_adjustment_note_create_view_renders_customer_and_invoice_selectors(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_adjustment_note_create'), {
+			'cliente_id': self.cliente.id,
+			'invoice_id': invoice.id,
+		})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'name="cliente_id"', html=False)
+		self.assertContains(response, 'name="invoice_id"', html=False)
+		self.assertContains(response, invoice.numero)
+		self.assertContains(response, 'Credit note')
+		self.assertContains(response, 'Current balance')
+		self.assertContains(response, 'Available credit')
+		self.assertContains(response, 'Other')
+		self.assertContains(response, 'id="advancedReasonWrapper"', html=False)
+		self.assertContains(response, 'id="advancedReasonSelect"', html=False)
+		self.assertContains(response, 'id="advancedDescriptionLabel"', html=False)
+		self.assertContains(response, 'id="advancedDescriptionHelp"', html=False)
+		self.assertContains(response, 'Amount to charge')
+		self.assertContains(response, 'Product to charge')
+		self.assertContains(response, 'Charge description')
+		self.assertContains(response, 'Use this field to clearly explain what will be charged to the customer.')
+		self.assertContains(response, f'data-package-price="{invoice.items.first().precio_unitario}"', html=False)
+
+	def test_backoffice_adjustment_note_create_view_translates_debit_labels_in_spanish(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.backoffice)
+		self.client.cookies[settings.LANGUAGE_COOKIE_NAME] = 'es'
+
+		response = self.client.get(reverse('backoffice_adjustment_note_create'), {
+			'cliente_id': self.cliente.id,
+			'invoice_id': invoice.id,
+		}, HTTP_ACCEPT_LANGUAGE='es')
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Monto a cobrar')
+		self.assertContains(response, 'Producto por cobrar')
+		self.assertContains(response, 'Descripcion del cobro')
+		self.assertContains(response, 'Usa este campo para explicar claramente que se le cobrara al cliente.')
+
+	def test_backoffice_adjustment_note_create_view_creates_general_customer_credit_without_invoice(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('backoffice_adjustment_note_create'), {
+			'cliente_id': str(self.cliente.id),
+			'note_tipo_documento': 'CREDITO',
+			'note_tipo_ajuste': 'FINANCIERO',
+			'note_motivo': 'DEFECT',
+			'note_tipo_credito': 'CREDIT_DUMP',
+			'note_descripcion': 'Credito general sin invoice',
+			'note_monto': '22.50',
+		})
+
+		nota = NotaAjuste.objects.get(invoice__isnull=True, descripcion='Credito general sin invoice')
+		self.assertRedirects(response, f"{reverse('backoffice_adjustment_note_create')}?cliente_id={self.cliente.id}")
+		self.assertEqual(nota.cliente, self.cliente)
+		self.assertEqual(nota.tipo_ajuste, 'FINANCIERO')
+		self.assertEqual(nota.total, Decimal('22.50'))
+
+	def test_backoffice_adjustment_note_create_view_creates_manual_product_credit_without_invoice(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('backoffice_adjustment_note_create'), {
+			'cliente_id': str(self.cliente.id),
+			'note_tipo_documento': 'CREDITO',
+			'note_tipo_ajuste': 'PRODUCTO',
+			'note_motivo': 'DAMAGE',
+			'note_tipo_credito': 'CREDIT_RETURN',
+			'note_descripcion': 'Devolucion manual sin invoice desde pantalla avanzada',
+			'note_manual_presentacion': [str(self.presentacion.id), '', ''],
+			'note_manual_qty': ['1', '0', '0'],
+			'note_manual_unit_qty': ['0', '0', '0'],
+			'note_manual_amount': ['15.00', '', ''],
+			'note_manual_description': ['Caja manual', '', ''],
+		})
+
+		nota = NotaAjuste.objects.get(invoice__isnull=True, descripcion='Devolucion manual sin invoice desde pantalla avanzada')
+		self.assertRedirects(response, f"{reverse('backoffice_adjustment_note_create')}?cliente_id={self.cliente.id}")
+		self.assertEqual(nota.tipo_ajuste, 'PRODUCTO')
+		self.assertEqual(nota.total, Decimal('15.00'))
+		self.assertEqual(nota.items.count(), 1)
+		self.assertEqual(nota.items.first().presentacion, self.presentacion)
+		self.assertEqual(nota.cliente, self.cliente)
+
+	def test_backoffice_adjustment_note_create_view_lists_and_approves_general_customer_notes(self):
+		nota = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=None,
+			tipo_ajuste='FINANCIERO',
+			tipo_documento='CREDITO',
+			motivo='DEFECT',
+			tipo_credito='CREDIT_DUMP',
+			descripcion='Pendiente aprobacion general',
+			usuario=self.backoffice,
+			items_payload=[],
+			monto=Decimal('18.00'),
+		)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_adjustment_note_create'), {
+			'cliente_id': self.cliente.id,
+		})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, nota.numero)
+		self.assertContains(response, 'Approve')
+
+		approve_response = self.client.post(reverse('backoffice_invoice_approve_note', args=[nota.id]))
+		nota.refresh_from_db()
+		self.cliente.refresh_from_db()
+
+		self.assertRedirects(approve_response, f"{reverse('backoffice_adjustment_note_create')}?cliente_id={self.cliente.id}")
+		self.assertEqual(nota.estado, 'APROBADA')
+		self.assertEqual(self.cliente.balance, Decimal('18.00'))
+
+	def test_backoffice_adjustment_note_create_view_shows_saved_product_lines_for_general_notes(self):
+		nota = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=None,
+			tipo_ajuste='PRODUCTO',
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Productos vencidos retirados',
+			usuario=self.backoffice,
+			items_payload=[{
+				'invoice_item': None,
+				'presentacion': self.presentacion,
+				'descripcion': 'Coca Cola caja vencida',
+				'cantidad': 1,
+				'monto_unitario': Decimal('15.00'),
+			}],
+			monto=Decimal('0.00'),
+		)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_adjustment_note_create'), {
+			'cliente_id': self.cliente.id,
+		})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, nota.numero)
+		self.assertContains(response, 'Saved product lines')
+		self.assertContains(response, 'Coca Cola caja vencida')
+		self.assertContains(response, '$15.00')
+
+	def test_backoffice_adjustment_note_create_view_creates_customer_assigned_note(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('backoffice_adjustment_note_create'), {
+			'cliente_id': str(self.cliente.id),
+			'invoice_id': str(invoice.id),
+			'note_tipo_documento': 'CREDITO',
+			'note_motivo': 'DAMAGE',
+			'note_tipo_credito': 'CREDIT_RETURN',
+			'note_descripcion': 'Creada desde pantalla avanzada',
+			f'note_qty_{invoice.items.first().id}': '1',
+			f'note_unit_qty_{invoice.items.first().id}': '1',
+			f'note_amount_{invoice.items.first().id}': '15.00',
+		})
+
+		nota = NotaAjuste.objects.get(invoice=invoice, descripcion='Creada desde pantalla avanzada')
+		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertEqual(nota.cliente, self.cliente)
+		self.assertEqual(nota.estado, 'BORRADOR')
+		self.assertEqual(nota.total, Decimal('16.25'))
+		self.assertEqual(nota.items.count(), 2)
+
+	def test_backoffice_invoice_detail_uses_clear_credit_note_labels(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+
+		self.assertContains(response, 'Boxes / pallets')
+		self.assertContains(response, 'Calculated amount')
+		self.assertContains(response, 'Calculated automatically from the quantities you enter.')
+		self.assertContains(response, 'Partial content')
+
+	def test_advanced_adjustment_note_create_uses_customer_price_for_manual_lines(self):
+		self.cliente.nivel_precio = 3
+		self.cliente.save(update_fields=['nivel_precio'])
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={self.cliente.id}")
+
+		self.assertContains(response, 'data-package-price="17.00"', html=False)
 
 	def test_backoffice_can_unlock_blocked_customer(self):
 		invoice = generar_invoice_desde_picking(
@@ -766,11 +1550,115 @@ class InvoiceFlowTests(TestCase):
 		list_response = self.client.get(reverse('backoffice_invoices_list'))
 		detail_response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
 		pdf_response = self.client.get(reverse('backoffice_invoice_pdf', args=[invoice.id]))
+		notes_response = self.client.get(reverse('backoffice_adjustment_notes_list'))
 
 		self.assertEqual(list_response.status_code, 200)
 		self.assertEqual(detail_response.status_code, 200)
 		self.assertEqual(pdf_response.status_code, 200)
+		self.assertEqual(notes_response.status_code, 200)
 		self.assertEqual(pdf_response['Content-Type'], 'application/pdf')
+		self.assertContains(list_response, reverse('backoffice_adjustment_notes_list'))
+		self.assertContains(list_response, 'Credit / Debit Notes')
+		self.assertNotContains(list_response, 'Create note')
+
+	def test_backoffice_adjustment_notes_list_can_filter_by_customer_creator_and_invoice_query(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		admin_user = Usuario.objects.create_user(username='admin-notes', password='secret123', role='admin')
+		other_customer_user = Usuario.objects.create_user(username='cliente-notes-2', password='secret123', role='cliente')
+		other_customer = Cliente.objects.create(
+			usuario=other_customer_user,
+			nombre_empresa='Cliente Secundario',
+			telefono='5550003333',
+			direccion='456 Elm St',
+			ciudad='Dallas',
+			estado='TX',
+			codigo_postal='75002',
+			pais='USA',
+			sales_tax_number='TX-999',
+			certificado_tax='certificados/second.pdf',
+		)
+		other_order = Pedido.objects.create(
+			cliente=other_customer,
+			origen='CLIENTE',
+			estado='VERIFICADO_AJUSTADO',
+			total=Decimal('25.00'),
+		)
+		PedidoItem.objects.create(
+			pedido=other_order,
+			presentacion=self.presentacion,
+			cantidad_solicitada=2,
+			cantidad=2,
+			precio=Decimal('12.50'),
+			subtotal=Decimal('25.00'),
+		)
+		other_invoice = generar_invoice_desde_picking(
+			pedido=other_order,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+		driver_note = crear_nota_ajuste_desde_invoice(
+			invoice=invoice,
+			tipo_documento='DEBITO',
+			tipo_ajuste='PRODUCTO',
+			motivo='OTHER',
+			tipo_credito='',
+			descripcion='Driver recargo de entrega',
+			usuario=self.driver,
+			items_payload=[{
+				'invoice_item': invoice.items.first(),
+				'cantidad': 1,
+				'monto_unitario': Decimal('5.00'),
+			}],
+		)
+		crear_nota_ajuste_desde_invoice(
+			invoice=invoice,
+			tipo_documento='DEBITO',
+			tipo_ajuste='PRODUCTO',
+			motivo='OTHER',
+			tipo_credito='',
+			descripcion='Backoffice recargo interno',
+			usuario=self.backoffice,
+			items_payload=[{
+				'invoice_item': invoice.items.first(),
+				'cantidad': 1,
+				'monto_unitario': Decimal('4.00'),
+			}],
+		)
+		admin_note = crear_nota_ajuste_desde_invoice(
+			invoice=other_invoice,
+			tipo_documento='DEBITO',
+			tipo_ajuste='PRODUCTO',
+			motivo='OTHER',
+			tipo_credito='',
+			descripcion='Admin recargo especial',
+			usuario=admin_user,
+			items_payload=[{
+				'invoice_item': other_invoice.items.first(),
+				'cantidad': 1,
+				'monto_unitario': Decimal('3.00'),
+			}],
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_adjustment_notes_list'), {
+			'cliente_id': str(self.cliente.id),
+			'creada_por': 'driver',
+			'q': invoice.numero,
+		})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, driver_note.numero)
+		self.assertNotContains(response, admin_note.numero)
+		self.assertNotContains(response, 'Backoffice recargo interno')
+		self.assertEqual(response.context['summary']['total'], 1)
+		self.assertEqual(response.context['selected_creator_role'], 'driver')
 
 	def test_backoffice_invoice_list_defaults_to_pending_dispatch(self):
 		pending_invoice = self._create_invoice(metodo_entrega='LTG', total='10.00')
@@ -869,7 +1757,84 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(items[0]['dispatched_quantity'], '3')
 		self.assertEqual(items[0]['customer_price'], '$15.00')
 		self.assertEqual(items[0]['suggested_unit_price'], '$1.79')
-		self.assertEqual(items[0]['profit_percentage'], '30.17%')
+		self.assertEqual(items[0]['profit_percentage'], '30.00%')
+
+	def test_invoice_pdf_item_rows_are_chunked_in_groups_of_ten(self):
+		rows = [{'index': number} for number in range(23)]
+
+		chunks = _chunk_invoice_pdf_item_rows(rows)
+
+		self.assertEqual([len(chunk) for chunk in chunks], [10, 10, 3])
+		self.assertEqual(chunks[0][0]['index'], 0)
+		self.assertEqual(chunks[-1][-1]['index'], 22)
+
+	def test_invoice_pdf_barcode_uses_small_human_readable_font(self):
+		barcode = _build_invoice_pdf_barcode('123456789012')
+
+		self.assertEqual(barcode.fontName, 'Helvetica')
+		self.assertEqual(barcode.fontSize, 5.5)
+		self.assertEqual(barcode.barHeight, 18)
+
+	def test_invoice_pdf_totals_rows_include_customer_credit_applied(self):
+		self.cliente.balance = Decimal('30.00')
+		self.cliente.save(update_fields=['balance'])
+
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+			applied_customer_credit=Decimal('24.98'),
+		)
+
+		styles = getSampleStyleSheet()
+		meta_label_style = ParagraphStyle('InvoiceMetaLabelTest', parent=styles['BodyText'])
+		meta_value_style = ParagraphStyle('InvoiceMetaValueTest', parent=styles['BodyText'])
+		section_title_style = ParagraphStyle('InvoiceSectionTitleTest', parent=styles['BodyText'])
+
+		rows = _build_invoice_pdf_totals_rows(
+			invoice,
+			meta_label_style=meta_label_style,
+			meta_value_style=meta_value_style,
+			section_title_style=section_title_style,
+			body_style=styles['BodyText'],
+		)
+
+		self.assertEqual(rows[1][0].text, 'Customer credit applied')
+		self.assertEqual(rows[1][1].text, '$24.98')
+		self.assertEqual(rows[-2][0].text, 'Outstanding invoice balance')
+		self.assertEqual(rows[-1][1].text, '<b>$20.02</b>')
+
+	def test_invoice_pdf_totals_rows_use_final_invoice_total_when_balance_is_zero(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		invoice.credito_cliente_aplicado = Decimal('19.34')
+		invoice.total_creditos = Decimal('0.50')
+		invoice.total_debitos = Decimal('11.36')
+		invoice.total_neto = Decimal('25.60')
+		invoice.saldo_cliente = Decimal('0.00')
+
+		styles = getSampleStyleSheet()
+		meta_label_style = ParagraphStyle('InvoiceMetaLabelBalanceTest', parent=styles['BodyText'])
+		meta_value_style = ParagraphStyle('InvoiceMetaValueBalanceTest', parent=styles['BodyText'])
+		section_title_style = ParagraphStyle('InvoiceSectionTitleBalanceTest', parent=styles['BodyText'])
+
+		rows = _build_invoice_pdf_totals_rows(
+			invoice,
+			meta_label_style=meta_label_style,
+			meta_value_style=meta_value_style,
+			section_title_style=section_title_style,
+			body_style=styles['BodyText'],
+		)
+
+		self.assertEqual(rows[-2][0].text, 'Outstanding invoice balance')
+		self.assertEqual(rows[-2][1].text, '$0.00')
+		self.assertEqual(rows[-1][0].text, 'Final invoice total')
+		self.assertEqual(rows[-1][1].text, '<b>$25.60</b>')
 
 	def test_backoffice_generate_invoice_view_saves_custom_suggested_unit_price(self):
 		self.client.force_login(self.backoffice)
@@ -1029,6 +1994,10 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(list_response, invoice.delivery.route_query_address)
 		self.assertContains(detail_response, invoice.delivery.route_query_address)
 		self.assertContains(detail_response, reverse('driver_delivery_upload_evidence', args=[invoice.delivery.id]))
+		self.assertContains(detail_response, 'QTY ORD')
+		self.assertContains(detail_response, 'QTY DSP')
+		self.assertContains(detail_response, f'<td>{self.pedido_item.cantidad_solicitada}</td>', html=False)
+		self.assertContains(detail_response, f'<td>{invoice.items.first().cantidad_facturada}</td>', html=False)
 
 	def test_driver_delivery_list_renders_in_spanish_when_selected(self):
 		invoice = generar_invoice_desde_picking(
@@ -1071,6 +2040,8 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(response, 'Resumen de entrega')
 		self.assertContains(response, 'Estado de pago')
 		self.assertContains(response, 'Saldo del cliente')
+		self.assertContains(response, 'QTY ORD')
+		self.assertContains(response, 'QTY DSP')
 		self.assertContains(response, 'Consulta de Google Maps')
 		self.assertContains(response, 'Evidencia')
 		self.assertContains(response, 'Subir evidencia')
@@ -1084,8 +2055,30 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(response, 'Detalles del pago')
 		self.assertContains(response, 'Firma del cliente')
 		self.assertContains(response, 'Guardar entrega')
-		self.assertContains(response, 'Asignada')
-		self.assertContains(response, 'Pendiente')
+		self.assertContains(response, 'Monto a cobrar')
+		self.assertContains(response, 'Producto por cobrar')
+		self.assertContains(response, 'Descripcion del cobro')
+
+	def test_driver_delivery_detail_uses_charge_labels_for_debit_note_ui(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.get(reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'id="driverReasonWrapper"', html=False)
+		self.assertContains(response, 'id="driverReasonSelect"', html=False)
+		self.assertContains(response, 'id="driverDescriptionLabel"', html=False)
+		self.assertContains(response, 'id="driverDescriptionHelp"', html=False)
+		self.assertContains(response, 'Amount to charge')
+		self.assertContains(response, 'Product to charge')
+		self.assertContains(response, 'Charge description')
+		self.assertContains(response, 'Use this field to clearly explain what will be charged to the customer.')
 		content = response.content.decode('utf-8')
 		self.assertLess(content.index('data-driver-section="adjustment-note"'), content.index('data-driver-section="payment-details"'))
 

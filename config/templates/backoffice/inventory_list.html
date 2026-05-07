@@ -48,6 +48,14 @@
       </div>
     </div>
   </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100 border-info">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">{% trans "Internal partial stock" %}</div>
+        <div class="display-6 fw-semibold">{{ total_fractional_stock }}</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="card shadow-sm">
@@ -74,7 +82,13 @@
             {% endif %}
           </td>
           <td data-label="{% trans 'Presentation' %}">{{ row.presentacion.nombre_traducido }}</td>
-          <td data-label="{% trans 'Physical' %}">{{ row.stock_fisico }}</td>
+          <td data-label="{% trans 'Physical' %}">
+            <div>{{ row.stock_fisico }}</div>
+            <div class="small fw-semibold text-dark">{{ row.physical_summary }}</div>
+            {% if row.fractional_stock > 0 %}
+            <div class="small text-muted">+ {{ row.fractional_stock }} {{ row.fractional_content_label }}</div>
+            {% endif %}
+          </td>
           <td data-label="{% trans 'Reserved' %}">{{ row.stock_reservado }}</td>
           <td data-label="{% trans 'Available' %}">{{ row.stock_disponible }}</td>
           <td data-label="{% trans 'Status' %}">
@@ -93,6 +107,49 @@
         {% empty %}
         <tr>
           <td colspan="7" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No inventory presentations match the current filter." %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card shadow-sm mt-4">
+  <div class="card-body border-bottom">
+    <h5 class="mb-0">{% trans "Internal partial stock by product" %}</h5>
+  </div>
+  <div class="table-responsive mobile-stack-responsive">
+    <table class="table table-striped align-middle mb-0 mobile-stack-table mobile-stack-table--list">
+      <thead>
+        <tr>
+          <th>{% trans "Product" %}</th>
+          <th>{% trans "Content" %}</th>
+          <th>{% trans "Physical" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in fractional_rows %}
+        <tr>
+          <td data-label="{% trans 'Product' %}">{{ row.producto.nombre_traducido }}</td>
+          <td data-label="{% trans 'Content' %}">
+            {% if row.presentacion %}
+            {{ row.presentacion.nombre_traducido }}
+            <div class="small text-muted">{{ row.stock_fisico }} {{ row.contenido }}</div>
+            {% else %}
+            {{ row.contenido }}
+            {% endif %}
+          </td>
+          <td data-label="{% trans 'Physical' %}">
+            {% if row.presentacion %}
+            {{ row.stock_fisico }} {{ row.contenido }}
+            {% else %}
+            {{ row.stock_fisico }}
+          {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="3" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No internal partial stock has been recorded yet." %}</td>
         </tr>
         {% endfor %}
       </tbody>

@@ -5,6 +5,8 @@ from . import views
 
 urlpatterns = [
 	path('backoffice/invoices/', views.backoffice_invoices_list, name='backoffice_invoices_list'),
+	path('backoffice/notes/', views.backoffice_adjustment_notes_list, name='backoffice_adjustment_notes_list'),
+	path('backoffice/notes/create/', views.backoffice_adjustment_note_create, name='backoffice_adjustment_note_create'),
 	path('backoffice/invoices/live-drivers/', views.backoffice_live_drivers, name='backoffice_live_drivers'),
 	path('backoffice/invoices/live-drivers/data/', views.backoffice_live_drivers_data, name='backoffice_live_drivers_data'),
 	path('backoffice/invoices/<int:invoice_id>/', views.backoffice_invoice_detail, name='backoffice_invoice_detail'),

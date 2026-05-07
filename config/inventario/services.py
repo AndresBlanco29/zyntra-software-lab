@@ -1,10 +1,40 @@
+import math
+import unicodedata
+
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils.translation import gettext as _
 
 from config.pedidos.models import PedidoItem
+from config.productos.models import Presentacion
 
-from .models import InventarioMovimiento, StockPresentacion
+from .models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
+
+
+def _normalize_content_term(value):
+    normalized = unicodedata.normalize('NFKD', str(value or '').strip().lower())
+    return ''.join(char for char in normalized if not unicodedata.combining(char))
+
+
+def _content_term_aliases(value):
+    normalized = _normalize_content_term(value)
+    aliases = {normalized}
+    if normalized.endswith('s'):
+        aliases.add(normalized[:-1])
+    if normalized.endswith('es'):
+        aliases.add(normalized[:-2])
+    return {alias for alias in aliases if alias}
+
+
+def _resolve_fractional_rollup_presentacion(producto_id, contenido):
+    contenido_aliases = _content_term_aliases(contenido)
+    for candidate in Presentacion.objects.filter(producto_id=producto_id, unidades__gt=1).order_by('unidades', 'id'):
+        candidate_aliases = set()
+        candidate_aliases.update(_content_term_aliases(candidate.tipo_contenido))
+        candidate_aliases.update(_content_term_aliases(candidate.tipo_contenido_en))
+        if contenido_aliases & candidate_aliases:
+            return candidate
+    return None
 
 
 def _lock_stock_records(presentacion_ids):
@@ -26,6 +56,30 @@ def _lock_stock_records(presentacion_ids):
         presentacion_id__in=presentacion_ids
     ).order_by('presentacion_id'):
         stock_map[stock.presentacion_id] = stock
+    return stock_map
+
+
+def _lock_fractional_stock_records(product_content_pairs):
+    stock_map = {}
+    normalized_pairs = []
+    for producto_id, contenido in product_content_pairs:
+        normalized_contenido = str(contenido or '').strip()
+        if not producto_id or not normalized_contenido:
+            continue
+        normalized_pairs.append((producto_id, normalized_contenido))
+    for producto_id, contenido in sorted(set(normalized_pairs)):
+        try:
+            StockProductoFraccionado.objects.get_or_create(
+                producto_id=producto_id,
+                contenido=contenido,
+                defaults={'stock_fisico': 0},
+            )
+        except IntegrityError:
+            pass
+    for stock in StockProductoFraccionado.objects.select_for_update().select_related('producto').filter(
+        producto_id__in=[producto_id for producto_id, _ in normalized_pairs]
+    ):
+        stock_map[(stock.producto_id, stock.contenido)] = stock
     return stock_map
 
 
@@ -105,6 +159,74 @@ def _apply_inventory_change(
         nota_ajuste_item=nota_ajuste_item,
         creado_por=creado_por,
     )
+
+
+def _apply_fractional_inventory_change(
+    *,
+    stock,
+    delta_fisico,
+    observacion='',
+    referencia='',
+    invoice=None,
+    nota_ajuste=None,
+    nota_ajuste_item=None,
+    creado_por=None,
+):
+    promotion_presentacion = _resolve_fractional_rollup_presentacion(stock.producto_id, stock.contenido)
+    units_per_package = max(int(getattr(promotion_presentacion, 'unidades', 0) or 0), 1) if promotion_presentacion else 1
+
+    if delta_fisico < 0 and stock.stock_fisico + delta_fisico < 0 and promotion_presentacion is not None:
+        missing_quantity = abs(stock.stock_fisico + delta_fisico)
+        packages_to_break = int(math.ceil(missing_quantity / units_per_package))
+        package_stock = _lock_stock_records([promotion_presentacion.id])[promotion_presentacion.id]
+        _apply_inventory_change(
+            stock=package_stock,
+            categoria='AJUSTE',
+            tipo='DESCONSOLIDACION_FRACCIONADA',
+            cantidad=packages_to_break,
+            delta_fisico=-packages_to_break,
+            delta_reservado=0,
+            referencia=referencia or f'FRACTIONAL-{stock.producto_id}',
+            observacion=observacion,
+            invoice=invoice,
+            nota_ajuste=nota_ajuste,
+            nota_ajuste_item=nota_ajuste_item,
+            creado_por=creado_por,
+        )
+        stock.stock_fisico += packages_to_break * units_per_package
+        stock.save(update_fields=['stock_fisico', 'actualizado_en'])
+
+    after_fisico = stock.stock_fisico + delta_fisico
+    if after_fisico < 0:
+        raise ValidationError(
+            _('Insufficient fractional stock for %(product)s - %(content)s.') % {
+                'product': stock.producto.nombre,
+                'content': stock.contenido,
+            }
+        )
+    stock.stock_fisico = after_fisico
+    stock.save(update_fields=['stock_fisico', 'actualizado_en'])
+
+    if delta_fisico > 0 and promotion_presentacion is not None and stock.stock_fisico >= units_per_package:
+        packages_to_promote = stock.stock_fisico // units_per_package
+        stock.stock_fisico = stock.stock_fisico % units_per_package
+        stock.save(update_fields=['stock_fisico', 'actualizado_en'])
+        package_stock = _lock_stock_records([promotion_presentacion.id])[promotion_presentacion.id]
+        _apply_inventory_change(
+            stock=package_stock,
+            categoria='AJUSTE',
+            tipo='CONSOLIDACION_FRACCIONADA',
+            cantidad=packages_to_promote,
+            delta_fisico=packages_to_promote,
+            delta_reservado=0,
+            referencia=referencia or f'FRACTIONAL-{stock.producto_id}',
+            observacion=observacion,
+            invoice=invoice,
+            nota_ajuste=nota_ajuste,
+            nota_ajuste_item=nota_ajuste_item,
+            creado_por=creado_por,
+        )
+    return stock
 
 
 @transaction.atomic
@@ -211,13 +333,12 @@ def reservar_stock_para_pedido_items(*, pedido, pedido_items, creado_por=None):
 def ajustar_reserva_item_pedido(*, item, nueva_cantidad, creado_por=None):
     locked_item = PedidoItem.objects.select_for_update().select_related('pedido', 'presentacion__producto').get(pk=item.pk)
     stock = _lock_stock_records([locked_item.presentacion_id])[locked_item.presentacion_id]
-    objetivo = max(int(nueva_cantidad), 1)
+    objetivo = max(int(nueva_cantidad), 0)
     actual = int(locked_item.cantidad_reservada_inventario or 0)
     delta = objetivo - actual
     if delta == 0:
-        locked_item.cantidad_solicitada = objetivo
         locked_item.cantidad = objetivo
-        locked_item.save(update_fields=['cantidad_solicitada', 'cantidad'])
+        locked_item.save(update_fields=['cantidad'])
         return locked_item
 
     if locked_item.cantidad_inventario_aplicada:
@@ -252,10 +373,165 @@ def ajustar_reserva_item_pedido(*, item, nueva_cantidad, creado_por=None):
             creado_por=creado_por,
         )
 
-    locked_item.cantidad_solicitada = objetivo
     locked_item.cantidad = objetivo
     locked_item.cantidad_reservada_inventario = objetivo
-    locked_item.save(update_fields=['cantidad_solicitada', 'cantidad', 'cantidad_reservada_inventario'])
+    locked_item.save(update_fields=['cantidad', 'cantidad_reservada_inventario'])
+    return locked_item
+
+
+@transaction.atomic
+def ajustar_cantidad_item_pedido_despues_picking(*, item, nueva_cantidad, creado_por=None):
+    locked_item = PedidoItem.objects.select_for_update().select_related('pedido', 'presentacion__producto').get(pk=item.pk)
+    objetivo = max(int(nueva_cantidad), 0)
+    actual = int(locked_item.cantidad_inventario_aplicada or locked_item.cantidad or 0)
+    delta = objetivo - actual
+
+    if delta == 0:
+        locked_item.cantidad = objetivo
+        locked_item.save(update_fields=['cantidad'])
+        return locked_item
+
+    stock = _lock_stock_records([locked_item.presentacion_id])[locked_item.presentacion_id]
+    _apply_inventory_change(
+        stock=stock,
+        categoria='SALIDA' if delta > 0 else 'AJUSTE',
+        tipo='SALIDA_PICKING' if delta > 0 else 'AJUSTE_PICKING',
+        cantidad=abs(delta),
+        delta_fisico=-delta,
+        delta_reservado=0,
+        referencia=f'PO-{locked_item.pedido_id}',
+        idempotency_key=f'PO-BACKOFFICE-AJUSTE-{locked_item.id}-{objetivo}',
+        pedido=locked_item.pedido,
+        pedido_item=locked_item,
+        creado_por=creado_por,
+    )
+
+    locked_item.cantidad = objetivo
+    locked_item.cantidad_inventario_aplicada = objetivo
+    locked_item.save(update_fields=['cantidad', 'cantidad_inventario_aplicada'])
+    return locked_item
+
+
+@transaction.atomic
+def reemplazar_presentacion_item_pedido(*, item, nueva_presentacion, creado_por=None):
+    locked_item = PedidoItem.objects.select_for_update().select_related('pedido', 'presentacion__producto').get(pk=item.pk)
+    if locked_item.presentacion_id == nueva_presentacion.id:
+        return locked_item
+    if locked_item.cantidad_inventario_aplicada:
+        raise ValidationError(_('Reserved quantities cannot be edited after picking has affected stock.'))
+    if nueva_presentacion.producto_id != locked_item.presentacion.producto_id:
+        raise ValidationError(_('Unit of measure can only be changed to another presentation of the same product.'))
+
+    stock_map = _lock_stock_records([locked_item.presentacion_id, nueva_presentacion.id])
+    reserva_actual = int(locked_item.cantidad_reservada_inventario or 0)
+    stock_actual = stock_map[locked_item.presentacion_id]
+    stock_nuevo = stock_map[nueva_presentacion.id]
+
+    if reserva_actual:
+        _apply_inventory_change(
+            stock=stock_actual,
+            categoria='RESERVA',
+            tipo='LIBERACION_PEDIDO',
+            cantidad=reserva_actual,
+            delta_fisico=0,
+            delta_reservado=-reserva_actual,
+            referencia=f'PO-{locked_item.pedido_id}',
+            idempotency_key=f'PO-SWAP-OUT-{locked_item.id}-{locked_item.presentacion_id}-{nueva_presentacion.id}',
+            pedido=locked_item.pedido,
+            pedido_item=locked_item,
+            creado_por=creado_por,
+        )
+        _apply_inventory_change(
+            stock=stock_nuevo,
+            categoria='RESERVA',
+            tipo='RESERVA_PEDIDO',
+            cantidad=reserva_actual,
+            delta_fisico=0,
+            delta_reservado=reserva_actual,
+            referencia=f'PO-{locked_item.pedido_id}',
+            idempotency_key=f'PO-SWAP-IN-{locked_item.id}-{locked_item.presentacion_id}-{nueva_presentacion.id}',
+            pedido=locked_item.pedido,
+            pedido_item=locked_item,
+            creado_por=creado_por,
+        )
+
+    locked_item.presentacion = nueva_presentacion
+    locked_item.save(update_fields=['presentacion'])
+    return locked_item
+
+
+@transaction.atomic
+def reemplazar_presentacion_item_pedido_despues_picking(*, item, nueva_presentacion, creado_por=None):
+    locked_item = PedidoItem.objects.select_for_update().select_related('pedido', 'presentacion__producto').get(pk=item.pk)
+    if locked_item.presentacion_id == nueva_presentacion.id:
+        return locked_item
+    if nueva_presentacion.producto_id != locked_item.presentacion.producto_id:
+        raise ValidationError(_('Unit of measure can only be changed to another presentation of the same product.'))
+
+    stock_map = _lock_stock_records([locked_item.presentacion_id, nueva_presentacion.id])
+    stock_actual = stock_map[locked_item.presentacion_id]
+    stock_nuevo = stock_map[nueva_presentacion.id]
+    aplicado_actual = int(locked_item.cantidad_inventario_aplicada or locked_item.cantidad or 0)
+    reservado_actual = int(locked_item.cantidad_reservada_inventario or 0)
+
+    if reservado_actual:
+        _apply_inventory_change(
+            stock=stock_actual,
+            categoria='RESERVA',
+            tipo='LIBERACION_PEDIDO',
+            cantidad=reservado_actual,
+            delta_fisico=0,
+            delta_reservado=-reservado_actual,
+            referencia=f'PO-{locked_item.pedido_id}',
+            idempotency_key=f'PO-BO-SWAP-RES-OUT-{locked_item.id}-{locked_item.presentacion_id}-{nueva_presentacion.id}',
+            pedido=locked_item.pedido,
+            pedido_item=locked_item,
+            creado_por=creado_por,
+        )
+        _apply_inventory_change(
+            stock=stock_nuevo,
+            categoria='RESERVA',
+            tipo='RESERVA_PEDIDO',
+            cantidad=reservado_actual,
+            delta_fisico=0,
+            delta_reservado=reservado_actual,
+            referencia=f'PO-{locked_item.pedido_id}',
+            idempotency_key=f'PO-BO-SWAP-RES-IN-{locked_item.id}-{locked_item.presentacion_id}-{nueva_presentacion.id}',
+            pedido=locked_item.pedido,
+            pedido_item=locked_item,
+            creado_por=creado_por,
+        )
+
+    if aplicado_actual:
+        _apply_inventory_change(
+            stock=stock_actual,
+            categoria='AJUSTE',
+            tipo='AJUSTE_PICKING',
+            cantidad=aplicado_actual,
+            delta_fisico=aplicado_actual,
+            delta_reservado=0,
+            referencia=f'PO-{locked_item.pedido_id}',
+            idempotency_key=f'PO-BO-SWAP-APPLIED-OUT-{locked_item.id}-{locked_item.presentacion_id}-{nueva_presentacion.id}',
+            pedido=locked_item.pedido,
+            pedido_item=locked_item,
+            creado_por=creado_por,
+        )
+        _apply_inventory_change(
+            stock=stock_nuevo,
+            categoria='SALIDA',
+            tipo='SALIDA_PICKING',
+            cantidad=aplicado_actual,
+            delta_fisico=-aplicado_actual,
+            delta_reservado=0,
+            referencia=f'PO-{locked_item.pedido_id}',
+            idempotency_key=f'PO-BO-SWAP-APPLIED-IN-{locked_item.id}-{locked_item.presentacion_id}-{nueva_presentacion.id}',
+            pedido=locked_item.pedido,
+            pedido_item=locked_item,
+            creado_por=creado_por,
+        )
+
+    locked_item.presentacion = nueva_presentacion
+    locked_item.save(update_fields=['presentacion'])
     return locked_item
 
 

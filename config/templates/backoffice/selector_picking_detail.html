@@ -42,7 +42,10 @@
 <form method="post" class="card shadow-sm" id="pickerVerificationForm" data-initial-shortage="{% if form_has_stock_shortage %}true{% else %}false{% endif %}">
   {% csrf_token %}
   <div class="card-body">
-    <h5 class="mb-3">{% trans "Real quantities by product" %}</h5>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+      <h5 class="mb-0">{% trans "Real quantities by product" %}</h5>
+      <button type="button" class="btn btn-outline-primary btn-sm" id="addProductRowButton">{% trans "Add product" %}</button>
+    </div>
     <div class="table-responsive mobile-stack-responsive">
       <table class="table align-middle mobile-stack-table mobile-stack-table--detail">
         <thead>
@@ -53,11 +56,17 @@
             <th>QTY PICK</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="pickerItemsTableBody">
           {% for item in item_rows %}
           <tr>
             <td data-label="{% trans 'Product' %}">{{ item.product }}</td>
-            <td data-label="U/M">{{ item.presentation }}</td>
+            <td data-label="U/M">
+              <select class="form-select form-select-sm" name="presentacion_{{ item.id }}">
+                {% for option in item.presentation_options %}
+                <option value="{{ option.id }}" {% if option.id == item.presentation_id %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+              </select>
+            </td>
             <td data-label="QTY ORD">{{ item.requested_quantity }}</td>
             <td data-label="QTY PICK" class="mobile-stack-table__input-cell">
               <div class="input-group quantity-stepper" data-quantity-stepper data-stock-physical="{{ item.stock_physical }}" data-applied-quantity="{{ item.applied_quantity }}">
@@ -68,9 +77,34 @@
             </td>
           </tr>
           {% endfor %}
+          {% for row in additional_item_rows %}
+          <tr data-added-product-row>
+            <td data-label="{% trans 'Product' %}">
+              <select class="form-select form-select-sm" name="presentacion_nueva[]" data-added-product-select>
+                <option value="">{% trans "Select a product..." %}</option>
+                {% for presentacion in available_presentations %}
+                <option value="{{ presentacion.id }}" data-stock-physical="{{ presentacion.stock_operativo.stock_fisico|default:0 }}" {% if row.presentacion_id == presentacion.id|stringformat:'s' %}selected{% endif %}>{{ presentacion.producto.nombre }} - {{ presentacion.nombre_traducido }}</option>
+                {% endfor %}
+              </select>
+            </td>
+            <td data-label="U/M"><span class="badge text-bg-danger">{% trans "New" %}</span></td>
+            <td data-label="QTY ORD">-</td>
+            <td data-label="QTY PICK" class="mobile-stack-table__input-cell">
+              <div class="d-flex gap-2 align-items-center">
+                <div class="input-group quantity-stepper flex-grow-1" data-quantity-stepper data-stock-physical="0" data-applied-quantity="0">
+                  <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="down" aria-label="{% trans 'Decrease real quantity' %}">-</button>
+                  <input type="number" min="1" class="form-control quantity-stepper__input" name="cantidad_nueva[]" value="{{ row.cantidad }}">
+                  <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="up" aria-label="{% trans 'Increase real quantity' %}">+</button>
+                </div>
+                <button type="button" class="btn btn-outline-danger btn-sm" data-remove-product-row>{% trans "Remove" %}</button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
         </tbody>
       </table>
     </div>
+    <div class="form-text mt-2">{% trans "Products added here will be marked in red for BackOffice review." %}</div>
 
     <div class="row g-3 mt-1">
       <div class="col-12">
@@ -111,6 +145,68 @@
     var noteHelp = document.getElementById('pickerNoteHelp');
     var stockAlert = document.getElementById('pickerStockAlert');
     var approvedCheckbox = document.getElementById('notaResuelta');
+    var addProductRowButton = document.getElementById('addProductRowButton');
+    var pickerItemsTableBody = document.getElementById('pickerItemsTableBody');
+    var availablePresentationOptionsHtml = '{% for presentacion in available_presentations %}<option value="{{ presentacion.id }}" data-stock-physical="{{ presentacion.stock_operativo.stock_fisico|default:0 }}">{{ presentacion.producto.nombre|escapejs }} - {{ presentacion.nombre_traducido|escapejs }}</option>{% endfor %}';
+
+    function syncAddedProductRow(row) {
+      var select = row.querySelector('[data-added-product-select]');
+      var stepper = row.querySelector('[data-quantity-stepper]');
+      if (!select || !stepper) {
+        return;
+      }
+
+      var selectedOption = select.options[select.selectedIndex];
+      stepper.dataset.stockPhysical = selectedOption ? Number(selectedOption.dataset.stockPhysical || 0) : 0;
+    }
+
+    function initQuantityStepper(stepper) {
+      if (!stepper || stepper.dataset.stepperReady === 'true') {
+        return;
+      }
+
+      var input = stepper.querySelector('.quantity-stepper__input');
+      stepper.querySelectorAll('[data-step]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          var currentValue = Number(input.value || 0);
+          var minValue = Number(input.min || 0);
+          var nextValue = button.dataset.step === 'down' ? currentValue - 1 : currentValue + 1;
+
+          input.value = Math.max(minValue, nextValue);
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          input.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+      });
+
+      input.addEventListener('input', updateFormState);
+      input.addEventListener('change', updateFormState);
+      stepper.dataset.stepperReady = 'true';
+    }
+
+    function buildAddedProductRow() {
+      var row = document.createElement('tr');
+      row.setAttribute('data-added-product-row', 'true');
+      row.innerHTML = '' +
+        '<td data-label="{% trans "Product" %}">' +
+          '<select class="form-select form-select-sm" name="presentacion_nueva[]" data-added-product-select>' +
+            '<option value="">{% trans "Select a product..." %}</option>' +
+            availablePresentationOptionsHtml +
+          '</select>' +
+        '</td>' +
+        '<td data-label="U/M"><span class="badge text-bg-danger">{% trans "New" %}</span></td>' +
+        '<td data-label="QTY ORD">-</td>' +
+        '<td data-label="QTY PICK" class="mobile-stack-table__input-cell">' +
+          '<div class="d-flex gap-2 align-items-center">' +
+            '<div class="input-group quantity-stepper flex-grow-1" data-quantity-stepper data-stock-physical="0" data-applied-quantity="0">' +
+              '<button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="down" aria-label="{% trans "Decrease real quantity" %}">-</button>' +
+              '<input type="number" min="1" class="form-control quantity-stepper__input" name="cantidad_nueva[]" value="1">' +
+              '<button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="up" aria-label="{% trans "Increase real quantity" %}">+</button>' +
+            '</div>' +
+            '<button type="button" class="btn btn-outline-danger btn-sm" data-remove-product-row>{% trans "Remove" %}</button>' +
+          '</div>' +
+        '</td>';
+      return row;
+    }
 
     function updateFormState() {
       var hasShortage = false;
@@ -148,22 +244,53 @@
     }
 
     document.querySelectorAll('[data-quantity-stepper]').forEach(function (stepper) {
-      var input = stepper.querySelector('.quantity-stepper__input');
+      initQuantityStepper(stepper);
+    });
 
-      stepper.querySelectorAll('[data-step]').forEach(function (button) {
-        button.addEventListener('click', function () {
-          var currentValue = Number(input.value || 0);
-          var minValue = Number(input.min || 0);
-          var nextValue = button.dataset.step === 'down' ? currentValue - 1 : currentValue + 1;
-
-          input.value = Math.max(minValue, nextValue);
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
-        });
+    document.querySelectorAll('[data-added-product-row]').forEach(function (row) {
+      syncAddedProductRow(row);
+      row.querySelector('[data-added-product-select]').addEventListener('change', function () {
+        syncAddedProductRow(row);
+        updateFormState();
       });
+    });
 
-      input.addEventListener('input', updateFormState);
-      input.addEventListener('change', updateFormState);
+    pickerItemsTableBody.addEventListener('click', function (event) {
+      var removeButton = event.target.closest('[data-remove-product-row]');
+      if (!removeButton) {
+        return;
+      }
+
+      var row = removeButton.closest('[data-added-product-row]');
+      if (row) {
+        row.remove();
+        updateFormState();
+      }
+    });
+
+    pickerItemsTableBody.addEventListener('change', function (event) {
+      var select = event.target.closest('[data-added-product-select]');
+      if (!select) {
+        return;
+      }
+
+      var row = select.closest('[data-added-product-row]');
+      if (row) {
+        syncAddedProductRow(row);
+        updateFormState();
+      }
+    });
+
+    addProductRowButton.addEventListener('click', function () {
+      var row = buildAddedProductRow();
+      pickerItemsTableBody.appendChild(row);
+      initQuantityStepper(row.querySelector('[data-quantity-stepper]'));
+      row.querySelector('[data-added-product-select]').addEventListener('change', function () {
+        syncAddedProductRow(row);
+        updateFormState();
+      });
+      syncAddedProductRow(row);
+      updateFormState();
     });
 
     updateFormState();

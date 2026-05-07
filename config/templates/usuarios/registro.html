@@ -255,7 +255,7 @@
                       data-tax-example-mode="number"
                       data-tax-example-title="{% if CURRENT_LANGUAGE == 'es' %}Ejemplo: Número de impuesto sobre ventas{% else %}Example: Sales tax number{% endif %}"
                       data-tax-example-note="{% if CURRENT_LANGUAGE == 'es' %}Localiza el número de impuesto en tu certificado y escríbelo sin espacios ni guiones.{% else %}Find the sales tax number on your certificate and enter it without spaces or hyphens.{% endif %}"
-                      data-tax-example-label="{% if CURRENT_LANGUAGE == 'es' %}Aquí va el número de impuesto{% else %}Enter this sales tax number{% endif %}"
+                      data-tax-example-label="{% if CURRENT_LANGUAGE == 'es' %}Este es el número de impuesto{% else %}This is the sales tax number{% endif %}"
                     >
                       {% if CURRENT_LANGUAGE == 'es' %}Ver ejemplo{% else %}View example{% endif %}
                     </button>
@@ -396,11 +396,12 @@
                 <div class="tax-example-container">
                   <img id="taxExampleImg" src="{% static 'img/examples/sales_tax_example.png' %}" alt="Ejemplo Sales Tax" class="img-fluid" />
                   <div class="tax-overlay">
+                    <div class="tax-redaction" data-tax-mask="address" aria-hidden="true"></div>
                     <div class="tax-highlight" id="taxHighlight" data-tax-highlight="salesTax">
-                      <div class="tax-label" id="taxLabel">{% if CURRENT_LANGUAGE == 'es' %}Aquí va el número de impuesto{% else %}Enter this sales tax number{% endif %}</div>
+                      <div class="tax-label" id="taxLabel">{% if CURRENT_LANGUAGE == 'es' %}Este es el número de impuesto{% else %}This is the sales tax number{% endif %}</div>
                     </div>
                     <div class="tax-highlight" data-tax-highlight="georgia">
-                      <div class="tax-label">State of Georgia</div>
+                      <div class="tax-label">Departmnt of revenue of your state</div>
                     </div>
                   </div>
                 </div>

@@ -11,6 +11,7 @@ class InvoiceItemInline(admin.TabularInline):
 class NotaAjusteItemInline(admin.TabularInline):
 	model = NotaAjusteItem
 	extra = 0
+	fields = ('invoice_item', 'presentacion', 'contenido_fraccionado', 'descripcion', 'cantidad', 'monto_unitario', 'total')
 
 
 class DeliveryEvidencePhotoInline(admin.TabularInline):
@@ -35,8 +36,8 @@ class InvoiceAdmin(admin.ModelAdmin):
 
 @admin.register(NotaAjuste)
 class NotaAjusteAdmin(admin.ModelAdmin):
-	list_display = ('numero', 'invoice', 'tipo_documento', 'estado', 'motivo', 'tipo_credito', 'total', 'inventario_estado', 'creada_en')
-	search_fields = ('numero', 'invoice__numero')
+	list_display = ('numero', 'cliente', 'invoice', 'tipo_documento', 'estado', 'motivo', 'tipo_credito', 'total', 'inventario_estado', 'creada_en')
+	search_fields = ('numero', 'invoice__numero', 'cliente__nombre_empresa')
 	list_filter = ('tipo_documento', 'estado', 'motivo', 'tipo_credito', 'inventario_estado')
 	inlines = [NotaAjusteItemInline]
 

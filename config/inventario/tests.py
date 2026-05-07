@@ -11,8 +11,8 @@ from config.pedidos.services import crear_pedido_desde_items, guardar_verificaci
 from config.productos.models import Categoria, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
 
-from .models import InventarioMovimiento, StockPresentacion
-from .services import cancelar_pedido_con_inventario, registrar_entrada_manual
+from .models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
+from .services import _apply_fractional_inventory_change, _lock_fractional_stock_records, cancelar_pedido_con_inventario, registrar_entrada_manual
 
 
 class InventarioOperativoTests(TestCase):
@@ -39,8 +39,8 @@ class InventarioOperativoTests(TestCase):
 		self.presentacion = Presentacion.objects.create(
 			producto=producto,
 			nombre='Caja',
-			unidades=1,
-			tipo_contenido='caja',
+			unidades=10,
+			tipo_contenido='unidades',
 			precio_1=Decimal('10.00'),
 		)
 		registrar_entrada_manual(presentacion=self.presentacion, cantidad=10, observacion='Initial stock', creado_por=self.backoffice)
@@ -205,6 +205,33 @@ class InventarioOperativoTests(TestCase):
 		self.assertEqual(stock.stock_fisico, 8)
 		self.assertTrue(InventarioMovimiento.objects.filter(nota_ajuste=nota, tipo='REVERSO_NOTA_CREDITO').exists())
 
+	def test_fractional_stock_promotes_into_full_packages_when_threshold_is_reached(self):
+		fractional_stock = _lock_fractional_stock_records([(self.presentacion.producto_id, 'unidades')])[(self.presentacion.producto_id, 'unidades')]
+
+		_apply_fractional_inventory_change(stock=fractional_stock, delta_fisico=7, observacion='First partial')
+		fractional_stock.refresh_from_db()
+		self.assertEqual(fractional_stock.stock_fisico, 7)
+
+		_apply_fractional_inventory_change(stock=fractional_stock, delta_fisico=3, observacion='Second partial')
+		fractional_stock.refresh_from_db()
+		stock_presentacion = StockPresentacion.objects.get(presentacion=self.presentacion)
+		self.assertEqual(fractional_stock.stock_fisico, 0)
+		self.assertEqual(stock_presentacion.stock_fisico, 11)
+
+	def test_fractional_stock_deconsolidates_package_when_reversal_needs_content_units(self):
+		stock_presentacion = StockPresentacion.objects.get(presentacion=self.presentacion)
+		stock_presentacion.stock_fisico = 1
+		stock_presentacion.stock_reservado = 0
+		stock_presentacion.stock_disponible = 1
+		stock_presentacion.save()
+		fractional_stock = _lock_fractional_stock_records([(self.presentacion.producto_id, 'unidades')])[(self.presentacion.producto_id, 'unidades')]
+
+		_apply_fractional_inventory_change(stock=fractional_stock, delta_fisico=-5, observacion='Reverse partial')
+		fractional_stock.refresh_from_db()
+		stock_presentacion.refresh_from_db()
+		self.assertEqual(stock_presentacion.stock_fisico, 0)
+		self.assertEqual(fractional_stock.stock_fisico, 5)
+
 
 class InventarioBackofficeViewsTests(TestCase):
 	def setUp(self):
@@ -215,16 +242,21 @@ class InventarioBackofficeViewsTests(TestCase):
 		self.presentacion = Presentacion.objects.create(
 			producto=producto,
 			nombre='Caja',
-			unidades=1,
-			tipo_contenido='caja',
+			unidades=20,
+			tipo_contenido='unidades',
 			precio_1=Decimal('15.00'),
 		)
 		self.presentacion_sin_stock = Presentacion.objects.create(
 			producto=producto,
-			nombre='Unidad',
-			unidades=1,
-			tipo_contenido='unidad',
+			nombre='Pallet',
+			unidades=30,
+			tipo_contenido='cajas',
 			precio_1=Decimal('2.00'),
+		)
+		self.stock_fraccionado = StockProductoFraccionado.objects.create(
+			producto=producto,
+			contenido='unidades',
+			stock_fisico=7,
 		)
 		registrar_entrada_manual(presentacion=self.presentacion, cantidad=6, observacion='Initial stock', creado_por=self.backoffice)
 
@@ -237,6 +269,49 @@ class InventarioBackofficeViewsTests(TestCase):
 		self.assertContains(response, 'Producto Vista Stock')
 		self.assertContains(response, self.presentacion.nombre_traducido)
 		self.assertContains(response, self.presentacion_sin_stock.nombre_traducido)
+		self.assertContains(response, 'Internal partial stock')
+		self.assertContains(response, 'unidades')
+		self.assertContains(response, '7')
+		self.assertContains(response, '6 box + 7 unidades')
+
+	def test_inventory_detail_view_displays_fractional_stock_for_product(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_inventory_detail', args=[self.presentacion.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Internal partial stock for this product')
+		self.assertContains(response, 'unidades')
+		self.assertContains(response, '7')
+		self.assertContains(response, self.presentacion.nombre_traducido)
+		self.assertContains(response, 'Package consolidation trace')
+
+	def test_inventory_detail_view_shows_consolidation_trace(self):
+		self.client.force_login(self.backoffice)
+		InventarioMovimiento.objects.create(
+			presentacion=self.presentacion,
+			stock=StockPresentacion.objects.get(presentacion=self.presentacion),
+			categoria='AJUSTE',
+			tipo='CONSOLIDACION_FRACCIONADA',
+			cantidad=1,
+			delta_fisico=1,
+			delta_reservado=0,
+			stock_fisico_anterior=6,
+			stock_fisico_posterior=7,
+			stock_reservado_anterior=0,
+			stock_reservado_posterior=0,
+			stock_disponible_anterior=6,
+			stock_disponible_posterior=7,
+			referencia='CRN-TEST',
+			observacion='Consolidacion de prueba',
+			creado_por=self.backoffice,
+		)
+
+		response = self.client.get(reverse('backoffice_inventory_detail', args=[self.presentacion.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Consolidacion de prueba')
+		self.assertContains(response, 'Fractional stock consolidation')
 
 	def test_inventory_detail_post_records_manual_entry(self):
 		self.client.force_login(self.backoffice)

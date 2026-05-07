@@ -12,11 +12,13 @@ from django.utils.translation import gettext as _
 
 from config.inventario.services import (
     aplicar_verificacion_picking_inventario,
+    reemplazar_presentacion_item_pedido,
     reservar_stock_para_pedido_items,
     validar_disponibilidad_para_items,
 )
 from config.inventario.models import StockPresentacion
 from config.notificaciones.models import crear_notificacion_backoffice, crear_notificacion_usuario
+from config.productos.models import Presentacion
 
 from .models import Pedido, PedidoItem
 
@@ -32,9 +34,18 @@ def _quantize_money(value):
     return _to_decimal(value, '0').quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
+def _resolve_pedido_item_price(*, pedido, presentacion):
+    cliente = getattr(pedido, 'cliente', None)
+    tier = cliente.get_nivel_precio_normalizado() if cliente and hasattr(cliente, 'get_nivel_precio_normalizado') else None
+    price = presentacion.get_price_for_tier(tier) if tier is not None else None
+    if price is None:
+        price = presentacion.precio_1
+    return _quantize_money(price or 0)
+
+
 def recalcular_pedido(pedido):
     total = Decimal('0.00')
-    for item in pedido.items.all():
+    for item in PedidoItem.objects.filter(pedido=pedido):
         item.subtotal = _quantize_money(_to_decimal(item.precio) * Decimal(str(item.cantidad or 0)))
         item.save(update_fields=['subtotal'])
         total += item.subtotal
@@ -161,11 +172,55 @@ def asignar_picking_a_seleccionador(*, pedido, seleccionador):
 
 
 @transaction.atomic
-def guardar_verificacion_picking(*, pedido, seleccionador, cantidades_reales, nota, nota_resuelta):
+def guardar_verificacion_picking(
+    *,
+    pedido,
+    seleccionador,
+    cantidades_reales,
+    nota,
+    nota_resuelta,
+    presentacion_updates=None,
+    additional_items=None,
+):
     if pedido.seleccionador_id != seleccionador.id:
         raise PermissionDenied(_('You are not assigned to this picking ticket.'))
 
     nota_texto = (nota or '').strip()
+    presentacion_updates = presentacion_updates or {}
+    additional_items = additional_items or []
+
+    items = list(pedido.items.select_related('presentacion__producto').all())
+
+    for item in items:
+        nueva_presentacion_id = presentacion_updates.get(item.id)
+        if not nueva_presentacion_id or nueva_presentacion_id == item.presentacion_id:
+            continue
+
+        nueva_presentacion = Presentacion.objects.select_related('producto').get(id=nueva_presentacion_id)
+        original_presentacion_id = item.selector_original_presentacion_id or item.presentacion_id
+        item = reemplazar_presentacion_item_pedido(item=item, nueva_presentacion=nueva_presentacion, creado_por=seleccionador)
+        item.selector_original_presentacion_id = original_presentacion_id
+        item.precio = _resolve_pedido_item_price(pedido=pedido, presentacion=nueva_presentacion)
+        item.subtotal = _quantize_money(item.precio * Decimal(str(item.cantidad or 0)))
+        item.save(update_fields=['selector_original_presentacion', 'precio', 'subtotal'])
+
+    nuevos_items_creados = []
+    for payload in additional_items:
+        presentacion = Presentacion.objects.select_related('producto').get(id=payload['presentacion_id'])
+        cantidad = max(int(payload.get('cantidad') or 0), 1)
+        precio = _resolve_pedido_item_price(pedido=pedido, presentacion=presentacion)
+        nuevo_item = PedidoItem.objects.create(
+            pedido=pedido,
+            presentacion=presentacion,
+            selector_added_by_picker=True,
+            cantidad_solicitada=cantidad,
+            cantidad=cantidad,
+            precio=precio,
+            subtotal=_quantize_money(precio * Decimal(str(cantidad))),
+        )
+        reservar_stock_para_pedido_items(pedido=pedido, pedido_items=[nuevo_item], creado_por=seleccionador)
+        nuevos_items_creados.append(nuevo_item)
+
     items = list(pedido.items.select_for_update().select_related('presentacion__producto').all())
     stock_evaluation = evaluar_stock_fisico_verificacion_picking(
         pedido_items=items,
@@ -218,12 +273,17 @@ def guardar_verificacion_picking(*, pedido, seleccionador, cantidades_reales, no
             url=reverse('backoffice_pedido_detalle', args=[pedido.id]),
         )
     else:
+        movement_message = ''
+        if nuevos_items_creados or any(item.selector_changed_presentation for item in items):
+            movement_message = ' ' + _('BackOffice should review the picker changes highlighted on the order detail.')
         crear_notificacion_backoffice(
             titulo=_('Picking verification completed for PO #%(id)s') % {'id': pedido.id},
-            mensaje=_('%(selector)s completed the picking verification for %(client)s.') % {
-                'selector': seleccionador.get_full_name() or seleccionador.username,
-                'client': pedido.cliente.nombre_empresa,
-            },
+            mensaje=(
+                _('%(selector)s completed the picking verification for %(client)s.') % {
+                    'selector': seleccionador.get_full_name() or seleccionador.username,
+                    'client': pedido.cliente.nombre_empresa,
+                }
+            ) + movement_message,
             tipo='PEDIDO',
             url=reverse('backoffice_pedido_detalle', args=[pedido.id]),
         )

@@ -45,8 +45,28 @@ class PickingVerificationFlowTests(TestCase):
 			unidades=1,
 			tipo_contenido='caja',
 			costo=Decimal('10.00'),
+			precio_1=Decimal('12.00'),
+		)
+		self.presentacion_unidad = Presentacion.objects.create(
+			producto=producto,
+			nombre='Unidad',
+			unidades=1,
+			tipo_contenido='unidad',
+			costo=Decimal('2.00'),
+			precio_1=Decimal('3.50'),
+		)
+		otro_producto = Producto.objects.create(nombre='Producto extra', categoria=categoria, marca=marca, activo=True)
+		self.presentacion_extra = Presentacion.objects.create(
+			producto=otro_producto,
+			nombre='Pack',
+			unidades=1,
+			tipo_contenido='pack',
+			costo=Decimal('4.00'),
+			precio_1=Decimal('6.00'),
 		)
 		registrar_entrada_manual(presentacion=self.presentacion, cantidad=10, observacion='Initial stock')
+		registrar_entrada_manual(presentacion=self.presentacion_unidad, cantidad=10, observacion='Alt stock')
+		registrar_entrada_manual(presentacion=self.presentacion_extra, cantidad=10, observacion='Extra stock')
 
 		self.pedido = Pedido.objects.create(
 			cliente=self.cliente,
@@ -267,6 +287,65 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(response.status_code, 302)
 		self.assertEqual(response.url, reverse('selector_picking_list'))
 
+	def test_selector_can_change_unit_of_measure_during_picking(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+
+		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			f'presentacion_{self.item.id}': str(self.presentacion_unidad.id),
+			f'cantidad_real_{self.item.id}': '2',
+			'nota_seleccionador': 'Cambio de U/M en picking',
+			'nota_seleccionador_resuelta': 'on',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.item.refresh_from_db()
+		self.pedido.refresh_from_db()
+		self.assertEqual(self.item.presentacion, self.presentacion_unidad)
+		self.assertEqual(self.item.selector_original_presentacion, self.presentacion)
+		self.assertEqual(self.item.cantidad_inventario_aplicada, 2)
+		self.assertEqual(self.pedido.estado, 'VERIFICADO_AJUSTADO')
+
+	def test_selector_can_add_product_during_picking(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+
+		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			f'presentacion_{self.item.id}': str(self.presentacion.id),
+			f'cantidad_real_{self.item.id}': '2',
+			'presentacion_nueva': str(self.presentacion_extra.id),
+			'cantidad_nueva': '1',
+			'nota_seleccionador': 'Agregado por picker',
+			'nota_seleccionador_resuelta': 'on',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		nuevo_item = PedidoItem.objects.get(pedido=self.pedido, presentacion=self.presentacion_extra)
+		self.assertTrue(nuevo_item.selector_added_by_picker)
+		self.assertEqual(nuevo_item.cantidad, 1)
+		self.assertEqual(nuevo_item.cantidad_inventario_aplicada, 1)
+
+	def test_backoffice_detail_highlights_picker_um_changes_and_added_products(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 2},
+			nota='Cambios del picker',
+			nota_resuelta=True,
+			presentacion_updates={self.item.id: self.presentacion_unidad.id},
+			additional_items=[{'presentacion_id': self.presentacion_extra.id, 'cantidad': 1}],
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Rows marked in red were changed by the picker')
+		self.assertContains(response, 'Added by picker')
+		self.assertContains(response, 'U/M changed by picker')
+		self.assertContains(response, 'table-danger')
+
 	def test_selector_post_with_stock_error_preserves_typed_quantities_and_note(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		self.client.force_login(self.selector)
@@ -299,6 +378,27 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'name="nota_seleccionador_resuelta"', html=False)
 		self.assertContains(response, 'disabled>', html=False)
 		self.assertContains(response, 'badge bg-danger', html=False)
+
+	def test_selector_can_save_zero_quantity_when_item_will_not_ship(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=0)
+
+		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			f'cantidad_real_{self.item.id}': '0',
+			'nota_seleccionador': '',
+			'nota_seleccionador_resuelta': 'on',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.assertEqual(response.url, reverse('selector_picking_list'))
+		self.pedido.refresh_from_db()
+		self.item.refresh_from_db()
+		self.assertEqual(self.item.cantidad, 0)
+		self.assertEqual(self.item.subtotal, Decimal('0.00'))
+		self.assertEqual(self.item.cantidad_inventario_aplicada, 0)
+		self.assertFalse(self.pedido.picking_bloqueado)
+		self.assertEqual(self.pedido.total, Decimal('0.00'))
 
 	def test_backoffice_cannot_move_blocked_order_forward(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
@@ -353,6 +453,128 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, f'name="suggested_unit_price_{self.item.id}"', html=False)
 		self.assertContains(response, 'Profit %')
 		self.assertContains(response, 'value="30.00"', html=False)
+
+	def test_backoffice_detail_renders_presentation_options_for_each_item(self):
+		self.pedido.estado = 'VERIFICADO_AJUSTADO'
+		self.pedido.save(update_fields=['estado', 'actualizada_en'])
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, f'name="presentacion_{self.item.id}"', html=False)
+		self.assertContains(response, f'<option value="{self.presentacion.id}" selected>{self.presentacion.nombre}</option>', html=False)
+		self.assertContains(response, f'value="{self.presentacion_unidad.id}"', html=False)
+		self.assertContains(response, f'>{self.presentacion_unidad.nombre}</option>', html=False)
+
+	def test_backoffice_can_edit_quantities_after_verified_picking(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 2},
+			nota='Verificado',
+			nota_resuelta=True,
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), {
+			'estado': 'VERIFICADO_AJUSTADO',
+			'nota_backoffice': 'Ajuste manual posterior',
+			f'cantidad_{self.item.id}': '1',
+			f'precio_{self.item.id}': '12.00',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.item.refresh_from_db()
+		self.pedido.refresh_from_db()
+		self.assertEqual(self.item.cantidad, 1)
+		self.assertEqual(self.item.cantidad_solicitada, 2)
+		self.assertEqual(self.item.cantidad_inventario_aplicada, 1)
+		self.assertEqual(self.pedido.total, Decimal('12.00'))
+
+	def test_backoffice_can_set_quantity_to_zero_before_invoice_generation(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 2},
+			nota='Verificado',
+			nota_resuelta=True,
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), {
+			'estado': 'VERIFICADO_AJUSTADO',
+			'nota_backoffice': 'No despachar esta linea',
+			f'cantidad_{self.item.id}': '0',
+			f'precio_{self.item.id}': '12.00',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.item.refresh_from_db()
+		self.pedido.refresh_from_db()
+		self.assertEqual(self.item.cantidad, 0)
+		self.assertEqual(self.item.cantidad_solicitada, 2)
+		self.assertEqual(self.item.cantidad_inventario_aplicada, 0)
+		self.assertEqual(self.item.subtotal, Decimal('0.00'))
+		self.assertEqual(self.pedido.total, Decimal('0.00'))
+
+	def test_backoffice_can_delete_picker_added_item_after_verified_picking(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 2},
+			nota='Con agregado',
+			nota_resuelta=True,
+			additional_items=[{'presentacion_id': self.presentacion_extra.id, 'cantidad': 1}],
+		)
+		nuevo_item = PedidoItem.objects.get(pedido=self.pedido, presentacion=self.presentacion_extra)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), {
+			'estado': 'VERIFICADO_AJUSTADO',
+			'nota_backoffice': 'Eliminar agregado picker',
+			f'cantidad_{self.item.id}': '2',
+			f'precio_{self.item.id}': '12.00',
+			f'cantidad_{nuevo_item.id}': '1',
+			f'precio_{nuevo_item.id}': '6.00',
+			f'eliminar_{nuevo_item.id}': 'on',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.assertFalse(PedidoItem.objects.filter(id=nuevo_item.id).exists())
+
+	def test_backoffice_can_change_presentation_after_verified_picking(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 2},
+			nota='Verificado',
+			nota_resuelta=True,
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), {
+			'estado': 'VERIFICADO_AJUSTADO',
+			'nota_backoffice': 'Cambio de presentacion posterior',
+			f'presentacion_{self.item.id}': str(self.presentacion_unidad.id),
+			f'cantidad_{self.item.id}': '2',
+			f'precio_{self.item.id}': '12.00',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.item.refresh_from_db()
+		self.pedido.refresh_from_db()
+		self.assertEqual(self.item.presentacion, self.presentacion_unidad)
+		self.assertEqual(self.item.cantidad_inventario_aplicada, 2)
+		self.assertEqual(self.pedido.total, Decimal('24.00'))
+
+		get_response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+		self.assertContains(get_response, f'name="presentacion_{self.item.id}"', html=False)
+		self.assertContains(get_response, 'This line was modified during picking. Do you want to delete it anyway?', html=False)
 
 	def test_backoffice_order_list_defaults_to_pending_orders(self):
 		in_progress_order = Pedido.objects.create(

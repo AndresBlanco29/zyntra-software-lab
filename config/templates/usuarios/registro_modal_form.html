@@ -107,7 +107,7 @@
             data-tax-example-mode="number"
             data-tax-example-title="{% if CURRENT_LANGUAGE == 'es' %}Ejemplo: Número de impuesto sobre ventas{% else %}Example: Sales tax number{% endif %}"
             data-tax-example-note="{% if CURRENT_LANGUAGE == 'es' %}Localiza el número de impuesto en tu certificado y escríbelo sin espacios ni guiones.{% else %}Find the sales tax number on your certificate and enter it without spaces or hyphens.{% endif %}"
-            data-tax-example-label="{% if CURRENT_LANGUAGE == 'es' %}Aquí va el número de impuesto{% else %}Enter this sales tax number{% endif %}">
+            data-tax-example-label="{% if CURRENT_LANGUAGE == 'es' %}Este es el número de impuesto{% else %}This is the sales tax number{% endif %}">
             {% if CURRENT_LANGUAGE == 'es' %}Ver ejemplo{% else %}View example{% endif %}
           </button>
         </div>
@@ -194,11 +194,12 @@
         <div class="tax-example-container" style="position:relative;">
           <img id="taxExampleImg" src="{% static 'img/examples/sales_tax_example.png' %}" alt="Ejemplo Sales Tax" class="img-fluid" />
           <div class="tax-overlay" style="position:absolute;inset:0;pointer-events:none;">
+            <div class="tax-redaction" data-tax-mask="address" aria-hidden="true" style="position:absolute;background:#fff;border-radius:2px;"></div>
             <div class="tax-highlight" id="taxHighlight" data-tax-highlight="salesTax" style="position:absolute;border:3px solid rgba(255,99,71,0.95);box-shadow:0 8px 24px rgba(0,0,0,0.25);background:rgba(255,99,71,0.06);border-radius:6px;">
-              <div class="tax-label" id="taxLabel" style="position:absolute;top:50%;left:calc(100% + 14px);transform:translateY(-50%);padding:6px 10px;background:rgba(255,99,71,0.95);color:#fff;border-radius:6px;font-weight:600;font-size:0.9rem;white-space:nowrap">{% if CURRENT_LANGUAGE == 'es' %}Aquí va el número de impuesto{% else %}Enter this sales tax number{% endif %}</div>
+              <div class="tax-label" id="taxLabel" style="position:absolute;top:50%;left:calc(100% + 14px);transform:translateY(-50%);padding:6px 10px;background:rgba(255,99,71,0.95);color:#fff;border-radius:6px;font-weight:600;font-size:0.9rem;white-space:nowrap">{% if CURRENT_LANGUAGE == 'es' %}Este es el número de impuesto{% else %}This is the sales tax number{% endif %}</div>
             </div>
             <div class="tax-highlight" data-tax-highlight="georgia" style="position:absolute;border:3px solid rgba(25,135,84,0.95);box-shadow:0 8px 24px rgba(0,0,0,0.2);background:rgba(25,135,84,0.08);border-radius:6px;">
-              <div class="tax-label" style="position:absolute;padding:6px 10px;background:rgba(25,135,84,0.95);color:#fff;border-radius:6px;font-weight:600;font-size:0.9rem;white-space:nowrap">State of Georgia</div>
+              <div class="tax-label" style="position:absolute;padding:6px 10px;background:rgba(25,135,84,0.95);color:#fff;border-radius:6px;font-weight:600;font-size:0.9rem;white-space:nowrap">Department of revenue of your state</div>
             </div>
           </div>
         </div>

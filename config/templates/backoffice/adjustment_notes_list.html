@@ -1,0 +1,230 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Credit / Debit Notes" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+  <div>
+    <h2 class="mb-1">{% trans "Credit / Debit Notes" %}</h2>
+    <p class="text-muted mb-0">{% trans "Search notes by customer, invoice, creator, type, or status. Review who created them and jump back to the invoice or customer context fast." %}</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{% url 'backoffice_adjustment_note_create' %}" class="btn btn-primary">{% trans "Create note" %}</a>
+    <a href="{% url 'backoffice_invoices_list' %}" class="btn btn-outline-secondary">{% trans "Open invoices" %}</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-6 col-xl-2">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Visible notes" %}</div>
+        <div class="display-6 fw-semibold mb-0">{{ summary.total }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Credits" %}</div>
+        <div class="display-6 fw-semibold text-danger mb-0">{{ summary.credits }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Debits" %}</div>
+        <div class="display-6 fw-semibold text-success mb-0">{{ summary.debits }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Drafts" %}</div>
+        <div class="display-6 fw-semibold text-warning mb-0">{{ summary.drafts }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Linked to invoice" %}</div>
+        <div class="display-6 fw-semibold mb-0">{{ summary.invoice_linked }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-2">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Created by driver" %}</div>
+        <div class="display-6 fw-semibold mb-0">{{ summary.driver_created }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3 border-0">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+      <div>
+        <h5 class="mb-1">{% trans "Search filters" %}</h5>
+        <div class="small text-muted">{% trans "Use a customer, invoice number, note number, description, or creator role to narrow the list." %}</div>
+      </div>
+      <a href="{% url 'backoffice_adjustment_notes_list' %}" class="btn btn-sm btn-outline-secondary">{% trans "Clear filters" %}</a>
+    </div>
+    <form method="get" class="row g-3">
+      <div class="col-lg-4">
+        <label class="form-label fw-semibold">{% trans "Search text" %}</label>
+        <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="{% trans 'Invoice, note, customer, or description' %}">
+      </div>
+      <div class="col-md-6 col-lg-2">
+        <label class="form-label fw-semibold">{% trans "Customer" %}</label>
+        <select name="cliente_id" class="form-select">
+          <option value="">{% trans "All customers" %}</option>
+          {% for customer in customers %}
+          <option value="{{ customer.id }}" {% if selected_customer_id == customer.id|stringformat:'s' %}selected{% endif %}>{{ customer.nombre_empresa }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6 col-lg-2">
+        <label class="form-label fw-semibold">{% trans "Created by" %}</label>
+        <select name="creada_por" class="form-select">
+          <option value="">{% trans "All creators" %}</option>
+          <option value="backoffice" {% if selected_creator_role == 'backoffice' %}selected{% endif %}>BackOffice</option>
+          <option value="driver" {% if selected_creator_role == 'driver' %}selected{% endif %}>{% trans "Driver" %}</option>
+          <option value="admin" {% if selected_creator_role == 'admin' %}selected{% endif %}>{% trans "Admin" %}</option>
+        </select>
+      </div>
+      <div class="col-md-6 col-lg-2">
+        <label class="form-label fw-semibold">{% trans "Type" %}</label>
+        <select name="tipo_documento" class="form-select">
+          <option value="">{% trans "All types" %}</option>
+          <option value="CREDITO" {% if selected_document_type == 'CREDITO' %}selected{% endif %}>{% trans "Credit note" %}</option>
+          <option value="DEBITO" {% if selected_document_type == 'DEBITO' %}selected{% endif %}>{% trans "Debit note" %}</option>
+        </select>
+      </div>
+      <div class="col-md-6 col-lg-2">
+        <label class="form-label fw-semibold">{% trans "Status" %}</label>
+        <select name="estado" class="form-select">
+          <option value="">{% trans "All statuses" %}</option>
+          <option value="BORRADOR" {% if selected_status == 'BORRADOR' %}selected{% endif %}>{% trans "Draft" %}</option>
+          <option value="APROBADA" {% if selected_status == 'APROBADA' %}selected{% endif %}>{% trans "Approved" %}</option>
+          <option value="ANULADA" {% if selected_status == 'ANULADA' %}selected{% endif %}>{% trans "Cancelled" %}</option>
+        </select>
+      </div>
+      <div class="col-md-6 col-lg-2">
+        <label class="form-label fw-semibold">{% trans "Scope" %}</label>
+        <select name="scope" class="form-select">
+          <option value="">{% trans "All notes" %}</option>
+          <option value="invoice" {% if selected_scope == 'invoice' %}selected{% endif %}>{% trans "Invoice-linked" %}</option>
+          <option value="general" {% if selected_scope == 'general' %}selected{% endif %}>{% trans "General customer balance" %}</option>
+        </select>
+      </div>
+      <div class="col-12 d-flex gap-2 flex-wrap">
+        <button type="submit" class="btn btn-primary">{% trans "Search notes" %}</button>
+        <a href="{% url 'backoffice_adjustment_notes_list' %}" class="btn btn-outline-secondary">{% trans "Reset" %}</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+      <div>
+        <h5 class="mb-1">{% trans "Results" %}</h5>
+        <div class="small text-muted">{% trans "Each row shows origin, balance impact, inventory behavior, evidence, and quick access back to the invoice or customer note center." %}</div>
+      </div>
+      <span class="badge text-bg-light">{{ summary.total }} {% trans "notes" %}</span>
+    </div>
+
+    <div class="table-responsive mobile-stack-responsive">
+      <table class="table align-middle mb-0 mobile-stack-table mobile-stack-table--list">
+        <thead>
+          <tr>
+            <th>{% trans "Note" %}</th>
+            <th>{% trans "Customer / Invoice" %}</th>
+            <th>{% trans "Origin" %}</th>
+            <th>{% trans "Status" %}</th>
+            <th>{% trans "Value" %}</th>
+            <th>{% trans "Operational detail" %}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for note in notes %}
+          <tr>
+            <td data-label="{% trans 'Note' %}">
+              <div class="fw-semibold">{{ note.numero }}</div>
+              <div class="small text-muted">{{ note.creada_en|date:"d/m/Y H:i" }}</div>
+              <div class="small mt-1">{{ note.get_tipo_documento_display }} · {{ note.get_motivo_display }}</div>
+              {% if note.tipo_credito %}
+              <div class="small text-muted">{{ note.get_tipo_credito_display }}</div>
+              {% endif %}
+            </td>
+            <td data-label="{% trans 'Customer / Invoice' %}">
+              <div class="fw-semibold">{{ note.cliente.nombre_empresa }}</div>
+              {% if note.invoice %}
+              <div class="small text-muted">{% trans "Invoice" %}: {{ note.invoice.numero }}</div>
+              <div class="small text-muted">{% trans "Outstanding balance" %}: ${{ note.invoice.saldo_cliente }}</div>
+              {% else %}
+              <div class="small text-muted">{% trans "General customer balance note" %}</div>
+              <div class="small text-muted">{% trans "Customer balance" %}: ${{ note.cliente.balance }}</div>
+              {% endif %}
+            </td>
+            <td data-label="{% trans 'Origin' %}">
+              <span class="badge {% if note.creada_por and note.creada_por.role == 'driver' %}bg-warning text-dark{% elif note.creada_por and note.creada_por.role == 'admin' %}bg-dark{% else %}bg-primary{% endif %}">
+                {% if note.creada_por %}{{ note.creada_por.role|title }}{% else %}{% trans "System" %}{% endif %}
+              </span>
+              <div class="small mt-2 text-muted">{% trans "Created by" %}: {% firstof note.creada_por.get_full_name note.creada_por.username '-' %}</div>
+              {% if note.aprobada_por %}
+              <div class="small text-muted">{% trans "Approved by" %}: {% firstof note.aprobada_por.get_full_name note.aprobada_por.username %}</div>
+              {% endif %}
+            </td>
+            <td data-label="{% trans 'Status' %}">
+              <span class="badge {% if note.estado == 'APROBADA' %}bg-success{% elif note.estado == 'ANULADA' %}bg-secondary{% else %}bg-warning text-dark{% endif %}">{{ note.get_estado_display }}</span>
+              <div class="small text-muted mt-2">{% trans "Mode" %}: {{ note.get_tipo_ajuste_display }}</div>
+              <div class="small text-muted">{% trans "Inventory" %}: {{ note.get_inventario_estado_display }}</div>
+            </td>
+            <td data-label="{% trans 'Value' %}">
+              <div class="fw-semibold">${{ note.total }}</div>
+              <div class="small text-muted">{% trans "Invoice impact" %}: ${{ note.monto_aplicado_invoice }}</div>
+              <div class="small text-muted">{% trans "Customer impact" %}: ${{ note.monto_aplicado_cliente }}</div>
+            </td>
+            <td data-label="{% trans 'Operational detail' %}">
+              <div class="small">{{ note.descripcion|default:'-' }}</div>
+              <div class="small text-muted mt-2">{{ note.item_count }} {% trans "item lines" %} · {{ note.evidence_count }} {% trans "evidence files" %}</div>
+              {% if note.items.all %}
+              <div class="small text-muted mt-1">
+                {% for item in note.items.all|slice:':2' %}
+                  {{ item.descripcion }}{% if not forloop.last %} · {% endif %}
+                {% endfor %}
+                {% if note.item_count > 2 %} · +{{ note.item_count|add:'-2' }}{% trans " more" %}{% endif %}
+              </div>
+              {% endif %}
+            </td>
+            <td data-label="{% trans 'Action' %}" class="text-end mobile-stack-table__action">
+              <div class="d-grid gap-2 justify-content-end">
+                {% if note.invoice %}
+                <a href="{% url 'backoffice_invoice_detail' note.invoice.id %}" class="btn btn-sm btn-outline-primary">{% trans "Open invoice" %}</a>
+                {% endif %}
+                <a href="{% url 'backoffice_adjustment_note_create' %}?cliente_id={{ note.cliente_id }}{% if note.invoice_id %}&invoice_id={{ note.invoice_id }}{% endif %}" class="btn btn-sm btn-outline-secondary">{% trans "Open note center" %}</a>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center py-5 text-muted mobile-stack-table__empty">
+              {% trans "No notes matched the current filters. Try another customer, invoice number, creator, or status." %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

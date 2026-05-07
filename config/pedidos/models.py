@@ -92,6 +92,14 @@ class PedidoItem(models.Model):
 
 	pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name='items')
 	presentacion = models.ForeignKey(Presentacion, on_delete=models.CASCADE)
+	selector_original_presentacion = models.ForeignKey(
+		Presentacion,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='pedido_items_selector_originales',
+	)
+	selector_added_by_picker = models.BooleanField(default=False)
 	cantidad_solicitada = models.PositiveIntegerField(default=1)
 	cantidad_reservada_inventario = models.PositiveIntegerField(default=0)
 	cantidad_inventario_aplicada = models.PositiveIntegerField(default=0)
@@ -101,3 +109,50 @@ class PedidoItem(models.Model):
 
 	def __str__(self):
 		return f"{self.presentacion.producto.nombre} x {self.cantidad}"
+
+	@property
+	def selector_changed_presentation(self):
+		return bool(self.selector_original_presentacion_id and self.selector_original_presentacion_id != self.presentacion_id)
+
+	@property
+	def selector_changed_quantity(self):
+		return int(self.cantidad or 0) != int(self.cantidad_solicitada or 0)
+
+	@property
+	def cantidad_solicitada_documentada(self):
+		current_quantity = int(self.cantidad_solicitada or 0)
+		if current_quantity > 0:
+			return current_quantity
+
+		movimientos_prefetch = getattr(self, '_prefetched_objects_cache', {}).get('movimientos_inventario')
+		if movimientos_prefetch is not None:
+			reservation_moves = [
+				movimiento for movimiento in movimientos_prefetch
+				if movimiento.tipo == 'RESERVA_PEDIDO' and int(movimiento.cantidad or 0) > 0
+			]
+			if reservation_moves:
+				reservation_moves.sort(key=lambda movimiento: (movimiento.creado_en, movimiento.id))
+				return int(reservation_moves[0].cantidad)
+
+		reservation_move = self.movimientos_inventario.filter(
+			tipo='RESERVA_PEDIDO',
+			cantidad__gt=0,
+		).order_by('creado_en', 'id').first()
+		if reservation_move:
+			return int(reservation_move.cantidad or 0)
+
+		pedido = getattr(self, 'pedido', None)
+		cotizacion = getattr(pedido, 'cotizacion', None) if pedido else None
+		if cotizacion is not None:
+			cotizacion_item = cotizacion.items.filter(
+				presentacion_id=self.presentacion_id,
+				cantidad__gt=0,
+			).order_by('id').first()
+			if cotizacion_item:
+				return int(cotizacion_item.cantidad or 0)
+
+		return int(self.cantidad or 0)
+
+	@property
+	def selector_has_changes(self):
+		return bool(self.selector_added_by_picker or self.selector_changed_presentation or self.selector_changed_quantity)

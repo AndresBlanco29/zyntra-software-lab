@@ -1,7 +1,10 @@
 ;(function(){
   var highlightRects = {
     salesTax: { x: 50.2, y: 42.6, w: 18.9, h: 9.5, labelPosition: 'right' },
-    georgia: { x: 39.2, y: 19.0, w: 17.1, h: 6.8, labelPosition: 'right' }
+    georgia: { x: 33.8, y: 19.8, w: 27.8, h: 14.3, labelPosition: 'right' }
+  };
+  var redactionRects = {
+    address: { x: 8.5, y: 73.0, w: 22.5, h: 11.2 }
   };
   var backdropEl = null;
   var currentExampleMode = 'number';
@@ -115,6 +118,17 @@
   }
 
   function positionHighlight(){
+    document.querySelectorAll('[data-tax-mask]').forEach(function(mask){
+      var key = mask.getAttribute('data-tax-mask');
+      var rect = redactionRects[key];
+      if(!rect) return;
+
+      mask.style.left = rect.x + '%';
+      mask.style.top = rect.y + '%';
+      mask.style.width = rect.w + '%';
+      mask.style.height = rect.h + '%';
+    });
+
     document.querySelectorAll('[data-tax-highlight]').forEach(function(highlight){
       var key = highlight.getAttribute('data-tax-highlight');
       var rect = highlightRects[key];
@@ -129,9 +143,23 @@
       if(!label) return;
 
       if(window.innerWidth <= 576){
+        if(rect.labelPosition === 'inside'){
+          label.style.left = '50%';
+          label.style.top = '50%';
+          label.style.transform = 'translate(-50%, -50%)';
+          return;
+        }
+
         label.style.left = '50%';
         label.style.top = '-30px';
         label.style.transform = 'translateX(-50%)';
+        return;
+      }
+
+      if(rect.labelPosition === 'inside'){
+        label.style.left = '50%';
+        label.style.top = '50%';
+        label.style.transform = 'translate(-50%, -50%)';
         return;
       }
 
@@ -142,7 +170,7 @@
         return;
       }
 
-      label.style.left = 'calc(100% + 14px)';
+      label.style.left = key === 'georgia' ? 'calc(100% + 4px)' : 'calc(100% + 14px)';
       label.style.top = '50%';
       label.style.transform = 'translateY(-50%)';
     });

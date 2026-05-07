@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import InventarioMovimiento, StockPresentacion
+from .models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
 
 
 @admin.register(StockPresentacion)
@@ -16,3 +16,10 @@ class InventarioMovimientoAdmin(admin.ModelAdmin):
 	search_fields = ('presentacion__producto__nombre', 'presentacion__nombre', 'referencia')
 	list_filter = ('categoria', 'tipo')
 	readonly_fields = ('creado_en',)
+
+
+@admin.register(StockProductoFraccionado)
+class StockProductoFraccionadoAdmin(admin.ModelAdmin):
+	list_display = ('producto', 'contenido', 'stock_fisico', 'actualizado_en')
+	search_fields = ('producto__nombre', 'contenido')
+	list_filter = ('contenido',)

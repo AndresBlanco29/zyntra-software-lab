@@ -47,6 +47,11 @@
             <span><strong>{% trans "Resolved" %}:</strong> {% if pedido.nota_seleccionador %}{% if pedido.nota_seleccionador_resuelta %}{% trans "Yes" %}{% else %}{% trans "No" %}{% endif %}{% else %}-{% endif %}</span>
             <span><strong>{% trans "Order lock" %}:</strong> {% if pedido.picking_bloqueado %}<span class="badge bg-danger">{% trans "Blocked" %}</span>{% else %}<span class="badge bg-success">{% trans "Unlocked" %}</span>{% endif %}</span>
           </div>
+          {% if pedido_has_picker_changes %}
+          <div class="alert alert-danger mt-3 mb-0">
+            {% trans "Rows marked in red were changed by the picker, including U/M changes or products added during picking." %}
+          </div>
+          {% endif %}
           {% if picker_stock_shortage_blocked %}
           <div class="alert alert-danger mt-3 mb-0">
             <div class="fw-semibold">{% trans "Picker reported physical stock shortage" %}</div>
@@ -116,6 +121,33 @@
             <div class="col-md-2 d-flex align-items-end">
               <button type="submit" class="btn btn-primary w-100">{% trans "Generate invoice" %}</button>
             </div>
+            {% if pedido.cliente.available_credit > 0 %}
+            <div class="col-12">
+              <div class="border rounded-3 p-3 bg-success-subtle">
+                <div class="row g-3 align-items-end">
+                  <div class="col-md-4">
+                    <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Customer balance" %}</div>
+                    <div class="fw-semibold">${{ pedido.cliente.balance }}</div>
+                    <div class="small text-muted">{% trans "Available credit for this invoice" %}: ${{ pedido.cliente.available_credit }}</div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="form-check mt-4 pt-2">
+                      <input class="form-check-input" type="checkbox" name="use_customer_credit" id="useCustomerCredit" checked>
+                      <label class="form-check-label fw-semibold" for="useCustomerCredit">{% trans "Apply customer credit" %}</label>
+                    </div>
+                  </div>
+                  <div class="col-md-5">
+                    <label class="form-label fw-semibold">{% trans "Credit to apply" %}</label>
+                    <div class="input-group">
+                      <span class="input-group-text">$</span>
+                      <input type="number" min="0" step="0.01" max="{{ pedido.cliente.available_credit }}" name="customer_credit_to_apply" class="form-control" value="{{ pedido.cliente.available_credit|floatformat:2 }}">
+                    </div>
+                    <div class="form-text">{% trans "Use the full amount for automatic application or edit it to apply only part of the available credit." %}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endif %}
             <div class="col-12">
               <div class="border rounded-3 p-3 bg-light-subtle mt-2">
                 <div class="fw-semibold mb-2">{% trans "Suggested resale price per unit for the final customer" %}</div>
@@ -207,7 +239,7 @@
   {% endfor %}
 {% endif %}
 
-<form method="post" class="card shadow-sm mb-3">
+<form method="post" class="card shadow-sm mb-3" id="backofficeOrderForm">
   {% csrf_token %}
   <div class="card-body">
     <div class="row g-3 mb-3">
@@ -266,15 +298,32 @@
           </tr>
         </thead>
         <tbody>
-          {% for item in pedido.items.all %}
-          <tr>
-            <td>{{ item.presentacion.producto.nombre }}</td>
-            <td>{{ item.presentacion.nombre }}</td>
+          {% for item in pedido_items %}
+          <tr class="{% if item.selector_has_changes %}table-danger{% endif %}">
+            <td>
+              {{ item.presentacion.producto.nombre }}
+              {% if item.selector_added_by_picker %}
+              <div><span class="badge text-bg-danger">{% trans "Added by picker" %}</span></div>
+              {% endif %}
+            </td>
+            <td>
+              {% if item.selector_changed_presentation %}
+                <div class="text-danger fw-semibold mb-2">{{ item.selector_original_presentacion.nombre }} → {{ item.presentacion.nombre }}</div>
+                <div><span class="badge text-bg-danger">{% trans "U/M changed by picker" %}</span></div>
+              {% endif %}
+              <select name="presentacion_{{ item.id }}" class="form-select form-select-sm {% if item.selector_changed_presentation %}border-danger text-danger fw-semibold{% endif %}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+                {% for option in item.presentation_options %}
+                <option value="{{ option.id }}" {% if option.id == item.presentacion_id %}selected{% endif %}>{{ option.nombre }}</option>
+                {% endfor %}
+              </select>
+            </td>
             <td>{{ item.cantidad_solicitada }}</td>
-            <td><input type="number" min="1" class="form-control form-control-sm" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}></td>
+            <td>
+              <input type="number" min="0" class="form-control form-control-sm {% if item.selector_changed_quantity %}border-danger text-danger fw-semibold{% endif %}" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+            </td>
             <td><input type="number" min="0" step="0.01" class="form-control form-control-sm" name="precio_{{ item.id }}" value="{{ item.precio }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}></td>
             <td>${{ item.subtotal }}</td>
-            <td><input type="checkbox" class="form-check-input" name="eliminar_{{ item.id }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}></td>
+            <td><input type="checkbox" class="form-check-input" name="eliminar_{{ item.id }}" {% if item.selector_has_changes %}data-picker-modified="true"{% endif %} {% if lineas_bloqueadas_para_picking %}disabled{% endif %}></td>
           </tr>
           {% endfor %}
         </tbody>
@@ -324,6 +373,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+  const orderForm = document.getElementById('backofficeOrderForm');
   const marginInputs = Array.from(document.querySelectorAll('.suggested-margin-input'));
   const valueInputs = Array.from(document.querySelectorAll('.suggested-value-input'));
   let syncing = false;
@@ -409,6 +459,20 @@ document.addEventListener('DOMContentLoaded', function () {
       syncFromValue(input);
     });
   });
+
+  if (orderForm) {
+    orderForm.addEventListener('submit', function (event) {
+      const modifiedDeleteChecked = orderForm.querySelector('input[data-picker-modified="true"]:checked');
+      if (!modifiedDeleteChecked) {
+        return;
+      }
+
+      const confirmed = window.confirm('{% trans "This line was modified during picking. Do you want to delete it anyway?" %}');
+      if (!confirmed) {
+        event.preventDefault();
+      }
+    });
+  }
 });
 </script>
 {% endblock %}

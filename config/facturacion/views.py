@@ -37,6 +37,7 @@ from config.usuarios.permissions import internal_permission_required
 from .models import Delivery, DeliveryEvidencePhoto, Invoice, NotaAjuste, NotaAjusteEvidencePhoto
 from .services import (
 	DEFAULT_SUGGESTED_PROFIT_PERCENTAGE,
+	_normalize_uploaded_file,
 	aprobar_nota_ajuste,
 	anular_nota_ajuste,
 	build_google_maps_route_url,
@@ -267,7 +268,9 @@ def _validate_driver_note_request(*, note_request):
 
 def _save_adjustment_note_evidence_files(nota, uploaded_files):
 	for uploaded_file in uploaded_files:
-		NotaAjusteEvidencePhoto.objects.create(nota=nota, image=uploaded_file)
+		normalized_file = _normalize_uploaded_file(uploaded_file)
+		if normalized_file is not None:
+			NotaAjusteEvidencePhoto.objects.create(nota=nota, image=normalized_file)
 
 
 def _build_note_product_presentations(selected_client):

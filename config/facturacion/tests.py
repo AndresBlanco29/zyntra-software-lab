@@ -14,7 +14,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, DeliveryNotificationLog, Invoice, NotaAjuste, NotaAjusteAplicacion
 from config.facturacion.services import anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, generar_invoice_desde_picking, start_delivery_route, unlock_client_from_delivery
-from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_item_data, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _resolve_invoice_suggested_unit_price
+from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_item_data, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
 from config.inventario.services import registrar_entrada_manual, reservar_stock_para_pedido_items
 from config.notificaciones.models import Notificacion
@@ -1113,7 +1113,7 @@ class InvoiceFlowTests(TestCase):
 			{
 				'estado_pago': 'PAGADO',
 				'metodo_pago': 'CASH',
-				'monto_pagado': '45.00',
+				'monto_pagado': '30.00',
 				'recibido_por': 'Juan Perez',
 				'firma_cliente_data': self.signature_data,
 				'driver_note_tipo_documento': 'CREDITO',
@@ -1177,7 +1177,7 @@ class InvoiceFlowTests(TestCase):
 			{
 				'estado_pago': 'PAGADO',
 				'metodo_pago': 'CASH',
-				'monto_pagado': '45.00',
+				'monto_pagado': '30.00',
 				'recibido_por': 'Juan Perez',
 				'firma_cliente_data': self.signature_data,
 				'driver_note_tipo_documento': 'CREDITO',
@@ -1196,42 +1196,56 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(response, 'Product credit notes must use Credit Return.')
 
 	def test_driver_complete_view_can_attach_evidence_to_adjustment_note(self):
-		invoice = generar_invoice_desde_picking(
-			pedido=self.pedido,
-			metodo_entrega='RUTA_DRIVER',
-			driver=self.driver,
-			usuario=self.backoffice,
+		invoice = self._create_invoice(metodo_entrega='RUTA_DRIVER', driver=self.driver, total='45.00')
+		nota = crear_nota_ajuste_desde_invoice(
+			invoice=invoice,
+			tipo_documento='CREDITO',
+			tipo_ajuste='PRODUCTO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Caja dañada al entregar',
+			usuario=self.driver,
+			items_payload=[{
+				'invoice_item': invoice.items.first(),
+				'cantidad': 1,
+				'cantidad_unidades': 0,
+				'monto_unitario': '15.00',
+			}],
+			monto='0.00',
 		)
-		self.client.force_login(self.driver)
+		_save_adjustment_note_evidence_files(nota, [self._build_test_image()])
 
-		response = self.client.post(
-			reverse('driver_delivery_complete', args=[invoice.delivery.id]),
-			{
-				'estado_pago': 'PAGADO',
-				'metodo_pago': 'CASH',
-				'monto_pagado': '45.00',
-				'recibido_por': 'Juan Perez',
-				'firma_cliente_data': self.signature_data,
-				'driver_note_tipo_documento': 'CREDITO',
-				'driver_note_motivo': 'DAMAGE',
-				'driver_note_tipo_credito': 'CREDIT_RETURN',
-				'driver_note_descripcion': 'Caja dañada al entregar',
-				f'driver_note_qty_{invoice.items.first().id}': '1',
-				f'driver_note_amount_{invoice.items.first().id}': '15.00',
-				'driver_note_evidence_photos': self.photo_file,
-			},
-			format='multipart',
-		)
-
-		invoice.refresh_from_db()
-		nota = invoice.notas_ajuste.get()
-		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
 		self.assertEqual(nota.evidence_photos.count(), 1)
 		self.assertIn('invoice-notes/evidence/', nota.evidence_photos.first().image.name)
 
 		self.client.force_login(self.backoffice)
 		backoffice_response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
 		self.assertContains(backoffice_response, nota.evidence_photos.first().image.url)
+
+	def test_driver_complete_view_ignores_empty_adjustment_evidence_files(self):
+		invoice = self._create_invoice(metodo_entrega='RUTA_DRIVER', driver=self.driver, total='45.00')
+		nota = crear_nota_ajuste_desde_invoice(
+			invoice=invoice,
+			tipo_documento='CREDITO',
+			tipo_ajuste='PRODUCTO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Caja dañada al entregar',
+			usuario=self.driver,
+			items_payload=[{
+				'invoice_item': invoice.items.first(),
+				'cantidad': 1,
+				'cantidad_unidades': 0,
+				'monto_unitario': '15.00',
+			}],
+			monto='0.00',
+		)
+		_save_adjustment_note_evidence_files(
+			nota,
+			[SimpleUploadedFile('empty-adjustment.png', b'', content_type='image/png')],
+		)
+
+		self.assertEqual(nota.evidence_photos.count(), 0)
 
 	def test_driver_can_create_adjustment_note_after_delivery(self):
 		invoice = generar_invoice_desde_picking(

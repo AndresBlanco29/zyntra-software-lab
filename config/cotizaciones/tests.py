@@ -83,6 +83,11 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertContains(response, 'Updated total: <span id="quoteTotalValue">$142.86</span>', html=False)
 		self.assertContains(response, 'data-send-ready-initial="false"')
 		self.assertContains(response, 'quote-send-email-button" disabled', html=False)
+		self.assertContains(response, 'Assign one customer price tier to all requested products')
+		self.assertContains(response, 'Apply to all products')
+		self.assertContains(response, 'option value="precio_1"')
+		self.assertContains(response, 'option value="precio_5"')
+		self.assertContains(response, 'data-price-key="precio_1"', html=False)
 
 	def test_backoffice_quote_detail_uses_customer_assigned_price_when_request_arrives(self):
 		self.cliente.estado_revision = Cliente.REVIEW_STATUS_APPROVED

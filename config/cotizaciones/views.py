@@ -173,6 +173,19 @@ def _build_quote_item_rows(cotizacion):
     return rows, display_total
 
 
+def _build_bulk_quote_price_options():
+    return [
+        {
+            'key': f'precio_{index}',
+            'label': _('Price %(number)s (%(percentage)s%%)') % {
+                'number': index,
+                'percentage': margin,
+            },
+        }
+        for index, margin in enumerate(ConfiguracionPrecios.obtener().porcentajes_lista(), start=1)
+    ]
+
+
 def _get_generated_order_from_quote(cotizacion):
     try:
         return cotizacion.pedido_generado
@@ -544,6 +557,7 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
         'cotizacion': cotizacion,
         'pedido_existente': pedido_existente,
         'cotizacion_item_rows': cotizacion_item_rows,
+        'bulk_price_options': _build_bulk_quote_price_options(),
         'display_total': display_total,
         'can_send_customer_quote': can_send_customer_quote,
         'can_generate_backoffice_order': can_generate_backoffice_order,
@@ -785,6 +799,38 @@ def cliente_cotizacion_recibida_detalle(request, token):
 
     puede_editar = cotizacion.estado == 'LISTA_PARA_CONFIRMACION' and pedido_existente is None
 
+    def build_cliente_quote_rows(post_data=None):
+        rows = []
+        items_payload = []
+        total = Decimal('0')
+
+        for item in list(cotizacion.items.select_related('presentacion__producto')):
+            marked_delete = bool(post_data and post_data.get(f'eliminar_{item.id}'))
+            quantity = _parse_quantity(
+                post_data.get(f'cantidad_{item.id}') if post_data else item.cantidad,
+                item.cantidad,
+            )
+            subtotal = _parse_decimal(item.precio) * quantity
+
+            rows.append({
+                'item': item,
+                'quantity': quantity,
+                'subtotal': subtotal,
+                'marked_delete': marked_delete,
+            })
+
+            if marked_delete:
+                continue
+
+            total += subtotal
+            items_payload.append({
+                'presentacion': item.presentacion,
+                'cantidad': quantity,
+                'precio': item.precio,
+            })
+
+        return rows, items_payload, total
+
     if request.method == 'POST':
         if not puede_editar:
             messages.info(request, _('This order can no longer be edited.'))
@@ -792,32 +838,22 @@ def cliente_cotizacion_recibida_detalle(request, token):
 
         accion = (request.POST.get('accion') or '').strip()
         nota_cliente = (request.POST.get('nota_cliente') or '').strip()
+        quote_rows, items_payload, total = build_cliente_quote_rows(request.POST)
 
-        with transaction.atomic():
-            items_payload = []
-            total = Decimal('0')
+        if accion == 'cancelar':
+            with transaction.atomic():
+                for row in quote_rows:
+                    item = row['item']
+                    if row['marked_delete']:
+                        item.delete()
+                        continue
 
-            for item in list(cotizacion.items.select_related('presentacion__producto')):
-                if request.POST.get(f'eliminar_{item.id}'):
-                    item.delete()
-                    continue
+                    item.cantidad = row['quantity']
+                    item.subtotal = row['subtotal']
+                    item.save(update_fields=['cantidad', 'subtotal'])
 
-                cantidad = _parse_quantity(request.POST.get(f'cantidad_{item.id}'), item.cantidad)
-                item.cantidad = cantidad
-                item.subtotal = _parse_decimal(item.precio) * cantidad
-                item.save(update_fields=['cantidad', 'subtotal'])
-
-                total += item.subtotal
-                items_payload.append({
-                    'presentacion': item.presentacion,
-                    'cantidad': item.cantidad,
-                    'precio': item.precio,
-                })
-
-            cotizacion.total = total
-            cotizacion.nota_confirmacion_cliente = nota_cliente
-
-            if accion == 'cancelar':
+                cotizacion.total = total
+                cotizacion.nota_confirmacion_cliente = nota_cliente
                 cotizacion.estado = 'CANCELADA_CLIENTE'
                 cotizacion.save(update_fields=['estado', 'total', 'nota_confirmacion_cliente'])
                 crear_notificacion_backoffice(
@@ -829,14 +865,45 @@ def cliente_cotizacion_recibida_detalle(request, token):
                 messages.warning(request, _('The quote was cancelled successfully.'))
                 return redirect('cliente_cotizacion_recibida_detalle', token=cotizacion.token_cliente)
 
-            if not items_payload:
-                messages.error(request, _('You must leave at least one product to create the purchase order.'))
-                return redirect('cliente_cotizacion_recibida_detalle', token=cotizacion.token_cliente)
+        if not items_payload:
+            messages.error(request, _('You must leave at least one product to create the purchase order.'))
+            context = {
+                'cotizacion': cotizacion,
+                'pedido_existente': pedido_existente,
+                'puede_editar': puede_editar,
+                'pendientes_cotizaciones': _cotizaciones_pendientes_cliente(cliente),
+                'quote_rows': quote_rows,
+                'pending_nota_cliente': nota_cliente,
+                'pending_acepta_terminos': bool(request.POST.get('acepta_terminos')),
+            }
+            return render(request, 'cotizaciones/cliente_confirmar_cotizacion.html', context)
 
-            if not request.POST.get('acepta_terminos'):
-                messages.error(request, _('You must accept the terms and prices to continue with the order.'))
-                return redirect('cliente_cotizacion_recibida_detalle', token=cotizacion.token_cliente)
+        if not request.POST.get('acepta_terminos'):
+            messages.error(request, _('You must accept the terms and prices to continue with the order.'))
+            context = {
+                'cotizacion': cotizacion,
+                'pedido_existente': pedido_existente,
+                'puede_editar': puede_editar,
+                'pendientes_cotizaciones': _cotizaciones_pendientes_cliente(cliente),
+                'quote_rows': quote_rows,
+                'pending_nota_cliente': nota_cliente,
+                'pending_acepta_terminos': False,
+            }
+            return render(request, 'cotizaciones/cliente_confirmar_cotizacion.html', context)
 
+        with transaction.atomic():
+            for row in quote_rows:
+                item = row['item']
+                if row['marked_delete']:
+                    item.delete()
+                    continue
+
+                item.cantidad = row['quantity']
+                item.subtotal = row['subtotal']
+                item.save(update_fields=['cantidad', 'subtotal'])
+
+            cotizacion.total = total
+            cotizacion.nota_confirmacion_cliente = nota_cliente
             pedido = _create_purchase_order_from_quote(
                 cotizacion=cotizacion,
                 items_payload=items_payload,
@@ -859,11 +926,18 @@ def cliente_cotizacion_recibida_detalle(request, token):
         messages.success(request, _('Your purchase order #{id} was sent successfully.').format(id=pedido.id))
         return redirect('cliente_cotizacion_recibida_detalle', token=cotizacion.token_cliente)
 
+    quote_rows, current_items_payload, current_total = build_cliente_quote_rows()
+
     context = {
         'cotizacion': cotizacion,
         'pedido_existente': pedido_existente,
         'puede_editar': puede_editar,
         'pendientes_cotizaciones': _cotizaciones_pendientes_cliente(cliente),
+        'quote_rows': quote_rows,
+        'pending_nota_cliente': cotizacion.nota_confirmacion_cliente or '',
+        'pending_acepta_terminos': False,
+        'current_items_payload': current_items_payload,
+        'current_total': current_total,
     }
     return render(request, 'cotizaciones/cliente_confirmar_cotizacion.html', context)
 

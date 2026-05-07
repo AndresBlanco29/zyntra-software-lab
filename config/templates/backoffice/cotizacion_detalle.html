@@ -19,6 +19,21 @@
       {% csrf_token %}
       <div class="card-body">
         <h5 class="mb-3">{% trans "Quoted Products" %}</h5>
+        <div class="row g-2 align-items-end mb-3">
+          <div class="col-md-8 col-lg-7">
+            <label for="bulkPriceTierSelect" class="form-label fw-semibold mb-1">{% trans "Assign one customer price tier to all requested products" %}</label>
+            <select id="bulkPriceTierSelect" class="form-select form-select-sm">
+              <option value="">{% trans "Select one of the 5 prices" %}</option>
+              {% for option in bulk_price_options %}
+              <option value="{{ option.key }}">{{ option.label }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">{% trans "This applies the selected price tier to every requested product so you do not have to change them one by one." %}</div>
+          </div>
+          <div class="col-md-4 col-lg-5 d-grid d-md-flex justify-content-md-end">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="applyBulkPriceTierButton">{% trans "Apply to all products" %}</button>
+          </div>
+        </div>
         <div class="table-responsive">
           <table class="table align-middle">
             <thead>
@@ -43,7 +58,7 @@
                   <select class="form-select form-select-sm mb-2 preset-price-select" data-target-input="precio_{{ item.id }}">
                     <option value="">{% trans "Manual price" %}</option>
                     {% for option in row.price_options %}
-                    <option value="{{ option.value|unlocalize }}" {% if row.selected_option == option.key %}selected{% endif %}>
+                    <option value="{{ option.value|unlocalize }}" data-price-key="{{ option.key }}" {% if row.selected_option == option.key %}selected{% endif %}>
                       {{ option.label }} - ${{ option.value }}
                     </option>
                     {% endfor %}
@@ -177,6 +192,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const priceInputs = document.querySelectorAll('.customer-price-input');
   const quantityInputs = document.querySelectorAll('.quote-quantity-input');
   const noteInput = quoteForm ? quoteForm.querySelector('textarea[name="nota_backoffice"]') : null;
+  const bulkPriceTierSelect = document.getElementById('bulkPriceTierSelect');
+  const applyBulkPriceTierButton = document.getElementById('applyBulkPriceTierButton');
   const emailButton = document.querySelector('.quote-send-email-button');
   const whatsappButton = document.querySelector('.quote-send-whatsapp-button');
   const whatsappOriginalHref = whatsappButton ? whatsappButton.getAttribute('href') : '#';
@@ -317,6 +334,25 @@ document.addEventListener('DOMContentLoaded', function () {
       markQuoteAsDirty();
     });
   });
+
+  if (applyBulkPriceTierButton && bulkPriceTierSelect) {
+    applyBulkPriceTierButton.addEventListener('click', function () {
+      const selectedPriceKey = bulkPriceTierSelect.value;
+      if (!selectedPriceKey) {
+        return;
+      }
+
+      presetSelects.forEach(function (select) {
+        const matchingOption = select.querySelector(`option[data-price-key="${selectedPriceKey}"]`);
+        if (!matchingOption) {
+          return;
+        }
+
+        select.value = matchingOption.value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
+  }
 
   quantityInputs.forEach(function (input) {
     input.addEventListener('input', function () {

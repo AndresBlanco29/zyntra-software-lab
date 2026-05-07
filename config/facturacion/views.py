@@ -390,11 +390,24 @@ def _build_invoice_pdf_compact_header(*, styles, invoice_number, generated_on, t
 	return header
 
 
-def _build_invoice_pdf_barcode(value):
+def _build_invoice_pdf_barcode(value, *, max_width=66):
 	barcode = code128.Code128(value, barHeight=18, barWidth=0.45, humanReadable=True)
+	if barcode.width > max_width:
+		scaled_bar_width = max(0.2, round(0.45 * (max_width / float(barcode.width)), 3))
+		barcode = code128.Code128(value, barHeight=18, barWidth=scaled_bar_width, humanReadable=True)
 	barcode.fontName = 'Helvetica'
 	barcode.fontSize = 5.5
-	return barcode
+	barcode.hAlign = 'CENTER'
+	barcode_wrapper = Table([[barcode]], colWidths=[max_width])
+	barcode_wrapper.setStyle(TableStyle([
+		('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+		('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+		('LEFTPADDING', (0, 0), (-1, -1), 0),
+		('RIGHTPADDING', (0, 0), (-1, -1), 0),
+		('TOPPADDING', (0, 0), (-1, -1), 0),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+	]))
+	return barcode_wrapper
 
 
 def _build_invoice_pdf_totals_rows(invoice, *, meta_label_style, meta_value_style, section_title_style, body_style):

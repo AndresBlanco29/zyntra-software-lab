@@ -134,26 +134,26 @@
                 </tr>
               </thead>
               <tbody>
-                {% for item in cotizacion.items.all %}
+                {% for row in quote_rows %}
                   <tr>
-                    <td>{{ item.presentacion.producto.nombre }}</td>
-                    <td>{{ item.presentacion.nombre }}</td>
-                    <td>${{ item.precio }}</td>
+                    <td>{{ row.item.presentacion.producto.nombre }}</td>
+                    <td>{{ row.item.presentacion.nombre }}</td>
+                    <td>${{ row.item.precio }}</td>
                     <td>
                       {% if puede_editar %}
                         <div class="input-group quantity-stepper" data-quantity-stepper>
                           <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="down" aria-label="{% trans 'Decrease quantity' %}">-</button>
-                          <input type="number" min="1" class="form-control form-control-sm quantity-stepper__input" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}">
+                          <input type="number" min="1" class="form-control form-control-sm quantity-stepper__input" name="cantidad_{{ row.item.id }}" value="{{ row.quantity }}">
                           <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="up" aria-label="{% trans 'Increase quantity' %}">+</button>
                         </div>
                       {% else %}
-                        <span class="fw-semibold">{{ item.cantidad }}</span>
+                        <span class="fw-semibold">{{ row.quantity }}</span>
                       {% endif %}
                     </td>
-                    <td>${{ item.subtotal }}</td>
+                    <td>${{ row.subtotal }}</td>
                     {% if puede_editar %}
                       <td>
-                        <input type="checkbox" name="eliminar_{{ item.id }}" class="form-check-input">
+                        <input type="checkbox" name="eliminar_{{ row.item.id }}" class="form-check-input" {% if row.marked_delete %}checked{% endif %}>
                       </td>
                     {% endif %}
                   </tr>
@@ -169,11 +169,11 @@
               {% if puede_editar %}
               <div class="mb-3">
                 <label class="form-label fw-semibold">{% trans "Additional note" %}</label>
-                <textarea class="form-control" rows="3" name="nota_cliente" placeholder="{% trans 'Comments for your order' %}"></textarea>
+                <textarea class="form-control" rows="3" name="nota_cliente" placeholder="{% trans 'Comments for your order' %}">{{ pending_nota_cliente }}</textarea>
               </div>
 
               <div class="form-check mb-3">
-                <input class="form-check-input" type="checkbox" name="acepta_terminos" id="aceptaTerminos">
+                <input class="form-check-input" type="checkbox" name="acepta_terminos" id="aceptaTerminos" {% if pending_acepta_terminos %}checked{% endif %}>
                 <label class="form-check-label" for="aceptaTerminos">
                   {% trans "I confirm that I have reviewed this order, including products, quantities, and prices, and I authorize La Tortilla Grocery LLC to process it under my business name. I understand that I am responsible for the accuracy of the order details submitted." %}
                 </label>

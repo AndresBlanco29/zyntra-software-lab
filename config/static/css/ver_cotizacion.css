@@ -72,14 +72,14 @@ body {
     color: white !important;
     text-align: center;
     font-weight: bold;
-    padding: 12px 12px 12px 22px;
+    padding: 12px 12px 12px 30px;
     font-size: 18px;
 }
 
 .sidebar .active::before {
     content: "";
     position: absolute;
-    left: 0;
+    left: -1px;
     top: 50%;
     transform: translateY(-50%);
     width: 7px; /* grosor */

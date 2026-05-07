@@ -1967,6 +1967,8 @@ class InvoiceFlowTests(TestCase):
 		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
 
 		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Total paid')
+		self.assertContains(response, '$45.00')
 		self.assertContains(response, 'Customer signature proof')
 		self.assertContains(response, 'Carlos Cliente')
 		self.assertContains(response, delivery.firma_cliente.url)

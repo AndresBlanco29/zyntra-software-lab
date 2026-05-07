@@ -30,7 +30,7 @@
     </div>
 
     <div class="mb-3">
-      <input id="id_negocio_modal" type="text" class="form-control form-control-lg" placeholder="{% if CURRENT_LANGUAGE == 'es' %}ID negocio o ID personal*{% else %}Business ID or personal ID*{% endif %}" name="id_cliente" pattern="[0-9]{9}" maxlength="9" inputmode="numeric" required />
+      <input id="id_negocio_modal" type="text" class="form-control form-control-lg" placeholder="{% if CURRENT_LANGUAGE == 'es' %}ID negocio o ID personal*{% else %}Business ID or personal ID*{% endif %}" name="id_cliente" pattern="[0-9]{8,9}" maxlength="9" inputmode="numeric" required />
     </div>
 
     <div class="mb-3">

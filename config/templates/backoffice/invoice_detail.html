@@ -76,6 +76,7 @@
         <div class="d-flex justify-content-between mb-2"><span>{% trans "Customer credit applied" %}</span><strong class="text-success">-${{ invoice.credito_cliente_aplicado }}</strong></div>
         <div class="d-flex justify-content-between mb-2"><span>{% trans "Credit notes" %}</span><strong class="text-danger">-${{ invoice.total_creditos }}</strong></div>
         <div class="d-flex justify-content-between mb-2"><span>{% trans "Debit notes" %}</span><strong class="text-success">+${{ invoice.total_debitos }}</strong></div>
+        <div class="d-flex justify-content-between mb-2"><span>{% trans "Total paid" %}</span><strong>${% if invoice.delivery %}{{ invoice.delivery.monto_pagado }}{% else %}0.00{% endif %}</strong></div>
         <hr>
         <div class="d-flex justify-content-between mb-2"><span>{% trans "Outstanding invoice balance" %}</span><strong>${{ invoice.saldo_cliente }}</strong></div>
         <div class="d-flex justify-content-between"><span>{% trans "Customer available credit" %}</span><strong>${{ invoice.cliente.available_credit }}</strong></div>

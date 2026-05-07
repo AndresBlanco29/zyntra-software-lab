@@ -64,6 +64,10 @@ def _registration_context(**extra):
     return context
 
 
+def _is_valid_registration_document(value):
+    return bool(re.fullmatch(r'\d{8,9}', (value or '').strip()))
+
+
 def _build_client_correction_url(request, cliente):
     return request.build_absolute_uri(reverse('corregir_solicitud_cliente', args=[str(cliente.correction_token)]))
 
@@ -1625,6 +1629,13 @@ def registro_view(request):
         certificado = request.FILES.get('certificado')
         submitted_state = request.POST.get('estado', '').strip()
         submitted_city = request.POST.get('ciudad', '').strip()
+
+        if not _is_valid_registration_document(documento):
+            message = _("El ID personal o Business ID debe tener 8 o 9 dígitos.")
+            if is_ajax:
+                return JsonResponse({'success': False, 'error': 'invalid_document', 'message': message}, status=400)
+            messages.error(request, message)
+            return redirect('registro')
 
         if not submitted_state:
             message = _("Debes ingresar un estado o departamento.")

@@ -40,6 +40,7 @@ from .services import (
 	aprobar_nota_ajuste,
 	anular_nota_ajuste,
 	build_google_maps_route_url,
+	calculate_delivery_collectible_balance,
 	complete_driver_delivery,
 	crear_nota_ajuste,
 	crear_nota_ajuste_desde_invoice,
@@ -1062,7 +1063,11 @@ def driver_delivery_detail(request, delivery_id):
 		id=delivery_id,
 		driver=request.user,
 	)
-	return render(request, 'backoffice/driver_delivery_detail.html', {'delivery': delivery, 'invoice': delivery.invoice})
+	return render(request, 'backoffice/driver_delivery_detail.html', {
+		'delivery': delivery,
+		'invoice': delivery.invoice,
+		'delivery_collectible_balance': calculate_delivery_collectible_balance(delivery=delivery),
+	})
 
 
 @login_required
@@ -1191,12 +1196,6 @@ def driver_delivery_complete(request, delivery_id):
 	if request.method != 'POST':
 		return redirect('driver_delivery_detail', delivery_id=delivery.id)
 	try:
-		complete_driver_delivery(
-			delivery=delivery,
-			driver_user=request.user,
-			payload=request.POST,
-			evidence_files=request.FILES.getlist('evidence_photos'),
-		)
 		nota = None
 		note_request = _extract_adjustment_note_request(delivery.invoice, request.POST, field_prefix='driver_note_')
 		note_evidence_files = request.FILES.getlist('driver_note_evidence_photos')
@@ -1214,8 +1213,17 @@ def driver_delivery_complete(request, delivery_id):
 				items_payload=note_request['items_payload'],
 				monto=note_request['monto'],
 			)
+		complete_driver_delivery(
+			delivery=delivery,
+			driver_user=request.user,
+			payload=request.POST,
+			evidence_files=request.FILES.getlist('evidence_photos'),
+			adjustment_note=nota,
+		)
+		if nota is not None:
 			_save_adjustment_note_evidence_files(nota, note_evidence_files)
 	except ValidationError as exc:
+		transaction.set_rollback(True)
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:
 		messages.success(request, _('Delivery saved successfully.'))

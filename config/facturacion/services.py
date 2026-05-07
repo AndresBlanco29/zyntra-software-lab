@@ -249,8 +249,15 @@ def start_delivery_route(*, delivery, driver_user):
 	return delivery
 
 
+def calculate_delivery_collectible_balance(*, delivery, adjustment_note=None):
+	collectible_balance = _clamp_non_negative_money(delivery.invoice.saldo_cliente)
+	if adjustment_note is not None and adjustment_note.tipo_documento == 'CREDITO':
+		collectible_balance = _clamp_non_negative_money(collectible_balance - Decimal(str(adjustment_note.total or '0.00')))
+	return collectible_balance
+
+
 @transaction.atomic
-def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files):
+def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, adjustment_note=None):
 	if delivery.driver_id != driver_user.id:
 		raise PermissionDenied(_('You are not assigned to this delivery.'))
 	if delivery.is_completed:
@@ -262,6 +269,7 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files):
 	motivo_no_pago = (payload.get('motivo_no_pago') or '').strip()
 	monto_pagado = _quantize_money(payload.get('monto_pagado') or '0')
 	signature_file = _build_signature_content_file(payload.get('firma_cliente_data'), delivery.id)
+	collectible_balance = calculate_delivery_collectible_balance(delivery=delivery, adjustment_note=adjustment_note)
 
 	if estado_pago not in {'PAGADO', 'NO_PAGADO'}:
 		raise ValidationError(_('Select a valid payment status.'))
@@ -270,9 +278,9 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files):
 	if estado_pago == 'PAGADO':
 		if not metodo_pago:
 			raise ValidationError(_('A payment method is required when the delivery is paid.'))
-		if monto_pagado <= 0:
+		if collectible_balance > 0 and monto_pagado <= 0:
 			raise ValidationError(_('Paid deliveries must include a payment amount greater than zero.'))
-		if monto_pagado > delivery.invoice.saldo_cliente:
+		if monto_pagado > collectible_balance:
 			raise ValidationError(_('The paid amount cannot exceed the customer balance.'))
 	else:
 		if not motivo_no_pago:

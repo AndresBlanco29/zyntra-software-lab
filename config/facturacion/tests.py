@@ -860,7 +860,7 @@ class InvoiceFlowTests(TestCase):
 		response = self.client.post(reverse('driver_delivery_complete', args=[invoice.delivery.id]), {
 			'estado_pago': 'PAGADO',
 			'metodo_pago': 'CASH',
-			'monto_pagado': '45.00',
+			'monto_pagado': '30.00',
 			'recibido_por': 'Juan Perez',
 			'firma_cliente_data': self.signature_data,
 			'driver_note_tipo_documento': 'CREDITO',
@@ -880,10 +880,43 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(nota.tipo_credito, 'CREDIT_RETURN')
 		self.assertEqual(nota.creada_por, self.driver)
 		self.assertEqual(nota.total, Decimal('15.00'))
+		self.assertEqual(invoice.delivery.monto_pagado, Decimal('30.00'))
 		notificacion = Notificacion.objects.filter(titulo__icontains=nota.numero).latest('creada_en')
 		self.assertIn('requires review', notificacion.titulo)
 		self.assertIn('approve or reject', notificacion.mensaje)
 		self.assertEqual(notificacion.url, f'/facturacion/backoffice/invoices/{invoice.id}/')
+
+	def test_driver_complete_view_rejects_payment_above_credit_adjusted_balance(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.post(
+			reverse('driver_delivery_complete', args=[invoice.delivery.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'metodo_pago': 'CASH',
+				'monto_pagado': '45.00',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+				'driver_note_tipo_documento': 'CREDITO',
+				'driver_note_motivo': 'DAMAGE',
+				'driver_note_tipo_credito': 'CREDIT_RETURN',
+				'driver_note_descripcion': 'Caja dañada al entregar',
+				f'driver_note_qty_{invoice.items.first().id}': '1',
+				f'driver_note_amount_{invoice.items.first().id}': '15.00',
+			},
+			follow=True,
+		)
+
+		invoice.refresh_from_db()
+		self.assertEqual(invoice.delivery.estado, 'ASIGNADA')
+		self.assertEqual(invoice.notas_ajuste.count(), 0)
+		self.assertContains(response, 'The paid amount cannot exceed the customer balance.')
 
 	def test_driver_complete_view_rejects_credit_dump_for_product_return(self):
 		invoice = generar_invoice_desde_picking(

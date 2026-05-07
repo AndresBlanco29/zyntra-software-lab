@@ -287,7 +287,8 @@
             </div>
             <div class="col-md-4 paid-only d-none">
               <label class="form-label fw-semibold">{% trans "Payment amount" %}</label>
-              <input type="number" min="0" step="0.01" name="monto_pagado" class="form-control" value="{{ invoice.saldo_cliente }}">
+              <input type="number" min="0" step="0.01" name="monto_pagado" id="paymentAmount" class="form-control" value="{{ delivery_collectible_balance }}" data-base-balance="{{ invoice.saldo_cliente }}">
+              <div class="form-text">{% trans "Credit notes created during delivery reduce the suggested amount to collect." %}</div>
             </div>
 
             <div class="col-md-4 paid-only d-none">
@@ -577,6 +578,7 @@
     const supportsInlineCamera = Boolean(window.isSecureContext && navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function');
     const paymentStatus = document.getElementById('paymentStatus');
     const paymentMethod = document.getElementById('paymentMethod');
+    const paymentAmountInput = document.getElementById('paymentAmount');
     const driverNoteType = document.getElementById('driverNoteType');
     const driverNoteTypePostDelivery = document.getElementById('driverNoteTypePostDelivery');
     const driverAdjustmentType = document.getElementById('driverAdjustmentType');
@@ -606,6 +608,7 @@
     const driverDescriptionHelp = document.getElementById('driverDescriptionHelp');
     const driverDescriptionLabelPostDelivery = document.getElementById('driverDescriptionLabelPostDelivery');
     const driverDescriptionHelpPostDelivery = document.getElementById('driverDescriptionHelpPostDelivery');
+    const driverFinancialAmountInput = driverFinancialAmountWrapper ? driverFinancialAmountWrapper.querySelector('input[name="driver_note_monto"]') : null;
     const canvas = document.getElementById('signatureCanvas');
     const signatureInput = document.getElementById('signatureData');
     const clearSignature = document.getElementById('clearSignature');
@@ -802,7 +805,34 @@
       const status = paymentStatus.value;
       paidFields.forEach((element) => element.classList.toggle('d-none', status !== 'PAGADO'));
       unpaidFields.forEach((element) => element.classList.toggle('d-none', status !== 'NO_PAGADO'));
+      updatePaymentAmountSuggestion();
       toggleMethodFields();
+    }
+
+    function getDriverDraftCreditAmount() {
+      if (!driverNoteType || driverNoteType.value !== 'CREDITO') {
+        return 0;
+      }
+      const isProduct = !driverAdjustmentType || driverAdjustmentType.value === 'PRODUCTO';
+      if (!isProduct) {
+        return Number((driverFinancialAmountInput && driverFinancialAmountInput.value) || '0');
+      }
+      return Array.from(document.querySelectorAll('#driverProductLinesWrapper .js-driver-adjustment-amount')).reduce((total, input) => {
+        if (input.disabled) {
+          return total;
+        }
+        return total + Number(input.value || '0');
+      }, 0);
+    }
+
+    function updatePaymentAmountSuggestion() {
+      if (!paymentAmountInput) {
+        return;
+      }
+      const baseBalance = Number(paymentAmountInput.dataset.baseBalance || paymentAmountInput.defaultValue || '0');
+      const suggestedAmount = Math.max(baseBalance - getDriverDraftCreditAmount(), 0);
+      paymentAmountInput.value = suggestedAmount.toFixed(2);
+      paymentAmountInput.max = suggestedAmount.toFixed(2);
     }
 
     function toggleMethodFields() {
@@ -909,6 +939,7 @@
         driverDescriptionHelp.textContent = isDebit ? driverDescriptionHelp.dataset.debitHelp : driverDescriptionHelp.dataset.creditHelp;
       }
       recalculateDriverAdjustmentAmounts();
+      updatePaymentAmountSuggestion();
     }
 
     function toggleDriverAdjustmentModePostDelivery() {
@@ -957,6 +988,7 @@
         const total = (packageQty * packagePrice) + ((packagePrice / unitsPerPackage) * unitQty);
         amountInput.value = total > 0 ? total.toFixed(2) : '';
       });
+      updatePaymentAmountSuggestion();
     }
 
     if (paymentStatus) {
@@ -978,6 +1010,9 @@
     }
     if (driverAdjustmentTypePostDelivery) {
       driverAdjustmentTypePostDelivery.addEventListener('change', toggleDriverAdjustmentModePostDelivery);
+    }
+    if (driverFinancialAmountInput) {
+      driverFinancialAmountInput.addEventListener('input', updatePaymentAmountSuggestion);
     }
     document.querySelectorAll('.js-driver-adjustment-package-qty, .js-driver-adjustment-unit-qty').forEach((field) => {
       field.addEventListener('input', recalculateDriverAdjustmentAmounts);

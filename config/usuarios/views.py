@@ -5,6 +5,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from django.contrib.messages import get_messages
 from django.contrib.auth.models import Group
 from .models import Usuario
 from .permissions import (
@@ -38,6 +39,13 @@ import os
 import re
 import urllib.request
 import urllib.error
+
+
+def _clear_pending_messages(request):
+    storage = get_messages(request)
+    for _message in storage:
+        pass
+    storage.used = True
 import logging
 import json
 
@@ -1530,6 +1538,7 @@ def login_view(request):
             user = authenticate(request, username=username, password=password)
             
             if user is not None:
+                _clear_pending_messages(request)
                 login(request, user)
                 redirect_url = _resolve_login_redirect(user, next_url)
 

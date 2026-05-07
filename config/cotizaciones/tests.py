@@ -161,6 +161,38 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertEqual(backoffice_response.status_code, 200)
 		self.assertNotContains(backoffice_response, 'Your order request was sent successfully.')
 
+	def test_customer_quote_success_message_is_cleared_on_admin_login(self):
+		self.cliente.estado_revision = Cliente.REVIEW_STATUS_APPROVED
+		self.cliente.nivel_precio = 3
+		self.cliente.save(update_fields=['estado_revision', 'nivel_precio'])
+
+		self.client.force_login(self.customer_user)
+		session = self.client.session
+		session['carrito'] = {
+			str(self.presentacion.id): {
+				'presentacion_id': self.presentacion.id,
+				'cantidad': 2,
+				'precio': str(self.presentacion.precio_1),
+			}
+		}
+		session.save()
+
+		response = self.client.post(reverse('guardar_cotizacion'), {'nota': 'Nueva solicitud'})
+		self.assertEqual(response.status_code, 302)
+
+		self.client.get(reverse('logout'))
+		admin_response = self.client.post(
+			reverse('login'),
+			{
+				'username': self.backoffice.username,
+				'password': 'secret123',
+			},
+			follow=True,
+		)
+
+		self.assertEqual(admin_response.status_code, 200)
+		self.assertNotContains(admin_response, 'Your order request was sent successfully.')
+
 	def test_guardar_cotizacion_allows_customer_without_assigned_prices(self):
 		self.cliente.estado_revision = Cliente.REVIEW_STATUS_APPROVED
 		self.cliente.nivel_precio = Cliente.PRICE_TIER_UNASSIGNED

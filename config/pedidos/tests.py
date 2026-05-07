@@ -346,6 +346,31 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'U/M changed by picker')
 		self.assertContains(response, 'table-danger')
 
+	def test_backoffice_detail_hides_picker_banner_after_backoffice_quantity_edit(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 2},
+			nota='Cantidad ajustada por picker',
+			nota_resuelta=True,
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), {
+			'estado': 'RECIBIDO',
+			'nota_backoffice': 'Ajuste final de backoffice',
+			f'cantidad_{self.item.id}': '3',
+			f'precio_{self.item.id}': '12.00',
+		})
+
+		self.assertEqual(response.status_code, 302)
+
+		get_response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+		self.assertEqual(get_response.status_code, 200)
+		self.assertNotContains(get_response, 'Rows marked in red were changed by the picker')
+		self.assertContains(get_response, 'table-danger')
+
 	def test_selector_post_with_stock_error_preserves_typed_quantities_and_note(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		self.client.force_login(self.selector)

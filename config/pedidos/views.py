@@ -51,6 +51,12 @@ def _is_selector_user(user):
 	return bool(user and user.is_authenticated and (user.is_superuser or user.role in {'admin', 'seleccionador'}))
 
 
+def _item_has_picker_change_banner(item, pedido):
+	if item.selector_added_by_picker or item.selector_changed_presentation:
+		return True
+	return pedido.estado == 'VERIFICADO_AJUSTADO' and item.selector_changed_quantity
+
+
 def _parse_decimal(value, default='0'):
 	text = str(value if value is not None else default).strip().replace(',', '.')
 	if not text:
@@ -297,7 +303,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 	context = {
 		'pedido': pedido,
 		'pedido_items': pedido_items,
-		'pedido_has_picker_changes': any(item.selector_has_changes for item in pedido_items),
+		'pedido_has_picker_changes': any(_item_has_picker_change_banner(item, pedido) for item in pedido_items),
 		'invoice': getattr(pedido, 'invoice', None),
 		'picker_stock_shortage_blocked': bool(pedido.picking_bloqueado and picker_stock_shortage_rows),
 		'picker_stock_shortage_rows': picker_stock_shortage_rows,

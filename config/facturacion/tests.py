@@ -1068,6 +1068,38 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(invoice.notas_ajuste.count(), 0)
 		self.assertContains(response, 'The paid amount cannot exceed the customer balance.')
 
+	def test_driver_complete_view_rejects_payment_below_credit_adjusted_balance(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.post(
+			reverse('driver_delivery_complete', args=[invoice.delivery.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'metodo_pago': 'CASH',
+				'monto_pagado': '29.00',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+				'driver_note_tipo_documento': 'CREDITO',
+				'driver_note_motivo': 'DAMAGE',
+				'driver_note_tipo_credito': 'CREDIT_RETURN',
+				'driver_note_descripcion': 'Caja dañada al entregar',
+				f'driver_note_qty_{invoice.items.first().id}': '1',
+				f'driver_note_amount_{invoice.items.first().id}': '15.00',
+			},
+			follow=True,
+		)
+
+		invoice.refresh_from_db()
+		self.assertEqual(invoice.delivery.estado, 'ASIGNADA')
+		self.assertEqual(invoice.notas_ajuste.count(), 0)
+		self.assertContains(response, 'The total paid amount must exactly match the amount due from the customer.')
+
 	def test_driver_complete_view_rejects_credit_dump_for_product_return(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
@@ -1362,6 +1394,66 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(nota.total, Decimal('7.50'))
 		self.assertEqual(nota.items.count(), 0)
 		self.assertEqual(invoice.delivery.monto_pagado, Decimal('52.50'))
+
+	def test_driver_complete_view_allows_paid_delivery_without_payment_when_credit_offsets_full_balance(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.post(reverse('driver_delivery_complete', args=[invoice.delivery.id]), {
+			'estado_pago': 'PAGADO',
+			'recibido_por': 'Juan Perez',
+			'firma_cliente_data': self.signature_data,
+			'driver_note_tipo_documento': 'CREDITO',
+			'driver_note_tipo_ajuste': 'FINANCIERO',
+			'driver_note_motivo': 'OTHER',
+			'driver_note_tipo_credito': 'CREDIT_DUMP',
+			'driver_note_descripcion': 'Credito total aplicado en entrega',
+			'driver_note_monto': '45.00',
+		})
+
+		invoice.refresh_from_db()
+		nota = invoice.notas_ajuste.get(descripcion='Credito total aplicado en entrega')
+		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertEqual(invoice.delivery.estado, 'ENTREGADA_PAGADA')
+		self.assertEqual(invoice.delivery.monto_pagado, Decimal('0.00'))
+		self.assertEqual(nota.total, Decimal('45.00'))
+
+	def test_driver_complete_view_rejects_collecting_payment_when_credit_requires_refund(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.post(
+			reverse('driver_delivery_complete', args=[invoice.delivery.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'metodo_pago': 'CASH',
+				'monto_pagado': '5.00',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+				'driver_note_tipo_documento': 'CREDITO',
+				'driver_note_tipo_ajuste': 'FINANCIERO',
+				'driver_note_motivo': 'OTHER',
+				'driver_note_tipo_credito': 'CREDIT_DUMP',
+				'driver_note_descripcion': 'Credito superior al saldo',
+				'driver_note_monto': '50.00',
+			},
+			follow=True,
+		)
+
+		invoice.refresh_from_db()
+		self.assertEqual(invoice.delivery.estado, 'ASIGNADA')
+		self.assertEqual(invoice.notas_ajuste.count(), 0)
+		self.assertContains(response, 'This delivery results in money due back to the customer. Do not record incoming payments.')
 
 	def test_driver_complete_view_rejects_payment_above_debit_adjusted_balance(self):
 		invoice = generar_invoice_desde_picking(

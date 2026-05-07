@@ -289,6 +289,8 @@
               <label class="form-label fw-semibold">{% trans "Total payment amount" %}</label>
               <input type="number" min="0" step="0.01" name="monto_pagado" id="paymentAmount" class="form-control" value="{{ delivery_collectible_balance }}" data-base-balance="{{ invoice.saldo_cliente }}">
               <div class="form-text">{% trans "Credit and debit notes created during delivery update the suggested amount to collect. The total is calculated automatically from up to three payment methods." %}</div>
+              <div class="form-text fw-semibold" id="paymentAmountSummary"></div>
+              <div class="form-text" id="paymentEntriesFeedback"></div>
             </div>
 
             <div class="col-12 paid-only d-none">
@@ -578,6 +580,8 @@
     const supportsInlineCamera = Boolean(window.isSecureContext && navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function');
     const paymentStatus = document.getElementById('paymentStatus');
     const paymentAmountInput = document.getElementById('paymentAmount');
+    const paymentAmountSummary = document.getElementById('paymentAmountSummary');
+    const paymentEntriesFeedback = document.getElementById('paymentEntriesFeedback');
     const paymentEntryMethods = Array.from(document.querySelectorAll('.js-payment-entry-method'));
     const paymentEntryAmounts = Array.from(document.querySelectorAll('.js-payment-entry-amount'));
     const driverNoteType = document.getElementById('driverNoteType');
@@ -623,6 +627,19 @@
       filesSelected: '{% trans "Files selected." %}',
       previewTitle: '{% trans "Selected photos" %}',
     };
+    const paymentStrings = {
+      customerPays: '{% trans "Customer must pay" %}',
+      customerReceives: '{% trans "Customer must receive" %}',
+      noPaymentRequired: '{% trans "No payment should be collected from the customer." %}',
+      entriesMatch: '{% trans "Entered payments match the required total." %}',
+      remaining: '{% trans "Remaining amount to collect:" %}',
+      exceeded: '{% trans "Entered payments exceed the required total by" %}',
+      removeIncomingPayments: '{% trans "Do not register incoming payments. This delivery results in money due back to the customer." %}',
+    };
+
+    function formatMoney(value) {
+      return `$${Number(value || 0).toFixed(2)}`;
+    }
 
     function setCameraStatus(widget, message) {
       const status = widget.querySelector('[data-camera-status]');
@@ -841,23 +858,98 @@
       }, 0);
     }
 
+    function getSignedPaymentDelta() {
+      if (!paymentAmountInput) {
+        return 0;
+      }
+      const baseBalance = Number(paymentAmountInput.dataset.baseBalance || paymentAmountInput.defaultValue || '0');
+      return baseBalance - getDriverDraftCreditAmount() + getDriverDraftDebitAmount();
+    }
+
+    function updatePaymentEntriesValidation(requiredAmount, signedDelta) {
+      if (!paymentEntriesFeedback) {
+        return;
+      }
+      const totalEntered = paymentEntryAmounts.reduce((sum, input) => sum + Number(input.value || '0'), 0);
+      paymentEntriesFeedback.classList.remove('text-danger', 'text-success', 'text-muted');
+      paymentEntryAmounts.forEach((input) => input.classList.remove('is-invalid', 'is-valid'));
+
+      if (!paymentStatus || paymentStatus.value !== 'PAGADO') {
+        paymentEntriesFeedback.textContent = '';
+        return;
+      }
+
+      if (signedDelta < 0) {
+        paymentEntriesFeedback.textContent = paymentStrings.removeIncomingPayments;
+        paymentEntriesFeedback.classList.add(totalEntered > 0 ? 'text-danger' : 'text-muted');
+        paymentEntryAmounts.forEach((input) => input.classList.add(totalEntered > 0 ? 'is-invalid' : 'is-valid'));
+        return;
+      }
+
+      if (requiredAmount === 0) {
+        paymentEntriesFeedback.textContent = paymentStrings.noPaymentRequired;
+        paymentEntriesFeedback.classList.add(totalEntered > 0 ? 'text-danger' : 'text-muted');
+        paymentEntryAmounts.forEach((input) => input.classList.add(totalEntered > 0 ? 'is-invalid' : 'is-valid'));
+        return;
+      }
+
+      if (Math.abs(totalEntered - requiredAmount) < 0.005) {
+        paymentEntriesFeedback.textContent = paymentStrings.entriesMatch;
+        paymentEntriesFeedback.classList.add('text-success');
+        paymentEntryAmounts.forEach((input) => {
+          if (Number(input.value || '0') > 0) {
+            input.classList.add('is-valid');
+          }
+        });
+        return;
+      }
+
+      if (totalEntered > requiredAmount) {
+        paymentEntriesFeedback.textContent = `${paymentStrings.exceeded} ${formatMoney(totalEntered - requiredAmount)}.`;
+      } else {
+        paymentEntriesFeedback.textContent = `${paymentStrings.remaining} ${formatMoney(requiredAmount - totalEntered)}.`;
+      }
+      paymentEntriesFeedback.classList.add('text-danger');
+      paymentEntryAmounts.forEach((input) => {
+        if (Number(input.value || '0') > 0) {
+          input.classList.add('is-invalid');
+        }
+      });
+    }
+
     function updatePaymentAmountSuggestion() {
       if (!paymentAmountInput) {
         return;
       }
-      const baseBalance = Number(paymentAmountInput.dataset.baseBalance || paymentAmountInput.defaultValue || '0');
-      const suggestedAmount = Math.max(baseBalance - getDriverDraftCreditAmount() + getDriverDraftDebitAmount(), 0);
+      const signedDelta = getSignedPaymentDelta();
+      const suggestedAmount = Math.max(signedDelta, 0);
       paymentAmountInput.max = suggestedAmount.toFixed(2);
       paymentAmountInput.readOnly = true;
-      syncPaymentEntriesTotal();
+      paymentAmountInput.value = suggestedAmount.toFixed(2);
+      paymentAmountInput.dataset.requiredAmount = suggestedAmount.toFixed(2);
+      paymentAmountInput.dataset.signedDelta = signedDelta.toFixed(2);
+      if (paymentAmountSummary) {
+        if (signedDelta < 0) {
+          paymentAmountSummary.textContent = `${paymentStrings.customerReceives} ${formatMoney(Math.abs(signedDelta))}.`;
+          paymentAmountSummary.className = 'form-text fw-semibold text-danger';
+        } else if (suggestedAmount === 0) {
+          paymentAmountSummary.textContent = paymentStrings.noPaymentRequired;
+          paymentAmountSummary.className = 'form-text fw-semibold text-muted';
+        } else {
+          paymentAmountSummary.textContent = `${paymentStrings.customerPays} ${formatMoney(suggestedAmount)}.`;
+          paymentAmountSummary.className = 'form-text fw-semibold text-success';
+        }
+      }
+      updatePaymentEntriesValidation(suggestedAmount, signedDelta);
     }
 
     function syncPaymentEntriesTotal() {
       if (!paymentAmountInput) {
         return;
       }
-      const total = paymentEntryAmounts.reduce((sum, input) => sum + Number(input.value || '0'), 0);
-      paymentAmountInput.value = total.toFixed(2);
+      const requiredAmount = Number(paymentAmountInput.dataset.requiredAmount || paymentAmountInput.value || '0');
+      const signedDelta = Number(paymentAmountInput.dataset.signedDelta || requiredAmount || '0');
+      updatePaymentEntriesValidation(requiredAmount, signedDelta);
     }
 
     function togglePaymentEntryFields() {

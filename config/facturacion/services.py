@@ -298,15 +298,39 @@ def start_delivery_route(*, delivery, driver_user):
 	return delivery
 
 
-def calculate_delivery_collectible_balance(*, delivery, adjustment_note=None):
-	collectible_balance = _clamp_non_negative_money(delivery.invoice.saldo_cliente)
+def calculate_delivery_payment_delta(*, delivery, adjustment_note=None):
+	payment_delta = _quantize_money(delivery.invoice.saldo_cliente)
 	if adjustment_note is not None:
 		adjustment_total = Decimal(str(adjustment_note.total or '0.00'))
 		if adjustment_note.tipo_documento == 'CREDITO':
-			collectible_balance = _clamp_non_negative_money(collectible_balance - adjustment_total)
+			payment_delta = _quantize_money(payment_delta - adjustment_total)
 		else:
-			collectible_balance = _quantize_money(collectible_balance + adjustment_total)
-	return collectible_balance
+			payment_delta = _quantize_money(payment_delta + adjustment_total)
+	return payment_delta
+
+
+def calculate_delivery_collectible_balance(*, delivery, adjustment_note=None):
+	return _clamp_non_negative_money(calculate_delivery_payment_delta(delivery=delivery, adjustment_note=adjustment_note))
+
+
+def _empty_driver_payment_details():
+	return {
+		'entries': [],
+		'metodo_pago': '',
+		'monto_pagado': Decimal('0.00'),
+		'monto_pagado_cash': Decimal('0.00'),
+		'monto_pagado_cheque': Decimal('0.00'),
+		'cheque_numero': '',
+		'cheque_banco': '',
+		'cheque_imagen': None,
+		'transferencia_referencia': '',
+		'tarjeta_ultimos_4': '',
+		'tarjeta_autorizacion': '',
+		'zelle_referencia': '',
+		'zelle_remitente': '',
+		'ach_referencia': '',
+		'ach_cuenta_ultimos_4': '',
+	}
 
 
 def _build_driver_payment_entry(*, position, metodo_pago, monto, cheque_numero='', cheque_banco='', cheque_imagen=None,
@@ -355,8 +379,10 @@ def _build_driver_payment_entry(*, position, metodo_pago, monto, cheque_numero='
 	return entry
 
 
-def _resolve_driver_delivery_payment(*, payload, collectible_balance, payment_files=None, cheque_image_file=None):
+def _resolve_driver_delivery_payment(*, payload, collectible_balance, payment_delta=None, payment_files=None, cheque_image_file=None):
 	entries = []
+	collectible_balance = _clamp_non_negative_money(collectible_balance)
+	payment_delta = _quantize_money(payment_delta if payment_delta is not None else collectible_balance)
 	if payment_files is None:
 		payment_files = {}
 	uses_new_rows = any(
@@ -365,6 +391,27 @@ def _resolve_driver_delivery_payment(*, payload, collectible_balance, payment_fi
 		or payment_files.get(f'payment_cheque_image_{index}')
 		for index in range(1, 4)
 	)
+	legacy_has_payment_input = any(
+		str(payload.get(field_name) or '').strip()
+		for field_name in (
+			'metodo_pago',
+			'monto_pagado',
+			'monto_pagado_cash',
+			'monto_pagado_cheque',
+			'cheque_numero',
+			'cheque_banco',
+			'transferencia_referencia',
+			'tarjeta_ultimos_4',
+			'tarjeta_autorizacion',
+			'zelle_referencia',
+			'zelle_remitente',
+			'ach_referencia',
+			'ach_cuenta_ultimos_4',
+		)
+	) or cheque_image_file is not None
+
+	if collectible_balance <= 0 and not uses_new_rows and not legacy_has_payment_input:
+		return _empty_driver_payment_details()
 
 	if uses_new_rows:
 		for index in range(1, 4):
@@ -440,15 +487,23 @@ def _resolve_driver_delivery_payment(*, payload, collectible_balance, payment_fi
 			))
 
 	if not entries:
+		if collectible_balance <= 0:
+			return _empty_driver_payment_details()
 		raise ValidationError(_('Add at least one payment method for paid deliveries.'))
 	if len(entries) > 3:
 		raise ValidationError(_('A maximum of three payment methods is allowed per delivery.'))
 
 	total_paid = _quantize_money(sum(entry['monto'] for entry in entries))
+	if collectible_balance <= 0:
+		if payment_delta < 0:
+			raise ValidationError(_('This delivery results in money due back to the customer. Do not record incoming payments.'))
+		raise ValidationError(_('This delivery does not require collecting payment from the customer.'))
 	if collectible_balance > 0 and total_paid <= 0:
 		raise ValidationError(_('Paid deliveries must include a payment amount greater than zero.'))
 	if total_paid > collectible_balance:
 		raise ValidationError(_('The paid amount cannot exceed the customer balance.'))
+	if total_paid < collectible_balance:
+		raise ValidationError(_('The total paid amount must exactly match the amount due from the customer.'))
 
 	cheque_entries = [entry for entry in entries if entry['metodo_pago'] == 'CHEQUE']
 	single_entry = entries[0] if len(entries) == 1 else None
@@ -482,6 +537,7 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 	recibido_por = (payload.get('recibido_por') or '').strip()
 	motivo_no_pago = (payload.get('motivo_no_pago') or '').strip()
 	signature_file = _build_signature_content_file(payload.get('firma_cliente_data'), delivery.id)
+	payment_delta = calculate_delivery_payment_delta(delivery=delivery, adjustment_note=adjustment_note)
 	collectible_balance = calculate_delivery_collectible_balance(delivery=delivery, adjustment_note=adjustment_note)
 	payment_details = None
 
@@ -493,6 +549,7 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 		payment_details = _resolve_driver_delivery_payment(
 			payload=payload,
 			collectible_balance=collectible_balance,
+			payment_delta=payment_delta,
 			payment_files=payment_files,
 			cheque_image_file=cheque_image_file,
 		)

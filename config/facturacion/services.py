@@ -68,6 +68,15 @@ def _apply_customer_balance_delta(*, cliente, delta):
 	return cliente.balance
 
 
+def _remaining_invoice_balance_before_payment(*, invoice):
+	return _clamp_non_negative_money(
+		Decimal(str(invoice.subtotal or '0.00'))
+		- Decimal(str(invoice.credito_cliente_aplicado or '0.00'))
+		- Decimal(str(invoice.total_creditos or '0.00'))
+		+ Decimal(str(invoice.total_debitos or '0.00'))
+	)
+
+
 def _calculate_invoice_totals(*, subtotal, credito_cliente_aplicado=Decimal('0.00'), total_creditos=Decimal('0.00'), total_debitos=Decimal('0.00'), total_pagado=Decimal('0.00')):
 	subtotal = _quantize_money(subtotal)
 	credito_cliente_aplicado = _clamp_non_negative_money(credito_cliente_aplicado)
@@ -124,6 +133,39 @@ def _create_invoice_notification(invoice):
 	)
 
 
+def _apply_pending_customer_notes_to_invoice(*, invoice):
+	pending_notes = list(
+		NotaAjuste.objects.select_for_update()
+		.filter(cliente=invoice.cliente, invoice__isnull=True, estado='APROBADA')
+		.order_by('aprobada_en', 'creada_en', 'id')
+	)
+	if not pending_notes:
+		return
+
+	for nota in pending_notes:
+		pending_customer_amount = _clamp_non_negative_money(nota.monto_aplicado_cliente)
+		if nota.tipo_documento == 'CREDITO':
+			amount_to_invoice = min(pending_customer_amount, _remaining_invoice_balance_before_payment(invoice=invoice))
+			if amount_to_invoice <= 0:
+				continue
+			invoice.total_creditos = _quantize_money(Decimal(str(invoice.total_creditos or '0.00')) + amount_to_invoice)
+			_apply_customer_balance_delta(cliente=invoice.cliente, delta=-amount_to_invoice)
+			nota.invoice = invoice
+			nota.monto_aplicado_invoice = _quantize_money(amount_to_invoice)
+			nota.monto_aplicado_cliente = _quantize_money(pending_customer_amount - amount_to_invoice)
+			nota.save(update_fields=['invoice', 'monto_aplicado_invoice', 'monto_aplicado_cliente'])
+		else:
+			amount_to_invoice = pending_customer_amount
+			if amount_to_invoice <= 0:
+				continue
+			invoice.total_debitos = _quantize_money(Decimal(str(invoice.total_debitos or '0.00')) + amount_to_invoice)
+			_apply_customer_balance_delta(cliente=invoice.cliente, delta=amount_to_invoice)
+			nota.invoice = invoice
+			nota.monto_aplicado_invoice = _quantize_money(amount_to_invoice)
+			nota.monto_aplicado_cliente = Decimal('0.00')
+			nota.save(update_fields=['invoice', 'monto_aplicado_invoice', 'monto_aplicado_cliente'])
+
+
 @transaction.atomic
 def generar_invoice_desde_picking(
 	*,
@@ -178,6 +220,9 @@ def generar_invoice_desde_picking(
 		raise ValidationError(_('Add at least one verified item before generating the invoice.'))
 
 	InvoiceItem.objects.bulk_create(invoice_items)
+	invoice.subtotal = _quantize_money(total)
+	invoice.save(update_fields=['subtotal', 'actualizada_en'])
+	_apply_pending_customer_notes_to_invoice(invoice=invoice)
 	cliente_credit_available = _clamp_non_negative_money(pedido.cliente.balance)
 	applied_credit = _clamp_non_negative_money(applied_customer_credit or '0.00')
 	if applied_credit > cliente_credit_available:
@@ -186,12 +231,16 @@ def generar_invoice_desde_picking(
 		raise ValidationError(_('The applied customer credit cannot exceed the invoice subtotal.'))
 	if applied_credit > 0:
 		_apply_customer_balance_delta(cliente=pedido.cliente, delta=-applied_credit)
-	invoice.subtotal = _quantize_money(total)
 	invoice.credito_cliente_aplicado = applied_credit
-	totals = _calculate_invoice_totals(subtotal=total, credito_cliente_aplicado=applied_credit)
+	totals = _calculate_invoice_totals(
+		subtotal=total,
+		credito_cliente_aplicado=applied_credit,
+		total_creditos=invoice.total_creditos,
+		total_debitos=invoice.total_debitos,
+	)
 	invoice.total_neto = totals['total_neto']
 	invoice.saldo_cliente = totals['saldo_cliente']
-	invoice.save(update_fields=['subtotal', 'credito_cliente_aplicado', 'total_neto', 'saldo_cliente', 'actualizada_en'])
+	invoice.save(update_fields=['subtotal', 'credito_cliente_aplicado', 'total_creditos', 'total_debitos', 'total_neto', 'saldo_cliente', 'actualizada_en'])
 
 	pedido.estado = 'INVOICE_GENERADA'
 	pedido.save(update_fields=['estado', 'actualizada_en'])

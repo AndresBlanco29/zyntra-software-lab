@@ -73,10 +73,40 @@ def _build_relaxed_field(field):
     relaxed_field.null = True
     relaxed_field.blank = True
     relaxed_field.default = None
+    if getattr(relaxed_field, 'remote_field', None) is not None:
+        relaxed_field.db_constraint = False
     return relaxed_field
 
 
+def _backfill_nota_ajuste_customer(connection, model, field):
+    if model._meta.app_label != 'facturacion' or model._meta.model_name != 'notaajuste':
+        return False
+    if field.column != 'cliente_id':
+        return False
+
+    invoice_field = model._meta.get_field('invoice')
+    invoice_table = invoice_field.related_model._meta.db_table
+    table_name = model._meta.db_table
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            UPDATE `{table_name}` AS note
+            INNER JOIN `{invoice_table}` AS invoice
+                ON invoice.`id` = note.`{invoice_field.column}`
+            SET note.`{field.column}` = invoice.`cliente_id`
+            WHERE note.`{field.column}` IS NULL
+              AND note.`{invoice_field.column}` IS NOT NULL
+            """
+        )
+
+    return True
+
+
 def _backfill_field_values(connection, model, field):
+    if _backfill_nota_ajuste_customer(connection, model, field):
+        return
+
     table_name = model._meta.db_table
     pk_column = model._meta.pk.column
     column_name = field.column
@@ -98,7 +128,7 @@ def _backfill_field_values(connection, model, field):
 
 
 def _add_missing_field(connection, model, field):
-    if field.unique and not field.primary_key:
+    if (field.unique and not field.primary_key) or getattr(field, 'many_to_one', False):
         relaxed_field = _build_relaxed_field(field)
         with connection.schema_editor() as schema_editor:
             schema_editor.add_field(model, relaxed_field)
@@ -110,7 +140,7 @@ def _add_missing_field(connection, model, field):
                 schema_editor.alter_field(model, relaxed_field, field, strict=False)
         except IntegrityError as exc:
             logger.warning(
-                "Runtime schema repair left %s.%s without unique constraint after backfill: %s",
+                "Runtime schema repair left %s.%s in relaxed mode after backfill: %s",
                 model._meta.db_table,
                 field.column,
                 exc,

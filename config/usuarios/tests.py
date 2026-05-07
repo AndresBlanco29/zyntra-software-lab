@@ -2,12 +2,16 @@ import re
 
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
+from django.db import connection
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 
 from config.clientes.models import Cliente
+from config.facturacion.models import Invoice, NotaAjuste
+from config.pedidos.models import Pedido
 from config.usuarios.models import Usuario
 from config.usuarios.permissions import get_redirect_url_for_user
+from config.usuarios.schema_repair import _backfill_field_values, _build_relaxed_field
 
 
 class InternalPermissionTests(TestCase):
@@ -217,6 +221,67 @@ class PasswordResetFlowTests(TestCase):
 		)
 		self.assertIn('Check your email', response.json()['html'])
 		self.assertEqual(len(mail.outbox), 1)
+
+
+class RuntimeSchemaRepairTests(TransactionTestCase):
+	def test_backfill_field_values_populates_note_customer_from_invoice(self):
+		creator = Usuario.objects.create_user(
+			username='schema-repair-backfill',
+			password='secret123',
+			role='backoffice',
+		)
+		customer_user = Usuario.objects.create_user(
+			username='schema-repair-customer',
+			password='secret123',
+			role='cliente',
+		)
+		cliente = Cliente.objects.create(
+			usuario=customer_user,
+			nombre_empresa='Schema Repair Customer',
+			telefono='5551234567',
+			direccion='123 Repair St',
+			ciudad='Dallas',
+			estado='TX',
+			codigo_postal='75001',
+			pais='USA',
+			sales_tax_number='TX-12345',
+			certificado_tax=SimpleUploadedFile('tax.txt', b'test tax certificate'),
+		)
+		pedido = Pedido.objects.create(
+			cliente=cliente,
+			origen='CLIENTE',
+			estado='INVOICE_GENERADA',
+		)
+		invoice = Invoice.objects.create(
+			pedido=pedido,
+			cliente=cliente,
+			metodo_entrega='LTG',
+			creada_por=creator,
+		)
+		cliente_field = NotaAjuste._meta.get_field('cliente')
+		relaxed_cliente_field = _build_relaxed_field(cliente_field)
+		with connection.schema_editor() as schema_editor:
+			schema_editor.alter_field(NotaAjuste, cliente_field, relaxed_cliente_field, strict=False)
+		note = NotaAjuste.objects.create(
+			cliente=cliente,
+			invoice=invoice,
+			tipo_documento='CREDITO',
+			tipo_credito='CREDIT_DUMP',
+			motivo='OTHER',
+		)
+
+		try:
+			NotaAjuste.objects.filter(pk=note.pk).update(cliente_id=None)
+			note.refresh_from_db()
+			self.assertIsNone(note.cliente_id)
+
+			_backfill_field_values(connection, NotaAjuste, cliente_field)
+
+			note.refresh_from_db()
+			self.assertEqual(note.cliente_id, cliente.id)
+		finally:
+			with connection.schema_editor() as schema_editor:
+				schema_editor.alter_field(NotaAjuste, relaxed_cliente_field, cliente_field, strict=False)
 
 	def test_password_reset_confirm_modal_returns_form_for_valid_token(self):
 		self.client.post(reverse('password_reset'), {'email': self.user.email})

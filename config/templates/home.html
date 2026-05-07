@@ -969,11 +969,21 @@ data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 
 <div class="footer-brand-text">
 
-<h5 class="footer-brand-name">{% trans "La Tortilla" %}<br>{% trans "Grocery" %}</h5>
+<h5 class="footer-brand-name">
+{% if home_contenido %}
+{{ home_contenido.footer_empresa_titulo_traducido|linebreaksbr }}
+{% else %}
+{% trans "La Tortilla" %}<br>{% trans "Grocery" %}
+{% endif %}
+</h5>
 
-<p>{% trans "La Tortilla Grocery LLC es un distribuidor mayorista de productos latinos de confianza." %}
+<p>{% if home_contenido %}
+{{ home_contenido.footer_empresa_descripcion_traducido }}
+{% else %}
+{% trans "La Tortilla Grocery LLC es un distribuidor mayorista de productos latinos de confianza." %}
 {% trans "Abastecemos tiendas, supermercados y restaurantes con calidad, precios competitivos" %}
 {% trans "y entregas eficientes." %}
+{% endif %}
 </p>
 
 </div>
@@ -1020,19 +1030,24 @@ data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 
 <div class="col-lg-3 footer-contact footer-col-divider">
 
-<h6>{% trans "Contactanos" %}</h6>
+<h6>{% if home_contenido %}{{ home_contenido.footer_contacto_titulo_traducido }}{% else %}{% trans "Contactanos" %}{% endif %}</h6>
 
 <p>
+{% if home_contenido %}
+{{ home_contenido.footer_contacto_direccion_linea_1 }}<br>
+{{ home_contenido.footer_contacto_direccion_linea_2 }}
+{% else %}
 {% trans "1666 Roswell Rd Bldg 100" %}<br>
 {% trans "Marietta, GA 30062-3639" %}
+{% endif %}
 </p>
 
 <p>
-{% trans "latortilla@gmail.com" %}
+{% if home_contenido %}{{ home_contenido.footer_contacto_email }}{% else %}{% trans "latortilla@gmail.com" %}{% endif %}
 </p>
 
 <p>
-{% trans "+1 (470) 967 2782" %}
+{% if home_contenido %}{{ home_contenido.footer_contacto_telefono }}{% else %}{% trans "+1 (470) 967 2782" %}{% endif %}
 </p>
 
 <div class="footer-social">

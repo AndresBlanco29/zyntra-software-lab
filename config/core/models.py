@@ -145,6 +145,24 @@ class HomeContenido(models.Model):
     estadistica_3_label = models.CharField(max_length=120, default="De Experiencia")
     estadistica_3_label_en = models.CharField(max_length=120, blank=True, null=True)
 
+    footer_empresa_titulo = models.CharField(max_length=120, default="La Tortilla Grocery")
+    footer_empresa_titulo_en = models.CharField(max_length=120, blank=True, null=True)
+
+    footer_empresa_descripcion = models.TextField(
+        default=(
+            "La Tortilla Grocery LLC es un distribuidor mayorista de productos latinos de confianza. "
+            "Abastecemos tiendas, supermercados y restaurantes con calidad, precios competitivos y entregas eficientes."
+        )
+    )
+    footer_empresa_descripcion_en = models.TextField(blank=True, null=True)
+
+    footer_contacto_titulo = models.CharField(max_length=120, default="Contactanos")
+    footer_contacto_titulo_en = models.CharField(max_length=120, blank=True, null=True)
+    footer_contacto_direccion_linea_1 = models.CharField(max_length=180, default="1666 Roswell Rd Bldg 100")
+    footer_contacto_direccion_linea_2 = models.CharField(max_length=180, default="Marietta, GA 30062-3639")
+    footer_contacto_email = models.EmailField(max_length=254, default="latortilla@gmail.com")
+    footer_contacto_telefono = models.CharField(max_length=60, default="+1 (470) 967 2782")
+
     activo = models.BooleanField(default=True)
     actualizado = models.DateTimeField(auto_now=True)
 
@@ -254,6 +272,18 @@ class HomeContenido(models.Model):
     def estadistica_3_label_traducido(self):
         return self._translated(self.estadistica_3_label, self.estadistica_3_label_en)
 
+    @property
+    def footer_empresa_titulo_traducido(self):
+        return self._translated(self.footer_empresa_titulo, self.footer_empresa_titulo_en)
+
+    @property
+    def footer_empresa_descripcion_traducido(self):
+        return self._translated(self.footer_empresa_descripcion, self.footer_empresa_descripcion_en)
+
+    @property
+    def footer_contacto_titulo_traducido(self):
+        return self._translated(self.footer_contacto_titulo, self.footer_contacto_titulo_en)
+
     def __str__(self):
         return f"Home contenido ({'activo' if self.activo else 'inactivo'})"
 
@@ -293,6 +323,16 @@ def ensure_homecontenido_quienes_schema():
         'estadistica_3_valor_en',
         'estadistica_3_label',
         'estadistica_3_label_en',
+        'footer_empresa_titulo',
+        'footer_empresa_titulo_en',
+        'footer_empresa_descripcion',
+        'footer_empresa_descripcion_en',
+        'footer_contacto_titulo',
+        'footer_contacto_titulo_en',
+        'footer_contacto_direccion_linea_1',
+        'footer_contacto_direccion_linea_2',
+        'footer_contacto_email',
+        'footer_contacto_telefono',
     )
 
     def get_existing_columns():

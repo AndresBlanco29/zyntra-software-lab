@@ -195,6 +195,9 @@ def _get_or_create_home_contenido():
             'estadistica_1_valor', 'estadistica_1_valor_en', 'estadistica_1_label', 'estadistica_1_label_en',
             'estadistica_2_valor', 'estadistica_2_valor_en', 'estadistica_2_label', 'estadistica_2_label_en',
             'estadistica_3_valor', 'estadistica_3_valor_en', 'estadistica_3_label', 'estadistica_3_label_en',
+            'footer_empresa_titulo', 'footer_empresa_titulo_en', 'footer_empresa_descripcion', 'footer_empresa_descripcion_en',
+            'footer_contacto_titulo', 'footer_contacto_titulo_en', 'footer_contacto_direccion_linea_1',
+            'footer_contacto_direccion_linea_2', 'footer_contacto_email', 'footer_contacto_telefono',
         ):
             current_value = instance.__dict__.get(field_name)
             if (
@@ -803,6 +806,18 @@ def editar_home_contenido(request):
         contenido.estadistica_3_valor_en = (request.POST.get('estadistica_3_valor_en') or '').strip()
         contenido.estadistica_3_label = (request.POST.get('estadistica_3_label') or '').strip() or contenido.estadistica_3_label
         contenido.estadistica_3_label_en = (request.POST.get('estadistica_3_label_en') or '').strip()
+
+        contenido.footer_empresa_titulo = (request.POST.get('footer_empresa_titulo') or '').strip() or contenido.footer_empresa_titulo
+        contenido.footer_empresa_titulo_en = (request.POST.get('footer_empresa_titulo_en') or '').strip()
+        contenido.footer_empresa_descripcion = (request.POST.get('footer_empresa_descripcion') or '').strip() or contenido.footer_empresa_descripcion
+        contenido.footer_empresa_descripcion_en = (request.POST.get('footer_empresa_descripcion_en') or '').strip()
+
+        contenido.footer_contacto_titulo = (request.POST.get('footer_contacto_titulo') or '').strip() or contenido.footer_contacto_titulo
+        contenido.footer_contacto_titulo_en = (request.POST.get('footer_contacto_titulo_en') or '').strip()
+        contenido.footer_contacto_direccion_linea_1 = (request.POST.get('footer_contacto_direccion_linea_1') or '').strip() or contenido.footer_contacto_direccion_linea_1
+        contenido.footer_contacto_direccion_linea_2 = (request.POST.get('footer_contacto_direccion_linea_2') or '').strip() or contenido.footer_contacto_direccion_linea_2
+        contenido.footer_contacto_email = (request.POST.get('footer_contacto_email') or '').strip() or contenido.footer_contacto_email
+        contenido.footer_contacto_telefono = (request.POST.get('footer_contacto_telefono') or '').strip() or contenido.footer_contacto_telefono
 
         contenido.activo = True if request.POST.get('activo') else False
 

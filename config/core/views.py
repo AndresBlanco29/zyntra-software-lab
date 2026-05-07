@@ -156,6 +156,16 @@ def _get_cached_home_contenido():
                 "estadistica_3_valor_en",
                 "estadistica_3_label",
                 "estadistica_3_label_en",
+                "footer_empresa_titulo",
+                "footer_empresa_titulo_en",
+                "footer_empresa_descripcion",
+                "footer_empresa_descripcion_en",
+                "footer_contacto_titulo",
+                "footer_contacto_titulo_en",
+                "footer_contacto_direccion_linea_1",
+                "footer_contacto_direccion_linea_2",
+                "footer_contacto_email",
+                "footer_contacto_telefono",
                 "activo",
             ).first()
         except (OperationalError, ProgrammingError):
@@ -211,6 +221,16 @@ def _get_cached_home_contenido():
                     "estadistica_3_valor_en",
                     "estadistica_3_label",
                     "estadistica_3_label_en",
+                    "footer_empresa_titulo",
+                    "footer_empresa_titulo_en",
+                    "footer_empresa_descripcion",
+                    "footer_empresa_descripcion_en",
+                    "footer_contacto_titulo",
+                    "footer_contacto_titulo_en",
+                    "footer_contacto_direccion_linea_1",
+                    "footer_contacto_direccion_linea_2",
+                    "footer_contacto_email",
+                    "footer_contacto_telefono",
                     "activo",
                 ).first()
             except Exception:

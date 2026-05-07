@@ -80,6 +80,17 @@
           <div>{{ home_contenido.estadistica_1_valor }} - {{ home_contenido.estadistica_1_label }}</div>
           <div>{{ home_contenido.estadistica_2_valor }} - {{ home_contenido.estadistica_2_label }}</div>
           <div>{{ home_contenido.estadistica_3_valor }} - {{ home_contenido.estadistica_3_label }}</div>
+
+          <div class="fw-semibold mt-3">{% trans "Footer empresa:" %}</div>
+          <div>{{ home_contenido.footer_empresa_titulo }}</div>
+          <div class="mt-1">{{ home_contenido.footer_empresa_descripcion|truncatewords:20 }}</div>
+
+          <div class="fw-semibold mt-3">{% trans "Contact us:" %}</div>
+          <div>{{ home_contenido.footer_contacto_titulo }}</div>
+          <div>{{ home_contenido.footer_contacto_direccion_linea_1 }}</div>
+          <div>{{ home_contenido.footer_contacto_direccion_linea_2 }}</div>
+          <div>{{ home_contenido.footer_contacto_email }}</div>
+          <div>{{ home_contenido.footer_contacto_telefono }}</div>
         </div>
       </div>
     </div>

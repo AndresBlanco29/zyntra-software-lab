@@ -2444,6 +2444,21 @@ class InvoiceFlowTests(TestCase):
 		content = response.content.decode('utf-8')
 		self.assertLess(content.index('data-driver-section="adjustment-note"'), content.index('data-driver-section="payment-details"'))
 
+	def test_driver_delivery_detail_defaults_adjustment_mode_to_product(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.get(reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '<option value="PRODUCTO" selected', html=False)
+		self.assertContains(response, 'Product return / item lines')
+
 	def test_driver_delivery_tracking_renders_in_spanish_when_selected(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,

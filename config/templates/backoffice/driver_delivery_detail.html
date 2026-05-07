@@ -142,8 +142,8 @@
             <div class="col-md-4">
               <label class="form-label fw-semibold">{% trans "Adjustment mode" %}</label>
               <select name="driver_note_tipo_ajuste" id="driverAdjustmentType" class="form-select">
+                <option value="PRODUCTO" selected data-credit-label="{% trans 'Product return / item lines' %}" data-debit-label="{% trans 'Product to charge' %}">{% trans "Product return / item lines" %}</option>
                 <option value="FINANCIERO" data-credit-label="{% trans 'Financial amount' %}" data-debit-label="{% trans 'Amount to charge' %}">{% trans "Financial amount" %}</option>
-                <option value="PRODUCTO" data-credit-label="{% trans 'Product return / item lines' %}" data-debit-label="{% trans 'Product to charge' %}">{% trans "Product return / item lines" %}</option>
               </select>
             </div>
             <div class="col-md-4" id="driverReasonWrapper">
@@ -384,8 +384,8 @@
         <div class="col-md-4">
           <label class="form-label fw-semibold">{% trans "Adjustment mode" %}</label>
           <select name="driver_note_tipo_ajuste" id="driverAdjustmentTypePostDelivery" class="form-select">
+            <option value="PRODUCTO" selected data-credit-label="{% trans 'Product return / item lines' %}" data-debit-label="{% trans 'Product to charge' %}">{% trans "Product return / item lines" %}</option>
             <option value="FINANCIERO" data-credit-label="{% trans 'Financial amount' %}" data-debit-label="{% trans 'Amount to charge' %}">{% trans "Financial amount" %}</option>
-            <option value="PRODUCTO" data-credit-label="{% trans 'Product return / item lines' %}" data-debit-label="{% trans 'Product to charge' %}">{% trans "Product return / item lines" %}</option>
           </select>
         </div>
         <div class="col-md-4" id="driverReasonWrapperPostDelivery">
@@ -977,6 +977,9 @@
     function toggleDriverNoteFields() {
       const isCredit = driverNoteType && driverNoteType.value === 'CREDITO';
       creditTypeFields.forEach((element) => element.classList.toggle('d-none', !isCredit));
+      if (isCredit && driverAdjustmentType) {
+        driverAdjustmentType.value = 'PRODUCTO';
+      }
       if (driverCreditType) {
         driverCreditType.disabled = !isCredit;
         if (!isCredit) {
@@ -989,6 +992,9 @@
     function toggleDriverNotePostFields() {
       const isCredit = driverNoteTypePostDelivery && driverNoteTypePostDelivery.value === 'CREDITO';
       creditTypePostFields.forEach((element) => element.classList.toggle('d-none', !isCredit));
+      if (isCredit && driverAdjustmentTypePostDelivery) {
+        driverAdjustmentTypePostDelivery.value = 'PRODUCTO';
+      }
       if (driverCreditTypePostDelivery) {
         driverCreditTypePostDelivery.disabled = !isCredit;
         if (!isCredit) {

@@ -131,11 +131,7 @@ La Tortilla Grocery
 <div class="list-group list-group-flush">
 {% get_current_language as CURRENT_LANGUAGE %}
 
-{% if request.user.is_superuser
-   or request.user|has_internal_permission:'admin.dashboard.view'
-   or request.user|has_internal_permission:'admin.customer_requests.view'
-   or request.user|has_internal_permission:'admin.products.view'
-   or request.user|has_internal_permission:'admin.content.view' %}
+{% if request.user.is_superuser or request.user|has_internal_permission:'admin.dashboard.view' or request.user|has_internal_permission:'admin.customer_requests.view' or request.user|has_internal_permission:'admin.products.view' or request.user|has_internal_permission:'admin.content.view' %}
   <div class="sidebar-section-title">{% trans "Administration" %}</div>
 
   {% if request.user|has_internal_permission:'admin.dashboard.view' %}

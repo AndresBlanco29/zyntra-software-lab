@@ -819,7 +819,7 @@ def editar_home_contenido(request):
         contenido.footer_contacto_titulo = (request.POST.get('footer_contacto_titulo') or '').strip() or contenido.footer_contacto_titulo
         contenido.footer_contacto_titulo_en = (request.POST.get('footer_contacto_titulo_en') or '').strip()
         contenido.footer_contacto_direccion_linea_1 = (request.POST.get('footer_contacto_direccion_linea_1') or '').strip() or contenido.footer_contacto_direccion_linea_1
-        contenido.footer_contacto_direccion_linea_2 = (request.POST.get('footer_contacto_direccion_linea_2') or '').strip() or contenido.footer_contacto_direccion_linea_2
+        contenido.footer_contacto_direccion_linea_2 = (request.POST.get('footer_contacto_direccion_linea_2') or '').strip()
         contenido.footer_contacto_email = (request.POST.get('footer_contacto_email') or '').strip() or contenido.footer_contacto_email
         contenido.footer_contacto_telefono = (request.POST.get('footer_contacto_telefono') or '').strip() or contenido.footer_contacto_telefono
 

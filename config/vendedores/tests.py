@@ -3,9 +3,10 @@ from decimal import Decimal
 
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from config.clientes.models import Cliente
-from config.pedidos.models import Pedido
+from config.pedidos.models import Pedido, PedidoItem
 from config.productos.models import Categoria, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
 
@@ -44,6 +45,31 @@ class VendedorPedidoTests(TestCase):
 			tipo_contenido='caja',
 			precio_1=Decimal('233.00'),
 		)
+		self.backoffice = Usuario.objects.create_user(
+			username='backoffice-order-test',
+			password='secret123',
+			role='backoffice',
+		)
+
+	def _create_customer_order(self, *, created_at, quantity, price):
+		pedido = Pedido.objects.create(
+			cliente=self.customer,
+			vendedor=self.vendor,
+			origen='VENDEDOR',
+			estado='RECIBIDO',
+			total=Decimal(str(price)) * Decimal(str(quantity)),
+		)
+		Pedido.objects.filter(id=pedido.id).update(creada_en=created_at, actualizada_en=created_at)
+		pedido.refresh_from_db()
+		PedidoItem.objects.create(
+			pedido=pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=quantity,
+			cantidad=quantity,
+			precio=Decimal(str(price)),
+			subtotal=Decimal(str(price)) * Decimal(str(quantity)),
+		)
+		return pedido
 
 	def test_enviar_pedido_returns_json_error_when_stock_is_unavailable(self):
 		self.client.force_login(self.vendor)
@@ -72,6 +98,41 @@ class VendedorPedidoTests(TestCase):
 				'error': 'Insufficient available stock for Coca-Colaaaaaaaa - caja. Requested 1, available 0.',
 			},
 		)
+
+	def test_catalogo_vendedor_shows_recent_customer_order_history(self):
+		now = timezone.now()
+		self._create_customer_order(created_at=now - timezone.timedelta(days=1), quantity=5, price='37.00')
+		self._create_customer_order(created_at=now - timezone.timedelta(days=8), quantity=2, price='36.50')
+		self._create_customer_order(created_at=now - timezone.timedelta(days=15), quantity=4, price='35.75')
+		self._create_customer_order(created_at=now - timezone.timedelta(days=22), quantity=7, price='34.10')
+
+		self.client.force_login(self.vendor)
+		response = self.client.get(reverse('catalogo_vendedor', args=[self.customer.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Historial')
+		self.assertContains(response, '5 @ $37.00')
+		self.assertContains(response, '2 @ $36.50')
+		self.assertContains(response, '4 @ $35.75')
+		self.assertNotContains(response, '7 @ $34.10')
+
+	def test_backoffice_can_access_order_taking_catalog(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('catalogo_vendedor', args=[self.customer.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Take Order')
+
+	def test_backoffice_can_access_take_order_customer_selector(self):
+		self.customer.aprobado = True
+		self.customer.save(update_fields=['aprobado'])
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('tomar_pedido'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, self.customer.nombre_empresa)
 
 
 class VendedorEditarClienteTests(TestCase):

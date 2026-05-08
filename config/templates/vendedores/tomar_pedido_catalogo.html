@@ -1,4 +1,4 @@
-{% load static i18n %}
+{% load static i18n permissions_tags %}
 <!doctype html>
 <html lang="{{ LANGUAGE_CODE }}">
 
@@ -66,22 +66,34 @@ La Tortilla Grocery
 <div class="col-md-2 sidebar p-0" id="vendedorCatalogSidebar">
 
 <div class="sidebar-user">
+{% if request.user.role == 'backoffice' %}
+{% trans "BackOffice" %} {{ request.user.username }}
+{% elif request.user.role == 'admin' %}
+{% trans "Admin" %} {{ request.user.username }}
+{% else %}
 {% trans "Vendedor" %} {{ request.user.username }}
+{% endif %}
 </div>
 
 <div class="list-group list-group-flush">
 
+{% if request.user|has_internal_permission:'vendor.customers.manage' %}
 <a href="{% url 'crear_cliente' %}" class="list-group-item">
 {% trans "Crear Cliente" %}
 </a>
+{% endif %}
 
+{% if request.user|has_internal_permission:'vendor.customers.view' %}
 <a href="{% url 'vendedores_clientes' %}" class="list-group-item">
 {% trans "Clientes" %}
 </a>
+{% endif %}
 
+{% if request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'backoffice.orders.view' %}
 <a href="{% url 'tomar_pedido' %}" class="list-group-item active">
 {% trans "Tomar Pedido" %}
 </a>
+{% endif %}
 
 </div>
 
@@ -281,6 +293,51 @@ data-precio5="{{ p.precio_5 }}"
 
 <div class="precios-vendedor mb-3">
 
+<div class="border rounded-3 bg-light-subtle p-3 mb-3 order-history-panel">
+
+<div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+
+<label class="fw-bold small mb-0">
+{% trans "Historial últimos 3 pedidos:" %}
+</label>
+
+<span class="small text-muted" data-order-history-current-label>
+{{ producto.presentaciones.first.nombre_traducido }}
+</span>
+
+</div>
+
+{% for p in producto.presentaciones.all %}
+
+<div class="order-history-list {% if not forloop.first %}d-none{% endif %}" data-order-history-list data-presentacion-id="{{ p.id }}">
+
+{% if p.recent_customer_orders %}
+
+<div class="d-flex flex-wrap gap-2">
+
+{% for pedido_item in p.recent_customer_orders %}
+
+<div class="border rounded-3 bg-white px-2 py-2 small flex-fill order-history-entry">
+<div class="fw-semibold">{{ pedido_item.pedido.creada_en|date:"n/j/Y" }}</div>
+<div>{% blocktrans with quantity=pedido_item.cantidad price=pedido_item.precio|floatformat:2 %}{{ quantity }} @ ${{ price }}{% endblocktrans %}</div>
+</div>
+
+{% endfor %}
+
+</div>
+
+{% else %}
+
+<div class="small text-muted">{% trans "Sin ventas recientes para esta presentación." %}</div>
+
+{% endif %}
+
+</div>
+
+{% endfor %}
+
+</div>
+
 <label class="fw-bold small">
 
 {% trans "Precio:" %}
@@ -463,6 +520,10 @@ $<span id="pedidoTotal">{{ total }}</span>
   
   .modal-content {
     border-radius: 12px;
+  }
+
+  .order-history-entry {
+    min-width: 112px;
   }
 </style>
 

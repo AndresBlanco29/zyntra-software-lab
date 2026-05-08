@@ -227,7 +227,7 @@ La Tortilla Grocery
   </details>
   {% endif %}
 
-  {% if request.user|has_internal_permission:'vendor.customers.manage' or request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' %}
+  {% if request.user|has_internal_permission:'vendor.customers.manage' or request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'backoffice.orders.view' %}
   <div class="sidebar-section-title">{% trans "Sales" %}</div>
 
   {% if request.user|has_internal_permission:'vendor.customers.manage' %}
@@ -242,7 +242,7 @@ La Tortilla Grocery
     {% trans "Customers" %}
   </a>
 
-  {% if request.user|has_internal_permission:'vendor.orders.view' %}
+  {% if request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'backoffice.orders.view' %}
   <a href="{% url 'tomar_pedido' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'catalogo_vendedor' or request.resolver_match.url_name == 'ver_pedido' %}active{% endif %}">
     {% trans "Take Order" %}
@@ -308,7 +308,7 @@ La Tortilla Grocery
   </details>
   {% endif %}
 
-  {% if request.user|has_internal_permission:'vendor.customers.manage' or request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' %}
+  {% if request.user|has_internal_permission:'vendor.customers.manage' or request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'backoffice.orders.view' %}
   <div class="sidebar-section-title">{% trans "Sales" %}</div>
 
   {% if request.user|has_internal_permission:'vendor.customers.manage' %}
@@ -325,7 +325,7 @@ La Tortilla Grocery
   </a>
   {% endif %}
 
-  {% if request.user|has_internal_permission:'vendor.orders.view' %}
+  {% if request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'backoffice.orders.view' %}
   <a href="{% url 'tomar_pedido' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'catalogo_vendedor' or request.resolver_match.url_name == 'ver_pedido' %}active{% endif %}">
     {% trans "Take Order" %}

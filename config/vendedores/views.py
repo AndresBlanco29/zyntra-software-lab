@@ -18,6 +18,7 @@ import logging
 from django.contrib.auth.decorators import login_required
 from decimal import Decimal, ROUND_HALF_UP
 
+from config.pedidos.models import PedidoItem
 from config.pedidos.services import crear_pedido_desde_items, notificar_backoffice_pedido
 from config.usuarios.permissions import internal_permission_required
 from config.usuarios.us_locations import US_STATE_CITIES, match_state_name, match_city_for_state
@@ -35,6 +36,36 @@ def _money_decimal(value):
 
 def _money_string(value):
     return format(_money_decimal(value), '.2f')
+
+
+def _attach_recent_customer_order_history(*, cliente, productos):
+    presentation_map = {}
+    for producto in productos:
+        for presentacion in producto.presentaciones.all():
+            presentacion.recent_customer_orders = []
+            presentation_map[presentacion.id] = presentacion
+
+    if not presentation_map:
+        return
+
+    recent_items = (
+        PedidoItem.objects
+        .select_related('pedido')
+        .filter(
+            pedido__cliente=cliente,
+            presentacion_id__in=presentation_map.keys(),
+        )
+        .exclude(pedido__estado='CANCELADO')
+        .order_by('presentacion_id', '-pedido__creada_en', '-pedido_id', '-id')
+    )
+
+    history_counts = {presentacion_id: 0 for presentacion_id in presentation_map}
+    for pedido_item in recent_items:
+        presentacion_id = pedido_item.presentacion_id
+        if history_counts[presentacion_id] >= 3:
+            continue
+        presentation_map[presentacion_id].recent_customer_orders.append(pedido_item)
+        history_counts[presentacion_id] += 1
 
 
 def _normalize_customer_location_payload(data):
@@ -150,7 +181,7 @@ def clientes(request):
     return render(request, "vendedores/clientes.html", context)
 
 @login_required
-@internal_permission_required('vendor.orders.view')
+@internal_permission_required('vendor.orders.view', 'backoffice.orders.view')
 def tomar_pedido(request):
 
     clientes = Cliente.objects.filter(aprobado=True).select_related("usuario")
@@ -162,14 +193,15 @@ def tomar_pedido(request):
     return render(request, "vendedores/tomar_pedido.html", context)
 
 @login_required
-@internal_permission_required('vendor.orders.view')
+@internal_permission_required('vendor.orders.view', 'backoffice.orders.view')
 def catalogo_vendedor(request, cliente_id):
 
     request.session["cliente_id"] = cliente_id
 
     cliente = Cliente.objects.get(id=cliente_id)
 
-    productos = Producto.objects.filter(activo=True).prefetch_related("presentaciones")
+    productos = list(Producto.objects.filter(activo=True).prefetch_related("presentaciones"))
+    _attach_recent_customer_order_history(cliente=cliente, productos=productos)
 
     categorias = Categoria.objects.all()
     marcas = Marca.objects.filter(activo=True)
@@ -195,7 +227,7 @@ def catalogo_vendedor(request, cliente_id):
     return render(request, "vendedores/tomar_pedido_catalogo.html", context)
 
 @login_required
-@internal_permission_required('vendor.orders.manage')
+@internal_permission_required('vendor.orders.manage', 'backoffice.orders.manage')
 def agregar_producto_pedido(request):
 
     if request.method == "POST":
@@ -249,7 +281,7 @@ def agregar_producto_pedido(request):
         })
 
 @login_required
-@internal_permission_required('vendor.orders.view')
+@internal_permission_required('vendor.orders.view', 'backoffice.orders.view')
 def ver_pedido(request):
 
     carrito = request.session.get("pedido", {})
@@ -300,7 +332,7 @@ def ver_pedido(request):
 
 @require_POST
 @login_required
-@internal_permission_required('vendor.orders.manage')
+@internal_permission_required('vendor.orders.manage', 'backoffice.orders.manage')
 def eliminar_producto_pedido(request):
 
     producto_id = request.POST.get("producto_id")
@@ -323,7 +355,7 @@ def eliminar_producto_pedido(request):
 @require_POST
 @require_POST
 @login_required
-@internal_permission_required('vendor.orders.manage')
+@internal_permission_required('vendor.orders.manage', 'backoffice.orders.manage')
 def actualizar_cantidad_pedido(request):
 
     producto_id = request.POST.get("producto_id")

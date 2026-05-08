@@ -1,5 +1,5 @@
 {% load static %}
-{% load i18n %}
+{% load i18n permissions_tags %}
 
 <!DOCTYPE html>
 
@@ -66,22 +66,34 @@ La Tortilla Grocery
 <div class="sidebar p-0 bg-white" id="pedidoResumenSidebar">
 
 <div class="sidebar-user">
+{% if request.user.role == 'backoffice' %}
+{% trans "BackOffice" %} {{ request.user.username }}
+{% elif request.user.role == 'admin' %}
+{% trans "Admin" %} {{ request.user.username }}
+{% else %}
 {% trans "Vendedor" %} {{ request.user.username }}
+{% endif %}
 </div>
 
 <div class="list-group list-group-flush">
 
+{% if request.user|has_internal_permission:'vendor.customers.manage' %}
 <a href="{% url 'crear_cliente' %}" class="list-group-item">
 {% trans "Crear Cliente" %}
 </a>
+{% endif %}
 
+{% if request.user|has_internal_permission:'vendor.customers.view' %}
 <a href="{% url 'vendedores_clientes' %}" class="list-group-item">
 {% trans "Clientes" %}
 </a>
+{% endif %}
 
+{% if request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'backoffice.orders.view' %}
 <a href="{% url 'tomar_pedido' %}" class="list-group-item active">
 {% trans "Tomar Pedido" %}
 </a>
+{% endif %}
 
 </div>
 

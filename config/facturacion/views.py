@@ -265,6 +265,8 @@ def _validate_driver_note_request(*, note_request):
 		raise ValidationError(_('Drivers can only request credit notes.'))
 	if note_request['tipo_ajuste'] != 'PRODUCTO':
 		raise ValidationError(_('Drivers can only request product return credit notes.'))
+	if note_request['tipo_credito'] != 'CREDIT_DUMP':
+		raise ValidationError(_('Drivers must use Credit Dump for damaged return notes.'))
 
 
 def _save_adjustment_note_evidence_files(nota, uploaded_files):

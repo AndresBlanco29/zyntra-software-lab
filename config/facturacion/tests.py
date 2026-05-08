@@ -1079,7 +1079,7 @@ class InvoiceFlowTests(TestCase):
 			'firma_cliente_data': self.signature_data,
 			'driver_note_tipo_documento': 'CREDITO',
 			'driver_note_motivo': 'DAMAGE',
-			'driver_note_tipo_credito': 'CREDIT_RETURN',
+			'driver_note_tipo_credito': 'CREDIT_DUMP',
 			'driver_note_descripcion': 'Caja dañada al entregar',
 			f'driver_note_qty_{invoice.items.first().id}': '1',
 			f'driver_note_amount_{invoice.items.first().id}': '15.00',
@@ -1091,7 +1091,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(invoice.delivery.estado, 'ENTREGADA_PAGADA')
 		self.assertEqual(nota.estado, 'BORRADOR')
 		self.assertEqual(nota.tipo_documento, 'CREDITO')
-		self.assertEqual(nota.tipo_credito, 'CREDIT_RETURN')
+		self.assertEqual(nota.tipo_credito, 'CREDIT_DUMP')
 		self.assertEqual(nota.creada_por, self.driver)
 		self.assertEqual(nota.total, Decimal('15.00'))
 		self.assertEqual(invoice.delivery.monto_pagado, Decimal('30.00'))
@@ -1119,7 +1119,7 @@ class InvoiceFlowTests(TestCase):
 				'firma_cliente_data': self.signature_data,
 				'driver_note_tipo_documento': 'CREDITO',
 				'driver_note_motivo': 'DAMAGE',
-				'driver_note_tipo_credito': 'CREDIT_RETURN',
+				'driver_note_tipo_credito': 'CREDIT_DUMP',
 				'driver_note_descripcion': 'Caja dañada al entregar',
 				f'driver_note_qty_{invoice.items.first().id}': '1',
 				f'driver_note_amount_{invoice.items.first().id}': '15.00',
@@ -1151,7 +1151,7 @@ class InvoiceFlowTests(TestCase):
 				'firma_cliente_data': self.signature_data,
 				'driver_note_tipo_documento': 'CREDITO',
 				'driver_note_motivo': 'DAMAGE',
-				'driver_note_tipo_credito': 'CREDIT_RETURN',
+				'driver_note_tipo_credito': 'CREDIT_DUMP',
 				'driver_note_descripcion': 'Caja dañada al entregar',
 				f'driver_note_qty_{invoice.items.first().id}': '1',
 				f'driver_note_amount_{invoice.items.first().id}': '15.00',
@@ -1164,7 +1164,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(invoice.notas_ajuste.count(), 0)
 		self.assertContains(response, 'The total paid amount must exactly match the amount due from the customer.')
 
-	def test_driver_complete_view_rejects_credit_dump_for_product_return(self):
+	def test_driver_complete_view_rejects_credit_return_for_product_return(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
 			metodo_entrega='RUTA_DRIVER',
@@ -1184,8 +1184,8 @@ class InvoiceFlowTests(TestCase):
 				'driver_note_tipo_documento': 'CREDITO',
 				'driver_note_tipo_ajuste': 'PRODUCTO',
 				'driver_note_motivo': 'DAMAGE',
-				'driver_note_tipo_credito': 'CREDIT_DUMP',
-				'driver_note_descripcion': 'Intento invalido de devolucion con dump',
+				'driver_note_tipo_credito': 'CREDIT_RETURN',
+				'driver_note_descripcion': 'Intento invalido de devolucion con return',
 				f'driver_note_qty_{invoice.items.first().id}': '1',
 				f'driver_note_amount_{invoice.items.first().id}': '15.00',
 			},
@@ -1194,7 +1194,7 @@ class InvoiceFlowTests(TestCase):
 
 		invoice.refresh_from_db()
 		self.assertEqual(invoice.notas_ajuste.count(), 0)
-		self.assertContains(response, 'Product credit notes must use Credit Return.')
+		self.assertContains(response, 'Drivers must use Credit Dump for damaged return notes.')
 
 	def test_driver_complete_view_can_attach_evidence_to_adjustment_note(self):
 		invoice = self._create_invoice(metodo_entrega='RUTA_DRIVER', driver=self.driver, total='45.00')
@@ -2555,7 +2555,8 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(response, 'id="driverDescriptionHelp"', html=False)
 		self.assertContains(response, 'Credit note')
 		self.assertContains(response, 'Product return / item lines')
-		self.assertContains(response, 'Driver credit notes use returned invoice lines and approved credit returns will restock inventory.', html=False)
+		self.assertContains(response, 'Driver credit notes use returned invoice lines and are always recorded as Credit Dump, so damaged products do not return to inventory.', html=False)
+		self.assertNotContains(response, 'Credit type')
 		self.assertContains(response, 'Use this field for the manual comment, especially when the reason is Other.')
 		content = response.content.decode('utf-8')
 		self.assertLess(content.index('data-driver-section="adjustment-note"'), content.index('data-driver-section="payment-details"'))
@@ -2572,7 +2573,8 @@ class InvoiceFlowTests(TestCase):
 		response = self.client.get(reverse('driver_delivery_detail', args=[invoice.delivery.id]))
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, '<option value="PRODUCTO" selected', html=False)
+		self.assertContains(response, 'name="driver_note_tipo_ajuste" id="driverAdjustmentType" value="PRODUCTO"', html=False)
+		self.assertContains(response, 'name="driver_note_tipo_credito" id="driverNoteCreditType" value="CREDIT_DUMP"', html=False)
 		self.assertContains(response, 'Product return / item lines')
 
 	def test_driver_delivery_tracking_renders_in_spanish_when_selected(self):

@@ -154,12 +154,7 @@
               </select>
             </div>
             <div class="col-md-4 driver-credit-type d-none">
-              <label class="form-label fw-semibold">{% trans "Credit type" %}</label>
-              <select name="driver_note_tipo_credito" id="driverNoteCreditType" class="form-select" disabled>
-                <option value="">{% trans "Select" %}</option>
-                <option value="CREDIT_DUMP">{% trans "Credit Dump" %}</option>
-                <option value="CREDIT_RETURN">{% trans "Credit Return" %}</option>
-              </select>
+                <input type="hidden" name="driver_note_tipo_credito" id="driverNoteCreditType" value="CREDIT_DUMP" disabled>
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold" id="driverDescriptionLabel" data-credit-label="{% trans 'Description' %}" data-debit-label="{% trans 'Charge description' %}">{% trans "Description" %}</label>
@@ -186,7 +181,7 @@
             </div>
             <div class="col-12">
               <div class="alert alert-secondary small mb-0">
-                {% trans "Driver credit notes use returned invoice lines and approved credit returns will restock inventory." %}
+                {% trans "Driver credit notes use returned invoice lines and are always recorded as Credit Dump, so damaged products do not return to inventory." %}
               </div>
             </div>
             <div class="col-12" id="driverProductLinesWrapper">
@@ -385,12 +380,7 @@
           </select>
         </div>
         <div class="col-md-4 driver-credit-type-post d-none">
-          <label class="form-label fw-semibold">{% trans "Credit type" %}</label>
-          <select name="driver_note_tipo_credito" id="driverNoteCreditTypePostDelivery" class="form-select" disabled>
-            <option value="">{% trans "Select" %}</option>
-            <option value="CREDIT_DUMP">{% trans "Credit Dump" %}</option>
-            <option value="CREDIT_RETURN">{% trans "Credit Return" %}</option>
-          </select>
+          <input type="hidden" name="driver_note_tipo_credito" id="driverNoteCreditTypePostDelivery" value="CREDIT_DUMP" disabled>
         </div>
         <div class="col-12">
           <label class="form-label fw-semibold" id="driverDescriptionLabelPostDelivery" data-credit-label="{% trans 'Description' %}" data-debit-label="{% trans 'Charge description' %}">{% trans "Description" %}</label>
@@ -425,7 +415,7 @@
         </div>
         <div class="col-12">
           <div class="alert alert-secondary small mb-0">
-            {% trans "Driver credit notes use returned invoice lines and approved credit returns will restock inventory." %}
+            {% trans "Driver credit notes use returned invoice lines and are always recorded as Credit Dump, so damaged products do not return to inventory." %}
           </div>
         </div>
         <div class="col-12" id="driverProductLinesWrapperPostDelivery">
@@ -995,22 +985,18 @@
         return;
       }
       const isCredit = !creditSelect.disabled;
-      const isProduct = !adjustmentSelect || adjustmentSelect.value === 'PRODUCTO';
-      if (dumpOption) {
-        dumpOption.disabled = isProduct;
-      }
-      if (returnOption) {
-        returnOption.disabled = !isProduct;
-      }
       if (!isCredit) {
         creditSelect.value = '';
         return;
       }
-      if (isProduct) {
-        if (creditSelect.value !== 'CREDIT_RETURN') {
-          creditSelect.value = 'CREDIT_RETURN';
-        }
-      } else if (creditSelect.value !== 'CREDIT_DUMP') {
+      const isProduct = !adjustmentSelect || adjustmentSelect.value === 'PRODUCTO';
+      if (dumpOption) {
+        dumpOption.disabled = false;
+      }
+      if (returnOption) {
+        returnOption.disabled = true;
+      }
+      if (isProduct && creditSelect.value !== 'CREDIT_DUMP') {
         creditSelect.value = 'CREDIT_DUMP';
       }
     }

@@ -860,8 +860,8 @@ def crear_nota_ajuste(
 		raise ValidationError(_('Select a note type to save the adjustment.'))
 	if not motivo:
 		raise ValidationError(_('Select a reason to save the adjustment.'))
-	if tipo_documento == 'CREDITO' and tipo_ajuste == 'PRODUCTO' and tipo_credito != 'CREDIT_RETURN':
-		raise ValidationError(_('Product credit notes must use Credit Return.'))
+	if tipo_documento == 'CREDITO' and tipo_ajuste == 'PRODUCTO' and tipo_credito not in {'CREDIT_RETURN', 'CREDIT_DUMP'}:
+		raise ValidationError(_('Product credit notes must use Credit Return or Credit Dump.'))
 	if tipo_documento == 'CREDITO' and tipo_ajuste == 'FINANCIERO' and tipo_credito != 'CREDIT_DUMP':
 		raise ValidationError(_('Financial credit notes must use Credit Dump.'))
 	general_amount = _quantize_money(monto or '0.00')

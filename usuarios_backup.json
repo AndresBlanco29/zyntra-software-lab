@@ -1,0 +1,2552 @@
+[
+{
+  "model": "usuarios.usuario",
+  "pk": 36,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$rumBSvbWMDAIKT9oVNbC0C$/3A6AWF3w8e0sCCVEQ6inG8ljNnp5VPfzjBT/kvAYr8=",
+    "last_login": "2026-05-14T22:22:27.483Z",
+    "is_superuser": true,
+    "username": "administrador",
+    "first_name": "Jhon",
+    "last_name": "Montes",
+    "email": "jhon@gmail.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-03-13T12:34:02Z",
+    "role": "admin",
+    "telefono": "3423432324",
+    "documento": "2342342342",
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-03-13T12:34:03.063Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 47,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$9eU407saeT8ATwvQzUsVxR$MUM8pAdfUSWWFDFHB6jYdGztwJWA+6V4/t7wE4IuMCM=",
+    "last_login": "2026-04-09T21:03:31.673Z",
+    "is_superuser": false,
+    "username": "pepito",
+    "first_name": "pepito",
+    "last_name": "perez",
+    "email": "pepitoo@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-03-15T15:34:26.443Z",
+    "role": "cliente",
+    "telefono": "3247163525",
+    "documento": "123456678",
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-03-15T15:34:27.262Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 48,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$UpiCHMuq1VUjnuQqtvCQj4$Arrcf76MQmzYOdsUPd0lkTHjvx4XZkHnqDjr1UaoFWg=",
+    "last_login": "2026-05-15T15:43:56.758Z",
+    "is_superuser": false,
+    "username": "david",
+    "first_name": "david",
+    "last_name": "mendez",
+    "email": "david@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-03-15T20:15:54.866Z",
+    "role": "vendedor",
+    "telefono": "322421222",
+    "documento": null,
+    "quickbooks_id": null,
+    "permission_overrides": {
+      "backoffice.quotes.view": true,
+      "backoffice.quotes.manage": true
+    },
+    "creado_en": "2026-03-15T20:15:54.866Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 49,
+  "fields": {
+    "password": "",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "user_00b8e32e",
+    "first_name": "alba",
+    "last_name": "mendez",
+    "email": "alba@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-03-15T20:19:51.005Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-03-15T20:19:51.007Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 52,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$dQ10d2apFv2JXTrX1K0Zef$0IMBuSo0kr7lvakTWsbLhWJmT3Ua9FUd+lToP9Ly324=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "Noah",
+    "first_name": "Laura",
+    "last_name": "Castellanos",
+    "email": "sepalabola@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-03-16T22:05:41.086Z",
+    "role": "cliente",
+    "telefono": "3124336742",
+    "documento": "123456987",
+    "quickbooks_id": "63",
+    "permission_overrides": {},
+    "creado_en": "2026-03-16T22:05:41.903Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 53,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$zQm4L4XfzlKEvsvKSR8QjZ$iDYXzbwn0BDky5YszkICa1GovOZctoo0CHlrXLwFfYM=",
+    "last_login": "2026-03-17T02:26:11.592Z",
+    "is_superuser": false,
+    "username": "vanss",
+    "first_name": "Vanessa",
+    "last_name": "Muñoz",
+    "email": "vmunozpinzon@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-03-17T02:22:08.634Z",
+    "role": "cliente",
+    "telefono": "5457646464",
+    "documento": "554546464",
+    "quickbooks_id": "62",
+    "permission_overrides": {},
+    "creado_en": "2026-03-17T02:22:09.448Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 54,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$Q3fHqz1YTY1tULpfBe3cQg$5hknXY+Ngg1/LpOEzCLryLeCzsJM4pBK1SugnYTV4xI=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "Jdjd",
+    "first_name": "Jjdy",
+    "last_name": "Jsj",
+    "email": "albamen2679@gmail.com",
+    "is_staff": false,
+    "is_active": false,
+    "date_joined": "2026-03-18T00:45:53.818Z",
+    "role": "vendedor",
+    "telefono": "6558921445",
+    "documento": null,
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-03-18T00:45:53.818Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 55,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$yaw3JQfDn6IbZfP675rImp$85PRXywQUj9PyELKLGbPruU7OHQUpqdupfmZw01tYnU=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "Hdhd",
+    "first_name": "Hdhsu",
+    "last_name": "Dysyd",
+    "email": "albamen2679@gmail.com",
+    "is_staff": false,
+    "is_active": false,
+    "date_joined": "2026-03-18T00:48:39.423Z",
+    "role": "vendedor",
+    "telefono": "6558921445",
+    "documento": null,
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-03-18T00:48:39.423Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 80,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$suH4Qh21gaFUh66iFcsM28$O3l90TjR57J06/LSvfgHLAnFufYC1Rwq7xccXa9r9A4=",
+    "last_login": "2026-05-20T16:42:51.614Z",
+    "is_superuser": false,
+    "username": "blanca",
+    "first_name": "Blanca",
+    "last_name": "Pinzon",
+    "email": "blanca@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-03-19T16:34:15.490Z",
+    "role": "backoffice",
+    "telefono": "3224566666",
+    "documento": null,
+    "quickbooks_id": null,
+    "permission_overrides": {
+      "admin.products.view": true,
+      "admin.products.manage": true
+    },
+    "creado_en": "2026-03-19T16:34:15.490Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 81,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$5OrbZ567eJ3XSDQyH6ydwJ$lM5do4nOflLPQONGehmuo1a5l3afQul2+tGkXkEAgQw=",
+    "last_login": "2026-04-23T18:35:46.989Z",
+    "is_superuser": false,
+    "username": "andres",
+    "first_name": "Andres Felipe",
+    "last_name": "Blanco Mendez",
+    "email": "andresilloblanco29@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-03-19T17:37:07.812Z",
+    "role": "cliente",
+    "telefono": "3247132692",
+    "documento": "109864394",
+    "quickbooks_id": "61",
+    "permission_overrides": {},
+    "creado_en": "2026-03-19T17:37:08.667Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 82,
+  "fields": {
+    "password": "pbkdf2_sha256$1200000$sF0KMqS1QlCud1uUhW5bkS$YC5yJUy3ymNHKA72HxtI7xeZ3yiETGAzhDM8YQDkKPw=",
+    "last_login": "2026-03-19T19:15:34.968Z",
+    "is_superuser": true,
+    "username": "admin",
+    "first_name": "Admin",
+    "last_name": "Principal",
+    "email": "admin@tortilla.local",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-03-19T18:59:10.881Z",
+    "role": "admin",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-03-19T18:59:11.772Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 83,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$67eus37Q15xZ2fydfglAqQ$F4QzwynuM4lpjIwwyZJRQ93Ixt1yRQKPe8YC/N9dUwA=",
+    "last_login": "2026-05-20T18:01:36.917Z",
+    "is_superuser": true,
+    "username": "vane",
+    "first_name": "",
+    "last_name": "",
+    "email": "vmunozpinzon@gmail.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-04-08T23:24:34.693Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-04-08T23:24:35.382Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 84,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$tXcAh1AKBjRqqo4btWPQxo$uLW0tsUAmOCZ47bbdaB+pBhHGDfHTszfoBJ4uTqO14I=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "pipe",
+    "first_name": "andres",
+    "last_name": "blanco",
+    "email": "andresilloblanco29@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-04-09T14:11:30.277Z",
+    "role": "cliente",
+    "telefono": "3247132692",
+    "documento": "109864394",
+    "quickbooks_id": "60",
+    "permission_overrides": {},
+    "creado_en": "2026-04-09T14:11:30.954Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 85,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$s35ZqjbXy4FmZy9ObAiVtB$rRNH9bQiSNMKZN51AXALngDaETI84Kr0UZEPNTenl4Q=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "prueba",
+    "first_name": "dasd",
+    "last_name": "sdsd",
+    "email": "andresilloblanco29@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-04-09T14:29:53.343Z",
+    "role": "cliente",
+    "telefono": "3231232132",
+    "documento": "123232131",
+    "quickbooks_id": "59",
+    "permission_overrides": {},
+    "creado_en": "2026-04-09T14:29:54.044Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 87,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$tSmveX8aTmtrRFvgIJdPcL$JmG2Z6jmypzf3FOwgO7x8upDbMURDaJzYyyGbvpKsz0=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "asd",
+    "first_name": "asdsad",
+    "last_name": "asdas",
+    "email": "andresilloblanco29@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-04-09T15:19:51.031Z",
+    "role": "cliente",
+    "telefono": "2131231232",
+    "documento": "123123123",
+    "quickbooks_id": "64",
+    "permission_overrides": {},
+    "creado_en": "2026-04-09T15:19:51.734Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 89,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$winvyWhaJUcL8RQjKEv3ZH$DxjBZ3ZnBTGXtSrEpLhdl9j8UaIcaqIEC5Q+f1hEHqY=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "asdsd",
+    "first_name": "asdasd",
+    "last_name": "asdsad",
+    "email": "andresilloblanco29@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-04-09T20:56:15.395Z",
+    "role": "cliente",
+    "telefono": "3432432432",
+    "documento": "214312312",
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-04-09T20:56:16.103Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 91,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$GtclpLQSX6nwU6PcoI25iR$YJmntOgk7QRWUtUAYljfaWh1XyQdx8kiqvPSsXQy7Rc=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "prueba esta",
+    "first_name": "sadas",
+    "last_name": "sada",
+    "email": "andresilloblanco29@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-04-09T23:49:38.361Z",
+    "role": "cliente",
+    "telefono": "1231231231",
+    "documento": "123123123",
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-04-09T23:49:39.065Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 92,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$rPbT5J2BUG9yHegUJW9AvM$BeysWfYBcYbhF2sEhU8KYrBTjs0E6M7PR5K4yWhuKBY=",
+    "last_login": "2026-05-06T22:28:06.133Z",
+    "is_superuser": false,
+    "username": "seleccionador",
+    "first_name": "selecci",
+    "last_name": "prueba",
+    "email": "pipe290905@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-04-13T16:39:42.910Z",
+    "role": "seleccionador",
+    "telefono": "3232224554",
+    "documento": null,
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-04-13T16:39:42.911Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 93,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$ROuC2EWejo4ZGNvcGwUMXP$OvrXSna4sZ8g5ubmDmc0ZChH5eQgT6K/Jv69ibWB0Cg=",
+    "last_login": "2026-05-15T17:27:26.056Z",
+    "is_superuser": false,
+    "username": "drive",
+    "first_name": "drive",
+    "last_name": "purbea",
+    "email": "juanchoblanco2312@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-04-13T16:41:16.025Z",
+    "role": "driver",
+    "telefono": "3213222221",
+    "documento": null,
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-04-13T16:41:16.025Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 94,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$iSHOA1LpvczGyjSzTggegF$XmBViQ/W0J/vDdWGOe0St3VK62ieNXVfA9mxlOAq6IY=",
+    "last_login": "2026-05-07T18:14:55.921Z",
+    "is_superuser": false,
+    "username": "cliente1",
+    "first_name": "Cliente",
+    "last_name": "Prueba1",
+    "email": "jam8106@hotmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-04-14T00:19:22.958Z",
+    "role": "cliente",
+    "telefono": "2234242343",
+    "documento": "123123123",
+    "quickbooks_id": "58",
+    "permission_overrides": {},
+    "creado_en": "2026-04-14T00:19:23.814Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 95,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$sebWRD6pDU2ClHgRPTlwoP$7m6wZsGXNuGEJGVGqevNCSXJAAz21aSdF+dXP6BLJkI=",
+    "last_login": "2026-04-17T20:26:54.030Z",
+    "is_superuser": false,
+    "username": "CLIENTE2",
+    "first_name": "JOHNNY",
+    "last_name": "USA",
+    "email": "jam24.dev@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-04-16T17:28:24.919Z",
+    "role": "cliente",
+    "telefono": "4578214554",
+    "documento": "514278532",
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-04-16T17:28:25.609Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 96,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$wtrGTfj7f9u6QfsncmeQtI$Vbhpo2QGQ1m9m1K7JwYnsCAZPkLEmunC5cT5kbb1GZE=",
+    "last_login": "2026-04-17T20:27:24.128Z",
+    "is_superuser": false,
+    "username": "cliente3",
+    "first_name": "A",
+    "last_name": "B",
+    "email": "jam24.dev@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-04-17T20:07:21.341Z",
+    "role": "cliente",
+    "telefono": "1234567890",
+    "documento": "123456789",
+    "quickbooks_id": "65",
+    "permission_overrides": {},
+    "creado_en": "2026-04-17T20:07:22.030Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 97,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$YrznX43TRXruDSU1TyfOlK$e2gyQL3imMy01mulXho3li6w3bnu10z3p7gymy/56pE=",
+    "last_login": "2026-04-24T19:40:41.463Z",
+    "is_superuser": false,
+    "username": "cliente4",
+    "first_name": "r",
+    "last_name": "s",
+    "email": "jam24.dev@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-04-17T20:09:01.245Z",
+    "role": "cliente",
+    "telefono": "4567812645",
+    "documento": "456789123",
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-04-17T20:09:01.930Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 98,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$hVrhA0ENmKPmtHoLW3nMdP$+XzWtK8aZw9ABLDBPhpa9+FMHCjoc6kHm0daYNuKUFI=",
+    "last_login": "2026-04-17T20:28:45.002Z",
+    "is_superuser": false,
+    "username": "cliente5",
+    "first_name": "h",
+    "last_name": "m",
+    "email": "jam24.dev@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-04-17T20:11:06.456Z",
+    "role": "cliente",
+    "telefono": "4561237891",
+    "documento": "456789123",
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-04-17T20:11:07.139Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 99,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$DruBVVwCFez587Wix7yrgi$fegjSKIO9gG/mlRnQQGUebAU11IHfloqIi2TZsJShmE=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "cliente6",
+    "first_name": "u",
+    "last_name": "p",
+    "email": "jam24.dev@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-04-17T20:12:25.753Z",
+    "role": "cliente",
+    "telefono": "4567891235",
+    "documento": "456789123",
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-04-17T20:12:26.442Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 100,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$ceQQhvDQT0jJhXiF1RrhVR$zrAGePLhqodDvXFil9PUX8+fwQl3zSfPCzXrnZTcTxg=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "cris",
+    "first_name": "cristian",
+    "last_name": "pinzon",
+    "email": "andresilloblanco29@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-04-23T16:42:58.985Z",
+    "role": "cliente",
+    "telefono": "3213132323",
+    "documento": "123213123",
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-04-23T16:42:59.680Z",
+    "groups": [
+      1
+    ],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 107,
+  "fields": {
+    "password": "!aXjswK4QRGs7EaAAHUyJQaZVLaRsuYVCjxByq3ij",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-customer-1-amy-s-bird-sanctuary",
+    "first_name": "",
+    "last_name": "",
+    "email": "Birds@intuit.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-13T21:21:08.742Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": "1",
+    "permission_overrides": {},
+    "creado_en": "2026-05-13T21:21:08.742Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 108,
+  "fields": {
+    "password": "!n624CHComy6ajZIN25grsmj2UQKarfkHzHksdzHp",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-customer-2-bill-s-windsurf-shop",
+    "first_name": "",
+    "last_name": "",
+    "email": "Surf@intuit.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-13T21:21:08.755Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": "2",
+    "permission_overrides": {},
+    "creado_en": "2026-05-13T21:21:08.755Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 109,
+  "fields": {
+    "password": "!ovENMDNTvCCtTheZ8dKzGFCMZqGvtgoTaFY32I5l",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-customer-3-cool-cars",
+    "first_name": "",
+    "last_name": "",
+    "email": "Cool_Cars@intuit.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-13T21:21:08.769Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": "3",
+    "permission_overrides": {},
+    "creado_en": "2026-05-13T21:21:08.769Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 110,
+  "fields": {
+    "password": "!dMxjeA9vggZSkbf5wg7wgBDASKIlzDpJSO9nxc2d",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-customer-4-diego-rodriguez",
+    "first_name": "",
+    "last_name": "",
+    "email": "Diego@rodriguez.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-13T21:21:08.780Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": "4",
+    "permission_overrides": {},
+    "creado_en": "2026-05-13T21:21:08.780Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 111,
+  "fields": {
+    "password": "!XBlsl6YbDGfu0wLuTNXpOpSnUd1uehtjFdKj5aUW",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-customer-5-dukes-basketball-camp",
+    "first_name": "",
+    "last_name": "",
+    "email": "Dukes_bball@intuit.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-13T21:21:08.794Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": "5",
+    "permission_overrides": {},
+    "creado_en": "2026-05-13T21:21:08.795Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 112,
+  "fields": {
+    "password": "!TklZEFVYvqpr82cDbhUgBvDRGMSo2oPrffjuXJp9",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-customer-6-dylan-sollfrank",
+    "first_name": "",
+    "last_name": "",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-13T21:21:08.804Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": "6",
+    "permission_overrides": {},
+    "creado_en": "2026-05-13T21:21:08.805Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 113,
+  "fields": {
+    "password": "!JsHThAe3EubEWT7nWGRM3td8q5kGukWTB723wCC8",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-customer-7-freeman-sporting-goods",
+    "first_name": "",
+    "last_name": "",
+    "email": "Sporting_goods@intuit.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-13T21:21:08.817Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": "9",
+    "permission_overrides": {},
+    "creado_en": "2026-05-13T21:21:08.817Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 114,
+  "fields": {
+    "password": "!KGp8SfcjFMWnYwiHLdbKeQqesxroxHoARPiyxV5e",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-customer-10-geeta-kalapatapu",
+    "first_name": "",
+    "last_name": "",
+    "email": "Geeta@kalapatapu.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-13T21:21:08.846Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": "10",
+    "permission_overrides": {},
+    "creado_en": "2026-05-13T21:21:08.846Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 115,
+  "fields": {
+    "password": "!Bm2nSogSryRclFGNoEO2eYRA8y870nFKrlIPVQDt",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-customer-11-gevelber-photography",
+    "first_name": "",
+    "last_name": "",
+    "email": "Photography@intuit.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-13T21:21:08.859Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": "11",
+    "permission_overrides": {},
+    "creado_en": "2026-05-13T21:21:08.860Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 116,
+  "fields": {
+    "password": "!56YcAZxBjXIZB8S9GPRJhfeozfnN9w4NVvjKDhDx",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-customer-12-jeff-s-jalopies",
+    "first_name": "",
+    "last_name": "",
+    "email": "Jalopies@intuit.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-13T21:21:08.872Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": "12",
+    "permission_overrides": {},
+    "creado_en": "2026-05-13T21:21:08.872Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 117,
+  "fields": {
+    "password": "!Yo8vT6GjLLM3U7U3reFJPnFyP6WPIws8Ik5KI5cv",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-customer-13-john-melton",
+    "first_name": "",
+    "last_name": "",
+    "email": "John@melton.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-13T21:21:08.884Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": "13",
+    "permission_overrides": {},
+    "creado_en": "2026-05-13T21:21:08.884Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 118,
+  "fields": {
+    "password": "!aqDzxESLDHVctngVQg5BJJ5wk9tSrfmA0SiqkEia",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-customer-14-kate-whelan",
+    "first_name": "",
+    "last_name": "",
+    "email": "Kate@whelan.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-13T21:21:08.895Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": "14",
+    "permission_overrides": {},
+    "creado_en": "2026-05-13T21:21:08.895Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 119,
+  "fields": {
+    "password": "!8KzWZYvtnSHfaJZ8KUciQXccNzXGZLvhaQQZ44Ee",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-customer-16-kookies-by-kathy",
+    "first_name": "",
+    "last_name": "",
+    "email": "qbwebsamplecompany@yahoo.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-13T21:21:08.905Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": "16",
+    "permission_overrides": {},
+    "creado_en": "2026-05-13T21:21:08.906Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 120,
+  "fields": {
+    "password": "!lgkZOKfZM0vi2GqOKP1WVL3aVt8Ic4D021t94XpT",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-customer-17-mark-cho",
+    "first_name": "",
+    "last_name": "",
+    "email": "Mark@cho.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-13T21:21:08.972Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": "17",
+    "permission_overrides": {},
+    "creado_en": "2026-05-13T21:21:08.972Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 121,
+  "fields": {
+    "password": "!0fkI6C3IXvpXbxEJxAqFD6JR8E97RM3W7Q9nPUtD",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-customer-18-paulsen-medical-supplies",
+    "first_name": "",
+    "last_name": "",
+    "email": "Medical@intuit.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-13T21:21:08.982Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": "18",
+    "permission_overrides": {},
+    "creado_en": "2026-05-13T21:21:08.982Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 122,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$dKERbajCnH8QnyQjF2zY2g$Hy35qncD/14M+953BhpqmpsDqLLlwv6jInSNA5XHnQU=",
+    "last_login": "2026-05-14T22:00:24.733Z",
+    "is_superuser": true,
+    "username": "qb-ui-check",
+    "first_name": "",
+    "last_name": "",
+    "email": "",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-05-14T22:00:04.139Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-05-14T22:00:04.140Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 123,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$XELtvr14kY3gVoOmscCHRA$+KlvPfXIRjfDZE2gB4asLl4ozhmennSgFgfow021Uxg=",
+    "last_login": "2026-05-14T22:25:30.986Z",
+    "is_superuser": true,
+    "username": "testadmin",
+    "first_name": "",
+    "last_name": "",
+    "email": "admin@example.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2026-05-14T22:24:52.038Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-05-14T22:24:53.165Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 126,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$bXbyMgPMBjORgqkDVz23mE$S2LlzIGyBtM/A+k2zU6fM3l5Uce8+1qZzOry5CF4aT4=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "qb-backoffice",
+    "first_name": "",
+    "last_name": "",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-14T23:50:33.550Z",
+    "role": "backoffice",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-05-14T23:50:35.593Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 130,
+  "fields": {
+    "password": "",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "probe-qb-user",
+    "first_name": "",
+    "last_name": "",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-15T21:21:05.475Z",
+    "role": "backoffice",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-05-15T21:21:05.483Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "usuarios.usuario",
+  "pk": 131,
+  "fields": {
+    "password": "",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "probe-qb-customer",
+    "first_name": "",
+    "last_name": "",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-05-15T21:21:05.487Z",
+    "role": "cliente",
+    "telefono": null,
+    "documento": null,
+    "quickbooks_id": null,
+    "permission_overrides": {},
+    "creado_en": "2026-05-15T21:21:05.487Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.group",
+  "pk": 1,
+  "fields": {
+    "name": "Cliente",
+    "permissions": []
+  }
+},
+{
+  "model": "auth.group",
+  "pk": 2,
+  "fields": {
+    "name": "Vendedor",
+    "permissions": []
+  }
+},
+{
+  "model": "auth.group",
+  "pk": 3,
+  "fields": {
+    "name": "BackOffice",
+    "permissions": []
+  }
+},
+{
+  "model": "auth.group",
+  "pk": 4,
+  "fields": {
+    "name": "Driver",
+    "permissions": []
+  }
+},
+{
+  "model": "auth.group",
+  "pk": 5,
+  "fields": {
+    "name": "Seleccionador",
+    "permissions": []
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 1,
+  "fields": {
+    "name": "Can add log entry",
+    "content_type": 1,
+    "codename": "add_logentry"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 2,
+  "fields": {
+    "name": "Can change log entry",
+    "content_type": 1,
+    "codename": "change_logentry"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 3,
+  "fields": {
+    "name": "Can delete log entry",
+    "content_type": 1,
+    "codename": "delete_logentry"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 4,
+  "fields": {
+    "name": "Can view log entry",
+    "content_type": 1,
+    "codename": "view_logentry"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 5,
+  "fields": {
+    "name": "Can add permission",
+    "content_type": 3,
+    "codename": "add_permission"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 6,
+  "fields": {
+    "name": "Can change permission",
+    "content_type": 3,
+    "codename": "change_permission"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 7,
+  "fields": {
+    "name": "Can delete permission",
+    "content_type": 3,
+    "codename": "delete_permission"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 8,
+  "fields": {
+    "name": "Can view permission",
+    "content_type": 3,
+    "codename": "view_permission"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 9,
+  "fields": {
+    "name": "Can add group",
+    "content_type": 2,
+    "codename": "add_group"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 10,
+  "fields": {
+    "name": "Can change group",
+    "content_type": 2,
+    "codename": "change_group"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 11,
+  "fields": {
+    "name": "Can delete group",
+    "content_type": 2,
+    "codename": "delete_group"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 12,
+  "fields": {
+    "name": "Can view group",
+    "content_type": 2,
+    "codename": "view_group"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 13,
+  "fields": {
+    "name": "Can add content type",
+    "content_type": 4,
+    "codename": "add_contenttype"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 14,
+  "fields": {
+    "name": "Can change content type",
+    "content_type": 4,
+    "codename": "change_contenttype"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 15,
+  "fields": {
+    "name": "Can delete content type",
+    "content_type": 4,
+    "codename": "delete_contenttype"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 16,
+  "fields": {
+    "name": "Can view content type",
+    "content_type": 4,
+    "codename": "view_contenttype"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 17,
+  "fields": {
+    "name": "Can add session",
+    "content_type": 5,
+    "codename": "add_session"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 18,
+  "fields": {
+    "name": "Can change session",
+    "content_type": 5,
+    "codename": "change_session"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 19,
+  "fields": {
+    "name": "Can delete session",
+    "content_type": 5,
+    "codename": "delete_session"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 20,
+  "fields": {
+    "name": "Can view session",
+    "content_type": 5,
+    "codename": "view_session"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 21,
+  "fields": {
+    "name": "Can add user",
+    "content_type": 6,
+    "codename": "add_usuario"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 22,
+  "fields": {
+    "name": "Can change user",
+    "content_type": 6,
+    "codename": "change_usuario"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 23,
+  "fields": {
+    "name": "Can delete user",
+    "content_type": 6,
+    "codename": "delete_usuario"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 24,
+  "fields": {
+    "name": "Can view user",
+    "content_type": 6,
+    "codename": "view_usuario"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 25,
+  "fields": {
+    "name": "Can add producto",
+    "content_type": 9,
+    "codename": "add_producto"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 26,
+  "fields": {
+    "name": "Can change producto",
+    "content_type": 9,
+    "codename": "change_producto"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 27,
+  "fields": {
+    "name": "Can delete producto",
+    "content_type": 9,
+    "codename": "delete_producto"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 28,
+  "fields": {
+    "name": "Can view producto",
+    "content_type": 9,
+    "codename": "view_producto"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 29,
+  "fields": {
+    "name": "Can add presentacion",
+    "content_type": 8,
+    "codename": "add_presentacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 30,
+  "fields": {
+    "name": "Can change presentacion",
+    "content_type": 8,
+    "codename": "change_presentacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 31,
+  "fields": {
+    "name": "Can delete presentacion",
+    "content_type": 8,
+    "codename": "delete_presentacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 32,
+  "fields": {
+    "name": "Can view presentacion",
+    "content_type": 8,
+    "codename": "view_presentacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 33,
+  "fields": {
+    "name": "Can add categoria",
+    "content_type": 7,
+    "codename": "add_categoria"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 34,
+  "fields": {
+    "name": "Can change categoria",
+    "content_type": 7,
+    "codename": "change_categoria"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 35,
+  "fields": {
+    "name": "Can delete categoria",
+    "content_type": 7,
+    "codename": "delete_categoria"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 36,
+  "fields": {
+    "name": "Can view categoria",
+    "content_type": 7,
+    "codename": "view_categoria"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 37,
+  "fields": {
+    "name": "Can add cliente",
+    "content_type": 10,
+    "codename": "add_cliente"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 38,
+  "fields": {
+    "name": "Can change cliente",
+    "content_type": 10,
+    "codename": "change_cliente"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 39,
+  "fields": {
+    "name": "Can delete cliente",
+    "content_type": 10,
+    "codename": "delete_cliente"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 40,
+  "fields": {
+    "name": "Can view cliente",
+    "content_type": 10,
+    "codename": "view_cliente"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 41,
+  "fields": {
+    "name": "Can add cotizacion",
+    "content_type": 11,
+    "codename": "add_cotizacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 42,
+  "fields": {
+    "name": "Can change cotizacion",
+    "content_type": 11,
+    "codename": "change_cotizacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 43,
+  "fields": {
+    "name": "Can delete cotizacion",
+    "content_type": 11,
+    "codename": "delete_cotizacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 44,
+  "fields": {
+    "name": "Can view cotizacion",
+    "content_type": 11,
+    "codename": "view_cotizacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 45,
+  "fields": {
+    "name": "Can add cotizacion item",
+    "content_type": 12,
+    "codename": "add_cotizacionitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 46,
+  "fields": {
+    "name": "Can change cotizacion item",
+    "content_type": 12,
+    "codename": "change_cotizacionitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 47,
+  "fields": {
+    "name": "Can delete cotizacion item",
+    "content_type": 12,
+    "codename": "delete_cotizacionitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 48,
+  "fields": {
+    "name": "Can view cotizacion item",
+    "content_type": 12,
+    "codename": "view_cotizacionitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 49,
+  "fields": {
+    "name": "Can add marca",
+    "content_type": 13,
+    "codename": "add_marca"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 50,
+  "fields": {
+    "name": "Can change marca",
+    "content_type": 13,
+    "codename": "change_marca"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 51,
+  "fields": {
+    "name": "Can delete marca",
+    "content_type": 13,
+    "codename": "delete_marca"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 52,
+  "fields": {
+    "name": "Can view marca",
+    "content_type": 13,
+    "codename": "view_marca"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 53,
+  "fields": {
+    "name": "Can add testimonio",
+    "content_type": 14,
+    "codename": "add_testimonio"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 54,
+  "fields": {
+    "name": "Can change testimonio",
+    "content_type": 14,
+    "codename": "change_testimonio"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 55,
+  "fields": {
+    "name": "Can delete testimonio",
+    "content_type": 14,
+    "codename": "delete_testimonio"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 56,
+  "fields": {
+    "name": "Can view testimonio",
+    "content_type": 14,
+    "codename": "view_testimonio"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 57,
+  "fields": {
+    "name": "Can add notificacion",
+    "content_type": 15,
+    "codename": "add_notificacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 58,
+  "fields": {
+    "name": "Can change notificacion",
+    "content_type": 15,
+    "codename": "change_notificacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 59,
+  "fields": {
+    "name": "Can delete notificacion",
+    "content_type": 15,
+    "codename": "delete_notificacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 60,
+  "fields": {
+    "name": "Can view notificacion",
+    "content_type": 15,
+    "codename": "view_notificacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 61,
+  "fields": {
+    "name": "Can add pedido compra",
+    "content_type": 16,
+    "codename": "add_pedidocompra"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 62,
+  "fields": {
+    "name": "Can change pedido compra",
+    "content_type": 16,
+    "codename": "change_pedidocompra"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 63,
+  "fields": {
+    "name": "Can delete pedido compra",
+    "content_type": 16,
+    "codename": "delete_pedidocompra"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 64,
+  "fields": {
+    "name": "Can view pedido compra",
+    "content_type": 16,
+    "codename": "view_pedidocompra"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 65,
+  "fields": {
+    "name": "Can add pedido item",
+    "content_type": 17,
+    "codename": "add_pedidoitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 66,
+  "fields": {
+    "name": "Can change pedido item",
+    "content_type": 17,
+    "codename": "change_pedidoitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 67,
+  "fields": {
+    "name": "Can delete pedido item",
+    "content_type": 17,
+    "codename": "delete_pedidoitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 68,
+  "fields": {
+    "name": "Can view pedido item",
+    "content_type": 17,
+    "codename": "view_pedidoitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 69,
+  "fields": {
+    "name": "Can add home contenido",
+    "content_type": 18,
+    "codename": "add_homecontenido"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 70,
+  "fields": {
+    "name": "Can change home contenido",
+    "content_type": 18,
+    "codename": "change_homecontenido"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 71,
+  "fields": {
+    "name": "Can delete home contenido",
+    "content_type": 18,
+    "codename": "delete_homecontenido"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 72,
+  "fields": {
+    "name": "Can view home contenido",
+    "content_type": 18,
+    "codename": "view_homecontenido"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 73,
+  "fields": {
+    "name": "Can add pedido",
+    "content_type": 19,
+    "codename": "add_pedido"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 74,
+  "fields": {
+    "name": "Can change pedido",
+    "content_type": 19,
+    "codename": "change_pedido"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 75,
+  "fields": {
+    "name": "Can delete pedido",
+    "content_type": 19,
+    "codename": "delete_pedido"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 76,
+  "fields": {
+    "name": "Can view pedido",
+    "content_type": 19,
+    "codename": "view_pedido"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 77,
+  "fields": {
+    "name": "Can add Configuracion de precios",
+    "content_type": 20,
+    "codename": "add_configuracionprecios"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 78,
+  "fields": {
+    "name": "Can change Configuracion de precios",
+    "content_type": 20,
+    "codename": "change_configuracionprecios"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 79,
+  "fields": {
+    "name": "Can delete Configuracion de precios",
+    "content_type": 20,
+    "codename": "delete_configuracionprecios"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 80,
+  "fields": {
+    "name": "Can view Configuracion de precios",
+    "content_type": 20,
+    "codename": "view_configuracionprecios"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 81,
+  "fields": {
+    "name": "Can add invoice",
+    "content_type": 21,
+    "codename": "add_invoice"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 82,
+  "fields": {
+    "name": "Can change invoice",
+    "content_type": 21,
+    "codename": "change_invoice"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 83,
+  "fields": {
+    "name": "Can delete invoice",
+    "content_type": 21,
+    "codename": "delete_invoice"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 84,
+  "fields": {
+    "name": "Can view invoice",
+    "content_type": 21,
+    "codename": "view_invoice"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 85,
+  "fields": {
+    "name": "Can add invoice item",
+    "content_type": 22,
+    "codename": "add_invoiceitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 86,
+  "fields": {
+    "name": "Can change invoice item",
+    "content_type": 22,
+    "codename": "change_invoiceitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 87,
+  "fields": {
+    "name": "Can delete invoice item",
+    "content_type": 22,
+    "codename": "delete_invoiceitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 88,
+  "fields": {
+    "name": "Can view invoice item",
+    "content_type": 22,
+    "codename": "view_invoiceitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 89,
+  "fields": {
+    "name": "Can add nota ajuste",
+    "content_type": 23,
+    "codename": "add_notaajuste"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 90,
+  "fields": {
+    "name": "Can change nota ajuste",
+    "content_type": 23,
+    "codename": "change_notaajuste"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 91,
+  "fields": {
+    "name": "Can delete nota ajuste",
+    "content_type": 23,
+    "codename": "delete_notaajuste"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 92,
+  "fields": {
+    "name": "Can view nota ajuste",
+    "content_type": 23,
+    "codename": "view_notaajuste"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 93,
+  "fields": {
+    "name": "Can add nota ajuste item",
+    "content_type": 24,
+    "codename": "add_notaajusteitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 94,
+  "fields": {
+    "name": "Can change nota ajuste item",
+    "content_type": 24,
+    "codename": "change_notaajusteitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 95,
+  "fields": {
+    "name": "Can delete nota ajuste item",
+    "content_type": 24,
+    "codename": "delete_notaajusteitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 96,
+  "fields": {
+    "name": "Can view nota ajuste item",
+    "content_type": 24,
+    "codename": "view_notaajusteitem"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 97,
+  "fields": {
+    "name": "Can add movimiento inventario pendiente",
+    "content_type": 25,
+    "codename": "add_movimientoinventariopendiente"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 98,
+  "fields": {
+    "name": "Can change movimiento inventario pendiente",
+    "content_type": 25,
+    "codename": "change_movimientoinventariopendiente"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 99,
+  "fields": {
+    "name": "Can delete movimiento inventario pendiente",
+    "content_type": 25,
+    "codename": "delete_movimientoinventariopendiente"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 100,
+  "fields": {
+    "name": "Can view movimiento inventario pendiente",
+    "content_type": 25,
+    "codename": "view_movimientoinventariopendiente"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 101,
+  "fields": {
+    "name": "Can add delivery evidence photo",
+    "content_type": 26,
+    "codename": "add_deliveryevidencephoto"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 102,
+  "fields": {
+    "name": "Can change delivery evidence photo",
+    "content_type": 26,
+    "codename": "change_deliveryevidencephoto"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 103,
+  "fields": {
+    "name": "Can delete delivery evidence photo",
+    "content_type": 26,
+    "codename": "delete_deliveryevidencephoto"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 104,
+  "fields": {
+    "name": "Can view delivery evidence photo",
+    "content_type": 26,
+    "codename": "view_deliveryevidencephoto"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 105,
+  "fields": {
+    "name": "Can add delivery",
+    "content_type": 27,
+    "codename": "add_delivery"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 106,
+  "fields": {
+    "name": "Can change delivery",
+    "content_type": 27,
+    "codename": "change_delivery"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 107,
+  "fields": {
+    "name": "Can delete delivery",
+    "content_type": 27,
+    "codename": "delete_delivery"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 108,
+  "fields": {
+    "name": "Can view delivery",
+    "content_type": 27,
+    "codename": "view_delivery"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 109,
+  "fields": {
+    "name": "Can add delivery notification log",
+    "content_type": 28,
+    "codename": "add_deliverynotificationlog"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 110,
+  "fields": {
+    "name": "Can change delivery notification log",
+    "content_type": 28,
+    "codename": "change_deliverynotificationlog"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 111,
+  "fields": {
+    "name": "Can delete delivery notification log",
+    "content_type": 28,
+    "codename": "delete_deliverynotificationlog"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 112,
+  "fields": {
+    "name": "Can view delivery notification log",
+    "content_type": 28,
+    "codename": "view_deliverynotificationlog"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 113,
+  "fields": {
+    "name": "Can add stock presentacion",
+    "content_type": 29,
+    "codename": "add_stockpresentacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 114,
+  "fields": {
+    "name": "Can change stock presentacion",
+    "content_type": 29,
+    "codename": "change_stockpresentacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 115,
+  "fields": {
+    "name": "Can delete stock presentacion",
+    "content_type": 29,
+    "codename": "delete_stockpresentacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 116,
+  "fields": {
+    "name": "Can view stock presentacion",
+    "content_type": 29,
+    "codename": "view_stockpresentacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 117,
+  "fields": {
+    "name": "Can add inventario movimiento",
+    "content_type": 30,
+    "codename": "add_inventariomovimiento"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 118,
+  "fields": {
+    "name": "Can change inventario movimiento",
+    "content_type": 30,
+    "codename": "change_inventariomovimiento"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 119,
+  "fields": {
+    "name": "Can delete inventario movimiento",
+    "content_type": 30,
+    "codename": "delete_inventariomovimiento"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 120,
+  "fields": {
+    "name": "Can view inventario movimiento",
+    "content_type": 30,
+    "codename": "view_inventariomovimiento"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 121,
+  "fields": {
+    "name": "Can add nota ajuste evidence photo",
+    "content_type": 31,
+    "codename": "add_notaajusteevidencephoto"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 122,
+  "fields": {
+    "name": "Can change nota ajuste evidence photo",
+    "content_type": 31,
+    "codename": "change_notaajusteevidencephoto"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 123,
+  "fields": {
+    "name": "Can delete nota ajuste evidence photo",
+    "content_type": 31,
+    "codename": "delete_notaajusteevidencephoto"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 124,
+  "fields": {
+    "name": "Can view nota ajuste evidence photo",
+    "content_type": 31,
+    "codename": "view_notaajusteevidencephoto"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 125,
+  "fields": {
+    "name": "Can add delivery payment",
+    "content_type": 32,
+    "codename": "add_deliverypayment"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 126,
+  "fields": {
+    "name": "Can change delivery payment",
+    "content_type": 32,
+    "codename": "change_deliverypayment"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 127,
+  "fields": {
+    "name": "Can delete delivery payment",
+    "content_type": 32,
+    "codename": "delete_deliverypayment"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 128,
+  "fields": {
+    "name": "Can view delivery payment",
+    "content_type": 32,
+    "codename": "view_deliverypayment"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 129,
+  "fields": {
+    "name": "Can add nota ajuste aplicacion",
+    "content_type": 33,
+    "codename": "add_notaajusteaplicacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 130,
+  "fields": {
+    "name": "Can change nota ajuste aplicacion",
+    "content_type": 33,
+    "codename": "change_notaajusteaplicacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 131,
+  "fields": {
+    "name": "Can delete nota ajuste aplicacion",
+    "content_type": 33,
+    "codename": "delete_notaajusteaplicacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 132,
+  "fields": {
+    "name": "Can view nota ajuste aplicacion",
+    "content_type": 33,
+    "codename": "view_notaajusteaplicacion"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 133,
+  "fields": {
+    "name": "Can add stock producto fraccionado",
+    "content_type": 34,
+    "codename": "add_stockproductofraccionado"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 134,
+  "fields": {
+    "name": "Can change stock producto fraccionado",
+    "content_type": 34,
+    "codename": "change_stockproductofraccionado"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 135,
+  "fields": {
+    "name": "Can delete stock producto fraccionado",
+    "content_type": 34,
+    "codename": "delete_stockproductofraccionado"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 136,
+  "fields": {
+    "name": "Can view stock producto fraccionado",
+    "content_type": 34,
+    "codename": "view_stockproductofraccionado"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 137,
+  "fields": {
+    "name": "Can add quick books connection",
+    "content_type": 35,
+    "codename": "add_quickbooksconnection"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 138,
+  "fields": {
+    "name": "Can change quick books connection",
+    "content_type": 35,
+    "codename": "change_quickbooksconnection"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 139,
+  "fields": {
+    "name": "Can delete quick books connection",
+    "content_type": 35,
+    "codename": "delete_quickbooksconnection"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 140,
+  "fields": {
+    "name": "Can view quick books connection",
+    "content_type": 35,
+    "codename": "view_quickbooksconnection"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 141,
+  "fields": {
+    "name": "Can add compra proveedor linea",
+    "content_type": 36,
+    "codename": "add_compraproveedorlinea"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 142,
+  "fields": {
+    "name": "Can change compra proveedor linea",
+    "content_type": 36,
+    "codename": "change_compraproveedorlinea"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 143,
+  "fields": {
+    "name": "Can delete compra proveedor linea",
+    "content_type": 36,
+    "codename": "delete_compraproveedorlinea"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 144,
+  "fields": {
+    "name": "Can view compra proveedor linea",
+    "content_type": 36,
+    "codename": "view_compraproveedorlinea"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 145,
+  "fields": {
+    "name": "Can add compra proveedor",
+    "content_type": 37,
+    "codename": "add_compraproveedor"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 146,
+  "fields": {
+    "name": "Can change compra proveedor",
+    "content_type": 37,
+    "codename": "change_compraproveedor"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 147,
+  "fields": {
+    "name": "Can delete compra proveedor",
+    "content_type": 37,
+    "codename": "delete_compraproveedor"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 148,
+  "fields": {
+    "name": "Can view compra proveedor",
+    "content_type": 37,
+    "codename": "view_compraproveedor"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 149,
+  "fields": {
+    "name": "Can add quick books import conflict",
+    "content_type": 38,
+    "codename": "add_quickbooksimportconflict"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 150,
+  "fields": {
+    "name": "Can change quick books import conflict",
+    "content_type": 38,
+    "codename": "change_quickbooksimportconflict"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 151,
+  "fields": {
+    "name": "Can delete quick books import conflict",
+    "content_type": 38,
+    "codename": "delete_quickbooksimportconflict"
+  }
+},
+{
+  "model": "auth.permission",
+  "pk": 152,
+  "fields": {
+    "name": "Can view quick books import conflict",
+    "content_type": 38,
+    "codename": "view_quickbooksimportconflict"
+  }
+}
+]

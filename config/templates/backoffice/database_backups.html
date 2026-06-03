@@ -1,0 +1,258 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Backups" %}{% endblock %}
+
+{% block content %}
+<style>
+  .dbb-shell {
+    --dbb-navy: #102a63;
+    --dbb-blue: #1f6fd1;
+    --dbb-ice: #f4fbff;
+    --dbb-stroke: rgba(16, 42, 99, 0.12);
+    --dbb-soft: #5a6c86;
+  }
+
+  .dbb-hero {
+    border-radius: 28px;
+    padding: 2rem;
+    color: #fff;
+    background: linear-gradient(135deg, #0f2860 0%, #1b4fa4 52%, #7ddcfb 100%);
+    box-shadow: 0 24px 60px rgba(16, 42, 99, 0.18);
+  }
+
+  .dbb-card {
+    border: 1px solid var(--dbb-stroke);
+    border-radius: 24px;
+    background: #fff;
+    box-shadow: 0 18px 40px rgba(16, 42, 99, 0.08);
+  }
+
+  .dbb-stat {
+    border-radius: 20px;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.12);
+    min-height: 100%;
+  }
+
+  .dbb-stat-label {
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.75);
+  }
+
+  .dbb-stat-value {
+    font-size: 1.45rem;
+    font-weight: 700;
+  }
+
+  .dbb-note {
+    color: var(--dbb-soft);
+  }
+
+  .dbb-backup-list {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .dbb-backup-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid rgba(16, 42, 99, 0.08);
+    border-radius: 18px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  }
+
+  .dbb-backup-meta {
+    color: var(--dbb-soft);
+    font-size: 0.9rem;
+  }
+
+  .dbb-strip {
+    border-radius: 20px;
+    background: var(--dbb-ice);
+    border: 1px dashed rgba(16, 42, 99, 0.18);
+    padding: 1rem 1.1rem;
+  }
+
+  @media (max-width: 767.98px) {
+    .dbb-hero {
+      padding: 1.4rem;
+    }
+
+    .dbb-backup-row {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+</style>
+
+<div class="dbb-shell">
+  <section class="dbb-hero mb-4">
+    <div class="row g-4 align-items-center">
+      <div class="col-lg-8">
+        <span class="badge rounded-pill text-bg-light text-primary px-3 py-2 mb-3">{% trans "Data protection workspace" %}</span>
+        <h1 class="h2 mb-2">{% trans "Backups" %}</h1>
+        <p class="mb-3 text-white-50">{% trans "Use this area to protect both the database and uploaded files. Full system backups let you recover PDFs, images, and the operational records in one restore flow." %}</p>
+        <div class="dbb-strip mb-3 text-dark small bg-white bg-opacity-75">
+          {% trans "Current backup download preference:" %} <strong>{{ backup_schedule_label }}</strong>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <form method="post" action="{% url 'system_backup' %}">
+            {% csrf_token %}
+            <input type="hidden" name="backup_schedule" value="{{ backup_schedule_preference }}">
+            <button type="submit" class="btn btn-light text-primary fw-semibold">{% trans "Create full backup" %}</button>
+          </form>
+          <form method="post" action="{% url 'quickbooks_database_backup' %}">
+            {% csrf_token %}
+            <input type="hidden" name="backup_schedule" value="{{ backup_schedule_preference }}">
+            <button type="submit" class="btn btn-outline-light">{% trans "Create database-only backup" %}</button>
+          </form>
+          <a href="{% url 'quickbooks_center' %}" class="btn btn-outline-light">{% trans "Back to QuickBooks Center" %}</a>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="row g-2">
+          <div class="col-6">
+            <div class="dbb-stat">
+              <div class="dbb-stat-label">{% trans "Full backups" %}</div>
+              <div class="dbb-stat-value">{{ system_backup_total }}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="dbb-stat">
+              <div class="dbb-stat-label">{% trans "Database-only" %}</div>
+              <div class="dbb-stat-value">{{ database_backup_total }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="dbb-card p-4 p-xl-5 mb-4">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+      <div>
+        <h3 class="mb-1">{% trans "Backup frequency preference" %}</h3>
+        <p class="dbb-note mb-0">{% trans "Choose how the customer wants backup downloads labeled and scheduled operationally: daily, weekly, or monthly." %}</p>
+      </div>
+      <div class="dbb-strip small">
+        {% trans "This preference is saved and reused by the backup buttons on this page." %}
+      </div>
+    </div>
+
+    <form method="post" action="{% url 'update_backup_schedule_preference' %}" class="row g-3 align-items-end mb-0">
+      {% csrf_token %}
+      <div class="col-md-8 col-lg-6">
+        <label for="backup_schedule" class="form-label fw-semibold">{% trans "Download cadence" %}</label>
+        <select id="backup_schedule" name="backup_schedule" class="form-select">
+          {% for option in backup_schedule_options %}
+          <option value="{{ option.value }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4 col-lg-3">
+        <button type="submit" class="btn btn-primary w-100">{% trans "Save preference" %}</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="dbb-card p-4 p-xl-5 mb-4">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+      <div>
+        <h3 class="mb-1">{% trans "Restore from backup" %}</h3>
+        <p class="dbb-note mb-0">{% trans "This action replaces the current system data with the selected backup. Use it only when you intentionally want to roll the system back to that snapshot." %}</p>
+      </div>
+      <div class="dbb-strip small">
+        {% trans "You must choose a backup, confirm replacement, and type RESTORE before the process runs." %}
+      </div>
+    </div>
+
+    <form method="post" action="{% url 'restore_backup_from_center' %}" class="row g-3 mb-0">
+      {% csrf_token %}
+      <div class="col-12">
+        <label for="backup_name" class="form-label fw-semibold">{% trans "Backup file" %}</label>
+        <select id="backup_name" name="backup_name" class="form-select" required>
+          <option value="">{% trans "Select a backup" %}</option>
+          {% for backup in database_restore_options %}
+          <option value="{{ backup.name }}">{{ backup.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-7">
+        <label for="confirmation" class="form-label fw-semibold">{% trans "Type RESTORE to confirm" %}</label>
+        <input id="confirmation" name="confirmation" type="text" class="form-control" placeholder="RESTORE" required>
+      </div>
+      <div class="col-md-5 d-flex align-items-end">
+        <div class="form-check border rounded-4 p-3 w-100">
+          <input class="form-check-input" type="checkbox" value="yes" id="replace_current_data" name="replace_current_data">
+          <label class="form-check-label" for="replace_current_data">
+            {% trans "Replace the current database and uploaded files" %}
+          </label>
+        </div>
+      </div>
+      <div class="col-12 d-flex justify-content-end">
+        <button type="submit" class="btn btn-danger">{% trans "Restore selected backup" %}</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="dbb-card p-4 p-xl-5 mb-4">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+      <div>
+        <h3 class="mb-1">{% trans "Recent full backups" %}</h3>
+        <p class="dbb-note mb-0">{% trans "Each file includes the database plus uploaded media files such as PDFs, invoice notes, product images, logos, and other files stored under media/." %}</p>
+      </div>
+      <div class="dbb-strip small">
+        {% trans "Files are stored under media/backups/system/ and use the saved cadence label in the generated file name." %}
+      </div>
+    </div>
+
+    {% if system_backup_history %}
+    <div class="dbb-backup-list">
+      {% for backup in system_backup_history %}
+      <div class="dbb-backup-row">
+        <div>
+          <div class="fw-semibold text-break">{{ backup.name }}</div>
+          <div class="dbb-backup-meta">{{ backup.modified_label }} · {{ backup.size_label }}</div>
+        </div>
+        <a href="{% url 'system_backup_download' backup.name %}" class="btn btn-outline-primary">{% trans "Download again" %}</a>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-light border mb-0">{% trans "No full backup files have been created yet." %}</div>
+    {% endif %}
+  </section>
+
+  <section class="dbb-card p-4 p-xl-5 mb-4">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+      <div>
+        <h3 class="mb-1">{% trans "Database-only backups" %}</h3>
+        <p class="dbb-note mb-0">{% trans "These are lighter exports with only the database records. Keep them if you want a faster dump without the uploaded files." %}</p>
+      </div>
+      <div class="dbb-strip small">
+        {% trans "Files are stored under media/backups/database/ and use the saved cadence label in the generated file name." %}
+      </div>
+    </div>
+
+    {% if database_backup_history %}
+    <div class="dbb-backup-list">
+      {% for backup in database_backup_history %}
+      <div class="dbb-backup-row">
+        <div>
+          <div class="fw-semibold text-break">{{ backup.name }}</div>
+          <div class="dbb-backup-meta">{{ backup.modified_label }} · {{ backup.size_label }}</div>
+        </div>
+        <a href="{% url 'quickbooks_database_backup_download' backup.name %}" class="btn btn-outline-primary">{% trans "Download again" %}</a>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-light border mb-0">{% trans "No database-only backup files have been created yet." %}</div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

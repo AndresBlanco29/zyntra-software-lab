@@ -1,0 +1,246 @@
+{% load static %}
+
+<!-- 
+    COMPONENTE: Modal de Progreso Reutilizable
+    
+    Uso en templates:
+    ```html
+    {% include 'components/progress_modal.html' with 
+        task_name="Importando Productos"
+        endpoint="/api/import-products/"
+    %}
+    ```
+-->
+
+<!-- CSS -->
+<link rel="stylesheet" href="{% static 'css/progress-loader.css' %}">
+
+<!-- Scripts -->
+<script src="{% static 'js/progress-loader.js' %}"></script>
+
+<!-- Componente de Control del Loader -->
+<script>
+/**
+ * Sistema de Integración del Loader de Progreso
+ * Se inicializa automáticamente
+ */
+
+window.ProgressLoaderManager = {
+    loaders: {},
+    activeTaskId: null,
+
+    /**
+     * Crear y mostrar un loader
+     */
+    create(taskId, options = {}) {
+        const loader = new ProgressLoader({
+            taskName: options.taskName || 'Procesando',
+            autoHide: options.autoHide !== false,
+            onComplete: options.onComplete || null
+        });
+
+        this.loaders[taskId] = loader;
+        this.activeTaskId = taskId;
+        
+        if (options.total) {
+            loader.show(options.total, options.initialMessage || 'Iniciando...');
+        }
+        
+        return loader;
+    },
+
+    /**
+     * Obtener un loader existente
+     */
+    get(taskId) {
+        return this.loaders[taskId] || null;
+    },
+
+    /**
+     * Actualizar un loader
+     */
+    update(taskId, current, message = null, icon = null) {
+        const loader = this.get(taskId);
+        if (loader) {
+            loader.update(current, message, icon);
+        }
+    },
+
+    /**
+     * Completar un loader
+     */
+    complete(taskId, message = '✅ ¡Completado!') {
+        const loader = this.get(taskId);
+        if (loader) {
+            loader.complete(message);
+            setTimeout(() => this.destroy(taskId), 2000);
+        }
+    },
+
+    /**
+     * Error en un loader
+     */
+    error(taskId, message = '❌ Error') {
+        const loader = this.get(taskId);
+        if (loader) {
+            loader.error(message);
+        }
+    },
+
+    /**
+     * Destruir un loader
+     */
+    destroy(taskId) {
+        const loader = this.get(taskId);
+        if (loader) {
+            loader.destroy();
+            delete this.loaders[taskId];
+        }
+    }
+};
+
+/**
+ * Helper para ejecutar peticiones con progreso automático
+ */
+window.executeWithProgress = async (options) => {
+    const {
+        method = 'POST',
+        url,
+        taskName = 'Procesando',
+        totalEstimated = 100,
+        data = {},
+        onProgress = null,
+        onComplete = null,
+        onError = null
+    } = options;
+
+    const taskId = `task_${Date.now()}`;
+    const loader = ProgressLoaderManager.create(taskId, {
+        taskName,
+        total: totalEstimated,
+        onComplete
+    });
+
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken'),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Error ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (result.success) {
+            loader.complete(result.message || '✅ ¡Completado exitosamente!');
+            if (onComplete) onComplete(result);
+        } else {
+            throw new Error(result.error || 'Error desconocido');
+        }
+
+    } catch (error) {
+        loader.error(`❌ ${error.message}`);
+        if (onError) onError(error);
+    }
+};
+
+/**
+ * Helper para obtener CSRF token
+ */
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Exponer globalmente
+window.ProgressLoaderManager = ProgressLoaderManager;
+window.executeWithProgress = executeWithProgress;
+</script>
+
+<!-- 
+    Documentación de Uso:
+    
+    1. Simple Loading:
+    ```html
+    <button onclick="showSimpleLoader()">Importar</button>
+    
+    <script>
+    function showSimpleLoader() {
+        const loader = new ProgressLoader({
+            taskName: 'Importando Productos'
+        });
+        loader.show(100);
+        
+        // Simular progreso
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += Math.random() * 20;
+            if (progress >= 100) {
+                clearInterval(interval);
+                loader.complete('¡Completado!');
+            } else {
+                loader.update(Math.min(progress, 99));
+            }
+        }, 500);
+    }
+    </script>
+    ```
+
+    2. Con API:
+    ```html
+    <button onclick="importWithAPI()">Importar</button>
+    
+    <script>
+    async function importWithAPI() {
+        await executeWithProgress({
+            url: '/api/import-products/',
+            taskName: 'Importando Productos',
+            totalEstimated: 100,
+            onComplete: () => window.location.reload()
+        });
+    }
+    </script>
+    ```
+
+    3. Con Manager:
+    ```html
+    <button onclick="startImport()">Importar</button>
+    
+    <script>
+    function startImport() {
+        const loader = ProgressLoaderManager.create('import_task', {
+            taskName: 'Importación en Curso',
+            total: 100
+        });
+        
+        loader.show(100);
+        
+        // Actualizar desde API o evento
+        fetch('/api/progress/?taskId=import_task')
+            .then(r => r.json())
+            .then(state => {
+                loader.update(state.current, state.message, state.icon);
+                if (state.completed) {
+                    ProgressLoaderManager.complete('import_task');
+                }
+            });
+    }
+    </script>
+    ```
+-->

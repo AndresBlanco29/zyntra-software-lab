@@ -1,0 +1,333 @@
+{% extends 'bases/base_vendedor.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Create Direct Invoice" %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start gap-3 mb-4">
+    <div>
+      <a href="{% url 'backoffice_invoices_list' %}" class="small text-decoration-none">&larr; {% trans "Back to invoices" %}</a>
+      <h1 class="h3 mt-2 mb-1">{% trans "Create direct invoice" %}</h1>
+      <p class="text-muted mb-0">{% trans "Use this flow when a customer buys directly at the warehouse and BackOffice must invoice immediately without picking or driver workflow." %}</p>
+    </div>
+    <div class="alert alert-info mb-0 py-2 px-3 small">
+      {% trans "Inventory is discounted immediately when the invoice is created." %}
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-12 col-xl-8">
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+          <form method="post" class="row g-3">
+            {% csrf_token %}
+            <div class="col-md-7">
+              <label class="form-label fw-semibold">{% trans "Customer" %}</label>
+              <select name="cliente_id" class="form-select" required>
+                <option value="">{% trans "Select a customer" %}</option>
+                {% for customer in customers %}
+                <option value="{{ customer.id }}" {% if selected_client and selected_client.id == customer.id %}selected{% endif %}>{{ customer.nombre_empresa }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-5">
+              <label class="form-label fw-semibold">{% trans "Delivery method" %}</label>
+              <select name="metodo_entrega" class="form-select" required>
+                <option value="CUSTOMER_PICK_UP" {% if selected_delivery_method == 'CUSTOMER_PICK_UP' %}selected{% endif %}>{% trans "Customer Pick Up" %}</option>
+                <option value="LTG" {% if selected_delivery_method == 'LTG' %}selected{% endif %}>LTG</option>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">{% trans "Invoice lines" %}</label>
+              <div
+                id="direct-invoice-lines"
+                class="vstack gap-3"
+                data-select-price-label="{% trans 'Select a price' %}"
+                data-no-prices-label="{% trans 'This product has no configured prices.' %}"
+                data-price-label="{% trans 'Price' %}"
+              >
+                {% for line in direct_invoice_lines %}
+                <div class="border rounded-3 p-3 direct-invoice-line">
+                  <div class="d-flex justify-content-between align-items-center mb-3 gap-3">
+                    <div>
+                      <div class="fw-semibold">{% trans "Product" %}</div>
+                      <div class="text-muted small">{% trans "Select the product and then choose one of its five configured prices." %}</div>
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm direct-invoice-remove-line">{% trans "Remove product" %}</button>
+                  </div>
+                  <div class="row g-2 align-items-end">
+                    <div class="col-lg-5">
+                      <label class="form-label small text-muted mb-1">{% trans "Product / presentation" %}</label>
+                      <select name="presentacion_id" class="form-select direct-invoice-presentation-select">
+                        <option value="">{% trans "Select one presentation" %}</option>
+                        {% for presentacion in presentations %}
+                        <option
+                          value="{{ presentacion.id }}"
+                          data-price-1="{{ presentacion.precio_1 }}"
+                          data-price-2="{{ presentacion.precio_2 }}"
+                          data-price-3="{{ presentacion.precio_3 }}"
+                          data-price-4="{{ presentacion.precio_4 }}"
+                          data-price-5="{{ presentacion.precio_5 }}"
+                          {% if line.presentacion_id == presentacion.id|stringformat:'s' %}selected{% endif %}
+                        >#{{ presentacion.id }} · {{ presentacion.producto.nombre }} · {{ presentacion.nombre }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="col-lg-4 col-md-6">
+                      <label class="form-label small text-muted mb-1">{% trans "Select one of the 5 prices" %}</label>
+                      <select name="precio_unitario" class="form-select direct-invoice-price-select" data-selected-value="{{ line.precio_unitario }}" data-default-tier="{{ default_price_tier }}">
+                        <option value="">{% trans "Select a price" %}</option>
+                      </select>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                      <label class="form-label small text-muted mb-1">{% trans "Qty" %}</label>
+                      <input type="number" min="1" name="cantidad" value="{{ line.cantidad }}" class="form-control" placeholder="0">
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              <div class="mt-3">
+                <button type="button" id="direct-invoice-add-line" class="btn btn-outline-primary">{% trans "Add another product" %}</button>
+              </div>
+            </div>
+
+            {% if selected_client and pending_notes_summary %}
+            <div class="col-12">
+              <div class="card bg-light border-0">
+                <div class="card-body">
+                  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+                    <div>
+                      <h2 class="h6 mb-1">{% trans "Customer credits and general notes" %}</h2>
+                      <p class="text-muted small mb-0">{% trans "Apply available credit or approved general notes before the direct invoice is saved." %}</p>
+                    </div>
+                    <div class="small text-muted">{% trans "Available customer credit" %}: ${{ pending_notes_summary.available_credit_excluding_notes }}</div>
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-md-6">
+                      <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" value="1" id="use-customer-credit" name="use_customer_credit" {% if use_customer_credit_checked %}checked{% endif %}>
+                        <label class="form-check-label" for="use-customer-credit">{% trans "Apply customer credit" %}</label>
+                      </div>
+                      <label class="form-label small text-muted">{% trans "Customer credit to apply" %}</label>
+                      <input type="number" min="0" step="0.01" name="customer_credit_to_apply" value="{{ customer_credit_to_apply_value }}" class="form-control" placeholder="0.00">
+                    </div>
+                    <div class="col-md-6">
+                      <div class="small text-muted mb-2">{% trans "Approved general notes" %}</div>
+                      <div class="vstack gap-2 small">
+                        {% for note in pending_notes_summary.notes %}
+                        <div class="border rounded p-2 bg-white">
+                          <div class="fw-semibold">{{ note.numero }} · {{ note.get_tipo_documento_display }}</div>
+                          <div class="text-muted mb-2">{% trans "Remaining amount" %}: ${{ note.remaining_amount }}</div>
+						  <input type="number" min="0" step="0.01" name="general_note_apply_{{ note.id }}" value="{{ note.prefill_amount }}" class="form-control form-control-sm" placeholder="0.00">
+                        </div>
+                        {% empty %}
+                        <div class="text-muted">{% trans "No approved general notes are available for this customer." %}</div>
+                        {% endfor %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+
+            <div class="col-12">
+              <label class="form-label fw-semibold">{% trans "BackOffice note" %}</label>
+              <textarea name="nota_backoffice" rows="3" class="form-control" placeholder="{% trans 'Optional note for the internal direct sale record.' %}">{{ backoffice_note_value }}</textarea>
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button type="submit" class="btn btn-primary btn-lg">{% trans "Create direct invoice" %}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-xl-4">
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+          <h2 class="h5 mb-3">{% trans "Direct sale flow" %}</h2>
+          <ol class="ps-3 mb-0 text-muted">
+            <li>{% trans "Select the customer buying at the warehouse." %}</li>
+            <li>{% trans "Add the products, quantities, and the unit prices to charge." %}</li>
+            <li>{% trans "Save the invoice to discount inventory immediately and register the sale in BackOffice." %}</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<template id="direct-invoice-line-template">
+  <div class="border rounded-3 p-3 direct-invoice-line">
+    <div class="d-flex justify-content-between align-items-center mb-3 gap-3">
+      <div>
+        <div class="fw-semibold">{% trans "Product" %}</div>
+        <div class="text-muted small">{% trans "Select the product and then choose one of its five configured prices." %}</div>
+      </div>
+      <button type="button" class="btn btn-outline-secondary btn-sm direct-invoice-remove-line">{% trans "Remove product" %}</button>
+    </div>
+    <div class="row g-2 align-items-end">
+      <div class="col-lg-5">
+        <label class="form-label small text-muted mb-1">{% trans "Product / presentation" %}</label>
+        <select name="presentacion_id" class="form-select direct-invoice-presentation-select">
+          <option value="">{% trans "Select one presentation" %}</option>
+          {% for presentacion in presentations %}
+          <option
+            value="{{ presentacion.id }}"
+            data-price-1="{{ presentacion.precio_1 }}"
+            data-price-2="{{ presentacion.precio_2 }}"
+            data-price-3="{{ presentacion.precio_3 }}"
+            data-price-4="{{ presentacion.precio_4 }}"
+            data-price-5="{{ presentacion.precio_5 }}"
+          >#{{ presentacion.id }} · {{ presentacion.producto.nombre }} · {{ presentacion.nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-lg-4 col-md-6">
+        <label class="form-label small text-muted mb-1">{% trans "Select one of the 5 prices" %}</label>
+        <select name="precio_unitario" class="form-select direct-invoice-price-select" data-default-tier="{{ default_price_tier }}">
+          <option value="">{% trans "Select a price" %}</option>
+        </select>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <label class="form-label small text-muted mb-1">{% trans "Qty" %}</label>
+        <input type="number" min="1" name="cantidad" class="form-control" placeholder="0">
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const linesContainer = document.getElementById('direct-invoice-lines');
+    const addLineButton = document.getElementById('direct-invoice-add-line');
+    const lineTemplate = document.getElementById('direct-invoice-line-template');
+
+    if (!linesContainer || !addLineButton || !lineTemplate) {
+      return;
+    }
+
+    const selectPriceLabel = linesContainer.dataset.selectPriceLabel;
+    const noPricesLabel = linesContainer.dataset.noPricesLabel;
+    const priceLabel = linesContainer.dataset.priceLabel;
+
+    function buildPriceOptions(lineElement, preferDefaultTier) {
+      const presentationSelect = lineElement.querySelector('.direct-invoice-presentation-select');
+      const priceSelect = lineElement.querySelector('.direct-invoice-price-select');
+      const selectedOption = presentationSelect.options[presentationSelect.selectedIndex];
+      const selectedValue = preferDefaultTier ? '' : (priceSelect.dataset.selectedValue || priceSelect.value || '');
+      const defaultTier = String(priceSelect.dataset.defaultTier || '1');
+
+      priceSelect.innerHTML = '';
+
+      const placeholderOption = document.createElement('option');
+      placeholderOption.value = '';
+      placeholderOption.textContent = selectPriceLabel;
+      priceSelect.appendChild(placeholderOption);
+
+      if (!selectedOption || !selectedOption.value) {
+        priceSelect.disabled = true;
+        priceSelect.dataset.selectedValue = '';
+        return;
+      }
+
+      const availablePrices = [];
+      for (let tier = 1; tier <= 5; tier += 1) {
+        const priceValue = selectedOption.dataset[`price${tier}`];
+        if (!priceValue || Number(priceValue) <= 0) {
+          continue;
+        }
+        availablePrices.push({ tier: String(tier), value: priceValue });
+      }
+
+      if (!availablePrices.length) {
+        placeholderOption.textContent = noPricesLabel;
+        priceSelect.disabled = true;
+        priceSelect.dataset.selectedValue = '';
+        return;
+      }
+
+      priceSelect.disabled = false;
+      let matchedOption = null;
+      let defaultOption = null;
+
+      availablePrices.forEach(function (priceEntry, index) {
+        const option = document.createElement('option');
+        option.value = priceEntry.value;
+        option.dataset.tier = priceEntry.tier;
+        option.textContent = `${priceLabel} ${priceEntry.tier} - $${priceEntry.value}`;
+        if (priceEntry.value === selectedValue) {
+          option.selected = true;
+          matchedOption = option;
+        }
+        if (priceEntry.tier === defaultTier) {
+          defaultOption = option;
+        }
+        if (index === 0 && !defaultOption) {
+          defaultOption = option;
+        }
+        priceSelect.appendChild(option);
+      });
+
+      if (!matchedOption && defaultOption) {
+        defaultOption.selected = true;
+      }
+
+      priceSelect.dataset.selectedValue = '';
+    }
+
+    function updateRemoveButtons() {
+      const lineElements = linesContainer.querySelectorAll('.direct-invoice-line');
+      lineElements.forEach(function (lineElement) {
+        const removeButton = lineElement.querySelector('.direct-invoice-remove-line');
+        if (!removeButton) {
+          return;
+        }
+        removeButton.disabled = lineElements.length === 1;
+      });
+    }
+
+    function setupLine(lineElement) {
+      const presentationSelect = lineElement.querySelector('.direct-invoice-presentation-select');
+      const removeButton = lineElement.querySelector('.direct-invoice-remove-line');
+
+      buildPriceOptions(lineElement, false);
+
+      presentationSelect.addEventListener('change', function () {
+        const priceSelect = lineElement.querySelector('.direct-invoice-price-select');
+        priceSelect.dataset.selectedValue = '';
+        buildPriceOptions(lineElement, true);
+      });
+
+      removeButton.addEventListener('click', function () {
+        const lineElements = linesContainer.querySelectorAll('.direct-invoice-line');
+        if (lineElements.length === 1) {
+          lineElement.querySelector('.direct-invoice-presentation-select').value = '';
+          lineElement.querySelector('input[name="cantidad"]').value = '';
+          const priceSelect = lineElement.querySelector('.direct-invoice-price-select');
+          priceSelect.dataset.selectedValue = '';
+          buildPriceOptions(lineElement, false);
+          return;
+        }
+        lineElement.remove();
+        updateRemoveButtons();
+      });
+    }
+
+    linesContainer.querySelectorAll('.direct-invoice-line').forEach(setupLine);
+    updateRemoveButtons();
+
+    addLineButton.addEventListener('click', function () {
+      const fragment = lineTemplate.content.cloneNode(true);
+      const lineElement = fragment.querySelector('.direct-invoice-line');
+      linesContainer.appendChild(fragment);
+      setupLine(linesContainer.lastElementChild);
+      updateRemoveButtons();
+    });
+  });
+</script>
+{% endblock %}

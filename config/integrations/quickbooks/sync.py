@@ -1,0 +1,2393 @@
+import re
+from datetime import timezone as dt_timezone
+from decimal import Decimal, ROUND_HALF_UP
+from pathlib import Path
+
+from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
+from django.db import transaction, IntegrityError
+from django.db.models import Q
+from django.utils import timezone
+from django.core.cache import cache
+from django.utils.dateparse import parse_date, parse_datetime
+from django.utils.translation import gettext as _
+
+from config.clientes.models import Cliente
+from config.facturacion.models import Invoice, NotaAjuste
+from config.integrations.models import QuickBooksImportConflict
+from config.inventario.models import CompraProveedor, CompraProveedorLinea, Proveedor, StockPresentacion
+from config.inventario.services import registrar_recepcion_compra_proveedor
+from config.productos.models import Categoria, Marca, Presentacion, Producto
+from config.usuarios.models import Usuario
+
+from .client import QuickBooksAPIClient, QuickBooksAPIError
+from .constants import QUICKBOOKS_SYNC_STATUS_FAILED, QUICKBOOKS_SYNC_STATUS_PENDING, QUICKBOOKS_SYNC_STATUS_SYNCED
+
+
+class QuickBooksSyncError(Exception):
+    pass
+
+
+SYNC_CURSOR_OVERLAP_SECONDS = 60
+
+
+def is_sync_locked(instance):
+    return bool(getattr(instance, 'quickbooks_id', '') and getattr(instance, 'sync_status', '') == QUICKBOOKS_SYNC_STATUS_SYNCED)
+
+
+def ensure_record_is_not_locked(instance, *, label='Record'):
+    if is_sync_locked(instance):
+        identifier = getattr(instance, 'numero', None) or getattr(instance, 'pk', '-')
+        raise QuickBooksSyncError(f'{label} {identifier} is locked because it is already synced with QuickBooks.')
+
+
+def _quantize_money(value):
+    return Decimal(str(value or '0')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def _as_float(value):
+    return float(_quantize_money(value))
+
+
+def _normalize_text(value, *, fallback=''):
+    return (value or fallback or '').strip()
+
+
+def _truncate(value, limit=100):
+    return _normalize_text(value)[:limit]
+
+
+def _parse_quickbooks_datetime(value):
+    if not value:
+        return None
+    parsed = parse_datetime(str(value).replace('Z', '+00:00'))
+    if parsed is None:
+        return None
+    if timezone.is_naive(parsed):
+        return timezone.make_aware(parsed, timezone.get_current_timezone())
+    return parsed
+
+
+def _parse_quickbooks_date(value):
+    if not value:
+        return None
+    return parse_date(str(value).strip())
+
+
+def _serialize_cursor(value):
+    if value is None:
+        return ''
+    if timezone.is_naive(value):
+        value = timezone.make_aware(value, timezone.get_current_timezone())
+    return value.astimezone(dt_timezone.utc).isoformat(timespec='seconds')
+
+
+def _cursor_for_query(value):
+    parsed = _parse_quickbooks_datetime(value)
+    if parsed is None:
+        return None
+    return _serialize_cursor(parsed - timezone.timedelta(seconds=SYNC_CURSOR_OVERLAP_SECONDS))
+
+
+def _extract_payload_last_updated_at(payload):
+    return _parse_quickbooks_datetime((payload.get('MetaData') or {}).get('LastUpdatedTime'))
+
+
+def _latest_payload_update(records):
+    latest = None
+    for record in records:
+        updated_at = _extract_payload_last_updated_at(record)
+        if updated_at is not None and (latest is None or updated_at > latest):
+            latest = updated_at
+    return latest
+
+
+def _nested_value(payload, path, default=None):
+    current = payload
+    for part in path.split('.'):
+        if not isinstance(current, dict):
+            return default
+        current = current.get(part)
+        if current is None:
+            return default
+    return current
+
+
+def _payload_needs_update(remote_payload, expected_payload, field_paths):
+    for path in field_paths:
+        if _nested_value(remote_payload, path, '') != _nested_value(expected_payload, path, ''):
+            return True
+    return False
+
+
+def _build_sparse_update_payload(remote_payload, expected_payload):
+    payload = dict(expected_payload)
+    payload['Id'] = str(remote_payload.get('Id', ''))
+    payload['SyncToken'] = str(remote_payload.get('SyncToken', ''))
+    payload['sparse'] = True
+    return payload
+
+
+def _mark_synced(instance, quickbooks_id):
+    instance.quickbooks_id = str(quickbooks_id or '')
+    instance.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+    instance.last_synced_at = timezone.now()
+    instance.save(update_fields=['quickbooks_id', 'sync_status', 'last_synced_at'])
+
+
+def _mark_failed(instance):
+    instance.sync_status = QUICKBOOKS_SYNC_STATUS_FAILED
+    instance.save(update_fields=['sync_status'])
+
+
+def _sync_result(*, entity, action, payload):
+    return {
+        'entity': entity,
+        'action': action,
+        'quickbooks_id': str(payload.get('Id', '')),
+        'payload': payload,
+    }
+
+
+def _batch_sync_result(*, record_ids, sync_callable):
+    results = []
+    for record_id in record_ids:
+        try:
+            result = sync_callable(record_id)
+        except Exception as exc:
+            results.append({
+                'id': int(record_id),
+                'ok': False,
+                'error': str(exc),
+            })
+        else:
+            results.append({
+                'id': int(record_id),
+                'ok': True,
+                'result': result,
+            })
+    return {
+        'requested_ids': [int(record_id) for record_id in record_ids],
+        'success_count': sum(1 for item in results if item['ok']),
+        'failed_count': sum(1 for item in results if not item['ok']),
+        'results': results,
+    }
+
+
+def _build_customer_display_name(cliente):
+    company_name = _normalize_text(cliente.nombre_empresa, fallback=f'Cliente {cliente.pk}')
+    return _truncate(f'LTG Customer {cliente.pk} - {company_name}')
+
+
+def _build_customer_payload(cliente):
+    payload = {
+        'DisplayName': _build_customer_display_name(cliente),
+        'CompanyName': _truncate(cliente.nombre_empresa, limit=100) or _build_customer_display_name(cliente),
+        'PrintOnCheckName': _truncate(cliente.nombre_empresa, limit=100) or _build_customer_display_name(cliente),
+        'Active': bool(cliente.aprobado),
+        'Notes': _truncate(f'Sales tax: {cliente.sales_tax_number}', limit=4000),
+    }
+    if cliente.telefono:
+        payload['PrimaryPhone'] = {'FreeFormNumber': _truncate(cliente.telefono, limit=21)}
+    if getattr(cliente.usuario, 'email', ''):
+        payload['PrimaryEmailAddr'] = {'Address': _truncate(cliente.usuario.email, limit=100)}
+    address = {
+        'Line1': _truncate(cliente.direccion, limit=500),
+        'City': _truncate(cliente.ciudad, limit=255),
+        'CountrySubDivisionCode': _truncate(cliente.estado, limit=255),
+        'PostalCode': _truncate(cliente.codigo_postal, limit=30),
+        'Country': _truncate(cliente.pais, limit=255),
+    }
+    clean_address = {key: value for key, value in address.items() if value}
+    if clean_address:
+        payload['BillAddr'] = clean_address
+        payload['ShipAddr'] = clean_address.copy()
+    return payload
+
+
+def fetch_quickbooks_customers(*, max_results=None, client=None, updated_after=None, page_size=100):
+    client = client or QuickBooksAPIClient()
+    if updated_after:
+        return client.find_updated_since('Customer', updated_after, max_results=max_results, page_size=page_size)
+    return client.find_all('Customer', max_results=max_results, order_by='MetaData.LastUpdatedTime', page_size=page_size)
+
+
+def fetch_quickbooks_vendors(*, max_results=25, client=None, updated_after=None, page_size=100):
+    client = client or QuickBooksAPIClient()
+    if updated_after:
+        return client.find_updated_since('Vendor', updated_after, max_results=max_results, page_size=page_size)
+    return client.find_all('Vendor', max_results=max_results, order_by='MetaData.LastUpdatedTime', page_size=page_size)
+
+
+def _extract_quickbooks_vendor_name(payload):
+    return _truncate(
+        payload.get('DisplayName')
+        or payload.get('CompanyName')
+        or payload.get('PrintOnCheckName')
+        or f"QuickBooks Vendor {payload.get('Id', '')}",
+        limit=255,
+    )
+
+
+def _extract_quickbooks_vendor_email(payload):
+    return _truncate((payload.get('PrimaryEmailAddr') or {}).get('Address', ''), limit=254)
+
+
+def _extract_quickbooks_vendor_phone(payload):
+    return _truncate((payload.get('PrimaryPhone') or {}).get('FreeFormNumber', ''), limit=40)
+
+
+def _extract_quickbooks_vendor_balance(payload):
+    return _quantize_money(payload.get('Balance') or payload.get('OpenBalance') or 0)
+
+
+def _build_vendor_import_defaults(payload):
+    return {
+        'nombre': _extract_quickbooks_vendor_name(payload),
+        'email': _extract_quickbooks_vendor_email(payload),
+        'telefono': _extract_quickbooks_vendor_phone(payload),
+        'company_name': _truncate(payload.get('CompanyName') or '', limit=255),
+        'balance': _extract_quickbooks_vendor_balance(payload),
+        'notas': _truncate(payload.get('Notes') or payload.get('PrintOnCheckName') or '', limit=4000),
+        'activo': bool(payload.get('Active', True)),
+    }
+
+
+def _mark_vendor_imported(proveedor, *, quickbooks_id):
+    proveedor.quickbooks_id = str(quickbooks_id)
+    proveedor.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+    proveedor.last_synced_at = timezone.now()
+    proveedor.save(update_fields=['quickbooks_id', 'sync_status', 'last_synced_at'])
+
+
+def _vendor_conflict_exists(*, quickbooks_id, name, email):
+    queryset = Proveedor.objects.all()
+    if email:
+        conflict = queryset.filter(email__iexact=email).exclude(quickbooks_id=quickbooks_id).first()
+        if conflict is not None:
+            return conflict
+    if name:
+        conflict = queryset.filter(nombre__iexact=name).exclude(quickbooks_id=quickbooks_id).first()
+        if conflict is not None:
+            return conflict
+    return None
+
+
+@transaction.atomic
+def import_quickbooks_vendor_record(payload):
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    if not quickbooks_id:
+        raise QuickBooksSyncError('QuickBooks vendor payload is missing an Id.')
+
+    defaults = _build_vendor_import_defaults(payload)
+    existing = Proveedor.objects.filter(quickbooks_id=quickbooks_id).first()
+    if existing is None:
+        conflict = _vendor_conflict_exists(
+            quickbooks_id=quickbooks_id,
+            name=defaults['nombre'],
+            email=defaults['email'],
+        )
+        if conflict is not None:
+            _upsert_import_conflict(
+                entity_type=QuickBooksImportConflict.ENTITY_VENDOR,
+                quickbooks_id=quickbooks_id,
+                display_name=defaults['nombre'],
+                reason=f"Local supplier conflict: {conflict.nombre} already exists without QuickBooks linkage.",
+                payload=payload,
+                local_model='Proveedor',
+                local_record_id=conflict.id,
+            )
+            return {
+                'ok': False,
+                'action': 'conflict',
+                'entity': 'Vendor',
+                'quickbooks_id': quickbooks_id,
+                'label': defaults['nombre'],
+                'error': f"Local supplier conflict: {conflict.nombre} already exists without QuickBooks linkage.",
+            }
+        proveedor = Proveedor.objects.create(**defaults)
+        action = 'created'
+    else:
+        for field, value in defaults.items():
+            setattr(existing, field, value)
+        existing.save(update_fields=[*defaults.keys(), 'actualizado_en'])
+        proveedor = existing
+        action = 'updated'
+
+    _mark_vendor_imported(proveedor, quickbooks_id=quickbooks_id)
+    _resolve_import_conflict(
+        entity_type=QuickBooksImportConflict.ENTITY_VENDOR,
+        quickbooks_id=quickbooks_id,
+        local_model='Proveedor',
+        local_record_id=proveedor.id,
+    )
+    return {
+        'ok': True,
+        'action': action,
+        'entity': 'Vendor',
+        'quickbooks_id': quickbooks_id,
+        'local_id': proveedor.id,
+        'label': proveedor.nombre,
+    }
+
+
+def _customer_payload_needs_update(remote_payload, expected_payload):
+    return _payload_needs_update(
+        remote_payload,
+        expected_payload,
+        (
+            'DisplayName',
+            'CompanyName',
+            'PrintOnCheckName',
+            'Active',
+            'Notes',
+            'PrimaryPhone.FreeFormNumber',
+            'PrimaryEmailAddr.Address',
+            'BillAddr.Line1',
+            'BillAddr.City',
+            'BillAddr.CountrySubDivisionCode',
+            'BillAddr.PostalCode',
+            'BillAddr.Country',
+            'ShipAddr.Line1',
+            'ShipAddr.City',
+            'ShipAddr.CountrySubDivisionCode',
+            'ShipAddr.PostalCode',
+            'ShipAddr.Country',
+        ),
+    )
+
+
+def sync_customer(*, cliente, client=None):
+    client = client or QuickBooksAPIClient()
+    try:
+        if cliente.quickbooks_id:
+            existing = client.find_by_id('Customer', cliente.quickbooks_id)
+            if existing:
+                desired_payload = _build_customer_payload(cliente)
+                if _customer_payload_needs_update(existing, desired_payload):
+                    updated = client.update_customer(_build_sparse_update_payload(existing, desired_payload))
+                    _mark_synced(cliente, updated.get('Id'))
+                    return _sync_result(entity='Customer', action='updated', payload=updated)
+                _mark_synced(cliente, existing.get('Id'))
+                return _sync_result(entity='Customer', action='existing', payload=existing)
+
+        display_name = _build_customer_display_name(cliente)
+        existing = client.find_one_by_display_name('Customer', display_name)
+        if existing:
+            _mark_synced(cliente, existing.get('Id'))
+            return _sync_result(entity='Customer', action='linked', payload=existing)
+
+        created = client.create_customer(_build_customer_payload(cliente))
+        _mark_synced(cliente, created.get('Id'))
+        return _sync_result(entity='Customer', action='created', payload=created)
+    except QuickBooksAPIError as exc:
+        _mark_failed(cliente)
+        raise QuickBooksSyncError(str(exc)) from exc
+
+
+def _build_item_name(presentacion):
+    product_name = _normalize_text(presentacion.producto.nombre, fallback=f'Producto {presentacion.producto_id}')
+    presentation_name = _normalize_text(presentacion.nombre, fallback=f'Presentacion {presentacion.pk}')
+    return _truncate(f'LTG Item {presentacion.pk} - {product_name} - {presentation_name}')
+
+
+def _build_item_description(presentacion):
+    parts = [
+        _normalize_text(presentacion.producto.descripcion),
+        _normalize_text(presentacion.nombre),
+        _normalize_text(presentacion.tipo_contenido),
+    ]
+    description = ' | '.join(part for part in parts if part)
+    return _truncate(description, limit=4000)
+
+
+def _get_default_income_account_ref(client):
+    accounts = client.query("select * from Account where AccountType = 'Income' maxresults 1").get('Account', [])
+    if not accounts:
+        raise QuickBooksSyncError('QuickBooks does not have an income account available for item sync.')
+    account = accounts[0]
+    return {'value': str(account.get('Id')), 'name': account.get('Name', '')}
+
+
+def fetch_quickbooks_items(*, max_results=25, client=None, updated_after=None, page_size=100):
+    client = client or QuickBooksAPIClient()
+    if updated_after:
+        return client.find_updated_since('Item', updated_after, max_results=max_results, page_size=page_size)
+    return client.find_all('Item', max_results=max_results, order_by='MetaData.LastUpdatedTime', page_size=page_size)
+
+
+def _build_item_payload(presentacion, *, client, income_account_ref=None):
+    return {
+        'Name': _build_item_name(presentacion),
+        'Type': 'NonInventory',
+        'Active': bool(presentacion.producto.activo),
+        'Description': _build_item_description(presentacion),
+        'UnitPrice': _as_float(presentacion.precio_1),
+        'IncomeAccountRef': income_account_ref or _get_default_income_account_ref(client),
+        'Sku': _truncate(presentacion.producto.codigo_barras, limit=100),
+    }
+
+
+def _item_payload_needs_update(remote_payload, expected_payload):
+    return _payload_needs_update(
+        remote_payload,
+        expected_payload,
+        (
+            'Name',
+            'Type',
+            'Active',
+            'Description',
+            'UnitPrice',
+            'IncomeAccountRef.value',
+            'Sku',
+        ),
+    )
+
+
+def _normalize_username_seed(value, fallback='qb-imported-user'):
+    normalized = re.sub(r'[^a-z0-9]+', '-', str(value or '').strip().lower()).strip('-')
+    return normalized or fallback
+
+
+def _build_unique_username(seed):
+    base_value = _normalize_username_seed(seed)
+    candidate = base_value[:150]
+    suffix = 1
+    while Usuario.objects.filter(username=candidate).exists():
+        suffix += 1
+        candidate = f'{base_value[:140]}-{suffix}'
+    return candidate
+
+
+def _pick_quickbooks_customer_address(payload):
+    return payload.get('BillAddr') or payload.get('ShipAddr') or {}
+
+
+def _extract_quickbooks_customer_display_name(payload):
+    return _truncate(
+        payload.get('DisplayName')
+        or payload.get('FullyQualifiedName')
+        or payload.get('CompanyName')
+        or payload.get('PrintOnCheckName')
+        or f"QuickBooks Customer {payload.get('Id', '')}",
+        limit=150,
+    )
+
+
+def _extract_quickbooks_customer_company_name(payload):
+    return _truncate(
+        payload.get('CompanyName')
+        or payload.get('DisplayName')
+        or payload.get('PrintOnCheckName')
+        or f"QuickBooks Customer {payload.get('Id', '')}",
+        limit=255,
+    )
+
+
+def _extract_quickbooks_customer_name(payload):
+    return _extract_quickbooks_customer_company_name(payload)
+
+
+def _extract_quickbooks_customer_email(payload):
+    return _truncate((payload.get('PrimaryEmailAddr') or {}).get('Address', ''), limit=254)
+
+
+def _extract_quickbooks_customer_phone(payload):
+    return _truncate((payload.get('PrimaryPhone') or {}).get('FreeFormNumber', ''), limit=20)
+
+
+def _extract_quickbooks_customer_balance(payload):
+    return _quantize_money(payload.get('Balance') or payload.get('OpenBalance') or 0)
+
+
+def _build_customer_import_defaults(payload):
+    address = _pick_quickbooks_customer_address(payload)
+    return {
+        'nombre_empresa': _extract_quickbooks_customer_company_name(payload),
+        'telefono': _extract_quickbooks_customer_phone(payload) or '0000000000',
+        'direccion': _truncate(address.get('Line1') or 'Imported from QuickBooks', limit=255),
+        'ciudad': _truncate(address.get('City') or 'Unknown', limit=100),
+        'estado': _truncate(address.get('CountrySubDivisionCode') or 'N/A', limit=100),
+        'codigo_postal': _truncate(address.get('PostalCode') or '', limit=20),
+        'pais': _truncate(address.get('Country') or 'USA', limit=100),
+        'sales_tax_number': _truncate(payload.get('TaxExemptionReasonId') or f"QB-{payload.get('Id', '')}", limit=100),
+        'certificado_tax': 'certificados/imported-from-quickbooks.txt',
+        'aprobado': True,
+        'estado_revision': Cliente.REVIEW_STATUS_APPROVED,
+        'balance': _extract_quickbooks_customer_balance(payload),
+    }
+
+
+def _apply_quickbooks_customer_to_local_record(cliente, payload):
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    if not quickbooks_id:
+        raise QuickBooksSyncError('QuickBooks customer payload is missing an Id.')
+    defaults = _build_customer_import_defaults(payload)
+    email = _extract_quickbooks_customer_email(payload)
+    display_name = _extract_quickbooks_customer_display_name(payload)
+    for field, value in defaults.items():
+        setattr(cliente, field, value)
+    cliente.save(update_fields=list(defaults.keys()))
+    user_update_fields = []
+    if email and cliente.usuario.email != email:
+        cliente.usuario.email = email
+        user_update_fields.append('email')
+    if display_name and cliente.usuario.first_name != display_name:
+        cliente.usuario.first_name = display_name
+        user_update_fields.append('first_name')
+    if cliente.usuario.last_name:
+        cliente.usuario.last_name = ''
+        user_update_fields.append('last_name')
+    if user_update_fields:
+        cliente.usuario.save(update_fields=user_update_fields)
+    _mark_customer_imported(cliente, quickbooks_id=quickbooks_id)
+    return cliente
+
+
+def _mark_customer_imported(cliente, *, quickbooks_id):
+    cliente.quickbooks_id = str(quickbooks_id)
+    cliente.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+    cliente.last_synced_at = timezone.now()
+    cliente.save(update_fields=['quickbooks_id', 'sync_status', 'last_synced_at'])
+    if cliente.usuario.quickbooks_id != str(quickbooks_id):
+        cliente.usuario.quickbooks_id = str(quickbooks_id)
+        cliente.usuario.save(update_fields=['quickbooks_id'])
+
+
+@transaction.atomic
+def import_quickbooks_customer_record(payload):
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    if not quickbooks_id:
+        raise QuickBooksSyncError('QuickBooks customer payload is missing an Id.')
+
+    company_name = _extract_quickbooks_customer_company_name(payload)
+    display_name = _extract_quickbooks_customer_display_name(payload)
+    email = _extract_quickbooks_customer_email(payload)
+    defaults = _build_customer_import_defaults(payload)
+    existing = Cliente.objects.select_related('usuario').filter(quickbooks_id=quickbooks_id).first()
+    if existing is None:
+        user = Usuario.objects.create_user(
+            username=_build_unique_username(f'qb-customer-{quickbooks_id}-{company_name}'),
+            email=email,
+            first_name=display_name,
+            role='cliente',
+            is_active=True,
+            quickbooks_id=quickbooks_id,
+        )
+        user.set_unusable_password()
+        user.save(update_fields=['password'])
+        cliente = Cliente.objects.create(usuario=user, **defaults)
+        action = 'created'
+    else:
+        cliente = _apply_quickbooks_customer_to_local_record(existing, payload)
+        action = 'updated'
+
+    if action == 'created':
+        _mark_customer_imported(cliente, quickbooks_id=quickbooks_id)
+    _resolve_import_conflict(
+        entity_type=QuickBooksImportConflict.ENTITY_CUSTOMER,
+        quickbooks_id=quickbooks_id,
+        local_model='Cliente',
+        local_record_id=cliente.id,
+    )
+    return {
+        'ok': True,
+        'action': action,
+        'entity': 'Customer',
+        'quickbooks_id': quickbooks_id,
+        'local_id': cliente.id,
+        'label': cliente.nombre_empresa,
+    }
+
+
+def _ensure_import_category_and_brand():
+    category, _ = Categoria.objects.get_or_create(nombre='QuickBooks Imported')
+    brand, _ = Marca.objects.get_or_create(nombre='QuickBooks Imported')
+    return category, brand
+
+
+def _first_populated(*values):
+    for value in values:
+        normalized = _normalize_text(value)
+        if normalized:
+            return normalized
+    return ''
+
+
+def _split_quickbooks_item_hierarchy(payload):
+    full_name = _normalize_text(payload.get('FullyQualifiedName'))
+    if not full_name:
+        return []
+    return [part.strip() for part in full_name.split(':') if part.strip()]
+
+
+def _resolve_quickbooks_item_category_and_brand(payload):
+    fallback_category, fallback_brand = _ensure_import_category_and_brand()
+    hierarchy = _split_quickbooks_item_hierarchy(payload)
+    parent_name = _normalize_text((payload.get('ParentRef') or {}).get('name'))
+    class_name = _normalize_text((payload.get('ClassRef') or {}).get('name'))
+    item_category_type = _normalize_text(payload.get('ItemCategoryType'))
+    explicit_brand = _first_populated(
+        payload.get('Brand'),
+        payload.get('brand'),
+        payload.get('Manufacturer'),
+        payload.get('manufacturer'),
+    )
+
+    category_name = _first_populated(
+        class_name,
+        parent_name,
+        hierarchy[0] if len(hierarchy) >= 2 else '',
+        item_category_type if item_category_type and item_category_type.upper() != 'PRODUCT' else '',
+    )
+    brand_name = explicit_brand
+    if not brand_name:
+        if len(hierarchy) >= 3:
+            brand_name = hierarchy[1]
+        elif len(hierarchy) >= 2:
+            brand_name = hierarchy[0]
+        else:
+            name_parts = [part.strip() for part in _normalize_text(payload.get('Name')).split(' - ') if part.strip()]
+            if len(name_parts) >= 2:
+                brand_name = name_parts[0]
+
+    category = fallback_category
+    if category_name:
+        category, _ = Categoria.objects.get_or_create(nombre=category_name)
+
+    brand = fallback_brand
+    if brand_name:
+        brand, _ = Marca.objects.get_or_create(nombre=brand_name)
+        brand.categorias.add(category)
+
+    return category, brand
+
+
+def _parse_quickbooks_item_name(payload):
+    item_name = _truncate(payload.get('Name') or f"QuickBooks Item {payload.get('Id', '')}", limit=255)
+    parts = [part.strip() for part in item_name.split(' - ') if part.strip()]
+    if len(parts) >= 3 and parts[0].startswith('LTG Item '):
+        return parts[1], parts[2]
+    return item_name, 'Unit'
+
+
+def _extract_quickbooks_item_cost(payload):
+    raw_cost = payload.get('PurchaseCost')
+    if raw_cost in (None, ''):
+        return None
+    return _quantize_money(raw_cost)
+
+
+def _is_image_attachable(payload):
+    content_type = _normalize_text(payload.get('ContentType')).lower()
+    category = _normalize_text(payload.get('Category')).lower()
+    file_name = _normalize_text(payload.get('FileName')).lower()
+    if content_type.startswith('image/'):
+        return True
+    if category == 'image':
+        return True
+    return file_name.endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif'))
+
+
+def _fetch_quickbooks_item_image(client, payload):
+    item_id = str(payload.get('Id') or '').strip()
+    if not item_id:
+        return None
+
+    for attachment in client.find_attachments_for_entity('Item', item_id, max_results=10):
+        if not _is_image_attachable(attachment):
+            continue
+        download_url = attachment.get('TempDownloadUri') or attachment.get('ThumbnailTempDownloadUri')
+        if not download_url:
+            continue
+        file_bytes, content_type = client.download_public_file(download_url)
+        original_name = attachment.get('FileName') or f'quickbooks-item-{item_id}.bin'
+        extension = Path(original_name).suffix
+        if not extension:
+            content_type = _normalize_text(content_type).lower()
+            if content_type == 'image/png':
+                extension = '.png'
+            elif content_type == 'image/webp':
+                extension = '.webp'
+            elif content_type == 'image/gif':
+                extension = '.gif'
+            else:
+                extension = '.jpg'
+        return ContentFile(file_bytes, name=f'quickbooks-item-{item_id}{extension}')
+    return None
+
+
+def _extract_quickbooks_item_qty_on_hand(payload):
+    # QuickBooks uses 'QtyOnHand' (or similar) for inventory items; accept multiple keys defensively.
+    for key in ('QtyOnHand', 'QuantityOnHand', 'QtyOnHandValue', 'QuantityOnHandValue'):
+        if key in payload:
+            try:
+                return int(float(payload.get(key) or 0))
+            except Exception:
+                try:
+                    return int(payload.get(key) or 0)
+                except Exception:
+                    return None
+    return None
+
+
+def _update_presentacion_from_quickbooks(presentacion, *, quickbooks_id, unit_price, item_cost):
+    Presentacion.objects.filter(pk=presentacion.pk).update(
+        nombre=presentacion.nombre,
+        unidades=presentacion.unidades,
+        tipo_contenido=presentacion.tipo_contenido,
+        quickbooks_id=quickbooks_id,
+        sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
+        last_synced_at=presentacion.last_synced_at,
+        costo=item_cost,
+        precio_1=unit_price,
+        precio_2=unit_price,
+        precio_3=unit_price,
+        precio_4=unit_price,
+        precio_5=unit_price,
+    )
+    presentacion.quickbooks_id = quickbooks_id
+    presentacion.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+    presentacion.costo = item_cost
+    presentacion.precio_1 = unit_price
+    presentacion.precio_2 = unit_price
+    presentacion.precio_3 = unit_price
+    presentacion.precio_4 = unit_price
+    presentacion.precio_5 = unit_price
+
+
+def _product_conflict_exists(*, quickbooks_id, product_name, presentation_name):
+    return Presentacion.objects.select_related('producto').filter(
+        producto__nombre__iexact=product_name,
+        nombre__iexact=presentation_name,
+    ).exclude(quickbooks_id=quickbooks_id).first()
+
+
+def _apply_quickbooks_item_to_local_record(presentacion, payload):
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    if not quickbooks_id:
+        raise QuickBooksSyncError('QuickBooks item payload is missing an Id.')
+    product_name, presentation_name = _parse_quickbooks_item_name(payload)
+    description = _truncate(payload.get('Description') or payload.get('FullyQualifiedName') or '', limit=4000)
+    sku = _truncate(payload.get('Sku') or '', limit=100)
+    unit_price = _quantize_money(payload.get('UnitPrice') or 0)
+    item_cost = _extract_quickbooks_item_cost(payload)
+    category, brand = _resolve_quickbooks_item_category_and_brand(payload)
+    producto = presentacion.producto
+    image_file = _fetch_quickbooks_item_image(QuickBooksAPIClient(), payload)
+    producto.nombre = product_name
+    producto.descripcion = description
+    producto.categoria = category
+    producto.marca = brand
+    producto.activo = bool(payload.get('Active', True))
+    if sku and (producto.codigo_barras in (None, '', sku) or not Producto.objects.exclude(pk=producto.pk).filter(codigo_barras=sku).exists()):
+        producto.codigo_barras = sku
+    if image_file is not None:
+        producto.imagen.save(image_file.name, image_file, save=False)
+    producto.quickbooks_id = quickbooks_id
+    producto.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+    producto.last_synced_at = timezone.now()
+    product_update_fields = ['nombre', 'descripcion', 'categoria', 'marca', 'activo', 'codigo_barras', 'quickbooks_id', 'sync_status', 'last_synced_at']
+    if image_file is not None:
+        product_update_fields.append('imagen')
+    try:
+        producto.save(update_fields=product_update_fields)
+    except IntegrityError as exc:
+        err_text = str(exc)
+        if 'codigo_barras' in err_text or 'productos_producto.codigo_barras' in err_text:
+            # Find the conflicting local product (if any) and record a conflict,
+            # then retry saving without the codigo_barras to avoid hard failure.
+            conflicting = None
+            try:
+                if sku:
+                    conflicting = Producto.objects.exclude(pk=producto.pk).filter(codigo_barras=sku).first()
+            except Exception:
+                conflicting = None
+
+            try:
+                # After an IntegrityError the transaction may be marked as broken.
+                # Clear the rollback flag so we can record the conflict and continue.
+                transaction.set_rollback(False)
+            except Exception:
+                pass
+            try:
+                QuickBooksImportConflict.objects.create(
+                    entity_type=QuickBooksImportConflict.ENTITY_ITEM,
+                    quickbooks_id=f"{quickbooks_id}-barcode-omitted",
+                    display_name=payload.get('Name') or quickbooks_id,
+                    reason=(f"Duplicate codigo_barras detected when updating product; "
+                            f"import updated without codigo_barras for review."),
+                    payload=payload,
+                    local_model='Producto',
+                    local_record_id=(conflicting.id if conflicting is not None else producto.id),
+                )
+            except Exception:
+                # If recording the conflict still fails, continue without blocking.
+                pass
+
+            # remove codigo_barras from fields and clear it on the model
+            producto.codigo_barras = None
+            if 'codigo_barras' in product_update_fields:
+                product_update_fields = [f for f in product_update_fields if f != 'codigo_barras']
+            producto.save(update_fields=product_update_fields)
+        else:
+            raise
+    presentacion.nombre = presentation_name
+    presentacion.unidades = max(int(presentacion.unidades or 1), 1)
+    presentacion.tipo_contenido = presentacion.tipo_contenido or 'unidades'
+    presentacion.last_synced_at = timezone.now()
+    _update_presentacion_from_quickbooks(
+        presentacion,
+        quickbooks_id=quickbooks_id,
+        unit_price=unit_price,
+        item_cost=item_cost,
+    )
+    # Update physical stock from QuickBooks if available
+    qty_on_hand = _extract_quickbooks_item_qty_on_hand(payload)
+    if qty_on_hand is not None:
+        try:
+            stock, _ = StockPresentacion.objects.get_or_create(presentacion=presentacion, defaults={'stock_fisico': max(int(qty_on_hand or 0), 0)})
+            if stock.stock_fisico != max(int(qty_on_hand or 0), 0):
+                stock.stock_fisico = max(int(qty_on_hand or 0), 0)
+                stock.save(update_fields=['stock_fisico', 'actualizado_en'])
+        except Exception:
+            # Don't fail the import if inventory update fails; recordable separately.
+            pass
+    return presentacion
+
+
+@transaction.atomic
+def import_quickbooks_item_record(payload):
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    if not quickbooks_id:
+        raise QuickBooksSyncError('QuickBooks item payload is missing an Id.')
+
+    product_name, presentation_name = _parse_quickbooks_item_name(payload)
+    description = _truncate(payload.get('Description') or payload.get('FullyQualifiedName') or '', limit=4000)
+    sku = _truncate(payload.get('Sku') or '', limit=100)
+    unit_price = _quantize_money(payload.get('UnitPrice') or 0)
+    item_cost = _extract_quickbooks_item_cost(payload)
+    category, brand = _resolve_quickbooks_item_category_and_brand(payload)
+    existing = Presentacion.objects.select_related('producto').filter(quickbooks_id=quickbooks_id).first()
+    if existing is None:
+        conflict = _product_conflict_exists(
+            quickbooks_id=quickbooks_id,
+            product_name=product_name,
+            presentation_name=presentation_name,
+        )
+        if conflict is not None:
+            _upsert_import_conflict(
+                entity_type=QuickBooksImportConflict.ENTITY_ITEM,
+                quickbooks_id=quickbooks_id,
+                display_name=payload.get('Name') or quickbooks_id,
+                reason=f'Local catalog conflict: {conflict.producto.nombre} / {conflict.nombre} already exists without QuickBooks linkage.',
+                payload=payload,
+                local_model='Presentacion',
+                local_record_id=conflict.id,
+            )
+            return {
+                'ok': False,
+                'action': 'conflict',
+                'entity': 'Item',
+                'quickbooks_id': quickbooks_id,
+                'label': payload.get('Name') or quickbooks_id,
+                'error': f'Local catalog conflict: {conflict.producto.nombre} / {conflict.nombre} already exists without QuickBooks linkage.',
+            }
+
+        # Wrap creation flow to handle integrity errors (duplicate codigo_barras)
+        try:
+            if sku and Producto.objects.filter(codigo_barras=sku).exists():
+                existing_prod = Producto.objects.filter(codigo_barras=sku).first()
+                original_sku = sku
+                sku = ''
+                QuickBooksImportConflict.objects.create(
+                    entity_type=QuickBooksImportConflict.ENTITY_ITEM,
+                    quickbooks_id=f"{quickbooks_id}-barcode-omitted",
+                    display_name=payload.get('Name') or quickbooks_id,
+                    reason=f'Local producto with codigo_barras {original_sku} exists (id={existing_prod.id}); importing without codigo_barras for review.',
+                    payload=payload,
+                    local_model='Producto',
+                    local_record_id=existing_prod.id,
+                )
+            producto = Producto.objects.create(
+                nombre=product_name,
+                descripcion=description,
+                categoria=category,
+                marca=brand,
+                codigo_barras=sku or None,
+                activo=bool(payload.get('Active', True)),
+                quickbooks_id=quickbooks_id,
+                sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
+                last_synced_at=timezone.now(),
+            )
+            image_file = _fetch_quickbooks_item_image(QuickBooksAPIClient(), payload)
+            if image_file is not None:
+                producto.imagen.save(image_file.name, image_file, save=False)
+                producto.save(update_fields=['imagen'])
+            presentacion = Presentacion.objects.create(
+                producto=producto,
+                nombre=presentation_name,
+                unidades=1,
+                tipo_contenido='unidades',
+                quickbooks_id=quickbooks_id,
+                sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
+                last_synced_at=timezone.now(),
+                precio_1=unit_price,
+                precio_2=unit_price,
+                precio_3=unit_price,
+                precio_4=unit_price,
+                precio_5=unit_price,
+            )
+            _update_presentacion_from_quickbooks(
+                presentacion,
+                quickbooks_id=quickbooks_id,
+                unit_price=unit_price,
+                item_cost=item_cost,
+            )
+            action = 'created'
+        except IntegrityError as exc:
+            err_text = str(exc)
+            if 'codigo_barras' in err_text or 'productos_producto.codigo_barras' in err_text:
+                # Retry creation without codigo_barras
+                if sku:
+                    sku = ''
+                producto = Producto.objects.create(
+                    nombre=product_name,
+                    descripcion=description,
+                    categoria=category,
+                    marca=brand,
+                    codigo_barras=None,
+                    activo=bool(payload.get('Active', True)),
+                    quickbooks_id=quickbooks_id,
+                    sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
+                    last_synced_at=timezone.now(),
+                )
+                # Record that we imported this QuickBooks item but omitted its codigo_barras
+                QuickBooksImportConflict.objects.create(
+                    entity_type=QuickBooksImportConflict.ENTITY_ITEM,
+                    quickbooks_id=f"{quickbooks_id}-barcode-omitted",
+                    display_name=payload.get('Name') or quickbooks_id,
+                    reason=f'Duplicate codigo_barras detected; imported item without codigo_barras for review.',
+                    payload=payload,
+                    local_model='Producto',
+                    local_record_id=producto.id,
+                )
+                image_file = _fetch_quickbooks_item_image(QuickBooksAPIClient(), payload)
+                if image_file is not None:
+                    producto.imagen.save(image_file.name, image_file, save=False)
+                    producto.save(update_fields=['imagen'])
+                presentacion = Presentacion.objects.create(
+                    producto=producto,
+                    nombre=presentation_name,
+                    unidades=1,
+                    tipo_contenido='unidades',
+                    quickbooks_id=quickbooks_id,
+                    sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
+                    last_synced_at=timezone.now(),
+                    precio_1=unit_price,
+                    precio_2=unit_price,
+                    precio_3=unit_price,
+                    precio_4=unit_price,
+                    precio_5=unit_price,
+                )
+                _update_presentacion_from_quickbooks(
+                    presentacion,
+                    quickbooks_id=quickbooks_id,
+                    unit_price=unit_price,
+                    item_cost=item_cost,
+                )
+                # Update physical stock from QuickBooks if available for newly created presentacion
+                qty_on_hand = _extract_quickbooks_item_qty_on_hand(payload)
+                if qty_on_hand is not None:
+                    try:
+                        stock, _ = StockPresentacion.objects.get_or_create(presentacion=presentacion, defaults={'stock_fisico': max(int(qty_on_hand or 0), 0)})
+                        if stock.stock_fisico != max(int(qty_on_hand or 0), 0):
+                            stock.stock_fisico = max(int(qty_on_hand or 0), 0)
+                            stock.save(update_fields=['stock_fisico', 'actualizado_en'])
+                    except Exception:
+                        pass
+                action = 'created'
+            else:
+                raise
+    else:
+        presentacion = _apply_quickbooks_item_to_local_record(existing, payload)
+        producto = presentacion.producto
+        action = 'updated'
+
+    _resolve_import_conflict(
+        entity_type=QuickBooksImportConflict.ENTITY_ITEM,
+        quickbooks_id=quickbooks_id,
+        local_model='Presentacion',
+        local_record_id=presentacion.id,
+    )
+    return {
+        'ok': True,
+        'action': action,
+        'entity': 'Item',
+        'quickbooks_id': quickbooks_id,
+        'local_id': presentacion.id,
+        'label': f'{producto.nombre} / {presentacion.nombre}',
+    }
+
+
+def _import_batch_result(*, entity_name, records, import_callable, task_cache_key=None):
+    results = []
+    total = len(records or [])
+    processed = 0
+    # initialize progress if we have a task key
+    if task_cache_key:
+        cache.set(task_cache_key, {'status': 'running', 'progress': 0, 'operation': entity_name}, timeout=60 * 60)
+    for record in records:
+        try:
+            result = import_callable(record)
+        except Exception as exc:
+            # If the failure looks like a duplicate barcode IntegrityError,
+            # try once more with the item's Sku cleared to avoid unique constraint.
+            err_text = str(exc)
+            if 'codigo_barras' in err_text or 'productos_producto.codigo_barras' in err_text:
+                try:
+                    retry_record = dict(record)
+                    retry_record['Sku'] = ''
+                    result = import_callable(retry_record)
+                    results.append(result)
+                    continue
+                except Exception:
+                    # fall through to append failed result below
+                    pass
+            results.append({
+                'ok': False,
+                'action': 'failed',
+                'entity': entity_name,
+                'quickbooks_id': str(record.get('Id') or ''),
+                'label': record.get('DisplayName') or record.get('Name') or record.get('Id') or entity_name,
+                'error': str(exc),
+            })
+        else:
+            results.append(result)
+
+        # update progress in cache after each record
+        processed += 1
+        if task_cache_key and total > 0:
+            # keep some headroom for finalization; map processed/total to 5..95
+            pct = int((processed / total) * 90) + 5
+            pct = min(max(pct, 0), 95)
+            cache.set(task_cache_key, {'status': 'running', 'progress': pct, 'operation': entity_name, 'result': {'processed': processed, 'total': total}}, timeout=60 * 60)
+
+    return {
+        'entity': entity_name,
+        'count': len(records),
+        'created_count': sum(1 for item in results if item.get('ok') and item.get('action') == 'created'),
+        'updated_count': sum(1 for item in results if item.get('ok') and item.get('action') == 'updated'),
+        'conflict_count': sum(1 for item in results if item.get('action') == 'conflict'),
+        'failed_count': sum(1 for item in results if not item.get('ok') and item.get('action') != 'conflict'),
+        'latest_updated_at': _serialize_cursor(_latest_payload_update(records)),
+        'results': results,
+    }
+
+
+def _upsert_import_conflict(*, entity_type, quickbooks_id, doc_number='', display_name='', reason='', payload=None, local_model='', local_record_id=None):
+    conflict, _ = QuickBooksImportConflict.objects.get_or_create(
+        entity_type=entity_type,
+        quickbooks_id=str(quickbooks_id),
+        defaults={
+            'doc_number': doc_number,
+            'display_name': display_name,
+            'reason': reason,
+            'payload': payload or {},
+            'local_model': local_model,
+            'local_record_id': local_record_id,
+        },
+    )
+    conflict.doc_number = doc_number
+    conflict.display_name = display_name
+    conflict.status = QuickBooksImportConflict.STATUS_CONFLICT
+    conflict.reason = reason
+    conflict.payload = payload or {}
+    conflict.local_model = local_model
+    conflict.local_record_id = local_record_id
+    conflict.resolution_note = ''
+    conflict.resolved_by = None
+    conflict.resolved_at = None
+    conflict.save(update_fields=['doc_number', 'display_name', 'status', 'reason', 'payload', 'local_model', 'local_record_id', 'resolution_note', 'resolved_by', 'resolved_at'])
+    return conflict
+
+
+def _resolve_import_conflict(*, entity_type, quickbooks_id, local_model, local_record_id, user=None, resolution_note=''):
+    conflict = QuickBooksImportConflict.objects.filter(entity_type=entity_type, quickbooks_id=str(quickbooks_id)).first()
+    if conflict is None:
+        return None
+    conflict.status = QuickBooksImportConflict.STATUS_MATCHED
+    conflict.reason = ''
+    conflict.local_model = local_model
+    conflict.local_record_id = local_record_id
+    conflict.resolution_note = resolution_note
+    conflict.resolved_by = user
+    conflict.resolved_at = timezone.now()
+    conflict.save(update_fields=['status', 'reason', 'local_model', 'local_record_id', 'resolution_note', 'resolved_by', 'resolved_at'])
+    return conflict
+
+
+def dismiss_quickbooks_import_conflict(conflict, *, user=None, resolution_note=''):
+    conflict.status = QuickBooksImportConflict.STATUS_DISMISSED
+    conflict.resolution_note = resolution_note
+    conflict.resolved_by = user
+    conflict.resolved_at = timezone.now()
+    conflict.save(update_fields=['status', 'resolution_note', 'resolved_by', 'resolved_at'])
+    return conflict
+
+
+def import_quickbooks_customers(*, max_results=None, client=None, updated_after=None, task_cache_key=None):
+    records = fetch_quickbooks_customers(max_results=max_results, client=client, updated_after=updated_after)
+    return _import_batch_result(entity_name='Customer', records=records, import_callable=import_quickbooks_customer_record, task_cache_key=task_cache_key)
+
+
+def import_quickbooks_vendors(*, max_results=25, client=None, updated_after=None, task_cache_key=None):
+    records = fetch_quickbooks_vendors(max_results=max_results, client=client, updated_after=updated_after)
+    return _import_batch_result(entity_name='Vendor', records=records, import_callable=import_quickbooks_vendor_record, task_cache_key=task_cache_key)
+
+
+def import_quickbooks_items(*, max_results=25, client=None, updated_after=None, task_cache_key=None):
+    records = fetch_quickbooks_items(max_results=max_results, client=client, updated_after=updated_after)
+    # Keep the full set of QuickBooks ids we received so we can detect
+    # Items that were removed/disabled in QuickBooks and mark them
+    # as inactive locally after the import run.
+    if records:
+        all_ids = {str(r.get('Id') or '') for r in records}
+        filtered = [r for r in records if (r.get('Type') or '').lower() != 'category']
+    else:
+        all_ids = set()
+        filtered = []
+
+    result = _import_batch_result(entity_name='Item', records=filtered, import_callable=import_quickbooks_item_record, task_cache_key=task_cache_key)
+
+    # If QuickBooks no longer returns some linked items, mark their local
+    # `Producto` as inactive to reflect deletion/disable in QuickBooks.
+    try:
+        if all_ids:
+            missing_qb_pres = Presentacion.objects.select_related('producto').filter(quickbooks_id__isnull=False).exclude(quickbooks_id__in=all_ids)
+            disabled = []
+            for pres in missing_qb_pres:
+                prod = pres.producto
+                if prod and prod.activo:
+                    prod.activo = False
+                    prod.save(update_fields=['activo'])
+                    disabled.append({'quickbooks_id': pres.quickbooks_id, 'local_id': prod.id, 'label': prod.nombre})
+            if disabled:
+                result['disabled_count'] = len(disabled)
+                result['disabled'] = disabled
+    except Exception:
+        # Don't let this block the main import result if something goes wrong
+        pass
+
+    return result
+
+
+def fetch_quickbooks_credit_memos(*, max_results=25, client=None, updated_after=None, page_size=100):
+    client = client or QuickBooksAPIClient()
+    if updated_after:
+        return client.find_updated_since('CreditMemo', updated_after, max_results=max_results, page_size=page_size)
+    return client.find_all('CreditMemo', max_results=max_results, order_by='MetaData.LastUpdatedTime', page_size=page_size)
+
+
+def fetch_quickbooks_bills(*, max_results=25, client=None, updated_after=None, page_size=100):
+    client = client or QuickBooksAPIClient()
+    if updated_after:
+        return client.find_updated_since('Bill', updated_after, max_results=max_results, page_size=page_size)
+    return client.find_all('Bill', max_results=max_results, order_by='MetaData.LastUpdatedTime', page_size=page_size)
+
+
+def fetch_quickbooks_purchase_orders(*, max_results=25, client=None, updated_after=None, page_size=100):
+    client = client or QuickBooksAPIClient()
+    if updated_after:
+        return client.find_updated_since('PurchaseOrder', updated_after, max_results=max_results, page_size=page_size)
+    return client.find_all('PurchaseOrder', max_results=max_results, order_by='MetaData.LastUpdatedTime', page_size=page_size)
+
+
+def _extract_bill_vendor_name(payload):
+    return _truncate((payload.get('VendorRef') or {}).get('name') or f"QuickBooks Vendor {payload.get('Id', '')}", limit=255)
+
+
+def _extract_purchase_order_vendor_name(payload):
+	return _truncate((payload.get('VendorRef') or {}).get('name') or f"QuickBooks Vendor {payload.get('Id', '')}", limit=255)
+
+
+def _match_local_bill_from_quickbooks(payload):
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    doc_number = _normalize_text(payload.get('DocNumber'))
+    queryset = CompraProveedor.objects.all()
+    if quickbooks_id:
+        compra = queryset.filter(quickbooks_id=quickbooks_id).first()
+        if compra is not None:
+            return compra
+    if doc_number:
+        compra = queryset.filter(bill_number=doc_number).first()
+        if compra is not None:
+            return compra
+    return None
+
+
+def _extract_bill_line_specs(payload):
+    line_specs = []
+    missing_item_refs = []
+    missing_amounts = []
+
+    for line in payload.get('Line') or []:
+        if (line.get('DetailType') or '') != 'ItemBasedExpenseLineDetail':
+            continue
+        detail = line.get('ItemBasedExpenseLineDetail') or {}
+        item_ref = detail.get('ItemRef') or {}
+        quickbooks_item_id = str(item_ref.get('value') or '').strip()
+        if not quickbooks_item_id:
+            missing_item_refs.append(line.get('Description') or line.get('Id') or 'Bill line')
+            continue
+        presentacion = Presentacion.objects.select_related('producto').filter(quickbooks_id=quickbooks_item_id).first()
+        if presentacion is None:
+            missing_item_refs.append(quickbooks_item_id)
+            continue
+
+        raw_quantity = detail.get('Qty') or 1
+        try:
+            quantity = max(int(Decimal(str(raw_quantity or 1))), 1)
+        except Exception:
+            quantity = 1
+        amount = _quantize_money(line.get('Amount') or 0)
+        unit_price = detail.get('UnitPrice')
+        if unit_price in (None, ''):
+            if quantity <= 0:
+                missing_amounts.append(quickbooks_item_id)
+                continue
+            unit_price = amount / Decimal(str(quantity or 1))
+        cost = _quantize_money(unit_price)
+        line_specs.append({
+            'presentacion': presentacion,
+            'cantidad': quantity,
+            'costo_unitario': cost,
+            'descripcion': _truncate(line.get('Description') or presentacion.producto.nombre, limit=255),
+        })
+
+    if missing_item_refs:
+        raise QuickBooksSyncError(
+            _('Bill references QuickBooks items that are not linked locally yet: %(items)s') % {
+                'items': ', '.join(str(item) for item in missing_item_refs[:5]),
+            }
+        )
+    if missing_amounts:
+        raise QuickBooksSyncError(
+            _('Bill contains item lines without enough quantity or amount information to calculate unit cost.')
+        )
+    if not line_specs:
+        raise QuickBooksSyncError(_('QuickBooks Bill does not contain importable item-based expense lines.'))
+    return line_specs
+
+
+def _match_local_purchase_order_from_quickbooks(payload):
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    doc_number = _normalize_text(payload.get('DocNumber'))
+    queryset = CompraProveedor.objects.all()
+    if quickbooks_id:
+        compra = queryset.filter(quickbooks_id=quickbooks_id).first()
+        if compra is not None:
+            return compra
+    if doc_number:
+        compra = queryset.filter(bill_number=doc_number).first()
+        if compra is not None:
+            return compra
+    return None
+
+
+def _extract_purchase_order_line_specs(payload):
+    line_specs = []
+    missing_item_refs = []
+
+    for line in payload.get('Line') or []:
+        if (line.get('DetailType') or '') != 'ItemBasedExpenseLineDetail':
+            continue
+        detail = line.get('ItemBasedExpenseLineDetail') or {}
+        item_ref = detail.get('ItemRef') or {}
+        quickbooks_item_id = str(item_ref.get('value') or '').strip()
+        if not quickbooks_item_id:
+            missing_item_refs.append(line.get('Description') or line.get('Id') or 'Purchase order line')
+            continue
+        presentacion = Presentacion.objects.select_related('producto').filter(quickbooks_id=quickbooks_item_id).first()
+        if presentacion is None:
+            missing_item_refs.append(quickbooks_item_id)
+            continue
+
+        raw_quantity = detail.get('Qty') or 1
+        try:
+            quantity = max(int(Decimal(str(raw_quantity or 1))), 1)
+        except Exception:
+            quantity = 1
+        unit_price = detail.get('UnitPrice')
+        amount = _quantize_money(line.get('Amount') or 0)
+        if unit_price in (None, ''):
+            unit_price = amount / Decimal(str(quantity or 1)) if quantity > 0 else Decimal('0.00')
+        cost = _quantize_money(unit_price)
+        line_specs.append({
+            'presentacion': presentacion,
+            'cantidad': quantity,
+            'costo_unitario': cost,
+            'descripcion': _truncate(line.get('Description') or presentacion.producto.nombre, limit=255),
+        })
+
+    if missing_item_refs:
+        raise QuickBooksSyncError(
+            _('Purchase order references QuickBooks items that are not linked locally yet: %(items)s') % {
+                'items': ', '.join(str(item) for item in missing_item_refs[:5]),
+            }
+        )
+    if not line_specs:
+        raise QuickBooksSyncError(_('QuickBooks Purchase Order does not contain importable item lines.'))
+    return line_specs
+
+
+def _apply_quickbooks_purchase_order_to_local_record(compra, payload):
+    update_fields = []
+    doc_number = _normalize_text(payload.get('DocNumber'))
+    if doc_number and compra.bill_number != doc_number:
+        compra.bill_number = doc_number
+        update_fields.append('bill_number')
+
+    vendor_name = _extract_purchase_order_vendor_name(payload)
+    if vendor_name and compra.proveedor_nombre != vendor_name:
+        compra.proveedor_nombre = vendor_name
+        update_fields.append('proveedor_nombre')
+
+    txn_date = payload.get('TxnDate')
+    parsed_txn_date = _parse_quickbooks_date(txn_date)
+    if parsed_txn_date and compra.fecha_compra != parsed_txn_date:
+        compra.fecha_compra = parsed_txn_date
+        update_fields.append('fecha_compra')
+
+    due_date = payload.get('DueDate')
+    parsed_due_date = _parse_quickbooks_date(due_date)
+    if compra.fecha_vencimiento != parsed_due_date:
+        compra.fecha_vencimiento = parsed_due_date
+        update_fields.append('fecha_vencimiento')
+
+    private_note = _truncate(payload.get('PrivateNote') or payload.get('Memo') or '', limit=4000)
+    if compra.notas != private_note:
+        compra.notas = private_note
+        update_fields.append('notas')
+
+    if compra.estado != CompraProveedor.STATUS_SENT:
+        compra.estado = CompraProveedor.STATUS_SENT
+        update_fields.append('estado')
+
+    compra.quickbooks_id = str(payload.get('Id') or '')
+    compra.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+    compra.last_synced_at = timezone.now()
+    update_fields.extend(['quickbooks_id', 'sync_status', 'last_synced_at'])
+    if update_fields:
+        compra.save(update_fields=list(dict.fromkeys(update_fields)))
+    return compra
+
+
+@transaction.atomic
+def import_quickbooks_purchase_order_record(payload):
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    if not quickbooks_id:
+        raise QuickBooksSyncError('QuickBooks Purchase Order payload is missing an Id.')
+
+    doc_number = _normalize_text(payload.get('DocNumber'))
+    display_name = _extract_purchase_order_vendor_name(payload)
+    try:
+        line_specs = _extract_purchase_order_line_specs(payload)
+    except QuickBooksSyncError as exc:
+        _upsert_import_conflict(
+            entity_type=QuickBooksImportConflict.ENTITY_PURCHASE_ORDER,
+            quickbooks_id=quickbooks_id,
+            doc_number=doc_number,
+            display_name=display_name,
+            reason=str(exc),
+            payload=payload,
+        )
+        return {
+            'ok': False,
+            'action': 'conflict',
+            'entity': 'PurchaseOrder',
+            'quickbooks_id': quickbooks_id,
+            'label': doc_number or display_name or quickbooks_id,
+            'error': str(exc),
+        }
+
+    compra = _match_local_purchase_order_from_quickbooks(payload)
+    if compra is None:
+        compra = CompraProveedor.objects.create(
+            proveedor_nombre=display_name,
+            bill_number=doc_number,
+            fecha_compra=_parse_quickbooks_date(payload.get('TxnDate')) or timezone.localdate(),
+            fecha_vencimiento=_parse_quickbooks_date(payload.get('DueDate')),
+            notas=_truncate(payload.get('PrivateNote') or payload.get('Memo') or '', limit=4000),
+            estado=CompraProveedor.STATUS_SENT,
+            quickbooks_id=quickbooks_id,
+            sync_status=QUICKBOOKS_SYNC_STATUS_PENDING,
+        )
+        for line_spec in line_specs:
+            line = CompraProveedorLinea(
+                compra=compra,
+                presentacion=line_spec['presentacion'],
+                cantidad=line_spec['cantidad'],
+                costo_unitario=line_spec['costo_unitario'],
+                descripcion=line_spec['descripcion'],
+            )
+            line.full_clean()
+            line.save()
+        compra.recalcular_totales(save=True)
+        action = 'created'
+    else:
+        _apply_quickbooks_purchase_order_to_local_record(compra, payload)
+        action = 'updated'
+
+    _apply_quickbooks_purchase_order_to_local_record(compra, payload)
+    _resolve_import_conflict(
+        entity_type=QuickBooksImportConflict.ENTITY_PURCHASE_ORDER,
+        quickbooks_id=quickbooks_id,
+        local_model='CompraProveedor',
+        local_record_id=compra.id,
+    )
+    return {
+        'ok': True,
+        'action': action,
+        'entity': 'PurchaseOrder',
+        'quickbooks_id': quickbooks_id,
+        'local_id': compra.id,
+        'label': doc_number or display_name or quickbooks_id,
+    }
+
+
+def _apply_quickbooks_bill_to_local_record(compra, payload):
+    update_fields = []
+    doc_number = _normalize_text(payload.get('DocNumber'))
+    if doc_number and compra.bill_number != doc_number:
+        compra.bill_number = doc_number
+        update_fields.append('bill_number')
+
+    vendor_name = _extract_bill_vendor_name(payload)
+    if vendor_name and compra.proveedor_nombre != vendor_name:
+        compra.proveedor_nombre = vendor_name
+        update_fields.append('proveedor_nombre')
+
+    txn_date = payload.get('TxnDate')
+    parsed_txn_date = _parse_quickbooks_date(txn_date)
+    if parsed_txn_date:
+        if compra.fecha_compra != parsed_txn_date:
+            compra.fecha_compra = parsed_txn_date
+            update_fields.append('fecha_compra')
+
+    due_date = payload.get('DueDate')
+    parsed_due_date = _parse_quickbooks_date(due_date)
+    if compra.fecha_vencimiento != parsed_due_date:
+        compra.fecha_vencimiento = parsed_due_date
+        update_fields.append('fecha_vencimiento')
+
+    private_note = _truncate(payload.get('PrivateNote') or '', limit=4000)
+    if compra.notas != private_note:
+        compra.notas = private_note
+        update_fields.append('notas')
+
+    compra.quickbooks_id = str(payload.get('Id') or '')
+    compra.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+    compra.last_synced_at = timezone.now()
+    update_fields.extend(['quickbooks_id', 'sync_status', 'last_synced_at'])
+    if update_fields:
+        compra.save(update_fields=list(dict.fromkeys(update_fields)))
+    return compra
+
+
+@transaction.atomic
+def import_quickbooks_bill_record(payload):
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    if not quickbooks_id:
+        raise QuickBooksSyncError('QuickBooks Bill payload is missing an Id.')
+
+    doc_number = _normalize_text(payload.get('DocNumber'))
+    display_name = _extract_bill_vendor_name(payload)
+    try:
+        line_specs = _extract_bill_line_specs(payload)
+    except QuickBooksSyncError as exc:
+        _upsert_import_conflict(
+            entity_type=QuickBooksImportConflict.ENTITY_BILL,
+            quickbooks_id=quickbooks_id,
+            doc_number=doc_number,
+            display_name=display_name,
+            reason=str(exc),
+            payload=payload,
+        )
+        return {
+            'ok': False,
+            'action': 'conflict',
+            'entity': 'Bill',
+            'quickbooks_id': quickbooks_id,
+            'label': doc_number or display_name or quickbooks_id,
+            'error': str(exc),
+        }
+
+    compra = _match_local_bill_from_quickbooks(payload)
+    if compra is None:
+        txn_date = payload.get('TxnDate')
+        due_date = payload.get('DueDate')
+        compra = CompraProveedor.objects.create(
+            proveedor_nombre=display_name,
+            bill_number=doc_number,
+            fecha_compra=_parse_quickbooks_date(txn_date) or timezone.localdate(),
+            fecha_vencimiento=_parse_quickbooks_date(due_date),
+            notas=_truncate(payload.get('PrivateNote') or '', limit=4000),
+            estado=CompraProveedor.STATUS_RECEIVED,
+            quickbooks_id=quickbooks_id,
+            sync_status=QUICKBOOKS_SYNC_STATUS_PENDING,
+        )
+        for line_spec in line_specs:
+            line = CompraProveedorLinea(
+                compra=compra,
+                presentacion=line_spec['presentacion'],
+                cantidad=line_spec['cantidad'],
+                costo_unitario=line_spec['costo_unitario'],
+                descripcion=line_spec['descripcion'],
+            )
+            line.full_clean()
+            line.save()
+        compra.recalcular_totales(save=True)
+        _apply_supplier_purchase_inventory(compra)
+        action = 'created'
+    else:
+        _apply_quickbooks_bill_to_local_record(compra, payload)
+        action = 'updated'
+
+    _apply_quickbooks_bill_to_local_record(compra, payload)
+    _resolve_import_conflict(
+        entity_type=QuickBooksImportConflict.ENTITY_BILL,
+        quickbooks_id=quickbooks_id,
+        local_model='CompraProveedor',
+        local_record_id=compra.id,
+    )
+    return {
+        'ok': True,
+        'action': action,
+        'entity': 'Bill',
+        'quickbooks_id': quickbooks_id,
+        'local_id': compra.id,
+        'label': doc_number or display_name or quickbooks_id,
+    }
+
+
+def _match_local_invoice_from_quickbooks(payload):
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    doc_number = _normalize_text(payload.get('DocNumber'))
+    if quickbooks_id:
+        invoice = Invoice.objects.filter(quickbooks_id=quickbooks_id).first()
+        if invoice is not None:
+            return invoice, 'Invoice'
+        debit_note = NotaAjuste.objects.filter(tipo_documento='DEBITO', quickbooks_id=quickbooks_id).first()
+        if debit_note is not None:
+            return debit_note, 'NotaAjuste'
+    if doc_number:
+        invoice = Invoice.objects.filter(numero=doc_number).first()
+        if invoice is not None:
+            return invoice, 'Invoice'
+        debit_note = NotaAjuste.objects.filter(tipo_documento='DEBITO', numero=doc_number).first()
+        if debit_note is not None:
+            return debit_note, 'NotaAjuste'
+    return None, ''
+
+
+def _match_local_credit_memo_from_quickbooks(payload):
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    doc_number = _normalize_text(payload.get('DocNumber'))
+    queryset = NotaAjuste.objects.filter(tipo_documento='CREDITO')
+    if quickbooks_id:
+        note = queryset.filter(quickbooks_id=quickbooks_id).first()
+        if note is not None:
+            return note
+    if doc_number:
+        note = queryset.filter(numero=doc_number).first()
+        if note is not None:
+            return note
+    return None
+
+
+def _find_local_customer_from_quickbooks_payload(payload):
+    customer_ref = payload.get('CustomerRef') or {}
+    customer_quickbooks_id = str(customer_ref.get('value') or '').strip()
+    customer_name = _truncate(customer_ref.get('name') or '', limit=255)
+    if customer_quickbooks_id:
+        customer = Cliente.objects.select_related('usuario').filter(quickbooks_id=customer_quickbooks_id).first()
+        if customer is not None:
+            return customer
+    if customer_name:
+        return Cliente.objects.select_related('usuario').filter(
+            Q(nombre_empresa__iexact=customer_name)
+            | Q(usuario__first_name__iexact=customer_name)
+        ).first()
+    return None
+
+
+def _build_quickbooks_adjustment_note_number(*, doc_number, prefix, quickbooks_id):
+    preferred_number = _normalize_text(doc_number)
+    if preferred_number and not NotaAjuste.objects.filter(numero=preferred_number).exists():
+        return preferred_number
+
+    base_number = _truncate(f'{prefix}-QB-{quickbooks_id}', limit=30) or f'{prefix}-QB'
+    candidate_number = base_number
+    suffix = 1
+    while NotaAjuste.objects.filter(numero=candidate_number).exists():
+        suffix += 1
+        suffix_text = f'-{suffix}'
+        candidate_number = f'{base_number[:30 - len(suffix_text)]}{suffix_text}'
+    return candidate_number
+
+
+def _create_adjustment_note_from_quickbooks_invoice(payload):
+    customer = _find_local_customer_from_quickbooks_payload(payload)
+    if customer is None:
+        raise QuickBooksSyncError('No local customer matched this QuickBooks invoice, so a debit note could not be created automatically.')
+
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    doc_number = _normalize_text(payload.get('DocNumber'))
+    total_amount = _quantize_money(payload.get('TotalAmt') or payload.get('Balance') or 0)
+    note = NotaAjuste.objects.create(
+        numero=_build_quickbooks_adjustment_note_number(doc_number=doc_number, prefix='DBN', quickbooks_id=quickbooks_id),
+        cliente=customer,
+        tipo_documento='DEBITO',
+        tipo_ajuste='FINANCIERO',
+        estado='APROBADA',
+        motivo='OTHER',
+        descripcion=_truncate(payload.get('PrivateNote') or _('Imported from QuickBooks invoice'), limit=4000),
+        monto=total_amount,
+        total=total_amount,
+        impacto_saldo=total_amount,
+        inventario_estado='NO_APLICA',
+        quickbooks_id=quickbooks_id,
+        sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
+        last_synced_at=timezone.now(),
+        aprobada_en=timezone.now(),
+    )
+    return note
+
+
+def _create_adjustment_note_from_quickbooks_credit_memo(payload):
+    customer = _find_local_customer_from_quickbooks_payload(payload)
+    if customer is None:
+        raise QuickBooksSyncError('No local customer matched this QuickBooks credit memo, so a credit note could not be created automatically.')
+
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    doc_number = _normalize_text(payload.get('DocNumber'))
+    total_amount = _quantize_money(payload.get('TotalAmt') or payload.get('Balance') or 0)
+    note = NotaAjuste.objects.create(
+        numero=_build_quickbooks_adjustment_note_number(doc_number=doc_number, prefix='CRN', quickbooks_id=quickbooks_id),
+        cliente=customer,
+        tipo_documento='CREDITO',
+        tipo_ajuste='FINANCIERO',
+        estado='APROBADA',
+        motivo='OTHER',
+        tipo_credito='CREDIT_DUMP',
+        descripcion=_truncate(payload.get('PrivateNote') or _('Imported from QuickBooks credit memo'), limit=4000),
+        monto=total_amount,
+        total=total_amount,
+        impacto_saldo=total_amount,
+        inventario_estado='NO_APLICA',
+        quickbooks_id=quickbooks_id,
+        sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
+        last_synced_at=timezone.now(),
+        aprobada_en=timezone.now(),
+    )
+    return note
+
+
+def _assign_unique_document_number(record, doc_number):
+    doc_number = _normalize_text(doc_number)
+    if not doc_number or getattr(record, 'numero', '') == doc_number:
+        return []
+    model = record.__class__
+    if model.objects.exclude(pk=record.pk).filter(numero=doc_number).exists():
+        return []
+    record.numero = doc_number
+    return ['numero']
+
+
+def _apply_quickbooks_invoice_to_local_record(record, payload):
+    update_fields = []
+    update_fields.extend(_assign_unique_document_number(record, payload.get('DocNumber')))
+    total_amount = _quantize_money(payload.get('TotalAmt') or payload.get('Balance') or 0)
+    balance = _quantize_money(payload.get('Balance') or total_amount)
+    if isinstance(record, Invoice):
+        if record.subtotal != total_amount:
+            record.subtotal = total_amount
+            update_fields.append('subtotal')
+        if record.total_neto != total_amount:
+            record.total_neto = total_amount
+            update_fields.append('total_neto')
+        if record.saldo_cliente != balance:
+            record.saldo_cliente = balance
+            update_fields.append('saldo_cliente')
+    else:
+        if record.total != total_amount:
+            record.total = total_amount
+            update_fields.append('total')
+        if record.monto != total_amount:
+            record.monto = total_amount
+            update_fields.append('monto')
+        if record.impacto_saldo != total_amount:
+            record.impacto_saldo = total_amount
+            update_fields.append('impacto_saldo')
+    record.quickbooks_id = str(payload.get('Id') or '')
+    record.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+    record.last_synced_at = timezone.now()
+    update_fields.extend(['quickbooks_id', 'sync_status', 'last_synced_at'])
+    if update_fields:
+        record.save(update_fields=list(dict.fromkeys(update_fields)))
+    return record
+
+
+def _apply_quickbooks_credit_memo_to_local_record(note, payload):
+    update_fields = []
+    update_fields.extend(_assign_unique_document_number(note, payload.get('DocNumber')))
+    total_amount = _quantize_money(payload.get('TotalAmt') or payload.get('Balance') or 0)
+    if note.total != total_amount:
+        note.total = total_amount
+        update_fields.append('total')
+    if note.monto != total_amount:
+        note.monto = total_amount
+        update_fields.append('monto')
+    if note.impacto_saldo != total_amount:
+        note.impacto_saldo = total_amount
+        update_fields.append('impacto_saldo')
+    note.quickbooks_id = str(payload.get('Id') or '')
+    note.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+    note.last_synced_at = timezone.now()
+    update_fields.extend(['quickbooks_id', 'sync_status', 'last_synced_at'])
+    if update_fields:
+        note.save(update_fields=list(dict.fromkeys(update_fields)))
+    return note
+
+
+def import_quickbooks_invoice_record(payload):
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    if not quickbooks_id:
+        raise QuickBooksSyncError('QuickBooks invoice payload is missing an Id.')
+    doc_number = _normalize_text(payload.get('DocNumber'))
+    display_name = _truncate((payload.get('CustomerRef') or {}).get('name') or doc_number or quickbooks_id, limit=255)
+    record, local_model = _match_local_invoice_from_quickbooks(payload)
+    if record is None:
+        try:
+            record = _create_adjustment_note_from_quickbooks_invoice(payload)
+        except QuickBooksSyncError as exc:
+            _upsert_import_conflict(
+                entity_type=QuickBooksImportConflict.ENTITY_INVOICE,
+                quickbooks_id=quickbooks_id,
+                doc_number=doc_number,
+                display_name=display_name,
+                reason=str(exc),
+                payload=payload,
+            )
+            return {
+                'ok': False,
+                'action': 'conflict',
+                'entity': 'Invoice',
+                'quickbooks_id': quickbooks_id,
+                'label': doc_number or display_name or quickbooks_id,
+                'error': str(exc),
+            }
+        local_model = 'NotaAjuste'
+        action = 'created'
+    else:
+        _apply_quickbooks_invoice_to_local_record(record, payload)
+        action = 'matched'
+
+    _apply_quickbooks_invoice_to_local_record(record, payload)
+    _resolve_import_conflict(
+        entity_type=QuickBooksImportConflict.ENTITY_INVOICE,
+        quickbooks_id=quickbooks_id,
+        local_model=local_model,
+        local_record_id=record.id,
+    )
+    return {
+        'ok': True,
+        'action': action,
+        'entity': 'Invoice',
+        'quickbooks_id': quickbooks_id,
+        'local_id': record.id,
+        'label': doc_number or getattr(record, 'numero', '') or quickbooks_id,
+    }
+
+
+def import_quickbooks_credit_memo_record(payload):
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    if not quickbooks_id:
+        raise QuickBooksSyncError('QuickBooks credit memo payload is missing an Id.')
+    doc_number = _normalize_text(payload.get('DocNumber'))
+    display_name = _truncate((payload.get('CustomerRef') or {}).get('name') or doc_number or quickbooks_id, limit=255)
+    note = _match_local_credit_memo_from_quickbooks(payload)
+    if note is None:
+        try:
+            note = _create_adjustment_note_from_quickbooks_credit_memo(payload)
+        except QuickBooksSyncError as exc:
+            _upsert_import_conflict(
+                entity_type=QuickBooksImportConflict.ENTITY_CREDIT_MEMO,
+                quickbooks_id=quickbooks_id,
+                doc_number=doc_number,
+                display_name=display_name,
+                reason=str(exc),
+                payload=payload,
+            )
+            return {
+                'ok': False,
+                'action': 'conflict',
+                'entity': 'CreditMemo',
+                'quickbooks_id': quickbooks_id,
+                'label': doc_number or display_name or quickbooks_id,
+                'error': str(exc),
+            }
+        action = 'created'
+    else:
+        _apply_quickbooks_credit_memo_to_local_record(note, payload)
+        action = 'matched'
+
+    _apply_quickbooks_credit_memo_to_local_record(note, payload)
+    _resolve_import_conflict(
+        entity_type=QuickBooksImportConflict.ENTITY_CREDIT_MEMO,
+        quickbooks_id=quickbooks_id,
+        local_model='NotaAjuste',
+        local_record_id=note.id,
+    )
+    return {
+        'ok': True,
+        'action': action,
+        'entity': 'CreditMemo',
+        'quickbooks_id': quickbooks_id,
+        'local_id': note.id,
+        'label': doc_number or note.numero or quickbooks_id,
+    }
+
+
+def import_quickbooks_accounting_documents(*, max_results=25, client=None, invoice_updated_after=None, credit_memo_updated_after=None):
+    invoice_records = fetch_quickbooks_invoices(max_results=max_results, client=client, updated_after=invoice_updated_after)
+    credit_memo_records = fetch_quickbooks_credit_memos(max_results=max_results, client=client, updated_after=credit_memo_updated_after)
+    results = [import_quickbooks_invoice_record(record) for record in invoice_records]
+    results.extend(import_quickbooks_credit_memo_record(record) for record in credit_memo_records)
+    return {
+        'entity': 'AccountingDocument',
+        'count': len(results),
+        'matched_count': sum(1 for item in results if item.get('ok')),
+        'conflict_count': sum(1 for item in results if item.get('action') == 'conflict'),
+        'invoice_result': {
+            'count': len(invoice_records),
+            'latest_updated_at': _serialize_cursor(_latest_payload_update(invoice_records)),
+        },
+        'credit_memo_result': {
+            'count': len(credit_memo_records),
+            'latest_updated_at': _serialize_cursor(_latest_payload_update(credit_memo_records)),
+        },
+        'results': results,
+    }
+
+
+def import_quickbooks_bills(*, max_results=25, client=None, updated_after=None, task_cache_key=None):
+    records = fetch_quickbooks_bills(max_results=max_results, client=client, updated_after=updated_after)
+    return _import_batch_result(entity_name='Bill', records=records, import_callable=import_quickbooks_bill_record, task_cache_key=task_cache_key)
+
+
+def import_quickbooks_purchase_orders(*, max_results=25, client=None, updated_after=None, task_cache_key=None):
+    records = fetch_quickbooks_purchase_orders(max_results=max_results, client=client, updated_after=updated_after)
+    return _import_batch_result(entity_name='PurchaseOrder', records=records, import_callable=import_quickbooks_purchase_order_record, task_cache_key=task_cache_key)
+
+
+def _sync_cursor_key(entity_name):
+    return f'quickbooks:{entity_name.lower()}'
+
+
+def pull_quickbooks_items_to_local(*, max_results=25, client=None, force_full=False):
+    client = client or QuickBooksAPIClient()
+    connection = client.connection
+    run_started_at = timezone.now()
+
+    item_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('item')))
+    items = import_quickbooks_items(max_results=max_results, client=client, updated_after=item_cursor)
+
+    connection.set_sync_cursor(_sync_cursor_key('item'), items.get('latest_updated_at') or _serialize_cursor(run_started_at))
+    connection.save(update_fields=['sync_state', 'updated_at'])
+
+    return {
+        'items': items,
+        'run_started_at': _serialize_cursor(run_started_at),
+        'incremental': not force_full,
+    }
+
+
+def pull_quickbooks_to_local(*, max_results=25, client=None, force_full=False):
+    client = client or QuickBooksAPIClient()
+    connection = client.connection
+    run_started_at = timezone.now()
+
+    customer_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('customer')))
+    vendor_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('vendor')))
+    item_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('item')))
+    invoice_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('invoice')))
+    credit_memo_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('credit_memo')))
+    bill_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('bill')))
+
+    customers = import_quickbooks_customers(max_results=max_results, client=client, updated_after=customer_cursor)
+    vendors = import_quickbooks_vendors(max_results=max_results, client=client, updated_after=vendor_cursor)
+    items = import_quickbooks_items(max_results=max_results, client=client, updated_after=item_cursor)
+    accounting_documents = import_quickbooks_accounting_documents(
+        max_results=max_results,
+        client=client,
+        invoice_updated_after=invoice_cursor,
+        credit_memo_updated_after=credit_memo_cursor,
+    )
+    bills = import_quickbooks_bills(max_results=max_results, client=client, updated_after=bill_cursor)
+
+    serialized_run_started_at = _serialize_cursor(run_started_at)
+    connection.set_sync_cursor(_sync_cursor_key('customer'), customers.get('latest_updated_at') or serialized_run_started_at)
+    connection.set_sync_cursor(_sync_cursor_key('vendor'), vendors.get('latest_updated_at') or serialized_run_started_at)
+    connection.set_sync_cursor(_sync_cursor_key('item'), items.get('latest_updated_at') or serialized_run_started_at)
+    connection.set_sync_cursor(_sync_cursor_key('invoice'), accounting_documents.get('invoice_result', {}).get('latest_updated_at') or serialized_run_started_at)
+    connection.set_sync_cursor(_sync_cursor_key('credit_memo'), accounting_documents.get('credit_memo_result', {}).get('latest_updated_at') or serialized_run_started_at)
+    connection.set_sync_cursor(_sync_cursor_key('bill'), bills.get('latest_updated_at') or serialized_run_started_at)
+    connection.save(update_fields=['sync_state', 'updated_at'])
+
+    return {
+        'customers': customers,
+        'vendors': vendors,
+        'items': items,
+        'accounting_documents': accounting_documents,
+        'bills': bills,
+        'run_started_at': serialized_run_started_at,
+        'incremental': not force_full,
+    }
+
+
+def retry_quickbooks_import_conflict(conflict, *, user=None):
+    payload = conflict.payload or {}
+    try:
+        if conflict.entity_type == QuickBooksImportConflict.ENTITY_CUSTOMER:
+            return import_quickbooks_customer_record(payload)
+        if conflict.entity_type == QuickBooksImportConflict.ENTITY_VENDOR:
+            return import_quickbooks_vendor_record(payload)
+        if conflict.entity_type == QuickBooksImportConflict.ENTITY_ITEM:
+            return import_quickbooks_item_record(payload)
+        if conflict.entity_type == QuickBooksImportConflict.ENTITY_INVOICE:
+            return import_quickbooks_invoice_record(payload)
+        if conflict.entity_type == QuickBooksImportConflict.ENTITY_CREDIT_MEMO:
+            return import_quickbooks_credit_memo_record(payload)
+        if conflict.entity_type == QuickBooksImportConflict.ENTITY_BILL:
+            return import_quickbooks_bill_record(payload)
+        if conflict.entity_type == QuickBooksImportConflict.ENTITY_PURCHASE_ORDER:
+            return import_quickbooks_purchase_order_record(payload)
+    except Exception as exc:
+        # Don't let DB errors or integrity problems raise a 500 from the retry endpoint.
+        # Return a structured failure result so the caller can display it.
+        return {
+            'ok': False,
+            'action': 'failed',
+            'entity': conflict.get_entity_type_display() or conflict.entity_type,
+            'quickbooks_id': str(payload.get('Id') or conflict.quickbooks_id or ''),
+            'label': payload.get('DisplayName') or payload.get('Name') or conflict.display_name or '',
+            'error': str(exc),
+        }
+    raise QuickBooksSyncError('Unsupported QuickBooks conflict entity.')
+
+
+def link_quickbooks_import_conflict(conflict, *, local_record_id=None, local_model=None, user=None, resolution_note=''):
+    payload = conflict.payload or {}
+    local_record_id = int(local_record_id or conflict.local_record_id or 0)
+    local_model = (local_model or conflict.local_model or '').strip() or None
+    if local_record_id <= 0:
+        raise QuickBooksSyncError('Provide a valid local record ID to link this QuickBooks record.')
+
+    if conflict.entity_type == QuickBooksImportConflict.ENTITY_CUSTOMER:
+        record = Cliente.objects.select_related('usuario').get(pk=local_record_id)
+        _apply_quickbooks_customer_to_local_record(record, payload)
+        local_model = 'Cliente'
+    elif conflict.entity_type == QuickBooksImportConflict.ENTITY_VENDOR:
+        record = Proveedor.objects.get(pk=local_record_id)
+        defaults = _build_vendor_import_defaults(payload)
+        for field, value in defaults.items():
+            setattr(record, field, value)
+        record.save(update_fields=[*defaults.keys(), 'actualizado_en'])
+        _mark_vendor_imported(record, quickbooks_id=payload.get('Id'))
+        local_model = 'Proveedor'
+    elif conflict.entity_type == QuickBooksImportConflict.ENTITY_ITEM:
+        record = Presentacion.objects.select_related('producto').get(pk=local_record_id)
+        _apply_quickbooks_item_to_local_record(record, payload)
+        local_model = 'Presentacion'
+    elif conflict.entity_type == QuickBooksImportConflict.ENTITY_INVOICE:
+        if local_model == 'NotaAjuste':
+            record = NotaAjuste.objects.get(pk=local_record_id, tipo_documento='DEBITO')
+        else:
+            record = Invoice.objects.get(pk=local_record_id)
+            local_model = 'Invoice'
+        _apply_quickbooks_invoice_to_local_record(record, payload)
+    elif conflict.entity_type == QuickBooksImportConflict.ENTITY_CREDIT_MEMO:
+        record = NotaAjuste.objects.get(pk=local_record_id, tipo_documento='CREDITO')
+        _apply_quickbooks_credit_memo_to_local_record(record, payload)
+        local_model = 'NotaAjuste'
+    elif conflict.entity_type == QuickBooksImportConflict.ENTITY_BILL:
+        record = CompraProveedor.objects.get(pk=local_record_id)
+        _apply_quickbooks_bill_to_local_record(record, payload)
+        local_model = 'CompraProveedor'
+    elif conflict.entity_type == QuickBooksImportConflict.ENTITY_PURCHASE_ORDER:
+        record = CompraProveedor.objects.get(pk=local_record_id)
+        _apply_quickbooks_purchase_order_to_local_record(record, payload)
+        local_model = 'CompraProveedor'
+    else:
+        raise QuickBooksSyncError('Unsupported QuickBooks conflict entity.')
+
+    _resolve_import_conflict(
+        entity_type=conflict.entity_type,
+        quickbooks_id=payload.get('Id') or conflict.quickbooks_id,
+        local_model=local_model,
+        local_record_id=record.id,
+        user=user,
+        resolution_note=resolution_note,
+    )
+    return {
+        'ok': True,
+        'action': 'linked',
+        'entity': conflict.entity_type,
+        'quickbooks_id': str(payload.get('Id') or conflict.quickbooks_id),
+        'local_id': record.id,
+        'local_model': local_model,
+    }
+
+
+def sync_product(*, presentacion, client=None):
+    client = client or QuickBooksAPIClient()
+    try:
+        if presentacion.quickbooks_id:
+            existing = client.find_by_id('Item', presentacion.quickbooks_id)
+            if existing:
+                desired_payload = _build_item_payload(
+                    presentacion,
+                    client=client,
+                    income_account_ref=existing.get('IncomeAccountRef') or None,
+                )
+                if _item_payload_needs_update(existing, desired_payload):
+                    updated = client.update_item(_build_sparse_update_payload(existing, desired_payload))
+                    _mark_synced(presentacion, updated.get('Id'))
+                    return _sync_result(entity='Item', action='updated', payload=updated)
+                _mark_synced(presentacion, existing.get('Id'))
+                return _sync_result(entity='Item', action='existing', payload=existing)
+
+        item_name = _build_item_name(presentacion)
+        existing = client.find_one_by_name('Item', item_name)
+        if existing:
+            _mark_synced(presentacion, existing.get('Id'))
+            return _sync_result(entity='Item', action='linked', payload=existing)
+
+        created = client.create_item(_build_item_payload(presentacion, client=client))
+        _mark_synced(presentacion, created.get('Id'))
+        return _sync_result(entity='Item', action='created', payload=created)
+    except (QuickBooksAPIError, QuickBooksSyncError) as exc:
+        _mark_failed(presentacion)
+        raise QuickBooksSyncError(str(exc)) from exc
+
+
+def _ensure_adjustment_item(client):
+    adjustment_name = 'LTG Adjustment Item'
+    existing = client.find_one_by_name('Item', adjustment_name)
+    if existing:
+        return existing
+    return client.create_item({
+        'Name': adjustment_name,
+        'Type': 'NonInventory',
+        'Active': True,
+        'Description': 'Generic adjustment item for La Tortilla Grocery sync.',
+        'UnitPrice': 0,
+        'IncomeAccountRef': _get_default_income_account_ref(client),
+    })
+
+
+def _build_sales_line(*, item_ref, amount, description, quantity=1, unit_price=None):
+    quantity = int(quantity or 1)
+    unit_price = unit_price if unit_price is not None else (Decimal(str(amount or 0)) / Decimal(str(quantity or 1)))
+    return {
+        'DetailType': 'SalesItemLineDetail',
+        'Amount': _as_float(amount),
+        'Description': _truncate(description, limit=4000),
+        'SalesItemLineDetail': {
+            'ItemRef': item_ref,
+            'Qty': quantity,
+            'UnitPrice': _as_float(unit_price),
+        },
+    }
+
+
+def _build_adjustment_item_ref(client):
+    item = _ensure_adjustment_item(client)
+    return {'value': str(item.get('Id')), 'name': item.get('Name', '')}
+
+
+def _find_transaction_by_doc_number(client, entity_name, doc_number):
+    escaped = _normalize_text(doc_number).replace("'", "\\'")
+    response = client.query(f"select * from {entity_name} where DocNumber = '{escaped}' maxresults 1")
+    entities = response.get(entity_name, [])
+    return entities[0] if entities else None
+
+
+def fetch_quickbooks_invoices(*, max_results=25, client=None, updated_after=None, page_size=100):
+    client = client or QuickBooksAPIClient()
+    if updated_after:
+        return client.find_updated_since('Invoice', updated_after, max_results=max_results, page_size=page_size)
+    return client.find_all('Invoice', max_results=max_results, order_by='MetaData.LastUpdatedTime', page_size=page_size)
+
+
+def sync_invoice(*, invoice, client=None):
+    client = client or QuickBooksAPIClient()
+    try:
+        if invoice.quickbooks_id:
+            existing = client.find_by_id('Invoice', invoice.quickbooks_id)
+            if existing:
+                _mark_synced(invoice, existing.get('Id'))
+                return _sync_result(entity='Invoice', action='existing', payload=existing)
+
+        customer_result = sync_customer(cliente=invoice.cliente, client=client)
+        lines = []
+        adjustment_item_ref = None
+        for item in invoice.items.select_related('presentacion__producto').all():
+            if item.presentacion_id:
+                sync_product(presentacion=item.presentacion, client=client)
+                item_ref = {'value': item.presentacion.quickbooks_id, 'name': _build_item_name(item.presentacion)}
+            else:
+                adjustment_item_ref = adjustment_item_ref or _build_adjustment_item_ref(client)
+                item_ref = adjustment_item_ref
+            lines.append(_build_sales_line(
+                item_ref=item_ref,
+                amount=item.subtotal,
+                description=f'{item.producto_nombre} - {item.presentacion_nombre}',
+                quantity=item.cantidad_facturada,
+                unit_price=item.precio_unitario,
+            ))
+
+        existing = _find_transaction_by_doc_number(client, 'Invoice', invoice.numero)
+        if existing:
+            _mark_synced(invoice, existing.get('Id'))
+            return _sync_result(entity='Invoice', action='linked', payload=existing)
+
+        created = client.create_invoice({
+            'CustomerRef': {'value': customer_result['quickbooks_id']},
+            'DocNumber': invoice.numero,
+            'TxnDate': invoice.creada_en.date().isoformat(),
+            'PrivateNote': _truncate(f'La Tortilla invoice {invoice.numero}', limit=4000),
+            'Line': lines,
+        })
+        _mark_synced(invoice, created.get('Id'))
+        return _sync_result(entity='Invoice', action='created', payload=created)
+    except (QuickBooksAPIError, QuickBooksSyncError) as exc:
+        _mark_failed(invoice)
+        raise QuickBooksSyncError(str(exc)) from exc
+
+
+def _build_adjustment_lines(note, client):
+    adjustment_item_ref = None
+    lines = []
+    for item in note.items.select_related('presentacion__producto').all():
+        amount = _quantize_money(item.total or Decimal(str(item.monto_unitario or '0')) * Decimal(str(item.cantidad or 1)))
+        if item.presentacion_id:
+            sync_product(presentacion=item.presentacion, client=client)
+            item_ref = {'value': item.presentacion.quickbooks_id, 'name': _build_item_name(item.presentacion)}
+        else:
+            adjustment_item_ref = adjustment_item_ref or _build_adjustment_item_ref(client)
+            item_ref = adjustment_item_ref
+        lines.append(_build_sales_line(
+            item_ref=item_ref,
+            amount=amount,
+            description=item.descripcion,
+            quantity=item.cantidad,
+            unit_price=item.monto_unitario,
+        ))
+    if lines:
+        return lines
+
+    adjustment_item_ref = _build_adjustment_item_ref(client)
+    amount = _quantize_money(note.total or note.monto or note.impacto_saldo)
+    if amount <= 0:
+        amount = Decimal('0.01')
+    return [
+        _build_sales_line(
+            item_ref=adjustment_item_ref,
+            amount=amount,
+            description=note.descripcion or note.get_motivo_display(),
+            quantity=1,
+            unit_price=amount,
+        )
+    ]
+
+
+def sync_adjustment_note(*, note, client=None):
+    client = client or QuickBooksAPIClient()
+    if note.estado != 'APROBADA':
+        raise QuickBooksSyncError('Only approved adjustment notes can be synced to QuickBooks.')
+    try:
+        if note.quickbooks_id:
+            entity_name = 'CreditMemo' if note.tipo_documento == 'CREDITO' else 'Invoice'
+            existing = client.find_by_id(entity_name, note.quickbooks_id)
+            if existing:
+                _mark_synced(note, existing.get('Id'))
+                return _sync_result(entity=entity_name, action='existing', payload=existing)
+
+        customer_result = sync_customer(cliente=note.cliente, client=client)
+        lines = _build_adjustment_lines(note, client)
+        entity_name = 'CreditMemo' if note.tipo_documento == 'CREDITO' else 'Invoice'
+        existing = _find_transaction_by_doc_number(client, entity_name, note.numero)
+        if existing:
+            _mark_synced(note, existing.get('Id'))
+            return _sync_result(entity=entity_name, action='linked', payload=existing)
+
+        payload = {
+            'CustomerRef': {'value': customer_result['quickbooks_id']},
+            'DocNumber': note.numero,
+            'TxnDate': note.fecha.date().isoformat(),
+            'PrivateNote': _truncate(note.descripcion or note.get_motivo_display(), limit=4000),
+            'Line': lines,
+        }
+        if note.invoice_id and note.invoice.quickbooks_id:
+            payload['CustomerMemo'] = {'value': f'Related invoice {note.invoice.numero}'}
+
+        if note.tipo_documento == 'CREDITO':
+            created = client.create_credit_memo(payload)
+        else:
+            created = client.create_invoice(payload)
+        _mark_synced(note, created.get('Id'))
+        return _sync_result(entity=entity_name, action='created', payload=created)
+    except (QuickBooksAPIError, QuickBooksSyncError) as exc:
+        _mark_failed(note)
+        raise QuickBooksSyncError(str(exc)) from exc
+
+
+def _build_vendor_payload(compra):
+    payload = {
+        'DisplayName': _truncate(compra.proveedor_nombre, limit=100) or f'Supplier {compra.pk}',
+        'CompanyName': _truncate(compra.proveedor_nombre, limit=100) or f'Supplier {compra.pk}',
+        'PrintOnCheckName': _truncate(compra.proveedor_nombre, limit=100) or f'Supplier {compra.pk}',
+    }
+    if compra.proveedor_email:
+        payload['PrimaryEmailAddr'] = {'Address': _truncate(compra.proveedor_email, limit=100)}
+    if compra.proveedor_telefono:
+        payload['PrimaryPhone'] = {'FreeFormNumber': _truncate(compra.proveedor_telefono, limit=21)}
+    return payload
+
+
+def _resolve_vendor_ref_for_purchase(*, compra, client):
+    display_name = _truncate(compra.proveedor_nombre, limit=100) or f'Supplier {compra.pk}'
+    existing = client.find_one_by_display_name('Vendor', display_name)
+    if existing:
+        return {
+            'value': str(existing.get('Id')),
+            'name': existing.get('DisplayName') or existing.get('PrintOnCheckName') or display_name,
+        }
+    created = client.create_entity('Vendor', _build_vendor_payload(compra))
+    return {
+        'value': str(created.get('Id')),
+        'name': created.get('DisplayName') or created.get('PrintOnCheckName') or display_name,
+    }
+
+
+def _build_purchase_bill_line(*, linea, client):
+    sync_product(presentacion=linea.presentacion, client=client)
+    return {
+        'DetailType': 'ItemBasedExpenseLineDetail',
+        'Amount': _as_float(linea.subtotal),
+        'Description': _truncate(
+            linea.descripcion or f'{linea.presentacion.producto.nombre} - {linea.presentacion.nombre}',
+            limit=4000,
+        ),
+        'ItemBasedExpenseLineDetail': {
+            'ItemRef': {'value': str(linea.presentacion.quickbooks_id), 'name': _build_item_name(linea.presentacion)},
+            'Qty': int(linea.cantidad),
+            'UnitPrice': _as_float(linea.costo_unitario),
+        },
+    }
+
+
+def _apply_supplier_purchase_inventory(compra):
+    registrar_recepcion_compra_proveedor(compra=compra, creado_por=compra.creado_por)
+
+
+def sync_supplier_purchase(*, compra, client=None):
+    client = client or QuickBooksAPIClient()
+    if not compra.lineas.exists():
+        raise QuickBooksSyncError('Supplier purchase must include at least one line before syncing to QuickBooks.')
+
+    try:
+        remote_bill = None
+        action = 'created'
+        if compra.quickbooks_id:
+            remote_bill = client.find_by_id('Bill', compra.quickbooks_id)
+            if remote_bill:
+                action = 'existing'
+
+        if remote_bill is None and compra.bill_number:
+            remote_bill = _find_transaction_by_doc_number(client, 'Bill', compra.bill_number)
+            if remote_bill:
+                compra.quickbooks_id = str(remote_bill.get('Id') or '')
+                compra.save(update_fields=['quickbooks_id'])
+                action = 'linked'
+
+        if remote_bill is None:
+            vendor_ref = _resolve_vendor_ref_for_purchase(compra=compra, client=client)
+            lines = [
+                _build_purchase_bill_line(linea=linea, client=client)
+                for linea in compra.lineas.select_related('presentacion__producto').all()
+            ]
+            payload = {
+                'VendorRef': vendor_ref,
+                'TxnDate': compra.fecha_compra.isoformat(),
+                'Line': lines,
+                'PrivateNote': _truncate(compra.notas or f'Supplier purchase {compra.pk}', limit=4000),
+            }
+            if compra.bill_number:
+                payload['DocNumber'] = _truncate(compra.bill_number, limit=21)
+            if compra.fecha_vencimiento:
+                payload['DueDate'] = compra.fecha_vencimiento.isoformat()
+            remote_bill = client.create_entity('Bill', payload)
+            compra.quickbooks_id = str(remote_bill.get('Id') or '')
+            compra.save(update_fields=['quickbooks_id'])
+
+        _mark_synced(compra, remote_bill.get('Id'))
+        return _sync_result(entity='Bill', action=action, payload=remote_bill)
+    except (QuickBooksAPIError, QuickBooksSyncError, ValidationError) as exc:
+        _mark_failed(compra)
+        raise QuickBooksSyncError(str(exc)) from exc
+
+
+def sync_customer_by_id(cliente_id):
+    return sync_customer(cliente=Cliente.objects.select_related('usuario').get(pk=cliente_id))
+
+
+def sync_product_by_id(presentacion_id):
+    return sync_product(presentacion=Presentacion.objects.select_related('producto').get(pk=presentacion_id))
+
+
+def sync_invoice_by_id(invoice_id):
+    return sync_invoice(invoice=Invoice.objects.select_related('cliente__usuario').prefetch_related('items__presentacion__producto').get(pk=invoice_id))
+
+
+def sync_adjustment_note_by_id(note_id):
+    return sync_adjustment_note(note=NotaAjuste.objects.select_related('cliente__usuario', 'invoice').prefetch_related('items__presentacion__producto').get(pk=note_id))
+
+
+def sync_supplier_purchase_by_id(compra_id):
+    return sync_supplier_purchase(
+        compra=CompraProveedor.objects.select_related('creado_por').prefetch_related('lineas__presentacion__producto').get(pk=compra_id)
+    )
+
+
+def sync_customer_batch_by_ids(customer_ids):
+    return _batch_sync_result(record_ids=customer_ids, sync_callable=sync_customer_by_id)
+
+
+def sync_product_batch_by_ids(presentation_ids):
+    return _batch_sync_result(record_ids=presentation_ids, sync_callable=sync_product_by_id)
+
+
+def sync_invoice_batch_by_ids(invoice_ids):
+    return _batch_sync_result(record_ids=invoice_ids, sync_callable=sync_invoice_by_id)
+
+
+def sync_adjustment_note_batch_by_ids(note_ids):
+    return _batch_sync_result(record_ids=note_ids, sync_callable=sync_adjustment_note_by_id)
+
+
+def sync_supplier_purchase_batch_by_ids(compra_ids):
+    return _batch_sync_result(record_ids=compra_ids, sync_callable=sync_supplier_purchase_by_id)

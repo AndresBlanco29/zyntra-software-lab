@@ -1019,8 +1019,8 @@ data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 <h6>{% trans "Legal" %}</h6>
 
 <ul>
-<li><a href="#">{% trans "Política y Privacidad" %}</a></li>
-<li><a href="#">{% trans "Términos y Condiciones" %}</a></li>
+<li><a href="{% url 'privacy' %}">{% trans "Política y Privacidad" %}</a></li>
+<li><a href="{% url 'terms' %}">{% trans "Términos y Condiciones" %}</a></li>
 </ul>
 
 </div>

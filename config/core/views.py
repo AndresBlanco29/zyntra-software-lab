@@ -284,3 +284,13 @@ def home(request):
 
 def health(request):
     return JsonResponse({"status": "ok"})
+
+
+def privacy_policy(request):
+    """Render the public privacy policy page."""
+    return render(request, "privacy.html", {})
+
+
+def terms_of_service(request):
+    """Render the public terms of service page."""
+    return render(request, "terms.html", {})

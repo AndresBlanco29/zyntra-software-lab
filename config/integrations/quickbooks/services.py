@@ -1,5 +1,6 @@
 import logging
 
+from django.core.cache import cache
 from django.utils import timezone
 
 from config.integrations.models import QuickBooksConnection
@@ -31,9 +32,14 @@ def get_connection():
     return QuickBooksConnection.get_solo()
 
 
+def _oauth_state_cache_key(state):
+    return f'quickbooks_oauth_state:{state}'
+
+
 def get_oauth_login_url(*, request):
     state = create_oauth_state()
     request.session['quickbooks_oauth_state'] = state
+    cache.set(_oauth_state_cache_key(state), True, timeout=600)
     return build_authorization_url(state=state)
 
 
@@ -71,7 +77,13 @@ def _is_invalid_refresh_token_error(exc):
 def handle_oauth_callback(*, request, code, state, realm_id):
     validate_quickbooks_settings()
     expected_state = request.session.pop('quickbooks_oauth_state', None)
-    if not expected_state or state != expected_state:
+    state_is_valid = bool(state) and (
+        (expected_state and state == expected_state)
+        or cache.get(_oauth_state_cache_key(state))
+    )
+    if state:
+        cache.delete(_oauth_state_cache_key(state))
+    if not state_is_valid:
         raise QuickBooksServiceError('Invalid QuickBooks OAuth state.')
     if not code:
         raise QuickBooksServiceError('QuickBooks OAuth callback did not include an authorization code.')

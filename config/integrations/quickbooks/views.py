@@ -1,6 +1,7 @@
 import logging
 from functools import wraps
 from pathlib import Path
+from urllib.parse import quote
 
 from django.contrib import messages
 from django.conf import settings
@@ -843,8 +844,8 @@ def quickbooks_login(request):
 
 
 @require_GET
-@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def quickbooks_callback(request):
+    """Public OAuth return URL (must match Intuit redirect URI, usually with trailing slash)."""
     try:
         connection = handle_oauth_callback(
             request=request,
@@ -855,9 +856,13 @@ def quickbooks_callback(request):
     except QuickBooksServiceError as exc:
         logger.warning('QuickBooks callback failed: %s', exc)
         messages.error(request, str(exc))
-        return redirect(get_redirect_url_for_user(request.user))
+        if request.user.is_authenticated:
+            return redirect(get_redirect_url_for_user(request.user))
+        return redirect(f'{reverse("login")}?next={quote(reverse("quickbooks_center"))}')
     messages.success(request, f'QuickBooks connected successfully. Realm ID: {connection.realm_id}')
-    return redirect(get_redirect_url_for_user(request.user))
+    if request.user.is_authenticated:
+        return redirect(get_redirect_url_for_user(request.user))
+    return redirect(f'{reverse("login")}?next={quote(reverse("quickbooks_center"))}')
 
 
 @require_GET

@@ -46,6 +46,7 @@ class ProtectedAreaLoginMiddleware:
     PUBLIC_PATH_PREFIXES = (
         "/static/",
         "/media/",
+        "/quickbooks/callback/",
         "/login/",
         "/login-modal/",
         "/password-reset/",

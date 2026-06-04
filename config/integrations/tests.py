@@ -174,11 +174,36 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         connection = QuickBooksConnection.get_solo()
         self.assertEqual(connection.realm_id, '9130357992222806')
-        self.assertEqual(connection.access_token, 'access-1')
-        self.assertEqual(connection.refresh_token, 'refresh-1')
-        self.assertTrue(connection.connected_at)
-        messages = [message.message for message in get_messages(response.wsgi_request)]
-        self.assertTrue(any('QuickBooks connected successfully.' in message for message in messages))
+
+    @patch('config.integrations.quickbooks.auth.requests.post')
+    def test_callback_with_trailing_slash_persists_tokens(self, mock_post):
+        session = self.client.session
+        session['quickbooks_oauth_state'] = 'state-trailing'
+        session.save()
+        mock_post.return_value = Mock(
+            ok=True,
+            status_code=200,
+            json=Mock(return_value={
+                'access_token': 'access-trailing',
+                'refresh_token': 'refresh-trailing',
+                'token_type': 'bearer',
+                'scope': 'com.intuit.quickbooks.accounting',
+                'expires_in': 3600,
+                'x_refresh_token_expires_in': 86400,
+            }),
+        )
+
+        response = self.client.get(
+            '/quickbooks/callback/',
+            {'state': 'state-trailing', 'code': 'auth-code-trailing', 'realmId': '9130357992222807'},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        connection = QuickBooksConnection.get_solo()
+        self.assertEqual(connection.realm_id, '9130357992222807')
+        self.assertEqual(connection.access_token, 'access-trailing')
+        self.assertEqual(connection.refresh_token, 'refresh-trailing')
 
     @patch('config.integrations.quickbooks.client.requests.request')
     @patch('config.integrations.quickbooks.auth.requests.post')

@@ -741,7 +741,7 @@ def _validate_restore_confirmation(request):
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def create_database_backup_stored(request):
     try:
-        _, backup_name = create_database_backup_file(label='manual')
+        saved_path, backup_name = create_database_backup_file(label='manual')
     except Exception as exc:
         logger.exception('Manual database backup failed: %s', exc)
         messages.error(request, _('Database backup could not be created.'))
@@ -757,7 +757,7 @@ def create_database_backup_stored(request):
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def create_system_backup_stored(request):
     try:
-        _, backup_name = create_system_backup_file(label='manual')
+        saved_path, backup_name = create_system_backup_file(label='manual')
     except Exception as exc:
         logger.exception('Manual system backup failed: %s', exc)
         messages.error(request, _('System backup could not be created.'))

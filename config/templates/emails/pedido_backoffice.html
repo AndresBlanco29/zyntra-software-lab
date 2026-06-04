@@ -1,25 +1,26 @@
 {% extends "emails/base_email.html" %}
+{% load i18n %}
 
-{% block preheader %}Nueva orden de compra #{{ pedido.id }} registrada para BackOffice.{% endblock %}
-{% block header_title %}Nueva orden de compra{% endblock %}
-{% block header_subtitle %}Notificación automática para BackOffice.{% endblock %}
+{% block preheader %}{% blocktrans with order_id=pedido.id %}New purchase order #{{ order_id }} registered for BackOffice.{% endblocktrans %}{% endblock %}
+{% block header_title %}{% trans "New purchase order" %}{% endblock %}
+{% block header_subtitle %}{% trans "Automatic notification for BackOffice." %}{% endblock %}
 
 {% block content %}
 <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px 18px; margin-bottom:22px;">
 	<table width="100%" cellspacing="0" cellpadding="0" role="presentation" style="font-size:14px; color:#1e293b;">
-		<tr><td style="padding:6px 0; width:110px;"><strong>Orden:</strong></td><td>#{{ pedido.id }}</td></tr>
-		<tr><td style="padding:6px 0;"><strong>Cliente:</strong></td><td>{{ cliente.nombre_empresa }}</td></tr>
-		<tr><td style="padding:6px 0;"><strong>Origen:</strong></td><td>{{ pedido.get_origen_display }}</td></tr>
-		<tr><td style="padding:6px 0;"><strong>Nota cliente:</strong></td><td>{{ pedido.nota_cliente|default:'-' }}</td></tr>
+		<tr><td style="padding:6px 0; width:110px;"><strong>{% trans "Order:" %}</strong></td><td>#{{ pedido.id }}</td></tr>
+		<tr><td style="padding:6px 0;"><strong>{% trans "Customer:" %}</strong></td><td>{{ cliente.nombre_empresa }}</td></tr>
+		<tr><td style="padding:6px 0;"><strong>{% trans "Source:" %}</strong></td><td>{{ pedido.get_origen_display }}</td></tr>
+		<tr><td style="padding:6px 0;"><strong>{% trans "Customer note:" %}</strong></td><td>{{ pedido.nota_cliente|default:'-' }}</td></tr>
 	</table>
 </div>
 
 <table width="100%" cellpadding="10" cellspacing="0" role="presentation" style="border-collapse:collapse; font-size:14px; border:1px solid #cbd5e1; border-radius:12px; overflow:hidden;">
 	<tr style="background:#0b3d91; color:#ffffff;">
-		<th align="left">Producto</th>
-		<th align="center">Cant.</th>
-		<th align="center">Precio</th>
-		<th align="center">Subtotal</th>
+		<th align="left">{% trans "Product" %}</th>
+		<th align="center">{% trans "Qty." %}</th>
+		<th align="center">{% trans "Price" %}</th>
+		<th align="center">{% trans "Subtotal" %}</th>
 	</tr>
 	{% for item in items %}
 	<tr style="border-bottom:1px solid #e2e8f0; background:{% cycle '#ffffff' '#f8fafc' %};">
@@ -30,7 +31,7 @@
 	</tr>
 	{% endfor %}
 	<tr style="background:#dbeafe;">
-		<td colspan="3" align="right" style="padding-top:15px;"><strong>Total:</strong></td>
+		<td colspan="3" align="right" style="padding-top:15px;"><strong>{% trans "Total:" %}</strong></td>
 		<td align="center" style="padding-top:15px;"><strong>${{ pedido.total }}</strong></td>
 	</tr>
 </table>

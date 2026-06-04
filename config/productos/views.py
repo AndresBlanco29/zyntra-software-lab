@@ -8,6 +8,7 @@ from django.views.decorators.http import require_http_methods
 from django.contrib import messages
 from django.utils.translation import gettext as _
 from django.core.exceptions import ValidationError
+from django.http import JsonResponse
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from config.clientes.models import Cliente
@@ -363,8 +364,11 @@ def crear_categoria(request):
     if request.method == "POST":
         nombre = (request.POST.get("nombre") or "").strip()
         nombre_en = (request.POST.get("nombre_en") or "").strip()
+        is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
 
         if not nombre:
+            if is_ajax:
+                return JsonResponse({"error": _("El nombre de la categoria es obligatorio.")}, status=400)
             return render(request, "admin/crear_categoria.html", {
                 "error": _("El nombre de la categoria es obligatorio."),
                 "nombre": nombre,
@@ -372,16 +376,20 @@ def crear_categoria(request):
             })
 
         if Categoria.objects.filter(nombre__iexact=nombre).exists():
+            if is_ajax:
+                return JsonResponse({"error": _("Ya existe una categoria con ese nombre.")}, status=400)
             return render(request, "admin/crear_categoria.html", {
                 "error": _("Ya existe una categoria con ese nombre."),
                 "nombre": nombre,
                 "nombre_en": nombre_en,
             })
 
-        Categoria.objects.create(
+        categoria = Categoria.objects.create(
             nombre=nombre,
             nombre_en=nombre_en,
         )
+        if is_ajax:
+            return JsonResponse({"id": categoria.id, "nombre": categoria.nombre, "nombre_en": categoria.nombre_en})
         messages.success(request, _("Categoria creada correctamente"))
         return redirect("lista_productos")
 
@@ -399,8 +407,11 @@ def crear_marca(request):
         nombre_en = (request.POST.get("nombre_en") or "").strip()
         logo = request.FILES.get("logo")
         categorias_ids = request.POST.getlist("categorias")
+        is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest'
 
         if not nombre:
+            if is_ajax:
+                return JsonResponse({"error": _("El nombre de la marca es obligatorio.")}, status=400)
             return render(request, "admin/crear_marca.html", {
                 "error": _("El nombre de la marca es obligatorio."),
                 "categorias": categorias,
@@ -410,6 +421,8 @@ def crear_marca(request):
             })
 
         if Marca.objects.filter(nombre__iexact=nombre).exists():
+            if is_ajax:
+                return JsonResponse({"error": _("Ya existe una marca con ese nombre.")}, status=400)
             return render(request, "admin/crear_marca.html", {
                 "error": _("Ya existe una marca con ese nombre."),
                 "categorias": categorias,
@@ -426,6 +439,9 @@ def crear_marca(request):
 
         if categorias_ids:
             marca.categorias.set(categorias_ids)
+
+        if is_ajax:
+            return JsonResponse({"id": marca.id, "nombre": marca.nombre, "nombre_en": marca.nombre_en})
 
         messages.success(request, _("Marca creada correctamente"))
         return redirect("lista_marcas")

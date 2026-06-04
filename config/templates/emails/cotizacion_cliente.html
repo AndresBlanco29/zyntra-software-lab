@@ -1,27 +1,28 @@
 {% extends "emails/base_email.html" %}
+{% load i18n %}
 
-{% block preheader %}Nueva solicitud de cotización enviada por {{ cliente.nombre_empresa }}.{% endblock %}
-{% block header_title %}Nueva solicitud de cotización{% endblock %}
-{% block header_subtitle %}Revisa los datos del cliente y valida precios y disponibilidad.{% endblock %}
+{% block preheader %}{% blocktrans with company=cliente.nombre_empresa %}New quote request sent by {{ company }}.{% endblocktrans %}{% endblock %}
+{% block header_title %}{% trans "New quote request" %}{% endblock %}
+{% block header_subtitle %}{% trans "Review the customer data and validate prices and availability." %}{% endblock %}
 
 {% block content %}
 <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px 18px; margin-bottom:22px;">
-    <div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-bottom:10px;">Cliente</div>
+    <div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-bottom:10px;">{% trans "Customer" %}</div>
     <table width="100%" cellspacing="0" cellpadding="0" role="presentation" style="font-size:14px; color:#1e293b;">
-        <tr><td style="padding:6px 0; width:120px;"><strong>Cliente:</strong></td><td>{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}</td></tr>
-        <tr><td style="padding:6px 0;"><strong>Empresa:</strong></td><td>{{ cliente.nombre_empresa }}</td></tr>
-        <tr><td style="padding:6px 0;"><strong>Teléfono:</strong></td><td>{{ cliente.telefono }}</td></tr>
-        <tr><td style="padding:6px 0;"><strong>Correo:</strong></td><td>{{ cliente.usuario.email }}</td></tr>
+        <tr><td style="padding:6px 0; width:120px;"><strong>{% trans "Customer:" %}</strong></td><td>{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}</td></tr>
+        <tr><td style="padding:6px 0;"><strong>{% trans "Company:" %}</strong></td><td>{{ cliente.nombre_empresa }}</td></tr>
+        <tr><td style="padding:6px 0;"><strong>{% trans "Phone:" %}</strong></td><td>{{ cliente.telefono }}</td></tr>
+        <tr><td style="padding:6px 0;"><strong>{% trans "Email:" %}</strong></td><td>{{ cliente.usuario.email }}</td></tr>
     </table>
 </div>
 
-<div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-bottom:10px;">Productos solicitados</div>
+<div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-bottom:10px;">{% trans "Requested products" %}</div>
 <table width="100%" cellpadding="10" cellspacing="0" role="presentation" style="border-collapse:collapse; font-size:14px; border:1px solid #cbd5e1; border-radius:12px; overflow:hidden;">
     <tr style="background:#0b3d91; color:#ffffff;">
-        <th align="left">Producto</th>
-        <th align="left">Descripción</th>
-        <th align="center">Presentación</th>
-        <th align="center">Cantidad</th>
+        <th align="left">{% trans "Product" %}</th>
+        <th align="left">{% trans "Description" %}</th>
+        <th align="center">{% trans "Presentation" %}</th>
+        <th align="center">{% trans "Quantity" %}</th>
     </tr>
     {% for item in items %}
     <tr style="border-bottom:1px solid #e2e8f0; background:{% cycle '#ffffff' '#f8fafc' %};">
@@ -35,12 +36,12 @@
 
 {% if nota %}
 <div style="margin-top:22px; background:#fff9db; border:1px solid #fde68a; border-radius:12px; padding:16px 18px;">
-    <div style="font-size:12px; color:#92400e; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-bottom:8px;">Nota del cliente</div>
+    <div style="font-size:12px; color:#92400e; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-bottom:8px;">{% trans "Customer note" %}</div>
     <div style="font-size:14px; color:#1e293b; line-height:1.6;">{{ nota }}</div>
 </div>
 {% endif %}
 {% endblock %}
 
 {% block footer_note %}
-Esta solicitud fue enviada desde el sistema de pedidos de La Tortilla Grocery. Contacta al cliente para validar precios y disponibilidad.
+{% trans "This request was sent from the La Tortilla Grocery ordering system. Contact the customer to validate prices and availability." %}
 {% endblock %}

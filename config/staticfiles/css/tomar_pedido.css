@@ -1,5 +1,67 @@
 body { background:#f4f6f9; }
 
+.vendor-order-shell {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.vendor-order-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 1.8rem 1.9rem;
+    border-radius: 28px;
+    background:
+        radial-gradient(circle at top right, rgba(125, 227, 255, 0.26), transparent 30%),
+        linear-gradient(135deg, #0f2d70 0%, #1f5ec0 54%, #71d7ff 100%);
+    color: #fff;
+    box-shadow: 0 22px 50px rgba(11, 61, 145, 0.16);
+}
+
+.vendor-order-eyebrow {
+    display: inline-flex;
+    padding: 0.45rem 0.8rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.14);
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.vendor-order-title {
+    font-size: clamp(2rem, 3vw, 2.6rem);
+    font-weight: 800;
+    margin-top: 0.75rem;
+}
+
+.vendor-order-copy {
+    color: rgba(255,255,255,0.84);
+    max-width: 42rem;
+}
+
+.vendor-order-hero-stat {
+    min-width: 160px;
+    padding: 1rem 1.15rem;
+    border-radius: 22px;
+    background: rgba(255,255,255,0.14);
+    backdrop-filter: blur(8px);
+    display: grid;
+    gap: 0.25rem;
+}
+
+.vendor-order-hero-value {
+    font-size: 1.85rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.vendor-order-hero-label {
+    color: rgba(255,255,255,0.8);
+    font-size: 0.9rem;
+}
+
 .navbar-custom {
     background: linear-gradient(90deg, #023B82, #0C64CF, #3F89DA);
 }
@@ -21,9 +83,96 @@ body { background:#f4f6f9; }
     box-shadow:0 10px 30px rgba(0,0,0,0.08);
 }
 
+.vendor-order-card,
+.vendor-order-summary-card {
+    border: 1px solid rgba(14, 58, 133, 0.08);
+    background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(246,250,255,0.98));
+}
+
+.vendor-order-card-head h5 {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: #102a63;
+}
+
+.vendor-order-card-head p,
+.vendor-order-summary-copy {
+    color: #64748b;
+}
+
+.vendor-order-search {
+    min-height: 52px;
+    border-radius: 16px;
+    border: 1px solid #d8e4f3;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.75);
+}
+
+.vendor-order-search:focus {
+    border-color: #2b72d6;
+    box-shadow: 0 0 0 0.2rem rgba(43, 114, 214, 0.15);
+}
+
 .table thead th{
-    background:#dcdcdc;
-    color: #495057;
+    background: linear-gradient(135deg, #0f377e 0%, #1d57b6 52%, #53b8f5 100%);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.84rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.vendor-order-table tbody td {
+    padding: 18px;
+    border-bottom: 1px solid #edf2f8;
+}
+
+.vendor-order-table tbody tr {
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.vendor-order-table tbody tr:nth-child(even) {
+    background: rgba(243, 248, 255, 0.72);
+}
+
+.vendor-order-table tbody tr:hover {
+    background: linear-gradient(90deg, rgba(31,79,163,0.04), rgba(99,208,255,0.04));
+    transform: translateY(-1px);
+}
+
+.vendor-order-person-name,
+.vendor-order-company {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.vendor-order-select-btn {
+    min-width: 108px;
+    border-radius: 12px;
+    font-weight: 700;
+    padding: 8px 14px;
+    border: none;
+    background: linear-gradient(135deg, #0b3d91, #2c72d7);
+    box-shadow: 0 10px 18px rgba(11, 61, 145, 0.16);
+}
+
+.vendor-order-summary-label {
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    color: #64748b;
+    margin-bottom: 0.35rem;
+}
+
+.vendor-order-summary-value {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #102a63;
+    margin-bottom: 0.35rem;
+}
+
+.vendor-order-empty-cell {
+    background: linear-gradient(180deg, #fbfdff 0%, #f5f9ff 100%);
 }
 
 .mobile-stack-table__action .btn {
@@ -324,5 +473,16 @@ background:#f3f4f6;
     .language-widget {
         bottom: 14px;
         left: 12px;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .vendor-order-hero {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .vendor-order-hero-stat {
+        width: 100%;
     }
 }

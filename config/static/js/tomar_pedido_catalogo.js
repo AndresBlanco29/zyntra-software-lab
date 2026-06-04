@@ -278,9 +278,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById("contadorPedido").textContent = data.total_items;
                     document.getElementById("pedidoCantidad").textContent = data.total_items;
 
-                    btn.textContent = "Añadido ✔";
+                    btn.textContent = document.body.dataset.msgAdded || "Added ✔";
                     setTimeout(() => {
-                        btn.textContent = "Agregar al Pedido";
+                        btn.textContent = document.body.dataset.msgAddDefault || "Add to Order";
                     }, 1200);
 
                     animarNumero(

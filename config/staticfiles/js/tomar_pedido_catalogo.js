@@ -138,6 +138,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function syncOrderHistory(card, select) {
+        const historyLabel = card.querySelector('[data-order-history-current-label]');
+        const selectedOption = select?.selectedOptions?.[0];
+        const selectedPresentationId = selectedOption?.value || '';
+
+        if (historyLabel && selectedOption) {
+            historyLabel.textContent = selectedOption.textContent.trim();
+        }
+
+        card.querySelectorAll('[data-order-history-list]').forEach(historyBlock => {
+            historyBlock.classList.toggle('d-none', historyBlock.dataset.presentacionId !== selectedPresentationId);
+        });
+    }
+
     document.getElementById("buscador").addEventListener("keyup", filtrarProductos);
     document.getElementById("filtroCategoria").addEventListener("change", filtrarProductos);
     document.getElementById("filtroMarca").addEventListener("change", filtrarProductos);
@@ -324,7 +338,10 @@ document.addEventListener('DOMContentLoaded', function() {
             let nombre = this.options[this.selectedIndex].text;
 
             infoTexto.textContent = unidades + " " + tipo + " por " + nombre.toLowerCase();
+            syncOrderHistory(card, this);
         });
+
+        syncOrderHistory(card, select);
     });
 
     if (precioSelectorOptions) {

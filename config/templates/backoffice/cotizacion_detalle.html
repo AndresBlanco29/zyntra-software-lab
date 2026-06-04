@@ -111,7 +111,7 @@
 
         <form method="post" action="{% url 'generar_pedido_desde_cotizacion' cotizacion.id %}" class="mt-2">
           {% csrf_token %}
-          <button type="submit" class="btn btn-success w-100" {% if not can_generate_backoffice_order %}disabled{% endif %}>{% trans "Generate purchase order" %}</button>
+          <button type="submit" class="btn btn-success w-100" {% if not can_generate_backoffice_order %}disabled{% endif %}>{% trans "Generate sales order" %}</button>
         </form>
 
         {% if not can_send_customer_quote %}
@@ -119,12 +119,12 @@
         {% endif %}
 
         {% if not can_generate_backoffice_order and not pedido_existente %}
-        <div class="small text-muted mt-2">{% trans "Save and confirm the quote pricing first to generate the purchase order from BackOffice." %}</div>
+        <div class="small text-muted mt-2">{% trans "Save and confirm the quote pricing first to generate the sales order from BackOffice." %}</div>
         {% endif %}
 
         {% if pedido_existente %}
         <div class="alert alert-success mt-3 mb-0">
-          {% blocktrans with pedido_id=pedido_existente.id %}Purchase order #{{ pedido_id }} has already been generated for this quote.{% endblocktrans %}
+          {% blocktrans with pedido_id=pedido_existente.id %}Sales order #{{ pedido_id }} has already been generated for this quote.{% endblocktrans %}
           <a href="{% url 'backoffice_pedido_detalle' pedido_existente.id %}" class="alert-link">{% trans "Open order" %}</a>
         </div>
         {% endif %}

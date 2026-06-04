@@ -63,7 +63,7 @@ PERMISSION_SECTIONS = (
     {
         'key': 'backoffice_access',
         'title': _('BackOffice'),
-        'description': _('Quotes and purchase order processing for internal operations.'),
+        'description': _('Quotes and sales order processing for internal operations.'),
         'permissions': (
             {
                 'code': 'backoffice.dashboard.view',
@@ -82,13 +82,18 @@ PERMISSION_SECTIONS = (
             },
             {
                 'code': 'backoffice.orders.view',
-                'label': _('Purchase orders'),
-                'description': _('View purchase orders, order details and picking tickets.'),
+                'label': _('Sales orders'),
+                'description': _('View sales orders, order details and picking tickets.'),
             },
             {
                 'code': 'backoffice.orders.manage',
-                'label': _('Manage purchase orders'),
+                'label': _('Manage sales orders'),
                 'description': _('Update order status, edit line items and prepare picking workflows.'),
+            },
+            {
+                'code': 'backoffice.reports.view',
+                'label': _('Reports dashboard'),
+                'description': _('View daily closing, revenue trends, driver reconciliation and commercial performance metrics.'),
             },
         ),
     },
@@ -185,6 +190,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         'backoffice.quotes.manage',
         'backoffice.orders.view',
         'backoffice.orders.manage',
+        'backoffice.reports.view',
     },
     'seleccionador': {
         'selector.picking.view',
@@ -308,6 +314,7 @@ def get_redirect_url_for_user(user):
         ('admin.dashboard.view', 'panel_admin'),
         ('admin.users.view', 'lista_usuarios_internos'),
         ('backoffice.dashboard.view', 'backoffice_dashboard'),
+        ('backoffice.reports.view', 'reportes_dashboard'),
         ('driver.delivery.view', 'driver_delivery_list'),
         ('selector.picking.view', 'selector_picking_list'),
         ('admin.products.view', 'lista_productos'),

@@ -11,9 +11,7 @@ pymysql.install_as_MySQLdb()
 
 from pathlib import Path
 import os
-
-from dotenv import load_dotenv
-load_dotenv()
+import sys
 
 # ========================
 # BASE
@@ -21,6 +19,10 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = BASE_DIR.parent
+
+from dotenv import load_dotenv
+
+load_dotenv(PROJECT_ROOT / '.env', override=True)
 
 
 def env_bool(name, default=False):
@@ -49,7 +51,26 @@ LOCALE_PATHS = [
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key')
 
-DEBUG = env_bool('DEBUG', False)
+
+def _is_railway_deploy():
+    return bool(
+        os.environ.get('RAILWAY_ENVIRONMENT')
+        or os.environ.get('RAILWAY_SERVICE_NAME')
+        or os.environ.get('RAILWAY_PROJECT_ID')
+    )
+
+
+def _is_local_runserver():
+    return len(sys.argv) > 1 and sys.argv[1] == 'runserver'
+
+
+if os.environ.get('DEBUG') is not None:
+    DEBUG = env_bool('DEBUG', False)
+elif _is_local_runserver() and not _is_railway_deploy():
+    DEBUG = True
+else:
+    DEBUG = False
+
 SERVE_MEDIA = env_bool('SERVE_MEDIA', True)
 
 # Dominio canónico (sin www). Se usa en ALLOWED_HOSTS, CSRF y el middleware de redirección.
@@ -65,7 +86,7 @@ for _host in (railway_domain, CANONICAL_DOMAIN, f'www.{CANONICAL_DOMAIN}'):
         ALLOWED_HOSTS.append(_host)
 
 if DEBUG:
-    for host in ('127.0.0.1', 'localhost' , '192.168.26.3', '.ngrok-free.dev', '.ngrok-free.app'):
+    for host in ('127.0.0.1', 'localhost' , '192.168.26.5', '.ngrok-free.dev', '.ngrok-free.app'):
         if host not in ALLOWED_HOSTS:
             ALLOWED_HOSTS.append(host)
 
@@ -82,7 +103,12 @@ for _origin in (
         CSRF_TRUSTED_ORIGINS.append(_origin)
 
 if DEBUG:
-    for _origin in ('https://*.ngrok-free.dev', 'https://*.ngrok-free.app'):
+    for _origin in (
+        'http://127.0.0.1:8000',
+        'http://localhost:8000',
+        'https://*.ngrok-free.dev',
+        'https://*.ngrok-free.app',
+    ):
         if _origin not in CSRF_TRUSTED_ORIGINS:
             CSRF_TRUSTED_ORIGINS.append(_origin)
 
@@ -131,6 +157,7 @@ INSTALLED_APPS = [
     'config.cotizaciones',
     'config.facturacion',
     'config.inventario',
+    'config.integrations',
     'config.notificaciones',
     'config.pedidos',
     'config.reportes',
@@ -193,15 +220,47 @@ WSGI_APPLICATION = 'config.config.wsgi.application'
 # BASE DE DATOS
 # ========================
 
-mysql_name = os.environ.get('MYSQLDATABASE', '')
-mysql_user = os.environ.get('MYSQLUSER', '')
-mysql_password = os.environ.get('MYSQLPASSWORD', '')
-mysql_host = os.environ.get('MYSQLHOST', '')
-mysql_port = os.environ.get('MYSQLPORT', '3306')
+def _env_first(*names, default=''):
+    for name in names:
+        value = os.environ.get(name)
+        if value is not None and str(value).strip() != '':
+            return value.strip()
+    return default
+
+
+mysql_name = _env_first('MYSQLDATABASE', 'DB_NAME')
+mysql_user = _env_first('MYSQLUSER', 'DB_USER')
+mysql_host = _env_first('MYSQLHOST', 'DB_HOST', default='127.0.0.1')
+mysql_port = _env_first('MYSQLPORT', 'DB_PORT', default='3306')
+mysql_password = os.environ.get('MYSQLPASSWORD')
+if mysql_password is None:
+    mysql_password = os.environ.get('DB_PASSWORD')
 db_conn_max_age = env_int('DB_CONN_MAX_AGE', 600)
 view_cache_timeout = env_int('VIEW_CACHE_TIMEOUT', 60)
+QUICKBOOKS_CLIENT_ID = os.environ.get('QUICKBOOKS_CLIENT_ID', '').strip()
+QUICKBOOKS_CLIENT_SECRET = os.environ.get('QUICKBOOKS_CLIENT_SECRET', '').strip()
+QUICKBOOKS_REDIRECT_URI = os.environ.get(
+    'QUICKBOOKS_REDIRECT_URI',
+    'http://127.0.0.1:8000/quickbooks/callback/',
+).strip()
+QUICKBOOKS_ENVIRONMENT = os.environ.get('QUICKBOOKS_ENVIRONMENT', 'sandbox').strip().lower() or 'sandbox'
+QUICKBOOKS_SCOPES = tuple(
+    scope.strip()
+    for scope in os.environ.get('QUICKBOOKS_SCOPES', 'com.intuit.quickbooks.accounting').split()
+    if scope.strip()
+)
+QUICKBOOKS_API_MINOR_VERSION = os.environ.get('QUICKBOOKS_API_MINOR_VERSION', '75').strip() or '75'
+# When True, only catalog preview/import is allowed in QuickBooks Center (blocks accounting sync).
+QUICKBOOKS_CATALOG_ONLY_MODE = env_bool('QUICKBOOKS_CATALOG_ONLY_MODE', default=True)
 
-if mysql_name and mysql_user and mysql_host and mysql_password:
+mysql_configured = bool(
+    mysql_name
+    and mysql_user
+    and mysql_host
+    and (mysql_password is not None)
+)
+
+if mysql_configured:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',

@@ -69,7 +69,7 @@ def crear_pedido_desde_items(
     reservar_inventario=True,
 ):
     if not items_payload:
-        raise ValidationError(_('You must add at least one item to create the purchase order.'))
+        raise ValidationError(_('You must add at least one item to create the sales order.'))
 
     if reservar_inventario:
         validar_disponibilidad_para_items(items_payload, bypass_stock_check=bypass_stock_check)
@@ -107,6 +107,9 @@ def crear_pedido_desde_items(
         total += subtotal
 
     created_items = list(PedidoItem.objects.bulk_create(pedido_items))
+    if created_items and any(item.pk is None for item in created_items):
+        created_items = list(PedidoItem.objects.filter(pedido=pedido).order_by('id'))
+
     pedido.total = _quantize_money(total)
     pedido.save(update_fields=['total', 'actualizada_en'])
 
@@ -118,7 +121,7 @@ def crear_pedido_desde_items(
 
 def validar_estado_backoffice_con_bloqueo(pedido, nuevo_estado):
     if pedido.picking_bloqueado and nuevo_estado != pedido.estado:
-        raise ValidationError(_('This purchase order is blocked by an unresolved picking note.'))
+        raise ValidationError(_('This sales order is blocked by an unresolved picking note.'))
 
 
 def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales):
@@ -153,7 +156,7 @@ def asignar_picking_a_seleccionador(*, pedido, seleccionador):
     if getattr(seleccionador, 'role', '') != 'seleccionador':
         raise ValidationError(_('Only selector users can be assigned to a picking ticket.'))
     if pedido.estado not in {'RECIBIDO', 'EN_GESTION', 'LISTO_PARA_PICKING', 'PARA_VERIFICAR'}:
-        raise ValidationError(_('This purchase order cannot be assigned to picking in its current status.'))
+        raise ValidationError(_('This sales order cannot be assigned to picking in its current status.'))
 
     pedido.seleccionador = seleccionador
     pedido.estado = 'PARA_VERIFICAR'
@@ -293,8 +296,8 @@ def guardar_verificacion_picking(
 
 def notificar_backoffice_pedido(pedido):
     crear_notificacion_backoffice(
-        titulo=_('New purchase order #%(id)s') % {'id': pedido.id},
-        mensaje=_('%(client)s submitted a new purchase order.') % {'client': pedido.cliente.nombre_empresa},
+        titulo=_('New sales order #%(id)s') % {'id': pedido.id},
+        mensaje=_('%(client)s submitted a new sales order.') % {'client': pedido.cliente.nombre_empresa},
         tipo='PEDIDO',
         url=reverse('backoffice_pedido_detalle', args=[pedido.id]),
     )
@@ -317,12 +320,12 @@ def notificar_backoffice_pedido(pedido):
             'items': pedido.items.select_related('presentacion__producto').all(),
         },
     )
-    text_content = _('A new purchase order #%(id)s was created for %(client)s.') % {
+    text_content = _('A new sales order #%(id)s was created for %(client)s.') % {
         'id': pedido.id,
         'client': pedido.cliente.nombre_empresa,
     }
     email = EmailMultiAlternatives(
-        subject=_('New purchase order #%(id)s') % {'id': pedido.id},
+        subject=_('New sales order #%(id)s') % {'id': pedido.id},
         body=text_content,
         from_email=settings.DEFAULT_FROM_EMAIL or settings.SERVER_EMAIL,
         to=backoffice_emails,
@@ -344,11 +347,11 @@ def notificar_cliente_pedido(pedido):
             'items': pedido.items.select_related('presentacion__producto').all(),
         },
     )
-    text_content = _('Your purchase order #%(id)s was generated successfully and is now being prepared for dispatch.') % {
+    text_content = _('Your sales order #%(id)s was generated successfully and is now being prepared for dispatch.') % {
         'id': pedido.id,
     }
     email = EmailMultiAlternatives(
-        subject=_('Purchase order in process #%(id)s') % {'id': pedido.id},
+        subject=_('Sales order in process #%(id)s') % {'id': pedido.id},
         body=text_content,
         from_email=settings.DEFAULT_FROM_EMAIL or settings.SERVER_EMAIL,
         to=[cliente_email],

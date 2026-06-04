@@ -17,6 +17,7 @@ from config.core.pdf_branding import (
 	BRAND_TEXT,
 	build_pdf_brand_banner,
 )
+from config.core.workflow_badges import build_order_workflow_badge
 from config.usuarios.permissions import internal_permission_required
 from config.usuarios.models import Usuario
 from config.inventario.services import ajustar_cantidad_item_pedido_despues_picking, ajustar_reserva_item_pedido, cancelar_pedido_con_inventario, eliminar_item_pedido_con_inventario, reemplazar_presentacion_item_pedido, reemplazar_presentacion_item_pedido_despues_picking, reservar_stock_para_pedido_items
@@ -29,6 +30,8 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 from config.cotizaciones.models import Cotizacion
 from config.facturacion.models import NotaAjuste
 from config.facturacion.services import DEFAULT_SUGGESTED_PROFIT_PERCENTAGE, resolve_presentacion_suggested_unit_price, summarize_pending_customer_notes
+from config.integrations.quickbooks.services import get_connection_status
+from config.integrations.quickbooks.views import get_dashboard_sync_context
 from config.notificaciones.models import Notificacion
 from config.productos.models import Presentacion
 from config.inventario.models import StockPresentacion
@@ -173,14 +176,16 @@ def backoffice_dashboard(request):
 		'pending_adjustment_notes_count': NotaAjuste.objects.filter(estado='BORRADOR').count(),
 		'unread_adjustment_notifications_count': Notificacion.objects.filter(tipo='NOTA_AJUSTE', leida=False).count(),
 		'notificaciones': Notificacion.objects.all()[:8],
+		'quickbooks_status': get_connection_status(),
 	}
+	context.update(get_dashboard_sync_context(request=request))
 	return render(request, 'backoffice/dashboard.html', context)
 
 
 @login_required
 @internal_permission_required('backoffice.orders.view')
 def backoffice_pedidos(request):
-	base_queryset = Pedido.objects.select_related('cliente__usuario', 'vendedor', 'seleccionador').prefetch_related('items').order_by('-creada_en')
+	base_queryset = Pedido.objects.select_related('cliente__usuario', 'vendedor', 'seleccionador', 'invoice', 'invoice__driver').prefetch_related('items').order_by('-creada_en')
 	pending_statuses = {'RECIBIDO', 'LISTO_PARA_PICKING'}
 	in_progress_statuses = {'EN_GESTION', 'PARA_VERIFICAR', 'VERIFICADO_AJUSTADO', 'INVOICE_GENERADA'}
 	completed_statuses = {'DESPACHADO'}
@@ -200,6 +205,7 @@ def backoffice_pedidos(request):
 	for pedido in pedidos:
 		pedido.estado_label = _pedido_state_label(pedido.estado)
 		pedido.origen_label = _pedido_origin_label(pedido.origen)
+		pedido.workflow_badge = build_order_workflow_badge(pedido)
 	return render(request, 'backoffice/pedidos_lista.html', {
 		'pedidos': pedidos,
 		'view_mode': view_mode,
@@ -218,6 +224,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 		id=pedido_id,
 	)
 	pedido_items = list(pedido.items.select_related('presentacion__producto', 'presentacion__stock_operativo'))
+	pedido.workflow_badge = build_order_workflow_badge(pedido)
 	picker_stock_evaluation = evaluar_stock_fisico_verificacion_picking(
 		pedido_items=pedido_items,
 		cantidades_reales={item.id: item.cantidad for item in pedido_items},
@@ -297,7 +304,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 			return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
-		messages.success(request, _('Purchase order updated successfully.'))
+		messages.success(request, _('Sales order updated successfully.'))
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
 	context = {
@@ -441,6 +448,7 @@ def selector_picking_list(request):
 
 	for pedido in pedidos:
 		pedido.estado_label = _pedido_state_label(pedido.estado)
+		pedido.workflow_badge = build_order_workflow_badge(pedido)
 	return render(request, 'backoffice/selector_picking_list.html', {
 		'pedidos': pedidos,
 		'view_mode': view_mode,

@@ -10,6 +10,7 @@ from .sitemaps import sitemaps
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
+    path('quickbooks/', include('config.integrations.quickbooks.urls')),
     path('', include('config.core.urls')),
     path('', include('config.productos.urls')),
     path('cotizaciones/', include('config.cotizaciones.urls')),
@@ -19,6 +20,7 @@ urlpatterns = [
     path('clientes/', include('config.clientes.urls')),
     path('facturacion/', include('config.facturacion.urls')),
     path('inventario/', include('config.inventario.urls')),
+    path('reportes/', include('config.reportes.urls')),
     path('', include('config.usuarios.urls')),
     path('i18n/', include('django.conf.urls.i18n')),
 ]

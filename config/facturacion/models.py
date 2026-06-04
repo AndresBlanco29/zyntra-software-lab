@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from config.clientes.models import Cliente
+from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_CHOICES, QUICKBOOKS_SYNC_STATUS_PENDING
 from config.pedidos.models import Pedido, PedidoItem
 from config.productos.models import Presentacion
 
@@ -50,6 +51,9 @@ class Invoice(models.Model):
 	notificado_en = models.DateTimeField(blank=True, null=True)
 	pdf_generado_en = models.DateTimeField(blank=True, null=True)
 	creada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='invoices_creadas')
+	quickbooks_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+	sync_status = models.CharField(max_length=20, choices=QUICKBOOKS_SYNC_STATUS_CHOICES, default=QUICKBOOKS_SYNC_STATUS_PENDING, db_index=True)
+	last_synced_at = models.DateTimeField(blank=True, null=True)
 	creada_en = models.DateTimeField(auto_now_add=True)
 	actualizada_en = models.DateTimeField(auto_now=True)
 
@@ -435,7 +439,7 @@ class NotaAjuste(models.Model):
 	)
 
 	REASON_CHOICES = (
-		('DAMAGE', _('Physical damage / transport')),
+		('DAMAGE', _('Damage / transport')),
 		('DEFECT', _('Factory defect / quality issue')),
 		('MISSING_ITEM', _('Missing item')),
 		('OTHER', _('Other')),
@@ -475,6 +479,9 @@ class NotaAjuste(models.Model):
 	inventario_estado = models.CharField(max_length=20, choices=INVENTORY_STATUS_CHOICES, default='NO_APLICA')
 	creada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='notas_ajuste_creadas')
 	aprobada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='notas_ajuste_aprobadas')
+	quickbooks_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+	sync_status = models.CharField(max_length=20, choices=QUICKBOOKS_SYNC_STATUS_CHOICES, default=QUICKBOOKS_SYNC_STATUS_PENDING, db_index=True)
+	last_synced_at = models.DateTimeField(blank=True, null=True)
 	fecha = models.DateTimeField(default=timezone.now)
 	creada_en = models.DateTimeField(auto_now_add=True)
 	aprobada_en = models.DateTimeField(blank=True, null=True)

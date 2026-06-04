@@ -43,6 +43,35 @@ let clienteEstadoId = null;
 let accionEstadoCliente = null;
 let nombreEstadoCliente = "";
 
+function getCustomerPageMessages() {
+    const source = document.getElementById('clientesPage');
+    const dataset = source ? source.dataset : {};
+
+    return {
+        fillAllFields: dataset.msgFillAllFields || 'Please complete all fields.',
+        invalidEmail: dataset.msgInvalidEmail || 'Please enter a valid email address.',
+        invalidPhone: dataset.msgInvalidPhone || 'Phone number must contain exactly 10 digits.',
+        updateErrorPrefix: dataset.msgUpdateErrorPrefix || 'Error updating:',
+        unknownError: dataset.msgUnknownError || 'Unknown error.',
+        requestError: dataset.msgRequestError || 'Error processing the request.',
+        deactivateCustomerTitle: dataset.msgDeactivateCustomerTitle || 'Deactivate customer',
+        deactivateCustomerQuestion: dataset.msgDeactivateCustomerQuestion || 'Do you want to deactivate {name}?',
+        deactivateAction: dataset.msgDeactivateAction || 'Deactivate',
+        activateCustomerTitle: dataset.msgActivateCustomerTitle || 'Activate customer',
+        activateCustomerQuestion: dataset.msgActivateCustomerQuestion || 'Do you want to activate {name}?',
+        activateAction: dataset.msgActivateAction || 'Activate',
+        actionErrorPrefix: dataset.msgActionErrorPrefix || 'Error:',
+        actionIncomplete: dataset.msgActionIncomplete || 'Could not complete the action.',
+        customerFallbackName: dataset.msgCustomerFallbackName || 'customer',
+        customerDeactivatedTitle: dataset.msgCustomerDeactivatedTitle || 'Customer deactivated',
+        customerDeactivatedBody: dataset.msgCustomerDeactivatedBody || 'The customer was deactivated successfully.',
+        customerActivatedTitle: dataset.msgCustomerActivatedTitle || 'Customer activated',
+        customerActivatedBody: dataset.msgCustomerActivatedBody || 'The customer was activated successfully.'
+    };
+}
+
+const customerMessages = getCustomerPageMessages();
+
 function getEditLocationElements() {
     return {
         countryInput: document.getElementById('paisCliente'),
@@ -90,20 +119,20 @@ function guardarEditarCliente() {
 
     // Validaciones básicas
     if (!empresa || !correo || !telefono || !direccion || !locationValues.estado || !locationValues.ciudad || !locationValues.pais) {
-        alert('Por favor completa todos los campos');
+        alert(customerMessages.fillAllFields);
         return;
     }
 
     // Validar email
     const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!regexEmail.test(correo)) {
-        alert('Por favor ingresa un correo válido');
+        alert(customerMessages.invalidEmail);
         return;
     }
 
     // Validar teléfono (exactamente 10 dígitos)
     if (!/^\d{10}$/.test(telefono)) {
-        alert('El teléfono debe tener exactamente 10 dígitos');
+        alert(customerMessages.invalidPhone);
         return;
     }
 
@@ -145,19 +174,19 @@ function guardarEditarCliente() {
                 location.reload();
             }, 2000);
         } else {
-            alert('Error al actualizar: ' + (data.message || 'Error desconocido'));
+            alert(`${customerMessages.updateErrorPrefix} ${data.message || customerMessages.unknownError}`);
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error al procesar la solicitud');
+        alert(customerMessages.requestError);
     });
 }
 
 function abrirModalEstadoCliente(clienteId, nombreCompleto, accion) {
     clienteEstadoId = clienteId;
     accionEstadoCliente = accion;
-    nombreEstadoCliente = nombreCompleto || "cliente";
+    nombreEstadoCliente = nombreCompleto || customerMessages.customerFallbackName;
 
     const titulo = document.getElementById('tituloConfirmarEstadoCliente');
     const texto = document.getElementById('textoConfirmarEstadoCliente');
@@ -168,14 +197,14 @@ function abrirModalEstadoCliente(clienteId, nombreCompleto, accion) {
     }
 
     if (accion === 'desactivar') {
-        titulo.textContent = 'Desactivar cliente';
-        texto.textContent = `¿Deseas desactivar a ${nombreEstadoCliente}?`;
-        btnConfirmar.textContent = 'Desactivar';
+        titulo.textContent = customerMessages.deactivateCustomerTitle;
+        texto.textContent = customerMessages.deactivateCustomerQuestion.replace('{name}', nombreEstadoCliente);
+        btnConfirmar.textContent = customerMessages.deactivateAction;
         btnConfirmar.style.background = 'linear-gradient(to right, #b91c1c, #dc2626)';
     } else {
-        titulo.textContent = 'Activar cliente';
-        texto.textContent = `¿Deseas activar a ${nombreEstadoCliente}?`;
-        btnConfirmar.textContent = 'Activar';
+        titulo.textContent = customerMessages.activateCustomerTitle;
+        texto.textContent = customerMessages.activateCustomerQuestion.replace('{name}', nombreEstadoCliente);
+        btnConfirmar.textContent = customerMessages.activateAction;
         btnConfirmar.style.background = 'linear-gradient(to right, #0b3d91, #1565c0)';
     }
 
@@ -206,7 +235,7 @@ function confirmarCambioEstadoCliente() {
     .then(response => response.json())
     .then(data => {
         if (!data.success) {
-            alert('Error: ' + (data.message || 'No se pudo completar la accion'));
+            alert(`${customerMessages.actionErrorPrefix} ${data.message || customerMessages.actionIncomplete}`);
             return;
         }
 
@@ -219,11 +248,11 @@ function confirmarCambioEstadoCliente() {
         const textoExito = document.getElementById('textoExitoEstadoCliente');
 
         if (accionEstadoCliente === 'desactivar') {
-            tituloExito.textContent = 'Cliente desactivado';
-            textoExito.textContent = 'El cliente se ha desactivado correctamente.';
+            tituloExito.textContent = customerMessages.customerDeactivatedTitle;
+            textoExito.textContent = customerMessages.customerDeactivatedBody;
         } else {
-            tituloExito.textContent = 'Cliente activado';
-            textoExito.textContent = 'El cliente se ha activado correctamente.';
+            tituloExito.textContent = customerMessages.customerActivatedTitle;
+            textoExito.textContent = customerMessages.customerActivatedBody;
         }
 
         const modalExito = new bootstrap.Modal(document.getElementById('exitoEstadoClienteModal'));
@@ -235,7 +264,7 @@ function confirmarCambioEstadoCliente() {
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error al procesar la solicitud');
+        alert(customerMessages.requestError);
     });
 }
 

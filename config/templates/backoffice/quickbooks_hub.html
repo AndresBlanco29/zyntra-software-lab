@@ -1,0 +1,1532 @@
+﻿{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "QuickBooks Center" %}{% endblock %}
+
+{% block content %}
+<style>
+  .qb-shell {
+    --qb-navy: #102a63;
+    --qb-blue: #1f6fd1;
+    --qb-cyan: #7de3ff;
+    --qb-ice: #f4fbff;
+    --qb-stroke: rgba(16, 42, 99, 0.12);
+    --qb-text-soft: #5a6c86;
+  }
+
+  .qb-hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: 28px;
+    padding: 2rem;
+    background: linear-gradient(135deg, #0f2860 0%, #184da0 46%, #73d7ff 100%);
+    color: #fff;
+    box-shadow: 0 24px 60px rgba(16, 42, 99, 0.22);
+  }
+
+  .qb-hero::before,
+  .qb-hero::after {
+    content: "";
+    position: absolute;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .qb-hero::before {
+    width: 260px;
+    height: 260px;
+    top: -120px;
+    right: -70px;
+  }
+
+  .qb-hero::after {
+    width: 170px;
+    height: 170px;
+    bottom: -70px;
+    right: 210px;
+  }
+
+  .qb-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.45rem 0.85rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .qb-hero-copy {
+    position: relative;
+    z-index: 1;
+  }
+
+  .qb-hero-copy h1 {
+    font-size: clamp(2rem, 4vw, 3.3rem);
+    line-height: 1.03;
+    margin: 0.95rem 0 0.9rem;
+  }
+
+  .qb-hero-copy p {
+    color: rgba(255, 255, 255, 0.84);
+    max-width: 56rem;
+    font-size: 1.02rem;
+  }
+
+  .qb-hero-panel {
+    position: relative;
+    z-index: 1;
+    border-radius: 24px;
+    padding: 1.2rem;
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(8px);
+  }
+
+  .qb-hero-status {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.9rem;
+    align-items: start;
+    margin-top: 1.2rem;
+    padding: 1rem 1.1rem;
+    border-radius: 20px;
+    border: 1px solid transparent;
+    backdrop-filter: blur(10px);
+  }
+
+  .qb-hero-status.is-green {
+    background: rgba(34, 181, 115, 0.14);
+    border-color: rgba(170, 245, 207, 0.28);
+  }
+
+  .qb-hero-status.is-yellow {
+    background: rgba(240, 180, 41, 0.16);
+    border-color: rgba(255, 225, 138, 0.28);
+  }
+
+  .qb-hero-status.is-red {
+    background: rgba(225, 75, 90, 0.16);
+    border-color: rgba(255, 177, 184, 0.26);
+  }
+
+  .qb-hero-status-icon {
+    width: 2.8rem;
+    height: 2.8rem;
+    border-radius: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.16);
+  }
+
+  .qb-hero-status-icon svg {
+    width: 1.3rem;
+    height: 1.3rem;
+  }
+
+  .qb-hero-status-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+  }
+
+  .qb-hero-status-copy {
+    color: rgba(255, 255, 255, 0.86);
+    margin-bottom: 0;
+    font-size: 0.95rem;
+  }
+
+  .qb-metric {
+    border-radius: 18px;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    min-height: 100%;
+  }
+
+  .qb-metric-label {
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.76);
+  }
+
+  .qb-metric-value {
+    font-size: 1.35rem;
+    font-weight: 700;
+  }
+
+  .qb-executive-banner {
+    border-radius: 24px;
+    padding: 1.1rem 1.2rem;
+    border: 1px solid transparent;
+    box-shadow: 0 14px 34px rgba(16, 42, 99, 0.08);
+  }
+
+  .qb-executive-banner.is-green {
+    background: linear-gradient(135deg, rgba(34, 181, 115, 0.14), rgba(132, 233, 185, 0.14));
+    border-color: rgba(34, 181, 115, 0.2);
+  }
+
+  .qb-executive-banner.is-yellow {
+    background: linear-gradient(135deg, rgba(240, 180, 41, 0.14), rgba(255, 225, 138, 0.18));
+    border-color: rgba(240, 180, 41, 0.24);
+  }
+
+  .qb-executive-banner.is-red {
+    background: linear-gradient(135deg, rgba(225, 75, 90, 0.12), rgba(255, 177, 184, 0.18));
+    border-color: rgba(225, 75, 90, 0.18);
+  }
+
+  .qb-executive-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--qb-navy);
+  }
+
+  .qb-executive-copy {
+    color: var(--qb-text-soft);
+    margin-bottom: 0;
+  }
+
+  .qb-section-card {
+    border: 1px solid var(--qb-stroke);
+    border-radius: 24px;
+    background: #fff;
+    box-shadow: 0 18px 40px rgba(16, 42, 99, 0.08);
+  }
+
+  .qb-step-card {
+    border: 1px solid var(--qb-stroke);
+    border-radius: 24px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    height: 100%;
+    box-shadow: 0 14px 36px rgba(16, 42, 99, 0.08);
+  }
+
+  .qb-step-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .qb-step-number {
+    width: 2.7rem;
+    height: 2.7rem;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #1b65c5, #78dfff);
+    color: #fff;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+
+  .qb-step-visual {
+    width: 4rem;
+    height: 4rem;
+    border-radius: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(19, 67, 147, 0.14), rgba(86, 207, 255, 0.2));
+    color: var(--qb-blue);
+    flex: 0 0 auto;
+  }
+
+  .qb-step-visual svg {
+    width: 1.85rem;
+    height: 1.85rem;
+  }
+
+  .qb-step-card p,
+  .qb-soft-copy {
+    color: var(--qb-text-soft);
+  }
+
+  .qb-action-stack {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .qb-action-item {
+    border: 1px solid rgba(16, 42, 99, 0.09);
+    border-radius: 18px;
+    background: #fff;
+    padding: 0.9rem;
+  }
+
+  .qb-action-item[id] {
+    scroll-margin-top: 110px;
+  }
+
+  .qb-action-item .btn,
+  .qb-action-item .form-control,
+  .qb-action-item .form-select,
+  .qb-action-item textarea {
+    border-radius: 14px;
+  }
+
+  .qb-action-note {
+    margin-top: 0.55rem;
+    margin-bottom: 0;
+    color: var(--qb-text-soft);
+    font-size: 0.9rem;
+  }
+
+  .qb-strip {
+    border-radius: 20px;
+    background: var(--qb-ice);
+    border: 1px dashed rgba(16, 42, 99, 0.2);
+    padding: 1rem 1.15rem;
+  }
+
+  .qb-mini-stat {
+    border: 1px solid var(--qb-stroke);
+    border-radius: 20px;
+    background: #fff;
+    padding: 1rem;
+    height: 100%;
+  }
+
+  .qb-mini-stat-value {
+    font-size: 1.65rem;
+    font-weight: 700;
+    color: var(--qb-navy);
+  }
+
+  .qb-mini-stat-label {
+    color: var(--qb-text-soft);
+    font-size: 0.9rem;
+  }
+
+  .qb-preview-card {
+    scroll-margin-top: 5.5rem;
+  }
+
+  .qb-chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+  }
+
+  .qb-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    border-radius: 999px;
+    padding: 0.55rem 0.9rem;
+    background: rgba(16, 42, 99, 0.06);
+    color: var(--qb-navy);
+    font-size: 0.9rem;
+  }
+
+  .qb-recent-item {
+    border: 1px solid var(--qb-stroke);
+    border-radius: 18px;
+    padding: 0.9rem 1rem;
+    background: #fff;
+  }
+
+  .qb-health-board {
+    border: 1px solid var(--qb-stroke);
+    border-radius: 24px;
+    background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+    box-shadow: 0 18px 40px rgba(16, 42, 99, 0.08);
+  }
+
+  .qb-traffic-stack {
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .qb-signal {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.9rem;
+    align-items: start;
+    padding: 1rem;
+    border-radius: 20px;
+    border: 1px solid rgba(16, 42, 99, 0.08);
+    background: #fff;
+  }
+
+  .qb-signal-light {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 999px;
+    margin-top: 0.25rem;
+    box-shadow: 0 0 0 0.28rem rgba(0, 0, 0, 0.03);
+  }
+
+  .qb-signal-light.is-green {
+    background: #22b573;
+    box-shadow: 0 0 0 0.35rem rgba(34, 181, 115, 0.14);
+  }
+
+  .qb-signal-light.is-yellow {
+    background: #f0b429;
+    box-shadow: 0 0 0 0.35rem rgba(240, 180, 41, 0.15);
+  }
+
+  .qb-signal-light.is-red {
+    background: #e14b5a;
+    box-shadow: 0 0 0 0.35rem rgba(225, 75, 90, 0.14);
+  }
+
+  .qb-signal-title {
+    font-weight: 700;
+    color: var(--qb-navy);
+  }
+
+  .qb-signal-copy {
+    color: var(--qb-text-soft);
+    font-size: 0.92rem;
+    margin-bottom: 0;
+  }
+
+  .qb-signal-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.9rem;
+    margin-top: 0.8rem;
+    padding: 0.75rem 0.9rem;
+    border-radius: 16px;
+    border: 1px solid rgba(16, 42, 99, 0.08);
+    background: rgba(16, 42, 99, 0.03);
+    color: var(--qb-navy);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .qb-signal-link:hover {
+    background: rgba(16, 42, 99, 0.07);
+    color: var(--qb-navy);
+  }
+
+  .qb-signal-link-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.1rem;
+    height: 2.1rem;
+    padding: 0 0.5rem;
+    border-radius: 999px;
+    background: #fff;
+    border: 1px solid rgba(16, 42, 99, 0.08);
+  }
+
+  .qb-preview-card {
+    border: 1px solid var(--qb-stroke);
+    border-radius: 24px;
+    background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+    box-shadow: 0 18px 40px rgba(16, 42, 99, 0.08);
+  }
+
+  .qb-preview-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 0.65rem 1rem;
+    border: 1px solid rgba(16, 42, 99, 0.12);
+    background: #fff;
+    color: var(--qb-navy);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .qb-preview-tab.is-active {
+    background: linear-gradient(135deg, #134393, #56cfff);
+    color: #fff;
+    border-color: transparent;
+  }
+
+  .qb-preview-table thead th {
+    font-size: 0.82rem;
+    color: var(--qb-text-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom-color: rgba(16, 42, 99, 0.08);
+  }
+
+  .qb-preview-table tbody td {
+    vertical-align: middle;
+    border-bottom-color: rgba(16, 42, 99, 0.06);
+  }
+
+  .qb-backup-list {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .qb-backup-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid rgba(16, 42, 99, 0.09);
+    border-radius: 18px;
+    background: #fff;
+  }
+
+  .qb-backup-meta {
+    color: var(--qb-text-soft);
+    font-size: 0.88rem;
+  }
+
+  .qb-section-locked {
+    opacity: 0.42;
+    pointer-events: none;
+    user-select: none;
+    filter: grayscale(0.15);
+  }
+
+  .qb-section-locked .btn,
+  .qb-section-locked a.btn,
+  .qb-section-locked button,
+  .qb-section-locked select,
+  .qb-section-locked textarea {
+    cursor: not-allowed;
+  }
+
+  .qb-preview-tab.is-disabled {
+    opacity: 0.45;
+    pointer-events: none;
+    cursor: not-allowed;
+  }
+
+  @media (max-width: 991.98px) {
+    .qb-hero {
+      padding: 1.4rem;
+    }
+  }
+</style>
+
+<div class="qb-shell">
+  {% if quickbooks_catalog_only_mode %}
+  <div class="alert alert-info border-0 shadow-sm mb-4" role="status">
+    <strong>{% trans "Catalog-only mode" %}</strong> —
+    {% trans "Only QuickBooks connection checks and catalog import are enabled. Accounting imports, pull sync, and outbound sync stay disabled until you turn off QUICKBOOKS_CATALOG_ONLY_MODE." %}
+  </div>
+  {% endif %}
+  {% with total_pending=quickbooks_pending_customer_count|add:quickbooks_pending_presentation_count|add:quickbooks_pending_invoice_count|add:quickbooks_pending_note_count %}
+  <section class="qb-hero mb-4">
+    <div class="row g-4 align-items-center">
+      <div class="col-xl-8 qb-hero-copy">
+        <span class="qb-eyebrow">{% trans "QuickBooks workflow" %}</span>
+        <h1>{% trans "A simpler place to manage QuickBooks" %}</h1>
+        <p>{% trans "If you are the owner or manager, use this page in order: connect the account, review what is coming from QuickBooks, import only what you need, and resolve any record that needs a manual decision. Each button explains its purpose before you use it." %}</p>
+        {% if not quickbooks_status.credentials_configured %}
+        <div class="qb-hero-status is-red">
+          <span class="qb-hero-status-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"></circle>
+              <path d="M12 8v5"></path>
+              <path d="M12 16h.01"></path>
+            </svg>
+          </span>
+          <div>
+            <div class="qb-hero-status-title">{% trans "QuickBooks API credentials missing" %}</div>
+            <p class="qb-hero-status-copy">{% trans "Add QUICKBOOKS_CLIENT_ID and QUICKBOOKS_CLIENT_SECRET to the .env file in the project folder (see .env.example), restart runserver, then use Connect QuickBooks." %}</p>
+          </div>
+        </div>
+        {% elif not quickbooks_status.is_active %}
+        <div class="qb-hero-status is-red">
+          <span class="qb-hero-status-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"></circle>
+              <path d="M12 8v5"></path>
+              <path d="M12 16h.01"></path>
+            </svg>
+          </span>
+          <div>
+            <div class="qb-hero-status-title">{% trans "QuickBooks is not connected yet" %}</div>
+            <p class="qb-hero-status-copy">{% trans "Connect the account first. Once that is done, the rest of the page becomes your guided workflow." %}</p>
+          </div>
+        </div>
+        {% elif quickbooks_active_conflicts_count > 0 %}
+        <div class="qb-hero-status is-yellow">
+          <span class="qb-hero-status-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3 2.8 19h18.4L12 3Z"></path>
+              <path d="M12 9v4.5"></path>
+              <path d="M12 17h.01"></path>
+            </svg>
+          </span>
+          <div>
+            <div class="qb-hero-status-title">{{ quickbooks_active_conflicts_count }} {% trans "items to review" %}</div>
+            <p class="qb-hero-status-copy">{% trans "The connection is working, but some records still need your decision before the process feels fully clean." %}</p>
+          </div>
+        </div>
+        {% elif total_pending > 20 %}
+        <div class="qb-hero-status is-yellow">
+          <span class="qb-hero-status-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3v12"></path>
+              <path d="m7.5 10.5 4.5 4.5 4.5-4.5"></path>
+              <rect x="4" y="17" width="16" height="4" rx="1.5"></rect>
+            </svg>
+          </span>
+          <div>
+            <div class="qb-hero-status-title">{{ total_pending }} {% trans "local records waiting to be sent" %}</div>
+            <p class="qb-hero-status-copy">{% trans "Everything is connected, but it is a good moment to run the pending local sync so accounting stays current." %}</p>
+          </div>
+        </div>
+        {% else %}
+        <div class="qb-hero-status is-green">
+          <span class="qb-hero-status-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m5 12 4.2 4.2L19 6.5"></path>
+            </svg>
+          </span>
+          <div>
+            <div class="qb-hero-status-title">{% trans "Today everything looks under control" %}</div>
+            <p class="qb-hero-status-copy">{% trans "QuickBooks is connected and there is no major warning right now, so you can continue with the normal routine." %}</p>
+          </div>
+        </div>
+        {% endif %}
+        <div class="d-flex flex-wrap gap-2 mt-4">
+          <a href="{% url 'quickbooks_import_conflicts' %}" class="btn btn-light text-primary fw-semibold">
+            {% trans "Open review queue" %}
+            {% if quickbooks_active_conflicts_count %}<span class="badge text-bg-danger ms-1">{{ quickbooks_active_conflicts_count }}</span>{% endif %}
+          </a>
+          {% if quickbooks_status.is_active %}
+          <span class="btn btn-outline-light disabled">{% trans "Connected to" %} {{ quickbooks_status.environment|upper }}</span>
+          {% else %}
+          <span class="btn btn-outline-light disabled">{% trans "Connect QuickBooks to unlock the next steps" %}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-xl-4">
+        <div class="qb-hero-panel">
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="qb-metric">
+                <div class="qb-metric-label">{% trans "Connection" %}</div>
+                <div class="qb-metric-value">{% if quickbooks_status.is_active %}{% trans "Ready" %}{% else %}{% trans "Pending" %}{% endif %}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="qb-metric">
+                <div class="qb-metric-label">{% trans "Environment" %}</div>
+                <div class="qb-metric-value">{{ quickbooks_status.environment|upper }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="qb-metric">
+                <div class="qb-metric-label">{% trans "Active queue" %}</div>
+                <div class="qb-metric-value">{{ quickbooks_active_conflicts_count }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="qb-metric">
+                <div class="qb-metric-label">{% trans "Pending local push" %}</div>
+                <div class="qb-metric-value">{{ quickbooks_pending_customer_count|add:quickbooks_pending_presentation_count|add:quickbooks_pending_invoice_count|add:quickbooks_pending_note_count }}</div>
+              </div>
+            </div>
+          </div>
+          <div class="mt-3 small text-white-50">
+            {% if quickbooks_status.realm_id %}
+            <div>{% trans "Realm ID" %}: {{ quickbooks_status.realm_id }}</div>
+            {% endif %}
+            {% if quickbooks_status.last_refreshed_at %}
+            <div>{% trans "Last token refresh" %}: {{ quickbooks_status.last_refreshed_at }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {% if quickbooks_dashboard_feedback %}
+  <div class="alert {% if quickbooks_dashboard_feedback.ok %}alert-success{% else %}alert-danger{% endif %} shadow-sm border-0 mb-4">
+    <div class="fw-semibold mb-1">{{ quickbooks_dashboard_feedback.title }}</div>
+    {% for detail in quickbooks_dashboard_feedback.details %}
+    <div class="small">{{ detail }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if quickbooks_status.last_error %}
+  <div class="alert alert-warning shadow-sm border-0 mb-4">
+    <div class="fw-semibold mb-1">{% trans "Latest QuickBooks warning" %}</div>
+    <div class="small">{{ quickbooks_status.last_error }}</div>
+  </div>
+  {% endif %}
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-6 col-xl-3">
+      <div class="qb-mini-stat">
+        <div class="qb-mini-stat-value">{{ quickbooks_pending_customer_count }}</div>
+        <div class="qb-mini-stat-label">{% trans "Customers waiting to sync from the app" %}</div>
+      </div>
+    </div>
+    <div class="col-lg-6 col-xl-3">
+      <div class="qb-mini-stat">
+        <div class="qb-mini-stat-value">{{ quickbooks_pending_presentation_count }}</div>
+        <div class="qb-mini-stat-label">{% trans "Catalog items waiting to sync from the app" %}</div>
+      </div>
+    </div>
+    <div class="col-lg-6 col-xl-3">
+      <div class="qb-mini-stat">
+        <div class="qb-mini-stat-value">{{ quickbooks_pending_invoice_count }}</div>
+        <div class="qb-mini-stat-label">{% trans "Invoices waiting to sync from the app" %}</div>
+      </div>
+    </div>
+    <div class="col-lg-6 col-xl-3">
+      <div class="qb-mini-stat">
+        <div class="qb-mini-stat-value">{{ quickbooks_pending_note_count }}</div>
+        <div class="qb-mini-stat-label">{% trans "Approved adjustment notes waiting to sync" %}</div>
+      </div>
+    </div>
+  </div>
+
+  <section class="qb-section-card p-4 p-xl-5 mb-4">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+      <div>
+        <h2 class="mb-1">{% trans "Step by step" %}</h2>
+        <p class="qb-soft-copy mb-0">{% trans "Follow these blocks in order. This avoids confusion between checking data, importing data, and syncing your own local records." %}</p>
+      </div>
+      <span class="badge text-bg-light border px-3 py-2">{% trans "Recommended order" %}: 1 → 2 → 3 → 4</span>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-12 col-xl-6">
+        <div class="qb-step-card p-4">
+          <div class="qb-step-head">
+            <span class="qb-step-number">1</span>
+            <span class="qb-step-visual" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M7 10.5V7.75A4.75 4.75 0 0 1 11.75 3h.5A4.75 4.75 0 0 1 17 7.75v2.75"></path>
+                <rect x="5" y="10" width="14" height="11" rx="2"></rect>
+                <path d="M12 14.25v2.5"></path>
+              </svg>
+            </span>
+            <div>
+              <h4 class="mb-1">{% trans "Connect and verify" %}</h4>
+              <p class="mb-0">{% trans "Start here when QuickBooks has not been linked yet, or when you want to confirm the token still works." %}</p>
+            </div>
+          </div>
+          <div class="qb-action-stack">
+            <div class="qb-action-item" id="qb-import-customers">
+              {% if quickbooks_status.credentials_configured %}
+              <a href="{% url 'quickbooks_login' %}" class="btn btn-success w-100">{% trans "Connect QuickBooks" %}</a>
+              {% else %}
+              <button type="button" class="btn btn-success w-100" disabled>{% trans "Connect QuickBooks" %}</button>
+              {% endif %}
+              <p class="qb-action-note">{% if quickbooks_status.credentials_configured %}{% trans "Use this first. It opens Intuit so you can link the company to this system." %}{% else %}{% trans "Configure .env credentials first (see alert above)." %}{% endif %}</p>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="qb-action-item h-100">
+                  <form method="get" action="{% url 'quickbooks_test_connection' %}">
+                    <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                    <button type="submit" class="btn btn-outline-primary w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Test connection" %}</button>
+                  </form>
+                  <p class="qb-action-note">{% trans "Confirms the connection is alive right now before you import or sync anything." %}</p>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="qb-action-item h-100">
+                  <form method="get" action="{% url 'quickbooks_status' %}">
+                    <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                    <button type="submit" class="btn btn-outline-secondary w-100">{% trans "View status" %}</button>
+                  </form>
+                  <p class="qb-action-note">{% trans "Shows technical status, environment, and connection details if you need to review them." %}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-xl-6">
+        <div class="qb-step-card p-4">
+          <div class="qb-step-head">
+            <span class="qb-step-number">2</span>
+            <span class="qb-step-visual" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="6"></circle>
+                <path d="m20 20-4.35-4.35"></path>
+                <path d="M11 8.5v5"></path>
+                <path d="M8.5 11H13.5"></path>
+              </svg>
+            </span>
+            <div>
+              <h4 class="mb-1">{% trans "Review before bringing data in" %}</h4>
+              <p class="mb-0">{% trans "Choose what you want to inspect. The preview opens right below on this same page so you do not lose the flow." %}</p>
+            </div>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
+              <div class="qb-action-item h-100">
+                <form method="get" action="{% url 'quickbooks_center' %}">
+                  <input type="hidden" name="preview" value="customers">
+                  <input type="hidden" name="preview_limit" value="8">
+                  <button type="submit" class="btn btn-outline-dark w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Preview customers" %}</button>
+                </form>
+                <p class="qb-action-note">{% trans "Only shows the customer list from QuickBooks. It does not change your system." %}</p>
+              </div>
+            </div>
+            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
+              <div class="qb-action-item h-100">
+                <form method="get" action="{% url 'quickbooks_center' %}">
+                  <input type="hidden" name="preview" value="vendors">
+                  <input type="hidden" name="preview_limit" value="8">
+                  <button type="submit" class="btn btn-outline-dark w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Preview suppliers" %}</button>
+                </form>
+                <p class="qb-action-note">{% trans "Only shows the supplier list from QuickBooks. It does not change your system." %}</p>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="qb-action-item h-100">
+                <form method="get" action="{% url 'quickbooks_center' %}">
+                  <input type="hidden" name="preview" value="items">
+                  <input type="hidden" name="preview_limit" value="8">
+                  <button type="submit" class="btn btn-outline-dark w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Preview catalog" %}</button>
+                </form>
+                <p class="qb-action-note">{% trans "Use this to review products and presentations before importing them." %}</p>
+              </div>
+            </div>
+            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
+              <div class="qb-action-item h-100">
+                <form method="get" action="{% url 'quickbooks_center' %}">
+                  <input type="hidden" name="preview" value="invoices">
+                  <input type="hidden" name="preview_limit" value="8">
+                  <button type="submit" class="btn btn-outline-dark w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Preview invoices" %}</button>
+                </form>
+                <p class="qb-action-note">{% trans "Review sales documents before matching them with local invoices." %}</p>
+              </div>
+            </div>
+            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
+              <div class="qb-action-item h-100">
+                <form method="get" action="{% url 'quickbooks_center' %}">
+                  <input type="hidden" name="preview" value="credit_memos">
+                  <input type="hidden" name="preview_limit" value="8">
+                  <button type="submit" class="btn btn-outline-dark w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Preview credit memos" %}</button>
+                </form>
+                <p class="qb-action-note">{% trans "Review credit memos before importing or deciding how to match them." %}</p>
+              </div>
+            </div>
+            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
+              <div class="qb-action-item h-100">
+                <form method="get" action="{% url 'quickbooks_center' %}">
+                  <input type="hidden" name="preview" value="purchase_orders">
+                  <input type="hidden" name="preview_limit" value="8">
+                  <button type="submit" class="btn btn-outline-dark w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Preview purchase orders" %}</button>
+                </form>
+                <p class="qb-action-note">{% trans "Review QuickBooks purchase orders before importing them as supplier purchase records." %}</p>
+              </div>
+            </div>
+            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
+              <div class="qb-action-item h-100">
+                <form method="get" action="{% url 'quickbooks_center' %}">
+                  <input type="hidden" name="preview" value="bills">
+                  <input type="hidden" name="preview_limit" value="8">
+                  <button type="submit" class="btn btn-outline-dark w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Preview bills" %}</button>
+                </form>
+                <p class="qb-action-note">{% trans "Review supplier Bills before bringing them into purchases and inventory." %}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-xl-6">
+        <div class="qb-step-card p-4">
+          <div class="qb-step-head">
+            <span class="qb-step-number">3</span>
+            <span class="qb-step-visual" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3v12"></path>
+                <path d="m7.5 10.5 4.5 4.5 4.5-4.5"></path>
+                <rect x="4" y="17" width="16" height="4" rx="1.5"></rect>
+              </svg>
+            </span>
+            <div>
+              <h4 class="mb-1">{% trans "Bring QuickBooks data into the app" %}</h4>
+              <p class="mb-0">{% trans "Run these only after reviewing previews. Each action has a different purpose so the owner does not confuse catalog import with accounting import." %}</p>
+            </div>
+          </div>
+          <div class="qb-action-stack">
+              <div class="qb-action-item{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}" id="qb-import-suppliers">
+              <form method="post" action="{% url 'quickbooks_import_customers_to_local' %}" data-qb-operation="import_customers_to_local">
+                {% csrf_token %}
+                <input type="hidden" name="limit" value="0">
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <button type="submit" class="btn btn-outline-success w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Import customers to the app" %}</button>
+              </form>
+              <p class="qb-action-note">{% trans "Brings customer data from QuickBooks into your system." %}</p>
+            </div>
+              <div class="qb-action-item{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}" id="qb-import-suppliers-vendors">
+              <form method="post" action="{% url 'quickbooks_import_vendors_to_local' %}" data-qb-operation="import_vendors_to_local">
+                {% csrf_token %}
+                <input type="hidden" name="limit" value="25">
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <button type="submit" class="btn btn-outline-success w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Import suppliers to the app" %}</button>
+              </form>
+              <p class="qb-action-note">{% trans "Brings QuickBooks vendors into your local supplier catalog." %}</p>
+            </div>
+              <div class="qb-action-item" id="qb-import-catalog">
+              <form method="post" action="{% url 'quickbooks_import_items_to_local' %}" data-qb-operation="import_items_to_local">
+                {% csrf_token %}
+                <input type="hidden" name="limit" value="0">
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <button type="submit" class="btn btn-outline-success w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Import catalog to the app" %}</button>
+              </form>
+              <p class="qb-action-note">{% trans "Brings products and presentations from QuickBooks into your system." %}</p>
+            </div>
+            <div class="qb-action-item{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}" id="qb-pull-accounting">
+              <form method="post" action="{% url 'quickbooks_import_accounting_documents_to_local' %}" data-qb-operation="import_accounting_documents_to_local">
+                {% csrf_token %}
+                <input type="hidden" name="limit" value="0">
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <button type="submit" class="btn btn-outline-warning w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Pull accounting documents" %}</button>
+              </form>
+              <p class="qb-action-note">{% trans "Imports invoice history and credit memos from QuickBooks. If there is no local invoice or note yet, the system creates a financial debit or credit note automatically when it can identify the local customer." %}</p>
+            </div>
+            <div class="qb-action-item{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}" id="qb-import-purchase-orders">
+              <form method="post" action="{% url 'quickbooks_import_purchase_orders_to_local' %}" data-qb-operation="import_purchase_orders_to_local">
+                {% csrf_token %}
+                <input type="hidden" name="limit" value="25">
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <button type="submit" class="btn btn-outline-warning w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Import purchase orders to the app" %}</button>
+              </form>
+              <p class="qb-action-note">{% trans "Creates local supplier purchase records from QuickBooks purchase orders without receiving inventory yet." %}</p>
+            </div>
+            <div class="qb-action-item{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}" id="qb-import-bills">
+              <form method="post" action="{% url 'quickbooks_import_bills_to_local' %}" data-qb-operation="import_bills_to_local">
+                {% csrf_token %}
+                <input type="hidden" name="limit" value="25">
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <button type="submit" class="btn btn-outline-warning w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Import Bills to the app" %}</button>
+              </form>
+              <p class="qb-action-note">{% trans "Creates local supplier purchases from QuickBooks Bills and loads inventory when the catalog items are already linked." %}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-xl-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
+        <div class="qb-step-card p-4">
+          <div class="qb-step-head">
+            <span class="qb-step-number">4</span>
+            <span class="qb-step-visual" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 12a8 8 0 0 1 13.66-5.66"></path>
+                <path d="M20 4v5h-5"></path>
+                <path d="M20 12a8 8 0 0 1-13.66 5.66"></path>
+                <path d="M4 20v-5h5"></path>
+              </svg>
+            </span>
+            <div>
+              <h4 class="mb-1">{% trans "Keep both systems aligned" %}</h4>
+              <p class="mb-0">{% trans "Use this section for routine sync runs and for the cases that need manual review." %}</p>
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <div class="qb-action-item h-100" id="qb-pull-sync">
+                <form method="post" action="{% url 'quickbooks_pull_sync_to_local' %}" data-qb-operation="pull_sync_to_local">
+                  {% csrf_token %}
+                  <input type="hidden" name="limit" value="25">
+                  <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                  <button type="submit" class="btn btn-primary w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Run pull sync now" %}</button>
+                </form>
+                <p class="qb-action-note">{% trans "This is the normal daily option. It only looks for new or changed information." %}</p>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="qb-action-item h-100" id="qb-full-resync">
+                <form method="post" action="{% url 'quickbooks_pull_sync_to_local' %}" data-qb-operation="pull_sync_to_local">
+                  {% csrf_token %}
+                  <input type="hidden" name="limit" value="100">
+                  <input type="hidden" name="mode" value="full">
+                  <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                  <button type="submit" class="btn btn-outline-primary w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Run full resync" %}</button>
+                </form>
+                <p class="qb-action-note">{% trans "Use this only when you want a full review of everything, even if it was already checked before." %}</p>
+              </div>
+            </div>
+          </div>
+          <div class="qb-strip mb-3">
+            <div class="fw-semibold mb-1">{% trans "If something needs your decision" %}</div>
+            <div class="small text-muted">{% trans "When the system cannot match a QuickBooks record with confidence, it places it in review so you can decide what to do without breaking accounting data." %}</div>
+          </div>
+          <a href="{% url 'quickbooks_import_conflicts' %}" class="btn btn-outline-secondary w-100">{% trans "Open review queue" %}</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="quickbooks-live-preview" class="qb-preview-card p-4 p-xl-5 mb-4">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-4">
+      <div>
+        <h3 class="mb-1">{% trans "Live preview" %}</h3>
+        <p class="qb-soft-copy mb-0">{% trans "Choose what you want to review from QuickBooks. The sample opens here so you can compare before importing." %}</p>
+      </div>
+      <div class="qb-chip-list">
+        <a href="{% url 'quickbooks_center' %}?preview=customers&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'customers' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Customers" %}</a>
+        <a href="{% url 'quickbooks_center' %}?preview=vendors&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'vendors' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Suppliers" %}</a>
+        <a href="{% url 'quickbooks_center' %}?preview=items&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'items' %}is-active{% endif %}">{% trans "Catalog" %}</a>
+        <a href="{% url 'quickbooks_center' %}?preview=invoices&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'invoices' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Invoices" %}</a>
+        <a href="{% url 'quickbooks_center' %}?preview=credit_memos&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'credit_memos' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Credit memos" %}</a>
+        <a href="{% url 'quickbooks_center' %}?preview=purchase_orders&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'purchase_orders' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Purchase orders" %}</a>
+        <a href="{% url 'quickbooks_center' %}?preview=bills&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'bills' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Bills" %}</a>
+      </div>
+    </div>
+
+    {% if quickbooks_preview_type %}
+      <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+        <div>
+          <h4 class="mb-1">{{ quickbooks_preview_title }}</h4>
+          <p class="qb-soft-copy mb-0">{{ quickbooks_preview_help }}</p>
+        </div>
+        <div class="qb-strip small">
+          {% trans "Showing up to" %} {{ quickbooks_preview_limit }} {% trans "records in this sample." %}
+        </div>
+      </div>
+
+      {% if quickbooks_preview_error %}
+      <div class="alert alert-warning shadow-sm border-0 mb-0">{{ quickbooks_preview_error }}</div>
+      {% elif quickbooks_preview_rows %}
+      <div class="table-responsive">
+        <table class="table qb-preview-table align-middle mb-0">
+          <thead>
+            <tr>
+              {% for column in quickbooks_preview_columns %}
+              <th>{{ column }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in quickbooks_preview_rows %}
+            <tr>
+              {% for value in row %}
+              <td>{{ value }}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="qb-strip text-muted">{% trans "No records were returned for this preview." %}</div>
+      {% endif %}
+    {% else %}
+    <div class="qb-strip">
+      <div class="fw-semibold mb-1">{% trans "What should you preview first?" %}</div>
+      <div class="small text-muted">{% trans "Usually start with customers, suppliers, and catalog. Then review invoices, credit memos, purchase orders, or Bills before bringing accounting data into the system." %}</div>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="qb-section-card p-4 p-xl-5 mb-4{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
+    <div class="row g-4 align-items-start">
+      <div class="col-xl-4">
+        <h3 class="mb-2">{% trans "Supplier PO / Pre-PO" %}</h3>
+        <p class="qb-soft-copy mb-3">{% trans "Use the purchase order center to create draft supplier orders, sync them to QuickBooks, and receive inventory only after the order is verified." %}</p>
+        <div class="qb-chip-list mb-3">
+          <span class="qb-chip">{{ quickbooks_pending_supplier_purchase_count }} {% trans "pending POs" %}</span>
+          <span class="qb-chip">{{ quickbooks_recent_supplier_purchases|length }} {% trans "recent purchases" %}</span>
+        </div>
+        <div class="qb-strip">
+          <div class="fw-semibold mb-1">{% trans "What this action does" %}</div>
+          <div class="small text-muted">{% trans "It lets BackOffice create a draft supplier PO, push it to QuickBooks when needed, and load inventory only when the order is received." %}</div>
+        </div>
+      </div>
+      <div class="col-xl-8">
+        <div class="qb-action-item mb-3">
+          <div class="row g-3 align-items-center">
+            <div class="col-lg-8">
+              <div class="fw-semibold mb-1">{% trans "Open the supplier purchase order center" %}</div>
+              <div class="small text-muted">{% trans "There you can create draft Pre-PO records, send them manually to QuickBooks if automatic sync fails, and receive stock only after verification." %}</div>
+            </div>
+            <div class="col-lg-4 d-grid">
+              <a href="{% url 'backoffice_supplier_purchase_list' %}" class="btn btn-success">{% trans "Open PO center" %}</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          {% for purchase in quickbooks_recent_supplier_purchases %}
+          <div class="col-md-6">
+            <div class="qb-recent-item h-100">
+              <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                <div class="fw-semibold">{{ purchase.po_number|default:purchase.bill_number|default:_('Purchase') }} · {{ purchase.proveedor_nombre }}</div>
+                <span class="badge text-bg-light">{{ purchase.estado }}</span>
+              </div>
+              <div class="small text-muted mb-2">{{ purchase.fecha_compra }} · {{ purchase.total }} · {{ purchase.sync_status }}</div>
+              <div class="small text-muted">
+                {% for line in purchase.lineas.all %}
+                <div>{{ line.cantidad }} x {{ line.presentacion.producto.nombre }} · {{ line.presentacion.nombre }}</div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="col-12">
+            <div class="qb-strip text-muted">{% trans "Supplier purchase orders created from BackOffice will appear here." %}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="qb-section-card p-4 p-xl-5 mb-4{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
+    <div class="row g-4 align-items-start">
+      <div class="col-xl-4">
+        <h3 class="mb-2">{% trans "Send local records to QuickBooks" %}</h3>
+        <p class="qb-soft-copy mb-3">{% trans "Use this area when the record was created in your system first and still needs to be sent to QuickBooks." %}</p>
+        <div class="qb-chip-list mb-3">
+          <span class="qb-chip">{{ quickbooks_pending_customer_count }} {% trans "customers" %}</span>
+          <span class="qb-chip">{{ quickbooks_pending_presentation_count }} {% trans "items" %}</span>
+          <span class="qb-chip">{{ quickbooks_pending_invoice_count }} {% trans "invoices" %}</span>
+          <span class="qb-chip">{{ quickbooks_pending_note_count }} {% trans "notes" %}</span>
+          <span class="qb-chip">{{ quickbooks_pending_supplier_purchase_count }} {% trans "Bills" %}</span>
+        </div>
+        <div class="qb-strip">
+          <div class="fw-semibold mb-1">{% trans "Use the advanced boxes only if you know the exact IDs" %}</div>
+          <div class="small text-muted">{% trans "If you are not sure, use the guided selectors. The ID boxes are meant for support or advanced cleanup tasks." %}</div>
+        </div>
+      </div>
+      <div class="col-xl-8">
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <div class="qb-action-item h-100">
+              <label class="form-label fw-semibold">{% trans "Send one customer" %}</label>
+              <form method="post" action="{% url 'quickbooks_sync_customers_batch' %}" class="d-grid gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <select name="ids" class="form-select">
+                  {% for cliente in quickbooks_pending_customers %}
+                  <option value="{{ cliente.id }}">#{{ cliente.id }} · {{ cliente.nombre_empresa }}</option>
+                  {% empty %}
+                  <option value="">{% trans "No pending customers" %}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_customers %}disabled{% endif %}>{% trans "Sync customer now" %}</button>
+              </form>
+              <p class="qb-action-note">{% trans "Recommended when you want to send one customer without touching anything else." %}</p>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="qb-action-item h-100">
+              <label class="form-label fw-semibold">{% trans "Send one catalog item" %}</label>
+              <form method="post" action="{% url 'quickbooks_sync_products_batch' %}" class="d-grid gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <select name="ids" class="form-select">
+                  {% for presentacion in quickbooks_pending_presentations %}
+                  <option value="{{ presentacion.id }}">#{{ presentacion.id }} · {{ presentacion.producto.nombre }} / {{ presentacion.nombre }}</option>
+                  {% empty %}
+                  <option value="">{% trans "No pending items" %}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_presentations %}disabled{% endif %}>{% trans "Sync item now" %}</button>
+              </form>
+              <p class="qb-action-note">{% trans "Use this when the product must exist in QuickBooks before sending invoices." %}</p>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="qb-action-item h-100">
+              <label class="form-label fw-semibold">{% trans "Send one invoice" %}</label>
+              <form method="post" action="{% url 'quickbooks_sync_invoices_batch' %}" class="d-grid gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <select name="ids" class="form-select">
+                  {% for invoice in quickbooks_pending_invoices %}
+                  <option value="{{ invoice.id }}">#{{ invoice.id }} · {{ invoice.numero }} · {{ invoice.cliente.nombre_empresa }}</option>
+                  {% empty %}
+                  <option value="">{% trans "No pending invoices" %}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_invoices %}disabled{% endif %}>{% trans "Sync invoice now" %}</button>
+              </form>
+              <p class="qb-action-note">{% trans "Use this when the sale is ready and should be posted to QuickBooks." %}</p>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="qb-action-item h-100">
+              <label class="form-label fw-semibold">{% trans "Send one adjustment note" %}</label>
+              <form method="post" action="{% url 'quickbooks_sync_adjustment_notes_batch' %}" class="d-grid gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <select name="ids" class="form-select">
+                  {% for nota in quickbooks_pending_notes %}
+                  <option value="{{ nota.id }}">#{{ nota.id }} · {{ nota.numero }} · {{ nota.cliente.nombre_empresa }}</option>
+                  {% empty %}
+                  <option value="">{% trans "No pending approved notes" %}</option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_notes %}disabled{% endif %}>{% trans "Sync note now" %}</button>
+              </form>
+              <p class="qb-action-note">{% trans "Use this for approved credit or debit notes that still need to be sent." %}</p>
+            </div>
+          </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="qb-action-item h-100">
+              <label class="form-label fw-semibold">{% trans "Advanced batch: customer IDs" %}</label>
+              <form method="post" action="{% url 'quickbooks_sync_customers_batch' %}" class="d-grid gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <textarea name="ids" rows="2" class="form-control" placeholder="51, 52, 53"></textarea>
+                <button type="submit" class="btn btn-outline-secondary">{% trans "Run customer batch" %}</button>
+              </form>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="qb-action-item h-100">
+              <label class="form-label fw-semibold">{% trans "Advanced batch: presentation IDs" %}</label>
+              <form method="post" action="{% url 'quickbooks_sync_products_batch' %}" class="d-grid gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <textarea name="ids" rows="2" class="form-control" placeholder="1, 2, 3"></textarea>
+                <button type="submit" class="btn btn-outline-secondary">{% trans "Run item batch" %}</button>
+              </form>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="qb-action-item h-100">
+              <label class="form-label fw-semibold">{% trans "Advanced batch: invoice IDs" %}</label>
+              <form method="post" action="{% url 'quickbooks_sync_invoices_batch' %}" class="d-grid gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <textarea name="ids" rows="2" class="form-control" placeholder="19, 20, 21"></textarea>
+                <button type="submit" class="btn btn-outline-secondary">{% trans "Run invoice batch" %}</button>
+              </form>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="qb-action-item h-100">
+              <label class="form-label fw-semibold">{% trans "Advanced batch: note IDs" %}</label>
+              <form method="post" action="{% url 'quickbooks_sync_adjustment_notes_batch' %}" class="d-grid gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <textarea name="ids" rows="2" class="form-control" placeholder="21, 22"></textarea>
+                <button type="submit" class="btn btn-outline-secondary">{% trans "Run note batch" %}</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="qb-health-board p-4 p-xl-5 mb-4">
+    <div class="row g-4 align-items-start">
+      <div class="col-xl-4">
+        <h3 class="mb-2">{% trans "Quick status lights" %}</h3>
+        <p class="qb-soft-copy mb-3">{% trans "This traffic light helps you decide if you can continue calmly, if you should review something, or if you should stop and reconnect first." %}</p>
+        <div class="qb-strip">
+          <div class="fw-semibold mb-1">{% trans "How to read it" %}</div>
+          <div class="small text-muted">{% trans "Green means you can continue. Yellow means review before continuing. Red means fix the connection or the issue first." %}</div>
+        </div>
+      </div>
+      <div class="col-xl-8">
+        <div class="qb-traffic-stack">
+          <div class="qb-signal">
+            <span class="qb-signal-light {% if quickbooks_status.is_active %}is-green{% else %}is-red{% endif %}"></span>
+            <div>
+              <div class="qb-signal-title">{% trans "Connection" %}</div>
+              <p class="qb-signal-copy">
+                {% if quickbooks_status.is_active %}
+                {% trans "Ready. QuickBooks is connected, so you can preview, import, and sync." %}
+                {% else %}
+                {% trans "Stopped. Connect QuickBooks before using the rest of this page." %}
+                {% endif %}
+              </p>
+              <a href="{% url 'quickbooks_login' %}" class="qb-signal-link">
+                <span>{% trans "Go to connection" %}</span>
+                <span class="qb-signal-link-count">{% if quickbooks_status.is_active %}1{% else %}!{% endif %}</span>
+              </a>
+            </div>
+          </div>
+
+          <div class="qb-signal">
+            <span class="qb-signal-light {% if quickbooks_active_conflicts_count > 0 %}is-yellow{% else %}is-green{% endif %}"></span>
+            <div>
+              <div class="qb-signal-title">{% trans "Review queue" %}</div>
+              <p class="qb-signal-copy">
+                {% if quickbooks_active_conflicts_count > 0 %}
+                {% trans "Review recommended." %} {{ quickbooks_active_conflicts_count }} {% trans "items are waiting for your decision." %}
+                {% else %}
+                {% trans "Clean. There are no pending review items right now." %}
+                {% endif %}
+              </p>
+              <a href="{% url 'quickbooks_import_conflicts' %}" class="qb-signal-link">
+                <span>{% trans "Open review queue" %}</span>
+                <span class="qb-signal-link-count">{{ quickbooks_active_conflicts_count }}</span>
+              </a>
+            </div>
+          </div>
+
+          <div class="qb-signal">
+            <span class="qb-signal-light {% if quickbooks_pending_customer_count|add:quickbooks_pending_presentation_count|add:quickbooks_pending_invoice_count|add:quickbooks_pending_note_count > 20 %}is-yellow{% else %}is-green{% endif %}"></span>
+            <div>
+              <div class="qb-signal-title">{% trans "Pending local records" %}</div>
+              <p class="qb-signal-copy">
+                {% with total_pending=quickbooks_pending_customer_count|add:quickbooks_pending_presentation_count|add:quickbooks_pending_invoice_count|add:quickbooks_pending_note_count %}
+                  {% if total_pending > 20 %}
+                  {% trans "Attention recommended." %} {{ total_pending }} {% trans "local records are still waiting to be sent to QuickBooks." %}
+                  {% elif total_pending > 0 %}
+                  {% trans "Under control." %} {{ total_pending }} {% trans "local records are waiting to be sent." %}
+                  {% else %}
+                  {% trans "Up to date. There are no local records waiting to be sent right now." %}
+                  {% endif %}
+                {% endwith %}
+              </p>
+              <a href="#qb-local-sync" class="qb-signal-link">
+                <span>{% trans "Review pending local sync" %}</span>
+                <span class="qb-signal-link-count">{{ total_pending }}</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="qb-section-card p-4 p-xl-5" id="qb-local-sync">
+    <div class="row g-4 align-items-start">
+      <div class="col-xl-4">
+        <h3 class="mb-2">{% trans "Health and review summary" %}</h3>
+        <p class="qb-soft-copy mb-3">{% trans "Use this area to quickly see whether the sync is healthy or if something needs attention before you continue." %}</p>
+        {% if quickbooks_has_saved_cursors %}
+        <div class="qb-chip-list">
+          {% for cursor in quickbooks_sync_cursors %}
+          <span class="qb-chip">{{ cursor.label }} · {{ cursor.value }}</span>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="qb-strip small text-muted">{% trans "No incremental cursors have been saved yet. After the first pull sync, this area will show what entities are already tracked incrementally." %}</div>
+        {% endif %}
+      </div>
+      <div class="col-xl-8">
+        <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
+          <h4 class="mb-0">{% trans "Most recent items that need attention" %}</h4>
+          <a href="{% url 'quickbooks_import_conflicts' %}" class="btn btn-outline-primary">{% trans "Manage full queue" %}</a>
+        </div>
+        <div class="row g-3">
+          {% for conflict in quickbooks_recent_conflicts %}
+          <div class="col-12 col-lg-6">
+            <div class="qb-recent-item h-100">
+              <div class="d-flex justify-content-between gap-2 mb-2">
+                <div class="fw-semibold">{{ conflict.get_entity_type_display }}</div>
+                {% if conflict.status == 'CONFLICT' %}
+                <span class="badge text-bg-danger">{% trans "Needs review" %}</span>
+                {% elif conflict.status == 'DISMISSED' %}
+                <span class="badge text-bg-secondary">{% trans "Dismissed" %}</span>
+                {% else %}
+                <span class="badge text-bg-success">{% trans "Resolved" %}</span>
+                {% endif %}
+              </div>
+              <div class="small text-muted mb-1">{{ conflict.doc_number|default:conflict.display_name|default:conflict.quickbooks_id }}</div>
+              <div class="small">{% if conflict.reason %}{{ conflict.reason }}{% else %}{% trans "No reason recorded." %}{% endif %}</div>
+              <div class="small text-muted mt-2">{{ conflict.last_seen_at|date:"d/m/Y H:i" }}</div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="col-12">
+            <div class="qb-strip text-muted">{% trans "There are no QuickBooks review items right now. This usually means imports are matching cleanly." %}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+  {% endwith %}
+
+  <!-- QuickBooks async task overlay -->
+  <div id="qb-task-overlay" style="display:none;position:fixed;inset:0;background:rgba(4,12,30,0.6);backdrop-filter:blur(4px);z-index:1050;align-items:center;justify-content:center;">
+    <div style="max-width:520px;width:92%;background:linear-gradient(180deg,#ffffff,#f1fbff);border-radius:18px;padding:28px 26px;box-shadow:0 30px 60px rgba(2,16,52,0.5);text-align:center;color:#102a63;">
+      <div style="font-weight:800;font-size:28px;margin-bottom:6px;">Cargando</div>
+      <div style="color:#4f6484;margin-bottom:16px;">Estamos importando datos desde QuickBooks. Este proceso puede tardar unos segundos.</div>
+      <div style="position:relative;height:18px;background:linear-gradient(90deg,#e6f7ff,#dff3ff);border-radius:999px;overflow:hidden;margin:14px 0;">
+        <div id="qb-task-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#1f6fd1,#73d7ff);transition:width 400ms ease;"></div>
+      </div>
+      <div style="font-weight:700;font-size:20px;margin-top:8px;color:#0f2860;"><span id="qb-task-progress-text">0</span>%</div>
+      <div id="qb-task-message" style="color:#6b7a99;font-size:0.95rem;margin-top:10px;">Preparando...</div>
+      <div id="qb-task-result-details" style="color:#4f6484;font-size:0.95rem;margin-top:10px;display:none;"></div>
+      <div id="qb-task-actions" style="margin-top:18px;display:flex;gap:8px;justify-content:center;">
+        <button id="qb-task-reload" class="btn btn-primary" style="display:none;">Recargar</button>
+        <button id="qb-task-cancel" class="btn btn-outline-secondary">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    function getCookie(name) {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(';').shift();
+    }
+
+    const overlay = document.getElementById('qb-task-overlay');
+    const bar = document.getElementById('qb-task-progress-bar');
+    const text = document.getElementById('qb-task-progress-text');
+    const message = document.getElementById('qb-task-message');
+    const cancelBtn = document.getElementById('qb-task-cancel');
+
+    function showOverlay(){ overlay.style.display='flex'; }
+    function hideOverlay(){ overlay.style.display='none'; }
+
+    function setProgress(p){
+      p = Math.max(0, Math.min(100, Math.floor(p)));
+      bar.style.width = p + '%';
+      text.textContent = p;
+    }
+
+    // gracefully animate percent towards target
+    function animateTo(target){
+      let current = parseInt(text.textContent || '0', 10);
+      if (current >= target) return setProgress(target);
+      const step = () => {
+        current = Math.min(target, current + Math.max(1, Math.round((target - current) * 0.18)));
+        setProgress(current);
+        if (current < target) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
+
+    function startPolling(taskId){
+      let polling = true;
+      let lastKnown = 0;
+      function poll(){
+        fetch('/quickbooks/task/status/' + taskId, {credentials: 'same-origin'}).then(r=>r.json()).then(function(data){
+          if (!data) return;
+          const p = parseInt(data.progress || 0, 10);
+          lastKnown = Math.max(lastKnown, p);
+          // animate up to a safe cap while running
+          if (data.status === 'running'){
+            const displayTarget = Math.max(lastKnown, 85);
+            animateTo(displayTarget);
+            message.textContent = 'Importando — por favor espera.';
+            setTimeout(poll, 900);
+            return;
+          }
+          if (data.status === 'completed'){
+            animateTo(100);
+            // show success and details (if present)
+            let details = '';
+            try{
+              const res = data.result || {};
+              if (res.created_count || res.updated_count || res.conflict_count || res.failed_count){
+                const parts = [];
+                if (typeof res.created_count !== 'undefined') parts.push('Creados: ' + (res.created_count||0));
+                if (typeof res.updated_count !== 'undefined') parts.push('Actualizados: ' + (res.updated_count||0));
+                if (typeof res.conflict_count !== 'undefined') parts.push('Conflictos: ' + (res.conflict_count||0));
+                if (typeof res.failed_count !== 'undefined') parts.push('Fallidos: ' + (res.failed_count||0));
+                details = parts.join(' · ');
+              }
+            }catch(e){ details = ''; }
+            message.textContent = 'Completado correctamente.';
+            if (details) { document.getElementById('qb-task-result-details').textContent = details; document.getElementById('qb-task-result-details').style.display = 'block'; }
+            // show up to 3 failed items with messages if provided
+            try{
+              const results = (data.result && data.result.results) || [];
+              const failed = results.filter(r=> !r.ok || r.action === 'conflict' || r.error).slice(0,3);
+              if (failed.length){
+                const list = document.createElement('div');
+                list.style.marginTop = '8px';
+                failed.forEach(function(item){
+                  const label = item.label || item.DisplayName || item.Name || item.DocNumber || item.quickbooks_id || 'Item';
+                  const err = item.error || (item.action==='conflict' ? 'Conflicto' : 'Falló');
+                  const el = document.createElement('div');
+                  el.style.fontSize='0.95rem';
+                  el.style.color='#5a6c86';
+                  el.textContent = `${label} · ${err}`;
+                  list.appendChild(el);
+                });
+                const detailsEl = document.getElementById('qb-task-result-details');
+                detailsEl.appendChild(list);
+                detailsEl.style.display='block';
+              }
+            }catch(e){}
+            // show reload button and let user close
+            document.getElementById('qb-task-reload').style.display = 'inline-block';
+            cancelBtn.style.display = 'inline-block';
+            return;
+          }
+          if (data.status === 'failed'){
+            animateTo(100);
+            message.textContent = 'Ha ocurrido un error: ' + (data.error || 'Error desconocido');
+            document.getElementById('qb-task-result-details').textContent = '';
+            document.getElementById('qb-task-result-details').style.display = 'none';
+            cancelBtn.style.display = 'inline-block';
+            document.getElementById('qb-task-reload').style.display = 'none';
+            try{
+              const results = (data.result && data.result.results) || [];
+              const failed = results.filter(r=> !r.ok || r.action === 'conflict' || r.error).slice(0,3);
+              if (failed.length){
+                const detailsEl = document.getElementById('qb-task-result-details');
+                detailsEl.innerHTML = '';
+                failed.forEach(function(item){
+                  const label = item.label || item.DisplayName || item.Name || item.DocNumber || item.quickbooks_id || 'Item';
+                  const err = item.error || (item.action==='conflict' ? 'Conflicto' : 'Falló');
+                  const el = document.createElement('div');
+                  el.style.fontSize='0.95rem';
+                  el.style.color='#e14b5a';
+                  el.textContent = `${label} · ${err}`;
+                  detailsEl.appendChild(el);
+                });
+                detailsEl.style.display='block';
+              }
+            }catch(e){}
+            return;
+          }
+        }).catch(function(){
+          // network hiccup — try again
+          setTimeout(poll, 1200);
+        });
+      }
+      poll();
+    }
+
+    cancelBtn.addEventListener('click', function(){ hideOverlay(); });
+    document.getElementById('qb-task-reload').addEventListener('click', function(){ location.reload(); });
+
+    // intercept forms with data-qb-operation
+    document.querySelectorAll('form[data-qb-operation]').forEach(function(form){
+      form.addEventListener('submit', function(ev){
+        ev.preventDefault();
+        const op = form.getAttribute('data-qb-operation');
+        const limit = (form.querySelector('input[name=limit]')||{}).value || '';
+        const csrftoken = getCookie('csrftoken');
+        showOverlay();
+        setProgress(6);
+        message.textContent = 'Iniciando tarea...';
+        fetch('/quickbooks/task/start', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'X-CSRFToken': csrftoken
+          },
+          body: new URLSearchParams({operation: op, limit: limit})
+        }).then(function(r){ return r.json(); }).then(function(json){
+          if (json && json.task_id){
+            startPolling(json.task_id);
+          } else {
+            message.textContent = 'No se pudo crear la tarea.';
+            hideOverlay();
+          }
+        }).catch(function(){ message.textContent = 'Error iniciando la tarea.'; });
+      });
+    });
+  })();
+  </script>
+
+</div>
+{% endblock %}

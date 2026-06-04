@@ -420,7 +420,7 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertEqual(pedido.canal_toma, 'backoffice')
 		self.assertTrue(pedido.acepta_terminos)
 		self.assertEqual(len(mail.outbox), 2)
-		self.assertIn('Purchase order in process', mail.outbox[-1].subject)
+		self.assertIn('Sales order in process', mail.outbox[-1].subject)
 		self.assertIn('generated successfully', mail.outbox[-1].body)
 
 	def test_backoffice_cannot_generate_duplicate_purchase_order_from_quote(self):

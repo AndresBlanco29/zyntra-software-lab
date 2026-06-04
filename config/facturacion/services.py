@@ -8,14 +8,24 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from config.inventario.services import _apply_fractional_inventory_change, _apply_inventory_change, _lock_fractional_stock_records, _lock_stock_records
+from config.inventario.services import _apply_fractional_inventory_change, _apply_inventory_change, _lock_fractional_stock_records, _lock_stock_records, aplicar_verificacion_picking_inventario
 from config.notificaciones.models import crear_notificacion_backoffice
+from config.pedidos.services import crear_pedido_desde_items
 from config.productos.models import Presentacion
 
 from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, DeliveryPayment, Invoice, InvoiceItem, NotaAjuste, NotaAjusteAplicacion, NotaAjusteItem
 
 
 DEFAULT_SUGGESTED_PROFIT_PERCENTAGE = Decimal('30.00')
+
+
+def _ensure_quickbooks_not_locked(*, invoice=None, nota=None):
+	from config.integrations.quickbooks.sync import is_sync_locked
+
+	if nota is not None and is_sync_locked(nota):
+		raise ValidationError(_('Adjustment note %(note)s is locked because it is already synced with QuickBooks.') % {'note': nota.numero})
+	if invoice is not None and is_sync_locked(invoice):
+		raise ValidationError(_('Invoice %(invoice)s is locked because it is already synced with QuickBooks.') % {'invoice': invoice.numero})
 
 
 def _to_decimal(value, default='0'):
@@ -90,7 +100,7 @@ def _validate_invoice_generation(pedido, metodo_entrega, driver):
 	if pedido.picking_bloqueado:
 		raise ValidationError(_('The order is blocked by an unresolved selector note.'))
 	if hasattr(pedido, 'invoice'):
-		raise ValidationError(_('This purchase order already has an invoice.'))
+		raise ValidationError(_('This sales order already has an invoice.'))
 	if metodo_entrega == 'RUTA_DRIVER' and driver is None:
 		raise ValidationError(_('A driver is required for route deliveries.'))
 	if driver is not None and getattr(driver, 'role', '') != 'driver':
@@ -223,6 +233,7 @@ def _apply_selected_customer_notes_to_invoice(*, invoice, note_applications, usu
 	total_selected_debits = Decimal('0.00')
 	for note_id, requested_amount in note_applications.items():
 		nota = notes[note_id]
+		_ensure_quickbooks_not_locked(nota=nota)
 		amount_to_apply = _clamp_non_negative_money(requested_amount)
 		if nota.tipo_documento == 'CREDITO':
 			total_selected_credits += amount_to_apply
@@ -341,6 +352,52 @@ def generar_invoice_desde_picking(
 
 	_create_invoice_notification(invoice)
 	return invoice
+
+
+@transaction.atomic
+def generar_invoice_directa_backoffice(
+	*,
+	cliente,
+	items_payload,
+	metodo_entrega,
+	usuario,
+	nota_backoffice='',
+	suggested_unit_prices=None,
+	applied_customer_credit=None,
+	selected_note_applications=None,
+):
+	if metodo_entrega not in {'LTG', 'CUSTOMER_PICK_UP'}:
+		raise ValidationError(_('Direct backoffice invoices only support LTG or customer pickup delivery methods.'))
+	if not items_payload:
+		raise ValidationError(_('Add at least one item before creating the direct invoice.'))
+
+	pedido = crear_pedido_desde_items(
+		cliente=cliente,
+		items_payload=items_payload,
+		origen='BACKOFFICE',
+		vendedor=None,
+		nota_cliente='',
+		acepta_terminos=False,
+		canal_toma='BACKOFFICE_DIRECT',
+		bypass_stock_check=False,
+		reservar_inventario=True,
+	)
+	item_ids = list(pedido.items.values_list('id', flat=True))
+	aplicar_verificacion_picking_inventario(pedido=pedido, pedido_item_ids=item_ids, creado_por=usuario)
+	pedido.estado = 'VERIFICADO_AJUSTADO'
+	pedido.nota_backoffice = (nota_backoffice or '').strip()
+	pedido.picking_verificado_en = timezone.now()
+	pedido.save(update_fields=['estado', 'nota_backoffice', 'picking_verificado_en', 'actualizada_en'])
+
+	return generar_invoice_desde_picking(
+		pedido=pedido,
+		metodo_entrega=metodo_entrega,
+		driver=None,
+		usuario=usuario,
+		suggested_unit_prices=suggested_unit_prices,
+		applied_customer_credit=applied_customer_credit,
+		selected_note_applications=selected_note_applications,
+	)
 
 
 def _build_signature_content_file(signature_data, delivery_id):
@@ -848,6 +905,8 @@ def crear_nota_ajuste(
 		raise ValidationError(_('Select a customer to save the adjustment.'))
 	if invoice is not None and invoice.cliente_id != cliente.id:
 		raise ValidationError(_('The selected invoice does not belong to the selected customer.'))
+	if invoice is not None:
+		_ensure_quickbooks_not_locked(invoice=invoice)
 	tipo_ajuste = (tipo_ajuste or 'PRODUCTO').strip().upper()
 	if tipo_ajuste not in {'PRODUCTO', 'FINANCIERO'}:
 		raise ValidationError(_('Select a valid adjustment type.'))
@@ -1073,6 +1132,7 @@ def _allocate_debit_note_amount(*, nota):
 
 @transaction.atomic
 def aprobar_nota_ajuste(*, nota, usuario):
+	_ensure_quickbooks_not_locked(nota=nota, invoice=nota.invoice if nota.invoice_id else None)
 	if nota.estado != 'BORRADOR':
 		raise ValidationError(_('Only draft adjustment notes can be approved.'))
 
@@ -1100,6 +1160,7 @@ def aprobar_nota_ajuste(*, nota, usuario):
 
 @transaction.atomic
 def anular_nota_ajuste(*, nota):
+	_ensure_quickbooks_not_locked(nota=nota, invoice=nota.invoice if nota.invoice_id else None)
 	if nota.estado == 'ANULADA':
 		return nota
 

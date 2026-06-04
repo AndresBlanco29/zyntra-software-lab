@@ -1,29 +1,30 @@
 {% extends "bases/base_vendedor.html" %}
+{% load i18n %}
 
 {% block title %}
-Crear Usuario BackOffice
+{% trans "Create BackOffice User" %}
 {% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4">Crear Usuario BackOffice</h2>
+<h2 class="mb-4">{% trans "Create BackOffice User" %}</h2>
 
 <form method="POST">
 
 {% csrf_token %}
 
 <div class="mb-3">
-<label>Nombre</label>
+<label>{% trans "First name" %}</label>
 <input type="text" name="nombre" class="form-control" required>
 </div>
 
 <div class="mb-3">
-<label>Apellido</label>
+<label>{% trans "Last name" %}</label>
 <input type="text" name="apellido" class="form-control" required>
 </div>
 
 <div class="mb-3">
-<label>Usuario</label>
+<label>{% trans "Username" %}</label>
 <input type="text" name="username" class="form-control" required>
 </div>
 
@@ -33,18 +34,18 @@ Crear Usuario BackOffice
 </div>
 
 <div class="mb-3">
-<label>Contraseña</label>
+<label>{% trans "Password" %}</label>
 <input type="password" name="password" class="form-control" required>
 </div>
 
 <div class="mb-3">
-<label>Teléfono</label>
+<label>{% trans "Phone" %}</label>
 <input type="text" name="telefono" class="form-control">
 </div>
 
 <div class="d-flex gap-2">
 <button type="submit" class="btn btn-success">
-Crear BackOffice
+{% trans "Create BackOffice" %}
 </button>
 
 <a href="{% url 'lista_backoffice' %}" class="btn btn-secondary">

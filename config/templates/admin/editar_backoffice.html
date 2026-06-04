@@ -1,12 +1,13 @@
 {% extends "bases/base_vendedor.html" %}
+{% load i18n %}
 
 {% block title %}
-Editar Usuario BackOffice
+{% trans "Edit BackOffice User" %}
 {% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4">Editar Usuario BackOffice</h2>
+<h2 class="mb-4">{% trans "Edit BackOffice User" %}</h2>
 
 <div class="card shadow-sm">
 <div class="card-body">
@@ -16,37 +17,37 @@ Editar Usuario BackOffice
 {% csrf_token %}
 
 <div class="mb-3">
-<label class="form-label">Nombre</label>
+<label class="form-label">{% trans "First name" %}</label>
 <input type="text" name="nombre" class="form-control" value="{{ usuario_backoffice.first_name }}" required>
 </div>
 
 <div class="mb-3">
-<label class="form-label">Apellido</label>
+<label class="form-label">{% trans "Last name" %}</label>
 <input type="text" name="apellido" class="form-control" value="{{ usuario_backoffice.last_name }}" required>
 </div>
 
 <div class="mb-3">
-<label class="form-label">Email</label>
+<label class="form-label">{% trans "Email" %}</label>
 <input type="email" name="email" class="form-control" value="{{ usuario_backoffice.email }}" required>
 </div>
 
 <div class="mb-3">
-<label class="form-label">Teléfono</label>
+<label class="form-label">{% trans "Phone" %}</label>
 <input type="text" name="telefono" class="form-control" value="{{ usuario_backoffice.telefono }}">
 </div>
 
 <div class="mb-3">
-<label class="form-label">Usuario</label>
+<label class="form-label">{% trans "Username" %}</label>
 <input type="text" class="form-control" value="{{ usuario_backoffice.username }}" disabled>
-<small class="text-muted">El nombre de usuario no se puede cambiar</small>
+<small class="text-muted">{% trans "The username cannot be changed." %}</small>
 </div>
 
 <button type="submit" class="btn btn-success">
-Guardar cambios
+{% trans "Save changes" %}
 </button>
 
 <a href="{% url 'lista_backoffice' %}" class="btn btn-secondary">
-Cancelar
+{% trans "Cancel" %}
 </a>
 
 </form>

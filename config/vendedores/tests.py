@@ -164,7 +164,25 @@ class VendedorEditarClienteTests(TestCase):
 			pais='USA',
 			sales_tax_number='TX-VENDOR-2',
 			certificado_tax='certificados/test.pdf',
+			balance=Decimal('239.00'),
 		)
+
+	def test_customer_list_matches_quickbooks_style_columns(self):
+		self.customer_user.first_name = 'Imported QB Contact'
+		self.customer_user.last_name = ''
+		self.customer_user.save(update_fields=['first_name', 'last_name'])
+		self.client.force_login(self.vendor)
+
+		response = self.client.get(reverse('vendedores_clientes'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '<th>Name</th>', html=True)
+		self.assertContains(response, '<th>Company Name</th>', html=True)
+		self.assertContains(response, '<th>PHONE</th>', html=True)
+		self.assertContains(response, '<th>Balance</th>', html=True)
+		self.assertContains(response, 'Imported QB Contact')
+		self.assertContains(response, 'Cliente Editable')
+		self.assertContains(response, '$239.00')
 
 	def test_admin_can_edit_customer_with_manual_international_location(self):
 		self.client.force_login(self.admin)

@@ -1,0 +1,74 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Suppliers" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+  <div>
+    <h2 class="mb-1">{% trans "Suppliers" %}</h2>
+    <p class="text-muted mb-0">{% trans "Manage vendor catalog and QuickBooks linkage." %}</p>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{% url 'quickbooks_center' %}#qb-import-suppliers" class="btn btn-outline-primary">{% trans "QuickBooks import" %}</a>
+    <a href="{% url 'backoffice_supplier_purchase_list' %}" class="btn btn-primary">{% trans "Purchase orders" %}</a>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><div class="small text-muted">{% trans "Total" %}</div><div class="h4 mb-0">{{ supplier_counts.total }}</div></div></div></div>
+  <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><div class="small text-muted">{% trans "Linked to QuickBooks" %}</div><div class="h4 mb-0">{{ supplier_counts.linked }}</div></div></div></div>
+  <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><div class="small text-muted">{% trans "Active" %}</div><div class="h4 mb-0">{{ supplier_counts.active }}</div></div></div></div>
+  <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><div class="small text-muted">{% trans "QB status" %}</div><div class="h6 mb-0">{% if quickbooks_status.is_active %}{% trans "Connected" %}{% else %}{% trans "Pending" %}{% endif %}</div></div></div></div>
+</div>
+
+<form method="get" class="card shadow-sm mb-4">
+  <div class="card-body row g-2 align-items-end">
+    <div class="col-md-4"><input type="search" name="q" value="{{ supplier_search_term }}" class="form-control" placeholder="{% trans 'Search supplier' %}"></div>
+    <div class="col-md-3">
+      <select name="status" class="form-select">
+        <option value="">{% trans "All statuses" %}</option>
+        <option value="active" {% if supplier_status_filter == 'active' %}selected{% endif %}>{% trans "Active" %}</option>
+        <option value="inactive" {% if supplier_status_filter == 'inactive' %}selected{% endif %}>{% trans "Inactive" %}</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select name="sync" class="form-select">
+        <option value="">{% trans "All sync states" %}</option>
+        <option value="linked" {% if supplier_sync_filter == 'linked' %}selected{% endif %}>{% trans "Linked" %}</option>
+        <option value="local" {% if supplier_sync_filter == 'local' %}selected{% endif %}>{% trans "Local only" %}</option>
+      </select>
+    </div>
+    <div class="col-md-2"><button class="btn btn-outline-secondary w-100" type="submit">{% trans "Filter" %}</button></div>
+  </div>
+</form>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>{% trans "Name" %}</th>
+          <th>{% trans "Email" %}</th>
+          <th>{% trans "QuickBooks" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for supplier in suppliers %}
+        <tr>
+          <td>{{ supplier.nombre }}</td>
+          <td>{{ supplier.email|default:"—" }}</td>
+          <td>{% if supplier.quickbooks_id %}{{ supplier.quickbooks_id }}{% else %}—{% endif %}</td>
+          <td>{% if supplier.activo %}{% trans "Active" %}{% else %}{% trans "Inactive" %}{% endif %}</td>
+          <td><a href="{% url 'backoffice_supplier_detail' supplier.id %}" class="btn btn-sm btn-outline-primary">{% trans "Open" %}</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-muted p-4">{% trans "No suppliers found." %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

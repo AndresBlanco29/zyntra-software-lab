@@ -4,11 +4,12 @@ import unicodedata
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils.translation import gettext as _
+from django.utils import timezone
 
 from config.pedidos.models import PedidoItem
 from config.productos.models import Presentacion
 
-from .models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
+from .models import CompraProveedor, InventarioMovimiento, StockPresentacion, StockProductoFraccionado
 
 
 def _normalize_content_term(value):
@@ -230,7 +231,7 @@ def _apply_fractional_inventory_change(
 
 
 @transaction.atomic
-def registrar_entrada_manual(*, presentacion, cantidad, observacion='', creado_por=None):
+def registrar_entrada_manual(*, presentacion, cantidad, observacion='', creado_por=None, referencia=None, idempotency_key=None):
     cantidad = max(int(cantidad or 0), 1)
     stock = _lock_stock_records([presentacion.id])[presentacion.id]
     return _apply_inventory_change(
@@ -240,11 +241,40 @@ def registrar_entrada_manual(*, presentacion, cantidad, observacion='', creado_p
         cantidad=cantidad,
         delta_fisico=cantidad,
         delta_reservado=0,
-        referencia=f'STOCK-{presentacion.id}',
-        idempotency_key=None,
+        referencia=referencia or f'STOCK-{presentacion.id}',
+        idempotency_key=idempotency_key,
         observacion=observacion,
         creado_por=creado_por,
     )
+
+@transaction.atomic
+def registrar_recepcion_compra_proveedor(*, compra, creado_por=None):
+    locked_compra = CompraProveedor.objects.select_for_update().prefetch_related('lineas__presentacion__producto').get(pk=compra.pk)
+    if locked_compra.estado == CompraProveedor.STATUS_CANCELLED:
+        raise ValidationError(_('Cancelled purchase orders cannot receive inventory.'))
+    if not locked_compra.lineas.exists():
+        raise ValidationError(_('Add at least one supplier purchase line before receiving inventory.'))
+    if locked_compra.inventory_applied:
+        return locked_compra
+
+    for linea in locked_compra.lineas.all():
+        registrar_entrada_manual(
+            presentacion=linea.presentacion,
+            cantidad=linea.cantidad,
+            observacion=f'{locked_compra.po_number or locked_compra.bill_number or locked_compra.pk} - {locked_compra.proveedor_nombre}',
+            creado_por=creado_por or locked_compra.creado_por,
+            referencia=f'SUPPLIER-PURCHASE-{locked_compra.pk}',
+            idempotency_key=f'supplier-purchase:{locked_compra.pk}:line:{linea.pk}',
+        )
+
+    locked_compra.estado = CompraProveedor.STATUS_RECEIVED
+    locked_compra.inventory_applied = True
+    locked_compra.inventory_received_at = timezone.now()
+    locked_compra.inventory_received_by = creado_por
+    locked_compra.save(
+        update_fields=['estado', 'inventory_applied', 'inventory_received_at', 'inventory_received_by', 'actualizado_en']
+    )
+    return locked_compra
 
 
 @transaction.atomic

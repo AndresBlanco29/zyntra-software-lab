@@ -1,9 +1,172 @@
 {% extends "bases/base_vendedor.html" %}
 {% load i18n %}
+{% get_current_language as CURRENT_LANGUAGE %}
 
 {% block title %}{{ delivery.invoice.numero }}{% endblock %}
 
 {% block content %}
+<style>
+  .driver-shell {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .driver-step-card {
+    border: 1px solid rgba(13, 110, 253, 0.12);
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  }
+
+  .driver-step-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    margin-bottom: 1rem;
+  }
+
+  .driver-step-index {
+    width: 2.1rem;
+    height: 2.1rem;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #0d6efd;
+    color: #fff;
+    font-weight: 700;
+    flex: 0 0 auto;
+  }
+
+  .driver-step-copy {
+    color: #6c757d;
+    font-size: 0.95rem;
+    margin: 0.15rem 0 0;
+  }
+
+  .driver-guide-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .driver-guide-item {
+    border: 1px solid rgba(13, 110, 253, 0.12);
+    border-radius: 0.9rem;
+    padding: 0.9rem 1rem;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  }
+
+  .driver-guide-item strong {
+    display: block;
+    margin-bottom: 0.2rem;
+  }
+
+  .driver-guide-item span {
+    display: block;
+    color: #6c757d;
+    font-size: 0.9rem;
+    line-height: 1.35;
+  }
+
+  .driver-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .driver-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.9rem;
+    margin-bottom: 1rem;
+  }
+
+  .driver-summary-tile {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 0.9rem;
+    padding: 0.9rem 1rem;
+    background: #f8fafc;
+  }
+
+  .driver-summary-label {
+    color: #6c757d;
+    font-size: 0.82rem;
+    margin-bottom: 0.15rem;
+  }
+
+  .driver-summary-value {
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  .driver-evidence-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .driver-evidence-toolbar form {
+    flex: 1 1 420px;
+  }
+
+  .driver-finish-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 1rem;
+  }
+
+  .driver-signature-card {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 1rem;
+    background: #fff;
+    padding: 1rem;
+    margin-top: 1rem;
+  }
+
+  .driver-submit-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding: 0.9rem 1rem;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 1rem;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(10px);
+  }
+
+  .driver-submit-copy {
+    color: #6c757d;
+    font-size: 0.92rem;
+    margin: 0;
+  }
+
+  @media (max-width: 991.98px) {
+    .driver-guide-grid,
+    .driver-summary-grid,
+    .driver-finish-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .driver-submit-bar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .driver-submit-bar .btn {
+      width: 100%;
+    }
+  }
+</style>
+<div class="driver-shell">
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
     <h2 class="mb-1">{{ delivery.invoice.numero }}</h2>
@@ -25,60 +188,116 @@
   {% endfor %}
 {% endif %}
 
-<div class="row g-3 mb-3">
-  <div class="col-lg-7">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="mb-0">{% trans "Delivery summary" %}</h5>
+<div class="card shadow-sm driver-step-card">
+  <div class="card-body">
+    <div class="driver-step-head">
+      <span class="driver-step-index">1</span>
+      <div>
+        <h5 class="mb-0">{% trans "Delivery summary" %}</h5>
+        <p class="driver-step-copy">{% trans "Review the stop details first, then start the route and keep this screen open while using Maps." %}</p>
+      </div>
+    </div>
+    <div class="driver-guide-grid mb-3">
+      <div class="driver-guide-item">
+        <strong>{% trans "Review stop" %}</strong>
+        <span>{% trans "Confirm the customer, address and invoice lines before moving." %}</span>
+      </div>
+      <div class="driver-guide-item">
+        <strong>{% trans "Start route" %}</strong>
+        <span>{% trans "Use the route button once you are ready to leave for this stop." %}</span>
+      </div>
+      <div class="driver-guide-item">
+        <strong>{% trans "Add evidence" %}</strong>
+        <span>{% trans "Upload photos before or after closing if you need delivery proof." %}</span>
+      </div>
+      <div class="driver-guide-item">
+        <strong>{% trans "Close delivery" %}</strong>
+        <span>{% trans "Finish with payment details, signature and any adjustment note if needed." %}</span>
+      </div>
+    </div>
+    <div class="driver-summary-grid">
+      <div class="driver-summary-tile">
+        <div class="driver-summary-label">{% trans "Status" %}</div>
+        <div class="driver-summary-value">{{ delivery.get_estado_display }}</div>
+        {% if delivery.workflow_badge %}
+        <div class="mt-2">
+          <span class="workflow-role-badge {% if delivery.workflow_badge.kind == 'split' %}workflow-role-badge--split{% endif %}" style="--workflow-start: {{ delivery.workflow_badge.color_start }}; --workflow-end: {{ delivery.workflow_badge.color_end }}; --workflow-text: {{ delivery.workflow_badge.text_color }};">
+            {{ delivery.workflow_badge.label }}
+          </span>
+        </div>
+        {% endif %}
+      </div>
+      <div class="driver-summary-tile">
+        <div class="driver-summary-label">{% trans "Payment status" %}</div>
+        <div class="driver-summary-value">{{ delivery.get_estado_pago_display }}</div>
+      </div>
+      <div class="driver-summary-tile">
+        <div class="driver-summary-label">{% trans "Customer balance" %}</div>
+        <div class="driver-summary-value">${{ delivery.invoice.saldo_cliente }}</div>
+      </div>
+    </div>
+    <div class="row g-3 align-items-start mb-3">
+      <div class="col-lg-8">
+        <div class="text-muted small">{% trans "Google Maps query" %}</div>
+        <div class="mb-3">{{ delivery.route_query_address }}</div>
+        <div class="row g-3">
+          <div class="col-md-4"><div class="text-muted small">{% trans "Estimated delivery" %}</div><div>{% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
+          <div class="col-md-4"><div class="text-muted small">{% trans "Started" %}</div><div>{% if delivery.route_started_at %}{{ delivery.route_started_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
+          <div class="col-md-4"><div class="text-muted small">{% trans "Delivered" %}</div><div>{% if delivery.delivered_at %}{{ delivery.delivered_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="driver-hero-actions">
           {% if not delivery.is_completed %}
           <form method="post" action="{% url 'driver_delivery_start_route' delivery.id %}">
             {% csrf_token %}
-            <button type="submit" class="btn btn-sm btn-primary">{% trans "Start route" %}</button>
+            <button type="submit" class="btn btn-primary">{% trans "Start route" %}</button>
           </form>
           {% endif %}
-        </div>
-        <div class="row g-3">
-          <div class="col-md-4"><div class="text-muted small">{% trans "Status" %}</div><div>{{ delivery.get_estado_display }}</div></div>
-          <div class="col-md-4"><div class="text-muted small">{% trans "Payment status" %}</div><div>{{ delivery.get_estado_pago_display }}</div></div>
-          <div class="col-md-4"><div class="text-muted small">{% trans "Customer balance" %}</div><div>${{ delivery.invoice.saldo_cliente }}</div></div>
-          <div class="col-12"><div class="text-muted small">{% trans "Google Maps query" %}</div><div>{{ delivery.route_query_address }}</div></div>
-          <div class="col-md-6"><div class="text-muted small">{% trans "Estimated delivery" %}</div><div>{% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
-          <div class="col-md-6"><div class="text-muted small">{% trans "Started" %}</div><div>{% if delivery.route_started_at %}{{ delivery.route_started_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
-          <div class="col-md-6"><div class="text-muted small">{% trans "Delivered" %}</div><div>{% if delivery.delivered_at %}{{ delivery.delivered_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
-        </div>
-        <hr>
-        <div class="table-responsive">
-          <table class="table table-sm align-middle mb-0">
-            <thead>
-              <tr>
-                <th>{% trans "Product" %}</th>
-                <th>{% trans "Presentation" %}</th>
-                <th>QTY ORD</th>
-                <th>QTY DSP</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for item in invoice.items.all %}
-              <tr>
-                <td>{{ item.producto_nombre }}</td>
-                <td>{{ item.presentacion_nombre }}</td>
-                <td>{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
-                <td>{{ item.cantidad_facturada }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+          <a href="{{ delivery.google_maps_url }}" target="_blank" rel="noopener" class="btn btn-outline-primary">{% trans "Google Maps" %}</a>
+          {% if delivery.estado == 'EN_RUTA' %}
+          <a href="{% url 'driver_delivery_tracking' delivery.id %}" class="btn btn-outline-primary">{% trans "Live tracking" %}</a>
+          {% endif %}
+          <a href="{% url 'driver_invoice_pdf' delivery.id %}" class="btn btn-outline-dark">{% trans "Download PDF" %}</a>
         </div>
       </div>
     </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>{% trans "Product" %}</th>
+            <th>{% trans "Presentation" %}</th>
+            <th>QTY ORD</th>
+            <th>QTY DSP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in invoice.items.all %}
+          <tr>
+            <td>{{ item.producto_nombre }}</td>
+            <td>{{ item.presentacion_nombre }}</td>
+            <td>{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
+            <td>{{ item.cantidad_facturada }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
-  <div class="col-lg-5">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
-          <h5 class="mb-0">{% trans "Evidence" %}</h5>
-          <form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_upload_evidence' delivery.id %}" class="d-flex flex-wrap align-items-center gap-2">
+</div>
+
+<div class="card shadow-sm driver-step-card">
+  <div class="card-body">
+    <div class="driver-step-head">
+      <span class="driver-step-index">2</span>
+      <div>
+        <h5 class="mb-0">{% trans "Evidence" %}</h5>
+        <p class="driver-step-copy">{% trans "Add delivery proof here if you need photos before or after closing the stop." %}</p>
+      </div>
+    </div>
+    <div class="driver-evidence-toolbar">
+      <form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_upload_evidence' delivery.id %}" class="d-flex flex-wrap align-items-center gap-2">
             {% csrf_token %}
             <div class="camera-upload-widget" data-camera-upload>
               <input type="file" name="evidence_photos" class="form-control form-control-sm" accept="image/*" capture="environment" multiple style="max-width: 230px;" data-camera-input>
@@ -94,40 +313,51 @@
               </div>
               <div class="row g-2 mt-2 d-none" data-file-preview></div>
             </div>
-            <button type="submit" class="btn btn-sm btn-outline-primary">{% trans "Upload evidence" %}</button>
-          </form>
-        </div>
-        <div class="row g-2">
-          {% for photo in delivery.evidence_photos.all %}
-          <div class="col-6">
-            <a href="{{ photo.image.url }}" target="_blank" rel="noopener">
-              <img src="{{ photo.image.url }}" alt="evidence" class="img-fluid rounded border">
-            </a>
-          </div>
-          {% empty %}
-          <div class="col-12 text-muted">{% trans "No evidence photos uploaded yet." %}</div>
-          {% endfor %}
-        </div>
-        <div class="form-text mt-3">{% trans "You can upload delivery photos before or after closing the invoice." %}</div>
-      </div>
+        <button type="submit" class="btn btn-sm btn-outline-primary">{% trans "Upload evidence" %}</button>
+      </form>
     </div>
+    <div class="row g-2">
+      {% for photo in delivery.evidence_photos.all %}
+      <div class="col-6 col-md-3">
+        <a href="{{ photo.image.url }}" target="_blank" rel="noopener">
+          <img src="{{ photo.image.url }}" alt="evidence" class="img-fluid rounded border">
+        </a>
+      </div>
+      {% empty %}
+      <div class="col-12 text-muted">{% trans "No evidence photos uploaded yet." %}</div>
+      {% endfor %}
+    </div>
+    <div class="form-text mt-3">{% trans "You can upload delivery photos before or after closing the invoice." %}</div>
+      </div>
   </div>
 </div>
 
 {% if not delivery.is_completed %}
-<form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_complete' delivery.id %}" class="card shadow-sm">
+<form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_complete' delivery.id %}" class="card shadow-sm driver-step-card">
   {% csrf_token %}
   <div class="card-body">
-    <h5 class="mb-3">{% trans "Complete delivery" %}</h5>
+    <div class="driver-step-head">
+      <span class="driver-step-index">3</span>
+      <div>
+        <h5 class="mb-0">{% trans "Complete delivery" %}</h5>
+        <p class="driver-step-copy">{% trans "Finish the stop in this order: notes if needed, payment details, then customer signature." %}</p>
+      </div>
+    </div>
     <div class="row g-3">
       <div class="col-12">
         <label class="form-label fw-semibold">{% trans "Driver notes" %}</label>
         <textarea name="notas_driver" class="form-control" rows="3"></textarea>
       </div>
-      <div class="col-12" data-driver-section="adjustment-note">
-        <div class="border rounded-3 p-3 bg-light-subtle">
+    </div>
+    <div class="driver-finish-grid mt-3">
+      <div data-driver-section="adjustment-note">
+        <div class="border rounded-3 p-3 bg-light-subtle h-100">
           <div class="mb-3">
-            <h6 class="mb-1">{% trans "Adjustment note during delivery" %}</h6>
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <span class="badge text-bg-light border">1</span>
+              <h6 class="mb-0">{% trans "Adjustment note during delivery" %}</h6>
+              <span class="badge text-bg-secondary">{% trans "Optional" %}</span>
+            </div>
             <p class="text-muted small mb-0">{% trans "Optional. Save a draft credit note for BackOffice review while closing the delivery." %}</p>
           </div>
           <div class="row g-3">
@@ -141,13 +371,13 @@
             <div class="col-md-4">
               <label class="form-label fw-semibold">{% trans "Adjustment mode" %}</label>
               <input type="hidden" name="driver_note_tipo_ajuste" id="driverAdjustmentType" value="PRODUCTO">
-              <div class="form-control bg-light">{% trans "Product return / item lines" %}</div>
+              <div class="form-control bg-light" data-debit-label="{% trans 'Product to charge' %}">{% trans "Product return / item lines" %}</div>
             </div>
             <div class="col-md-4" id="driverReasonWrapper">
               <label class="form-label fw-semibold">{% trans "Reason" %}</label>
               <select name="driver_note_motivo" id="driverReasonSelect" class="form-select">
                 <option value="">{% trans "Select..." %}</option>
-                <option value="DAMAGE">{% trans "Physical damage / transport" %}</option>
+                <option value="DAMAGE">{% trans "Damage / transport" %}</option>
                 <option value="DEFECT">{% trans "Factory defect / quality issue" %}</option>
                 <option value="MISSING_ITEM">{% trans "Missing item" %}</option>
                 <option value="OTHER">{% trans "Other" %}</option>
@@ -232,28 +462,13 @@
           </div>
         </div>
       </div>
-      <div class="col-12 unpaid-only d-none">
-        <label class="form-label fw-semibold">{% trans "Evidence photos" %}</label>
-        <div class="camera-upload-widget" data-camera-upload>
-          <input type="file" name="evidence_photos" class="form-control" accept="image/*" capture="environment" multiple data-camera-input>
-          <div class="d-flex flex-wrap gap-2 mt-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-camera-start>{% trans "Use camera" %}</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-capture>{% trans "Take photo" %}</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-stop>{% trans "Stop camera" %}</button>
-          </div>
-          <div class="form-text" data-camera-status>{% trans "Choose files or use the camera to attach photos." %}</div>
-          <div class="mt-2 d-none" data-camera-preview>
-            <video class="w-100 rounded border bg-dark" style="max-height: 220px; object-fit: cover;" playsinline autoplay muted data-camera-video></video>
-            <canvas class="d-none" data-camera-canvas></canvas>
-          </div>
-          <div class="row g-2 mt-2 d-none" data-file-preview></div>
-        </div>
-        <div class="form-text">{% trans "At least one photo is required when the customer does not pay." %}</div>
-      </div>
-      <div class="col-12" data-driver-section="payment-details">
-        <div class="border rounded-3 p-3 bg-light-subtle">
+      <div data-driver-section="payment-details">
+        <div class="border rounded-3 p-3 bg-light-subtle h-100">
           <div class="mb-3">
-            <h6 class="mb-1">{% trans "Payment details" %}</h6>
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <span class="badge text-bg-light border">2</span>
+              <h6 class="mb-0">{% trans "Payment details" %}</h6>
+            </div>
             <p class="text-muted small mb-0">{% trans "Complete the payment information after reviewing note details and evidence." %}</p>
           </div>
           <div class="row g-3">
@@ -270,7 +485,7 @@
               <input type="text" name="recibido_por" class="form-control" required>
             </div>
             <div class="col-md-4 paid-only d-none">
-              <label class="form-label fw-semibold">{% trans "Total payment amount" %}</label>
+              <label class="form-label fw-semibold" data-debit-label="{% trans 'Amount to charge' %}">{% trans "Total payment amount" %}</label>
               <input type="number" min="0" step="0.01" name="monto_pagado" id="paymentAmount" class="form-control" value="{{ delivery_collectible_balance }}" data-base-balance="{{ invoice.saldo_cliente }}">
               <div class="form-text">{% trans "Credit and debit notes created during delivery update the suggested amount to collect. The total is calculated automatically from up to three payment methods." %}</div>
               <div class="form-text fw-semibold" id="paymentAmountSummary"></div>
@@ -287,7 +502,7 @@
                   <div class="col-md-4"><label class="form-label fw-semibold">{% trans "Amount 1" %}</label><div class="input-group"><span class="input-group-text">$</span><input type="number" min="0" step="0.01" name="payment_amount_1" class="form-control js-payment-entry-amount" data-entry-index="1"></div></div>
                   <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque number" %}</label><input type="text" name="payment_cheque_numero_1" class="form-control" disabled></div>
                   <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque bank" %}</label><input type="text" name="payment_cheque_banco_1" class="form-control" disabled></div>
-                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque image" %}</label><input type="file" name="payment_cheque_image_1" class="form-control" accept="image/*" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque image" %}</label><input type="file" name="payment_cheque_image_1" class="form-control" accept="image/*" capture="environment" disabled></div>
                   <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="TRANSFERENCIA"><label class="form-label fw-semibold">{% trans "Transfer reference" %}</label><input type="text" name="payment_transferencia_referencia_1" class="form-control" disabled></div>
                   <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Card last 4" %}</label><input type="text" name="payment_tarjeta_ultimos_4_1" maxlength="4" class="form-control" disabled></div>
                   <div class="col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Authorization code" %}</label><input type="text" name="payment_tarjeta_autorizacion_1" class="form-control" disabled></div>
@@ -301,7 +516,7 @@
                   <div class="col-md-4"><label class="form-label fw-semibold">{% trans "Amount 2" %}</label><div class="input-group"><span class="input-group-text">$</span><input type="number" min="0" step="0.01" name="payment_amount_2" class="form-control js-payment-entry-amount" data-entry-index="2"></div></div>
                   <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque number" %}</label><input type="text" name="payment_cheque_numero_2" class="form-control" disabled></div>
                   <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque bank" %}</label><input type="text" name="payment_cheque_banco_2" class="form-control" disabled></div>
-                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque image" %}</label><input type="file" name="payment_cheque_image_2" class="form-control" accept="image/*" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque image" %}</label><input type="file" name="payment_cheque_image_2" class="form-control" accept="image/*" capture="environment" disabled></div>
                   <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="TRANSFERENCIA"><label class="form-label fw-semibold">{% trans "Transfer reference" %}</label><input type="text" name="payment_transferencia_referencia_2" class="form-control" disabled></div>
                   <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Card last 4" %}</label><input type="text" name="payment_tarjeta_ultimos_4_2" maxlength="4" class="form-control" disabled></div>
                   <div class="col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Authorization code" %}</label><input type="text" name="payment_tarjeta_autorizacion_2" class="form-control" disabled></div>
@@ -315,7 +530,7 @@
                   <div class="col-md-4"><label class="form-label fw-semibold">{% trans "Amount 3" %}</label><div class="input-group"><span class="input-group-text">$</span><input type="number" min="0" step="0.01" name="payment_amount_3" class="form-control js-payment-entry-amount" data-entry-index="3"></div></div>
                   <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque number" %}</label><input type="text" name="payment_cheque_numero_3" class="form-control" disabled></div>
                   <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque bank" %}</label><input type="text" name="payment_cheque_banco_3" class="form-control" disabled></div>
-                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque image" %}</label><input type="file" name="payment_cheque_image_3" class="form-control" accept="image/*" disabled></div>
+                  <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque image" %}</label><input type="file" name="payment_cheque_image_3" class="form-control" accept="image/*" capture="environment" disabled></div>
                   <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="TRANSFERENCIA"><label class="form-label fw-semibold">{% trans "Transfer reference" %}</label><input type="text" name="payment_transferencia_referencia_3" class="form-control" disabled></div>
                   <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Card last 4" %}</label><input type="text" name="payment_tarjeta_ultimos_4_3" maxlength="4" class="form-control" disabled></div>
                   <div class="col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Authorization code" %}</label><input type="text" name="payment_tarjeta_autorizacion_3" class="form-control" disabled></div>
@@ -331,10 +546,34 @@
               <label class="form-label fw-semibold">{% trans "Reason for non-payment" %}</label>
               <textarea name="motivo_no_pago" class="form-control" rows="3"></textarea>
             </div>
+
+            <div class="col-12 unpaid-only d-none">
+              <label class="form-label fw-semibold">{% trans "Evidence photos" %}</label>
+              <div class="camera-upload-widget" data-camera-upload>
+                <input type="file" name="evidence_photos" class="form-control" accept="image/*" capture="environment" multiple data-camera-input>
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" data-camera-start>{% trans "Use camera" %}</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-capture>{% trans "Take photo" %}</button>
+                  <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-stop>{% trans "Stop camera" %}</button>
+                </div>
+                <div class="form-text" data-camera-status>{% trans "Choose files or use the camera to attach photos." %}</div>
+                <div class="mt-2 d-none" data-camera-preview>
+                  <video class="w-100 rounded border bg-dark" style="max-height: 220px; object-fit: cover;" playsinline autoplay muted data-camera-video></video>
+                  <canvas class="d-none" data-camera-canvas></canvas>
+                </div>
+                <div class="row g-2 mt-2 d-none" data-file-preview></div>
+              </div>
+              <div class="form-text">{% trans "At least one photo is required when the customer does not pay." %}</div>
+            </div>
           </div>
         </div>
       </div>
-      <div class="col-12">
+    </div>
+    <div class="driver-signature-card">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <span class="badge text-bg-light border">3</span>
+        <h6 class="mb-0">{% trans "Customer signature" %}</h6>
+      </div>
         <label class="form-label fw-semibold">{% trans "Customer signature" %}</label>
         <div class="border rounded p-2 bg-light">
           <canvas id="signatureCanvas" class="w-100" height="220" style="touch-action:none;background:#fff;"></canvas>
@@ -343,9 +582,9 @@
         <div class="d-flex justify-content-end mt-2">
           <button type="button" id="clearSignature" class="btn btn-sm btn-outline-secondary">{% trans "Clear signature" %}</button>
         </div>
-      </div>
     </div>
-    <div class="d-flex justify-content-end mt-4">
+    <div class="driver-submit-bar">
+      <p class="driver-submit-copy">{% trans "Review payment details and signature before saving the delivery." %}</p>
       <button type="submit" class="btn btn-primary">{% trans "Save delivery" %}</button>
     </div>
   </div>
@@ -367,13 +606,13 @@
         <div class="col-md-4">
           <label class="form-label fw-semibold">{% trans "Adjustment mode" %}</label>
           <input type="hidden" name="driver_note_tipo_ajuste" id="driverAdjustmentTypePostDelivery" value="PRODUCTO">
-          <div class="form-control bg-light">{% trans "Product return / item lines" %}</div>
+          <div class="form-control bg-light" data-debit-label="{% trans 'Product to charge' %}">{% trans "Product return / item lines" %}</div>
         </div>
         <div class="col-md-4" id="driverReasonWrapperPostDelivery">
           <label class="form-label fw-semibold">{% trans "Reason" %}</label>
           <select name="driver_note_motivo" id="driverReasonSelectPostDelivery" class="form-select">
             <option value="">{% trans "Select..." %}</option>
-            <option value="DAMAGE">{% trans "Physical damage / transport" %}</option>
+            <option value="DAMAGE">{% trans "Damage / transport" %}</option>
             <option value="DEFECT">{% trans "Factory defect / quality issue" %}</option>
             <option value="MISSING_ITEM">{% trans "Missing item" %}</option>
             <option value="OTHER">{% trans "Other" %}</option>
@@ -549,6 +788,7 @@
   </div>
 </div>
 {% endif %}
+</div>
 
 <script>
   (function () {

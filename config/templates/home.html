@@ -715,7 +715,7 @@ en un mercado competitivo.
 <div class="container">
 
 <div class="title-divider">
-<span>{% if CURRENT_LANGUAGE == 'es' %}Usa La Tortilla Grocery como app{% else %}Use La Tortilla Grocery like an app{% endif %}</span>
+<span>{% trans "Use La Tortilla Grocery like an app" %}</span>
 </div>
 
 <div class="install-app-shell">
@@ -950,6 +950,7 @@ data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 
 <div class="footer-divider-line"></div>
 
+<!-- (Legal quick links removed — links remain in footer) -->
 
 <!-- FOOTER -->
 
@@ -1019,8 +1020,8 @@ data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 <h6>{% trans "Legal" %}</h6>
 
 <ul>
-<li><a href="#">{% trans "Política y Privacidad" %}</a></li>
-<li><a href="#">{% trans "Términos y Condiciones" %}</a></li>
+<li><a href="{% url 'privacy' %}">{% trans "Política y Privacidad" %}</a></li>
+<li><a href="{% url 'terms' %}">{% trans "Términos y Condiciones" %}</a></li>
 </ul>
 
 </div>
@@ -1936,11 +1937,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <span class="language-current">
 
-{% if LANGUAGE_CODE == "es" %}
-ES
-{% else %}
-EN
-{% endif %}
+{{ LANGUAGE_CODE|upper }}
 
 </span>
 

@@ -77,13 +77,13 @@ def _normalize_customer_location_payload(data):
     manual_location = bool(data.get('manual_location'))
 
     if not direccion:
-        raise ValidationError(_('La direccion es obligatoria.'))
+        raise ValidationError(_('Address is required.'))
     if not ciudad:
-        raise ValidationError(_('La ciudad es obligatoria.'))
+        raise ValidationError(_('City is required.'))
     if not estado:
-        raise ValidationError(_('El estado o departamento es obligatorio.'))
+        raise ValidationError(_('State or province is required.'))
     if not pais:
-        raise ValidationError(_('El pais es obligatorio.'))
+        raise ValidationError(_('Country is required.'))
 
     normalized_country = pais.lower()
     is_usa = normalized_country in USA_COUNTRY_ALIASES
@@ -91,11 +91,11 @@ def _normalize_customer_location_payload(data):
     if is_usa and not manual_location:
         matched_state = match_state_name(estado)
         if not matched_state:
-            raise ValidationError(_('Debes seleccionar un estado valido.'))
+            raise ValidationError(_('Select a valid state.'))
 
         matched_city = match_city_for_state(matched_state, ciudad)
         if not matched_city:
-            raise ValidationError(_('Debes seleccionar una ciudad valida para el estado elegido.'))
+            raise ValidationError(_('Select a valid city for the chosen state.'))
 
         estado = matched_state
         ciudad = matched_city
@@ -131,11 +131,11 @@ def crear_cliente(request):
 
         certificado = request.FILES.get("certificado")
         if not certificado:
-            messages.error(request, "Debes adjuntar el certificado tax para crear el cliente.")
+            messages.error(request, _('Attach the tax certificate to create the customer.'))
             return render(request, "vendedores/crear_cliente.html")
 
         if not request.POST.get("confirmacion"):
-            messages.error(request, "Debes aceptar la declaración sobre la veracidad de la información fiscal.")
+            messages.error(request, _('Accept the statement confirming the tax information is accurate.'))
             return render(request, "vendedores/crear_cliente.html")
 
         # crear usuario
@@ -431,13 +431,13 @@ def enviar_pedido(request):
     if not tipo_orden:
         return JsonResponse({
             "success": False,
-            "error": "Debe indicar cómo se tomó la orden"
+            "error": str(_('You must indicate how the order was taken.'))
     })
 
     if not carrito or not cliente_id:
         return JsonResponse({
             "success": False,
-            "error": "No hay productos ni cliente seleccionados para generar el pedido."
+            "error": str(_('There are no selected products or customer to generate the order.'))
         }, status=400)
 
     cliente = Cliente.objects.get(id=cliente_id)
@@ -476,7 +476,7 @@ def enviar_pedido(request):
         notificar_backoffice_pedido(pedido)
     except Exception as exc:
         logger.exception("Error enviando notificacion del pedido %s: %s", pedido.id, exc)
-        warning = "El pedido se generó, pero no se pudo enviar el correo de notificación."
+        warning = str(_('The order was created, but the notification email could not be sent.'))
 
     request.session["pedido"] = {}
     request.session.pop("cliente_id", None)
@@ -495,7 +495,7 @@ def editar_cliente(request):
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
-        return JsonResponse({'success': False, 'message': _('Solicitud invalida.')}, status=400)
+        return JsonResponse({'success': False, 'message': _('Invalid request.')}, status=400)
 
     cliente_id = data.get('cliente_id')
     empresa = (data.get('empresa') or '').strip()
@@ -503,11 +503,11 @@ def editar_cliente(request):
     telefono = (data.get('telefono') or '').strip()
 
     if not cliente_id:
-        return JsonResponse({'success': False, 'message': _('Cliente no encontrado')}, status=404)
+        return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
     if not empresa or not correo or not telefono:
-        return JsonResponse({'success': False, 'message': _('Por favor completa todos los campos requeridos.')}, status=400)
+        return JsonResponse({'success': False, 'message': _('Please complete all required fields.')}, status=400)
     if len(telefono) != 10 or not telefono.isdigit():
-        return JsonResponse({'success': False, 'message': _('El telefono debe tener exactamente 10 digitos.')}, status=400)
+        return JsonResponse({'success': False, 'message': _('Phone number must contain exactly 10 digits.')}, status=400)
 
     try:
         location_payload = _normalize_customer_location_payload(data)
@@ -525,10 +525,10 @@ def editar_cliente(request):
         cliente.usuario.email = correo
         cliente.usuario.save(update_fields=['email'])
 
-        return JsonResponse({'success': True, 'message': _('Cliente actualizado correctamente')})
+        return JsonResponse({'success': True, 'message': _('Customer updated successfully.')})
 
     except Cliente.DoesNotExist:
-        return JsonResponse({'success': False, 'message': _('Cliente no encontrado')}, status=404)
+        return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
     except ValidationError as exc:
         return JsonResponse({'success': False, 'message': exc.messages[0] if getattr(exc, 'messages', None) else str(exc)}, status=400)
     except Exception as exc:
@@ -541,7 +541,7 @@ def desactivar_cliente(request):
     
     # Solo administradores pueden desactivar clientes
     if not (request.user.is_superuser or request.user.role == 'admin'):
-        return JsonResponse({'success': False, 'message': 'Permiso denegado. Solo administradores pueden desactivar clientes.'}, status=403)
+        return JsonResponse({'success': False, 'message': str(_('Permission denied. Only administrators can deactivate customers.'))}, status=403)
 
     try:
         import json
@@ -549,7 +549,7 @@ def desactivar_cliente(request):
         cliente_id = data.get('cliente_id')
 
         if not cliente_id:
-            return JsonResponse({'success': False, 'message': 'ID de cliente requerido'}, status=400)
+            return JsonResponse({'success': False, 'message': str(_('Customer ID is required.'))}, status=400)
 
         cliente = get_object_or_404(Cliente, id=cliente_id)
         cliente.aprobado = False
@@ -558,7 +558,7 @@ def desactivar_cliente(request):
         cliente.usuario.is_active = False
         cliente.usuario.save(update_fields=['is_active'])
 
-        return JsonResponse({'success': True, 'message': 'Cliente desactivado correctamente'})
+        return JsonResponse({'success': True, 'message': str(_('Customer deactivated successfully.'))})
 
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)}, status=400)
@@ -570,7 +570,7 @@ def activar_cliente(request):
     
     # Solo administradores pueden activar clientes
     if not (request.user.is_superuser or request.user.role == 'admin'):
-        return JsonResponse({'success': False, 'message': 'Permiso denegado. Solo administradores pueden activar clientes.'}, status=403)
+        return JsonResponse({'success': False, 'message': str(_('Permission denied. Only administrators can activate customers.'))}, status=403)
 
     try:
         import json
@@ -578,7 +578,7 @@ def activar_cliente(request):
         cliente_id = data.get('cliente_id')
 
         if not cliente_id:
-            return JsonResponse({'success': False, 'message': 'ID de cliente requerido'}, status=400)
+            return JsonResponse({'success': False, 'message': str(_('Customer ID is required.'))}, status=400)
 
         cliente = get_object_or_404(Cliente, id=cliente_id)
         cliente.aprobado = True
@@ -587,7 +587,7 @@ def activar_cliente(request):
         cliente.usuario.is_active = True
         cliente.usuario.save(update_fields=['is_active'])
 
-        return JsonResponse({'success': True, 'message': 'Cliente activado correctamente'})
+        return JsonResponse({'success': True, 'message': str(_('Customer activated successfully.'))})
 
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)}, status=400)

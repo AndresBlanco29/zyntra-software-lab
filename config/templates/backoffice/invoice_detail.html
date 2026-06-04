@@ -12,13 +12,24 @@
   </div>
 </div>
 {% endif %}
+{% if invoice_quickbooks_locked %}
+<div class="alert alert-info d-flex justify-content-between align-items-center gap-3 mb-3">
+  <div>
+    <strong>{% trans "QuickBooks lock active." %}</strong>
+    <div class="small mb-0">{% trans "This invoice is already synced, so no more accounting edits or adjustment note changes are allowed from this screen." %}</div>
+  </div>
+  <span class="badge text-bg-primary">{% trans "Synced" %}</span>
+</div>
+{% endif %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
     <h2 class="mb-1">{{ invoice.numero }}</h2>
     <p class="text-muted mb-0">{% trans "Invoice generated from verified picking quantities." %}</p>
   </div>
   <div class="d-flex gap-2">
+    {% if not invoice_quickbooks_locked %}
     <a href="{{ advanced_adjustment_note_url }}" class="btn btn-outline-primary">{% trans "Advanced note" %}</a>
+    {% endif %}
     <a href="{% url 'backoffice_invoices_list' %}" class="btn btn-outline-secondary">{% trans "Back to list" %}</a>
     <a href="{% url 'backoffice_invoice_pdf' invoice.id %}" class="btn btn-success">{% trans "Export PDF" %}</a>
   </div>
@@ -34,7 +45,7 @@
             <div class="fw-semibold">{{ invoice.cliente.nombre_empresa }}</div>
           </div>
           <div class="col-md-4">
-            <div class="text-muted small">{% trans "Purchase order" %}</div>
+            <div class="text-muted small">{% trans "Sales order" %}</div>
             <div class="fw-semibold">#{{ invoice.pedido_id }}</div>
           </div>
           <div class="col-md-4">
@@ -322,7 +333,11 @@
                 <td>{{ nota.get_inventario_estado_display }}</td>
                 <td>${{ nota.total }}</td>
                 <td class="text-end">
-                  {% if nota.estado == 'BORRADOR' %}
+                  {% if nota.quickbooks_id and nota.sync_status == 'SYNCED' %}
+                    <span class="badge text-bg-primary">{% trans "Locked by QuickBooks" %}</span>
+                  {% elif invoice_quickbooks_locked %}
+                    <span class="badge text-bg-secondary">{% trans "Invoice locked" %}</span>
+                  {% elif nota.estado == 'BORRADOR' %}
                     <div class="d-flex gap-2 justify-content-end">
                       <form method="post" action="{% url 'backoffice_invoice_approve_note' nota.id %}">
                         {% csrf_token %}
@@ -445,8 +460,13 @@
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
           <h5 class="mb-0">{% trans "Create adjustment note" %}</h5>
+          {% if not invoice_quickbooks_locked %}
           <a href="{{ advanced_adjustment_note_url }}" class="btn btn-sm btn-outline-primary">{% trans "Choose customer and invoice" %}</a>
+          {% endif %}
         </div>
+        {% if invoice_quickbooks_locked %}
+          <div class="alert alert-light border mb-0">{% trans "This invoice is locked after QuickBooks sync. Create or change accounting notes directly in QuickBooks or sync a new local record before locking it." %}</div>
+        {% else %}
         <form method="post" enctype="multipart/form-data" action="{% url 'backoffice_invoice_create_note' invoice.id %}">
           {% csrf_token %}
           <div class="row g-2 mb-3">
@@ -469,7 +489,7 @@
               <label class="form-label fw-semibold">{% trans "Reason" %}</label>
               <select name="note_motivo" id="backofficeReasonSelect" class="form-select" required>
                 <option value="">{% trans "Select..." %}</option>
-                <option value="DAMAGE">{% trans "Physical damage / transport" %}</option>
+                <option value="DAMAGE">{% trans "Damage / transport" %}</option>
                 <option value="DEFECT">{% trans "Factory defect / quality issue" %}</option>
                 <option value="MISSING_ITEM">{% trans "Missing item" %}</option>
                 <option value="OTHER">{% trans "Other" %}</option>
@@ -497,7 +517,7 @@
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
-              <input type="file" name="note_evidence_photos" class="form-control" accept="image/*" multiple>
+              <input type="file" name="note_evidence_photos" class="form-control" accept="image/*" capture="environment" multiple>
               <div class="form-text">{% trans "Optional photos or evidence that support this adjustment note." %}</div>
             </div>
           </div>
@@ -545,6 +565,7 @@
 
           <button type="submit" class="btn btn-primary w-100">{% trans "Save draft note" %}</button>
         </form>
+        {% endif %}
       </div>
     </div>
   </div>

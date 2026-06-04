@@ -93,7 +93,7 @@
         <label class="form-label fw-semibold">{% trans "Created by" %}</label>
         <select name="creada_por" class="form-select">
           <option value="">{% trans "All creators" %}</option>
-          <option value="backoffice" {% if selected_creator_role == 'backoffice' %}selected{% endif %}>BackOffice</option>
+          <option value="backoffice" {% if selected_creator_role == 'backoffice' %}selected{% endif %}>{% trans "BackOffice" %}</option>
           <option value="driver" {% if selected_creator_role == 'driver' %}selected{% endif %}>{% trans "Driver" %}</option>
           <option value="admin" {% if selected_creator_role == 'admin' %}selected{% endif %}>{% trans "Admin" %}</option>
         </select>
@@ -177,7 +177,12 @@
             </td>
             <td data-label="{% trans 'Origin' %}">
               <span class="badge {% if note.creada_por and note.creada_por.role == 'driver' %}bg-warning text-dark{% elif note.creada_por and note.creada_por.role == 'admin' %}bg-dark{% else %}bg-primary{% endif %}">
-                {% if note.creada_por %}{{ note.creada_por.role|title }}{% else %}{% trans "System" %}{% endif %}
+                {% if note.creada_por %}
+                  {% if note.creada_por.role == 'driver' %}{% trans "Driver" %}
+                  {% elif note.creada_por.role == 'admin' %}{% trans "Admin" %}
+                  {% elif note.creada_por.role == 'backoffice' %}{% trans "BackOffice" %}
+                  {% else %}{{ note.creada_por.role|title }}{% endif %}
+                {% else %}{% trans "System" %}{% endif %}
               </span>
               <div class="small mt-2 text-muted">{% trans "Created by" %}: {% firstof note.creada_por.get_full_name note.creada_por.username '-' %}</div>
               {% if note.aprobada_por %}

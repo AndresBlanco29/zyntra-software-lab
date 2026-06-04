@@ -14,7 +14,17 @@
 
 <hr />
 
-<div class="row gx-4">
+<div class="row gx-4" id="createCustomerPage"
+data-step-one-text="{% trans 'Step 1 of 2' %}"
+data-step-two-text="{% trans 'Step 2 of 2' %}"
+data-msg-required-fields="{% trans 'Please complete all required fields.' %}"
+data-msg-document-max="{% trans 'The document must have a maximum of 9 digits.' %}"
+data-msg-phone-ten="{% trans 'Phone number must contain exactly 10 digits.' %}"
+data-msg-email-invalid="{% trans 'Email address must be valid, for example user@domain.com.' %}"
+data-msg-business-phone-ten="{% trans 'Business phone number must contain exactly 10 digits.' %}"
+data-msg-business-email-invalid="{% trans 'Business email address must be valid.' %}"
+data-msg-upload-certificate="{% trans 'Please upload the tax certificate.' %}"
+data-msg-accept-declaration="{% trans 'You must accept the statement confirming the tax information is accurate.' %}">
 <div class="col-12">
 
 <div class="card custom-card">
@@ -32,7 +42,7 @@
 <div class="text-center mb-4">
 
 <div class="fw-semibold text-primary mb-2" id="stepText">
-{% trans "Paso 1 de 2" %}
+{% trans "Step 1 of 2" %}
 </div>
 
 <div class="step-bar mx-auto w-75">
@@ -169,7 +179,7 @@ required
 <input class="form-check-input" type="checkbox" id="confirmCheckbox" name="confirmacion" required />
 
 <label class="form-check-label">
-{% if CURRENT_LANGUAGE == 'es' %}Declaro que la información fiscal y comercial proporcionada para este cliente, incluido el número de impuesto sobre ventas y el certificado adjunto, es verdadera, exacta, actual y verificable según la información entregada por el cliente. Entiendo que el cliente es responsable por cualquier error, omisión o uso indebido de esa información.{% else %}I certify that the tax and business information provided for this customer, including the sales tax number and attached certificate, is true, accurate, current, and verifiable based on the information submitted by the customer. I understand that the customer is responsible for any error, omission, or improper use of that information.{% endif %}
+{% trans "I certify that the tax and business information provided for this customer, including the sales tax number and attached certificate, is true, accurate, current, and verifiable based on the information submitted by the customer. I understand that the customer is responsible for any error, omission, or improper use of that information." %}
 </label>
 
 </div>
@@ -247,6 +257,20 @@ required
 
 // Permitir solo números en documento y teléfono
 document.addEventListener('DOMContentLoaded', function() {
+  const customerPage = document.getElementById('createCustomerPage');
+  const createCustomerMessages = {
+    requiredFields: customerPage?.dataset.msgRequiredFields || 'Please complete all required fields.',
+    documentMax: customerPage?.dataset.msgDocumentMax || 'The document must have a maximum of 9 digits.',
+    phoneTen: customerPage?.dataset.msgPhoneTen || 'Phone number must contain exactly 10 digits.',
+    emailInvalid: customerPage?.dataset.msgEmailInvalid || 'Email address must be valid, for example user@domain.com.',
+    businessPhoneTen: customerPage?.dataset.msgBusinessPhoneTen || 'Business phone number must contain exactly 10 digits.',
+    businessEmailInvalid: customerPage?.dataset.msgBusinessEmailInvalid || 'Business email address must be valid.',
+    uploadCertificate: customerPage?.dataset.msgUploadCertificate || 'Please upload the tax certificate.',
+    acceptDeclaration: customerPage?.dataset.msgAcceptDeclaration || 'You must accept the statement confirming the tax information is accurate.',
+    stepOneText: customerPage?.dataset.stepOneText || 'Step 1 of 2',
+    stepTwoText: customerPage?.dataset.stepTwoText || 'Step 2 of 2'
+  };
+  window.createCustomerMessages = createCustomerMessages;
   const documentoInputs = document.querySelectorAll('.documento-input');
   const telefonoInputs = document.querySelectorAll('.telefono-input');
   
@@ -297,49 +321,49 @@ function validarFormulario() {
   // Validación de campos requeridos
   if (!nombre || !apellido || !telefono || !email || !empresa || !sales_tax ||
       !direccion || !ciudad || !estado || !codigo_postal || !pais) {
-    mostrarError('Por favor llenar todos los campos obligatorios');
+    mostrarError(window.createCustomerMessages.requiredFields);
     return;
   }
   
   // Validación de documento (máximo 9 dígitos)
   if (documento && documento.length > 9) {
-    mostrarError('El documento debe tener máximo 9 dígitos');
+    mostrarError(window.createCustomerMessages.documentMax);
     return;
   }
   
   // Validación de teléfono (10 dígitos)
   if (!/^\d{10}$/.test(telefono)) {
-    mostrarError('El teléfono debe tener exactamente 10 dígitos');
+    mostrarError(window.createCustomerMessages.phoneTen);
     return;
   }
   
   // Validación de email
   if (!validarEmail(email)) {
-    mostrarError('El correo debe ser válido (ejemplo: usuario@dominio.com)');
+    mostrarError(window.createCustomerMessages.emailInvalid);
     return;
   }
   
   // Validación de teléfono comercial si está lleno
   if (telefono_comercial && !/^\d{10}$/.test(telefono_comercial)) {
-    mostrarError('El teléfono comercial debe tener 10 dígitos');
+    mostrarError(window.createCustomerMessages.businessPhoneTen);
     return;
   }
   
   // Validación de email comercial si está lleno
   if (email_comercial && !validarEmail(email_comercial)) {
-    mostrarError('El correo comercial debe ser válido');
+    mostrarError(window.createCustomerMessages.businessEmailInvalid);
     return;
   }
   
   // Validación de certificado
   if (!certificado) {
-    mostrarError('Por favor subir el certificado de impuesto');
+    mostrarError(window.createCustomerMessages.uploadCertificate);
     return;
   }
   
   // Validación de checkbox
   if (!checkbox) {
-    mostrarError('Debes aceptar la declaración sobre la veracidad de la información fiscal');
+    mostrarError(window.createCustomerMessages.acceptDeclaration);
     return;
   }
   
@@ -372,14 +396,14 @@ function mostrarExito() {
 function nextStep() {
   document.getElementById('step1').style.display = 'none';
   document.getElementById('step2').style.display = 'block';
-  document.getElementById('stepText').textContent = 'Paso 2 de 2';
+  document.getElementById('stepText').textContent = window.createCustomerMessages.stepTwoText;
   document.getElementById('progressBar').style.width = '100%';
 }
 
 function prevStep() {
   document.getElementById('step2').style.display = 'none';
   document.getElementById('step1').style.display = 'block';
-  document.getElementById('stepText').textContent = 'Paso 1 de 2';
+  document.getElementById('stepText').textContent = window.createCustomerMessages.stepOneText;
   document.getElementById('progressBar').style.width = '50%';
 }
 

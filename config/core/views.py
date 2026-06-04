@@ -284,3 +284,13 @@ def home(request):
 
 def health(request):
     return JsonResponse({"status": "ok"})
+
+
+def privacy_policy(request):
+    """Página de Privacy Policy simple para integraciones (QuickBooks)."""
+    return render(request, "privacy.html", {})
+
+
+def terms_of_service(request):
+    """Página de Terms of Service simple."""
+    return render(request, "terms.html", {})

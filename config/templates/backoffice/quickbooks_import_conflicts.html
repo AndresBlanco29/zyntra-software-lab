@@ -1,0 +1,107 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "QuickBooks Review Queue" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
+  <div>
+    <h2 class="mb-1">{% trans "QuickBooks review queue" %}</h2>
+    <p class="text-muted mb-0">{% trans "Unmatched or conflicting records pulled from QuickBooks are listed here for review." %}</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <span class="badge text-bg-light border px-3 py-2">{{ quickbooks_status.environment|upper }}</span>
+    <a href="{% url 'quickbooks_center' %}" class="btn btn-outline-primary">{% trans "Back to QuickBooks Center" %}</a>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+      <h5 class="mb-0">{% trans "Review items" %}</h5>
+      <span class="badge text-bg-danger">{{ active_conflicts_count }} {% trans "active conflicts" %}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead>
+          <tr>
+            <th>{% trans "Entity" %}</th>
+            <th>{% trans "QuickBooks ID" %}</th>
+            <th>{% trans "Doc / label" %}</th>
+            <th>{% trans "Status" %}</th>
+            <th>{% trans "Reason" %}</th>
+            <th>{% trans "Local link" %}</th>
+            <th>{% trans "Actions" %}</th>
+            <th>{% trans "Last seen" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for conflict in conflicts %}
+          <tr>
+            <td>{{ conflict.get_entity_type_display }}</td>
+            <td><code>{{ conflict.quickbooks_id }}</code></td>
+            <td>
+              <div class="fw-semibold">{{ conflict.doc_number|default:conflict.display_name|default:'-' }}</div>
+              {% if conflict.display_name and conflict.display_name != conflict.doc_number %}
+              <div class="small text-muted">{{ conflict.display_name }}</div>
+              {% endif %}
+            </td>
+            <td>
+              {% if conflict.status == 'CONFLICT' %}
+              <span class="badge text-bg-danger">{% trans "Conflict" %}</span>
+              {% else %}
+              <span class="badge text-bg-success">{% trans "Matched" %}</span>
+              {% endif %}
+            </td>
+            <td class="small">{{ conflict.reason|default:'-' }}</td>
+            <td>
+              {% if conflict.local_model and conflict.local_record_id %}
+              <span class="small">{{ conflict.local_model }} #{{ conflict.local_record_id }}</span>
+              {% else %}
+              <span class="text-muted">-</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="d-flex flex-column gap-2">
+                {% if conflict.status == 'CONFLICT' %}
+                <form method="post" action="{% url 'quickbooks_import_conflict_retry' conflict.id %}" class="d-flex gap-2 flex-wrap">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-primary">{% trans "Retry" %}</button>
+                </form>
+                <form method="post" action="{% url 'quickbooks_import_conflict_link' conflict.id %}" class="d-flex gap-2 flex-wrap align-items-center">
+                  {% csrf_token %}
+                  {% if conflict.entity_type == 'INVOICE' %}
+                  <select name="local_model" class="form-select form-select-sm" style="max-width: 150px;">
+                    <option value="Invoice" {% if conflict.local_model != 'NotaAjuste' %}selected{% endif %}>{% trans "Invoice" %}</option>
+                    <option value="NotaAjuste" {% if conflict.local_model == 'NotaAjuste' %}selected{% endif %}>{% trans "Debit note" %}</option>
+                  </select>
+                  {% else %}
+                  <input type="hidden" name="local_model" value="{{ conflict.local_model|default:'' }}">
+                  {% endif %}
+                  <input type="number" name="local_record_id" value="{{ conflict.local_record_id|default:'' }}" class="form-control form-control-sm" placeholder="{% trans 'Local ID' %}" style="max-width: 110px;">
+                  <input type="text" name="resolution_note" class="form-control form-control-sm" placeholder="{% trans 'Note' %}" style="max-width: 160px;">
+                  <button type="submit" class="btn btn-sm btn-outline-success">{% trans "Link" %}</button>
+                </form>
+                <form method="post" action="{% url 'quickbooks_import_conflict_dismiss' conflict.id %}" class="d-flex gap-2 flex-wrap align-items-center">
+                  {% csrf_token %}
+                  <input type="text" name="resolution_note" class="form-control form-control-sm" placeholder="{% trans 'Dismiss reason' %}" style="max-width: 180px;">
+                  <button type="submit" class="btn btn-sm btn-outline-secondary">{% trans "Dismiss" %}</button>
+                </form>
+                {% else %}
+                <div class="small text-muted">{{ conflict.resolution_note|default:'-' }}</div>
+                {% endif %}
+              </div>
+            </td>
+            <td class="small text-muted">{{ conflict.last_seen_at|date:"d/m/Y H:i" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-center text-muted py-4">{% trans "No QuickBooks conflicts are pending review." %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

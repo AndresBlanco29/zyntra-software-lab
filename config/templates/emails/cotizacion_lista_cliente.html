@@ -1,24 +1,25 @@
 {% extends "emails/base_email.html" %}
+{% load i18n %}
 
-{% block preheader %}Tu pedido #{{ cotizacion.id }} ya está listo para revisión y confirmación.{% endblock %}
-{% block header_title %}Pedido listo para confirmar{% endblock %}
-{% block header_subtitle %}Revisa tu pedido y confirma si todo está correcto para generar la orden de compra.{% endblock %}
+{% block preheader %}{% blocktrans with quote_id=cotizacion.id %}Your order #{{ quote_id }} is ready for review and confirmation.{% endblocktrans %}{% endblock %}
+{% block header_title %}{% trans "Order ready to confirm" %}{% endblock %}
+{% block header_subtitle %}{% trans "Review your order and confirm that everything is correct to generate the purchase order." %}{% endblock %}
 
 {% block content %}
-<p style="margin:0 0 14px 0; font-size:15px; line-height:1.7;">Hola {{ cliente.usuario.first_name|default:cliente.nombre_empresa }},</p>
-<p style="margin:0 0 16px 0; font-size:15px; line-height:1.7;">Tu pedido <strong>#{{ cotizacion.id }}</strong> ya tiene precios definidos y está listo para continuar con la orden de compra.</p>
+<p style="margin:0 0 14px 0; font-size:15px; line-height:1.7;">{% blocktrans with customer_name=cliente.usuario.first_name|default:cliente.nombre_empresa %}Hello {{ customer_name }},{% endblocktrans %}</p>
+<p style="margin:0 0 16px 0; font-size:15px; line-height:1.7;">{% blocktrans with quote_id=cotizacion.id %}Your order <strong>#{{ quote_id }}</strong> already has prices defined and is ready to continue to the purchase order.{% endblocktrans %}</p>
 
 <div style="margin:22px 0; text-align:center;">
-  <a href="{{ confirm_url }}" style="display:inline-block; background:#ffd400; color:#1e293b; padding:14px 24px; text-decoration:none; border-radius:10px; font-size:14px; font-weight:700;">Ir a Pedidos Recibidos</a>
+  <a href="{{ confirm_url }}" style="display:inline-block; background:#ffd400; color:#1e293b; padding:14px 24px; text-decoration:none; border-radius:10px; font-size:14px; font-weight:700;">{% trans "Go to Received Orders" %}</a>
 </div>
 
 <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px 18px; margin-top:20px;">
-  <div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-bottom:8px;">Siguiente paso</div>
-  <div style="font-size:14px; line-height:1.7; color:#1e293b;">En el panel de cliente entra a <strong>Pedidos Recibidos</strong> y revisa el pedido para confirmarlo o cancelarlo.</div>
+  <div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-bottom:8px;">{% trans "Next step" %}</div>
+  <div style="font-size:14px; line-height:1.7; color:#1e293b;">{% trans "In the customer panel, go to" %} <strong>{% trans "Received Orders" %}</strong> {% trans "and review the order to confirm or cancel it." %}</div>
 </div>
 
 <div style="margin-top:20px; font-size:14px; line-height:1.7; color:#475569;">
-  <div style="margin-bottom:8px;"><strong>Enlace directo:</strong></div>
+  <div style="margin-bottom:8px;"><strong>{% trans "Direct link:" %}</strong></div>
   <div style="word-break:break-all; color:#0b3d91;">{{ confirm_url }}</div>
 </div>
 {% endblock %}

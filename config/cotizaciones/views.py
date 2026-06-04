@@ -688,21 +688,21 @@ def generar_pedido_desde_cotizacion(request, cotizacion_id):
     if pedido_existente is not None:
         messages.info(
             request,
-            _('This quote already has purchase order #%(id)s generated.') % {'id': pedido_existente.id},
+            _('This quote already has sales order #%(id)s generated.') % {'id': pedido_existente.id},
         )
         return redirect('backoffice_pedido_detalle', pedido_id=pedido_existente.id)
 
     if not cotizacion.items.exists():
-        messages.error(request, _('The order has no products to generate a purchase order.'))
+        messages.error(request, _('The order has no products to generate a sales order.'))
         return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
     if not cotizacion.backoffice_pricing_confirmed:
-        messages.warning(request, _('Save and confirm the quote pricing before generating the purchase order.'))
+        messages.warning(request, _('Save and confirm the quote pricing before generating the sales order.'))
         return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
     items_payload = _build_order_items_payload_from_quote(cotizacion)
     if not items_payload:
-        messages.error(request, _('You must leave at least one product to create the purchase order.'))
+        messages.error(request, _('You must leave at least one product to create the sales order.'))
         return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
     nota_cliente = (cotizacion.nota_confirmacion_cliente or '').strip()
@@ -735,12 +735,12 @@ def generar_pedido_desde_cotizacion(request, cotizacion_id):
     if cliente_notificado:
         messages.success(
             request,
-            _('Purchase order #%(id)s was generated successfully and the customer was notified.') % {'id': pedido.id},
+            _('Sales order #%(id)s was generated successfully and the customer was notified.') % {'id': pedido.id},
         )
     else:
         messages.warning(
             request,
-            _('Purchase order #%(id)s was generated, but the customer email could not be sent.') % {'id': pedido.id},
+            _('Sales order #%(id)s was generated, but the customer email could not be sent.') % {'id': pedido.id},
         )
 
     return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
@@ -866,7 +866,7 @@ def cliente_cotizacion_recibida_detalle(request, token):
                 return redirect('cliente_cotizacion_recibida_detalle', token=cotizacion.token_cliente)
 
         if not items_payload:
-            messages.error(request, _('You must leave at least one product to create the purchase order.'))
+            messages.error(request, _('You must leave at least one product to create the sales order.'))
             context = {
                 'cotizacion': cotizacion,
                 'pedido_existente': pedido_existente,
@@ -923,7 +923,7 @@ def cliente_cotizacion_recibida_detalle(request, token):
         except Exception as exc:
             logger.exception('Error notificando pedido confirmado %s al cliente: %s', pedido.id, exc)
 
-        messages.success(request, _('Your purchase order #{id} was sent successfully.').format(id=pedido.id))
+        messages.success(request, _('Your sales order #{id} was sent successfully.').format(id=pedido.id))
         return redirect('cliente_cotizacion_recibida_detalle', token=cotizacion.token_cliente)
 
     quote_rows, current_items_payload, current_total = build_cliente_quote_rows()

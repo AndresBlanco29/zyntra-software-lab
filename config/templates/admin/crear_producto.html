@@ -43,31 +43,39 @@
 </div>
 
 <div class="mb-3">
-<label class="form-label">{% trans "Categoria" %}</label>
-<select name="categoria" class="form-control">
-<option value="">{% trans "Seleccionar categoria" %}</option>
+	<div class="d-flex justify-content-between align-items-center">
+		<label class="form-label mb-0">{% trans "Categoria" %}</label>
+		<button type="button" class="btn btn-link p-0" id="btn-open-crear-categoria" title="{% trans 'Crear categoria' %}">+
+		</button>
+	</div>
+	<select name="categoria" class="form-control mt-2">
+		<option value="">{% trans "Seleccionar categoria" %}</option>
 
-{% for categoria in categorias %}
-<option value="{{ categoria.id }}">
-{{ categoria.nombre }}
-</option>
-{% endfor %}
+		{% for categoria in categorias %}
+		<option value="{{ categoria.id }}">
+			{{ categoria.nombre }}
+		</option>
+		{% endfor %}
 
-</select>
+	</select>
 </div>
 
 <div class="mb-3">
-<label class="form-label">{% trans "Marca" %}</label>
-<select name="marca" class="form-control">
-<option value="">{% trans "Seleccionar marca" %}</option>
+	<div class="d-flex justify-content-between align-items-center">
+		<label class="form-label mb-0">{% trans "Marca" %}</label>
+		<button type="button" class="btn btn-link p-0" id="btn-open-crear-marca" title="{% trans 'Crear marca' %}">+
+		</button>
+	</div>
+	<select name="marca" class="form-control mt-2">
+		<option value="">{% trans "Seleccionar marca" %}</option>
 
-{% for marca in marcas %}
-<option value="{{ marca.id }}">
-{{ marca.nombre }}
-</option>
-{% endfor %}
+		{% for marca in marcas %}
+		<option value="{{ marca.id }}">
+			{{ marca.nombre }}
+		</option>
+		{% endfor %}
 
-</select>
+	</select>
 </div>
 
 <div class="mb-3">
@@ -180,5 +188,161 @@
 </div>
 
 <script src="{% static 'js/product-price-formula.js' %}"></script>
+
+<!-- Modal para crear categoria rapido -->
+<div class="modal fade" id="crearCategoriaModal" tabindex="-1" aria-labelledby="crearCategoriaLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="crearCategoriaLabel">{% trans "Crear Categoria" %}</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body">
+				<div id="crear-categoria-error" class="text-danger mb-2"></div>
+				<form id="crear-categoria-form">
+					{% csrf_token %}
+					<div class="mb-3">
+						<label class="form-label">{% trans "Nombre de la categoria" %}</label>
+						<input type="text" name="nombre" class="form-control" required>
+					</div>
+					<div class="mb-3">
+						<label class="form-label">{% trans "Nombre en ingles" %}</label>
+						<input type="text" name="nombre_en" class="form-control">
+					</div>
+					<div class="d-flex justify-content-end">
+						<button type="submit" class="btn btn-primary">{% trans "Guardar Categoria" %}</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+	var openBtn = document.getElementById('btn-open-crear-categoria');
+	var modalEl = document.getElementById('crearCategoriaModal');
+	var crearForm = document.getElementById('crear-categoria-form');
+	var errorDiv = document.getElementById('crear-categoria-error');
+	var categoriaSelect = document.querySelector('select[name="categoria"]');
+
+	if(openBtn){
+		openBtn.addEventListener('click', function(){
+			var modal = new bootstrap.Modal(modalEl);
+			errorDiv.textContent = '';
+			crearForm.reset();
+			modal.show();
+		});
+	}
+
+	if(crearForm){
+		crearForm.addEventListener('submit', function(e){
+			e.preventDefault();
+			errorDiv.textContent = '';
+			var formData = new FormData(crearForm);
+			fetch("{% url 'crear_categoria' %}", {
+				method: 'POST',
+				body: formData,
+				headers: {
+					'X-Requested-With': 'XMLHttpRequest'
+				}
+			}).then(function(resp){
+				if(resp.ok){
+					return resp.json();
+				}
+				return resp.json().then(function(data){ throw data; });
+			}).then(function(data){
+				var opt = document.createElement('option');
+				opt.value = data.id;
+				opt.textContent = data.nombre;
+				categoriaSelect.appendChild(opt);
+				categoriaSelect.value = data.id;
+				var modal = bootstrap.Modal.getInstance(modalEl);
+				if(modal) modal.hide();
+			}).catch(function(err){
+				errorDiv.textContent = err && err.error ? err.error : 'Error';
+			});
+		});
+	}
+});
+</script>
+
+<!-- Modal para crear marca rapido -->
+<div class="modal fade" id="crearMarcaModal" tabindex="-1" aria-labelledby="crearMarcaLabel" aria-hidden="true">
+	<div class="modal-dialog">
+		<div class="modal-content">
+			<div class="modal-header">
+				<h5 class="modal-title" id="crearMarcaLabel">{% trans "Crear Marca" %}</h5>
+				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+			</div>
+			<div class="modal-body">
+				<div id="crear-marca-error" class="text-danger mb-2"></div>
+				<form id="crear-marca-form">
+					{% csrf_token %}
+					<div class="mb-3">
+						<label class="form-label">{% trans "Nombre de la marca" %}</label>
+						<input type="text" name="nombre" class="form-control" required>
+					</div>
+					<div class="mb-3">
+						<label class="form-label">{% trans "Nombre en ingles" %}</label>
+						<input type="text" name="nombre_en" class="form-control">
+					</div>
+					<div class="d-flex justify-content-end">
+						<button type="submit" class="btn btn-primary">{% trans "Guardar Marca" %}</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+	var openMarcaBtn = document.getElementById('btn-open-crear-marca');
+	var modalMarcaEl = document.getElementById('crearMarcaModal');
+	var crearMarcaForm = document.getElementById('crear-marca-form');
+	var errorMarcaDiv = document.getElementById('crear-marca-error');
+	var marcaSelect = document.querySelector('select[name="marca"]');
+
+	if(openMarcaBtn){
+		openMarcaBtn.addEventListener('click', function(){
+			var modal = new bootstrap.Modal(modalMarcaEl);
+			errorMarcaDiv.textContent = '';
+			crearMarcaForm.reset();
+			modal.show();
+		});
+	}
+
+	if(crearMarcaForm){
+		crearMarcaForm.addEventListener('submit', function(e){
+			e.preventDefault();
+			errorMarcaDiv.textContent = '';
+			var formData = new FormData(crearMarcaForm);
+			fetch("{% url 'crear_marca' %}", {
+				method: 'POST',
+				body: formData,
+				headers: {
+					'X-Requested-With': 'XMLHttpRequest'
+				}
+			}).then(function(resp){
+				if(resp.ok){
+					return resp.json();
+				}
+				return resp.json().then(function(data){ throw data; });
+			}).then(function(data){
+				var opt = document.createElement('option');
+				opt.value = data.id;
+				opt.textContent = data.nombre;
+				marcaSelect.appendChild(opt);
+				marcaSelect.value = data.id;
+				var modal = bootstrap.Modal.getInstance(modalMarcaEl);
+				if(modal) modal.hide();
+			}).catch(function(err){
+				errorMarcaDiv.textContent = err && err.error ? err.error : 'Error';
+			});
+		});
+	}
+});
+</script>
 
 {% endblock %}

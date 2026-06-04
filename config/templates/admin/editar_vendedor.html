@@ -2,12 +2,12 @@
 {% load i18n %}
 
 {% block title %}
-{% trans "Editar Vendedor" %}
+{% trans "Edit Vendor" %}
 {% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4">{% trans "Editar Vendedor" %}</h2>
+<h2 class="mb-4">{% trans "Edit Vendor" %}</h2>
 
 <div class="card shadow-sm">
 <div class="card-body">
@@ -17,12 +17,12 @@
 {% csrf_token %}
 
 <div class="mb-3">
-<label class="form-label">{% trans "Nombre" %}</label>
+<label class="form-label">{% trans "First name" %}</label>
 <input type="text" name="nombre" class="form-control" value="{{ vendedor.first_name }}" required>
 </div>
 
 <div class="mb-3">
-<label class="form-label">{% trans "Apellido" %}</label>
+<label class="form-label">{% trans "Last name" %}</label>
 <input type="text" name="apellido" class="form-control" value="{{ vendedor.last_name }}" required>
 </div>
 
@@ -32,14 +32,14 @@
 </div>
 
 <div class="mb-3">
-<label class="form-label">{% trans "Telefono" %}</label>
+<label class="form-label">{% trans "Phone" %}</label>
 <input type="text" name="telefono" class="form-control" value="{{ vendedor.telefono }}">
 </div>
 
 <div class="mb-3">
-<label class="form-label">{% trans "Usuario" %}</label>
+<label class="form-label">{% trans "Username" %}</label>
 <input type="text" class="form-control" value="{{ vendedor.username }}" disabled>
-<small class="text-muted">{% trans "El nombre de usuario no se puede cambiar" %}</small>
+<small class="text-muted">{% trans "The username cannot be changed." %}</small>
 </div>
 
 <button type="submit" class="btn btn-success">

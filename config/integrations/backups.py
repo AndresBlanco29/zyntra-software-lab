@@ -10,7 +10,7 @@ from tempfile import NamedTemporaryFile
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
-from django.core.files.storage import default_storage
+from django.core.files.storage import FileSystemStorage, default_storage
 from django.core.management import call_command
 from django.db import models
 from django.utils import timezone
@@ -42,11 +42,10 @@ def _build_system_backup_name(*, label=''):
 
 
 def _get_backup_storage():
-    if getattr(settings, 'USE_CLOUDINARY_MEDIA', False):
-        from cloudinary_storage.storage import RawMediaCloudinaryStorage
-
-        return RawMediaCloudinaryStorage()
-    return default_storage
+    """Always store backups on local disk (MEDIA_ROOT), not Cloudinary."""
+    media_root = Path(settings.MEDIA_ROOT)
+    media_root.mkdir(parents=True, exist_ok=True)
+    return FileSystemStorage(location=str(media_root))
 
 
 def _database_backup_storage_path(backup_name):

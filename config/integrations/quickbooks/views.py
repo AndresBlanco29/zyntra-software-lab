@@ -25,6 +25,7 @@ from config.productos.models import Presentacion
 from config.usuarios.permissions import get_redirect_url_for_user, internal_permission_required
 from config.integrations.backups import (
     DatabaseBackupError,
+    _get_backup_storage,
     create_database_backup_file,
     create_system_backup_file,
     list_database_backups,
@@ -1117,7 +1118,7 @@ def quickbooks_database_backup(request):
         logger.exception('Database backup generation failed: %s', exc)
         return _response_or_redirect(request, operation='database_backup', error='Database backup could not be created.', status_code=500)
 
-    backup_file = default_storage.open(saved_path, 'rb')
+    backup_file = _get_backup_storage().open(saved_path, 'rb')
     response = FileResponse(backup_file, as_attachment=True, filename=backup_name, content_type='application/gzip')
     response['X-Backup-Path'] = str(Path(settings.MEDIA_ROOT) / saved_path)
     response['X-Backup-Schedule'] = backup_schedule
@@ -1134,7 +1135,7 @@ def system_backup(request):
         logger.exception('System backup generation failed: %s', exc)
         return _response_or_redirect(request, operation='system_backup', error='System backup could not be created.', status_code=500)
 
-    backup_file = default_storage.open(saved_path, 'rb')
+    backup_file = _get_backup_storage().open(saved_path, 'rb')
     response = FileResponse(backup_file, as_attachment=True, filename=backup_name, content_type='application/gzip')
     response['X-Backup-Path'] = str(Path(settings.MEDIA_ROOT) / saved_path)
     response['X-Backup-Schedule'] = backup_schedule

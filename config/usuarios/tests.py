@@ -24,6 +24,7 @@ class InternalPermissionTests(TestCase):
 
 		self.assertTrue(user.has_internal_permission('backoffice.dashboard.view'))
 		self.assertTrue(user.has_internal_permission('backoffice.quotes.manage'))
+		self.assertTrue(user.has_internal_permission('backoffice.reports.view'))
 		self.assertFalse(user.has_internal_permission('admin.products.view'))
 
 	def test_permission_overrides_can_grant_and_revoke_access(self):
@@ -90,6 +91,96 @@ class InternalPermissionTests(TestCase):
 		self.assertTrue(user.has_internal_permission('driver.delivery.view'))
 		self.assertTrue(user.has_internal_permission('driver.delivery.manage'))
 		self.assertEqual(get_redirect_url_for_user(user), reverse('driver_delivery_list'))
+
+	def test_backoffice_without_vendor_permissions_does_not_render_sales_menu(self):
+		user = Usuario.objects.create_user(
+			username='backoffice-no-vendor-menu',
+			password='secret123',
+			role='backoffice',
+		)
+		self.client.force_login(user)
+
+		response = self.client.get(reverse('backoffice_dashboard'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertNotContains(response, f'href="{reverse("crear_cliente")}"', html=False)
+		self.assertNotContains(response, f'href="{reverse("vendedores_clientes")}"', html=False)
+		self.assertNotContains(response, f'href="{reverse("tomar_pedido")}"', html=False)
+		self.assertContains(response, f'href="{reverse("reportes_dashboard")}"', html=False)
+
+	def test_backoffice_with_vendor_permissions_renders_sales_menu(self):
+		user = Usuario.objects.create_user(
+			username='backoffice-with-vendor-menu',
+			password='secret123',
+			role='backoffice',
+			permission_overrides={
+				'vendor.customers.manage': True,
+				'vendor.orders.manage': True,
+			},
+		)
+		self.client.force_login(user)
+
+		response = self.client.get(reverse('backoffice_dashboard'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, f'href="{reverse("crear_cliente")}"', html=False)
+		self.assertContains(response, f'href="{reverse("vendedores_clientes")}"', html=False)
+		self.assertContains(response, f'href="{reverse("tomar_pedido")}"', html=False)
+
+	def test_vendor_with_backoffice_permissions_renders_operations_menu(self):
+		user = Usuario.objects.create_user(
+			username='vendor-with-backoffice-menu',
+			password='secret123',
+			role='vendedor',
+			permission_overrides={
+				'backoffice.dashboard.view': True,
+				'backoffice.orders.manage': True,
+			},
+		)
+		self.client.force_login(user)
+
+		response = self.client.get(reverse('backoffice_dashboard'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, f'href="{reverse("backoffice_dashboard")}"', html=False)
+		self.assertContains(response, f'href="{reverse("backoffice_pedidos")}"', html=False)
+		self.assertContains(response, f'href="{reverse("backoffice_inventory_list")}"', html=False)
+
+	def test_driver_with_vendor_permissions_renders_only_granted_sales_links(self):
+		user = Usuario.objects.create_user(
+			username='driver-with-vendor-menu',
+			password='secret123',
+			role='driver',
+			permission_overrides={
+				'vendor.customers.view': True,
+				'vendor.orders.view': True,
+			},
+		)
+		self.client.force_login(user)
+
+		response = self.client.get(reverse('driver_delivery_list'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertNotContains(response, f'href="{reverse("crear_cliente")}"', html=False)
+		self.assertContains(response, f'href="{reverse("vendedores_clientes")}"', html=False)
+		self.assertContains(response, f'href="{reverse("tomar_pedido")}"', html=False)
+
+	def test_backoffice_with_admin_products_permission_renders_admin_products_link(self):
+		user = Usuario.objects.create_user(
+			username='backoffice-with-admin-products-menu',
+			password='secret123',
+			role='backoffice',
+			permission_overrides={
+				'admin.products.view': True,
+			},
+		)
+		self.client.force_login(user)
+
+		response = self.client.get(reverse('backoffice_dashboard'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, f'href="{reverse("lista_productos")}"', html=False)
+		self.assertNotContains(response, f'href="{reverse("panel_admin")}"', html=False)
 
 
 class InternalUserAdminViewTests(TestCase):
@@ -227,6 +318,15 @@ class PasswordResetFlowTests(TestCase):
 
 
 class RuntimeSchemaRepairTests(TransactionTestCase):
+	def setUp(self):
+		self.user = Usuario.objects.create_user(
+			username='runtime-reset-user',
+			email='runtime-reset@example.com',
+			password='ClaveAnterior123!',
+			role='cliente',
+			is_active=True,
+		)
+
 	def test_backfill_field_values_populates_note_customer_from_invoice(self):
 		creator = Usuario.objects.create_user(
 			username='schema-repair-backfill',

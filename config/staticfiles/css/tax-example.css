@@ -1,8 +1,11 @@
 .tax-example-container{position:relative;display:block;text-align:center}
 .tax-example-container img{max-width:100%;height:auto;display:block;margin:0 auto}
 .tax-overlay{position:absolute;inset:0;pointer-events:none}
+.tax-redaction{position:absolute;background:#fff;border-radius:2px}
 .tax-highlight{position:absolute;border:3px solid rgba(255,99,71,0.95);box-shadow:0 8px 24px rgba(0,0,0,0.25);background:rgba(255,99,71,0.06);border-radius:6px;animation:taxPulse 1.6s infinite}
 .tax-label{position:absolute;top:50%;left:calc(100% + 14px);transform:translateY(-50%);margin:0;width:max-content;padding:6px 10px;background:rgba(255,99,71,0.95);color:#fff;border-radius:6px;font-weight:600;font-size:0.9rem;white-space:nowrap}
+.tax-highlight[data-tax-highlight="georgia"]{border-color:rgba(25,135,84,0.95);box-shadow:0 8px 24px rgba(0,0,0,0.2);background:rgba(25,135,84,0.08)}
+.tax-highlight[data-tax-highlight="georgia"] .tax-label{background:rgba(25,135,84,0.95);min-width:260px;padding:6px 14px;font-size:0.84rem;white-space:nowrap;text-align:center}
 .tax-example-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.5);opacity:0;pointer-events:none;transition:opacity .15s linear;z-index:1055}
 .tax-example-backdrop.show{opacity:1;pointer-events:auto}
 .modal#taxExampleModal{position:fixed;inset:0;z-index:1060;overflow-x:hidden;overflow-y:auto;padding:1rem}
@@ -11,4 +14,4 @@
 .modal#taxExampleModal .modal-dialog{margin:1.75rem auto}
 @keyframes taxPulse{0%{box-shadow:0 0 0 0 rgba(255,99,71,0.45)}50%{box-shadow:0 0 0 12px rgba(255,99,71,0)}100%{box-shadow:0 0 0 0 rgba(255,99,71,0)}}
 /* Responsive tweaks */
-@media (max-width:576px){.tax-label{font-size:0.8rem;padding:5px 8px;left:50%;top:-30px;transform:translateX(-50%);white-space:normal;max-width:180px;text-align:center}}
+@media (max-width:576px){.tax-label{font-size:0.8rem;padding:5px 8px;left:50%;top:-30px;transform:translateX(-50%);white-space:normal;max-width:180px;text-align:center}.tax-highlight[data-tax-highlight="georgia"] .tax-label{min-width:0;max-width:95%;font-size:0.8rem;white-space:normal}}

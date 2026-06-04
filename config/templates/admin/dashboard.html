@@ -14,6 +14,56 @@ Dashboard
 <div class="container-fluid">
   <div class="row dashboard-cards g-3 g-md-4">
 
+    <div class="col-12">
+      <div class="card shadow-sm border-0 text-white" style="background: linear-gradient(135deg, #0f2f73 0%, #1d5cb8 48%, #5ec2ff 100%); overflow: hidden;">
+        <div class="card-body p-4 p-xl-5">
+          <div class="row g-4 align-items-center">
+            <div class="col-lg-8">
+              <span class="badge rounded-pill text-bg-light text-primary mb-3 px-3 py-2">{% trans "Accounting sync workspace" %}</span>
+              <h3 class="mb-2">{% trans "QuickBooks Center" %}</h3>
+              <p class="mb-3 text-white-50">{% trans "Open a dedicated step-by-step workspace to connect QuickBooks, review incoming data, import safely, run syncs, and resolve conflicts without guessing what each button does." %}</p>
+              <div class="d-flex flex-wrap gap-2">
+                <a href="{% url 'quickbooks_center' %}" class="btn btn-light text-primary fw-semibold">{% trans "Open QuickBooks Center" %}</a>
+                <a href="{% url 'database_backups_center' %}" class="btn btn-outline-light">{% trans "Database backups" %}</a>
+                <a href="{% url 'quickbooks_import_conflicts' %}" class="btn btn-outline-light">
+                  {% trans "Review queue" %}
+                  {% if quickbooks_import_conflicts_count %}<span class="badge text-bg-danger ms-1">{{ quickbooks_import_conflicts_count }}</span>{% endif %}
+                </a>
+              </div>
+            </div>
+            <div class="col-lg-4">
+              <div class="row g-2">
+                <div class="col-6">
+                  <div class="rounded-4 bg-white bg-opacity-10 p-3 h-100">
+                    <div class="small text-white-50">{% trans "Connection" %}</div>
+                    <div class="fw-semibold">{% if quickbooks_status.is_active %}{% trans "Connected" %}{% else %}{% trans "Pending" %}{% endif %}</div>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="rounded-4 bg-white bg-opacity-10 p-3 h-100">
+                    <div class="small text-white-50">{% trans "Environment" %}</div>
+                    <div class="fw-semibold">{{ quickbooks_status.environment|upper }}</div>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="rounded-4 bg-white bg-opacity-10 p-3 h-100">
+                    <div class="small text-white-50">{% trans "Pending local sync" %}</div>
+                    <div class="fw-semibold">{{ quickbooks_pending_customer_count|add:quickbooks_pending_presentation_count|add:quickbooks_pending_invoice_count|add:quickbooks_pending_note_count }}</div>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="rounded-4 bg-white bg-opacity-10 p-3 h-100">
+                    <div class="small text-white-50">{% trans "Queue" %}</div>
+                    <div class="fw-semibold">{{ quickbooks_import_conflicts_count }} {% trans "open" %}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="col-12 col-sm-6 col-lg-3">
       <div class="card shadow-sm h-100">
         <div class="card-body text-center">

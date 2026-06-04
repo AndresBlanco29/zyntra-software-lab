@@ -2,26 +2,26 @@
 {% load i18n %}
 
 {% block title %}
-{% trans "Diagnostico Certificado" %}
+{% trans "Certificate diagnostics" %}
 {% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4">{% trans "Diagnostico de certificado" %}</h2>
+<h2 class="mb-4">{% trans "Certificate diagnostics" %}</h2>
 
 <div class="card shadow-sm border-0 mb-4">
   <div class="card-body">
-    <h5 class="mb-3">{% trans "Cliente" %}</h5>
+    <h5 class="mb-3">{% trans "Customer" %}</h5>
     <p class="mb-1"><strong>{% trans "ID:" %}</strong> {{ cliente.id }}</p>
-    <p class="mb-1"><strong>{% trans "Empresa:" %}</strong> {{ cliente.nombre_empresa }}</p>
+    <p class="mb-1"><strong>{% trans "Company:" %}</strong> {{ cliente.nombre_empresa }}</p>
     <p class="mb-0"><strong>{% trans "Email:" %}</strong> {{ cliente.usuario.email }}</p>
   </div>
 </div>
 
 <div class="card shadow-sm border-0 mb-4">
   <div class="card-body">
-    <h5 class="mb-3 text-danger">{% trans "No se pudo abrir el certificado" %}</h5>
-    <p class="text-muted mb-3">{% trans "Este detalle solo lo ve el administrador y sirve para identificar el error real del archivo." %}</p>
+    <h5 class="mb-3 text-danger">{% trans "Could not open the certificate." %}</h5>
+    <p class="text-muted mb-3">{% trans "This detail is only visible to the administrator and helps identify the real file error." %}</p>
 
     <div class="bg-light rounded p-3" style="overflow:auto;">
       {% for linea in diagnostico %}
@@ -32,8 +32,8 @@
 </div>
 
 <div class="d-flex gap-2">
-  <a href="{% url 'ver_cliente' cliente.id %}" class="btn btn-secondary">{% trans "Volver al cliente" %}</a>
-  <a href="{% url 'clientes_pendientes' %}" class="btn btn-outline-secondary">{% trans "Volver a solicitudes" %}</a>
+  <a href="{% url 'ver_cliente' cliente.id %}" class="btn btn-secondary">{% trans "Back to customer" %}</a>
+  <a href="{% url 'clientes_pendientes' %}" class="btn btn-outline-secondary">{% trans "Back to requests" %}</a>
 </div>
 
 {% endblock %}

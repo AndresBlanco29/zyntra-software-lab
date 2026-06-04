@@ -2,7 +2,7 @@
 {% load i18n %}
 
 {% block title %}
-Clientes Pendientes
+{% trans "Customer requests" %}
 {% endblock %}
 
 {% block content %}
@@ -27,14 +27,14 @@ Clientes Pendientes
 
 <thead>
 <tr>
-<th>{% trans "Empresa" %}</th>
+<th>{% trans "Company" %}</th>
 <th>{% trans "Status" %}</th>
-<th>{% trans "Ciudad" %}</th>
-<th>{% trans "Telefono" %}</th>
+<th>{% trans "City" %}</th>
+<th>{% trans "Phone" %}</th>
 <th>{% trans "Sales Tax" %}</th>
-<th>{% trans "Certificado" %}</th>
+<th>{% trans "Certificate" %}</th>
 <th>{% trans "Admin note" %}</th>
-<th>{% trans "Acciones" %}</th>
+<th>{% trans "Actions" %}</th>
 </tr>
 </thead>
 
@@ -62,10 +62,10 @@ Clientes Pendientes
 
 {% if cliente.certificado_tax %}
 <a href="{% url 'ver_certificado_cliente' cliente.id %}" target="_blank" class="btn btn-info btn-sm">
-{% trans "Ver certificado" %}
+{% trans "View certificate" %}
 </a>
 {% else %}
-{% trans "No disponible" %}
+{% trans "Not available" %}
 {% endif %}
 
 </td>

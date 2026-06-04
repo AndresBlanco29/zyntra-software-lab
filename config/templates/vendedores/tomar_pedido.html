@@ -9,22 +9,39 @@
 
 <link rel="stylesheet" href="{% static 'css/tomar_pedido.css' %}">
 
-<h3 class="fw-bold">{% trans "Tomar Pedido" %}</h3>
+<div class="vendor-order-shell">
 
-<div class="card custom-card mt-4 p-4">
+<section class="vendor-order-hero mb-4">
+	<div>
+		<span class="vendor-order-eyebrow">{% trans "Sales" %}</span>
+		<h3 class="vendor-order-title mb-1">{% trans "Tomar Pedido" %}</h3>
+		<p class="vendor-order-copy mb-0">{% trans "Start with the right customer and move into the catalog with a cleaner, faster flow." %}</p>
+	</div>
+	<div class="vendor-order-hero-stat">
+		<span class="vendor-order-hero-value">{{ clientes|length }}</span>
+		<span class="vendor-order-hero-label">{% trans "Available customers" %}</span>
+	</div>
+</section>
 
-<h5>{% trans "Paso 1: Seleccionar Cliente" %}</h5>
+<div class="card custom-card vendor-order-card p-4">
+
+<div class="vendor-order-card-head mb-3">
+	<div>
+		<h5 class="mb-1">{% trans "Paso 1: Seleccionar Cliente" %}</h5>
+		<p class="mb-0">{% trans "Choose the customer you are visiting before building the order." %}</p>
+	</div>
+</div>
 
 <input 
 type="search"
 id="buscadorCliente"
-class="form-control mb-3"
+class="form-control vendor-order-search mb-3"
 placeholder="{% trans 'Buscar por nombre, empresa o documento' %}"
 >
 
 <div class="table-responsive mobile-stack-responsive">
 
-<table class="table mobile-stack-table mobile-stack-table--take-order">
+<table class="table vendor-order-table mobile-stack-table mobile-stack-table--take-order">
 
 <thead>
 
@@ -46,17 +63,17 @@ data-empresa="{{ cliente.nombre_empresa }}"
 >
 
 <td data-label="{% trans 'Cliente' %}">
-{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}
+	<div class="vendor-order-person-name">{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}</div>
 </td>
 
 <td data-label="{% trans 'Empresa' %}">
-{{ cliente.nombre_empresa }}
+	<span class="vendor-order-company">{{ cliente.nombre_empresa }}</span>
 </td>
 
 <td data-label="{% trans 'Acción' %}" class="mobile-stack-table__action">
 
 <a href="{% url 'catalogo_vendedor' cliente.id %}"
-class="btn btn-primary btn-sm">
+class="btn btn-primary btn-sm vendor-order-select-btn">
 
 {% trans "Seleccionar" %}
 
@@ -69,7 +86,7 @@ class="btn btn-primary btn-sm">
 {% empty %}
 
 <tr>
-<td colspan="3" class="text-center text-muted py-4 mobile-stack-table__empty">
+<td colspan="3" class="text-center text-muted py-4 mobile-stack-table__empty vendor-order-empty-cell">
 {% trans "No hay clientes registrados." %}
 </td>
 </tr>
@@ -85,9 +102,13 @@ class="btn btn-primary btn-sm">
 </div>
 
 
-<div class="card custom-card mt-4 p-4">
+<div class="card custom-card vendor-order-summary-card mt-4 p-4">
 
-<strong>{% trans "Cliente:" %}</strong> {% trans "Sin Seleccionar" %}
+<div class="vendor-order-summary-label">{% trans "Cliente:" %}</div>
+<div class="vendor-order-summary-value">{% trans "Sin Seleccionar" %}</div>
+<p class="vendor-order-summary-copy mb-0">{% trans "Select one customer to open the catalog and prepare the order with the correct prices." %}</p>
+
+</div>
 
 </div>
 

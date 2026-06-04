@@ -1,12 +1,15 @@
 from django.urls import path
 
 from .views import (
+    create_database_backup_stored,
+    create_system_backup_stored,
     database_backups_center,
     quickbooks_callback,
     quickbooks_center,
     quickbooks_database_backup,
     quickbooks_database_backup_download,
     restore_backup_from_center,
+    restore_backup_upload,
     system_backup,
     system_backup_download,
     update_backup_schedule_preference,
@@ -41,10 +44,8 @@ from .views import (
     quickbooks_sync_supplier_purchase_create,
     quickbooks_test_connection,
     quickbooks_start_task,
-    quickbooks_start_products_sync,
     quickbooks_task_status,
 )
-from .views import quickbooks_disconnect
 
 
 urlpatterns = [
@@ -75,6 +76,9 @@ urlpatterns = [
     path('import/conflicts/<int:conflict_id>/dismiss', quickbooks_import_conflict_dismiss, name='quickbooks_import_conflict_dismiss'),
     path('backup/preferences', update_backup_schedule_preference, name='update_backup_schedule_preference'),
     path('backup/restore', restore_backup_from_center, name='restore_backup_from_center'),
+    path('backup/restore/upload', restore_backup_upload, name='restore_backup_upload'),
+    path('backup/database/create', create_database_backup_stored, name='create_database_backup_stored'),
+    path('backup/system/create', create_system_backup_stored, name='create_system_backup_stored'),
     path('backup/system', system_backup, name='system_backup'),
     path('backup/system/<str:backup_name>', system_backup_download, name='system_backup_download'),
     path('backup/database', quickbooks_database_backup, name='quickbooks_database_backup'),
@@ -87,9 +91,6 @@ urlpatterns = [
     path('sync/supplier-purchases/create', quickbooks_sync_supplier_purchase_create, name='quickbooks_sync_supplier_purchase_create'),
     path('sync/customers/batch', quickbooks_sync_customers_batch, name='quickbooks_sync_customers_batch'),
     path('sync/products/batch', quickbooks_sync_products_batch, name='quickbooks_sync_products_batch'),
-    path('sync/products/start', quickbooks_start_products_sync, name='quickbooks_start_products_sync'),
     path('sync/invoices/batch', quickbooks_sync_invoices_batch, name='quickbooks_sync_invoices_batch'),
     path('sync/adjustment-notes/batch', quickbooks_sync_adjustment_notes_batch, name='quickbooks_sync_adjustment_notes_batch'),
-    path('connect', quickbooks_login, name='quickbooks_connect'),
-    path('disconnect', quickbooks_disconnect, name='quickbooks_disconnect'),
 ]

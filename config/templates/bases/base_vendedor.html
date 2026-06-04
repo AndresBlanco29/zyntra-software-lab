@@ -15,6 +15,10 @@
 
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
 <link rel="stylesheet" href="{% static 'css/layout_vendedor.css' %}">
+<style>
+  .navbar-custom .container-fluid { display: grid; grid-template-columns: minmax(220px, auto) minmax(320px, 680px) auto; align-items: center; gap: 18px; }
+  .navbar-search-icon svg { width: 18px; height: 18px; max-width: 18px; max-height: 18px; }
+</style>
 
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
 <script defer src="{% static 'js/language-session.js' %}"></script>
@@ -29,6 +33,7 @@
 
 <div class="container-fluid">
 
+<div class="navbar-brand-group">
 <button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="sidebarToggleBtn" aria-label="{% trans 'Open menu' %}">
 ☰
 </button>
@@ -36,6 +41,30 @@
 <a class="navbar-brand fw-bold">
 La Tortilla Grocery
 </a>
+</div>
+
+<div
+  class="navbar-search"
+  id="panelQuickSearch"
+  data-empty-message="{% trans 'Start typing to find a section or shortcut.' %}"
+  data-no-results-message="{% trans 'No matching shortcuts were found.' %}">
+  <label class="visually-hidden" for="panelSearchInput">{% trans "Search modules and shortcuts" %}</label>
+  <div class="navbar-search-field">
+    <span class="navbar-search-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false">
+        <path d="M10.5 4.5a6 6 0 1 0 3.86 10.6l3.77 3.77a.75.75 0 1 0 1.06-1.06l-3.77-3.77A6 6 0 0 0 10.5 4.5Zm0 1.5a4.5 4.5 0 1 1 0 9a4.5 4.5 0 0 1 0-9Z"></path>
+      </svg>
+    </span>
+    <input
+      id="panelSearchInput"
+      class="navbar-search-input"
+      type="search"
+      placeholder="{% trans 'Search shortcuts, modules, or pages' %}"
+      autocomplete="off"
+      spellcheck="false">
+  </div>
+  <div id="panelSearchResults" class="navbar-search-results" hidden></div>
+</div>
 
 <div class="ms-auto">
 
@@ -69,6 +98,32 @@ La Tortilla Grocery
 </div>
 
 </nav>
+
+<div id="quickSearchShortcuts" hidden>
+{% if request.user|has_internal_permission:'vendor.customers.manage' %}
+  <a class="quick-search-shortcut" href="{% url 'crear_cliente' %}" data-label="{% trans 'Create customer' %}" data-section="{% trans 'Quick action' %}" data-keywords="new customer add customer create customer customer form registrar cliente crear cliente nuevo cliente"></a>
+{% endif %}
+{% if request.user|has_internal_permission:'vendor.orders.view' %}
+  <a class="quick-search-shortcut" href="{% url 'tomar_pedido' %}" data-label="{% trans 'Take order' %}" data-section="{% trans 'Quick action' %}" data-keywords="new order create order sales order take order pedido venta crear pedido orden"></a>
+{% endif %}
+{% if request.user|has_internal_permission:'backoffice.orders.view' %}
+  <a class="quick-search-shortcut" href="{% url 'backoffice_direct_invoice_create' %}" data-label="{% trans 'Create direct invoice' %}" data-section="{% trans 'Quick action' %}" data-keywords="invoice invoices create invoice new invoice direct invoice factura facturas crear factura factura directa"></a>
+  <a class="quick-search-shortcut" href="{% url 'backoffice_adjustment_note_create' %}" data-label="{% trans 'Create credit or debit note' %}" data-section="{% trans 'Quick action' %}" data-keywords="credit note debit note notes adjustment note create note nota de credito nota de debito crear nota"></a>
+{% endif %}
+{% if request.user|has_internal_permission:'admin.products.view' %}
+  <a class="quick-search-shortcut" href="{% url 'crear_producto' %}" data-label="{% trans 'Create product' %}" data-section="{% trans 'Quick action' %}" data-keywords="create product new product add product crear producto nuevo producto"></a>
+{% endif %}
+{% if request.user|has_internal_permission:'backoffice.dashboard.view' %}
+  <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-import-customers" data-label="{% trans 'QuickBooks import customers' %}" data-section="QuickBooks action" data-keywords="quickbooks import customers sync customers customer import clientes importar clientes"></a>
+  <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-import-suppliers" data-label="{% trans 'QuickBooks import suppliers' %}" data-section="QuickBooks action" data-keywords="quickbooks import suppliers vendors supplier import vendor import suplidores proveedores importar proveedores vendors"></a>
+  <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-import-catalog" data-label="{% trans 'QuickBooks import catalog' %}" data-section="QuickBooks action" data-keywords="quickbooks import catalog items products presentations catalog import importar catalogo importar productos items"></a>
+  <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-pull-accounting" data-label="{% trans 'Pull accounting documents' %}" data-section="QuickBooks action" data-keywords="quickbooks invoices invoice credit memo pull accounting documents sync accounting facturas creditos debitos documentos contables"></a>
+  <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-import-purchase-orders" data-label="{% trans 'Import purchase orders' %}" data-section="QuickBooks action" data-keywords="quickbooks import purchase orders po pre po purchase order importar purchase orders importar po"></a>
+  <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-import-bills" data-label="{% trans 'Import bills' %}" data-section="QuickBooks action" data-keywords="quickbooks bills import bills supplier bills vendor bills importar bills facturas de proveedor"></a>
+  <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-pull-sync" data-label="{% trans 'Run pull sync now' %}" data-section="QuickBooks action" data-keywords="quickbooks sync pull sync run sync sincronizar quickbooks incremental sync"></a>
+  <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-full-resync" data-label="{% trans 'Run full resync' %}" data-section="QuickBooks action" data-keywords="quickbooks full resync full sync reimport resync sincronizacion completa"></a>
+{% endif %}
+</div>
 
 <!-- Modal de confirmacion de logout -->
 <div class="modal fade" id="logoutModal" tabindex="-1">
@@ -131,13 +186,40 @@ La Tortilla Grocery
 <div class="list-group list-group-flush">
 {% get_current_language as CURRENT_LANGUAGE %}
 
-{% if request.user.is_superuser or request.user|has_internal_permission:'admin.dashboard.view' or request.user|has_internal_permission:'admin.users.view' or request.user|has_internal_permission:'admin.customer_requests.view' or request.user|has_internal_permission:'admin.products.view' or request.user|has_internal_permission:'admin.content.view' %}
+{% if request.user.is_superuser or request.user|has_internal_permission:'admin.dashboard.view' or request.user|has_internal_permission:'admin.users.view' or request.user|has_internal_permission:'admin.customer_requests.view' or request.user|has_internal_permission:'admin.products.view' or request.user|has_internal_permission:'admin.content.view' or request.user|has_internal_permission:'backoffice.reports.view' %}
   <div class="sidebar-section-title">{% trans "Administration" %}</div>
 
   {% if request.user|has_internal_permission:'admin.dashboard.view' %}
   <a href="{% url 'panel_admin' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'panel_admin' %}active{% endif %}">
     {% trans "Admin Dashboard" %}
+  </a>
+  {% endif %}
+
+  {% if request.user|has_internal_permission:'admin.dashboard.view' %}
+  <details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'quickbooks_center' or request.resolver_match.url_name == 'quickbooks_import_conflicts' or request.resolver_match.url_name == 'database_backups_center' %}open{% endif %}>
+    <summary class="sidebar-collapsible-summary">{% trans "QuickBooks" %}</summary>
+    <div class="sidebar-collapsible-links">
+      <a href="{% url 'quickbooks_center' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'quickbooks_center' %}active{% endif %}">
+        {% trans "QuickBooks Center" %}
+      </a>
+      <a href="{% url 'quickbooks_import_conflicts' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'quickbooks_import_conflicts' %}active{% endif %}">
+        {% trans "Review queue" %}
+      </a>
+      <a href="{% url 'database_backups_center' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'database_backups_center' %}active{% endif %}">
+        {% trans "Database Backups" %}
+      </a>
+    </div>
+  </details>
+  {% endif %}
+
+  {% if request.user|has_internal_permission:'backoffice.reports.view' %}
+  <a href="{% url 'reportes_dashboard' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'reportes_dashboard' %}active{% endif %}">
+    {% trans "Reports Center" %}
   </a>
   {% endif %}
 
@@ -169,14 +251,21 @@ La Tortilla Grocery
   </a>
   {% endif %}
 
-  {% if request.user|has_internal_permission:'backoffice.dashboard.view' or request.user|has_internal_permission:'backoffice.quotes.view' or request.user|has_internal_permission:'backoffice.orders.view' or request.user|has_internal_permission:'driver.delivery.view' or request.user|has_internal_permission:'selector.picking.view' %}
-  <details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'backoffice_dashboard' or request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' or request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' or request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' or request.resolver_match.url_name == 'backoffice_adjustment_notes_list' or request.resolver_match.url_name == 'backoffice_adjustment_note_create' or request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' or request.resolver_match.url_name == 'driver_delivery_list' or request.resolver_match.url_name == 'driver_delivery_detail' or request.resolver_match.url_name == 'driver_delivery_tracking' or request.resolver_match.url_name == 'selector_picking_list' or request.resolver_match.url_name == 'selector_picking_detail' %}open{% endif %}>
+  {% if not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'backoffice.dashboard.view' or not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'backoffice.quotes.view' or not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'backoffice.orders.view' or not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'backoffice.reports.view' or not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'driver.delivery.view' or not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'selector.picking.view' %}
+  <details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'backoffice_dashboard' or request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' or request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' or request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_direct_invoice_create' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' or request.resolver_match.url_name == 'backoffice_adjustment_notes_list' or request.resolver_match.url_name == 'backoffice_adjustment_note_create' or request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' or request.resolver_match.url_name == 'backoffice_supplier_list' or request.resolver_match.url_name == 'backoffice_supplier_detail' or request.resolver_match.url_name == 'backoffice_supplier_purchase_list' or request.resolver_match.url_name == 'backoffice_supplier_purchase_detail' or request.resolver_match.url_name == 'reportes_dashboard' or request.resolver_match.url_name == 'driver_delivery_list' or request.resolver_match.url_name == 'driver_delivery_detail' or request.resolver_match.url_name == 'driver_delivery_tracking' or request.resolver_match.url_name == 'selector_picking_list' or request.resolver_match.url_name == 'selector_picking_detail' %}open{% endif %}>
     <summary class="sidebar-collapsible-summary">{% trans "Operations" %}</summary>
     <div class="sidebar-collapsible-links">
       {% if request.user|has_internal_permission:'backoffice.dashboard.view' %}
       <a href="{% url 'backoffice_dashboard' %}"
         class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_dashboard' %}active{% endif %}">
         {% trans "BackOffice" %}
+      </a>
+      {% endif %}
+
+      {% if request.user|has_internal_permission:'backoffice.reports.view' %}
+      <a href="{% url 'reportes_dashboard' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'reportes_dashboard' %}active{% endif %}">
+        {% trans "Reports Center" %}
       </a>
       {% endif %}
 
@@ -190,14 +279,14 @@ La Tortilla Grocery
       {% if request.user|has_internal_permission:'backoffice.orders.view' %}
       <a href="{% url 'backoffice_pedidos' %}"
         class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' %}active{% endif %}">
-        {% trans "Purchase Orders" %}
+        {% trans "Sales Orders" %}
       </a>
       <a href="{% url 'backoffice_live_drivers' %}"
         class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' %}active{% endif %}">
         {% trans "Live Drivers" %}
       </a>
       <a href="{% url 'backoffice_invoices_list' %}"
-        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' %}active{% endif %}">
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_direct_invoice_create' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' %}active{% endif %}">
         {% trans "Invoices" %}
       </a>
       <a href="{% url 'backoffice_adjustment_notes_list' %}"
@@ -207,6 +296,14 @@ La Tortilla Grocery
       <a href="{% url 'backoffice_inventory_list' %}"
         class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' %}active{% endif %}">
         {% trans "Inventory" %}
+      </a>
+      <a href="{% url 'backoffice_supplier_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_supplier_list' or request.resolver_match.url_name == 'backoffice_supplier_detail' %}active{% endif %}">
+        {% trans "Suppliers" %}
+      </a>
+      <a href="{% url 'backoffice_supplier_purchase_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_supplier_purchase_list' or request.resolver_match.url_name == 'backoffice_supplier_purchase_detail' %}active{% endif %}">
+        {% trans "Pre-PO / PO" %}
       </a>
       {% endif %}
 
@@ -227,88 +324,27 @@ La Tortilla Grocery
   </details>
   {% endif %}
 
-  {% if request.user|has_internal_permission:'vendor.customers.manage' or request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'backoffice.orders.view' %}
-  <div class="sidebar-section-title">{% trans "Sales" %}</div>
-
-  {% if request.user|has_internal_permission:'vendor.customers.manage' %}
-  <a href="{% url 'crear_cliente' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'crear_cliente' %}active{% endif %}">
-    {% trans "Create Customer" %}
-  </a>
-  {% endif %}
-
-  <a href="{% url 'vendedores_clientes' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'vendedores_clientes' %}active{% endif %}">
-    {% trans "Customers" %}
-  </a>
-
-  {% if request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'backoffice.orders.view' %}
-  <a href="{% url 'tomar_pedido' %}"
-    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'catalogo_vendedor' or request.resolver_match.url_name == 'ver_pedido' %}active{% endif %}">
-    {% trans "Take Order" %}
-  </a>
-  {% endif %}
-  {% endif %}
-{% else %}
-  {% if request.user|has_internal_permission:'backoffice.dashboard.view' or request.user|has_internal_permission:'backoffice.quotes.view' or request.user|has_internal_permission:'backoffice.orders.view' or request.user|has_internal_permission:'driver.delivery.view' or request.user|has_internal_permission:'selector.picking.view' %}
-  <details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'backoffice_dashboard' or request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' or request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' or request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' or request.resolver_match.url_name == 'backoffice_adjustment_notes_list' or request.resolver_match.url_name == 'backoffice_adjustment_note_create' or request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' or request.resolver_match.url_name == 'driver_delivery_list' or request.resolver_match.url_name == 'driver_delivery_detail' or request.resolver_match.url_name == 'driver_delivery_tracking' or request.resolver_match.url_name == 'selector_picking_list' or request.resolver_match.url_name == 'selector_picking_detail' %}open{% endif %}>
-    <summary class="sidebar-collapsible-summary">{% trans "Operations" %}</summary>
+  {% if not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'backoffice.dashboard.view' %}
+  <details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'quickbooks_center' or request.resolver_match.url_name == 'quickbooks_import_conflicts' or request.resolver_match.url_name == 'database_backups_center' %}open{% endif %}>
+    <summary class="sidebar-collapsible-summary">{% trans "QuickBooks" %}</summary>
     <div class="sidebar-collapsible-links">
-      {% if request.user|has_internal_permission:'backoffice.dashboard.view' %}
-      <a href="{% url 'backoffice_dashboard' %}"
-        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_dashboard' %}active{% endif %}">
-        {% trans "BackOffice" %}
+      <a href="{% url 'quickbooks_center' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'quickbooks_center' %}active{% endif %}">
+        {% trans "QuickBooks Center" %}
       </a>
-      {% endif %}
-
-      {% if request.user|has_internal_permission:'backoffice.quotes.view' %}
-      <a href="{% url 'backoffice_cotizaciones' %}"
-        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' %}active{% endif %}">
-        {% trans "Quotes" %}
+      <a href="{% url 'quickbooks_import_conflicts' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'quickbooks_import_conflicts' %}active{% endif %}">
+        {% trans "Review queue" %}
       </a>
-      {% endif %}
-
-      {% if request.user|has_internal_permission:'backoffice.orders.view' %}
-      <a href="{% url 'backoffice_pedidos' %}"
-        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' %}active{% endif %}">
-        {% trans "Purchase Orders" %}
+      <a href="{% url 'database_backups_center' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'database_backups_center' %}active{% endif %}">
+        {% trans "Database Backups" %}
       </a>
-      <a href="{% url 'backoffice_live_drivers' %}"
-        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' %}active{% endif %}">
-        {% trans "Live Drivers" %}
-      </a>
-      <a href="{% url 'backoffice_invoices_list' %}"
-        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' %}active{% endif %}">
-        {% trans "Invoices" %}
-      </a>
-      <a href="{% url 'backoffice_adjustment_notes_list' %}"
-        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_adjustment_notes_list' or request.resolver_match.url_name == 'backoffice_adjustment_note_create' %}active{% endif %}">
-        {% trans "Credit / Debit Notes" %}
-      </a>
-      <a href="{% url 'backoffice_inventory_list' %}"
-        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' %}active{% endif %}">
-        {% trans "Inventory" %}
-      </a>
-      {% endif %}
-
-      {% if request.user|has_internal_permission:'driver.delivery.view' %}
-      <a href="{% url 'driver_delivery_list' %}"
-        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'driver_delivery_list' or request.resolver_match.url_name == 'driver_delivery_detail' or request.resolver_match.url_name == 'driver_delivery_tracking' %}active{% endif %}">
-        {% trans "Driver Deliveries" %}
-      </a>
-      {% endif %}
-
-      {% if request.user|has_internal_permission:'selector.picking.view' %}
-      <a href="{% url 'selector_picking_list' %}"
-        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'selector_picking_list' or request.resolver_match.url_name == 'selector_picking_detail' %}active{% endif %}">
-        {% trans "Assigned Picking Tickets" %}
-      </a>
-      {% endif %}
     </div>
   </details>
   {% endif %}
 
-  {% if request.user|has_internal_permission:'vendor.customers.manage' or request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'backoffice.orders.view' %}
+  {% if not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'vendor.customers.manage' or not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'vendor.customers.view' or not request.user.is_superuser and request.user.role != 'admin' and request.user|has_internal_permission:'vendor.orders.view' %}
   <div class="sidebar-section-title">{% trans "Sales" %}</div>
 
   {% if request.user|has_internal_permission:'vendor.customers.manage' %}
@@ -325,7 +361,130 @@ La Tortilla Grocery
   </a>
   {% endif %}
 
-  {% if request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'backoffice.orders.view' %}
+  {% if request.user|has_internal_permission:'vendor.orders.view' %}
+  <a href="{% url 'tomar_pedido' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'catalogo_vendedor' or request.resolver_match.url_name == 'ver_pedido' %}active{% endif %}">
+    {% trans "Take Order" %}
+  </a>
+  {% endif %}
+  {% endif %}
+{% else %}
+  {% if request.user|has_internal_permission:'backoffice.dashboard.view' or request.user|has_internal_permission:'backoffice.quotes.view' or request.user|has_internal_permission:'backoffice.orders.view' or request.user|has_internal_permission:'backoffice.reports.view' or request.user|has_internal_permission:'driver.delivery.view' or request.user|has_internal_permission:'selector.picking.view' %}
+    <details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'backoffice_dashboard' or request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' or request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' or request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_direct_invoice_create' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' or request.resolver_match.url_name == 'backoffice_adjustment_notes_list' or request.resolver_match.url_name == 'backoffice_adjustment_note_create' or request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' or request.resolver_match.url_name == 'backoffice_supplier_list' or request.resolver_match.url_name == 'backoffice_supplier_detail' or request.resolver_match.url_name == 'backoffice_supplier_purchase_list' or request.resolver_match.url_name == 'backoffice_supplier_purchase_detail' or request.resolver_match.url_name == 'reportes_dashboard' or request.resolver_match.url_name == 'driver_delivery_list' or request.resolver_match.url_name == 'driver_delivery_detail' or request.resolver_match.url_name == 'driver_delivery_tracking' or request.resolver_match.url_name == 'selector_picking_list' or request.resolver_match.url_name == 'selector_picking_detail' %}open{% endif %}>
+    <summary class="sidebar-collapsible-summary">{% trans "Operations" %}</summary>
+    <div class="sidebar-collapsible-links">
+      {% if request.user|has_internal_permission:'backoffice.dashboard.view' %}
+      <a href="{% url 'backoffice_dashboard' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_dashboard' %}active{% endif %}">
+        {% trans "BackOffice" %}
+      </a>
+
+      <a href="{% url 'database_backups_center' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'database_backups_center' %}active{% endif %}">
+        {% trans "Database Backups" %}
+      </a>
+      {% endif %}
+
+      {% if request.user|has_internal_permission:'backoffice.reports.view' %}
+      <a href="{% url 'reportes_dashboard' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'reportes_dashboard' %}active{% endif %}">
+        {% trans "Reports Center" %}
+      </a>
+      {% endif %}
+
+      {% if request.user|has_internal_permission:'backoffice.quotes.view' %}
+      <a href="{% url 'backoffice_cotizaciones' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' %}active{% endif %}">
+        {% trans "Quotes" %}
+      </a>
+      {% endif %}
+
+      {% if request.user|has_internal_permission:'backoffice.orders.view' %}
+      <a href="{% url 'backoffice_pedidos' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' %}active{% endif %}">
+        {% trans "Sales Orders" %}
+      </a>
+      <a href="{% url 'backoffice_live_drivers' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' %}active{% endif %}">
+        {% trans "Live Drivers" %}
+      </a>
+      <a href="{% url 'backoffice_invoices_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_direct_invoice_create' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' %}active{% endif %}">
+        {% trans "Invoices" %}
+      </a>
+      <a href="{% url 'backoffice_adjustment_notes_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_adjustment_notes_list' or request.resolver_match.url_name == 'backoffice_adjustment_note_create' %}active{% endif %}">
+        {% trans "Credit / Debit Notes" %}
+      </a>
+      <a href="{% url 'backoffice_inventory_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' %}active{% endif %}">
+        {% trans "Inventory" %}
+      </a>
+      <a href="{% url 'backoffice_supplier_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_supplier_list' or request.resolver_match.url_name == 'backoffice_supplier_detail' %}active{% endif %}">
+        {% trans "Suppliers" %}
+      </a>
+      <a href="{% url 'backoffice_supplier_purchase_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_supplier_purchase_list' or request.resolver_match.url_name == 'backoffice_supplier_purchase_detail' %}active{% endif %}">
+        {% trans "Pre-PO / PO" %}
+      </a>
+      {% endif %}
+
+      {% if request.user|has_internal_permission:'driver.delivery.view' %}
+      <a href="{% url 'driver_delivery_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'driver_delivery_list' or request.resolver_match.url_name == 'driver_delivery_detail' or request.resolver_match.url_name == 'driver_delivery_tracking' %}active{% endif %}">
+        {% trans "Driver Deliveries" %}
+      </a>
+      {% endif %}
+
+      {% if request.user|has_internal_permission:'selector.picking.view' %}
+      <a href="{% url 'selector_picking_list' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'selector_picking_list' or request.resolver_match.url_name == 'selector_picking_detail' %}active{% endif %}">
+        {% trans "Assigned Picking Tickets" %}
+      </a>
+      {% endif %}
+    </div>
+  </details>
+  {% endif %}
+
+  {% if request.user|has_internal_permission:'backoffice.dashboard.view' %}
+  <details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'quickbooks_center' or request.resolver_match.url_name == 'quickbooks_import_conflicts' or request.resolver_match.url_name == 'database_backups_center' %}open{% endif %}>
+    <summary class="sidebar-collapsible-summary">{% trans "QuickBooks" %}</summary>
+    <div class="sidebar-collapsible-links">
+      <a href="{% url 'quickbooks_center' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'quickbooks_center' %}active{% endif %}">
+        {% trans "QuickBooks Center" %}
+      </a>
+      <a href="{% url 'quickbooks_import_conflicts' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'quickbooks_import_conflicts' %}active{% endif %}">
+        {% trans "Review queue" %}
+      </a>
+      <a href="{% url 'database_backups_center' %}"
+        class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'database_backups_center' %}active{% endif %}">
+        {% trans "Database Backups" %}
+      </a>
+    </div>
+  </details>
+  {% endif %}
+
+  {% if request.user|has_internal_permission:'vendor.customers.manage' or request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' %}
+  <div class="sidebar-section-title">{% trans "Sales" %}</div>
+
+  {% if request.user|has_internal_permission:'vendor.customers.manage' %}
+  <a href="{% url 'crear_cliente' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'crear_cliente' %}active{% endif %}">
+    {% trans "Create Customer" %}
+  </a>
+  {% endif %}
+
+  {% if request.user|has_internal_permission:'vendor.customers.view' %}
+  <a href="{% url 'vendedores_clientes' %}"
+    class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'vendedores_clientes' %}active{% endif %}">
+    {% trans "Customers" %}
+  </a>
+  {% endif %}
+
+  {% if request.user|has_internal_permission:'vendor.orders.view' %}
   <a href="{% url 'tomar_pedido' %}"
     class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'catalogo_vendedor' or request.resolver_match.url_name == 'ver_pedido' %}active{% endif %}">
     {% trans "Take Order" %}
@@ -355,7 +514,7 @@ La Tortilla Grocery
 <div class="language-widget">
 
 
-<button class="language-toggle" onclick="toggleLanguageMenu()" type="button" aria-expanded="false" aria-controls="languageMenu" title="{% if CURRENT_LANGUAGE == 'es' %}Español{% else %}English{% endif %}">
+<button class="language-toggle" onclick="toggleLanguageMenu()" type="button" aria-expanded="false" aria-controls="languageMenu" title="{% trans 'Change language' %}">
   🌎
 </button>
 
@@ -437,6 +596,268 @@ document.addEventListener('DOMContentLoaded', function () {
   const languageToggle = document.querySelector('.language-toggle');
   const languageMenu = document.getElementById('languageMenu');
   const sidebarScrollStorageKey = 'ltg-panel-sidebar-scroll-{{ request.user.id|default:"anon" }}';
+  const quickSearch = document.getElementById('panelQuickSearch');
+  const quickSearchInput = document.getElementById('panelSearchInput');
+  const quickSearchResults = document.getElementById('panelSearchResults');
+
+  function normalizeSearchText(value) {
+    return (value || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  }
+
+  function findSidebarSectionLabel(link) {
+    const collapsible = link.closest('.sidebar-collapsible');
+    if (collapsible) {
+      const summary = collapsible.querySelector('.sidebar-collapsible-summary');
+      if (summary) {
+        return summary.textContent.replace(/\s+/g, ' ').trim();
+      }
+    }
+
+    let sibling = link.previousElementSibling;
+    while (sibling) {
+      if (sibling.classList.contains('sidebar-section-title')) {
+        return sibling.textContent.replace(/\s+/g, ' ').trim();
+      }
+      sibling = sibling.previousElementSibling;
+    }
+
+    return '';
+  }
+
+  function buildQuickSearchAliases(item) {
+    const source = normalizeSearchText([item.label, item.section, item.href].join(' '));
+    const aliases = [];
+
+    if (source.includes('invoice') || source.includes('/invoices/')) {
+      aliases.push('factura facturas billing cobranza cobros');
+    }
+    if (source.includes('credit / debit notes') || source.includes('adjustment') || source.includes('/notes/')) {
+      aliases.push('nota notas credito debito creditos debitos ajustes nota de credito nota de debito');
+    }
+    if (source.includes('supplier') || source.includes('vendor') || source.includes('/suppliers/')) {
+      aliases.push('proveedor proveedores suplidor suplidores vendors compras proveedor');
+    }
+    if (source.includes('pre po') || source.includes('purchase order') || source.includes('/purchase-orders/') || source.includes('bills')) {
+      aliases.push('orden compra ordenes compra prepo po purchase order bills bill factura proveedor facturas proveedor compras');
+    }
+    if (source.includes('inventory') || source.includes('/inventario/') || source.includes('/inventory/')) {
+      aliases.push('inventario stock existencia existencias almacen');
+    }
+    if (source.includes('customer') || source.includes('customers') || source.includes('/clientes/') || source.includes('crear-cliente')) {
+      aliases.push('cliente clientes customer customers cuentas negocios');
+    }
+    if (source.includes('quote') || source.includes('quotes') || source.includes('cotizacion')) {
+      aliases.push('cotizacion cotizaciones presupuesto presupuestos quote quotes');
+    }
+    if (source.includes('sales orders') || source.includes('take order') || source.includes('pedido') || source.includes('ordenes')) {
+      aliases.push('pedido pedidos orden venta ordenes ventas sales order sales orders tomar pedido');
+    }
+    if (source.includes('reports')) {
+      aliases.push('reporte reportes informe informes analytics metricas');
+    }
+    if (source.includes('quickbooks')) {
+      aliases.push('contabilidad accounting sync sincronizar sincronizacion importacion importar');
+    }
+    if (source.includes('backoffice')) {
+      aliases.push('panel dashboard inicio resumen operaciones');
+    }
+    if (source.includes('driver') || source.includes('deliveries') || source.includes('live drivers')) {
+      aliases.push('driver drivers chofer choferes entrega entregas ruta rutas reparto');
+    }
+    if (source.includes('picking') || source.includes('selector')) {
+      aliases.push('picking seleccion selector seleccionador tickets');
+    }
+    if (source.includes('internal users') || source.includes('perfil_admin')) {
+      aliases.push('usuarios internos empleados staff perfil mi perfil cuenta');
+    }
+    if (source.includes('products') || source.includes('product') || source.includes('catalog')) {
+      aliases.push('producto productos catalogo catalog items sku presentaciones');
+    }
+    if (source.includes('requests')) {
+      aliases.push('solicitud solicitudes aprobaciones registros pendientes');
+    }
+    if (source.includes('database backups')) {
+      aliases.push('backup backups respaldo respaldos copia seguridad base datos');
+    }
+
+    return normalizeSearchText(aliases.join(' '));
+  }
+
+  function buildQuickSearchIndex() {
+    const sidebarItems = sidebar ? Array.from(sidebar.querySelectorAll('.list-group-item[href]')).map(function (link) {
+      const label = link.textContent.replace(/\s+/g, ' ').trim();
+      const section = findSidebarSectionLabel(link);
+      const href = link.getAttribute('href');
+      const keywords = normalizeSearchText([label, section, href].join(' '));
+
+      return {
+        href: href,
+        label: label,
+        section: section,
+        keywords: keywords,
+        aliases: '',
+      };
+    }).map(function (item) {
+      return Object.assign({}, item, {
+        aliases: buildQuickSearchAliases(item),
+      });
+    }).filter(function (item) {
+      return item.label && item.href && item.href !== '#';
+    }) : [];
+
+    const shortcutItems = Array.from(document.querySelectorAll('#quickSearchShortcuts .quick-search-shortcut[href]')).map(function (link) {
+      const label = (link.dataset.label || link.textContent || '').replace(/\s+/g, ' ').trim();
+      const section = (link.dataset.section || '').replace(/\s+/g, ' ').trim();
+      const href = link.getAttribute('href');
+      const keywords = normalizeSearchText([label, section, link.dataset.keywords || '', href].join(' '));
+
+      return {
+        href: href,
+        label: label,
+        section: section,
+        keywords: keywords,
+        aliases: buildQuickSearchAliases({
+          href: href,
+          label: label,
+          section: section,
+        }),
+      };
+    }).filter(function (item) {
+      return item.label && item.href && item.href !== '#';
+    });
+
+    const seen = new Set();
+    return sidebarItems.concat(shortcutItems).filter(function (item) {
+      const key = item.href + '::' + item.label;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  }
+
+  function rankQuickSearchItem(item, query) {
+    if (!query) {
+      return 3;
+    }
+
+    const label = normalizeSearchText(item.label);
+    const section = normalizeSearchText(item.section);
+    const aliases = normalizeSearchText(item.aliases || '');
+    if (label === query) {
+      return 0;
+    }
+    if (aliases === query || aliases.split(' ').includes(query)) {
+      return 1;
+    }
+    if (label.startsWith(query)) {
+      return 2;
+    }
+    if (label.includes(query)) {
+      return 3;
+    }
+    if (aliases.includes(query)) {
+      return 4;
+    }
+    if (section.includes(query) || item.keywords.includes(query)) {
+      return 5;
+    }
+
+    const queryTokens = query.split(' ').filter(Boolean);
+    if (queryTokens.length && queryTokens.every(function (token) {
+      return item.keywords.includes(token) || aliases.includes(token);
+    })) {
+      return 6;
+    }
+
+    return Number.POSITIVE_INFINITY;
+  }
+
+  function closeQuickSearch() {
+    if (!quickSearchResults) {
+      return;
+    }
+
+    quickSearchResults.hidden = true;
+    quickSearch.classList.remove('is-open');
+  }
+
+  function renderQuickSearchResults() {
+    if (!quickSearch || !quickSearchInput || !quickSearchResults) {
+      return;
+    }
+
+    const query = normalizeSearchText(quickSearchInput.value);
+    const items = buildQuickSearchIndex();
+    const rankedItems = items.map(function (item) {
+      return {
+        score: rankQuickSearchItem(item, query),
+        item: item,
+      };
+    }).filter(function (entry) {
+      return Number.isFinite(entry.score);
+    }).sort(function (left, right) {
+      if (left.score !== right.score) {
+        return left.score - right.score;
+      }
+      return left.item.label.localeCompare(right.item.label);
+    }).slice(0, 8);
+
+    if (!query) {
+      quickSearchResults.innerHTML = '<div class="navbar-search-empty">' + (quickSearch.dataset.emptyMessage || '') + '</div>';
+      quickSearchResults.hidden = false;
+      quickSearch.classList.add('is-open');
+      return;
+    }
+
+    if (!rankedItems.length) {
+      quickSearchResults.innerHTML = '<div class="navbar-search-empty">' + (quickSearch.dataset.noResultsMessage || '') + '</div>';
+      quickSearchResults.hidden = false;
+      quickSearch.classList.add('is-open');
+      return;
+    }
+
+    quickSearchResults.innerHTML = rankedItems.map(function (entry) {
+      const sectionMarkup = entry.item.section ? '<span class="navbar-search-result-meta">' + entry.item.section + '</span>' : '';
+      return '<a class="navbar-search-result" href="' + entry.item.href + '"><span class="navbar-search-result-label">' + entry.item.label + '</span>' + sectionMarkup + '</a>';
+    }).join('');
+    quickSearchResults.hidden = false;
+    quickSearch.classList.add('is-open');
+  }
+
+  if (quickSearch && quickSearchInput && quickSearchResults) {
+    quickSearchInput.addEventListener('focus', renderQuickSearchResults);
+    quickSearchInput.addEventListener('input', renderQuickSearchResults);
+    quickSearchInput.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        closeQuickSearch();
+        quickSearchInput.blur();
+        return;
+      }
+
+      if (event.key === 'Enter') {
+        const firstResult = quickSearchResults.querySelector('.navbar-search-result');
+        if (firstResult) {
+          event.preventDefault();
+          window.location.href = firstResult.href;
+        }
+      }
+    });
+
+    quickSearch.addEventListener('click', function (event) {
+      event.stopPropagation();
+    });
+
+    document.addEventListener('click', function () {
+      closeQuickSearch();
+    });
+  }
 
   function restoreSidebarScroll() {
     if (!sidebar) {
@@ -491,6 +912,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('keydown', function (event) {
       if (event.key === 'Escape') {
         closeLanguageMenu();
+        closeQuickSearch();
       }
     });
   }

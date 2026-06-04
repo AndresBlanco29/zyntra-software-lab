@@ -718,17 +718,59 @@ def _fetch_quickbooks_item_image(client, payload):
 
 
 def _extract_quickbooks_item_qty_on_hand(payload):
-    # QuickBooks uses 'QtyOnHand' (or similar) for inventory items; accept multiple keys defensively.
+    # QuickBooks inventory/assembly items expose on-hand quantity; other types do not track stock.
+    item_type = str(payload.get('Type') or '').strip().lower()
+    if item_type and item_type not in {'inventory', 'assembly'}:
+        return None
     for key in ('QtyOnHand', 'QuantityOnHand', 'QtyOnHandValue', 'QuantityOnHandValue'):
-        if key in payload:
-            try:
-                return int(float(payload.get(key) or 0))
-            except Exception:
-                try:
-                    return int(payload.get(key) or 0)
-                except Exception:
-                    return None
+        if key not in payload:
+            continue
+        raw_value = payload.get(key)
+        if raw_value is None or raw_value == '':
+            continue
+        try:
+            return max(int(float(raw_value)), 0)
+        except (TypeError, ValueError):
+            continue
     return None
+
+
+def _enrich_quickbooks_item_payload(payload, *, client=None):
+    normalized = dict(payload or {})
+    if _extract_quickbooks_item_qty_on_hand(normalized) is not None:
+        return normalized
+    item_id = str(normalized.get('Id') or '').strip()
+    item_type = str(normalized.get('Type') or '').strip().lower()
+    if not item_id or item_type not in {'inventory', 'assembly'}:
+        return normalized
+    try:
+        client = client or QuickBooksAPIClient()
+        full_payload = client.find_by_id('Item', item_id)
+    except Exception:
+        return normalized
+    if not full_payload:
+        return normalized
+    merged = dict(normalized)
+    for key, value in full_payload.items():
+        if key in {'QtyOnHand', 'QuantityOnHand', 'QtyOnHandValue', 'QuantityOnHandValue', 'Type', 'TrackQtyOnHand'}:
+            merged[key] = value
+        elif key not in merged or merged.get(key) in (None, '', [], {}):
+            merged[key] = value
+    return merged
+
+
+def _sync_stock_from_quickbooks_item(presentacion, payload):
+    qty_on_hand = _extract_quickbooks_item_qty_on_hand(payload)
+    if qty_on_hand is None:
+        return False
+    stock, created = StockPresentacion.objects.get_or_create(
+        presentacion=presentacion,
+        defaults={'stock_fisico': qty_on_hand, 'stock_reservado': 0},
+    )
+    if not created and stock.stock_fisico != qty_on_hand:
+        stock.stock_fisico = qty_on_hand
+        stock.save(update_fields=['stock_fisico', 'actualizado_en'])
+    return True
 
 
 def _update_presentacion_from_quickbooks(presentacion, *, quickbooks_id, unit_price, item_cost):
@@ -842,22 +884,16 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload):
         unit_price=unit_price,
         item_cost=item_cost,
     )
-    # Update physical stock from QuickBooks if available
-    qty_on_hand = _extract_quickbooks_item_qty_on_hand(payload)
-    if qty_on_hand is not None:
-        try:
-            stock, _ = StockPresentacion.objects.get_or_create(presentacion=presentacion, defaults={'stock_fisico': max(int(qty_on_hand or 0), 0)})
-            if stock.stock_fisico != max(int(qty_on_hand or 0), 0):
-                stock.stock_fisico = max(int(qty_on_hand or 0), 0)
-                stock.save(update_fields=['stock_fisico', 'actualizado_en'])
-        except Exception:
-            # Don't fail the import if inventory update fails; recordable separately.
-            pass
+    try:
+        _sync_stock_from_quickbooks_item(presentacion, payload)
+    except Exception:
+        pass
     return presentacion
 
 
 @transaction.atomic
-def import_quickbooks_item_record(payload):
+def import_quickbooks_item_record(payload, *, client=None):
+    payload = _enrich_quickbooks_item_payload(payload, client=client)
     quickbooks_id = str(payload.get('Id') or '').strip()
     if not quickbooks_id:
         raise QuickBooksSyncError('QuickBooks item payload is missing an Id.')
@@ -944,6 +980,10 @@ def import_quickbooks_item_record(payload):
                 unit_price=unit_price,
                 item_cost=item_cost,
             )
+            try:
+                _sync_stock_from_quickbooks_item(presentacion, payload)
+            except Exception:
+                pass
             action = 'created'
         except IntegrityError as exc:
             err_text = str(exc)
@@ -996,16 +1036,10 @@ def import_quickbooks_item_record(payload):
                     unit_price=unit_price,
                     item_cost=item_cost,
                 )
-                # Update physical stock from QuickBooks if available for newly created presentacion
-                qty_on_hand = _extract_quickbooks_item_qty_on_hand(payload)
-                if qty_on_hand is not None:
-                    try:
-                        stock, _ = StockPresentacion.objects.get_or_create(presentacion=presentacion, defaults={'stock_fisico': max(int(qty_on_hand or 0), 0)})
-                        if stock.stock_fisico != max(int(qty_on_hand or 0), 0):
-                            stock.stock_fisico = max(int(qty_on_hand or 0), 0)
-                            stock.save(update_fields=['stock_fisico', 'actualizado_en'])
-                    except Exception:
-                        pass
+                try:
+                    _sync_stock_from_quickbooks_item(presentacion, payload)
+                except Exception:
+                    pass
                 action = 'created'
             else:
                 raise

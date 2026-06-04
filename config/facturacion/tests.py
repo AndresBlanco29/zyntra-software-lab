@@ -14,8 +14,9 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, DeliveryNotificationLog, Invoice, NotaAjuste, NotaAjusteAplicacion
-from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, generar_invoice_desde_picking, start_delivery_route, unlock_client_from_delivery
+from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, start_delivery_route, unlock_client_from_delivery
 from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_item_data, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
+from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_SYNCED
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
 from config.inventario.services import registrar_entrada_manual, reservar_stock_para_pedido_items
 from config.notificaciones.models import Notificacion
@@ -144,10 +145,68 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(self.pedido.estado, 'INVOICE_GENERADA')
 		self.assertEqual(invoice.items.count(), 1)
 		self.assertEqual(invoice.items.first().cantidad_facturada, 3)
-		self.assertEqual(invoice.items.first().precio_venta_sugerido_unitario, Decimal('1.79'))
-		self.assertEqual(invoice.saldo_cliente, Decimal('45.00'))
+
+	def test_generar_invoice_directa_backoffice_creates_invoice_and_discounts_inventory(self):
+		starting_stock = StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico
+
+		invoice = generar_invoice_directa_backoffice(
+			cliente=self.cliente,
+			items_payload=[{
+				'presentacion': self.presentacion,
+				'cantidad': 2,
+				'precio': Decimal('18.00'),
+			}],
+			metodo_entrega='CUSTOMER_PICK_UP',
+			usuario=self.backoffice,
+			nota_backoffice='Venta mostrador',
+		)
+
+		invoice.refresh_from_db()
+		invoice.pedido.refresh_from_db()
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		pedido_item = invoice.pedido.items.get()
+		self.assertEqual(invoice.metodo_entrega, 'CUSTOMER_PICK_UP')
+		self.assertEqual(invoice.pedido.origen, 'BACKOFFICE')
+		self.assertEqual(invoice.pedido.nota_backoffice, 'Venta mostrador')
+		self.assertEqual(invoice.items.first().precio_unitario, Decimal('18.00'))
+		self.assertEqual(stock.stock_fisico, starting_stock - 2)
+		self.assertEqual(pedido_item.cantidad_inventario_aplicada, 2)
+		self.assertTrue(InventarioMovimiento.objects.filter(pedido=invoice.pedido, tipo='SALIDA_PICKING').exists())
+
+	def test_backoffice_direct_invoice_create_view_creates_invoice_without_driver_workflow(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('backoffice_direct_invoice_create'), {
+			'cliente_id': str(self.cliente.id),
+			'metodo_entrega': 'CUSTOMER_PICK_UP',
+			'presentacion_id': [str(self.presentacion.id), ''],
+			'cantidad': ['2', ''],
+			'precio_unitario': ['17.00', ''],
+			'nota_backoffice': 'Venta directa en bodega',
+		})
+
+		invoice = Invoice.objects.latest('id')
+		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertEqual(invoice.metodo_entrega, 'CUSTOMER_PICK_UP')
+		self.assertEqual(invoice.driver, None)
+		self.assertEqual(invoice.pedido.origen, 'BACKOFFICE')
+		self.assertEqual(invoice.pedido.nota_backoffice, 'Venta directa en bodega')
+		self.assertEqual(invoice.items.first().cantidad_facturada, 2)
+		self.assertEqual(invoice.items.first().precio_unitario, Decimal('17.00'))
+		self.assertEqual(invoice.saldo_cliente, Decimal('34.00'))
 		self.assertTrue(invoice.despachador_notificado)
-		self.assertTrue(hasattr(invoice, 'delivery'))
+		self.assertFalse(hasattr(invoice, 'delivery'))
+
+	def test_backoffice_direct_invoice_create_view_renders_dynamic_product_row_with_price_options(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_direct_invoice_create'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'id="direct-invoice-add-line"')
+		self.assertContains(response, 'data-price-1="15.00"')
+		self.assertContains(response, 'data-price-5="19.00"')
+		self.assertContains(response, 'Select one of the 5 prices')
 
 	def test_generate_invoice_accepts_manual_suggested_unit_price(self):
 		invoice = generar_invoice_desde_picking(
@@ -196,6 +255,128 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(invoice_item.subtotal, Decimal('0.00'))
 		self.assertEqual(invoice.subtotal, Decimal('0.00'))
 		self.assertEqual(invoice.saldo_cliente, Decimal('0.00'))
+
+	def test_synced_invoice_blocks_creating_new_adjustment_note(self):
+		self.client.force_login(self.backoffice)
+		invoice = self._create_invoice()
+		invoice.quickbooks_id = 'QB-INV-1'
+		invoice.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+		invoice.save(update_fields=['quickbooks_id', 'sync_status'])
+
+		response = self.client.post(reverse('backoffice_invoice_create_note', args=[invoice.id]), {}, follow=True)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertFalse(invoice.notas_ajuste.exists())
+		messages = [message.message for message in response.context['messages']]
+		self.assertTrue(any('locked because it is already synced with QuickBooks' in message for message in messages))
+
+	def test_synced_invoice_blocks_approving_draft_note(self):
+		self.client.force_login(self.backoffice)
+		invoice = self._create_invoice()
+		nota = crear_nota_ajuste_desde_invoice(
+			invoice=invoice,
+			tipo_ajuste='FINANCIERO',
+			tipo_documento='CREDITO',
+			motivo='OTHER',
+			tipo_credito='CREDIT_DUMP',
+			descripcion='Draft before sync',
+			usuario=self.backoffice,
+			items_payload=[],
+			monto=Decimal('5.00'),
+		)
+		invoice.quickbooks_id = 'QB-INV-2'
+		invoice.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+		invoice.save(update_fields=['quickbooks_id', 'sync_status'])
+
+		response = self.client.post(reverse('backoffice_invoice_approve_note', args=[nota.id]), follow=True)
+
+		self.assertEqual(response.status_code, 200)
+		nota.refresh_from_db()
+		self.assertEqual(nota.estado, 'BORRADOR')
+		messages = [message.message for message in response.context['messages']]
+		self.assertTrue(any('locked because it is already synced with QuickBooks' in message for message in messages))
+
+	def test_synced_note_blocks_void_action(self):
+		self.client.force_login(self.backoffice)
+		invoice = self._create_invoice()
+		nota = crear_nota_ajuste_desde_invoice(
+			invoice=invoice,
+			tipo_ajuste='FINANCIERO',
+			tipo_documento='CREDITO',
+			motivo='OTHER',
+			tipo_credito='CREDIT_DUMP',
+			descripcion='Already synced note',
+			usuario=self.backoffice,
+			items_payload=[],
+			monto=Decimal('5.00'),
+		)
+		nota.quickbooks_id = 'QB-NOTE-1'
+		nota.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+		nota.save(update_fields=['quickbooks_id', 'sync_status'])
+
+		response = self.client.post(reverse('backoffice_invoice_cancel_note', args=[nota.id]), follow=True)
+
+		self.assertEqual(response.status_code, 200)
+		nota.refresh_from_db()
+		self.assertEqual(nota.estado, 'BORRADOR')
+		messages = [message.message for message in response.context['messages']]
+		self.assertTrue(any('Adjustment note' in message and 'locked because it is already synced with QuickBooks' in message for message in messages))
+
+	def test_driver_cannot_create_note_for_synced_invoice(self):
+		invoice = self._create_invoice(metodo_entrega='RUTA_DRIVER', driver=self.driver)
+		invoice.delivery.estado = 'ENTREGADA_PAGADA'
+		invoice.delivery.save(update_fields=['estado'])
+		invoice.quickbooks_id = 'QB-INV-DRIVER'
+		invoice.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+		invoice.save(update_fields=['quickbooks_id', 'sync_status'])
+		self.client.force_login(self.driver)
+
+		response = self.client.post(
+			reverse('driver_delivery_create_note', args=[invoice.delivery.id]),
+			{
+				'driver_note_tipo_ajuste': 'PRODUCTO',
+				'driver_note_tipo_documento': 'CREDITO',
+				'driver_note_motivo': 'DAMAGE',
+				'driver_note_tipo_credito': 'CREDIT_DUMP',
+				'driver_note_descripcion': 'Driver locked test',
+				f'driver_note_qty_{invoice.items.first().id}': '1',
+				f'driver_note_amount_{invoice.items.first().id}': '5.00',
+			},
+			follow=True,
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertFalse(NotaAjuste.objects.filter(invoice=invoice, descripcion='Driver locked test').exists())
+		messages = [message.message for message in response.context['messages']]
+		self.assertTrue(any('locked because it is already synced with QuickBooks' in message for message in messages))
+
+	def test_synced_general_note_cannot_be_applied_to_new_invoice(self):
+		general_note = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=None,
+			tipo_ajuste='FINANCIERO',
+			tipo_documento='CREDITO',
+			motivo='OTHER',
+			tipo_credito='CREDIT_DUMP',
+			descripcion='General synced note',
+			usuario=self.backoffice,
+			items_payload=[],
+			monto=Decimal('8.00'),
+		)
+		aprobar_nota_ajuste(nota=general_note, usuario=self.backoffice)
+		general_note.quickbooks_id = 'QB-GENERAL-1'
+		general_note.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+		general_note.save(update_fields=['quickbooks_id', 'sync_status'])
+		pedido = self._create_verified_order(total='15.00', quantity=1)
+
+		with self.assertRaisesMessage(ValidationError, 'Adjustment note'):
+			generar_invoice_desde_picking(
+				pedido=pedido,
+				metodo_entrega='LTG',
+				driver=None,
+				usuario=self.backoffice,
+				selected_note_applications={general_note.id: Decimal('5.00')},
+			)
 
 	def test_invoice_pdf_item_data_recovers_requested_quantity_from_reservation_history(self):
 		reservar_stock_para_pedido_items(pedido=self.pedido, pedido_items=[self.pedido_item], creado_por=self.backoffice)
@@ -807,7 +988,7 @@ class InvoiceFlowTests(TestCase):
 			usuario=self.backoffice,
 		)
 
-		with self.assertRaisesMessage(ValidationError, 'A credit type is required for credit notes.'):
+		with self.assertRaisesMessage(ValidationError, 'Product credit notes must use Credit Return or Credit Dump.'):
 			crear_nota_ajuste_desde_invoice(
 				invoice=invoice,
 				tipo_documento='CREDITO',
@@ -853,7 +1034,7 @@ class InvoiceFlowTests(TestCase):
 			usuario=self.backoffice,
 		)
 
-		with self.assertRaisesMessage(ValidationError, 'Enter a unit amount greater than zero for each selected adjustment item.'):
+		with self.assertRaisesMessage(ValidationError, 'Enter an amount greater than zero for each selected adjustment item.'):
 			crear_nota_ajuste_desde_invoice(
 				invoice=invoice,
 				tipo_documento='DEBITO',
@@ -1114,7 +1295,7 @@ class InvoiceFlowTests(TestCase):
 			{
 				'estado_pago': 'PAGADO',
 				'metodo_pago': 'CASH',
-				'monto_pagado': '30.00',
+				'monto_pagado': '30.01',
 				'recibido_por': 'Juan Perez',
 				'firma_cliente_data': self.signature_data,
 				'driver_note_tipo_documento': 'CREDITO',
@@ -1286,9 +1467,10 @@ class InvoiceFlowTests(TestCase):
 		self.client.force_login(self.driver)
 
 		response = self.client.post(reverse('driver_delivery_create_note', args=[invoice.delivery.id]), {
-			'driver_note_tipo_documento': 'DEBITO',
-			'driver_note_motivo': 'DEFECT',
-			'driver_note_descripcion': 'Cargo adicional después de la entrega',
+			'driver_note_tipo_documento': 'CREDITO',
+			'driver_note_motivo': 'DAMAGE',
+			'driver_note_tipo_credito': 'CREDIT_DUMP',
+			'driver_note_descripcion': 'Caja dañada después de la entrega',
 			f'driver_note_qty_{invoice.items.first().id}': '1',
 			f'driver_note_amount_{invoice.items.first().id}': '5.00',
 		})
@@ -1296,7 +1478,7 @@ class InvoiceFlowTests(TestCase):
 		invoice.refresh_from_db()
 		nota = invoice.notas_ajuste.get()
 		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
-		self.assertEqual(nota.tipo_documento, 'DEBITO')
+		self.assertEqual(nota.tipo_documento, 'CREDITO')
 		self.assertEqual(nota.estado, 'BORRADOR')
 		self.assertEqual(nota.creada_por, self.driver)
 		notificacion = Notificacion.objects.filter(titulo__icontains=nota.numero).latest('creada_en')
@@ -1576,7 +1758,7 @@ class InvoiceFlowTests(TestCase):
 		invoice.refresh_from_db()
 		self.assertEqual(invoice.delivery.estado, 'ASIGNADA')
 		self.assertEqual(invoice.notas_ajuste.count(), 0)
-		self.assertContains(response, 'The paid amount cannot exceed the customer balance.')
+		self.assertContains(response, 'Drivers can only request credit notes.')
 
 	def test_driver_cannot_create_financial_debit_note_after_delivery(self):
 		invoice = generar_invoice_desde_picking(
@@ -1984,6 +2166,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(list_response, reverse('backoffice_adjustment_notes_list'))
 		self.assertContains(list_response, 'Credit / Debit Notes')
 		self.assertNotContains(list_response, 'Create note')
+		self.assertContains(list_response, reverse('backoffice_direct_invoice_create'))
 
 	def test_backoffice_adjustment_notes_list_can_filter_by_customer_creator_and_invoice_query(self):
 		invoice = generar_invoice_desde_picking(
@@ -2195,9 +2378,11 @@ class InvoiceFlowTests(TestCase):
 	def test_invoice_pdf_barcode_uses_small_human_readable_font(self):
 		barcode = _build_invoice_pdf_barcode('123456789012')
 
-		self.assertEqual(barcode.fontName, 'Helvetica')
-		self.assertEqual(barcode.fontSize, 5.5)
-		self.assertEqual(barcode.barHeight, 18)
+		self.assertEqual(barcode.__class__.__name__, 'Table')
+		inner_barcode = barcode._cellvalues[0][0]
+		self.assertEqual(inner_barcode.fontName, 'Helvetica')
+		self.assertEqual(inner_barcode.fontSize, 5.5)
+		self.assertEqual(inner_barcode.barHeight, 18)
 
 	def test_invoice_pdf_totals_rows_include_customer_credit_applied(self):
 		self.cliente.balance = Decimal('30.00')

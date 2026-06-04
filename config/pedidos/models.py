@@ -24,6 +24,7 @@ class Pedido(models.Model):
 	ORIGEN_CHOICES = (
 		('CLIENTE', 'Cliente'),
 		('VENDEDOR', 'Vendedor'),
+		('BACKOFFICE', 'BackOffice'),
 	)
 
 	cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='pedidos')

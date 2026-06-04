@@ -1,160 +1,68 @@
-{% extends 'bases/base_vendedor.html' %}
+{% extends "bases/base_vendedor.html" %}
 {% load i18n %}
 
-{% block title %}{{ compra.po_number }}{% endblock %}
+{% block title %}{% trans "Purchase order" %} #{{ compra.id }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-start gap-3 mb-4">
-    <div>
-      <a href="{% url 'backoffice_supplier_purchase_list' %}" class="small text-decoration-none">&larr; {% trans "Back to PO center" %}</a>
-      <h1 class="h3 mt-2 mb-1">{{ compra.po_number }}</h1>
-      <div class="text-muted">{{ compra.proveedor_nombre }}{% if compra.bill_number %} · {{ compra.bill_number }}{% endif %}</div>
-    </div>
-    <div class="d-flex flex-wrap gap-2 align-items-center">
-      <span class="badge {% if compra.estado == 'RECIBIDA' %}text-bg-success{% elif compra.estado == 'ENVIADA' %}text-bg-primary{% elif compra.estado == 'CANCELADA' %}text-bg-secondary{% else %}text-bg-warning{% endif %}">{{ compra.get_estado_display }}</span>
-      <span class="badge text-bg-light">{{ compra.sync_status }}</span>
-    </div>
+<div class="mb-4">
+  <a href="{% url 'backoffice_supplier_purchase_list' %}" class="btn btn-link px-0">← {% trans "Back to purchase orders" %}</a>
+  <h2 class="mb-1">{% trans "Purchase order" %} #{{ compra.id }}</h2>
+  <p class="text-muted mb-0">{{ compra.proveedor_nombre }} · {{ compra.get_estado_display }}{% if compra.quickbooks_id %} · QB {{ compra.quickbooks_id }}{% endif %}</p>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body row g-3">
+    <div class="col-md-4"><strong>{% trans "Purchase date" %}:</strong> {{ compra.fecha_compra }}</div>
+    <div class="col-md-4"><strong>{% trans "Due date" %}:</strong> {{ compra.fecha_vencimiento|default:"—" }}</div>
+    <div class="col-md-4"><strong>{% trans "Total" %}:</strong> ${{ compra.total }}</div>
   </div>
+</div>
 
-  <div class="row g-4 mb-4">
-    <div class="col-12 col-xl-8">
-      <div class="card shadow-sm border-0">
-        <div class="card-body p-4">
-          <div class="row g-3">
-            <div class="col-md-4">
-              <div class="small text-muted">{% trans "Purchase date" %}</div>
-              <div class="fw-semibold">{{ compra.fecha_compra }}</div>
-            </div>
-            <div class="col-md-4">
-              <div class="small text-muted">{% trans "Due date" %}</div>
-              <div class="fw-semibold">{{ compra.fecha_vencimiento|default:'-' }}</div>
-            </div>
-            <div class="col-md-4">
-              <div class="small text-muted">{% trans "Total" %}</div>
-              <div class="fw-semibold">{{ compra.total }}</div>
-            </div>
-            <div class="col-md-6">
-              <div class="small text-muted">{% trans "Linked catalog supplier" %}</div>
-              <div class="fw-semibold">{% if compra.proveedor %}{{ compra.proveedor.nombre }}{% else %}-{% endif %}</div>
-            </div>
-            <div class="col-md-6">
-              <div class="small text-muted">{% trans "Supplier email" %}</div>
-              <div class="fw-semibold">{{ compra.proveedor_email|default:'-' }}</div>
-            </div>
-            <div class="col-md-6">
-              <div class="small text-muted">{% trans "Supplier phone" %}</div>
-              <div class="fw-semibold">{{ compra.proveedor_telefono|default:'-' }}</div>
-            </div>
-            <div class="col-12">
-              <div class="small text-muted">{% trans "Internal note" %}</div>
-              <div class="fw-semibold">{{ compra.notas|default:'-' }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-xl-4">
-      <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body p-4">
-          <h2 class="h5 mb-3">{% trans "Actions" %}</h2>
-          <div class="d-grid gap-2">
-            {% if compra.estado == 'BORRADOR' and not compra.quickbooks_id and not compra.inventory_applied %}
-            <form method="post" class="row g-2 mb-2">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="update_supplier_link">
-              <div class="col-12">
-                <label class="form-label fw-semibold">{% trans "Change linked supplier" %}</label>
-                <select name="proveedor_id" class="form-select">
-                  <option value="">{% trans "Select a supplier from the catalog" %}</option>
-                  {% for supplier in purchase_suppliers %}
-                  <option value="{{ supplier.id }}" {% if compra.proveedor_id == supplier.id %}selected{% endif %}>{{ supplier.nombre }}{% if supplier.company_name %} · {{ supplier.company_name }}{% endif %}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div class="col-12 d-grid">
-                <button type="submit" class="btn btn-outline-secondary w-100">{% trans "Update linked supplier" %}</button>
-              </div>
-            </form>
-            {% endif %}
-
-            {% if not compra.quickbooks_id and compra.estado != 'CANCELADA' %}
-            <form method="post" action="{% url 'quickbooks_sync_supplier_purchase_create' %}">
-              {% csrf_token %}
-              <input type="hidden" name="purchase_id" value="{{ compra.id }}">
-              <input type="hidden" name="redirect_to" value="{% url 'backoffice_supplier_purchase_detail' compra.id %}">
-              <button type="submit" class="btn btn-success w-100">{% if compra.sync_status == 'FAILED' %}{% trans "Run manual QuickBooks sync" %}{% else %}{% trans "Send to QuickBooks" %}{% endif %}</button>
-            </form>
-            {% endif %}
-
-            {% if compra.estado != 'RECIBIDA' and compra.estado != 'CANCELADA' %}
-            <form method="post" action="{% url 'backoffice_supplier_purchase_receive' compra.id %}">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-outline-primary w-100">{% trans "Receive inventory" %}</button>
-            </form>
-            {% endif %}
-
-            {% if compra.estado == 'BORRADOR' and not compra.quickbooks_id and not compra.inventory_applied %}
-            <form method="post" action="{% url 'backoffice_supplier_purchase_cancel' compra.id %}">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-outline-danger w-100">{% trans "Cancel draft" %}</button>
-            </form>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-
-      <div class="card shadow-sm border-0">
-        <div class="card-body p-4">
-          <h2 class="h5 mb-3">{% trans "Sync and receipt state" %}</h2>
-          <div class="small text-muted mb-2">{% trans "QuickBooks ID" %}</div>
-          <div class="fw-semibold mb-3">{{ compra.quickbooks_id|default:'-' }}</div>
-          <div class="small text-muted mb-2">{% trans "Inventory loaded" %}</div>
-          <div class="fw-semibold mb-3">{% if compra.inventory_applied %}{% trans "Yes" %}{% else %}{% trans "No" %}{% endif %}</div>
-          <div class="small text-muted mb-2">{% trans "Received at" %}</div>
-          <div class="fw-semibold mb-3">{{ compra.inventory_received_at|default:'-' }}</div>
-          <div class="small text-muted mb-2">{% trans "Received by" %}</div>
-          <div class="fw-semibold">{% if compra.inventory_received_by %}{{ compra.inventory_received_by.get_full_name|default:compra.inventory_received_by.username }}{% else %}-{% endif %}</div>
-        </div>
-      </div>
-    </div>
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold">{% trans "Lines" %}</div>
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead><tr><th>{% trans "Product" %}</th><th>{% trans "Qty" %}</th><th>{% trans "Unit cost" %}</th><th>{% trans "Subtotal" %}</th></tr></thead>
+      <tbody>
+        {% for linea in compra.lineas.all %}
+        <tr>
+          <td>{{ linea.descripcion|default:linea.presentacion }}</td>
+          <td>{{ linea.cantidad }}</td>
+          <td>${{ linea.costo_unitario }}</td>
+          <td>${{ linea.subtotal }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-muted p-3">{% trans "No lines." %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
+</div>
 
-  <div class="card shadow-sm border-0">
-    <div class="card-body p-4">
-      <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
-        <h2 class="h5 mb-0">{% trans "Order lines" %}</h2>
-        <span class="small text-muted">{{ compra.lineas.count }} {% trans "lines" %}</span>
-      </div>
-      <div class="table-responsive">
-        <table class="table align-middle mb-0">
-          <thead>
-            <tr>
-              <th>{% trans "Product" %}</th>
-              <th>{% trans "Qty" %}</th>
-              <th>{% trans "Unit cost" %}</th>
-              <th>{% trans "Subtotal" %}</th>
-              <th>{% trans "Note" %}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for line in compra.lineas.all %}
-            <tr>
-              <td>
-                <div class="fw-semibold">{{ line.presentacion.producto.nombre }}</div>
-                <div class="small text-muted">{{ line.presentacion.nombre }}</div>
-              </td>
-              <td>{{ line.cantidad }}</td>
-              <td>{{ line.costo_unitario }}</td>
-              <td>{{ line.subtotal }}</td>
-              <td>{{ line.descripcion|default:'-' }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+{% if compra.estado == 'BORRADOR' and not compra.quickbooks_id %}
+<form method="post" class="card shadow-sm mb-3">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="update_supplier_link">
+  <div class="card-body row g-2 align-items-end">
+    <div class="col-md-8">
+      <label class="form-label">{% trans "Linked supplier" %}</label>
+      <select name="proveedor_id" class="form-select">
+        {% for s in purchase_suppliers %}
+        <option value="{{ s.id }}" {% if compra.proveedor_id == s.id %}selected{% endif %}>{{ s.nombre }}</option>
+        {% endfor %}
+      </select>
     </div>
+    <div class="col-md-4"><button type="submit" class="btn btn-outline-primary w-100">{% trans "Update supplier" %}</button></div>
   </div>
+</form>
+{% endif %}
+
+<div class="d-flex flex-wrap gap-2">
+  {% if compra.estado == 'BORRADOR' and not compra.inventory_applied %}
+  <form method="post" action="{% url 'backoffice_supplier_purchase_cancel' compra.id %}">{% csrf_token %}<button class="btn btn-outline-danger" type="submit">{% trans "Cancel" %}</button></form>
+  {% endif %}
+  {% if compra.estado != 'RECIBIDA' and not compra.inventory_applied %}
+  <form method="post" action="{% url 'backoffice_supplier_purchase_receive' compra.id %}">{% csrf_token %}<button class="btn btn-success" type="submit">{% trans "Receive inventory" %}</button></form>
+  {% endif %}
 </div>
 {% endblock %}

@@ -1,102 +1,50 @@
-{% extends 'bases/base_vendedor.html' %}
+{% extends "bases/base_vendedor.html" %}
 {% load i18n %}
 
 {% block title %}{{ supplier.nombre }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
-    <div>
-      <a href="{% url 'backoffice_supplier_list' %}" class="btn btn-link px-0 text-decoration-none">&larr; {% trans "Back to suppliers" %}</a>
-      <h1 class="h3 mb-1">{{ supplier.nombre }}</h1>
-      <p class="text-muted mb-0">{% trans "Review and update the local supplier profile used by purchasing and QuickBooks sync." %}</p>
-    </div>
-    <div class="d-flex flex-wrap gap-2 align-items-center">
-      {% if supplier.quickbooks_id %}
-      <span class="badge text-bg-success px-3 py-2">{% trans "Linked" %}</span>
-      <span class="badge text-bg-light border px-3 py-2">{{ supplier.quickbooks_id }}</span>
-      {% else %}
-      <span class="badge text-bg-secondary px-3 py-2">{% trans "Local only" %}</span>
-      {% endif %}
-      <span class="badge text-bg-light border px-3 py-2">{% if supplier.activo %}{% trans "Active" %}{% else %}{% trans "Inactive" %}{% endif %}</span>
-      <span class="badge text-bg-light border px-3 py-2">{{ supplier.sync_status }}</span>
-    </div>
-  </div>
-
-  <div class="row g-4">
-    <div class="col-12 col-xl-8">
-      <div class="card shadow-sm border-0">
-        <div class="card-body p-4">
-          <h2 class="h5 mb-3">{% trans "Supplier profile" %}</h2>
-          <form method="post" class="row g-3">
-            {% csrf_token %}
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">{% trans "Supplier name" %}</label>
-              <input type="text" name="nombre" class="form-control" value="{{ supplier.nombre }}" required>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">{% trans "Company" %}</label>
-              <input type="text" name="company_name" class="form-control" value="{{ supplier.company_name }}">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">{% trans "Email" %}</label>
-              <input type="email" name="email" class="form-control" value="{{ supplier.email }}">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">{% trans "Phone" %}</label>
-              <input type="text" name="telefono" class="form-control" value="{{ supplier.telefono }}">
-            </div>
-            <div class="col-12">
-              <label class="form-label fw-semibold">{% trans "Notes" %}</label>
-              <textarea name="notas" rows="4" class="form-control">{{ supplier.notas }}</textarea>
-            </div>
-            <div class="col-12">
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="supplier-active" name="activo" value="1" {% if supplier.activo %}checked{% endif %}>
-                <label class="form-check-label" for="supplier-active">{% trans "Supplier is active" %}</label>
-              </div>
-            </div>
-            <div class="col-12 d-flex justify-content-end">
-              <button type="submit" class="btn btn-primary">{% trans "Save supplier changes" %}</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12 col-xl-4">
-      <div class="card shadow-sm border-0 mb-4">
-        <div class="card-body p-4">
-          <h2 class="h5 mb-3">{% trans "QuickBooks sync" %}</h2>
-          <dl class="row mb-0 small">
-            <dt class="col-5 text-muted">{% trans "Connection" %}</dt>
-            <dd class="col-7 mb-2">{% if quickbooks_status.is_active %}{% trans "Connected" %}{% else %}{% trans "Pending connection" %}{% endif %}</dd>
-            <dt class="col-5 text-muted">{% trans "Environment" %}</dt>
-            <dd class="col-7 mb-2">{{ quickbooks_status.environment|upper }}</dd>
-            <dt class="col-5 text-muted">{% trans "Last sync" %}</dt>
-            <dd class="col-7 mb-2">{% if supplier.last_synced_at %}{{ supplier.last_synced_at }}{% else %}-{% endif %}</dd>
-            <dt class="col-5 text-muted">{% trans "Sync status" %}</dt>
-            <dd class="col-7 mb-0">{{ supplier.sync_status }}</dd>
-          </dl>
-        </div>
-      </div>
-
-      <div class="card shadow-sm border-0">
-        <div class="card-body p-4">
-          <h2 class="h5 mb-3">{% trans "Supplier summary" %}</h2>
-          <dl class="row mb-0 small">
-            <dt class="col-5 text-muted">{% trans "Created" %}</dt>
-            <dd class="col-7 mb-2">{{ supplier.creado_en }}</dd>
-            <dt class="col-5 text-muted">{% trans "Updated" %}</dt>
-            <dd class="col-7 mb-2">{{ supplier.actualizado_en }}</dd>
-            <dt class="col-5 text-muted">{% trans "Email" %}</dt>
-            <dd class="col-7 mb-2">{{ supplier.email|default:'-' }}</dd>
-            <dt class="col-5 text-muted">{% trans "Phone" %}</dt>
-            <dd class="col-7 mb-0">{{ supplier.telefono|default:'-' }}</dd>
-          </dl>
-        </div>
-      </div>
-    </div>
-  </div>
+<div class="mb-4">
+  <a href="{% url 'backoffice_supplier_list' %}" class="btn btn-link px-0">← {% trans "Back to suppliers" %}</a>
+  <h2 class="mb-1">{{ supplier.nombre }}</h2>
+  <p class="text-muted mb-0">
+    {% if supplier.quickbooks_id %}{% trans "Linked to QuickBooks" %}: {{ supplier.quickbooks_id }}{% else %}{% trans "Not linked to QuickBooks yet." %}{% endif %}
+  </p>
 </div>
+
+<form method="post" class="card shadow-sm">
+  {% csrf_token %}
+  <div class="card-body row g-3">
+    <div class="col-md-6">
+      <label class="form-label">{% trans "Name" %}</label>
+      <input type="text" name="nombre" class="form-control" value="{{ supplier.nombre }}" required>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">{% trans "Company" %}</label>
+      <input type="text" name="company_name" class="form-control" value="{{ supplier.company_name }}">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">{% trans "Email" %}</label>
+      <input type="email" name="email" class="form-control" value="{{ supplier.email }}">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">{% trans "Phone" %}</label>
+      <input type="text" name="telefono" class="form-control" value="{{ supplier.telefono }}">
+    </div>
+    <div class="col-12">
+      <label class="form-label">{% trans "Notes" %}</label>
+      <textarea name="notas" class="form-control" rows="3">{{ supplier.notas }}</textarea>
+    </div>
+    <div class="col-12">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="activo" value="1" id="supplierActivo" {% if supplier.activo %}checked{% endif %}>
+        <label class="form-check-label" for="supplierActivo">{% trans "Active supplier" %}</label>
+      </div>
+    </div>
+    <div class="col-12">
+      <button type="submit" class="btn btn-primary">{% trans "Save changes" %}</button>
+      <a href="{% url 'quickbooks_import_vendors_to_local' %}" class="btn btn-outline-primary ms-2">{% trans "Import vendors from QuickBooks" %}</a>
+    </div>
+  </div>
+</form>
 {% endblock %}

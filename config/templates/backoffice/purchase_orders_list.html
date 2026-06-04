@@ -1,470 +1,66 @@
-{% extends 'bases/base_vendedor.html' %}
+{% extends "bases/base_vendedor.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Pre-PO / PO" %}{% endblock %}
+{% block title %}{% trans "Purchase orders" %}{% endblock %}
 
 {% block content %}
-<style>
-  .po-hero {
-    position: relative;
-    overflow: hidden;
-    border-radius: 28px;
-    padding: 2rem;
-    background: linear-gradient(135deg, #0f2860 0%, #184da0 46%, #73d7ff 100%);
-    color: #fff;
-    box-shadow: 0 24px 60px rgba(16, 42, 99, 0.22);
-  }
-
-  .po-hero::before,
-  .po-hero::after {
-    content: "";
-    position: absolute;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.12);
-  }
-
-  .po-hero::before {
-    width: 250px;
-    height: 250px;
-    top: -110px;
-    right: -60px;
-  }
-
-  .po-hero::after {
-    width: 180px;
-    height: 180px;
-    bottom: -80px;
-    right: 180px;
-  }
-
-  .po-hero-copy,
-  .po-hero-aside,
-  .po-hero-status {
-    position: relative;
-    z-index: 1;
-  }
-
-  .po-eyebrow {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.45rem 0.85rem;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.16);
-    font-size: 0.82rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-
-  .po-hero-copy h1 {
-    font-size: clamp(2rem, 4vw, 3.2rem);
-    line-height: 1.03;
-    margin: 0.95rem 0 0.9rem;
-  }
-
-  .po-hero-copy p,
-  .po-hero-status-copy,
-  .po-hero-aside .small {
-    color: rgba(255, 255, 255, 0.84);
-  }
-
-  .po-hero-aside {
-    border-radius: 24px;
-    padding: 1.2rem;
-    background: rgba(255, 255, 255, 0.12);
-    backdrop-filter: blur(8px);
-  }
-
-  .po-hero-metric {
-    border-radius: 18px;
-    padding: 1rem;
-    background: rgba(255, 255, 255, 0.1);
-    min-height: 100%;
-  }
-
-  .po-hero-metric-label {
-    font-size: 0.82rem;
-    color: rgba(255, 255, 255, 0.76);
-  }
-
-  .po-hero-metric-value {
-    font-size: 1.35rem;
-    font-weight: 700;
-  }
-
-  .po-hero-status {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 0.9rem;
-    align-items: start;
-    margin-top: 1.2rem;
-    padding: 1rem 1.1rem;
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.14);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    backdrop-filter: blur(10px);
-  }
-
-  .po-hero-status-icon {
-    width: 2.8rem;
-    height: 2.8rem;
-    border-radius: 18px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(255, 255, 255, 0.16);
-    font-size: 1.1rem;
-  }
-
-  .po-lifecycle-card {
-    border-radius: 24px;
-    background: linear-gradient(180deg, #ffffff 0%, #f5f9ff 100%);
-    border: 1px solid rgba(16, 42, 99, 0.1);
-    box-shadow: 0 18px 40px rgba(16, 42, 99, 0.08);
-  }
-</style>
-<div class="container-fluid py-4">
-  <div class="row g-4 mb-4">
-    <div class="col-12 col-xl-8">
-      <section class="po-hero h-100">
-        <div class="row g-4 align-items-start">
-          <div class="col-xl-8">
-            <div class="po-hero-copy">
-              <span class="po-eyebrow">{% trans "Supplier workflow" %}</span>
-              <h1>{% trans "Pre-PO / PO Center" %}</h1>
-              <p class="mb-0">{% trans "Create draft supplier purchase orders, sync them manually to QuickBooks when needed, and receive inventory only after physical verification." %}</p>
-            </div>
-
-            <div class="po-hero-status">
-              <div class="po-hero-status-icon">&#9888;</div>
-              <div>
-                <div class="fw-semibold mb-1">{% trans "Recommended flow" %}</div>
-                <p class="po-hero-status-copy mb-0">{% trans "Create the draft with supplier, products, quantities, and costs. Send it to QuickBooks manually if the automatic sync did not complete. Mark it as received only when the merchandise is verified." %}</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="col-xl-4">
-            <div class="po-hero-aside h-100">
-              <div class="small mb-3">{% trans "QuickBooks source of truth after sync" %}</div>
-              <div class="fw-semibold fs-5 mb-3">{% trans "Accounting data locks once the record is synced." %}</div>
-
-              <div class="row g-3">
-                <div class="col-6">
-                  <div class="po-hero-metric">
-                    <div class="po-hero-metric-label">{% trans "Drafts" %}</div>
-                    <div class="po-hero-metric-value">{{ purchase_counts.draft }}</div>
-                  </div>
-                </div>
-                <div class="col-6">
-                  <div class="po-hero-metric">
-                    <div class="po-hero-metric-label">{% trans "Sent" %}</div>
-                    <div class="po-hero-metric-value">{{ purchase_counts.sent }}</div>
-                  </div>
-                </div>
-                <div class="col-6">
-                  <div class="po-hero-metric">
-                    <div class="po-hero-metric-label">{% trans "Received" %}</div>
-                    <div class="po-hero-metric-value">{{ purchase_counts.received }}</div>
-                  </div>
-                </div>
-                <div class="col-6">
-                  <div class="po-hero-metric">
-                    <div class="po-hero-metric-label">{% trans "Imported Bills" %}</div>
-                    <div class="po-hero-metric-value">{{ purchase_counts.imported_bills }}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-    <div class="col-12 col-xl-4">
-      <div class="po-lifecycle-card h-100">
-        <div class="card-body p-4">
-          <h2 class="h5 mb-3">{% trans "Lifecycle" %}</h2>
-          <div class="small text-muted mb-3">{% trans "Recommended flow" %}</div>
-          <ol class="mb-0 ps-3 text-muted">
-            <li>{% trans "Create the draft with supplier, products, quantities, and costs." %}</li>
-            <li>{% trans "Send it to QuickBooks manually if the automatic sync did not complete." %}</li>
-            <li>{% trans "Mark it as received only when the merchandise is verified." %}</li>
-          </ol>
-        </div>
-      </div>
-    </div>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+  <div>
+    <h2 class="mb-1">{% trans "Purchase orders" %}</h2>
+    <p class="text-muted mb-0">{% trans "Draft, send, receive, and sync supplier purchases with QuickBooks." %}</p>
   </div>
-
-  <div class="row g-4">
-    <div class="col-12">
-      <div class="card shadow-sm border-0">
-        <div class="card-body p-4">
-          <h2 class="h5 mb-3">{% trans "Create draft Pre-PO" %}</h2>
-          <form method="post" class="row g-3">
-            {% csrf_token %}
-            <div class="col-12">
-              <label class="form-label fw-semibold">{% trans "Supplier from catalog" %}</label>
-              <select name="proveedor_id" id="purchase-supplier-select" class="form-select">
-                <option value="">{% trans "Select a supplier from the catalog" %}</option>
-                {% for supplier in purchase_suppliers %}
-                <option value="{{ supplier.id }}" data-name="{{ supplier.nombre }}" data-email="{{ supplier.email }}" data-phone="{{ supplier.telefono }}">{{ supplier.nombre }}{% if supplier.company_name %} · {{ supplier.company_name }}{% endif %}</option>
-                {% endfor %}
-              </select>
-              <div class="form-text">{% trans "If you select a supplier here, the purchase order will use that supplier profile automatically." %}</div>
-            </div>
-            <div class="col-md-7">
-              <label class="form-label fw-semibold">{% trans "Supplier name" %}</label>
-              <input type="text" id="purchase-supplier-name" name="proveedor_nombre" class="form-control">
-            </div>
-            <div class="col-md-5">
-              <label class="form-label fw-semibold">{% trans "Reference / Bill number" %}</label>
-              <input type="text" name="bill_number" class="form-control" placeholder="BILL-1001">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">{% trans "Purchase date" %}</label>
-              <input type="date" name="fecha_compra" class="form-control" required>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">{% trans "Due date" %}</label>
-              <input type="date" name="fecha_vencimiento" class="form-control">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">{% trans "Supplier email" %}</label>
-              <input type="email" id="purchase-supplier-email" name="proveedor_email" class="form-control">
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">{% trans "Supplier phone" %}</label>
-              <input type="text" id="purchase-supplier-phone" name="proveedor_telefono" class="form-control">
-            </div>
-            <div class="col-12">
-              <label class="form-label fw-semibold">{% trans "Order lines" %}</label>
-              <div id="purchase-order-lines" class="vstack gap-2">
-                <div class="row g-2 align-items-end purchase-order-line">
-                  <div class="col-lg-6">
-                    <label class="form-label small text-muted mb-1">{% trans "Product / presentation" %}</label>
-                    <select name="presentacion_id" class="form-select">
-                      <option value="">{% trans "Select one presentation" %}</option>
-                      {% for presentacion in purchase_presentations %}
-                      <option value="{{ presentacion.id }}">#{{ presentacion.id }} · {{ presentacion.producto.nombre }} · {{ presentacion.nombre }}</option>
-                      {% endfor %}
-                    </select>
-                  </div>
-                  <div class="col-lg-2 col-md-4">
-                    <label class="form-label small text-muted mb-1">{% trans "Qty" %}</label>
-                    <input type="number" min="1" name="cantidad" class="form-control" placeholder="0">
-                  </div>
-                  <div class="col-lg-2 col-md-4">
-                    <label class="form-label small text-muted mb-1">{% trans "Unit cost" %}</label>
-                    <input type="number" min="0" step="0.01" name="costo_unitario" class="form-control" placeholder="0.00">
-                  </div>
-                  <div class="col-lg-2 col-md-4">
-                    <label class="form-label small text-muted mb-1">{% trans "Line note" %}</label>
-                    <input type="text" name="descripcion" class="form-control" placeholder="{% trans 'Optional' %}">
-                  </div>
-                </div>
-              </div>
-              <div class="mt-3">
-                <button type="button" id="purchase-order-add-line" class="btn btn-outline-primary">{% trans "Add another product" %}</button>
-              </div>
-            </div>
-            <div class="col-12">
-              <label class="form-label fw-semibold">{% trans "Internal note" %}</label>
-              <textarea name="notas" rows="3" class="form-control" placeholder="{% trans 'Reference, delivery note, or payment terms.' %}"></textarea>
-            </div>
-            <div class="col-12 d-grid">
-              <button type="submit" class="btn btn-success">{% trans "Save draft" %}</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12">
-      <div class="card shadow-sm border-0">
-        <div class="card-body p-4">
-          <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
-            <h2 class="h5 mb-0">{% trans "Recent purchase orders" %}</h2>
-            <span class="small text-muted">{% trans "Latest 25 records" %}</span>
-          </div>
-          <div class="table-responsive">
-            <table class="table align-middle mb-0">
-              <thead>
-                <tr>
-                  <th>{% trans "PO" %}</th>
-                  <th>{% trans "Supplier" %}</th>
-                  <th>{% trans "Status" %}</th>
-                  <th>{% trans "QuickBooks" %}</th>
-                  <th>{% trans "Total" %}</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for purchase in purchase_orders %}
-                <tr>
-                  <td>
-                    <div class="fw-semibold">{{ purchase.po_number }}</div>
-                    <div class="small text-muted">{{ purchase.fecha_compra }}</div>
-                  </td>
-                  <td>
-                    <div class="fw-semibold">{{ purchase.proveedor_nombre }}</div>
-                    {% if purchase.bill_number %}
-                    <div class="small text-muted">{{ purchase.bill_number }}</div>
-                    {% endif %}
-                  </td>
-                  <td>
-                    <span class="badge {% if purchase.estado == 'RECIBIDA' %}text-bg-success{% elif purchase.estado == 'ENVIADA' %}text-bg-primary{% elif purchase.estado == 'CANCELADA' %}text-bg-secondary{% else %}text-bg-warning{% endif %}">{{ purchase.get_estado_display }}</span>
-                  </td>
-                  <td>
-                    <div class="small fw-semibold">{{ purchase.sync_status }}</div>
-                    {% if purchase.quickbooks_id %}
-                    <div class="small text-muted">ID {{ purchase.quickbooks_id }}</div>
-                    {% endif %}
-                  </td>
-                  <td>{{ purchase.total }}</td>
-                  <td class="text-end">
-                    <a href="{% url 'backoffice_supplier_purchase_detail' purchase.id %}" class="btn btn-sm btn-outline-secondary">{% trans "Open" %}</a>
-                  </td>
-                </tr>
-                {% empty %}
-                <tr>
-                  <td colspan="6" class="text-center text-muted py-4">{% trans "No supplier purchase orders have been created yet." %}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-12">
-      <div class="card shadow-sm border-0">
-        <div class="card-body p-4">
-          <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
-            <div>
-              <h2 class="h5 mb-1">{% trans "Imported Bills from QuickBooks" %}</h2>
-              <p class="mb-0 text-muted">{% trans "Bills imported from QuickBooks land here after they create a received supplier purchase locally." %}</p>
-            </div>
-            <div class="d-flex align-items-center gap-2 small text-muted">
-              <span>{% trans "Latest 25 imported bills" %}</span>
-              {% if bill_conflicts_count %}
-              <a href="{% url 'quickbooks_import_conflicts' %}" class="btn btn-sm btn-outline-warning">{% trans "Open bill conflicts" %} ({{ bill_conflicts_count }})</a>
-              {% endif %}
-            </div>
-          </div>
-          {% if bill_conflicts_count %}
-          <div class="alert alert-warning py-2 px-3 small">
-            {% trans "Some QuickBooks Bills could not be imported. Open the review queue to see which ones are missing importable item lines or linked products." %}
-          </div>
-          {% endif %}
-          <div class="table-responsive">
-            <table class="table align-middle mb-0">
-              <thead>
-                <tr>
-                  <th>{% trans "Bill" %}</th>
-                  <th>{% trans "Supplier" %}</th>
-                  <th>{% trans "Status" %}</th>
-                  <th>{% trans "QuickBooks" %}</th>
-                  <th>{% trans "Total" %}</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for bill in imported_bills %}
-                <tr>
-                  <td>
-                    <div class="fw-semibold">{{ bill.bill_number|default:bill.po_number }}</div>
-                    <div class="small text-muted">{{ bill.fecha_compra }}</div>
-                  </td>
-                  <td>
-                    <div class="fw-semibold">{{ bill.proveedor_nombre }}</div>
-                    {% if bill.fecha_vencimiento %}
-                    <div class="small text-muted">{% trans "Due" %}: {{ bill.fecha_vencimiento }}</div>
-                    {% endif %}
-                  </td>
-                  <td>
-                    <span class="badge text-bg-success">{{ bill.get_estado_display }}</span>
-                  </td>
-                  <td>
-                    <div class="small fw-semibold">{{ bill.sync_status }}</div>
-                    <div class="small text-muted">ID {{ bill.quickbooks_id }}</div>
-                  </td>
-                  <td>{{ bill.total }}</td>
-                  <td class="text-end">
-                    <a href="{% url 'backoffice_supplier_purchase_detail' bill.id %}" class="btn btn-sm btn-outline-secondary">{% trans "Open" %}</a>
-                  </td>
-                </tr>
-                {% empty %}
-                <tr>
-                  <td colspan="6" class="text-center text-muted py-4">{% trans "No QuickBooks Bills have been imported yet." %}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{% url 'quickbooks_import_conflicts' %}" class="btn btn-outline-danger">{% trans "Review queue" %} {% if bill_conflicts_count %}<span class="badge text-bg-danger">{{ bill_conflicts_count }}</span>{% endif %}</a>
+    <a href="{% url 'quickbooks_center' %}#qb-import-bills" class="btn btn-outline-primary">{% trans "Import bills" %}</a>
   </div>
 </div>
-<template id="purchase-order-line-template">
-  <div class="row g-2 align-items-end purchase-order-line">
-    <div class="col-lg-6">
-      <label class="form-label small text-muted mb-1">{% trans "Product / presentation" %}</label>
-      <select name="presentacion_id" class="form-select">
-        <option value="">{% trans "Select one presentation" %}</option>
-        {% for presentacion in purchase_presentations %}
-        <option value="{{ presentacion.id }}">#{{ presentacion.id }} · {{ presentacion.producto.nombre }} · {{ presentacion.nombre }}</option>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><div class="small text-muted">{% trans "Draft" %}</div><div class="h4 mb-0">{{ purchase_counts.draft }}</div></div></div></div>
+  <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><div class="small text-muted">{% trans "Sent" %}</div><div class="h4 mb-0">{{ purchase_counts.sent }}</div></div></div></div>
+  <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><div class="small text-muted">{% trans "Received" %}</div><div class="h4 mb-0">{{ purchase_counts.received }}</div></div></div></div>
+  <div class="col-md-3"><div class="card shadow-sm"><div class="card-body"><div class="small text-muted">{% trans "Pending QB sync" %}</div><div class="h4 mb-0">{{ purchase_counts.pending_sync }}</div></div></div></div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold">{% trans "Purchase orders" %}</div>
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead><tr><th>#</th><th>{% trans "Supplier" %}</th><th>{% trans "Status" %}</th><th>{% trans "QuickBooks" %}</th><th></th></tr></thead>
+      <tbody>
+        {% for compra in purchase_orders %}
+        <tr>
+          <td>{{ compra.id }}</td>
+          <td>{{ compra.proveedor_nombre }}</td>
+          <td>{{ compra.get_estado_display }}</td>
+          <td>{% if compra.quickbooks_id %}{{ compra.quickbooks_id }}{% else %}—{% endif %}</td>
+          <td><a class="btn btn-sm btn-outline-primary" href="{% url 'backoffice_supplier_purchase_detail' compra.id %}">{% trans "Open" %}</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-muted p-4">{% trans "No purchase orders yet." %}</td></tr>
         {% endfor %}
-      </select>
-    </div>
-    <div class="col-lg-2 col-md-4">
-      <label class="form-label small text-muted mb-1">{% trans "Qty" %}</label>
-      <input type="number" min="1" name="cantidad" class="form-control" placeholder="0">
-    </div>
-    <div class="col-lg-2 col-md-4">
-      <label class="form-label small text-muted mb-1">{% trans "Unit cost" %}</label>
-      <input type="number" min="0" step="0.01" name="costo_unitario" class="form-control" placeholder="0.00">
-    </div>
-    <div class="col-lg-2 col-md-4">
-      <label class="form-label small text-muted mb-1">{% trans "Line note" %}</label>
-      <input type="text" name="descripcion" class="form-control" placeholder="{% trans 'Optional' %}">
-    </div>
+      </tbody>
+    </table>
   </div>
-</template>
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    var supplierSelect = document.getElementById('purchase-supplier-select');
-    var orderLines = document.getElementById('purchase-order-lines');
-    var addLineButton = document.getElementById('purchase-order-add-line');
-    var lineTemplate = document.getElementById('purchase-order-line-template');
+</div>
 
-    if (orderLines && addLineButton && lineTemplate) {
-      addLineButton.addEventListener('click', function () {
-        var fragment = lineTemplate.content.cloneNode(true);
-        orderLines.appendChild(fragment);
-      });
-    }
-
-    if (!supplierSelect) {
-      return;
-    }
-    var supplierName = document.getElementById('purchase-supplier-name');
-    var supplierEmail = document.getElementById('purchase-supplier-email');
-    var supplierPhone = document.getElementById('purchase-supplier-phone');
-
-    function syncSupplierFields() {
-      var option = supplierSelect.options[supplierSelect.selectedIndex];
-      if (!option || !option.value) {
-        return;
-      }
-      supplierName.value = option.dataset.name || '';
-      supplierEmail.value = option.dataset.email || '';
-      supplierPhone.value = option.dataset.phone || '';
-    }
-
-    supplierSelect.addEventListener('change', syncSupplierFields);
-    syncSupplierFields();
-  });
-</script>
+{% if imported_bills %}
+<div class="card shadow-sm mb-4">
+  <div class="card-header fw-semibold">{% trans "Imported Bills from QuickBooks" %}</div>
+  <div class="table-responsive">
+    <table class="table mb-0">
+      <thead><tr><th>{% trans "Supplier" %}</th><th>{% trans "Bill" %}</th><th></th></tr></thead>
+      <tbody>
+        {% for compra in imported_bills %}
+        <tr>
+          <td>{{ compra.proveedor_nombre }}</td>
+          <td>{{ compra.bill_number|default:compra.quickbooks_id }}</td>
+          <td><a href="{% url 'backoffice_supplier_purchase_detail' compra.id %}" class="btn btn-sm btn-outline-secondary">{% trans "View" %}</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

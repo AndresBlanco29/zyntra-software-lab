@@ -1,4 +1,4 @@
-{% extends "bases/base_vendedor.html" %}
+﻿{% extends "bases/base_vendedor.html" %}
 {% load i18n %}
 
 {% block title %}{% trans "QuickBooks Center" %}{% endblock %}
@@ -481,49 +481,41 @@
     font-size: 0.88rem;
   }
 
+  .qb-section-locked {
+    opacity: 0.42;
+    pointer-events: none;
+    user-select: none;
+    filter: grayscale(0.15);
+  }
+
+  .qb-section-locked .btn,
+  .qb-section-locked a.btn,
+  .qb-section-locked button,
+  .qb-section-locked select,
+  .qb-section-locked textarea {
+    cursor: not-allowed;
+  }
+
+  .qb-preview-tab.is-disabled {
+    opacity: 0.45;
+    pointer-events: none;
+    cursor: not-allowed;
+  }
+
   @media (max-width: 991.98px) {
     .qb-hero {
       padding: 1.4rem;
     }
   }
-
-    // Intercept product batch forms to use background task + overlay
-    document.querySelectorAll('form[data-qb-sync-products]').forEach(function(form){
-      form.addEventListener('submit', function(ev){
-        ev.preventDefault();
-        var select = form.querySelector('select[name="ids"]');
-        var ids = '';
-        if (select){
-          // allow selecting a single id from the select
-          ids = select.value || '';
-        }
-        var csrftoken = getCookie('csrftoken');
-        showOverlay();
-        setProgress(6);
-        // set overlay to exporting mode for product sync
-        document.getElementById('qb-task-title').textContent = 'Exportando a QuickBooks';
-        document.getElementById('qb-task-desc').textContent = 'Enviando producto(s) al catálogo de QuickBooks. No cierre esta ventana.';
-        message.textContent = 'Iniciando sincronización de items...';
-        fetch('{% url "quickbooks_start_products_sync" %}', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: {
-            'X-CSRFToken': csrftoken,
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-          },
-          body: new URLSearchParams({ids: ids})
-        }).then(function(r){ return r.json(); }).then(function(json){
-          if (json && json.task_id){
-            startPolling(json.task_id);
-          } else {
-            message.textContent = 'No se pudo iniciar la tarea.';
-          }
-        }).catch(function(){ message.textContent = 'Error iniciando la tarea.'; });
-      });
-    });
 </style>
 
 <div class="qb-shell">
+  {% if quickbooks_catalog_only_mode %}
+  <div class="alert alert-info border-0 shadow-sm mb-4" role="status">
+    <strong>{% trans "Catalog-only mode" %}</strong> —
+    {% trans "Only QuickBooks connection checks and catalog import are enabled. Accounting imports, pull sync, and outbound sync stay disabled until you turn off QUICKBOOKS_CATALOG_ONLY_MODE." %}
+  </div>
+  {% endif %}
   {% with total_pending=quickbooks_pending_customer_count|add:quickbooks_pending_presentation_count|add:quickbooks_pending_invoice_count|add:quickbooks_pending_note_count %}
   <section class="qb-hero mb-4">
     <div class="row g-4 align-items-center">
@@ -531,7 +523,21 @@
         <span class="qb-eyebrow">{% trans "QuickBooks workflow" %}</span>
         <h1>{% trans "A simpler place to manage QuickBooks" %}</h1>
         <p>{% trans "If you are the owner or manager, use this page in order: connect the account, review what is coming from QuickBooks, import only what you need, and resolve any record that needs a manual decision. Each button explains its purpose before you use it." %}</p>
-        {% if not quickbooks_status.is_active %}
+        {% if not quickbooks_status.credentials_configured %}
+        <div class="qb-hero-status is-red">
+          <span class="qb-hero-status-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9"></circle>
+              <path d="M12 8v5"></path>
+              <path d="M12 16h.01"></path>
+            </svg>
+          </span>
+          <div>
+            <div class="qb-hero-status-title">{% trans "QuickBooks API credentials missing" %}</div>
+            <p class="qb-hero-status-copy">{% trans "Add QUICKBOOKS_CLIENT_ID and QUICKBOOKS_CLIENT_SECRET to the .env file in the project folder (see .env.example), restart runserver, then use Connect QuickBooks." %}</p>
+          </div>
+        </div>
+        {% elif not quickbooks_status.is_active %}
         <div class="qb-hero-status is-red">
           <span class="qb-hero-status-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -710,8 +716,12 @@
           </div>
           <div class="qb-action-stack">
             <div class="qb-action-item" id="qb-import-customers">
+              {% if quickbooks_status.credentials_configured %}
               <a href="{% url 'quickbooks_login' %}" class="btn btn-success w-100">{% trans "Connect QuickBooks" %}</a>
-              <p class="qb-action-note">{% trans "Use this first. It opens Intuit so you can link the company to this system." %}</p>
+              {% else %}
+              <button type="button" class="btn btn-success w-100" disabled>{% trans "Connect QuickBooks" %}</button>
+              {% endif %}
+              <p class="qb-action-note">{% if quickbooks_status.credentials_configured %}{% trans "Use this first. It opens Intuit so you can link the company to this system." %}{% else %}{% trans "Configure .env credentials first (see alert above)." %}{% endif %}</p>
             </div>
             <div class="row g-3">
               <div class="col-md-6">
@@ -755,7 +765,7 @@
             </div>
           </div>
           <div class="row g-3">
-            <div class="col-md-6">
+            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
               <div class="qb-action-item h-100">
                 <form method="get" action="{% url 'quickbooks_center' %}">
                   <input type="hidden" name="preview" value="customers">
@@ -765,7 +775,7 @@
                 <p class="qb-action-note">{% trans "Only shows the customer list from QuickBooks. It does not change your system." %}</p>
               </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
               <div class="qb-action-item h-100">
                 <form method="get" action="{% url 'quickbooks_center' %}">
                   <input type="hidden" name="preview" value="vendors">
@@ -785,7 +795,7 @@
                 <p class="qb-action-note">{% trans "Use this to review products and presentations before importing them." %}</p>
               </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
               <div class="qb-action-item h-100">
                 <form method="get" action="{% url 'quickbooks_center' %}">
                   <input type="hidden" name="preview" value="invoices">
@@ -795,7 +805,7 @@
                 <p class="qb-action-note">{% trans "Review sales documents before matching them with local invoices." %}</p>
               </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
               <div class="qb-action-item h-100">
                 <form method="get" action="{% url 'quickbooks_center' %}">
                   <input type="hidden" name="preview" value="credit_memos">
@@ -805,7 +815,7 @@
                 <p class="qb-action-note">{% trans "Review credit memos before importing or deciding how to match them." %}</p>
               </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
               <div class="qb-action-item h-100">
                 <form method="get" action="{% url 'quickbooks_center' %}">
                   <input type="hidden" name="preview" value="purchase_orders">
@@ -815,7 +825,7 @@
                 <p class="qb-action-note">{% trans "Review QuickBooks purchase orders before importing them as supplier purchase records." %}</p>
               </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
               <div class="qb-action-item h-100">
                 <form method="get" action="{% url 'quickbooks_center' %}">
                   <input type="hidden" name="preview" value="bills">
@@ -846,7 +856,7 @@
             </div>
           </div>
           <div class="qb-action-stack">
-              <div class="qb-action-item" id="qb-import-suppliers">
+              <div class="qb-action-item{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}" id="qb-import-suppliers">
               <form method="post" action="{% url 'quickbooks_import_customers_to_local' %}" data-qb-operation="import_customers_to_local">
                 {% csrf_token %}
                 <input type="hidden" name="limit" value="0">
@@ -855,7 +865,7 @@
               </form>
               <p class="qb-action-note">{% trans "Brings customer data from QuickBooks into your system." %}</p>
             </div>
-              <div class="qb-action-item" id="qb-import-catalog">
+              <div class="qb-action-item{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}" id="qb-import-suppliers-vendors">
               <form method="post" action="{% url 'quickbooks_import_vendors_to_local' %}" data-qb-operation="import_vendors_to_local">
                 {% csrf_token %}
                 <input type="hidden" name="limit" value="25">
@@ -864,7 +874,7 @@
               </form>
               <p class="qb-action-note">{% trans "Brings QuickBooks vendors into your local supplier catalog." %}</p>
             </div>
-              <div class="qb-action-item" id="qb-pull-accounting">
+              <div class="qb-action-item" id="qb-import-catalog">
               <form method="post" action="{% url 'quickbooks_import_items_to_local' %}" data-qb-operation="import_items_to_local">
                 {% csrf_token %}
                 <input type="hidden" name="limit" value="0">
@@ -873,7 +883,7 @@
               </form>
               <p class="qb-action-note">{% trans "Brings products and presentations from QuickBooks into your system." %}</p>
             </div>
-            <div class="qb-action-item" id="qb-import-purchase-orders">
+            <div class="qb-action-item{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}" id="qb-pull-accounting">
               <form method="post" action="{% url 'quickbooks_import_accounting_documents_to_local' %}" data-qb-operation="import_accounting_documents_to_local">
                 {% csrf_token %}
                 <input type="hidden" name="limit" value="0">
@@ -882,7 +892,7 @@
               </form>
               <p class="qb-action-note">{% trans "Imports invoice history and credit memos from QuickBooks. If there is no local invoice or note yet, the system creates a financial debit or credit note automatically when it can identify the local customer." %}</p>
             </div>
-            <div class="qb-action-item" id="qb-import-bills">
+            <div class="qb-action-item{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}" id="qb-import-purchase-orders">
               <form method="post" action="{% url 'quickbooks_import_purchase_orders_to_local' %}" data-qb-operation="import_purchase_orders_to_local">
                 {% csrf_token %}
                 <input type="hidden" name="limit" value="25">
@@ -891,7 +901,7 @@
               </form>
               <p class="qb-action-note">{% trans "Creates local supplier purchase records from QuickBooks purchase orders without receiving inventory yet." %}</p>
             </div>
-            <div class="qb-action-item">
+            <div class="qb-action-item{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}" id="qb-import-bills">
               <form method="post" action="{% url 'quickbooks_import_bills_to_local' %}" data-qb-operation="import_bills_to_local">
                 {% csrf_token %}
                 <input type="hidden" name="limit" value="25">
@@ -904,7 +914,7 @@
         </div>
       </div>
 
-      <div class="col-12 col-xl-6">
+      <div class="col-12 col-xl-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
         <div class="qb-step-card p-4">
           <div class="qb-step-head">
             <span class="qb-step-number">4</span>
@@ -963,13 +973,13 @@
         <p class="qb-soft-copy mb-0">{% trans "Choose what you want to review from QuickBooks. The sample opens here so you can compare before importing." %}</p>
       </div>
       <div class="qb-chip-list">
-        <a href="{% url 'quickbooks_center' %}?preview=customers&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'customers' %}is-active{% endif %}">{% trans "Customers" %}</a>
-        <a href="{% url 'quickbooks_center' %}?preview=vendors&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'vendors' %}is-active{% endif %}">{% trans "Suppliers" %}</a>
+        <a href="{% url 'quickbooks_center' %}?preview=customers&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'customers' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Customers" %}</a>
+        <a href="{% url 'quickbooks_center' %}?preview=vendors&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'vendors' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Suppliers" %}</a>
         <a href="{% url 'quickbooks_center' %}?preview=items&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'items' %}is-active{% endif %}">{% trans "Catalog" %}</a>
-        <a href="{% url 'quickbooks_center' %}?preview=invoices&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'invoices' %}is-active{% endif %}">{% trans "Invoices" %}</a>
-        <a href="{% url 'quickbooks_center' %}?preview=credit_memos&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'credit_memos' %}is-active{% endif %}">{% trans "Credit memos" %}</a>
-        <a href="{% url 'quickbooks_center' %}?preview=purchase_orders&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'purchase_orders' %}is-active{% endif %}">{% trans "Purchase orders" %}</a>
-        <a href="{% url 'quickbooks_center' %}?preview=bills&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'bills' %}is-active{% endif %}">{% trans "Bills" %}</a>
+        <a href="{% url 'quickbooks_center' %}?preview=invoices&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'invoices' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Invoices" %}</a>
+        <a href="{% url 'quickbooks_center' %}?preview=credit_memos&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'credit_memos' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Credit memos" %}</a>
+        <a href="{% url 'quickbooks_center' %}?preview=purchase_orders&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'purchase_orders' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Purchase orders" %}</a>
+        <a href="{% url 'quickbooks_center' %}?preview=bills&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'bills' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Bills" %}</a>
       </div>
     </div>
 
@@ -1018,7 +1028,7 @@
     {% endif %}
   </section>
 
-  <section class="qb-section-card p-4 p-xl-5 mb-4">
+  <section class="qb-section-card p-4 p-xl-5 mb-4{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
     <div class="row g-4 align-items-start">
       <div class="col-xl-4">
         <h3 class="mb-2">{% trans "Supplier PO / Pre-PO" %}</h3>
@@ -1071,7 +1081,7 @@
     </div>
   </section>
 
-  <section class="qb-section-card p-4 p-xl-5 mb-4">
+  <section class="qb-section-card p-4 p-xl-5 mb-4{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
     <div class="row g-4 align-items-start">
       <div class="col-xl-4">
         <h3 class="mb-2">{% trans "Send local records to QuickBooks" %}</h3>
@@ -1111,7 +1121,7 @@
           <div class="col-md-6">
             <div class="qb-action-item h-100">
               <label class="form-label fw-semibold">{% trans "Send one catalog item" %}</label>
-              <form method="post" action="{% url 'quickbooks_sync_products_batch' %}" data-qb-sync-products="1" class="d-grid gap-2">
+              <form method="post" action="{% url 'quickbooks_sync_products_batch' %}" class="d-grid gap-2">
                 {% csrf_token %}
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
                 <select name="ids" class="form-select">
@@ -1121,10 +1131,7 @@
                   <option value="">{% trans "No pending items" %}</option>
                   {% endfor %}
                 </select>
-                <div class="d-flex gap-2">
-                  <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_presentations %}disabled{% endif %}>{% trans "Sync item now" %}</button>
-                  <button type="button" id="btn-sync-all-items" class="btn btn-primary" {% if not quickbooks_pending_presentations %}disabled{% endif %}>{% trans "Sync all pending items" %}</button>
-                </div>
+                <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_presentations %}disabled{% endif %}>{% trans "Sync item now" %}</button>
               </form>
               <p class="qb-action-note">{% trans "Use this when the product must exist in QuickBooks before sending invoices." %}</p>
             </div>
@@ -1181,7 +1188,7 @@
           <div class="col-md-6">
             <div class="qb-action-item h-100">
               <label class="form-label fw-semibold">{% trans "Advanced batch: presentation IDs" %}</label>
-              <form method="post" action="{% url 'quickbooks_sync_products_batch' %}" data-qb-sync-products="1" class="d-grid gap-2">
+              <form method="post" action="{% url 'quickbooks_sync_products_batch' %}" class="d-grid gap-2">
                 {% csrf_token %}
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
                 <textarea name="ids" rows="2" class="form-control" placeholder="1, 2, 3"></textarea>
@@ -1343,8 +1350,8 @@
   <!-- QuickBooks async task overlay -->
   <div id="qb-task-overlay" style="display:none;position:fixed;inset:0;background:rgba(4,12,30,0.6);backdrop-filter:blur(4px);z-index:1050;align-items:center;justify-content:center;">
     <div style="max-width:520px;width:92%;background:linear-gradient(180deg,#ffffff,#f1fbff);border-radius:18px;padding:28px 26px;box-shadow:0 30px 60px rgba(2,16,52,0.5);text-align:center;color:#102a63;">
-      <div id="qb-task-title" style="font-weight:800;font-size:28px;margin-bottom:6px;">Procesando</div>
-      <div id="qb-task-desc" style="color:#4f6484;margin-bottom:16px;">Por favor espere. Esta operación puede tardar unos segundos.</div>
+      <div style="font-weight:800;font-size:28px;margin-bottom:6px;">Cargando</div>
+      <div style="color:#4f6484;margin-bottom:16px;">Estamos importando datos desde QuickBooks. Este proceso puede tardar unos segundos.</div>
       <div style="position:relative;height:18px;background:linear-gradient(90deg,#e6f7ff,#dff3ff);border-radius:999px;overflow:hidden;margin:14px 0;">
         <div id="qb-task-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#1f6fd1,#73d7ff);transition:width 400ms ease;"></div>
       </div>
@@ -1405,12 +1412,7 @@
           if (data.status === 'running'){
             const displayTarget = Math.max(lastKnown, 85);
             animateTo(displayTarget);
-            // show operation-specific running message
-            if (data.operation === 'sync_products_batch'){
-              message.textContent = 'Exportando a QuickBooks — por favor espera.';
-            } else {
-              message.textContent = 'Importando — por favor espera.';
-            }
+            message.textContent = 'Importando — por favor espera.';
             setTimeout(poll, 900);
             return;
           }
@@ -1429,16 +1431,7 @@
                 details = parts.join(' · ');
               }
             }catch(e){ details = ''; }
-            // operation-specific success message and title
-            if (data.operation === 'sync_products_batch'){
-              document.getElementById('qb-task-title').textContent = 'Exportación completada';
-              message.textContent = 'Exportación completada correctamente.';
-              document.getElementById('qb-task-desc').textContent = 'Se han enviado los productos a QuickBooks.';
-            } else {
-              document.getElementById('qb-task-title').textContent = 'Completado';
-              message.textContent = 'Completado correctamente.';
-              document.getElementById('qb-task-desc').textContent = '';
-            }
+            message.textContent = 'Completado correctamente.';
             if (details) { document.getElementById('qb-task-result-details').textContent = details; document.getElementById('qb-task-result-details').style.display = 'block'; }
             // show up to 3 failed items with messages if provided
             try{
@@ -1468,16 +1461,7 @@
           }
           if (data.status === 'failed'){
             animateTo(100);
-            // operation-specific failure message and title
-            if (data.operation === 'sync_products_batch'){
-              document.getElementById('qb-task-title').textContent = 'Error en exportación';
-              message.textContent = 'Error exportando a QuickBooks: ' + (data.error || 'Error desconocido');
-              document.getElementById('qb-task-desc').textContent = '';
-            } else {
-              document.getElementById('qb-task-title').textContent = 'Ha ocurrido un error';
-              message.textContent = 'Ha ocurrido un error: ' + (data.error || 'Error desconocido');
-              document.getElementById('qb-task-desc').textContent = '';
-            }
+            message.textContent = 'Ha ocurrido un error: ' + (data.error || 'Error desconocido');
             document.getElementById('qb-task-result-details').textContent = '';
             document.getElementById('qb-task-result-details').style.display = 'none';
             cancelBtn.style.display = 'inline-block';
@@ -1541,35 +1525,6 @@
         }).catch(function(){ message.textContent = 'Error iniciando la tarea.'; });
       });
     });
-
-    // 'Sync all pending items' button
-    var syncAllBtn = document.getElementById('btn-sync-all-items');
-    if (syncAllBtn){
-      syncAllBtn.addEventListener('click', function(){
-        var csrftoken = getCookie('csrftoken');
-        showOverlay();
-        setProgress(6);
-        // indicate exporting mode
-        document.getElementById('qb-task-title').textContent = 'Exportando a QuickBooks';
-        document.getElementById('qb-task-desc').textContent = 'Enviando producto(s) al catálogo de QuickBooks. No cierre esta ventana.';
-        message.textContent = 'Iniciando sincronización de items...';
-        fetch('{% url "quickbooks_start_products_sync" %}', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: {
-            'X-CSRFToken': csrftoken,
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-          },
-          body: new URLSearchParams({ids: ''})
-        }).then(function(r){ return r.json(); }).then(function(json){
-          if (json && json.task_id){
-            startPolling(json.task_id);
-          } else {
-            message.textContent = 'No se pudo iniciar la tarea.';
-          }
-        }).catch(function(){ message.textContent = 'Error iniciando la tarea.'; });
-      });
-    }
   })();
   </script>
 

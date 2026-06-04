@@ -1,4 +1,4 @@
-{% load static %}
+{% load static i18n %}
 
 <!-- Header con logo -->
 <div class="text-center mb-3">
@@ -10,8 +10,8 @@
 
 <!-- Título -->
 <div class="text-center mb-4">
-  <h6 class="fw-bold text-primary mb-1">Acceso a Plataforma</h6>
-  <small class="text-muted">Inicia sesión con tu perfil asignado.</small>
+  <h6 class="fw-bold text-primary mb-1">{% trans "Platform access" %}</h6>
+  <small class="text-muted">{% trans "Sign in with your assigned profile." %}</small>
 </div>
 
 <!-- Mensajes de error -->
@@ -33,7 +33,7 @@
       type="text" 
       name="username" 
       class="form-control" 
-      placeholder="Usuario"
+      placeholder="{% trans 'Username' %}"
       id="username"
       required
     >
@@ -44,7 +44,7 @@
       type="password" 
       name="password" 
       class="form-control pe-5" 
-      placeholder="Contraseña"
+      placeholder="{% trans 'Password' %}"
       id="password"
       required
     />
@@ -60,18 +60,18 @@
   <div class="mb-3 form-check">
     <input type="checkbox" class="form-check-input" id="rememberMe" name="remember">
     <label class="form-check-label" for="rememberMe">
-      Recuérdame
+      {% trans "Remember me" %}
     </label>
   </div>
 
-  <button type="submit" class="btn btn-yellow w-100 fw-bold">Iniciar Sesión</button>
+  <button type="submit" class="btn btn-yellow w-100 fw-bold">{% trans "Sign in" %}</button>
 </form>
 
 <hr class="my-3">
 
 <p class="text-center text-muted small mb-0">
-  ¿No tienes cuenta? 
-  <a href="#" class="fw-bold text-primary" onclick="cargarRegistro(); return false;">Regístrate aquí</a>
+  {% trans "Don't have an account?" %}
+  <a href="#" class="fw-bold text-primary" onclick="cargarRegistro(); return false;">{% trans "Sign up here" %}</a>
 </p>
 
 <script>
@@ -112,13 +112,13 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
       // Mostrar error
       const alertDiv = document.createElement('div');
       alertDiv.className = 'alert alert-danger alert-dismissible fade show';
-      alertDiv.innerHTML = '<strong>Error:</strong> ' + data.error + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
+      alertDiv.innerHTML = '<strong>{% trans "Error:" %}</strong> ' + data.error + '<button type="button" class="btn-close" data-bs-dismiss="alert"></button>';
       document.getElementById('loginForm').parentElement.insertBefore(alertDiv, document.getElementById('loginForm'));
     }
   })
   .catch(error => {
     console.error('Error:', error);
-    alert('Error al iniciar sesión');
+    alert('{% trans "Error signing in." %}');
   });
 });
 </script>

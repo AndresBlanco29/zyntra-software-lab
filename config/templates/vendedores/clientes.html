@@ -9,54 +9,88 @@
 
 <link rel="stylesheet" href="{% static 'css/clientes.css' %}">
 
-<div class="d-flex justify-content-between align-items-center mb-3 clientes-toolbar">
-    
-<div>
-
-<h3 class="fw-bold mb-0">{% trans "Clientes" %}</h3>
-
-<small class="text-muted">
-{% trans "Consulta datos del cliente" %}
-</small>
-
-</div>
-
-<div class="d-flex gap-2 mb-3 clientes-filters">
-
-<input 
-type="search"
-id="buscadorClientes"
-class="form-control"
-placeholder="{% trans 'Buscar por nombre, empresa o documento' %}"
+<div
+  class="vendor-shell vendor-shell--customers"
+  id="clientesPage"
+  data-msg-fill-all-fields="{% trans 'Please complete all fields.' %}"
+  data-msg-invalid-email="{% trans 'Please enter a valid email address.' %}"
+  data-msg-invalid-phone="{% trans 'Phone number must contain exactly 10 digits.' %}"
+  data-msg-update-error-prefix="{% trans 'Error updating:' %}"
+  data-msg-unknown-error="{% trans 'Unknown error.' %}"
+  data-msg-request-error="{% trans 'Error processing the request.' %}"
+  data-msg-deactivate-customer-title="{% trans 'Deactivate customer' %}"
+  data-msg-deactivate-customer-question="{% trans 'Do you want to deactivate {name}?' %}"
+  data-msg-deactivate-action="{% trans 'Deactivate' %}"
+  data-msg-activate-customer-title="{% trans 'Activate customer' %}"
+  data-msg-activate-customer-question="{% trans 'Do you want to activate {name}?' %}"
+  data-msg-activate-action="{% trans 'Activate' %}"
+  data-msg-action-error-prefix="{% trans 'Error:' %}"
+  data-msg-action-incomplete="{% trans 'Could not complete the action.' %}"
+  data-msg-customer-fallback-name="{% trans 'customer' %}"
+  data-msg-customer-deactivated-title="{% trans 'Customer deactivated' %}"
+  data-msg-customer-deactivated-body="{% trans 'The customer was deactivated successfully.' %}"
+  data-msg-customer-activated-title="{% trans 'Customer activated' %}"
+  data-msg-customer-activated-body="{% trans 'The customer was activated successfully.' %}"
 >
 
-<select id="filtroEstado" class="form-select" style="max-width:180px;">
+<section class="vendor-hero vendor-hero--customers mb-4">
+  <div>
+    <span class="vendor-eyebrow">{% trans "Sales" %}</span>
+    <h3 class="vendor-hero-title mb-1">{% trans "Clientes" %}</h3>
+    <p class="vendor-hero-copy mb-0">{% trans "Consulta datos del cliente" %}</p>
+  </div>
+  <div class="vendor-hero-stats">
+    <div class="vendor-stat-pill">
+      <span class="vendor-stat-pill-value">{{ clientes|length }}</span>
+      <span class="vendor-stat-pill-label">{% trans "Customers" %}</span>
+    </div>
+  </div>
+</section>
 
-<option value="">
-{% trans "Todos" %}
-</option>
+<section class="vendor-filter-panel mb-4">
+  <div class="d-flex justify-content-between align-items-center clientes-toolbar gap-3">
+    <div>
+      <div class="vendor-panel-title">{% trans "Customer directory" %}</div>
+      <small class="vendor-panel-copy">{% trans "Search, filter and review your customer base quickly." %}</small>
+    </div>
 
-<option value="activo">
-{% trans "Activos" %}
-</option>
+    <div class="d-flex gap-2 mb-0 clientes-filters">
+      <input 
+      type="search"
+      id="buscadorClientes"
+      class="form-control vendor-search-input"
+      placeholder="{% trans 'Buscar por nombre, empresa o documento' %}"
+      >
 
-<option value="inactivo">
-{% trans "Inactivos" %}
-</option>
+      <select id="filtroEstado" class="form-select vendor-filter-select">
+        <option value="">
+        {% trans "Todos" %}
+        </option>
 
-</select>
+        <option value="activo">
+        {% trans "Activos" %}
+        </option>
 
-</div>
-
-</div>
-
-<hr />
+        <option value="inactivo">
+        {% trans "Inactivos" %}
+        </option>
+      </select>
+    </div>
+  </div>
+</section>
 
 <div class="d-flex justify-content-center">
 
-<div class="card custom-card w-100">
+<div class="card custom-card vendor-table-card w-100">
 
 <div class="card-body p-0">
+
+<div class="vendor-table-head">
+  <div>
+    <h4 class="mb-1">{% trans "Customer list" %}</h4>
+    <p class="mb-0">{% trans "Clear, organized information for each account." %}</p>
+  </div>
+</div>
 
 <div class="table-responsive mobile-stack-responsive">
 
@@ -66,15 +100,13 @@ placeholder="{% trans 'Buscar por nombre, empresa o documento' %}"
 
 <tr>
 
-<th>{% trans "Cliente" %}</th>
+<th>Name</th>
 
-<th>{% trans "Empresa" %}</th>
+<th>Company Name</th>
 
-<th>{% trans "Correo Electrónico" %}</th>
+<th>PHONE</th>
 
-<th>{% trans "Teléfono" %}</th>
-
-<th>{% trans "Estado" %}</th>
+<th>Balance</th>
 
 <th>{% trans "Acción" %}</th>
 
@@ -87,46 +119,32 @@ placeholder="{% trans 'Buscar por nombre, empresa o documento' %}"
 {% for cliente in clientes %}
 
 <tr
-data-nombre="{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}"
+data-nombre="{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa }}"
 data-empresa="{{ cliente.nombre_empresa }}"
 data-correo="{{ cliente.usuario.email }}"
 data-telefono="{{ cliente.telefono }}"
 data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 >
 
-<td data-label="{% trans 'Cliente' %}">{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}</td>
-
-<td data-label="{% trans 'Empresa' %}">{{ cliente.nombre_empresa }}</td>
-
-<td data-label="{% trans 'Correo Electrónico' %}">{{ cliente.usuario.email }}</td>
-
-<td data-label="{% trans 'Teléfono' %}">{{ cliente.telefono }}</td>
-
-<td data-label="{% trans 'Estado' %}">
-
-{% if cliente.aprobado %}
-
-<span class="badge bg-success">
-{% trans "Activo" %}
-</span>
-
-{% else %}
-
-<span class="badge bg-danger">
-{% trans "Inactivo" %}
-</span>
-
-{% endif %}
-
+<td data-label="Name">
+  <div class="vendor-person-name">{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa }}</div>
 </td>
+
+<td data-label="Company Name">
+  <div class="vendor-company-name">{{ cliente.nombre_empresa }}</div>
+</td>
+
+<td data-label="PHONE" class="vendor-muted-cell">{{ cliente.telefono }}</td>
+
+<td data-label="Balance" class="vendor-muted-cell">${{ cliente.balance|floatformat:2 }}</td>
 
 <td data-label="{% trans 'Acción' %}" class="mobile-stack-table__action clientes-acciones-cell">
 
 <div class="clientes-acciones-group">
 
-<button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editarClienteModal"
+<button class="btn btn-primary btn-sm vendor-action-btn" data-bs-toggle="modal" data-bs-target="#editarClienteModal"
   data-cliente-id="{{ cliente.id }}"
-  data-cliente-nombre="{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}"
+  data-cliente-nombre="{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa }}"
   data-cliente-empresa="{{ cliente.nombre_empresa }}"
   data-cliente-correo="{{ cliente.usuario.email }}"
   data-cliente-telefono="{{ cliente.telefono }}"
@@ -141,13 +159,13 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 
 {% if request.user.is_superuser or request.user.role == 'admin' %}
   {% if cliente.aprobado %}
-  <button class="btn btn-danger btn-sm"
-    onclick="abrirModalEstadoCliente({{ cliente.id }}, '{{ cliente.usuario.first_name|escapejs }} {{ cliente.usuario.last_name|escapejs }}', 'desactivar')">
+  <button class="btn btn-danger btn-sm vendor-secondary-btn"
+    onclick="abrirModalEstadoCliente({{ cliente.id }}, '{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa|escapejs }}', 'desactivar')">
     {% trans "Desactivar" %}
   </button>
   {% else %}
-  <button class="btn btn-success btn-sm"
-    onclick="abrirModalEstadoCliente({{ cliente.id }}, '{{ cliente.usuario.first_name|escapejs }} {{ cliente.usuario.last_name|escapejs }}', 'activar')">
+  <button class="btn btn-success btn-sm vendor-secondary-btn is-success"
+    onclick="abrirModalEstadoCliente({{ cliente.id }}, '{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa|escapejs }}', 'activar')">
     {% trans "Activar" %}
   </button>
   {% endif %}
@@ -162,7 +180,7 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 {% empty %}
 
 <tr>
-<td colspan="6" class="text-center text-muted py-4 mobile-stack-table__empty">
+<td colspan="5" class="text-center text-muted py-4 mobile-stack-table__empty vendor-empty-cell">
 {% trans "No hay clientes registrados." %}
 </td>
 </tr>
@@ -176,6 +194,8 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 </div>
 
 </div>
+</div>
+
 </div>
 
 </div>
@@ -261,8 +281,8 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
         <button type="button" class="btn-close btn-close-white position-absolute" style="top: 10px; right: 15px;" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body text-center p-4">
-        <h5 class="fw-bold mb-2" style="color: #0b3d91;">¡Cliente Actualizado!</h5>
-        <p class="text-muted">Los datos del cliente se han actualizado correctamente.</p>
+        <h5 class="fw-bold mb-2" style="color: #0b3d91;">{% trans "Customer Updated!" %}</h5>
+        <p class="text-muted">{% trans "The customer data was updated successfully." %}</p>
       </div>
       <div class="modal-footer border-0 justify-content-center pb-3">
         <button type="button" class="btn" style="background: linear-gradient(to right, #0b3d91, #1565c0); color: white; font-weight: 700; padding: 10px 25px;" data-bs-dismiss="modal">{% trans "Cerrar" %}</button>
@@ -276,7 +296,7 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.14);">
       <div class="modal-header border-0" style="background: linear-gradient(135deg, #0b3d91, #1565c0); border-radius: 12px 12px 0 0;">
-        <h5 class="modal-title text-white fw-bold" id="tituloConfirmarEstadoCliente">Confirmar acción</h5>
+        <h5 class="modal-title text-white fw-bold" id="tituloConfirmarEstadoCliente">{% trans "Confirm action" %}</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body text-center p-4">

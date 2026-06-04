@@ -28,10 +28,10 @@ const csrf = (
 const actualizarURL = document.body.dataset.actualizarUrl
 const eliminarURL = document.body.dataset.eliminarUrl
 const enviarURL = document.body.dataset.enviarUrl
-const orderTypeMessage = document.body.dataset.msgOrderType || 'Debes indicar cómo se tomó la orden'
-const submitErrorMessage = document.body.dataset.msgSubmitError || 'No se pudo generar el pedido.'
-const removeErrorMessage = document.body.dataset.msgRemoveError || 'No se pudo eliminar el producto del pedido.'
-const requestErrorMessage = document.body.dataset.msgRequestError || 'Ocurrió un error procesando la solicitud.'
+const orderTypeMessage = document.body.dataset.msgOrderType || 'You must indicate how the order was taken.'
+const submitErrorMessage = document.body.dataset.msgSubmitError || 'The order could not be created.'
+const removeErrorMessage = document.body.dataset.msgRemoveError || 'The product could not be removed from the order.'
+const requestErrorMessage = document.body.dataset.msgRequestError || 'An error occurred while processing the request.'
 const feedbackBox = document.getElementById('pedidoFeedback')
 
 function formatMoney(value) {

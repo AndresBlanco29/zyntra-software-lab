@@ -287,10 +287,10 @@ def health(request):
 
 
 def privacy_policy(request):
-    """Render the public privacy policy page."""
+    """Página de Privacy Policy simple para integraciones (QuickBooks)."""
     return render(request, "privacy.html", {})
 
 
 def terms_of_service(request):
-    """Render the public terms of service page."""
+    """Página de Terms of Service simple."""
     return render(request, "terms.html", {})

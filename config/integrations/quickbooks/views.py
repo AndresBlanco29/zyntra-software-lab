@@ -1,4 +1,5 @@
 import logging
+from functools import wraps
 from pathlib import Path
 
 from django.contrib import messages
@@ -8,6 +9,7 @@ from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import transaction
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateformat import format as date_format
 from django.utils.dateparse import parse_date
@@ -30,8 +32,10 @@ from config.integrations.backups import (
     open_database_backup,
     open_system_backup,
     restore_database_backup_file,
+    restore_database_backup_upload,
 )
 
+from .auth import QuickBooksConfigurationError, quickbooks_credentials_configured, quickbooks_credentials_setup_message
 from .client import QuickBooksAPIClient, QuickBooksAPIError
 from .services import QuickBooksServiceError, get_connection, get_connection_status, get_oauth_login_url, handle_oauth_callback
 from .sync import (
@@ -70,6 +74,33 @@ from django.core.cache import cache
 
 
 logger = logging.getLogger(__name__)
+
+CATALOG_ONLY_BLOCKED_MESSAGE = _(
+    'This QuickBooks action is disabled while catalog-only mode is active. '
+    'Only catalog preview and import are enabled.'
+)
+
+
+def _quickbooks_catalog_only_enabled():
+    return getattr(settings, 'QUICKBOOKS_CATALOG_ONLY_MODE', True)
+
+
+def _guard_quickbooks_catalog_only(request, *, operation='quickbooks'):
+    if not _quickbooks_catalog_only_enabled():
+        return None
+    return _response_or_redirect(request, operation=operation, error=CATALOG_ONLY_BLOCKED_MESSAGE, status_code=403)
+
+
+def quickbooks_requires_full_mode(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        blocked = _guard_quickbooks_catalog_only(request, operation=view_func.__name__)
+        if blocked is not None:
+            return blocked
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
+
 
 BACKUP_SCHEDULE_CHOICES = (
     ('daily', 'Daily'),
@@ -136,6 +167,7 @@ def _build_backup_history(limit=8):
             'name': backup['name'],
             'size_label': _format_backup_size(backup['size_bytes']),
             'modified_label': date_format(timezone.localtime(backup['modified_at']), 'Y-m-d H:i'),
+            'download_url_name': 'quickbooks_database_backup_download',
         })
     return history
 
@@ -147,6 +179,7 @@ def _build_system_backup_history(limit=8):
             'name': backup['name'],
             'size_label': _format_backup_size(backup['size_bytes']),
             'modified_label': date_format(timezone.localtime(backup['modified_at']), 'Y-m-d H:i'),
+            'download_url_name': 'system_backup_download',
         })
     return history
 
@@ -524,6 +557,16 @@ def _parse_quickbooks_import_limit(raw_value, *, default=None):
 
 def _build_quickbooks_preview_context(*, request):
     preview_type = str(request.GET.get('preview') or '').strip().lower()
+    if preview_type and _quickbooks_catalog_only_enabled() and preview_type != 'items':
+        return {
+            'quickbooks_preview_type': preview_type,
+            'quickbooks_preview_title': _('Preview disabled'),
+            'quickbooks_preview_help': '',
+            'quickbooks_preview_columns': [],
+            'quickbooks_preview_rows': [],
+            'quickbooks_preview_limit': _quickbooks_center_preview_limit(request),
+            'quickbooks_preview_error': CATALOG_ONLY_BLOCKED_MESSAGE,
+        }
     if not preview_type:
         return {
             'quickbooks_preview_type': '',
@@ -657,6 +700,7 @@ def _build_quickbooks_center_context(*, request):
             sync_cursors.append({'label': label, 'value': raw_cursors[key]})
 
     return {
+        'quickbooks_catalog_only_mode': _quickbooks_catalog_only_enabled(),
         'quickbooks_status': get_connection_status(),
         'quickbooks_recent_conflicts': conflicts[:5],
         'quickbooks_active_conflicts_count': conflicts.filter(status=QuickBooksImportConflict.STATUS_CONFLICT).count(),
@@ -680,6 +724,70 @@ def database_backups_center(request):
     return render(request, 'backoffice/database_backups.html', _build_database_backups_context(request=request))
 
 
+def _validate_restore_confirmation(request):
+    confirmation = str(request.POST.get('confirmation') or '').strip().upper()
+    replace_current_data = request.POST.get('replace_current_data') == 'yes'
+    if not replace_current_data:
+        messages.error(request, _('Confirm that the current data will be replaced before restoring.'))
+        return False
+    if confirmation != 'RESTORE':
+        messages.error(request, _('Type RESTORE exactly to confirm the restore operation.'))
+        return False
+    return True
+
+
+@require_POST
+@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+def create_database_backup_stored(request):
+    try:
+        _, backup_name = create_database_backup_file(label='manual')
+    except Exception as exc:
+        logger.exception('Manual database backup failed: %s', exc)
+        messages.error(request, _('Database backup could not be created.'))
+        return redirect('database_backups_center')
+    messages.success(
+        request,
+        _('Database backup created and saved on the server: %(name)s') % {'name': backup_name},
+    )
+    return redirect('database_backups_center')
+
+
+@require_POST
+@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+def create_system_backup_stored(request):
+    try:
+        _, backup_name = create_system_backup_file(label='manual')
+    except Exception as exc:
+        logger.exception('Manual system backup failed: %s', exc)
+        messages.error(request, _('System backup could not be created.'))
+        return redirect('database_backups_center')
+    messages.success(
+        request,
+        _('System backup created and saved on the server: %(name)s') % {'name': backup_name},
+    )
+    return redirect('database_backups_center')
+
+
+@require_POST
+@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+def restore_backup_upload(request):
+    uploaded_file = request.FILES.get('backup_file')
+    if uploaded_file is None or not str(uploaded_file.name or '').strip():
+        messages.error(request, _('Select a backup file to upload before restoring.'))
+        return redirect('database_backups_center')
+    if not _validate_restore_confirmation(request):
+        return redirect('database_backups_center')
+
+    try:
+        restored_name = restore_database_backup_upload(uploaded_file=uploaded_file, flush=True)
+    except DatabaseBackupError as exc:
+        logger.warning('Backup restore from upload failed: %s', exc)
+        messages.error(request, str(exc))
+        return redirect('database_backups_center')
+
+    return _render_restore_completion(restored_name)
+
+
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def update_backup_schedule_preference(request):
@@ -692,9 +800,13 @@ def update_backup_schedule_preference(request):
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def quickbooks_login(request):
+    if not quickbooks_credentials_configured():
+        messages.error(request, quickbooks_credentials_setup_message())
+        redirect_to = _resolve_dashboard_redirect(request) or reverse('quickbooks_center')
+        return redirect(redirect_to)
     try:
         oauth_url = get_oauth_login_url(request=request)
-    except QuickBooksServiceError as exc:
+    except (QuickBooksServiceError, QuickBooksConfigurationError) as exc:
         messages.error(request, str(exc))
         return redirect(get_redirect_url_for_user(request.user))
     return redirect(oauth_url)
@@ -730,6 +842,12 @@ def quickbooks_status(request):
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def quickbooks_test_connection(request):
+    if not quickbooks_credentials_configured():
+        setup_message = quickbooks_credentials_setup_message()
+        if _resolve_dashboard_redirect(request):
+            return _response_or_redirect(request, operation='test_connection', error=setup_message, status_code=503)
+        return JsonResponse(_status_payload(connection_status=get_connection_status(), error=setup_message), status=503)
+
     connection = get_connection()
     if not connection.is_active:
         if _resolve_dashboard_redirect(request):
@@ -737,6 +855,11 @@ def quickbooks_test_connection(request):
         return JsonResponse(_status_payload(connection_status=get_connection_status(), error='QuickBooks is not connected yet.'), status=503)
     try:
         company = QuickBooksAPIClient(connection=connection).get_company_info()
+    except QuickBooksConfigurationError as exc:
+        logger.warning('QuickBooks test connection blocked: %s', exc)
+        if _resolve_dashboard_redirect(request):
+            return _response_or_redirect(request, operation='test_connection', error=str(exc), status_code=503)
+        return JsonResponse(_status_payload(connection_status=get_connection_status(), error=str(exc)), status=503)
     except (QuickBooksServiceError, QuickBooksAPIError) as exc:
         logger.warning('QuickBooks test connection failed: %s', exc)
         if _resolve_dashboard_redirect(request):
@@ -750,32 +873,7 @@ def quickbooks_test_connection(request):
 
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
-def quickbooks_disconnect(request):
-    """Clear QuickBooks connection tokens and realm, effectively disconnecting the app."""
-    try:
-        connection = get_connection()
-        connection.access_token = ''
-        connection.refresh_token = ''
-        connection.realm_id = ''
-        connection.access_token_expires_at = None
-        connection.refresh_token_expires_at = None
-        connection.connected_at = None
-        connection.last_refreshed_at = None
-        connection.last_error = 'Disconnected by user.'
-        connection.save(update_fields=[
-            'access_token', 'refresh_token', 'realm_id',
-            'access_token_expires_at', 'refresh_token_expires_at',
-            'connected_at', 'last_refreshed_at', 'last_error', 'updated_at'
-        ])
-        messages.success(request, 'QuickBooks disconnected successfully.')
-    except Exception as exc:
-        logger.warning('QuickBooks disconnect failed: %s', exc)
-        messages.error(request, 'QuickBooks disconnection failed.')
-    return redirect(get_redirect_url_for_user(request.user))
-
-
-@require_GET
-@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_import_customers(request):
     try:
         result = fetch_quickbooks_customers(max_results=_parse_quickbooks_import_limit(request.GET.get('limit'), default=None))
@@ -787,6 +885,7 @@ def quickbooks_import_customers(request):
 
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_import_vendors(request):
     try:
         result = fetch_quickbooks_vendors(max_results=request.GET.get('limit', 25))
@@ -798,6 +897,7 @@ def quickbooks_import_vendors(request):
 
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_import_items(request):
     try:
         result = fetch_quickbooks_items(max_results=request.GET.get('limit', 25))
@@ -809,6 +909,7 @@ def quickbooks_import_items(request):
 
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_import_bills(request):
     try:
         result = fetch_quickbooks_bills(max_results=request.GET.get('limit', 25))
@@ -820,6 +921,7 @@ def quickbooks_import_bills(request):
 
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_import_purchase_orders(request):
     try:
         result = fetch_quickbooks_purchase_orders(max_results=request.GET.get('limit', 25))
@@ -831,6 +933,7 @@ def quickbooks_import_purchase_orders(request):
 
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_import_customers_to_local(request):
     try:
         result = import_quickbooks_customers(max_results=_parse_quickbooks_import_limit(request.POST.get('limit'), default=None))
@@ -842,6 +945,7 @@ def quickbooks_import_customers_to_local(request):
 
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_import_vendors_to_local(request):
     try:
         result = import_quickbooks_vendors(max_results=int(request.POST.get('limit', 25) or 25))
@@ -864,6 +968,7 @@ def quickbooks_import_items_to_local(request):
 
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_import_bills_to_local(request):
     try:
         result = import_quickbooks_bills(max_results=int(request.POST.get('limit', 25) or 25))
@@ -875,6 +980,7 @@ def quickbooks_import_bills_to_local(request):
 
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_import_purchase_orders_to_local(request):
     try:
         result = import_quickbooks_purchase_orders(max_results=int(request.POST.get('limit', 25) or 25))
@@ -886,6 +992,7 @@ def quickbooks_import_purchase_orders_to_local(request):
 
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_import_invoices(request):
     try:
         result = fetch_quickbooks_invoices(max_results=request.GET.get('limit', 25))
@@ -897,6 +1004,7 @@ def quickbooks_import_invoices(request):
 
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_import_credit_memos(request):
     try:
         result = fetch_quickbooks_credit_memos(max_results=request.GET.get('limit', 25))
@@ -908,6 +1016,7 @@ def quickbooks_import_credit_memos(request):
 
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_import_accounting_documents_to_local(request):
     try:
         result = import_quickbooks_accounting_documents(
@@ -923,6 +1032,10 @@ def quickbooks_import_accounting_documents_to_local(request):
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def quickbooks_start_task(request):
     operation = str(request.POST.get('operation') or '').strip()
+    if _quickbooks_catalog_only_enabled() and operation != 'import_items_to_local':
+        blocked = _guard_quickbooks_catalog_only(request, operation='task_start')
+        if blocked is not None:
+            return blocked
     limit_raw = request.POST.get('limit')
     try:
         limit = _parse_quickbooks_import_limit(limit_raw, default=None)
@@ -969,61 +1082,6 @@ def quickbooks_start_task(request):
     return JsonResponse({'task_id': task_id})
 
 
-@require_POST
-@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
-def quickbooks_start_products_sync(request):
-    """Start a background task to sync multiple product presentations to QuickBooks.
-
-    Accepts POST parameter `ids` (CSV or newline separated). If empty, will sync all pending
-    presentations (where quickbooks_id is null).
-    Returns JSON: {"task_id": "..."}
-    """
-    try:
-        raw_ids = str(request.POST.get('ids') or '').strip()
-        if raw_ids:
-            # parse IDs similarly to existing parser
-            ids = [int(x.strip()) for x in raw_ids.replace('\n', ',').split(',') if x.strip()]
-        else:
-            # all pending presentations
-            ids = list(Presentacion.objects.filter(quickbooks_id__isnull=True).values_list('id', flat=True))
-    except Exception:
-        return _response_or_redirect(request, operation='start_products_sync', error='Invalid ids', status_code=400)
-
-    task_id = uuid.uuid4().hex
-    cache_key = f'quickbooks_task_{task_id}'
-    cache.set(cache_key, {'status': 'running', 'progress': 0, 'operation': 'sync_products_batch'}, timeout=60 * 60)
-
-    def _runner_products(task_key, presentation_ids):
-        total = len(presentation_ids)
-        results = []
-        try:
-            cache.set(task_key, {'status': 'running', 'progress': 1, 'operation': 'sync_products_batch'}, timeout=60 * 60)
-            for idx, pid in enumerate(presentation_ids):
-                try:
-                    res = sync_product_by_id(pid)
-                    results.append({'id': int(pid), 'ok': True, 'result': res})
-                except Exception as exc:
-                    results.append({'id': int(pid), 'ok': False, 'error': str(exc)})
-                # update progress
-                progress = int(((idx + 1) / total) * 100) if total else 100
-                cache.set(task_key, {'status': 'running', 'progress': progress, 'operation': 'sync_products_batch', 'last_results': results[-10:]}, timeout=60 * 60)
-
-            summary = {
-                'requested_ids': [int(x) for x in presentation_ids],
-                'success_count': sum(1 for r in results if r.get('ok')),
-                'failed_count': sum(1 for r in results if not r.get('ok')),
-                'results': results,
-            }
-            cache.set(task_key, {'status': 'completed', 'progress': 100, 'operation': 'sync_products_batch', 'result': summary}, timeout=60 * 60)
-        except Exception as exc:
-            cache.set(task_key, {'status': 'failed', 'progress': 100, 'operation': 'sync_products_batch', 'error': str(exc)}, timeout=60 * 60)
-
-    thread = threading.Thread(target=_runner_products, args=(cache_key, ids), daemon=True)
-    thread.start()
-
-    return JsonResponse({'task_id': task_id})
-
-
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def quickbooks_task_status(request, task_id):
@@ -1036,6 +1094,7 @@ def quickbooks_task_status(request, task_id):
 
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_pull_sync_to_local(request):
     try:
         result = pull_quickbooks_to_local(
@@ -1114,17 +1173,11 @@ def system_backup_download(request, backup_name):
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def restore_backup_from_center(request):
     backup_name = str(request.POST.get('backup_name') or '').strip()
-    confirmation = str(request.POST.get('confirmation') or '').strip().upper()
-    replace_current_data = request.POST.get('replace_current_data') == 'yes'
 
     if not backup_name:
-        messages.error(request, 'Select a backup file before restoring.')
+        messages.error(request, _('Select a backup file before restoring.'))
         return redirect('database_backups_center')
-    if not replace_current_data:
-        messages.error(request, 'Confirm that the current data will be replaced before restoring.')
-        return redirect('database_backups_center')
-    if confirmation != 'RESTORE':
-        messages.error(request, 'Type RESTORE exactly to confirm the restore operation.')
+    if not _validate_restore_confirmation(request):
         return redirect('database_backups_center')
 
     try:
@@ -1157,6 +1210,9 @@ def quickbooks_import_conflicts(request):
 def quickbooks_import_conflict_retry(request, conflict_id):
     try:
         conflict = QuickBooksImportConflict.objects.get(pk=conflict_id)
+        if _quickbooks_catalog_only_enabled() and conflict.entity_type != QuickBooksImportConflict.ENTITY_ITEM:
+            messages.error(request, CATALOG_ONLY_BLOCKED_MESSAGE)
+            return redirect(_conflicts_redirect_target(request))
         retry_quickbooks_import_conflict(conflict, user=request.user)
     except QuickBooksImportConflict.DoesNotExist:
         messages.error(request, 'QuickBooks conflict not found.')
@@ -1169,6 +1225,7 @@ def quickbooks_import_conflict_retry(request, conflict_id):
 
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_import_conflict_link(request, conflict_id):
     try:
         conflict = QuickBooksImportConflict.objects.get(pk=conflict_id)
@@ -1207,6 +1264,7 @@ def quickbooks_import_conflict_dismiss(request, conflict_id):
 
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_sync_customer(request, cliente_id):
     try:
         result = sync_customer_by_id(cliente_id)
@@ -1220,6 +1278,7 @@ def quickbooks_sync_customer(request, cliente_id):
 
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_sync_product(request, presentacion_id):
     try:
         result = sync_product_by_id(presentacion_id)
@@ -1233,6 +1292,7 @@ def quickbooks_sync_product(request, presentacion_id):
 
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_sync_invoice(request, invoice_id):
     try:
         result = sync_invoice_by_id(invoice_id)
@@ -1246,6 +1306,7 @@ def quickbooks_sync_invoice(request, invoice_id):
 
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_sync_adjustment_note(request, note_id):
     try:
         result = sync_adjustment_note_by_id(note_id)
@@ -1259,6 +1320,7 @@ def quickbooks_sync_adjustment_note(request, note_id):
 
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_sync_supplier_purchase_create(request):
     compra = None
     try:
@@ -1283,6 +1345,7 @@ def quickbooks_sync_supplier_purchase_create(request):
 
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_sync_customers_batch(request):
     try:
         result = sync_customer_batch_by_ids(_parse_id_list(request.POST.get('ids', '')))
@@ -1293,6 +1356,7 @@ def quickbooks_sync_customers_batch(request):
 
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_sync_products_batch(request):
     try:
         result = sync_product_batch_by_ids(_parse_id_list(request.POST.get('ids', '')))
@@ -1303,6 +1367,7 @@ def quickbooks_sync_products_batch(request):
 
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_sync_invoices_batch(request):
     try:
         result = sync_invoice_batch_by_ids(_parse_id_list(request.POST.get('ids', '')))
@@ -1313,6 +1378,7 @@ def quickbooks_sync_invoices_batch(request):
 
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
 def quickbooks_sync_adjustment_notes_batch(request):
     try:
         result = sync_adjustment_note_batch_by_ids(_parse_id_list(request.POST.get('ids', '')))

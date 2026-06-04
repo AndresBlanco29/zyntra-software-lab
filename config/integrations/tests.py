@@ -1,5 +1,6 @@
 import gzip
 import json
+import tempfile
 from decimal import Decimal
 from io import StringIO
 from pathlib import Path
@@ -434,6 +435,46 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertEqual(modified_at.month, 5)
         self.assertEqual(modified_at.day, 20)
 
+    def test_restore_backup_upload_restores_database_from_downloaded_file(self):
+        self.client.force_login(self.user)
+        backup_response = self.client.post(reverse('quickbooks_database_backup'))
+        backup_name = backup_response['Content-Disposition'].split('filename="', 1)[1].rstrip('"')
+        backup_bytes = b''.join(backup_response.streaming_content)
+
+        Producto.objects.filter(pk=self.presentacion.producto_id).delete()
+
+        with tempfile.NamedTemporaryFile(suffix='.json.gz', delete=False) as temp_file:
+            temp_file.write(backup_bytes)
+            temp_path = temp_file.name
+
+        try:
+            with open(temp_path, 'rb') as uploaded:
+                response = self.client.post(
+                    reverse('restore_backup_upload'),
+                    {
+                        'confirmation': 'RESTORE',
+                        'replace_current_data': 'yes',
+                        'backup_file': uploaded,
+                    },
+                )
+        finally:
+            Path(temp_path).unlink(missing_ok=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Restore completed')
+        self.assertTrue(Producto.objects.filter(nombre='Tortilla 12').exists())
+        self.assertTrue(
+            any(path.name == backup_name for path in (Path(default_storage.location) / 'backups' / 'database').glob('*.json.gz'))
+        )
+
+    def test_database_backups_center_shows_manual_backup_and_upload_restore(self):
+        response = self.client.get(reverse('database_backups_center'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse('create_database_backup_stored'))
+        self.assertContains(response, reverse('restore_backup_upload'))
+        self.assertContains(response, reverse('restore_backup_from_center'))
+
     def test_database_backups_center_restore_action_replaces_system_from_selected_backup(self):
         self.client.force_login(self.user)
         media_path = 'invoice-notes/ui-restore-proof.txt'
@@ -760,6 +801,35 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertEqual(credit_note.total, Decimal('10.00'))
         self.assertEqual(credit_note.cliente, self.cliente)
         self.assertFalse(QuickBooksImportConflict.objects.filter(quickbooks_id__in=['QB-INV-AUTO-1', 'QB-CM-AUTO-1']).exists())
+
+    @patch('config.integrations.quickbooks.client.requests.request')
+    def test_import_items_to_local_sets_physical_stock_from_qty_on_hand(self, mock_request):
+        self._activate_connection()
+        mock_request.return_value = self._json_response({
+            'QueryResponse': {
+                'Item': [
+                    {
+                        'Id': 'QB-ITEM-STOCK',
+                        'Name': 'cargador fake',
+                        'Type': 'Inventory',
+                        'Description': 'QuickBooks inventory item',
+                        'Sku': 'CHG-FAKE',
+                        'UnitPrice': 12.5,
+                        'PurchaseCost': 6.0,
+                        'QtyOnHand': 18,
+                        'Active': True,
+                    }
+                ]
+            }
+        })
+
+        response = self.client.post(reverse('quickbooks_import_items_to_local'), {'limit': '10'})
+
+        self.assertEqual(response.status_code, 200)
+        presentacion = Presentacion.objects.get(quickbooks_id='QB-ITEM-STOCK')
+        stock = StockPresentacion.objects.get(presentacion=presentacion)
+        self.assertEqual(stock.stock_fisico, 18)
+        self.assertEqual(stock.stock_disponible, 18)
 
 
 @override_settings(

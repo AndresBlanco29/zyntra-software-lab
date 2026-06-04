@@ -19,6 +19,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from config.clientes.models import Cliente
+from config.core.workflow_badges import build_delivery_workflow_badge
 from config.productos.models import Presentacion
 from config.core.pdf_branding import (
 	BRAND_BORDER,
@@ -29,6 +30,7 @@ from config.core.pdf_branding import (
 	BRAND_TEXT,
 	build_pdf_logo_image,
 )
+from config.integrations.quickbooks.sync import is_sync_locked
 from config.notificaciones.models import Notificacion
 from config.pedidos.models import Pedido
 from config.usuarios.models import Usuario
@@ -47,6 +49,7 @@ from .services import (
 	crear_nota_ajuste,
 	crear_nota_ajuste_desde_invoice,
 	ensure_delivery_for_invoice,
+	generar_invoice_directa_backoffice,
 	generar_invoice_desde_picking,
 	list_pending_customer_notes,
 	resolve_presentacion_suggested_unit_price,
@@ -59,6 +62,18 @@ from .services import (
 def _format_pdf_money(value):
 	amount = Decimal(str(value or '0')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 	return f'${amount:,.2f}'
+
+
+def _validate_invoice_is_not_quickbooks_locked(invoice):
+	if is_sync_locked(invoice):
+		raise ValidationError(_('Invoice %(invoice)s is locked because it is already synced with QuickBooks.') % {'invoice': invoice.numero})
+
+
+def _validate_note_is_not_quickbooks_locked(nota):
+	if is_sync_locked(nota):
+		raise ValidationError(_('Adjustment note %(note)s is locked because it is already synced with QuickBooks.') % {'note': nota.numero})
+	if nota.invoice_id:
+		_validate_invoice_is_not_quickbooks_locked(nota.invoice)
 
 
 def _resolve_invoice_barcode(item):
@@ -244,6 +259,103 @@ def _extract_adjustment_note_request(invoice, post_data, *, field_prefix=''):
 	has_note_request = bool(tipo_documento or motivo or tipo_credito or descripcion or has_item_data or monto > 0)
 	if not has_note_request:
 		return None
+
+
+def _parse_direct_invoice_lines(post_data):
+	raw_presentacion_ids = post_data.getlist('presentacion_id')
+	raw_quantities = post_data.getlist('cantidad')
+	raw_unit_prices = post_data.getlist('precio_unitario')
+
+	line_specs = []
+	for index, raw_presentacion_id in enumerate(raw_presentacion_ids):
+		presentacion_id = str(raw_presentacion_id or '').strip()
+		quantity = str(raw_quantities[index] if index < len(raw_quantities) else '').strip()
+		unit_price = str(raw_unit_prices[index] if index < len(raw_unit_prices) else '').strip()
+		if not any((presentacion_id, quantity, unit_price)):
+			continue
+		if not (presentacion_id and quantity and unit_price):
+			raise ValidationError(_('Each direct invoice line needs product, quantity, and unit price.'))
+		try:
+			parsed_presentacion_id = int(presentacion_id)
+			parsed_quantity = int(quantity)
+			parsed_unit_price = Decimal(unit_price)
+		except (TypeError, ValueError, InvalidOperation) as exc:
+			raise ValidationError(_('One or more direct invoice lines contain invalid values.')) from exc
+		if parsed_quantity <= 0:
+			raise ValidationError(_('Quantity must be greater than zero.'))
+		if parsed_unit_price <= 0:
+			raise ValidationError(_('Unit price must be greater than zero.'))
+		line_specs.append({
+			'presentacion_id': parsed_presentacion_id,
+			'cantidad': parsed_quantity,
+			'precio': parsed_unit_price,
+		})
+
+	if not line_specs:
+		raise ValidationError(_('Add at least one direct invoice line before saving.'))
+
+	presentaciones = {
+		presentacion.id: presentacion
+		for presentacion in Presentacion.objects.select_related('producto').filter(
+			id__in=[spec['presentacion_id'] for spec in line_specs]
+		)
+	}
+	if len(presentaciones) != len({spec['presentacion_id'] for spec in line_specs}):
+		raise ValidationError(_('One or more selected presentations no longer exist.'))
+
+	items_payload = []
+	for spec in line_specs:
+		items_payload.append({
+			'presentacion': presentaciones[spec['presentacion_id']],
+			'cantidad': spec['cantidad'],
+			'precio': spec['precio'],
+		})
+	return items_payload
+
+
+def _build_direct_invoice_line_drafts(post_data=None):
+	raw_presentacion_ids = post_data.getlist('presentacion_id') if post_data is not None else []
+	raw_quantities = post_data.getlist('cantidad') if post_data is not None else []
+	raw_unit_prices = post_data.getlist('precio_unitario') if post_data is not None else []
+	row_count = max(len(raw_presentacion_ids), len(raw_quantities), len(raw_unit_prices), 1)
+	return [{
+		'presentacion_id': str(raw_presentacion_ids[index] if index < len(raw_presentacion_ids) else '').strip(),
+		'cantidad': str(raw_quantities[index] if index < len(raw_quantities) else '').strip(),
+		'precio_unitario': str(raw_unit_prices[index] if index < len(raw_unit_prices) else '').strip(),
+	} for index in range(row_count)]
+
+
+def _build_direct_invoice_context(*, selected_client_id=None, post_data=None):
+	selected_client = None
+	if selected_client_id:
+		selected_client = Cliente.objects.filter(id=selected_client_id).first()
+	pending_notes_summary = summarize_pending_customer_notes(cliente=selected_client) if selected_client else None
+	default_price_tier = 1
+	if selected_client is not None:
+		try:
+			default_price_tier = max(1, min(5, int(selected_client.nivel_precio or 1)))
+		except (TypeError, ValueError):
+			default_price_tier = 1
+	selected_general_note_values = {}
+	if pending_notes_summary and post_data is not None:
+		selected_general_note_values = {
+			note.id: str(post_data.get(f'general_note_apply_{note.id}') or '').strip()
+			for note in pending_notes_summary['notes']
+		}
+		for note in pending_notes_summary['notes']:
+			note.prefill_amount = selected_general_note_values.get(note.id, '')
+	return {
+		'customers': Cliente.objects.order_by('nombre_empresa'),
+		'presentations': Presentacion.objects.select_related('producto').order_by('producto__nombre', 'nombre'),
+		'direct_invoice_lines': _build_direct_invoice_line_drafts(post_data),
+		'selected_client': selected_client,
+		'pending_notes_summary': pending_notes_summary,
+		'default_price_tier': default_price_tier,
+		'selected_delivery_method': str(post_data.get('metodo_entrega') if post_data is not None else 'CUSTOMER_PICK_UP' or 'CUSTOMER_PICK_UP').strip() or 'CUSTOMER_PICK_UP',
+		'backoffice_note_value': str(post_data.get('nota_backoffice') if post_data is not None else '' or '').strip(),
+		'use_customer_credit_checked': str(post_data.get('use_customer_credit') if post_data is not None else '').strip().lower() in {'1', 'true', 'on', 'yes'},
+		'customer_credit_to_apply_value': str(post_data.get('customer_credit_to_apply') if post_data is not None else '' or '').strip(),
+	}
 	if not tipo_documento:
 		raise ValidationError(_('Select a note type to save the adjustment.'))
 
@@ -318,6 +430,7 @@ def _build_adjustment_note_creation_context(*, selected_client_id=None, selected
 		'product_presentations': _build_note_product_presentations(selected_client),
 		'selected_client': selected_client,
 		'selected_invoice': selected_invoice,
+		'selected_invoice_quickbooks_locked': bool(selected_invoice and is_sync_locked(selected_invoice)),
 	}
 
 
@@ -539,11 +652,11 @@ def _invoice_pdf_response(invoice):
 				Spacer(1, 6),
 			])
 
-		rows = [[_('Barcode'), _('Description'), _('U/M'), _('Qty ord'), _('Qty dsp'), _('Cust. / unit'), _('Subtotal'), _('Sug. rtl / unit'), _('Profit %')]]
+		rows = [[_('Barcode'), _('Description'), _('U/M'), _('Qty ord'), _('Qty dsp'), _('Cust. / unit'), _('Subtotal'), _('SGT RTL / SRP 30%')]]
 		for item in chunk:
 			barcode_cell = Paragraph('-', body_style)
 			if item['barcode']:
-				barcode_cell = _build_invoice_pdf_barcode(item['barcode'])
+				barcode_cell = _build_invoice_pdf_barcode(item['barcode'], max_width=80)
 			rows.append([
 				barcode_cell,
 				Paragraph(item['product_name'], body_style),
@@ -553,10 +666,9 @@ def _invoice_pdf_response(invoice):
 				item['customer_price'],
 				item['subtotal'],
 				item['suggested_unit_price'],
-				item['profit_percentage'],
 			])
 
-		table = Table(rows, colWidths=[74, 108, 58, 34, 34, 56, 54, 64, 40], repeatRows=1)
+		table = Table(rows, colWidths=[88, 170, 34, 30, 30, 52, 52, 64], repeatRows=1)
 		table.setStyle(TableStyle([
 			('BACKGROUND', (0, 0), (-1, 0), BRAND_PRIMARY),
 			('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
@@ -755,6 +867,49 @@ def backoffice_invoices_list(request):
 
 
 @login_required
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_direct_invoice_create(request):
+	selected_client_id = request.GET.get('cliente_id') or request.POST.get('cliente_id') or ''
+	context = _build_direct_invoice_context(
+		selected_client_id=selected_client_id or None,
+		post_data=request.POST if request.method == 'POST' else None,
+	)
+
+	if request.method == 'POST':
+		selected_client = context.get('selected_client')
+		if selected_client is None:
+			messages.error(request, _('Select a customer before creating the direct invoice.'))
+			return render(request, 'backoffice/direct_invoice_create.html', context)
+		try:
+			metodo_entrega = str(request.POST.get('metodo_entrega') or '').strip()
+			items_payload = _parse_direct_invoice_lines(request.POST)
+			pending_notes_summary = summarize_pending_customer_notes(cliente=selected_client)
+			selected_note_applications = _parse_general_note_applications(selected_client, request.POST)
+			applied_customer_credit = _parse_customer_credit_to_apply(
+				selected_client,
+				request.POST,
+				available_credit=pending_notes_summary['available_credit_excluding_notes'],
+			)
+			invoice = generar_invoice_directa_backoffice(
+				cliente=selected_client,
+				items_payload=items_payload,
+				metodo_entrega=metodo_entrega,
+				usuario=request.user,
+				nota_backoffice=str(request.POST.get('nota_backoffice') or '').strip(),
+				applied_customer_credit=applied_customer_credit,
+				selected_note_applications=selected_note_applications,
+			)
+		except ValidationError as exc:
+			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+			return render(request, 'backoffice/direct_invoice_create.html', context)
+
+		messages.success(request, _('Direct invoice generated successfully.'))
+		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
+
+	return render(request, 'backoffice/direct_invoice_create.html', context)
+
+
+@login_required
 @internal_permission_required('backoffice.orders.view')
 def backoffice_adjustment_notes_list(request):
 	query = (request.GET.get('q') or '').strip()
@@ -852,6 +1007,8 @@ def backoffice_adjustment_note_create(request):
 			return render(request, 'backoffice/adjustment_note_create.html', context)
 
 		try:
+			if selected_invoice is not None:
+				_validate_invoice_is_not_quickbooks_locked(selected_invoice)
 			note_request = _extract_adjustment_note_request(selected_invoice, request.POST, field_prefix='note_')
 			if note_request is None:
 				raise ValidationError(_('Add note details before saving the adjustment.'))
@@ -943,6 +1100,7 @@ def backoffice_invoice_detail(request, invoice_id):
 		'invoice': invoice,
 		'driver_created_notes_count': driver_created_notes_count,
 		'advanced_adjustment_note_url': f"{reverse('backoffice_adjustment_note_create')}?cliente_id={invoice.cliente_id}&invoice_id={invoice.id}",
+		'invoice_quickbooks_locked': is_sync_locked(invoice),
 	})
 
 
@@ -1003,6 +1161,7 @@ def backoffice_invoice_create_note(request, invoice_id):
 		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
 
 	try:
+		_validate_invoice_is_not_quickbooks_locked(invoice)
 		note_request = _extract_adjustment_note_request(invoice, request.POST, field_prefix='note_')
 		if note_request is None:
 			raise ValidationError(_('Add note details before saving the adjustment.'))
@@ -1036,6 +1195,7 @@ def backoffice_invoice_approve_note(request, note_id):
 		return redirect(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}")
 
 	try:
+		_validate_note_is_not_quickbooks_locked(nota)
 		aprobar_nota_ajuste(nota=nota, usuario=request.user)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
@@ -1056,6 +1216,7 @@ def backoffice_invoice_cancel_note(request, note_id):
 		return redirect(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}")
 
 	try:
+		_validate_note_is_not_quickbooks_locked(nota)
 		anular_nota_ajuste(nota=nota)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
@@ -1095,6 +1256,8 @@ def driver_delivery_list(request):
 	else:
 		view_mode = 'active'
 		deliveries = _ordered_driver_deliveries(base_queryset.exclude(estado__in=completed_statuses))
+	for delivery in deliveries:
+		delivery.workflow_badge = build_delivery_workflow_badge(delivery)
 	return render(request, 'backoffice/driver_delivery_list.html', {
 		'deliveries': deliveries,
 		'view_mode': view_mode,
@@ -1111,6 +1274,7 @@ def driver_delivery_detail(request, delivery_id):
 		id=delivery_id,
 		driver=request.user,
 	)
+	delivery.workflow_badge = build_delivery_workflow_badge(delivery)
 	return render(request, 'backoffice/driver_delivery_detail.html', {
 		'delivery': delivery,
 		'invoice': delivery.invoice,

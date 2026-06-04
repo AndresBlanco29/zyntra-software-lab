@@ -2,12 +2,12 @@
 {% load i18n %}
 
 {% block title %}
-{% trans "Detalle Cliente" %}
+{% trans "Customer details" %}
 {% endblock %}
 
 {% block content %}
 
-<h2 class="mb-4">{% trans "Detalle del Cliente" %}</h2>
+<h2 class="mb-4">{% trans "Customer details" %}</h2>
 
 <div class="mb-3">
 {% if cliente.estado_revision == 'PENDIENTE' %}
@@ -26,32 +26,32 @@
 <div class="row">
 
 <div class="col-md-6 mb-3">
-<strong>{% trans "Empresa:" %}</strong><br>
+<strong>{% trans "Company:" %}</strong><br>
 {{ cliente.nombre_empresa }}
 </div>
 
 <div class="col-md-6 mb-3">
-<strong>{% trans "Correo:" %}</strong><br>
+<strong>{% trans "Email:" %}</strong><br>
 {{ cliente.usuario.email }}
 </div>
 
 <div class="col-md-6 mb-3">
-<strong>{% trans "Telefono:" %}</strong><br>
+<strong>{% trans "Phone:" %}</strong><br>
 {{ cliente.telefono }}
 </div>
 
 <div class="col-md-6 mb-3">
-<strong>{% trans "Ciudad:" %}</strong><br>
+<strong>{% trans "City:" %}</strong><br>
 {{ cliente.ciudad }}
 </div>
 
 <div class="col-md-6 mb-3">
-<strong>{% trans "Estado:" %}</strong><br>
+<strong>{% trans "State:" %}</strong><br>
 {{ cliente.estado }}
 </div>
 
 <div class="col-md-6 mb-3">
-<strong>{% trans "Codigo Postal:" %}</strong><br>
+<strong>{% trans "ZIP code:" %}</strong><br>
 {{ cliente.codigo_postal }}
 </div>
 
@@ -61,7 +61,7 @@
 </div>
 
 <div class="col-md-6 mb-3">
-<strong>{% trans "Pais:" %}</strong><br>
+<strong>{% trans "Country:" %}</strong><br>
 {{ cliente.pais }}
 </div>
 
@@ -96,14 +96,14 @@
 
 <hr>
 
-<h5 class="mb-3">{% trans "Certificado de Impuesto" %}</h5>
+<h5 class="mb-3">{% trans "Tax certificate" %}</h5>
 
 {% if cliente.certificado_tax %}
 <a href="{% url 'ver_certificado_cliente' cliente.id %}" target="_blank" class="btn btn-info">
-{% trans "Ver certificado" %}
+{% trans "View certificate" %}
 </a>
 {% else %}
-<p>{% trans "No se subio certificado" %}</p>
+<p>{% trans "No certificate uploaded." %}</p>
 {% endif %}
 
 {% if cliente.nota_rechazo %}
@@ -163,7 +163,7 @@
 </form>
 
 <a href="{% url 'clientes_pendientes' %}?view={{ view_mode|default:'pending' }}" class="btn btn-secondary">
-{% trans "Volver" %}
+{% trans "Back" %}
 </a>
 
 </div>

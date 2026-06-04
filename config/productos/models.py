@@ -5,6 +5,8 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils.translation import get_language, gettext_lazy as _
 
+from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_CHOICES, QUICKBOOKS_SYNC_STATUS_PENDING
+
 
 def _normalize_translation_term(value):
     normalized = unicodedata.normalize("NFKD", (value or "").strip().lower())
@@ -184,6 +186,18 @@ class Producto(models.Model):
         null=True
     )
 
+    sync_status = models.CharField(
+        max_length=20,
+        choices=QUICKBOOKS_SYNC_STATUS_CHOICES,
+        default=QUICKBOOKS_SYNC_STATUS_PENDING,
+        db_index=True,
+    )
+
+    last_synced_at = models.DateTimeField(
+        blank=True,
+        null=True,
+    )
+
     creado_en = models.DateTimeField(auto_now_add=True)
 
     @property
@@ -212,6 +226,17 @@ class Presentacion(models.Model):
     tipo_contenido_en = models.CharField(max_length=50, blank=True)
 
     costo = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+
+    quickbooks_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+
+    sync_status = models.CharField(
+        max_length=20,
+        choices=QUICKBOOKS_SYNC_STATUS_CHOICES,
+        default=QUICKBOOKS_SYNC_STATUS_PENDING,
+        db_index=True,
+    )
+
+    last_synced_at = models.DateTimeField(blank=True, null=True)
 
     precio_1 = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     precio_2 = models.DecimalField(max_digits=10, decimal_places=2, default=0)

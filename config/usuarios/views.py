@@ -19,6 +19,8 @@ from .permissions import (
 from .us_locations import US_STATE_CITIES
 from config.clientes.models import Cliente
 from config.core.models import Testimonio, HomeContenido, ensure_homecontenido_quienes_schema
+from config.integrations.quickbooks.services import get_connection_status
+from config.integrations.quickbooks.views import get_dashboard_sync_context
 from config.productos.models import Producto, Marca
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.clickjacking import xframe_options_sameorigin
@@ -647,8 +649,10 @@ def panel_admin(request):
         'clientes_pendientes': clientes_pendientes,
         'clientes_aprobados': clientes_aprobados,
         'vendedores': vendedores,
-        'productos': productos
+        'productos': productos,
+        'quickbooks_status': get_connection_status(),
     }
+    context.update(get_dashboard_sync_context(request=request))
 
     return render(request, 'admin/dashboard.html', context)
 

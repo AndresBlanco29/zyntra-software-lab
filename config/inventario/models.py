@@ -1,8 +1,12 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_CHOICES, QUICKBOOKS_SYNC_STATUS_PENDING
 from config.productos.models import Presentacion, Producto
 
 
@@ -98,3 +102,138 @@ class InventarioMovimiento(models.Model):
 
 	def __str__(self):
 		return f'{self.referencia} | {self.get_tipo_display()} | {self.presentacion_id}'
+
+
+class Proveedor(models.Model):
+	nombre = models.CharField(max_length=255, unique=True)
+	email = models.EmailField(blank=True)
+	telefono = models.CharField(max_length=40, blank=True)
+	company_name = models.CharField(max_length=255, blank=True)
+	balance = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	notas = models.TextField(blank=True)
+	activo = models.BooleanField(default=True)
+	quickbooks_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+	sync_status = models.CharField(
+		max_length=20,
+		choices=QUICKBOOKS_SYNC_STATUS_CHOICES,
+		default=QUICKBOOKS_SYNC_STATUS_PENDING,
+		db_index=True,
+	)
+	last_synced_at = models.DateTimeField(blank=True, null=True)
+	creado_en = models.DateTimeField(auto_now_add=True)
+	actualizado_en = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		ordering = ('nombre', 'id')
+		verbose_name = _('Supplier')
+		verbose_name_plural = _('Suppliers')
+
+	def __str__(self):
+		return self.nombre
+
+
+class CompraProveedor(models.Model):
+	STATUS_DRAFT = 'BORRADOR'
+	STATUS_SENT = 'ENVIADA'
+	STATUS_RECEIVED = 'RECIBIDA'
+	STATUS_CANCELLED = 'CANCELADA'
+
+	STATUS_CHOICES = (
+		(STATUS_DRAFT, _('Draft')),
+		(STATUS_SENT, _('Sent')),
+		(STATUS_RECEIVED, _('Received')),
+		(STATUS_CANCELLED, _('Cancelled')),
+	)
+
+	proveedor = models.ForeignKey(
+		Proveedor,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='compras',
+	)
+	proveedor_nombre = models.CharField(max_length=255)
+	proveedor_email = models.EmailField(blank=True)
+	proveedor_telefono = models.CharField(max_length=40, blank=True)
+	po_number = models.CharField(max_length=100, blank=True, unique=True)
+	bill_number = models.CharField(max_length=100, blank=True)
+	fecha_compra = models.DateField(default=timezone.localdate)
+	fecha_vencimiento = models.DateField(blank=True, null=True)
+	notas = models.TextField(blank=True)
+	estado = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_DRAFT, db_index=True)
+	subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+	total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+	inventory_applied = models.BooleanField(default=False)
+	inventory_received_at = models.DateTimeField(blank=True, null=True)
+	inventory_received_by = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='compras_proveedor_recibidas',
+	)
+	quickbooks_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+	sync_status = models.CharField(
+		max_length=20,
+		choices=QUICKBOOKS_SYNC_STATUS_CHOICES,
+		default=QUICKBOOKS_SYNC_STATUS_PENDING,
+		db_index=True,
+	)
+	last_synced_at = models.DateTimeField(blank=True, null=True)
+	creado_por = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='compras_proveedor_creadas',
+	)
+	creado_en = models.DateTimeField(auto_now_add=True)
+	actualizado_en = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		ordering = ('-fecha_compra', '-id')
+
+	def __str__(self):
+		identifier = self.po_number or self.bill_number or f'Compra {self.pk}'
+		return f'{identifier} | {self.proveedor_nombre}'
+
+	@property
+	def accounting_locked(self):
+		return bool(self.quickbooks_id or self.sync_status == 'SYNCED')
+
+	def recalcular_totales(self, *, save=True):
+		total = sum((linea.subtotal for linea in self.lineas.all()), start=Decimal('0.00'))
+		self.subtotal = total
+		self.total = total
+		if save and self.pk:
+			self.save(update_fields=['subtotal', 'total', 'actualizado_en'])
+		return total
+
+	def save(self, *args, **kwargs):
+		is_new = self.pk is None
+		super().save(*args, **kwargs)
+		if is_new and not self.po_number:
+			self.po_number = f'PO-{timezone.now().year}-{self.pk:06d}'
+			super().save(update_fields=['po_number'])
+
+
+class CompraProveedorLinea(models.Model):
+	compra = models.ForeignKey(CompraProveedor, on_delete=models.CASCADE, related_name='lineas')
+	presentacion = models.ForeignKey(Presentacion, on_delete=models.PROTECT, related_name='compras_proveedor_lineas')
+	cantidad = models.PositiveIntegerField(default=1)
+	costo_unitario = models.DecimalField(max_digits=12, decimal_places=2)
+	subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+	descripcion = models.CharField(max_length=255, blank=True)
+
+	class Meta:
+		ordering = ('id',)
+
+	def clean(self):
+		if self.cantidad <= 0:
+			raise ValidationError(_('Quantity must be greater than zero.'))
+		if self.costo_unitario < 0:
+			raise ValidationError(_('Unit cost cannot be negative.'))
+
+	def save(self, *args, **kwargs):
+		self.subtotal = self.cantidad * self.costo_unitario
+		super().save(*args, **kwargs)

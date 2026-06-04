@@ -1,7 +1,10 @@
+from types import SimpleNamespace
+
 from django.conf import settings
 from django.test import TestCase
 from django.urls import reverse
 
+from config.core.workflow_badges import build_delivery_workflow_badge, build_order_workflow_badge
 from config.usuarios.models import Usuario
 
 
@@ -41,3 +44,19 @@ class BackofficeSpanishTranslationsTests(TestCase):
 		self.assertContains(inventory_response, 'Stock reservado', html=False)
 		self.assertContains(inventory_response, 'Sin stock')
 		self.assertContains(inventory_response, 'Inventario')
+
+
+class WorkflowBadgeTests(TestCase):
+	def test_vendor_orders_use_vendor_to_backoffice_transition_badge(self):
+		badge = build_order_workflow_badge(SimpleNamespace(estado='RECIBIDO', origen='VENDEDOR', invoice=None))
+
+		self.assertEqual(badge['kind'], 'split')
+		self.assertEqual(badge['sender_role'], 'vendedor')
+		self.assertEqual(badge['receiver_role'], 'backoffice')
+
+	def test_route_deliveries_use_backoffice_to_driver_transition_badge(self):
+		badge = build_delivery_workflow_badge(SimpleNamespace(estado='ASIGNADA'))
+
+		self.assertEqual(badge['kind'], 'split')
+		self.assertEqual(badge['sender_role'], 'backoffice')
+		self.assertEqual(badge['receiver_role'], 'driver')

@@ -4,6 +4,156 @@
 {% block title %}{% trans "Driver Deliveries" %}{% endblock %}
 
 {% block content %}
+<style>
+  .driver-list-shell {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .driver-list-hero {
+    border-radius: 1.25rem;
+    padding: 1.25rem;
+    background: linear-gradient(135deg, #0d47a1 0%, #1976d2 48%, #64b5f6 100%);
+    color: #fff;
+    box-shadow: 0 18px 40px rgba(13, 71, 161, 0.18);
+  }
+
+  .driver-list-hero p {
+    color: rgba(255, 255, 255, 0.86);
+  }
+
+  .driver-list-guide {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  .driver-list-guide-item {
+    border-radius: 1rem;
+    padding: 0.9rem 1rem;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+  }
+
+  .driver-list-guide-item strong {
+    display: block;
+    margin-bottom: 0.2rem;
+  }
+
+  .driver-list-guide-item span {
+    display: block;
+    font-size: 0.92rem;
+    line-height: 1.35;
+  }
+
+  .driver-list-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .driver-list-metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    flex: 1 1 420px;
+  }
+
+  .driver-list-metric {
+    border: 1px solid rgba(13, 110, 253, 0.12);
+    border-radius: 1rem;
+    padding: 0.9rem 1rem;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+  }
+
+  .driver-list-metric-label {
+    font-size: 0.82rem;
+    color: #6c757d;
+  }
+
+  .driver-list-metric-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+
+  .driver-list-card {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+  }
+
+  .driver-list-section-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .driver-delivery-invoice {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .driver-delivery-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+  }
+
+  .driver-delivery-address {
+    display: grid;
+    gap: 0.25rem;
+  }
+
+  .driver-delivery-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-end;
+  }
+
+  .driver-inline-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    background: #f8f9fa;
+    padding: 0.25rem 0.6rem;
+    color: #6c757d;
+    font-size: 0.82rem;
+  }
+
+  .driver-action-help {
+    color: #6c757d;
+    font-size: 0.84rem;
+    text-align: right;
+    margin-top: 0.35rem;
+  }
+
+  @media (max-width: 991.98px) {
+    .driver-list-guide,
+    .driver-list-metrics {
+      grid-template-columns: 1fr;
+    }
+
+    .driver-delivery-actions {
+      justify-content: flex-start;
+    }
+
+    .driver-action-help {
+      text-align: left;
+    }
+  }
+</style>
+<div class="driver-list-shell">
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
     <h2 class="mb-1">
@@ -20,6 +170,41 @@
       {% trans "Assigned invoices ready for route and proof of delivery." %}
       {% endif %}
     </p>
+  </div>
+</div>
+
+<div class="driver-list-hero">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div>
+      <h3 class="h4 mb-2">
+        {% if view_mode == 'completed' %}
+        {% trans "Review completed stops without losing delivery context." %}
+        {% else %}
+        {% trans "Work each stop in order so the route is easier to follow." %}
+        {% endif %}
+      </h3>
+      <p class="mb-0">
+        {% if view_mode == 'completed' %}
+        {% trans "Use this view to confirm what was delivered, what was paid, and which invoices already have evidence or notes." %}
+        {% else %}
+        {% trans "First review the assigned invoices, then select the ones you want in the route, and finally open each stop to close it with payment, evidence and signature." %}
+        {% endif %}
+      </p>
+    </div>
+  </div>
+  <div class="driver-list-guide">
+    <div class="driver-list-guide-item">
+      <strong>{% trans "1. Review priority" %}</strong>
+      <span>{% trans "Check the estimated delivery time and customer address before leaving." %}</span>
+    </div>
+    <div class="driver-list-guide-item">
+      <strong>{% trans "2. Build the route" %}</strong>
+      <span>{% trans "Select the stops you want to send to Maps and generate the route in one step." %}</span>
+    </div>
+    <div class="driver-list-guide-item">
+      <strong>{% trans "3. Close each stop" %}</strong>
+      <span>{% trans "Open the stop detail to register payment, evidence and signature without missing anything." %}</span>
+    </div>
   </div>
 </div>
 
@@ -40,10 +225,34 @@
   {% endif %}
 </div>
 
+<div class="driver-list-toolbar">
+  <div class="driver-list-metrics">
+    <div class="driver-list-metric">
+      <div class="driver-list-metric-label">{% trans "Active stops" %}</div>
+      <div class="driver-list-metric-value">{{ active_count }}</div>
+    </div>
+    <div class="driver-list-metric">
+      <div class="driver-list-metric-label">{% trans "Completed stops" %}</div>
+      <div class="driver-list-metric-value">{{ completed_count }}</div>
+    </div>
+    <div class="driver-list-metric">
+      <div class="driver-list-metric-label">{% trans "Current view" %}</div>
+      <div class="driver-list-metric-value">{% if view_mode == 'completed' %}{% trans "Delivered" %}{% else %}{% trans "Assigned" %}{% endif %}</div>
+    </div>
+  </div>
+</div>
+
 {% if view_mode == 'active' %}
 <form method="get" action="{% url 'driver_delivery_route' %}" id="driverSelectionTableForm">
-  <div class="card shadow-sm">
+  <div class="card shadow-sm driver-list-card">
     <div class="card-body">
+      <div class="driver-list-section-head">
+        <div>
+          <h5 class="mb-1">{% trans "Assigned stops" %}</h5>
+          <p class="text-muted mb-0">{% trans "Each row shows the next action clearly: select it for the route, download the PDF if needed, or open the stop to complete it." %}</p>
+        </div>
+        <div class="driver-inline-hint">{% trans "Generate route" %}: {% trans "Select one or more deliveries first." %}</div>
+      </div>
       <div class="table-responsive mobile-stack-responsive">
         <table class="table align-middle mb-0 mobile-stack-table mobile-stack-table--driver">
         <thead>
@@ -56,8 +265,7 @@
             <th>{% trans "Address" %}</th>
             <th>{% trans "Delivery" %}</th>
             <th>{% trans "Payment" %}</th>
-            <th>{% trans "PDF" %}</th>
-            <th></th>
+            <th>{% trans "Actions" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -71,23 +279,43 @@
               {% endif %}
             </td>
             <td data-label="{% trans 'Invoice' %}">
-              <strong>{{ delivery.invoice.numero }}</strong>
-              <div class="small text-muted">PO #{{ delivery.invoice.pedido_id }}</div>
+              <div class="driver-delivery-invoice">
+                <strong>{{ delivery.invoice.numero }}</strong>
+                <div class="driver-delivery-meta">
+                  <span class="small text-muted">PO #{{ delivery.invoice.pedido_id }}</span>
+                  <span class="driver-inline-hint">{% trans "Estimated delivery" %}: {% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</span>
+                </div>
+              </div>
             </td>
             <td data-label="{% trans 'Customer' %}">{{ delivery.invoice.cliente.nombre_empresa }}</td>
             <td data-label="{% trans 'Address' %}">
-              <div>{{ delivery.route_address }}</div>
-              <div class="small text-muted">{% trans "Maps query:" %} {{ delivery.route_query_address }}</div>
-              <div class="small text-muted">{% trans "Estimated delivery" %}: {% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
+              <div class="driver-delivery-address">
+                <div>{{ delivery.route_address }}</div>
+                <div class="small text-muted">{% trans "Maps query:" %} {{ delivery.route_query_address }}</div>
+              </div>
             </td>
-            <td data-label="{% trans 'Delivery' %}"><span class="badge bg-info text-dark">{{ delivery.get_estado_display }}</span></td>
+            <td data-label="{% trans 'Delivery' %}">
+              <div class="workflow-status-stack">
+                <span class="badge bg-info text-dark">{{ delivery.get_estado_display }}</span>
+                {% if delivery.workflow_badge %}
+                <span class="workflow-role-badge {% if delivery.workflow_badge.kind == 'split' %}workflow-role-badge--split{% endif %}" style="--workflow-start: {{ delivery.workflow_badge.color_start }}; --workflow-end: {{ delivery.workflow_badge.color_end }}; --workflow-text: {{ delivery.workflow_badge.text_color }};">
+                  {{ delivery.workflow_badge.label }}
+                </span>
+                {% endif %}
+              </div>
+            </td>
             <td data-label="{% trans 'Payment' %}"><span class="badge {% if delivery.estado_pago == 'NO_PAGADO' %}bg-danger{% elif delivery.estado_pago == 'PAGADO' %}bg-success{% else %}bg-secondary{% endif %}">{{ delivery.get_estado_pago_display }}</span></td>
-            <td data-label="{% trans 'PDF' %}" class="mobile-stack-table__action"><a class="btn btn-sm btn-outline-dark" href="{% url 'driver_invoice_pdf' delivery.id %}">{% trans "Download" %}</a></td>
-            <td data-label="{% trans 'Action' %}" class="text-end mobile-stack-table__action"><a class="btn btn-sm btn-primary" href="{% url 'driver_delivery_detail' delivery.id %}">{% trans "Open" %}</a></td>
+            <td data-label="{% trans 'Actions' %}" class="mobile-stack-table__action">
+              <div class="driver-delivery-actions">
+                <a class="btn btn-sm btn-outline-dark" href="{% url 'driver_invoice_pdf' delivery.id %}">{% trans "Download" %}</a>
+                <a class="btn btn-sm btn-primary" href="{% url 'driver_delivery_detail' delivery.id %}">{% trans "Open" %}</a>
+              </div>
+              <div class="driver-action-help">{% trans "Open the stop to register payment, evidence and signature." %}</div>
+            </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="8" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No deliveries are currently assigned to you." %}</td>
+            <td colspan="7" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No deliveries are currently assigned to you." %}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -97,8 +325,14 @@
   </div>
 </form>
 {% else %}
-<div class="card shadow-sm">
+<div class="card shadow-sm driver-list-card">
   <div class="card-body">
+    <div class="driver-list-section-head">
+      <div>
+        <h5 class="mb-1">{% trans "Completed stops" %}</h5>
+        <p class="text-muted mb-0">{% trans "Review finished deliveries with quick access to the PDF and the saved delivery summary." %}</p>
+      </div>
+    </div>
     <div class="table-responsive mobile-stack-responsive">
       <table class="table align-middle mb-0 mobile-stack-table mobile-stack-table--driver">
         <thead>
@@ -108,31 +342,49 @@
             <th>{% trans "Address" %}</th>
             <th>{% trans "Delivery" %}</th>
             <th>{% trans "Payment" %}</th>
-            <th>{% trans "PDF" %}</th>
-            <th></th>
+            <th>{% trans "Actions" %}</th>
           </tr>
         </thead>
         <tbody>
           {% for delivery in deliveries %}
           <tr>
             <td data-label="{% trans 'Invoice' %}">
-              <strong>{{ delivery.invoice.numero }}</strong>
-              <div class="small text-muted">PO #{{ delivery.invoice.pedido_id }}</div>
+              <div class="driver-delivery-invoice">
+                <strong>{{ delivery.invoice.numero }}</strong>
+                <div class="driver-delivery-meta">
+                  <span class="small text-muted">PO #{{ delivery.invoice.pedido_id }}</span>
+                  <span class="driver-inline-hint">{% trans "Estimated delivery" %}: {% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</span>
+                </div>
+              </div>
             </td>
             <td data-label="{% trans 'Customer' %}">{{ delivery.invoice.cliente.nombre_empresa }}</td>
             <td data-label="{% trans 'Address' %}">
-              <div>{{ delivery.route_address }}</div>
-              <div class="small text-muted">{% trans "Maps query:" %} {{ delivery.route_query_address }}</div>
-              <div class="small text-muted">{% trans "Estimated delivery" %}: {% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
+              <div class="driver-delivery-address">
+                <div>{{ delivery.route_address }}</div>
+                <div class="small text-muted">{% trans "Maps query:" %} {{ delivery.route_query_address }}</div>
+              </div>
             </td>
-            <td data-label="{% trans 'Delivery' %}"><span class="badge bg-info text-dark">{{ delivery.get_estado_display }}</span></td>
+            <td data-label="{% trans 'Delivery' %}">
+              <div class="workflow-status-stack">
+                <span class="badge bg-info text-dark">{{ delivery.get_estado_display }}</span>
+                {% if delivery.workflow_badge %}
+                <span class="workflow-role-badge {% if delivery.workflow_badge.kind == 'split' %}workflow-role-badge--split{% endif %}" style="--workflow-start: {{ delivery.workflow_badge.color_start }}; --workflow-end: {{ delivery.workflow_badge.color_end }}; --workflow-text: {{ delivery.workflow_badge.text_color }};">
+                  {{ delivery.workflow_badge.label }}
+                </span>
+                {% endif %}
+              </div>
+            </td>
             <td data-label="{% trans 'Payment' %}"><span class="badge {% if delivery.estado_pago == 'NO_PAGADO' %}bg-danger{% elif delivery.estado_pago == 'PAGADO' %}bg-success{% else %}bg-secondary{% endif %}">{{ delivery.get_estado_pago_display }}</span></td>
-            <td data-label="{% trans 'PDF' %}" class="mobile-stack-table__action"><a class="btn btn-sm btn-outline-dark" href="{% url 'driver_invoice_pdf' delivery.id %}">{% trans "Download" %}</a></td>
-            <td data-label="{% trans 'Action' %}" class="text-end mobile-stack-table__action"><a class="btn btn-sm btn-success" href="{% url 'driver_delivery_detail' delivery.id %}">{% trans "View summary" %}</a></td>
+            <td data-label="{% trans 'Actions' %}" class="mobile-stack-table__action">
+              <div class="driver-delivery-actions">
+                <a class="btn btn-sm btn-outline-dark" href="{% url 'driver_invoice_pdf' delivery.id %}">{% trans "Download" %}</a>
+                <a class="btn btn-sm btn-success" href="{% url 'driver_delivery_detail' delivery.id %}">{% trans "View summary" %}</a>
+              </div>
+            </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="7" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No delivered invoices are available yet." %}</td>
+            <td colspan="6" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No delivered invoices are available yet." %}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -178,4 +430,5 @@
     syncRouteButtonState();
   });
 </script>
+</div>
 {% endblock %}

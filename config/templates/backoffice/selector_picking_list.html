@@ -58,7 +58,16 @@
         <tr>
           <td data-label="{% trans 'ID' %}">#{{ pedido.id }}</td>
           <td data-label="{% trans 'Customer' %}">{{ pedido.cliente.nombre_empresa }}</td>
-          <td data-label="{% trans 'Status' %}"><span class="badge bg-info text-dark">{{ pedido.estado_label }}</span></td>
+          <td data-label="{% trans 'Status' %}">
+            <div class="workflow-status-stack">
+              <span class="badge bg-info text-dark">{{ pedido.estado_label }}</span>
+              {% if pedido.workflow_badge %}
+              <span class="workflow-role-badge {% if pedido.workflow_badge.kind == 'split' %}workflow-role-badge--split{% endif %}" style="--workflow-start: {{ pedido.workflow_badge.color_start }}; --workflow-end: {{ pedido.workflow_badge.color_end }}; --workflow-text: {{ pedido.workflow_badge.text_color }};">
+                {{ pedido.workflow_badge.label }}
+              </span>
+              {% endif %}
+            </div>
+          </td>
           <td data-label="{% trans 'Locked' %}">
             {% if pedido.picking_bloqueado %}
               <span class="badge bg-danger">{% trans "Blocked" %}</span>

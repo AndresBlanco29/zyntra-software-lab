@@ -1,20 +1,21 @@
 {% extends "emails/base_email.html" %}
+{% load i18n %}
 
-{% block preheader %}Tu orden de compra #{{ pedido.id }} fue generada y está en preparación para despacho.{% endblock %}
-{% block header_title %}Orden de compra en proceso{% endblock %}
-{% block header_subtitle %}Tu pedido fue generado correctamente y ya está siendo preparado para despacho.{% endblock %}
+{% block preheader %}{% blocktrans with order_id=pedido.id %}Your purchase order #{{ order_id }} was created and is being prepared for dispatch.{% endblocktrans %}{% endblock %}
+{% block header_title %}{% trans "Purchase order in progress" %}{% endblock %}
+{% block header_subtitle %}{% trans "Your order was created successfully and is already being prepared for dispatch." %}{% endblock %}
 
 {% block content %}
-<p style="margin:0 0 14px 0; font-size:15px; line-height:1.7;">Estimado cliente {{ cliente.nombre_empresa }},</p>
-<p style="margin:0 0 12px 0; font-size:15px; line-height:1.7;">Tu orden de compra <strong>#{{ pedido.id }}</strong> fue generada correctamente.</p>
-<p style="margin:0 0 20px 0; font-size:15px; line-height:1.7;">Ya estamos preparando tu pedido para despacho. A continuación te compartimos el resumen:</p>
+<p style="margin:0 0 14px 0; font-size:15px; line-height:1.7;">{% blocktrans with company=cliente.nombre_empresa %}Dear customer {{ company }},{% endblocktrans %}</p>
+<p style="margin:0 0 12px 0; font-size:15px; line-height:1.7;">{% blocktrans with order_id=pedido.id %}Your purchase order <strong>#{{ order_id }}</strong> was created successfully.{% endblocktrans %}</p>
+<p style="margin:0 0 20px 0; font-size:15px; line-height:1.7;">{% trans "We are already preparing your order for dispatch. Below is the summary:" %}</p>
 
 <table width="100%" cellpadding="8" cellspacing="0" role="presentation" style="border-collapse:collapse; font-size:14px; border:1px solid #cbd5e1; border-radius:12px; overflow:hidden;">
   <tr style="background:#0b3d91; color:#ffffff;">
-    <th align="left">Producto</th>
-    <th align="center">Cant.</th>
-    <th align="center">Precio</th>
-    <th align="center">Subtotal</th>
+    <th align="left">{% trans "Product" %}</th>
+    <th align="center">{% trans "Qty." %}</th>
+    <th align="center">{% trans "Price" %}</th>
+    <th align="center">{% trans "Subtotal" %}</th>
   </tr>
   {% for item in items %}
   <tr style="border-bottom:1px solid #e2e8f0; background:{% cycle '#ffffff' '#f8fafc' %};">
@@ -25,7 +26,7 @@
   </tr>
   {% endfor %}
   <tr style="background:#dbeafe;">
-    <td colspan="3" align="right" style="padding-top:12px;"><strong>Total:</strong></td>
+    <td colspan="3" align="right" style="padding-top:12px;"><strong>{% trans "Total:" %}</strong></td>
     <td align="center" style="padding-top:12px;"><strong>${{ pedido.total }}</strong></td>
   </tr>
 </table>

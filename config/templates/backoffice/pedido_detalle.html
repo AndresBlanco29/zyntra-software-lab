@@ -4,8 +4,15 @@
 {% block title %}{% trans "Order" %} #{{ pedido.id }}{% endblock %}
 
 {% block content %}
-<h2 class="mb-3">{% trans "Purchase Order" %} #{{ pedido.id }}</h2>
+<h2 class="mb-3">{% trans "Sales Order" %} #{{ pedido.id }}</h2>
 <p class="text-muted">{% trans "Customer" %}: {{ pedido.cliente.nombre_empresa }} | {% trans "Origin" %}: {{ pedido_origen_label }}</p>
+{% if pedido.workflow_badge %}
+<div class="mb-3">
+  <span class="workflow-role-badge {% if pedido.workflow_badge.kind == 'split' %}workflow-role-badge--split{% endif %}" style="--workflow-start: {{ pedido.workflow_badge.color_start }}; --workflow-end: {{ pedido.workflow_badge.color_end }}; --workflow-text: {{ pedido.workflow_badge.text_color }};">
+    {{ pedido.workflow_badge.label }}
+  </span>
+</div>
+{% endif %}
 
 <div class="card shadow-sm mb-3">
   <div class="card-body">
@@ -100,7 +107,7 @@
               <select name="metodo_entrega" class="form-select" required>
                 <option value="">{% trans "Select a delivery method..." %}</option>
                 <option value="RUTA_DRIVER">{% trans "Route with driver" %}</option>
-                <option value="LTG">LTG</option>
+                <option value="LTG">{% trans "LTG delivery" %}</option>
                 <option value="CUSTOMER_PICK_UP">{% trans "Customer Pick Up" %}</option>
               </select>
             </div>
@@ -153,15 +160,20 @@
                         </td>
                         <td>
                           <span class="badge {% if nota.tipo_documento == 'CREDITO' %}bg-success{% else %}bg-danger{% endif %}">{{ nota.get_tipo_documento_display }}</span>
+                          {% if nota.quickbooks_id and nota.sync_status == 'SYNCED' %}
+                            <span class="badge text-bg-primary ms-1">{% trans "Locked by QuickBooks" %}</span>
+                          {% endif %}
                         </td>
                         <td>${{ nota.remaining_amount }}</td>
                         <td style="min-width: 220px;">
                           <div class="input-group input-group-sm">
                             <span class="input-group-text">$</span>
-                            <input type="number" min="0" step="0.01" max="{{ nota.remaining_amount }}" name="general_note_apply_{{ nota.id }}" class="form-control" value="0.00">
+                            <input type="number" min="0" step="0.01" max="{{ nota.remaining_amount }}" name="general_note_apply_{{ nota.id }}" class="form-control" value="0.00" {% if nota.quickbooks_id and nota.sync_status == 'SYNCED' %}disabled{% endif %}>
                           </div>
                           <div class="form-text">
-                            {% if nota.tipo_documento == 'CREDITO' %}
+                            {% if nota.quickbooks_id and nota.sync_status == 'SYNCED' %}
+                              {% trans "This note is locked after QuickBooks sync and can no longer be applied from this screen." %}
+                            {% elif nota.tipo_documento == 'CREDITO' %}
                               {% trans "Apply any part of this credit now, or leave 0.00 to keep it for a future invoice." %}
                             {% else %}
                               {% trans "Charge any part of this debit now, or leave 0.00 to keep it for a future invoice." %}

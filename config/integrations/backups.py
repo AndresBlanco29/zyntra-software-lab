@@ -285,6 +285,43 @@ def _restore_media_from_system_backup(backup_file):
             default_storage.save(target_name, ContentFile(extracted.read()))
 
 
+ALLOWED_BACKUP_UPLOAD_SUFFIXES = ('.json.gz', '.json', '.tar.gz')
+MAX_BACKUP_UPLOAD_BYTES = 200 * 1024 * 1024
+
+
+def _validate_uploaded_backup_file(uploaded_file):
+    if uploaded_file is None:
+        raise DatabaseBackupError('Backup file is required.')
+    original_name = Path(str(uploaded_file.name or '')).name
+    if not original_name:
+        raise DatabaseBackupError('Backup file name is required.')
+    normalized_name = original_name.lower()
+    if not any(normalized_name.endswith(suffix) for suffix in ALLOWED_BACKUP_UPLOAD_SUFFIXES):
+        raise DatabaseBackupError('Unsupported backup file type. Use .json.gz, .json, or .tar.gz.')
+    size = getattr(uploaded_file, 'size', None)
+    if size is not None and int(size) > MAX_BACKUP_UPLOAD_BYTES:
+        raise DatabaseBackupError('Backup file is too large (max 200 MB).')
+    return _backup_kind_from_name(original_name)[1]
+
+
+def restore_database_backup_upload(*, uploaded_file, flush=False):
+    backup_name = _validate_uploaded_backup_file(uploaded_file)
+    suffix = ''.join(Path(backup_name).suffixes) or '.bin'
+    total_bytes = 0
+    with NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
+        temp_path = Path(temp_file.name)
+        for chunk in uploaded_file.chunks():
+            total_bytes += len(chunk)
+            if total_bytes > MAX_BACKUP_UPLOAD_BYTES:
+                temp_path.unlink(missing_ok=True)
+                raise DatabaseBackupError('Backup file is too large (max 200 MB).')
+            temp_file.write(chunk)
+    try:
+        return restore_database_backup_file(source=str(temp_path), flush=flush)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
 def restore_database_backup_file(*, source, flush=False):
     backup_file, _, backup_name = _open_restore_source(source)
     backup_kind, normalized_name = _backup_kind_from_name(backup_name)

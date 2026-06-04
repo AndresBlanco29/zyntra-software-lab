@@ -23,7 +23,7 @@
       <select id="filtroRol" class="form-select">
         <option value="">{% trans "All roles" %}</option>
         <option value="vendedor">{% trans "Vendor" %}</option>
-        <option value="backoffice">BackOffice</option>
+        <option value="backoffice">{% trans "BackOffice" %}</option>
         <option value="seleccionador">{% trans "Selector" %}</option>
         <option value="driver">{% trans "Driver" %}</option>
       </select>
@@ -68,7 +68,7 @@
         {% elif usuario.role == 'driver' %}
           <span class="badge bg-success">{% trans "Driver" %}</span>
         {% else %}
-          <span class="badge bg-warning text-dark">BackOffice</span>
+          <span class="badge bg-warning text-dark">{% trans "BackOffice" %}</span>
         {% endif %}
       </td>
       <td>

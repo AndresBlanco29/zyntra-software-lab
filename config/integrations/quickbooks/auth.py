@@ -20,9 +20,20 @@ class QuickBooksOAuthError(Exception):
     pass
 
 
+def quickbooks_credentials_configured():
+    return bool(settings.QUICKBOOKS_CLIENT_ID and settings.QUICKBOOKS_CLIENT_SECRET)
+
+
+def quickbooks_credentials_setup_message():
+    return (
+        'Configure QUICKBOOKS_CLIENT_ID and QUICKBOOKS_CLIENT_SECRET in the .env file '
+        '(see .env.example), restart runserver, then connect QuickBooks again.'
+    )
+
+
 def validate_quickbooks_settings():
-    if not settings.QUICKBOOKS_CLIENT_ID or not settings.QUICKBOOKS_CLIENT_SECRET:
-        raise QuickBooksConfigurationError('QuickBooks client credentials are not configured.')
+    if not quickbooks_credentials_configured():
+        raise QuickBooksConfigurationError(quickbooks_credentials_setup_message())
     if not settings.QUICKBOOKS_REDIRECT_URI:
         raise QuickBooksConfigurationError('QuickBooks redirect URI is not configured.')
 

@@ -25,6 +25,8 @@
 <body
 data-agregar-url="{% url 'agregar_producto_pedido' %}"
 data-csrf="{{ csrf_token }}"
+data-msg-added="{% trans 'Added' %} ✔"
+data-msg-add-default="{% trans 'Add to Order' %}"
 >
 
 <!-- NAVBAR -->
@@ -33,7 +35,7 @@ data-csrf="{{ csrf_token }}"
 
 <div class="container-fluid">
 
-<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="vendedorCatalogSidebarToggle" aria-label="Abrir menu">
+<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="vendedorCatalogSidebarToggle" aria-label="{% trans 'Open menu' %}">
 ☰
 </button>
 
@@ -580,8 +582,6 @@ menu.style.display = "flex";
 
 </script>
 
-{% get_current_language as LANGUAGE_CODE %}
-
 <div class="language-widget">
 
 <button class="language-toggle" onclick="toggleLanguageMenu()">
@@ -589,12 +589,7 @@ menu.style.display = "flex";
 🌎
 
 <span class="language-current">
-
-{% if LANGUAGE_CODE == "es" %}
-ES
-{% else %}
-EN
-{% endif %}
+{{ LANGUAGE_CODE|upper }}
 
 </span>
 

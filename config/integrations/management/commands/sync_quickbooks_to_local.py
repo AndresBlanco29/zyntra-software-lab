@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from config.integrations.quickbooks.client import QuickBooksAPIError
@@ -14,6 +15,11 @@ class Command(BaseCommand):
         parser.add_argument('--items-only', action='store_true', help='Refresh only QuickBooks catalog items and their linked local products.')
 
     def handle(self, *args, **options):
+        if getattr(settings, 'QUICKBOOKS_CATALOG_ONLY_MODE', True) and not options.get('items_only'):
+            raise CommandError(
+                'Full QuickBooks pull sync is disabled while QUICKBOOKS_CATALOG_ONLY_MODE is enabled. '
+                'Use --items-only for catalog import or set QUICKBOOKS_CATALOG_ONLY_MODE=False.'
+            )
         raw_limit = int(options.get('limit') or 0)
         limit = None if raw_limit <= 0 else raw_limit
         try:

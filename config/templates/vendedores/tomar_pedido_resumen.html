@@ -11,7 +11,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf-token" content="{{ csrf_token }}">
 
-<title>{% trans "Resumen del Pedido" %}</title>
+<title>{% trans "Order summary" %}</title>
 
 <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
 <link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
@@ -28,11 +28,11 @@
 <body data-actualizar-url="{% url 'actualizar_cantidad_pedido' %}"
 data-eliminar-url="{% url 'eliminar_producto_pedido' %}"
 data-enviar-url="{% url 'enviar_pedido' %}"
-data-csrf="{{ csrf_token %}"
-data-msg-order-type="{% trans 'Debes indicar cómo se tomó la orden' %}"
-data-msg-submit-error="{% trans 'No se pudo generar el pedido.' %}"
-data-msg-remove-error="{% trans 'No se pudo eliminar el producto del pedido.' %}"
-data-msg-request-error="{% trans 'Ocurrió un error procesando la solicitud.' %}"
+data-csrf="{{ csrf_token }}"
+data-msg-order-type="{% trans 'You must indicate how the order was taken.' %}"
+data-msg-submit-error="{% trans 'The order could not be created.' %}"
+data-msg-remove-error="{% trans 'The product could not be removed from the order.' %}"
+data-msg-request-error="{% trans 'An error occurred while processing the request.' %}"
 style="margin: 0; padding: 0;">
 
 <!-- NAVBAR -->
@@ -41,7 +41,7 @@ style="margin: 0; padding: 0;">
 
 <div class="container-fluid">
 
-<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="pedidoResumenSidebarToggle" aria-label="Abrir menu">
+<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="pedidoResumenSidebarToggle" aria-label="{% trans 'Open menu' %}">
 ☰
 </button>
 
@@ -52,7 +52,7 @@ La Tortilla Grocery
 <div class="ms-auto d-flex align-items-center gap-2">
 
 <a href="#" class="btn btn-outline-light">
-{% trans "Pedido" %} (<span id="contadorPedido">{{ productos|length }}</span>)
+{% trans "Order" %} (<span id="contadorPedido">{{ productos|length }}</span>)
 </a>
 
 </div>
@@ -426,8 +426,6 @@ menu.style.display = "flex";
 
 </script>
 
-{% get_current_language as LANGUAGE_CODE %}
-
 <div class="language-widget">
 
 <button class="language-toggle" onclick="toggleLanguageMenu()">
@@ -435,12 +433,7 @@ menu.style.display = "flex";
 🌎
 
 <span class="language-current">
-
-{% if LANGUAGE_CODE == "es" %}
-ES
-{% else %}
-EN
-{% endif %}
+{{ LANGUAGE_CODE|upper }}
 
 </span>
 

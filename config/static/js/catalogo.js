@@ -3,9 +3,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const lang = document.body.dataset.lang.slice(0,2);
     const agregarUrl = document.body.dataset.agregarUrl;
     const csrfToken = document.body.dataset.csrf;
-    const buttonCopy = {
-        added: { es: 'Añadido ✔', en: 'Added ✔' },
-    };
+    const addedButtonLabel = document.body.dataset.msgAdded || 'Added ✔';
 
     const traducciones = {
 
@@ -116,7 +114,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         document.getElementById("contadorCarrito").textContent = data.total_items;
 
                         // Animación visual
-                        btn.textContent = buttonCopy.added[lang] || buttonCopy.added.es;
+                        btn.textContent = addedButtonLabel;
                         setTimeout(() => {
                             btn.textContent = btn.dataset.defaultLabel;
                         }, 1200);

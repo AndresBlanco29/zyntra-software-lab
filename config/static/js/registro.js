@@ -1,4 +1,7 @@
 document.addEventListener("DOMContentLoaded", function () {
+    const registroPage = document.getElementById("registroPage");
+    const passwordMismatchMessage = registroPage?.dataset.msgPasswordMismatch || "Passwords do not match.";
+    const selectedFilePrefix = registroPage?.dataset.msgSelectedFilePrefix || "Selected file:";
 
     const uploadBox = document.querySelector(".upload-box");
     const fileInput = document.getElementById("certificado");
@@ -41,7 +44,7 @@ document.addEventListener("DOMContentLoaded", function () {
         let pass2 = document.querySelector("input[name='password2']").value;
 
         if (pass1 !== pass2) {
-            alert("Las contraseñas no coinciden");
+            alert(passwordMismatchMessage);
             return;
         }
 
@@ -84,7 +87,7 @@ window.nextStepCredenciales = nextStepCredenciales;
                 const fileName = this.files[0].name;
 
                 document.querySelector(".upload-content p").innerText =
-                "Archivo seleccionado: " + fileName;
+                `${selectedFilePrefix} ${fileName}`;
             }
 
         });

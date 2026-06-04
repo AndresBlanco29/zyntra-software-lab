@@ -2,6 +2,8 @@ import uuid
 from decimal import Decimal
 
 from django.db import models
+
+from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_CHOICES, QUICKBOOKS_SYNC_STATUS_PENDING
 from config.productos.models import normalize_price_tier
 from config.usuarios.models import Usuario
 
@@ -172,6 +174,25 @@ class Cliente(models.Model):
         max_digits=12,
         decimal_places=2,
         default=Decimal('0.00')
+    )
+
+    quickbooks_id = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+
+    sync_status = models.CharField(
+        max_length=20,
+        choices=QUICKBOOKS_SYNC_STATUS_CHOICES,
+        default=QUICKBOOKS_SYNC_STATUS_PENDING,
+        db_index=True,
+    )
+
+    last_synced_at = models.DateTimeField(
+        blank=True,
+        null=True,
     )
 
     creado_en = models.DateTimeField(

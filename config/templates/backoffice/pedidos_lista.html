@@ -1,10 +1,10 @@
 {% extends "bases/base_vendedor.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Purchase Orders" %}{% endblock %}
+{% block title %}{% trans "Sales Orders" %}{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">{% trans "Received Purchase Orders" %}</h2>
+<h2 class="mb-4">{% trans "Received Sales Orders" %}</h2>
 
 <div class="btn-group mb-3" role="group" aria-label="{% trans 'Order views' %}">
   <a href="{% url 'backoffice_pedidos' %}" class="btn {% if view_mode == 'pending' %}btn-primary{% else %}btn-outline-primary{% endif %}">
@@ -47,7 +47,16 @@
           <td data-label="{% trans 'Customer' %}">{{ pedido.cliente.nombre_empresa }}</td>
           <td data-label="{% trans 'Selector' %}">{% if pedido.seleccionador %}{% firstof pedido.seleccionador.get_full_name pedido.seleccionador.username %}{% else %}<span class="text-muted">-</span>{% endif %}</td>
           <td data-label="{% trans 'Origin' %}">{{ pedido.origen_label }}</td>
-          <td data-label="{% trans 'Status' %}"><span class="badge {% if pedido.estado == 'DESPACHADO' %}bg-success{% elif pedido.estado == 'CANCELADO' %}bg-secondary{% elif pedido.estado == 'EN_GESTION' or pedido.estado == 'PARA_VERIFICAR' or pedido.estado == 'VERIFICADO_AJUSTADO' or pedido.estado == 'INVOICE_GENERADA' %}bg-warning text-dark{% else %}bg-info text-dark{% endif %}">{{ pedido.estado_label }}</span></td>
+          <td data-label="{% trans 'Status' %}">
+            <div class="workflow-status-stack">
+              <span class="badge {% if pedido.estado == 'DESPACHADO' %}bg-success{% elif pedido.estado == 'CANCELADO' %}bg-secondary{% elif pedido.estado == 'EN_GESTION' or pedido.estado == 'PARA_VERIFICAR' or pedido.estado == 'VERIFICADO_AJUSTADO' or pedido.estado == 'INVOICE_GENERADA' %}bg-warning text-dark{% else %}bg-info text-dark{% endif %}">{{ pedido.estado_label }}</span>
+              {% if pedido.workflow_badge %}
+              <span class="workflow-role-badge {% if pedido.workflow_badge.kind == 'split' %}workflow-role-badge--split{% endif %}" style="--workflow-start: {{ pedido.workflow_badge.color_start }}; --workflow-end: {{ pedido.workflow_badge.color_end }}; --workflow-text: {{ pedido.workflow_badge.text_color }};">
+                {{ pedido.workflow_badge.label }}
+              </span>
+              {% endif %}
+            </div>
+          </td>
           <td data-label="{% trans 'Total' %}">${{ pedido.total }}</td>
           <td data-label="{% trans 'Date' %}">{{ pedido.creada_en|date:"d/m/Y H:i" }}</td>
           <td data-label="{% trans 'Action' %}" class="mobile-stack-table__action">
@@ -56,7 +65,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="8" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No purchase orders have been registered yet." %}</td>
+          <td colspan="8" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No sales orders have been registered yet." %}</td>
         </tr>
         {% endfor %}
       </tbody>

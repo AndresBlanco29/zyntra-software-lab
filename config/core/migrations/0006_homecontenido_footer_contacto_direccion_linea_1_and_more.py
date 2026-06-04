@@ -3,6 +3,36 @@
 from django.db import migrations, models
 
 
+def add_missing_homecontenido_footer_fields(apps, schema_editor):
+    model = apps.get_model('core', 'HomeContenido')
+    table_name = model._meta.db_table
+
+    with schema_editor.connection.cursor() as cursor:
+        existing_columns = {
+            column.name
+            for column in schema_editor.connection.introspection.get_table_description(cursor, table_name)
+        }
+
+    field_definitions = (
+        ('footer_contacto_direccion_linea_1', models.CharField(default='1666 Roswell Rd Bldg 100', max_length=180)),
+        ('footer_contacto_direccion_linea_2', models.CharField(default='Marietta, GA 30062-3639', max_length=180)),
+        ('footer_contacto_email', models.EmailField(default='latortilla@gmail.com', max_length=254)),
+        ('footer_contacto_telefono', models.CharField(default='+1 (470) 967 2782', max_length=60)),
+        ('footer_contacto_titulo', models.CharField(default='Contactanos', max_length=120)),
+        ('footer_contacto_titulo_en', models.CharField(blank=True, max_length=120, null=True)),
+        ('footer_empresa_descripcion', models.TextField(default='La Tortilla Grocery LLC es un distribuidor mayorista de productos latinos de confianza. Abastecemos tiendas, supermercados y restaurantes con calidad, precios competitivos y entregas eficientes.')),
+        ('footer_empresa_descripcion_en', models.TextField(blank=True, null=True)),
+        ('footer_empresa_titulo', models.CharField(default='La Tortilla Grocery', max_length=120)),
+        ('footer_empresa_titulo_en', models.CharField(blank=True, max_length=120, null=True)),
+    )
+
+    for field_name, field in field_definitions:
+        if field_name in existing_columns:
+            continue
+        field.set_attributes_from_name(field_name)
+        schema_editor.add_field(model, field)
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,54 +40,61 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='homecontenido',
-            name='footer_contacto_direccion_linea_1',
-            field=models.CharField(default='1666 Roswell Rd Bldg 100', max_length=180),
-        ),
-        migrations.AddField(
-            model_name='homecontenido',
-            name='footer_contacto_direccion_linea_2',
-            field=models.CharField(default='Marietta, GA 30062-3639', max_length=180),
-        ),
-        migrations.AddField(
-            model_name='homecontenido',
-            name='footer_contacto_email',
-            field=models.EmailField(default='latortilla@gmail.com', max_length=254),
-        ),
-        migrations.AddField(
-            model_name='homecontenido',
-            name='footer_contacto_telefono',
-            field=models.CharField(default='+1 (470) 967 2782', max_length=60),
-        ),
-        migrations.AddField(
-            model_name='homecontenido',
-            name='footer_contacto_titulo',
-            field=models.CharField(default='Contactanos', max_length=120),
-        ),
-        migrations.AddField(
-            model_name='homecontenido',
-            name='footer_contacto_titulo_en',
-            field=models.CharField(blank=True, max_length=120, null=True),
-        ),
-        migrations.AddField(
-            model_name='homecontenido',
-            name='footer_empresa_descripcion',
-            field=models.TextField(default='La Tortilla Grocery LLC es un distribuidor mayorista de productos latinos de confianza. Abastecemos tiendas, supermercados y restaurantes con calidad, precios competitivos y entregas eficientes.'),
-        ),
-        migrations.AddField(
-            model_name='homecontenido',
-            name='footer_empresa_descripcion_en',
-            field=models.TextField(blank=True, null=True),
-        ),
-        migrations.AddField(
-            model_name='homecontenido',
-            name='footer_empresa_titulo',
-            field=models.CharField(default='La Tortilla Grocery', max_length=120),
-        ),
-        migrations.AddField(
-            model_name='homecontenido',
-            name='footer_empresa_titulo_en',
-            field=models.CharField(blank=True, max_length=120, null=True),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunPython(add_missing_homecontenido_footer_fields, migrations.RunPython.noop),
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name='homecontenido',
+                    name='footer_contacto_direccion_linea_1',
+                    field=models.CharField(default='1666 Roswell Rd Bldg 100', max_length=180),
+                ),
+                migrations.AddField(
+                    model_name='homecontenido',
+                    name='footer_contacto_direccion_linea_2',
+                    field=models.CharField(default='Marietta, GA 30062-3639', max_length=180),
+                ),
+                migrations.AddField(
+                    model_name='homecontenido',
+                    name='footer_contacto_email',
+                    field=models.EmailField(default='latortilla@gmail.com', max_length=254),
+                ),
+                migrations.AddField(
+                    model_name='homecontenido',
+                    name='footer_contacto_telefono',
+                    field=models.CharField(default='+1 (470) 967 2782', max_length=60),
+                ),
+                migrations.AddField(
+                    model_name='homecontenido',
+                    name='footer_contacto_titulo',
+                    field=models.CharField(default='Contactanos', max_length=120),
+                ),
+                migrations.AddField(
+                    model_name='homecontenido',
+                    name='footer_contacto_titulo_en',
+                    field=models.CharField(blank=True, max_length=120, null=True),
+                ),
+                migrations.AddField(
+                    model_name='homecontenido',
+                    name='footer_empresa_descripcion',
+                    field=models.TextField(default='La Tortilla Grocery LLC es un distribuidor mayorista de productos latinos de confianza. Abastecemos tiendas, supermercados y restaurantes con calidad, precios competitivos y entregas eficientes.'),
+                ),
+                migrations.AddField(
+                    model_name='homecontenido',
+                    name='footer_empresa_descripcion_en',
+                    field=models.TextField(blank=True, null=True),
+                ),
+                migrations.AddField(
+                    model_name='homecontenido',
+                    name='footer_empresa_titulo',
+                    field=models.CharField(default='La Tortilla Grocery', max_length=120),
+                ),
+                migrations.AddField(
+                    model_name='homecontenido',
+                    name='footer_empresa_titulo_en',
+                    field=models.CharField(blank=True, max_length=120, null=True),
+                ),
+            ],
         ),
     ]

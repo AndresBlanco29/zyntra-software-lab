@@ -11,6 +11,7 @@ from .auth import (
     build_expiry_timestamp,
     create_oauth_state,
     exchange_code_for_tokens,
+    quickbooks_credentials_configured,
     refresh_access_token,
     validate_quickbooks_settings,
 )
@@ -105,6 +106,7 @@ def get_connection_status():
     return {
         'environment': connection.environment,
         'configured': bool(connection.environment),
+        'credentials_configured': quickbooks_credentials_configured(),
         'realm_id': connection.realm_id,
         'is_active': connection.is_active,
         'connected_at': connection.connected_at.isoformat() if connection.connected_at else None,

@@ -1,972 +1,407 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block title %}{% trans "Reports Center" %}{% endblock %}
 
 {% block content %}
-<style>
-  .reports-shell {
-    --reports-card: #ffffff;
-    --reports-border: #dbe5ee;
-    --reports-ink: #12304a;
-    --reports-muted: #6a7f93;
-    --reports-primary: #0f5c91;
-    display: grid;
-    gap: 1.25rem;
-    padding-bottom: 1rem;
-    overflow-x: hidden;
-  }
-
-  .reports-board,
-  .reports-card,
-  .reports-kpi {
-    background: var(--reports-card);
-    border: 1px solid var(--reports-border);
-    border-radius: 1.35rem;
-    box-shadow: 0 16px 38px rgba(11, 44, 70, 0.08);
-    overflow: hidden;
-  }
-
-  .reports-board {
-    background:
-      radial-gradient(circle at top right, rgba(15, 92, 145, 0.12), transparent 24%),
-      linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
-  }
-
-  .reports-head {
-    display: grid;
-    grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.95fr);
-    gap: 1.5rem;
-    padding: 1.6rem;
-    border-bottom: 1px solid #edf3f8;
-  }
-
-  .reports-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.35rem 0.75rem;
-    border-radius: 999px;
-    background: #eaf3fa;
-    color: var(--reports-primary);
-    font-size: 0.74rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-
-  .reports-muted {
-    color: var(--reports-muted);
-  }
-
-  .reports-chip-row,
-  .reports-toolbar,
-  .reports-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.65rem;
-  }
-
-  .reports-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.5rem 0.9rem;
-    border-radius: 999px;
-    background: #fff;
-    border: 1px solid #d8e4ef;
-    color: #35546f;
-    font-weight: 600;
-    font-size: 0.88rem;
-  }
-
-  .reports-action-block {
-    display: grid;
-    gap: 1rem;
-    align-content: start;
-  }
-
-  .reports-toolbar .btn {
-    border-radius: 999px;
-    padding-inline: 1rem;
-  }
-
-  .reports-mini-grid,
-  .reports-kpis,
-  .reports-grid-2,
-  .reports-ranking-grid {
-    display: grid;
-    gap: 1rem;
-  }
-
-  .reports-kpis {
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    padding: 1.2rem 1.6rem 1.6rem;
-  }
-
-  .reports-kpi {
-    padding: 1.2rem;
-    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  }
-
-  .reports-kpi-value,
-  .reports-value {
-    font-size: clamp(1.55rem, 2.8vw, 2.25rem);
-    line-height: 1;
-    font-weight: 800;
-    color: var(--reports-ink);
-  }
-
-  .reports-filter-card,
-  .reports-card {
-    padding: 1.35rem;
-  }
-
-  .reports-filter-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 0.9rem;
-    align-items: end;
-  }
-
-  .reports-filter-grid label {
-    font-size: 0.78rem;
-    font-weight: 700;
-    color: #38556d;
-    margin-bottom: 0.35rem;
-  }
-
-  .reports-main-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.9fr);
-    gap: 1rem;
-  }
-
-  .reports-chart-box {
-    position: relative;
-    width: 100%;
-    height: 320px;
-    border-radius: 1.1rem;
-    border: 1px solid #deebf4;
-    background: linear-gradient(180deg, #fbfdff 0%, #f2f8fd 100%);
-    padding: 0.75rem;
-  }
-
-  .reports-chart-box.is-tall {
-    height: 360px;
-  }
-
-  .reports-chart-box canvas {
-    width: 100% !important;
-    height: 100% !important;
-  }
-
-  .reports-mini-grid {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  }
-
-  .reports-mini-stat {
-    padding: 1rem;
-    border-radius: 1rem;
-    border: 1px solid #dbe8f1;
-    background: #f7fbfe;
-  }
-
-  .reports-alert-list,
-  .reports-ranking-list,
-  .reports-comparison-list,
-  .reports-donut-legend {
-    display: grid;
-    gap: 0.85rem;
-  }
-
-  .reports-alert {
-    padding: 0.95rem 1rem;
-    border-left: 4px solid var(--reports-primary);
-    border-radius: 1rem;
-    background: #f7fbff;
-  }
-
-  .reports-grid-2 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .reports-donut-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.7fr);
-    gap: 1rem;
-    align-items: center;
-  }
-
-  .reports-donut-item,
-  .reports-ranking-item {
-    display: grid;
-    gap: 0.35rem;
-  }
-
-  .reports-swatch,
-  .reports-legend-dot {
-    width: 0.8rem;
-    height: 0.8rem;
-    border-radius: 999px;
-    display: inline-block;
-  }
-
-  .reports-ranking-track {
-    width: 100%;
-    height: 0.7rem;
-    background: #e8f0f6;
-    border-radius: 999px;
-    overflow: hidden;
-  }
-
-  .reports-ranking-fill {
-    height: 100%;
-    border-radius: 999px;
-    background: linear-gradient(90deg, #0f5c91 0%, #50b9cb 100%);
-  }
-
-  .reports-ranking-fill.is-green {
-    background: linear-gradient(90deg, #2c9357 0%, #96de9f 100%);
-  }
-
-  .reports-compare-row {
-    display: grid;
-    grid-template-columns: minmax(170px, 1.2fr) repeat(3, minmax(100px, 0.8fr));
-    gap: 0.75rem;
-    align-items: center;
-    padding: 0.95rem 0;
-    border-bottom: 1px solid #e7eef5;
-  }
-
-  .reports-compare-row:last-child {
-    border-bottom: 0;
-  }
-
-  @media (max-width: 1199px) {
-    .reports-head,
-    .reports-main-grid,
-    .reports-grid-2,
-    .reports-ranking-grid,
-    .reports-donut-layout {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  @media (min-width: 1200px) {
-    .reports-ranking-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  @media (max-width: 767px) {
-    .reports-head,
-    .reports-kpis,
-    .reports-filter-card,
-    .reports-card {
-      padding: 1rem;
-    }
-
-    .reports-compare-row {
-      grid-template-columns: 1fr;
-    }
-
-    .reports-chart-box,
-    .reports-chart-box.is-tall {
-      height: 280px;
-    }
-  }
-</style>
+<link rel="stylesheet" href="{% static 'css/reports_dashboard.css' %}">
 
 <div class="reports-shell">
-  <section class="reports-board">
-    <div class="reports-head">
-      <div>
-        <span class="reports-label">{% trans "Executive reporting workspace" %}</span>
-        <h1 class="h2 fw-bold mt-3 mb-2">{% trans "Reports Center" %}</h1>
-        <p class="reports-muted mb-3">{% trans "Control the day, compare periods and visualize what is moving in sales, collections, customers and product categories from a single analytics board." %}</p>
-        <div class="reports-chip-row">
-          <span class="reports-chip">{{ period.label }}</span>
-          <span class="reports-chip">{{ period.start_date|date:"d/m/Y" }} - {{ period.end_date|date:"d/m/Y" }}</span>
-          <span class="reports-chip">{{ period.days }} {% trans "day window" %}</span>
-          <span class="reports-chip">{{ close_snapshot.deliveries_count }} {% trans "deliveries" %}</span>
-        </div>
-      </div>
-      <div class="reports-action-block">
-        <div class="reports-toolbar">
-          <a href="{% url 'reportes_export_excel' %}?{{ export_querystring }}" class="btn btn-light border text-primary fw-semibold">{% trans "Export Excel" %}</a>
-          <a href="{% url 'reportes_export_pdf' %}?{{ export_querystring }}" class="btn btn-outline-primary fw-semibold">{% trans "Export PDF" %}</a>
-          <form method="post" action="{% url 'reportes_send_email_now' %}" class="d-inline">
-            {% csrf_token %}
-            <input type="hidden" name="period" value="{{ period.preset }}">
-            <input type="hidden" name="start_date" value="{{ period.start_date|date:'Y-m-d' }}">
-            <input type="hidden" name="end_date" value="{{ period.end_date|date:'Y-m-d' }}">
-            <input type="hidden" name="driver_id" value="{{ active_filters.driver_id|default:'' }}">
-            <input type="hidden" name="vendor_id" value="{{ active_filters.vendor_id|default:'' }}">
-            <input type="hidden" name="customer_id" value="{{ active_filters.customer_id|default:'' }}">
-            <input type="hidden" name="section" value="{{ active_filters.section }}">
-            <button type="submit" class="btn btn-warning fw-semibold">{% trans "Send by email" %}</button>
-          </form>
-        </div>
-        <div class="reports-mini-grid">
-          <div class="reports-mini-stat">
-            <div class="small text-uppercase fw-semibold text-secondary mb-1">{% trans "Today collected" %}</div>
-            <div class="reports-value">${{ today_close.collected_amount }}</div>
-            <div class="reports-muted small mt-2">{{ today_close.deliveries_count }} {% trans "completed deliveries today" %}</div>
-          </div>
-          <div class="reports-mini-stat">
-            <div class="small text-uppercase fw-semibold text-secondary mb-1">{% trans "Today's outstanding" %}</div>
-            <div class="reports-value">${{ today_close.outstanding_amount }}</div>
-            <div class="reports-muted small mt-2">{{ today_close.unpaid_count }} {% trans "unpaid deliveries today" %}</div>
-          </div>
-        </div>
-      </div>
+  <div class="reports-hero d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div>
+      <div class="small text-white-50 text-uppercase fw-semibold">{% trans "Analytics workspace" %}</div>
+      <h1>{% trans "Reports Center" %}</h1>
+      <p class="mb-0 text-white-50">{{ period.label }} · {{ period.start_date|date:"M j, Y" }} — {{ period.end_date|date:"M j, Y" }}</p>
     </div>
-
-    <section class="reports-kpis">
-      {% for card in summary_cards %}
-        <article class="reports-kpi">
-          <h3 class="h6 mb-3">{{ card.label }}</h3>
-          <div class="reports-kpi-value">{% if card.is_currency %}${{ card.value }}{% else %}{{ card.value }}{% endif %}</div>
-          <p class="reports-muted small mt-3 mb-0">{{ card.caption }}</p>
-        </article>
-      {% endfor %}
-    </section>
-  </section>
-
-  <section class="reports-card reports-filter-card">
-    <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
-      <div>
-        <span class="reports-label">{% trans "Filter" %}</span>
-        <h2 class="h5 mt-2 mb-1">{% trans "Analyze a day, week, biweekly window or month" %}</h2>
-        <p class="reports-muted mb-0">{% trans "Use quick windows or a custom range to refresh the analytics board and exports." %}</p>
-      </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'reportes_export_excel' %}?{{ export_querystring }}" class="btn btn-light text-primary fw-semibold">{% trans "Export Excel" %}</a>
+      <a href="{% url 'reportes_export_pdf' %}?{{ export_querystring }}" class="btn btn-outline-light">{% trans "Export PDF" %}</a>
     </div>
-    <form method="get" class="reports-filter-grid">
-      <div>
-        <label for="id_period">{% trans "Window" %}</label>
-        <select id="id_period" name="period" class="form-select">
-          {% for value, label in period_choices %}
-            <option value="{{ value }}" {% if period.preset == value %}selected{% endif %}>{{ label }}</option>
+  </div>
+
+  <form method="get" class="card reports-filter-card mb-4">
+    <div class="card-body row g-3 align-items-end">
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">{% trans "Period" %}</label>
+        <select name="period" class="form-select form-select-sm">
+          {% for key, label in period_choices %}
+          <option value="{{ key }}" {% if period.preset == key %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
       </div>
-      <div>
-        <label for="id_start_date">{% trans "Start date" %}</label>
-        <input id="id_start_date" type="date" name="start_date" value="{{ period.start_date|date:'Y-m-d' }}" class="form-control">
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">{% trans "Start" %}</label>
+        <input type="date" name="start_date" class="form-control form-control-sm" value="{{ period.start_date|date:'Y-m-d' }}">
       </div>
-      <div>
-        <label for="id_end_date">{% trans "End date" %}</label>
-        <input id="id_end_date" type="date" name="end_date" value="{{ period.end_date|date:'Y-m-d' }}" class="form-control">
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">{% trans "End" %}</label>
+        <input type="date" name="end_date" class="form-control form-control-sm" value="{{ period.end_date|date:'Y-m-d' }}">
       </div>
-      <div>
-        <label for="id_driver_id">{% trans "Driver" %}</label>
-        <select id="id_driver_id" name="driver_id" class="form-select">
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">{% trans "Driver" %}</label>
+        <select name="driver_id" class="form-select form-select-sm">
           <option value="">{% trans "All drivers" %}</option>
-          {% for id, label in filter_options.drivers %}
-            <option value="{{ id }}" {% if active_filters.driver_id == id %}selected{% endif %}>{{ label }}</option>
+          {% for driver_id, driver_name in filter_options.drivers %}
+          <option value="{{ driver_id }}" {% if active_filters.driver_id == driver_id %}selected{% endif %}>{{ driver_name }}</option>
           {% endfor %}
         </select>
       </div>
-      <div>
-        <label for="id_vendor_id">{% trans "Vendor" %}</label>
-        <select id="id_vendor_id" name="vendor_id" class="form-select">
-          <option value="">{% trans "All vendors" %}</option>
-          {% for id, label in filter_options.vendors %}
-            <option value="{{ id }}" {% if active_filters.vendor_id == id %}selected{% endif %}>{{ label }}</option>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">{% trans "Sales rep" %}</label>
+        <select name="vendor_id" class="form-select form-select-sm">
+          <option value="">{% trans "All reps" %}</option>
+          {% for vendor_id, vendor_name in filter_options.vendors %}
+          <option value="{{ vendor_id }}" {% if active_filters.vendor_id == vendor_id %}selected{% endif %}>{{ vendor_name }}</option>
           {% endfor %}
         </select>
       </div>
-      <div>
-        <label for="id_customer_id">{% trans "Customer" %}</label>
-        <select id="id_customer_id" name="customer_id" class="form-select">
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">{% trans "Customer" %}</label>
+        <select name="customer_id" class="form-select form-select-sm">
           <option value="">{% trans "All customers" %}</option>
-          {% for id, label in filter_options.customers %}
-            <option value="{{ id }}" {% if active_filters.customer_id == id %}selected{% endif %}>{{ label }}</option>
+          {% for customer_id, customer_name in filter_options.customers %}
+          <option value="{{ customer_id }}" {% if active_filters.customer_id == customer_id %}selected{% endif %}>{{ customer_name }}</option>
           {% endfor %}
         </select>
       </div>
-      <div>
-        <label for="id_section">{% trans "Export section" %}</label>
-        <select id="id_section" name="section" class="form-select">
-          {% for value, label in section_choices %}
-            <option value="{{ value }}" {% if active_filters.section == value %}selected{% endif %}>{{ label }}</option>
+      <div class="col-md-2">
+        <label class="form-label small fw-semibold">{% trans "Export section" %}</label>
+        <select name="section" class="form-select form-select-sm">
+          {% for key, label in section_choices %}
+          <option value="{{ key }}" {% if active_filters.section == key %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
       </div>
-      <div>
-        <button type="submit" class="btn btn-primary w-100">{% trans "Refresh report" %}</button>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary btn-sm w-100">{% trans "Apply filters" %}</button>
       </div>
-    </form>
-  </section>
+    </div>
+  </form>
 
-  <div class="reports-main-grid">
-    <section class="reports-card">
-      <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
-        <div>
-          <span class="reports-label">{% trans "Trends" %}</span>
-          <h2 class="h5 mt-2 mb-1">{% trans "Daily sales and collection pulse" %}</h2>
-          <p class="reports-muted mb-0">{% trans "Now rendered as a real responsive chart, without SVG fallbacks or horizontal scrolling." %}</p>
-        </div>
-      </div>
-      <div class="reports-chart-box is-tall">
-        <canvas id="trendChart"></canvas>
-      </div>
-    </section>
-
-    <section class="reports-card">
-      <span class="reports-label">{% trans "Attention points" %}</span>
-      <h2 class="h5 mt-2 mb-3">{% trans "What deserves follow-up now" %}</h2>
-      <div class="reports-mini-grid mb-3">
-        <div class="reports-mini-stat">
-          <div class="small text-uppercase fw-semibold text-secondary mb-1">{% trans "Delivered amount" %}</div>
-          <div class="reports-value">${{ close_snapshot.delivered_amount }}</div>
-        </div>
-        <div class="reports-mini-stat">
-          <div class="small text-uppercase fw-semibold text-secondary mb-1">{% trans "Collected amount" %}</div>
-          <div class="reports-value">${{ close_snapshot.collected_amount }}</div>
-        </div>
-        <div class="reports-mini-stat">
-          <div class="small text-uppercase fw-semibold text-secondary mb-1">{% trans "Outstanding balance" %}</div>
-          <div class="reports-value">${{ close_snapshot.outstanding_amount }}</div>
-        </div>
-        <div class="reports-mini-stat">
-          <div class="small text-uppercase fw-semibold text-secondary mb-1">{% trans "Delivered items" %}</div>
-          <div class="reports-value">{{ close_snapshot.items_delivered }}</div>
-        </div>
-      </div>
-      <div class="mb-3">
-        {% if close_snapshot.reconciliation_gap == 0 %}
-          <span class="badge rounded-pill text-bg-success-subtle text-success border border-success-subtle px-3 py-2">{% trans "Reconciliation balanced" %}</span>
-        {% else %}
-          <span class="badge rounded-pill text-bg-danger-subtle text-danger border border-danger-subtle px-3 py-2">{% trans "Review mismatch" %}</span>
-        {% endif %}
-      </div>
-      <div class="reports-alert-list">
-        {% for alert in focus_alerts %}
-          <article class="reports-alert">
-            <div class="fw-semibold text-dark mb-1">{{ alert.title }}</div>
-            <div class="reports-muted small">{{ alert.description }}</div>
-          </article>
-        {% empty %}
-          <p class="reports-muted mb-0">{% trans "No operational alerts were generated for this range." %}</p>
-        {% endfor %}
-      </div>
-    </section>
+  <div class="reports-kpi-grid">
+    {% for card in summary_cards %}
+    <div class="reports-kpi">
+      <div class="label">{{ card.label }}</div>
+      <div class="value">{% if card.is_currency %}${{ card.value|floatformat:2 }}{% else %}{{ card.value }}{% endif %}</div>
+      <p class="caption">{{ card.caption }}</p>
+    </div>
+    {% endfor %}
   </div>
 
-  <div class="reports-grid-2">
-    <section class="reports-card">
-      <span class="reports-label">{% trans "Category drill-down" %}</span>
-      <h2 class="h5 mt-2 mb-3">{% trans "Ventas por categoría" %}</h2>
-      <div class="reports-donut-layout">
-        <div class="reports-chart-box">
-          <canvas id="categoryChart"></canvas>
-        </div>
-        <div class="reports-donut-legend">
-          {% for item in category_chart.segments %}
-            <article class="reports-donut-item">
-              <div class="d-flex justify-content-between gap-3 align-items-center">
-                <div class="fw-semibold text-dark"><span class="reports-swatch me-2" style="background: {{ item.color }};"></span>{{ item.label }}</div>
-                <div class="text-end">
-                  <div class="fw-semibold text-dark">${{ item.value }}</div>
-                  <div class="reports-muted small">{{ item.share_percent }}%</div>
-                </div>
-              </div>
-            </article>
-          {% empty %}
-            <p class="reports-muted mb-0">{% trans "No category performance was found in this range." %}</p>
-          {% endfor %}
-        </div>
-      </div>
-    </section>
+  {% if focus_alerts %}
+  <div class="mb-4">
+    {% for alert in focus_alerts %}
+    <div class="reports-alert">
+      <strong>{{ alert.title }}</strong>
+      <div class="small text-muted mt-1">{{ alert.description }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
-    <section class="reports-card">
-      <span class="reports-label">{% trans "Payment mix" %}</span>
-      <h2 class="h5 mt-2 mb-3">{% trans "Formas de pago" %}</h2>
-      <div class="reports-donut-layout">
-        <div class="reports-chart-box">
-          <canvas id="paymentChart"></canvas>
+  <div class="row g-4 mb-4">
+    <div class="col-xl-8">
+      <div class="reports-panel h-100">
+        <div class="panel-head">
+          <h3>{% trans "Sales vs collections trend" %}</h3>
+          <span class="badge text-bg-light text-primary">{{ period.days }} {% trans "days" %}</span>
         </div>
-        <div class="reports-donut-legend">
-          {% for item in payment_chart.segments %}
-            <article class="reports-donut-item">
-              <div class="d-flex justify-content-between gap-3 align-items-center">
-                <div class="fw-semibold text-dark"><span class="reports-swatch me-2" style="background: {{ item.color }};"></span>{{ item.label }}</div>
-                <div class="text-end">
-                  <div class="fw-semibold text-dark">${{ item.value }}</div>
-                  <div class="reports-muted small">{{ item.share_percent }}%</div>
-                </div>
+        <div class="panel-body">
+          {% if trend_rows %}
+          <svg class="reports-trend-svg mb-3" viewBox="0 0 100 64" preserveAspectRatio="none" role="img" aria-label="{% trans 'Trend chart' %}">
+            <polyline fill="none" stroke="#1d5cb8" stroke-width="1.8" stroke-linejoin="round" points="{{ trend_chart.sales_points }}"></polyline>
+            <polyline fill="none" stroke="#2b9f5a" stroke-width="1.8" stroke-linejoin="round" points="{{ trend_chart.collected_points }}"></polyline>
+          </svg>
+          <div class="reports-trend-bars">
+            {% for row in trend_rows %}
+            <div class="day">
+              <div class="bar-group">
+                <div class="bar sales" style="height: {{ row.sales_bar_height }}px;" title="{% trans 'Sales' %}"></div>
+                <div class="bar collected" style="height: {{ row.collected_bar_height }}px;" title="{% trans 'Collected' %}"></div>
               </div>
-            </article>
-          {% empty %}
-            <p class="reports-muted mb-0">{% trans "No payment mix data is available for this range." %}</p>
-          {% endfor %}
+              <div class="day-label">{{ row.label }}</div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="reports-legend-inline">
+            <span class="lg-sales">{% trans "Gross sales" %}</span>
+            <span class="lg-collected">{% trans "Collected on routes" %}</span>
+          </div>
+          {% else %}
+          <p class="text-muted mb-0">{% trans "No trend data for the selected period." %}</p>
+          {% endif %}
         </div>
       </div>
-    </section>
+    </div>
+    <div class="col-xl-4">
+      <div class="reports-panel h-100">
+        <div class="panel-head"><h3>{% trans "Period comparison" %}</h3></div>
+        <div class="panel-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0 reports-compare-table">
+              <thead>
+                <tr>
+                  <th>{% trans "Metric" %}</th>
+                  <th class="text-end">{% trans "Current" %}</th>
+                  <th class="text-end">{% trans "Change" %}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in comparison_rows %}
+                <tr>
+                  <td>{{ row.label }}</td>
+                  <td class="text-end fw-semibold">
+                    {% if forloop.counter <= 2 %}
+                      {{ row.current_value|floatformat:0 }}
+                    {% else %}
+                      ${{ row.current_value|floatformat:2 }}
+                    {% endif %}
+                  </td>
+                  <td class="text-end {% if row.is_positive %}text-success{% else %}text-danger{% endif %}">
+                    {% if row.change_percent %}{{ row.change_percent|floatformat:1 }}%{% else %}—{% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div class="reports-ranking-grid">
-    <section class="reports-card">
-      <span class="reports-label">{% trans "Customer drill-down" %}</span>
-      <h2 class="h5 mt-2 mb-3">{% trans "Top clients by billing" %}</h2>
-      <div class="reports-ranking-list">
-        {% for row in customer_rows %}
-          <article class="reports-ranking-item">
-            <div class="d-flex justify-content-between gap-3">
-              <div>
-                <div class="fw-semibold text-dark">{{ row.name }}</div>
-                <div class="reports-muted small">{% blocktrans with count=row.invoices_count %}{{ count }} invoices{% endblocktrans %}</div>
+  <div class="row g-4 mb-4">
+    <div class="col-lg-6">
+      <div class="reports-panel h-100">
+        <div class="panel-head"><h3>{% trans "Revenue by category" %}</h3></div>
+        <div class="panel-body">
+          {% if category_chart.segments %}
+          <div class="reports-donut-wrap">
+            <div class="reports-donut" style="background: {{ category_chart.style }};"></div>
+            <div class="reports-donut-legend">
+              {% for segment in category_chart.segments %}
+              <div class="reports-legend-item">
+                <span><span class="reports-legend-swatch" style="background: {{ segment.color }};"></span> {{ segment.label }}</span>
+                <span class="fw-semibold">${{ segment.value|floatformat:2 }} ({{ segment.share_percent }}%)</span>
               </div>
-              <div class="text-end">
-                <div class="fw-semibold text-dark">${{ row.sales_amount }}</div>
-                <div class="reports-muted small">${{ row.pending_amount }} {% trans "pending" %}</div>
-              </div>
-            </div>
-            <div class="reports-ranking-track">
-              <div class="reports-ranking-fill" style="width: {{ row.bar_width }}%"></div>
-            </div>
-          </article>
-        {% empty %}
-          <p class="reports-muted mb-0">{% trans "No customer billing was found in this range." %}</p>
-        {% endfor %}
-      </div>
-    </section>
-
-    <section class="reports-card">
-      <span class="reports-label">{% trans "Product drill-down" %}</span>
-      <h2 class="h5 mt-2 mb-3">{% trans "Top products by revenue" %}</h2>
-      <div class="reports-ranking-list">
-        {% for row in top_products %}
-          <article class="reports-ranking-item">
-            <div class="d-flex justify-content-between gap-3">
-              <div>
-                <div class="fw-semibold text-dark">{{ row.name }}</div>
-                <div class="reports-muted small">{{ row.units_sold }} {% trans "units" %}</div>
-              </div>
-              <div class="text-end fw-semibold text-dark">${{ row.revenue }}</div>
-            </div>
-            <div class="reports-ranking-track">
-              <div class="reports-ranking-fill is-green" style="width: {{ row.bar_width }}%"></div>
-            </div>
-          </article>
-        {% empty %}
-          <p class="reports-muted mb-0">{% trans "No product trend is available in this range." %}</p>
-        {% endfor %}
-      </div>
-    </section>
-  </div>
-
-  <div class="reports-grid-2">
-    <section class="reports-card">
-      <span class="reports-label">{% trans "By driver" %}</span>
-      <h2 class="h5 mt-2 mb-3">{% trans "Route close per driver" %}</h2>
-      <div class="reports-chart-box is-tall">
-        <canvas id="driverChart"></canvas>
-      </div>
-    </section>
-
-    <section class="reports-card">
-      <span class="reports-label">{% trans "Recent close" %}</span>
-      <h2 class="h5 mt-2 mb-3">{% trans "Latest reconciled deliveries" %}</h2>
-      <div class="reports-chart-box is-tall">
-        <canvas id="recentCloseChart"></canvas>
-      </div>
-    </section>
-  </div>
-
-  <div class="reports-grid-2">
-    <section class="reports-card">
-      <span class="reports-label">{% trans "By vendor" %}</span>
-      <h2 class="h5 mt-2 mb-3">{% trans "Commercial performance" %}</h2>
-      <div class="reports-chart-box is-tall">
-        <canvas id="vendorChart"></canvas>
-      </div>
-    </section>
-
-    <section class="reports-card">
-      <span class="reports-label">{% trans "By internal user" %}</span>
-      <h2 class="h5 mt-2 mb-3">{% trans "Invoice creation activity" %}</h2>
-      <div class="reports-chart-box is-tall">
-        <canvas id="creatorChart"></canvas>
-      </div>
-    </section>
-  </div>
-
-  <div class="reports-grid-2">
-    <section class="reports-card">
-      <span class="reports-label">{% trans "Low rotation" %}</span>
-      <h2 class="h5 mt-2 mb-3">{% trans "What sells the least" %}</h2>
-      <div class="reports-chart-box is-tall">
-        <canvas id="lowRotationChart"></canvas>
-      </div>
-    </section>
-
-    <section class="reports-card">
-      <span class="reports-label">{% trans "Comparison" %}</span>
-      <h2 class="h5 mt-2 mb-1">{% trans "Current period vs previous window" %}</h2>
-      <p class="reports-muted mb-0">{% blocktrans with start=period.comparison_start_date|date:'d/m/Y' end=period.comparison_end_date|date:'d/m/Y' %}The previous comparison window covers {{ start }} to {{ end }}.{% endblocktrans %}</p>
-      <div class="reports-comparison-list mt-4">
-        {% for row in comparison_rows %}
-          <div class="reports-compare-row">
-            <div>
-              <div class="fw-semibold text-dark">{{ row.label }}</div>
-              <div class="small reports-muted">
-                {% if row.change_percent is not None %}
-                  {% if row.is_positive %}+{% endif %}{{ row.change_percent }}%
-                {% else %}
-                  {% trans "No previous baseline" %}
-                {% endif %}
-              </div>
-            </div>
-            <div>
-              <div class="small text-uppercase text-secondary fw-semibold">{% trans "Current" %}</div>
-              <div class="fw-bold text-dark">{{ row.current_value }}</div>
-            </div>
-            <div>
-              <div class="small text-uppercase text-secondary fw-semibold">{% trans "Previous" %}</div>
-              <div class="fw-bold text-dark">{{ row.previous_value }}</div>
-            </div>
-            <div>
-              <div class="small text-uppercase text-secondary fw-semibold">{% trans "Change" %}</div>
-              <div class="fw-bold {% if row.is_positive %}text-success{% else %}text-danger{% endif %}">{% if row.is_positive %}+{% endif %}{{ row.change }}</div>
+              {% endfor %}
             </div>
           </div>
-        {% endfor %}
+          {% else %}
+          <p class="text-muted mb-0">{% trans "No category breakdown yet." %}</p>
+          {% endif %}
+        </div>
       </div>
-    </section>
+    </div>
+    <div class="col-lg-6">
+      <div class="reports-panel h-100">
+        <div class="panel-head"><h3>{% trans "Collections by payment method" %}</h3></div>
+        <div class="panel-body">
+          {% if payment_chart.segments %}
+          <div class="reports-donut-wrap">
+            <div class="reports-donut" style="background: {{ payment_chart.style }};"></div>
+            <div class="reports-donut-legend">
+              {% for segment in payment_chart.segments %}
+              <div class="reports-legend-item">
+                <span><span class="reports-legend-swatch" style="background: {{ segment.color }};"></span> {{ segment.label }}</span>
+                <span class="fw-semibold">${{ segment.value|floatformat:2 }} ({{ segment.share_percent }}%)</span>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% else %}
+          <p class="text-muted mb-0">{% trans "No payment breakdown yet." %}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
   </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-xl-6">
+      <div class="reports-panel h-100">
+        <div class="panel-head"><h3>{% trans "Driver close" %}</h3></div>
+        <div class="panel-body">
+          {% if driver_rows %}
+            {% with max_amount=driver_rows.0.delivered_amount %}
+            {% for row in driver_rows %}
+            <div class="reports-bar-row fill-green">
+              <div class="meta"><span class="fw-semibold">{{ row.name }}</span><span>${{ row.collected_amount|floatformat:2 }} · {{ row.deliveries_count }} {% trans "deliveries" %}</span></div>
+              <div class="track"><div class="fill" style="width: {% widthratio row.delivered_amount max_amount 100 %}%;"></div></div>
+            </div>
+            {% endfor %}
+            {% endwith %}
+          {% else %}
+          <p class="text-muted mb-0">{% trans "No driver activity in this range." %}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-6">
+      <div class="reports-panel h-100">
+        <div class="panel-head"><h3>{% trans "Customer drill-down" %}</h3></div>
+        <div class="panel-body">
+          {% if customer_rows %}
+            {% with max_sales=customer_rows.0.sales_amount %}
+            {% for row in customer_rows %}
+            <div class="reports-bar-row">
+              <div class="meta"><span class="fw-semibold">{{ row.name }}</span><span>${{ row.sales_amount|floatformat:2 }}</span></div>
+              <div class="track"><div class="fill" style="width: {% widthratio row.sales_amount max_sales 100 %}%;"></div></div>
+              <div class="small text-muted mt-1">{% trans "Pending" %}: ${{ row.pending_amount|floatformat:2 }} · {% trans "Invoices" %}: {{ row.invoices_count }}</div>
+            </div>
+            {% endfor %}
+            {% endwith %}
+          {% else %}
+          <p class="text-muted mb-0">{% trans "No customer sales in this range." %}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-6">
+      <div class="reports-panel h-100">
+        <div class="panel-head"><h3>{% trans "Sales reps" %}</h3></div>
+        <div class="panel-body">
+          {% if vendor_rows %}
+            {% with max_sales=vendor_rows.0.sales_amount %}
+            {% for row in vendor_rows %}
+            <div class="reports-bar-row fill-amber">
+              <div class="meta"><span class="fw-semibold">{{ row.name }}</span><span>${{ row.sales_amount|floatformat:2 }}</span></div>
+              <div class="track"><div class="fill" style="width: {{ row.bar_width }}%;"></div></div>
+              <div class="small text-muted mt-1">{% trans "Orders" %}: {{ row.orders_count }} · {% trans "Avg. ticket" %}: ${{ row.avg_ticket|floatformat:2 }}</div>
+            </div>
+            {% endfor %}
+            {% endwith %}
+          {% else %}
+          <p class="text-muted mb-0">{% trans "No rep activity yet." %}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="reports-panel h-100">
+        <div class="panel-head"><h3>{% trans "Internal users (invoice creators)" %}</h3></div>
+        <div class="panel-body">
+          {% if creator_rows %}
+            {% for row in creator_rows %}
+            <div class="reports-bar-row">
+              <div class="meta"><span class="fw-semibold">{{ row.name }}</span><span>${{ row.total_amount|floatformat:2 }}</span></div>
+              <div class="track"><div class="fill" style="width: {{ row.bar_width }}%;"></div></div>
+            </div>
+            {% endfor %}
+          {% else %}
+          <p class="text-muted mb-0">{% trans "No internal billing activity." %}</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-6">
+      <div class="reports-panel h-100">
+        <div class="panel-head"><h3>{% trans "Top products" %}</h3></div>
+        <div class="panel-body">
+          {% for row in top_products %}
+          <div class="reports-bar-row fill-green">
+            <div class="meta"><span>{{ row.name }}</span><span>{{ row.units_sold }} {% trans "units" %} · ${{ row.revenue|floatformat:2 }}</span></div>
+            <div class="track"><div class="fill" style="width: {{ row.bar_width }}%;"></div></div>
+          </div>
+          {% empty %}
+          <p class="text-muted mb-0">{% trans "No product sales yet." %}</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="reports-panel h-100">
+        <div class="panel-head"><h3>{% trans "Low rotation watchlist" %}</h3></div>
+        <div class="panel-body">
+          {% for row in low_products %}
+          <div class="reports-bar-row fill-amber">
+            <div class="meta"><span>{{ row.name }}</span><span>{{ row.units_sold }} {% trans "units" %}</span></div>
+            <div class="track"><div class="fill" style="width: {{ row.bar_width }}%;"></div></div>
+          </div>
+          {% empty %}
+          <p class="text-muted mb-0">{% trans "No low-rotation items flagged." %}</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-lg-5">
+      <div class="reports-panel h-100">
+        <div class="panel-head"><h3>{% trans "Route close snapshot" %}</h3></div>
+        <div class="panel-body">
+          <ul class="list-unstyled mb-3">
+            <li class="mb-2"><strong>{% trans "Deliveries" %}:</strong> {{ close_snapshot.deliveries_count }}</li>
+            <li class="mb-2"><strong>{% trans "Drivers active" %}:</strong> {{ close_snapshot.drivers_count }}</li>
+            <li class="mb-2"><strong>{% trans "Delivered value" %}:</strong> ${{ close_snapshot.delivered_amount|floatformat:2 }}</li>
+            <li class="mb-2"><strong>{% trans "Collected" %}:</strong> ${{ close_snapshot.collected_amount|floatformat:2 }}</li>
+            <li class="mb-2"><strong>{% trans "Outstanding" %}:</strong> ${{ close_snapshot.outstanding_amount|floatformat:2 }}</li>
+            <li class="mb-2"><strong>{% trans "Paid / unpaid" %}:</strong> {{ close_snapshot.paid_count }} / {{ close_snapshot.unpaid_count }}</li>
+          </ul>
+          {% for row in close_payment_rows %}
+          <div class="reports-bar-row">
+            <div class="meta"><span>{{ row.label }}</span><span>${{ row.value|floatformat:2 }}</span></div>
+            <div class="track"><div class="fill" style="width: {% if close_snapshot.collected_amount %}{% widthratio row.value close_snapshot.collected_amount 100 %}{% else %}0{% endif %}%;"></div></div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="reports-panel h-100">
+        <div class="panel-head"><h3>{% trans "Recent route closes" %}</h3></div>
+        <div class="panel-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr>
+                  <th>{% trans "Invoice" %}</th>
+                  <th>{% trans "Customer" %}</th>
+                  <th>{% trans "Driver" %}</th>
+                  <th class="text-end">{% trans "Collected" %}</th>
+                  <th class="text-end">{% trans "Pending" %}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in recent_close_rows %}
+                <tr>
+                  <td>{{ row.invoice_number }}</td>
+                  <td>{{ row.customer_name }}</td>
+                  <td>{{ row.driver_name }}</td>
+                  <td class="text-end">${{ row.collected_amount|floatformat:2 }}</td>
+                  <td class="text-end">${{ row.outstanding_amount|floatformat:2 }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-muted p-3">{% trans "No recent closes in range." %}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <form method="post" action="{% url 'reportes_send_email_now' %}" class="card reports-filter-card">
+    {% csrf_token %}
+    <div class="card-body d-flex flex-wrap align-items-center gap-3">
+      <input type="hidden" name="period" value="{{ period.preset }}">
+      <input type="hidden" name="start_date" value="{{ period.start_date|date:'Y-m-d' }}">
+      <input type="hidden" name="end_date" value="{{ period.end_date|date:'Y-m-d' }}">
+      <input type="hidden" name="section" value="{{ active_filters.section }}">
+      {% if active_filters.driver_id %}<input type="hidden" name="driver_id" value="{{ active_filters.driver_id }}">{% endif %}
+      <button type="submit" class="btn btn-primary">{% trans "Send by email" %}</button>
+      <span class="text-muted small">{% trans "Delivers the selected section as a PDF attachment to configured recipients." %}</span>
+    </div>
+  </form>
 </div>
 
-{{ chart_payloads|json_script:"reports-chart-data" }}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.2/dist/chart.umd.js" integrity="sha384-eI7PSr3L1XLISH8JdDII5YN/njoSsxfbrkCTnJrzXt+ENP5MOVBxD+l6sEG4zoLp" crossorigin="anonymous"></script>
-<script>
-  (function () {
-    const payloadNode = document.getElementById('reports-chart-data');
-    if (!payloadNode || typeof Chart === 'undefined') {
-      return;
-    }
-
-    const chartData = JSON.parse(payloadNode.textContent);
-    const currencyFormatter = new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 2,
-    });
-
-    Chart.defaults.font.family = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-    Chart.defaults.color = '#5f7285';
-    Chart.defaults.plugins.legend.labels.usePointStyle = true;
-    Chart.defaults.plugins.legend.labels.boxWidth = 10;
-
-    const moneyTick = (value) => currencyFormatter.format(value || 0);
-    const byId = (id) => document.getElementById(id);
-
-    function createChart(id, config) {
-      const element = byId(id);
-      if (!element) {
-        return null;
-      }
-      return new Chart(element, config);
-    }
-
-    function baseScales(currencyAxis, secondaryAxis) {
-      const scales = {
-        x: {
-          grid: { color: 'rgba(15, 92, 145, 0.08)' },
-          ticks: { color: '#6a7f93' },
-        },
-        y: {
-          grid: { color: 'rgba(15, 92, 145, 0.08)' },
-          ticks: { color: '#6a7f93' },
-        },
-      };
-      if (currencyAxis === 'y') {
-        scales.y.ticks.callback = moneyTick;
-      }
-      if (currencyAxis === 'x') {
-        scales.x.ticks.callback = moneyTick;
-      }
-      if (secondaryAxis) {
-        scales.y1 = secondaryAxis;
-      }
-      return scales;
-    }
-
-    createChart('trendChart', {
-      type: 'line',
-      data: {
-        labels: chartData.trend.labels,
-        datasets: [
-          {
-            label: '{% trans "Sales" %}',
-            data: chartData.trend.sales,
-            borderColor: '#0f5c91',
-            backgroundColor: 'rgba(15, 92, 145, 0.14)',
-            tension: 0.35,
-            fill: true,
-            pointRadius: 3,
-          },
-          {
-            label: '{% trans "Collected" %}',
-            data: chartData.trend.collected,
-            borderColor: '#2b9f5a',
-            backgroundColor: 'rgba(43, 159, 90, 0.12)',
-            tension: 0.35,
-            fill: true,
-            pointRadius: 3,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { intersect: false, mode: 'index' },
-        scales: baseScales('y'),
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (context) => `${context.dataset.label}: ${moneyTick(context.parsed.y)}`,
-            },
-          },
-        },
-      },
-    });
-
-    createChart('categoryChart', {
-      type: 'doughnut',
-      data: {
-        labels: chartData.categories.labels,
-        datasets: [{ data: chartData.categories.values, backgroundColor: chartData.categories.colors, borderWidth: 0 }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '62%',
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (context) => `${context.label}: ${moneyTick(context.parsed)}`,
-            },
-          },
-        },
-      },
-    });
-
-    createChart('paymentChart', {
-      type: 'doughnut',
-      data: {
-        labels: chartData.payments.labels,
-        datasets: [{ data: chartData.payments.values, backgroundColor: chartData.payments.colors, borderWidth: 0 }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '62%',
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (context) => `${context.label}: ${moneyTick(context.parsed)}`,
-            },
-          },
-        },
-      },
-    });
-
-    createChart('driverChart', {
-      type: 'bar',
-      data: {
-        labels: chartData.drivers.labels,
-        datasets: [
-          { label: '{% trans "Delivered" %}', data: chartData.drivers.delivered, backgroundColor: '#0f5c91', borderRadius: 8 },
-          { label: '{% trans "Collected" %}', data: chartData.drivers.collected, backgroundColor: '#2b9f5a', borderRadius: 8 },
-          { label: '{% trans "Pending" %}', data: chartData.drivers.pending, backgroundColor: '#d58918', borderRadius: 8 },
-        ],
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: baseScales('x'),
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (context) => `${context.dataset.label}: ${moneyTick(context.parsed.x)}`,
-            },
-          },
-        },
-      },
-    });
-
-    createChart('recentCloseChart', {
-      type: 'bar',
-      data: {
-        labels: chartData.recent_close.labels,
-        datasets: [
-          { label: '{% trans "Collected" %}', data: chartData.recent_close.collected, backgroundColor: '#2b9f5a', borderRadius: 8 },
-          { label: '{% trans "Pending" %}', data: chartData.recent_close.pending, backgroundColor: '#d58918', borderRadius: 8 },
-        ],
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: baseScales('x'),
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (context) => `${context.dataset.label}: ${moneyTick(context.parsed.x)}`,
-            },
-          },
-        },
-      },
-    });
-
-    createChart('vendorChart', {
-      data: {
-        labels: chartData.vendors.labels,
-        datasets: [
-          {
-            type: 'bar',
-            label: '{% trans "Sales" %}',
-            data: chartData.vendors.sales,
-            backgroundColor: '#0f5c91',
-            borderRadius: 8,
-          },
-          {
-            type: 'bar',
-            label: '{% trans "Pending" %}',
-            data: chartData.vendors.pending,
-            backgroundColor: '#d58918',
-            borderRadius: 8,
-          },
-          {
-            type: 'line',
-            label: '{% trans "Avg ticket" %}',
-            data: chartData.vendors.avg_ticket,
-            borderColor: '#7552cc',
-            backgroundColor: '#7552cc',
-            yAxisID: 'y1',
-            tension: 0.3,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: baseScales('y', {
-          position: 'right',
-          grid: { drawOnChartArea: false },
-          ticks: { callback: moneyTick, color: '#7552cc' },
-        }),
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (context) => `${context.dataset.label}: ${moneyTick(context.parsed.y)}`,
-            },
-          },
-        },
-      },
-    });
-
-    createChart('creatorChart', {
-      data: {
-        labels: chartData.creators.labels,
-        datasets: [
-          {
-            type: 'bar',
-            label: '{% trans "Total" %}',
-            data: chartData.creators.total,
-            backgroundColor: '#0f5c91',
-            borderRadius: 8,
-          },
-          {
-            type: 'bar',
-            label: '{% trans "Pending" %}',
-            data: chartData.creators.pending,
-            backgroundColor: '#d58918',
-            borderRadius: 8,
-          },
-          {
-            type: 'line',
-            label: '{% trans "Invoices" %}',
-            data: chartData.creators.invoices,
-            borderColor: '#2b9f5a',
-            backgroundColor: '#2b9f5a',
-            yAxisID: 'y1',
-            tension: 0.3,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: baseScales('y', {
-          position: 'right',
-          grid: { drawOnChartArea: false },
-          ticks: { color: '#2b9f5a' },
-        }),
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (context) => {
-                if (context.dataset.yAxisID === 'y1') {
-                  return `${context.dataset.label}: ${context.parsed.y}`;
-                }
-                return `${context.dataset.label}: ${moneyTick(context.parsed.y)}`;
-              },
-            },
-          },
-        },
-      },
-    });
-
-    createChart('lowRotationChart', {
-      data: {
-        labels: chartData.low_rotation.labels,
-        datasets: [
-          {
-            type: 'bar',
-            label: '{% trans "Units" %}',
-            data: chartData.low_rotation.units,
-            backgroundColor: '#39a7d8',
-            borderRadius: 8,
-          },
-          {
-            type: 'line',
-            label: '{% trans "Revenue" %}',
-            data: chartData.low_rotation.revenue,
-            borderColor: '#db5b6b',
-            backgroundColor: '#db5b6b',
-            yAxisID: 'y1',
-            tension: 0.3,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: baseScales(null, {
-          position: 'right',
-          grid: { drawOnChartArea: false },
-          ticks: { callback: moneyTick, color: '#db5b6b' },
-        }),
-        plugins: {
-          tooltip: {
-            callbacks: {
-              label: (context) => {
-                if (context.dataset.yAxisID === 'y1') {
-                  return `${context.dataset.label}: ${moneyTick(context.parsed.y)}`;
-                }
-                return `${context.dataset.label}: ${context.parsed.y}`;
-              },
-            },
-          },
-        },
-      },
-    });
-  })();
-</script>
+{{ chart_payloads|json_script:"reports-chart-payloads" }}
 {% endblock %}

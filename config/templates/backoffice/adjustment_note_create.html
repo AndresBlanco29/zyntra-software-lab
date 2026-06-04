@@ -97,6 +97,9 @@
             </div>
             {% endif %}
             {% if nota.estado == 'BORRADOR' %}
+            {% if nota.quickbooks_id and nota.sync_status == 'SYNCED' %}
+            <div class="small text-primary">{% trans "This note is locked because it is already synced with QuickBooks." %}</div>
+            {% else %}
             <div class="d-flex gap-2">
               <form method="post" action="{% url 'backoffice_invoice_approve_note' nota.id %}">
                 {% csrf_token %}
@@ -107,8 +110,13 @@
                 <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Void" %}</button>
               </form>
             </div>
+            {% endif %}
             {% elif nota.estado == 'APROBADA' %}
+            {% if nota.quickbooks_id and nota.sync_status == 'SYNCED' %}
+            <div class="small text-primary">{% trans "This note is approved and locked because it was already synced with QuickBooks." %}</div>
+            {% else %}
             <div class="small text-success">{% trans "This note is already approved and has already impacted the customer balance." %}</div>
+            {% endif %}
             {% else %}
             <div class="small text-muted">{% trans "This note was voided and no longer affects the customer balance." %}</div>
             {% endif %}
@@ -133,6 +141,8 @@
 
         {% if not selected_client %}
         <div class="alert alert-info mb-0">{% trans "Select a customer to create either a general financial note or an invoice-linked product adjustment." %}</div>
+        {% elif selected_invoice_quickbooks_locked %}
+        <div class="alert alert-light border mb-0">{% trans "The selected invoice is already synced with QuickBooks, so no new linked adjustment note can be created from this screen." %}</div>
         {% else %}
         <form method="post" enctype="multipart/form-data">
           {% csrf_token %}
@@ -159,7 +169,7 @@
               <label class="form-label fw-semibold">{% trans "Reason" %}</label>
               <select name="note_motivo" id="advancedReasonSelect" class="form-select" required>
                 <option value="">{% trans "Select..." %}</option>
-                <option value="DAMAGE">{% trans "Physical damage / transport" %}</option>
+                <option value="DAMAGE">{% trans "Damage / transport" %}</option>
                 <option value="DEFECT">{% trans "Factory defect / quality issue" %}</option>
                 <option value="MISSING_ITEM">{% trans "Missing item" %}</option>
                 <option value="OTHER">{% trans "Other" %}</option>
@@ -188,7 +198,7 @@
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
-              <input type="file" name="note_evidence_photos" class="form-control" accept="image/*" multiple>
+              <input type="file" name="note_evidence_photos" class="form-control" accept="image/*" capture="environment" multiple>
             </div>
           </div>
 

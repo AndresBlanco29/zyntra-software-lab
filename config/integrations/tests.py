@@ -1,12 +1,13 @@
 import gzip
 import json
 import tempfile
+import time
 from decimal import Decimal
 from io import StringIO
 from pathlib import Path
 from datetime import date
 from unittest.mock import Mock, patch
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from django.contrib.messages import get_messages
 from django.core.management import call_command
@@ -435,6 +436,21 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertEqual(modified_at.month, 5)
         self.assertEqual(modified_at.day, 20)
 
+    def _wait_for_restore_job(self, response):
+        self.assertEqual(response.status_code, 302)
+        job_id = parse_qs(urlparse(response.url).query).get('restore_job', [None])[0]
+        self.assertTrue(job_id)
+        for _ in range(200):
+            status_response = self.client.get(reverse('backup_restore_status', args=[job_id]))
+            self.assertEqual(status_response.status_code, 200)
+            data = status_response.json()
+            if data.get('status') == 'completed':
+                return data
+            if data.get('status') == 'failed':
+                self.fail(data.get('error') or 'Restore job failed.')
+            time.sleep(0.05)
+        self.fail('Restore job did not complete in time.')
+
     def test_restore_backup_upload_restores_database_from_downloaded_file(self):
         self.client.force_login(self.user)
         backup_response = self.client.post(reverse('quickbooks_database_backup'))
@@ -460,8 +476,8 @@ class QuickBooksIntegrationTests(TestCase):
         finally:
             Path(temp_path).unlink(missing_ok=True)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Restore completed')
+        restore_result = self._wait_for_restore_job(response)
+        self.assertIn(backup_name, restore_result.get('backup_name', ''))
         self.assertTrue(Producto.objects.filter(nombre='Tortilla 12').exists())
         self.assertTrue(
             any(path.name == backup_name for path in (Path(default_storage.location) / 'backups' / 'database').glob('*.json.gz'))
@@ -474,6 +490,7 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertContains(response, reverse('create_database_backup_stored'))
         self.assertContains(response, reverse('restore_backup_upload'))
         self.assertContains(response, reverse('restore_backup_from_center'))
+        self.assertContains(response, 'restore-job-overlay')
 
     def test_database_backups_center_restore_action_replaces_system_from_selected_backup(self):
         self.client.force_login(self.user)
@@ -501,8 +518,8 @@ class QuickBooksIntegrationTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Restore completed')
+        restore_result = self._wait_for_restore_job(response)
+        self.assertIn(backup_name, restore_result.get('backup_name', ''))
         self.assertTrue(Producto.objects.filter(nombre='Tortilla 12').exists())
         self.assertTrue(default_storage.exists(media_path))
 

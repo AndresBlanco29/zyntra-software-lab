@@ -1,4 +1,8 @@
+import json
+import logging
 import tarfile
+import threading
+import uuid
 from datetime import datetime
 from gzip import open as gzip_open
 from gzip import compress as gzip_compress
@@ -18,6 +22,9 @@ from django.utils import timezone
 
 DATABASE_BACKUP_DIRECTORY = Path('backups') / 'database'
 SYSTEM_BACKUP_DIRECTORY = Path('backups') / 'system'
+UPLOAD_RESTORE_DIRECTORY = Path('backups') / 'uploads'
+RESTORE_JOB_DIRECTORY = Path('backups') / 'restore-jobs'
+logger = logging.getLogger(__name__)
 MEDIA_ARCHIVE_PREFIX = 'media/'
 DATABASE_ARCHIVE_NAME = 'database.json'
 BACKUP_TIMESTAMP_FORMAT = '%Y%m%d-%H%M%S'
@@ -303,22 +310,77 @@ def _validate_uploaded_backup_file(uploaded_file):
     return _backup_kind_from_name(original_name)[1]
 
 
-def restore_database_backup_upload(*, uploaded_file, flush=False):
+def persist_uploaded_backup_for_restore(uploaded_file):
     backup_name = _validate_uploaded_backup_file(uploaded_file)
-    suffix = ''.join(Path(backup_name).suffixes) or '.bin'
+    upload_root = Path(settings.MEDIA_ROOT) / UPLOAD_RESTORE_DIRECTORY
+    upload_root.mkdir(parents=True, exist_ok=True)
+    dest_path = upload_root / f'{uuid.uuid4().hex}-{backup_name}'
     total_bytes = 0
-    with NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
-        temp_path = Path(temp_file.name)
+    with dest_path.open('wb') as dest_file:
         for chunk in uploaded_file.chunks():
             total_bytes += len(chunk)
             if total_bytes > MAX_BACKUP_UPLOAD_BYTES:
-                temp_path.unlink(missing_ok=True)
+                dest_path.unlink(missing_ok=True)
                 raise DatabaseBackupError('Backup file is too large (max 200 MB).')
-            temp_file.write(chunk)
+            dest_file.write(chunk)
+    return dest_path
+
+
+def restore_database_backup_upload(*, uploaded_file, flush=False):
+    temp_path = persist_uploaded_backup_for_restore(uploaded_file)
     try:
         return restore_database_backup_file(source=str(temp_path), flush=flush)
     finally:
         temp_path.unlink(missing_ok=True)
+
+
+def _restore_job_status_path(job_id):
+    normalized_job_id = Path(str(job_id or '').strip()).name
+    if not normalized_job_id or normalized_job_id != str(job_id or '').strip():
+        raise DatabaseBackupError('Invalid restore job id.')
+    job_root = Path(settings.MEDIA_ROOT) / RESTORE_JOB_DIRECTORY
+    job_root.mkdir(parents=True, exist_ok=True)
+    return job_root / f'{normalized_job_id}.json'
+
+
+def _write_restore_job_status(job_id, payload):
+    status_path = _restore_job_status_path(job_id)
+    status_path.write_text(json.dumps(payload), encoding='utf-8')
+
+
+def get_database_restore_job(job_id):
+    try:
+        status_path = _restore_job_status_path(job_id)
+    except DatabaseBackupError:
+        return None
+    if not status_path.exists():
+        return None
+    try:
+        return json.loads(status_path.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def start_database_restore_job(*, source, flush=False, cleanup_source=False):
+    job_id = uuid.uuid4().hex
+    source_value = str(source)
+
+    def _runner():
+        try:
+            _write_restore_job_status(job_id, {'status': 'running', 'phase': 'restore'})
+            backup_name = restore_database_backup_file(source=source_value, flush=flush)
+            _write_restore_job_status(job_id, {'status': 'completed', 'backup_name': backup_name})
+        except Exception as exc:
+            logger.exception('Background database restore failed: %s', exc)
+            _write_restore_job_status(job_id, {'status': 'failed', 'error': str(exc)})
+        finally:
+            if cleanup_source:
+                Path(source_value).unlink(missing_ok=True)
+
+    _write_restore_job_status(job_id, {'status': 'running', 'phase': 'queued'})
+    thread = threading.Thread(target=_runner, daemon=True)
+    thread.start()
+    return job_id
 
 
 def restore_database_backup_file(*, source, flush=False):

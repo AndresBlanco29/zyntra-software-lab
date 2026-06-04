@@ -108,6 +108,7 @@
   <div class="card-body">
     <div class="alert alert-warning small mb-4" role="alert">
       {% trans "Restoring replaces current database records. Type RESTORE and confirm below. After a full restore you may need to sign in again." %}
+      {% trans "Large backups run in the background and can take several minutes; keep this page open until the progress overlay finishes." %}
     </div>
     <div class="row g-4">
       <div class="col-lg-6">
@@ -203,4 +204,81 @@
     </div>
   </div>
 </div>
+
+<div id="restore-job-overlay" style="display:none;position:fixed;inset:0;background:rgba(4,12,30,0.6);backdrop-filter:blur(4px);z-index:1050;align-items:center;justify-content:center;">
+  <div style="max-width:520px;width:92%;background:linear-gradient(180deg,#ffffff,#f1fbff);border-radius:18px;padding:28px 26px;box-shadow:0 30px 60px rgba(2,16,52,0.5);text-align:center;color:#102a63;">
+    <h3 class="h5 mb-2">{% trans "Restoring backup" %}</h3>
+    <p id="restore-job-message" class="text-muted small mb-3">{% trans "Please wait. Do not close this tab." %}</p>
+    <div style="position:relative;height:18px;background:linear-gradient(90deg,#e6f7ff,#dff3ff);border-radius:999px;overflow:hidden;margin:14px 0;">
+      <div id="restore-job-progress" style="height:100%;width:35%;background:linear-gradient(90deg,#1f6fd1,#73d7ff);transition:width 400ms ease;"></div>
+    </div>
+    <p id="restore-job-error" class="text-danger small mb-0" style="display:none;"></p>
+  </div>
+</div>
+
+<script>
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const jobId = params.get('restore_job');
+  if (!jobId) {
+    return;
+  }
+
+  const overlay = document.getElementById('restore-job-overlay');
+  const messageEl = document.getElementById('restore-job-message');
+  const progressEl = document.getElementById('restore-job-progress');
+  const errorEl = document.getElementById('restore-job-error');
+  const statusUrl = '{% url "backup_restore_status" job_id="__JOB__" %}'.replace('__JOB__', encodeURIComponent(jobId));
+
+  overlay.style.display = 'flex';
+
+  function showCompletion(backupName) {
+    progressEl.style.width = '100%';
+    messageEl.textContent = '{% trans "Restore completed." %}';
+    const card = document.createElement('div');
+    card.className = 'mt-3';
+    card.innerHTML = '<p class="small mb-2">{% trans "Restored from:" %} <code></code></p><p class="small mb-3">{% trans "If your session was replaced, sign in again before continuing." %}</p><a class="btn btn-primary btn-sm" href="/login/">{% trans "Go to sign in" %}</a>';
+    card.querySelector('code').textContent = backupName || jobId;
+    overlay.querySelector('div').appendChild(card);
+    if (window.history.replaceState) {
+      const cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+  }
+
+  function poll() {
+    fetch(statusUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+      .then(function (response) { return response.json().then(function (data) { return { ok: response.ok, data: data }; }); })
+      .then(function (payload) {
+        const data = payload.data || {};
+        if (!payload.ok || data.status === 'not_found') {
+          errorEl.style.display = 'block';
+          errorEl.textContent = data.error || '{% trans "Restore job not found." %}';
+          return;
+        }
+        if (data.status === 'running') {
+          progressEl.style.width = data.phase === 'restore' ? '65%' : '35%';
+          window.setTimeout(poll, 2500);
+          return;
+        }
+        if (data.status === 'completed') {
+          showCompletion(data.backup_name);
+          return;
+        }
+        if (data.status === 'failed') {
+          errorEl.style.display = 'block';
+          errorEl.textContent = data.error || '{% trans "Restore failed." %}';
+          messageEl.textContent = '{% trans "Restore failed." %}';
+          return;
+        }
+        window.setTimeout(poll, 2500);
+      })
+      .catch(function () {
+        window.setTimeout(poll, 4000);
+      });
+  }
+
+  poll();
+})();
+</script>
 {% endblock %}

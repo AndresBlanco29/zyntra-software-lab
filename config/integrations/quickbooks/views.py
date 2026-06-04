@@ -32,8 +32,9 @@ from config.integrations.backups import (
     list_system_backups,
     open_database_backup,
     open_system_backup,
-    restore_database_backup_file,
-    restore_database_backup_upload,
+    persist_uploaded_backup_for_restore,
+    start_database_restore_job,
+    get_database_restore_job,
 )
 
 from .auth import QuickBooksConfigurationError, quickbooks_credentials_configured, quickbooks_credentials_setup_message
@@ -769,6 +770,14 @@ def create_system_backup_stored(request):
     return redirect('database_backups_center')
 
 
+def _redirect_to_restore_job(request, job_id):
+    messages.info(
+        request,
+        _('Restore started. This may take several minutes; keep this page open until it finishes.'),
+    )
+    return redirect(f'{reverse("database_backups_center")}?restore_job={job_id}')
+
+
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def restore_backup_upload(request):
@@ -780,13 +789,33 @@ def restore_backup_upload(request):
         return redirect('database_backups_center')
 
     try:
-        restored_name = restore_database_backup_upload(uploaded_file=uploaded_file, flush=True)
+        persisted_path = persist_uploaded_backup_for_restore(uploaded_file)
+        job_id = start_database_restore_job(
+            source=str(persisted_path),
+            flush=True,
+            cleanup_source=True,
+        )
     except DatabaseBackupError as exc:
         logger.warning('Backup restore from upload failed: %s', exc)
         messages.error(request, str(exc))
         return redirect('database_backups_center')
 
-    return _render_restore_completion(restored_name)
+    return _redirect_to_restore_job(request, job_id)
+
+
+@require_GET
+@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+def backup_restore_status(request, job_id):
+    data = get_database_restore_job(job_id)
+    if not data:
+        return JsonResponse({'status': 'not_found', 'error': 'Restore job not found.'}, status=404)
+    payload = {
+        'status': data.get('status'),
+        'phase': data.get('phase'),
+        'backup_name': data.get('backup_name'),
+        'error': data.get('error'),
+    }
+    return JsonResponse(payload)
 
 
 @require_POST
@@ -1182,13 +1211,13 @@ def restore_backup_from_center(request):
         return redirect('database_backups_center')
 
     try:
-        restored_name = restore_database_backup_file(source=backup_name, flush=True)
+        job_id = start_database_restore_job(source=backup_name, flush=True, cleanup_source=False)
     except DatabaseBackupError as exc:
         logger.warning('Backup restore from center failed: %s', exc)
         messages.error(request, str(exc))
         return redirect('database_backups_center')
 
-    return _render_restore_completion(restored_name)
+    return _redirect_to_restore_job(request, job_id)
 
 
 @require_GET

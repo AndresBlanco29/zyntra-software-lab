@@ -273,7 +273,7 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertEqual(connection.refresh_token, '')
         self.assertEqual(connection.last_error, 'QuickBooks connection expired. Reconnect QuickBooks to continue.')
 
-    def test_quickbooks_center_admin_shows_single_admin_navigation_entry(self):
+    def test_quickbooks_center_admin_shows_organized_navigation_with_sales_and_operations(self):
         admin_user = Usuario.objects.create_user(
             username='qb-admin',
             password='secret123',
@@ -285,8 +285,10 @@ class QuickBooksIntegrationTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f'href="{reverse("quickbooks_center")}"', count=1, html=False)
-        self.assertNotContains(response, f'href="{reverse("backoffice_dashboard")}"', html=False)
-        self.assertNotContains(response, f'href="{reverse("tomar_pedido")}"', html=False)
+        self.assertContains(response, 'Customers & Sales', html=False)
+        self.assertContains(response, f'href="{reverse("vendedores_clientes")}"', html=False)
+        self.assertContains(response, f'href="{reverse("tomar_pedido")}"', html=False)
+        self.assertContains(response, f'href="{reverse("backoffice_dashboard")}"', html=False)
 
     def test_quickbooks_center_preview_tabs_keep_live_preview_anchor(self):
         response = self.client.get(reverse('quickbooks_center'), {'preview': 'customers', 'preview_limit': '8'})

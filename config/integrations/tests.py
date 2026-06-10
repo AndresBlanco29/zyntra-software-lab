@@ -1062,6 +1062,54 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         self.assertTrue(default_storage.exists(presentacion.producto.imagen.name))
 
     @patch('config.integrations.quickbooks.client.requests.request')
+    def test_import_items_to_local_handles_single_attachable_object(self, mock_request):
+        self._activate_connection()
+
+        def request_side_effect(method, url, **kwargs):
+            parsed_url = urlparse(url)
+            if parsed_url.path.endswith('/query'):
+                query = kwargs.get('params', {}).get('query', '')
+                if 'from Item' in query:
+                    return self._json_response({
+                        'QueryResponse': {
+                            'Item': [
+                                {
+                                    'Id': 'QB-ITEM-2',
+                                    'Name': 'Imported Chips Bag',
+                                    'Description': 'Single attachable image item',
+                                    'Sku': 'QB-SKU-2',
+                                    'UnitPrice': 3.5,
+                                    'PurchaseCost': 2.0,
+                                    'Active': True,
+                                }
+                            ]
+                        }
+                    })
+                if 'from Attachable' in query:
+                    return self._json_response({
+                        'QueryResponse': {
+                            'Attachable': {
+                                'Id': 'ATT-ITEM-2',
+                                'FileName': 'chips.png',
+                                'Category': 'Image',
+                                'ContentType': 'image/png',
+                                'TempDownloadUri': 'https://download.quickbooks.test/chips.png',
+                            }
+                        }
+                    })
+            if url == 'https://download.quickbooks.test/chips.png':
+                return self._binary_response(b'qb-image-bytes-single', content_type='image/png')
+            raise AssertionError(f'Unexpected QuickBooks request: {method} {url}')
+
+        mock_request.side_effect = request_side_effect
+
+        response = self.client.post(reverse('quickbooks_import_items_to_local'), {'limit': '10'})
+
+        self.assertEqual(response.status_code, 200)
+        presentacion = Presentacion.objects.get(quickbooks_id='QB-ITEM-2')
+        self.assertTrue(bool(presentacion.producto.imagen.name))
+
+    @patch('config.integrations.quickbooks.client.requests.request')
     def test_pull_sync_command_runs_full_pull_summary(self, mock_request):
         self._activate_connection()
         mock_request.side_effect = [

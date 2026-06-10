@@ -121,18 +121,102 @@ class QuickBooksAPIClient:
             page_size=page_size,
         )
 
+    def _normalize_query_entities(self, response, entity_name):
+        entities = response.get(entity_name, [])
+        if isinstance(entities, dict):
+            return [entities]
+        if isinstance(entities, list):
+            return entities
+        return []
+
     def find_attachments_for_entity(self, entity_type, entity_id, *, max_results=10):
+        entity_id = str(entity_id or '').strip()
+        if not entity_id:
+            return []
+
+        type_variants = []
+        for candidate in (entity_type, str(entity_type or '').lower(), str(entity_type or '').title()):
+            normalized = str(candidate or '').strip()
+            if normalized and normalized not in type_variants:
+                type_variants.append(normalized)
+
+        attachments = []
+        seen_ids = set()
+        for type_value in type_variants:
+            response = self.query(
+                self._build_select_statement(
+                    'Attachable',
+                    where_clause=(
+                        f"AttachableRef.EntityRef.Type = '{self._escape_query_value(type_value)}' "
+                        f"and AttachableRef.EntityRef.value = '{self._escape_query_value(entity_id)}'"
+                    ),
+                    max_results=max_results,
+                )
+            )
+            for attachment in self._normalize_query_entities(response, 'Attachable'):
+                attachable_id = str(attachment.get('Id') or '').strip()
+                if attachable_id:
+                    if attachable_id in seen_ids:
+                        continue
+                    seen_ids.add(attachable_id)
+                attachments.append(attachment)
+            if attachments:
+                return attachments[:max_results]
+
         response = self.query(
             self._build_select_statement(
                 'Attachable',
-                where_clause=(
-                    f"AttachableRef.EntityRef.Type = '{self._escape_query_value(entity_type)}' "
-                    f"and AttachableRef.EntityRef.value = '{self._escape_query_value(entity_id)}'"
-                ),
+                where_clause=f"AttachableRef.EntityRef.value = '{self._escape_query_value(entity_id)}'",
                 max_results=max_results,
             )
         )
-        return response.get('Attachable', [])
+        for attachment in self._normalize_query_entities(response, 'Attachable'):
+            attachable_id = str(attachment.get('Id') or '').strip()
+            if attachable_id:
+                if attachable_id in seen_ids:
+                    continue
+                seen_ids.add(attachable_id)
+            attachments.append(attachment)
+        return attachments[:max_results]
+
+    def download_attachable_content(self, attachment):
+        attachable_id = str(attachment.get('Id') or '').strip()
+        download_candidates = [
+            attachment.get('TempDownloadUri'),
+            attachment.get('ThumbnailTempDownloadUri'),
+        ]
+        for download_url in download_candidates:
+            normalized_url = str(download_url or '').strip()
+            if not normalized_url:
+                continue
+            try:
+                return self.download_public_file(normalized_url)
+            except QuickBooksAPIError:
+                try:
+                    return self.download_authenticated_file(normalized_url)
+                except QuickBooksAPIError:
+                    continue
+
+        if attachable_id:
+            return self.download_authenticated_file(
+                f'{self.base_url}{self.realm_path(f"download/{attachable_id}")}',
+            )
+        raise QuickBooksAPIError('QuickBooks attachment does not include a downloadable URI.')
+
+    def download_authenticated_file(self, download_url):
+        response = requests.request(
+            'GET',
+            download_url,
+            headers={
+                'Authorization': f'Bearer {self.connection.access_token}',
+                'Accept': '*/*',
+            },
+            timeout=30,
+        )
+        if not response.ok:
+            logger.warning('QuickBooks authenticated download failed: %s -> %s', download_url, response.status_code)
+            raise QuickBooksAPIError(f'QuickBooks authenticated download failed with status {response.status_code}.')
+        return response.content, response.headers.get('Content-Type', '')
 
     def download_public_file(self, download_url):
         response = requests.request(

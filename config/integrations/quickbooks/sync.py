@@ -1,3 +1,4 @@
+import logging
 import re
 from datetime import timezone as dt_timezone
 from decimal import Decimal, ROUND_HALF_UP
@@ -26,6 +27,9 @@ from .constants import QUICKBOOKS_SYNC_STATUS_FAILED, QUICKBOOKS_SYNC_STATUS_PEN
 
 class QuickBooksSyncError(Exception):
     pass
+
+
+logger = logging.getLogger(__name__)
 
 
 SYNC_CURSOR_OVERLAP_SECONDS = 60
@@ -694,13 +698,15 @@ def _fetch_quickbooks_item_image(client, payload):
     if not item_id:
         return None
 
+    client = client or QuickBooksAPIClient()
     for attachment in client.find_attachments_for_entity('Item', item_id, max_results=10):
         if not _is_image_attachable(attachment):
             continue
-        download_url = attachment.get('TempDownloadUri') or attachment.get('ThumbnailTempDownloadUri')
-        if not download_url:
+        try:
+            file_bytes, content_type = client.download_attachable_content(attachment)
+        except QuickBooksAPIError as exc:
+            logger.warning('QuickBooks image download failed for item %s: %s', item_id, exc)
             continue
-        file_bytes, content_type = client.download_public_file(download_url)
         original_name = attachment.get('FileName') or f'quickbooks-item-{item_id}.bin'
         extension = Path(original_name).suffix
         if not extension:
@@ -714,7 +720,19 @@ def _fetch_quickbooks_item_image(client, payload):
             else:
                 extension = '.jpg'
         return ContentFile(file_bytes, name=f'quickbooks-item-{item_id}{extension}')
+    logger.info('QuickBooks item %s has no downloadable image attachment.', item_id)
     return None
+
+
+def _save_quickbooks_item_image(*, producto, payload, client=None, force=False):
+    if not force and producto.imagen:
+        return False
+    image_file = _fetch_quickbooks_item_image(client, payload)
+    if image_file is None:
+        return False
+    producto.imagen.save(image_file.name, image_file, save=True)
+    cache.delete('catalogo:productos_activos_v2')
+    return True
 
 
 def _extract_quickbooks_item_qty_on_hand(payload):
@@ -805,10 +823,11 @@ def _product_conflict_exists(*, quickbooks_id, product_name, presentation_name):
     ).exclude(quickbooks_id=quickbooks_id).first()
 
 
-def _apply_quickbooks_item_to_local_record(presentacion, payload):
+def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None):
     quickbooks_id = str(payload.get('Id') or '').strip()
     if not quickbooks_id:
         raise QuickBooksSyncError('QuickBooks item payload is missing an Id.')
+    client = client or QuickBooksAPIClient()
     product_name, presentation_name = _parse_quickbooks_item_name(payload)
     description = _truncate(payload.get('Description') or payload.get('FullyQualifiedName') or '', limit=4000)
     sku = _truncate(payload.get('Sku') or '', limit=100)
@@ -816,7 +835,7 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload):
     item_cost = _extract_quickbooks_item_cost(payload)
     category, brand = _resolve_quickbooks_item_category_and_brand(payload)
     producto = presentacion.producto
-    image_file = _fetch_quickbooks_item_image(QuickBooksAPIClient(), payload)
+    image_saved = _save_quickbooks_item_image(producto=producto, payload=payload, client=client)
     producto.nombre = product_name
     producto.descripcion = description
     producto.categoria = category
@@ -824,13 +843,11 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload):
     producto.activo = bool(payload.get('Active', True))
     if sku and (producto.codigo_barras in (None, '', sku) or not Producto.objects.exclude(pk=producto.pk).filter(codigo_barras=sku).exists()):
         producto.codigo_barras = sku
-    if image_file is not None:
-        producto.imagen.save(image_file.name, image_file, save=False)
     producto.quickbooks_id = quickbooks_id
     producto.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
     producto.last_synced_at = timezone.now()
     product_update_fields = ['nombre', 'descripcion', 'categoria', 'marca', 'activo', 'codigo_barras', 'quickbooks_id', 'sync_status', 'last_synced_at']
-    if image_file is not None:
+    if image_saved:
         product_update_fields.append('imagen')
     try:
         producto.save(update_fields=product_update_fields)
@@ -894,6 +911,7 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload):
 @transaction.atomic
 def import_quickbooks_item_record(payload, *, client=None):
     payload = _enrich_quickbooks_item_payload(payload, client=client)
+    client = client or QuickBooksAPIClient()
     quickbooks_id = str(payload.get('Id') or '').strip()
     if not quickbooks_id:
         raise QuickBooksSyncError('QuickBooks item payload is missing an Id.')
@@ -956,10 +974,7 @@ def import_quickbooks_item_record(payload, *, client=None):
                 sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
                 last_synced_at=timezone.now(),
             )
-            image_file = _fetch_quickbooks_item_image(QuickBooksAPIClient(), payload)
-            if image_file is not None:
-                producto.imagen.save(image_file.name, image_file, save=False)
-                producto.save(update_fields=['imagen'])
+            _save_quickbooks_item_image(producto=producto, payload=payload, client=client)
             presentacion = Presentacion.objects.create(
                 producto=producto,
                 nombre=presentation_name,
@@ -1012,10 +1027,7 @@ def import_quickbooks_item_record(payload, *, client=None):
                     local_model='Producto',
                     local_record_id=producto.id,
                 )
-                image_file = _fetch_quickbooks_item_image(QuickBooksAPIClient(), payload)
-                if image_file is not None:
-                    producto.imagen.save(image_file.name, image_file, save=False)
-                    producto.save(update_fields=['imagen'])
+                _save_quickbooks_item_image(producto=producto, payload=payload, client=client)
                 presentacion = Presentacion.objects.create(
                     producto=producto,
                     nombre=presentation_name,
@@ -1044,7 +1056,7 @@ def import_quickbooks_item_record(payload, *, client=None):
             else:
                 raise
     else:
-        presentacion = _apply_quickbooks_item_to_local_record(existing, payload)
+        presentacion = _apply_quickbooks_item_to_local_record(existing, payload, client=client)
         producto = presentacion.producto
         action = 'updated'
 
@@ -1214,6 +1226,53 @@ def import_quickbooks_items(*, max_results=25, client=None, updated_after=None, 
         pass
 
     return result
+
+
+def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=None):
+    client = client or QuickBooksAPIClient()
+    queryset = (
+        Producto.objects.filter(quickbooks_id__isnull=False)
+        .exclude(quickbooks_id='')
+        .filter(Q(imagen__isnull=True) | Q(imagen=''))
+        .order_by('nombre', 'id')
+    )
+    if limit is not None:
+        queryset = queryset[:max(int(limit), 0)]
+
+    summary = {
+        'checked': 0,
+        'synced': 0,
+        'missing_in_qb': 0,
+        'failed': 0,
+        'synced_labels': [],
+    }
+    for producto in queryset.iterator():
+        summary['checked'] += 1
+        item_id = str(producto.quickbooks_id).strip()
+        try:
+            payload = client.find_by_id('Item', item_id) or {'Id': item_id, 'Name': producto.nombre}
+        except QuickBooksAPIError:
+            summary['failed'] += 1
+            continue
+
+        if dry_run:
+            attachments = client.find_attachments_for_entity('Item', item_id, max_results=3)
+            image_attachments = [attachment for attachment in attachments if _is_image_attachable(attachment)]
+            if image_attachments:
+                summary['synced'] += 1
+                summary['synced_labels'].append(producto.nombre)
+            else:
+                summary['missing_in_qb'] += 1
+            continue
+
+        if _save_quickbooks_item_image(producto=producto, payload=payload, client=client):
+            summary['synced'] += 1
+            summary['synced_labels'].append(producto.nombre)
+        else:
+            summary['missing_in_qb'] += 1
+
+    cache.delete('catalogo:productos_activos_v2')
+    return summary
 
 
 def fetch_quickbooks_credit_memos(*, max_results=25, client=None, updated_after=None, page_size=100):

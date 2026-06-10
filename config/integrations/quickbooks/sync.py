@@ -703,7 +703,7 @@ def _resolve_tipo_contenido(label, explicit_tipo=None):
 
     tokens = set(re.findall(r'[a-z0-9]+', normalized))
     packaging_tokens = {
-        'case', 'cs', 'ea', 'each', 'pallet', 'plt', 'box', 'bx', 'pack', 'pk', 'bag', 'can', 'bottle',
+        'case', 'cs', 'ea', 'each', 'pallet', 'plt', 'box', 'bx', 'pack', 'pk', 'bag', 'can', 'bottle', 'ct', 'count',
     }
     packaging_aliases = {
         'case': 'caja',
@@ -713,6 +713,8 @@ def _resolve_tipo_contenido(label, explicit_tipo=None):
         'plt': 'pallet',
         'bx': 'caja',
         'pk': 'pack',
+        'ct': 'unidad',
+        'count': 'unidad',
     }
     if tokens & packaging_tokens:
         for token in sorted(tokens, key=len, reverse=True):
@@ -731,9 +733,43 @@ def _looks_like_packaging_segment(label):
         return True
     if _extract_packaging_unit_count(label):
         return True
-    packaging_tokens = {'case', 'cs', 'ea', 'each', 'pallet', 'plt', 'box', 'bx', 'pack', 'pk'}
+    packaging_tokens = {'case', 'cs', 'ea', 'each', 'pallet', 'plt', 'box', 'bx', 'pack', 'pk', 'ct', 'count'}
     tokens = set(re.findall(r'[a-z0-9]+', normalized))
     return bool(tokens & packaging_tokens)
+
+
+_TRAILING_PACKAGING_PATTERNS = (
+    re.compile(r'^(?P<product>.+?)\s+(?P<packaging>\d+\s*CT)\s*$', re.I),
+    re.compile(r'^(?P<product>.+?)\s+(?P<packaging>\d+\s*COUNT)\s*$', re.I),
+    re.compile(r'^(?P<product>.+?)\s+(?P<packaging>\d+\s*PK)\s*$', re.I),
+    re.compile(r'^(?P<product>.+?)\s+(?P<packaging>\d+\s*PACK)\s*$', re.I),
+    re.compile(r'^(?P<product>.+?)\s+(?P<packaging>PACK\s*\d+)\s*$', re.I),
+    re.compile(r'^(?P<product>.+?)\s+(?P<packaging>BOX\s*\d+)\s*$', re.I),
+    re.compile(r'^(?P<product>.+?)\s+(?P<packaging>\d+\s*BOX)\s*$', re.I),
+    re.compile(r'^(?P<product>.+?)\s+(?P<packaging>CASE\s*\d+)\s*$', re.I),
+    re.compile(r'^(?P<product>.+?)\s+(?P<packaging>\d+\s*CASE)\s*$', re.I),
+    re.compile(r'^(?P<product>.+?)\s+(?P<packaging>CAJA\s*\d+)\s*$', re.I),
+    re.compile(r'^(?P<product>.+?)\s+(?P<packaging>\d+\s*CAJA)\s*$', re.I),
+    re.compile(r'^(?P<product>.+?)\s+(?P<packaging>PALLET)\s*$', re.I),
+    re.compile(r'^(?P<product>.+?)\s+(?P<packaging>CASE)\s*$', re.I),
+    re.compile(r'^(?P<product>.+?)\s+(?P<packaging>BOX)\s*$', re.I),
+    re.compile(r'^(?P<product>.+?)\s+(?P<packaging>CAJA)\s*$', re.I),
+)
+
+
+def _split_trailing_packaging_from_name(name):
+    text = _normalize_text(name)
+    if not text:
+        return None, None
+    for pattern in _TRAILING_PACKAGING_PATTERNS:
+        match = pattern.match(text)
+        if not match:
+            continue
+        product = match.group('product').strip()
+        packaging = match.group('packaging').strip()
+        if product and packaging and _looks_like_packaging_segment(packaging):
+            return product, packaging
+    return None, None
 
 
 def _parse_description_packaging(description):
@@ -777,6 +813,11 @@ def _parse_quickbooks_presentation(payload):
     elif len(parts) >= 2 and _looks_like_packaging_segment(parts[-1]):
         product_name = ' - '.join(parts[:-1])
         presentation_name = parts[-1]
+    else:
+        trailing_product, trailing_packaging = _split_trailing_packaging_from_name(item_name)
+        if trailing_product and trailing_packaging:
+            product_name = trailing_product
+            presentation_name = trailing_packaging
 
     if uom_label and presentation_name in {'Unit', ''}:
         presentation_name = uom_label

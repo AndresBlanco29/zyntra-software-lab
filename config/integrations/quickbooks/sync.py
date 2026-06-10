@@ -1,5 +1,6 @@
 import logging
 import re
+import unicodedata
 from datetime import timezone as dt_timezone
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
@@ -18,7 +19,7 @@ from config.facturacion.models import Invoice, NotaAjuste
 from config.integrations.models import QuickBooksImportConflict
 from config.inventario.models import CompraProveedor, CompraProveedorLinea, Proveedor, StockPresentacion
 from config.inventario.services import registrar_recepcion_compra_proveedor
-from config.productos.models import Categoria, Marca, Presentacion, Producto
+from config.productos.models import Categoria, Marca, PRESENTACION_TERM_TRANSLATIONS, Presentacion, Producto
 from config.usuarios.models import Usuario
 
 from .client import QuickBooksAPIClient, QuickBooksAPIError
@@ -667,12 +668,137 @@ def _resolve_quickbooks_item_category_and_brand(payload):
     return category, brand
 
 
-def _parse_quickbooks_item_name(payload):
+def _normalize_packaging_term(value):
+    normalized = unicodedata.normalize('NFKD', (value or '').strip().lower())
+    return ''.join(char for char in normalized if not unicodedata.combining(char))
+
+
+def _extract_packaging_unit_count(label):
+    if not label:
+        return None
+    patterns = (
+        r'\b(\d+)\s*(?:pk|pack|packs|ct|count|unidades|units|u)\b',
+        r'\b(?:case|box|caja|pallet)\s*[- ]*(\d+)\b',
+        r'\b(\d+)\s*(?:case|box|caja|pallet)\b',
+    )
+    for pattern in patterns:
+        match = re.search(pattern, label, re.I)
+        if match:
+            count = int(match.group(1))
+            if count > 0:
+                return count
+    return None
+
+
+def _resolve_tipo_contenido(label, explicit_tipo=None):
+    if explicit_tipo:
+        normalized = _normalize_packaging_term(explicit_tipo)
+        if normalized in PRESENTACION_TERM_TRANSLATIONS:
+            return PRESENTACION_TERM_TRANSLATIONS[normalized]['es']
+        return explicit_tipo.strip().lower()
+
+    normalized = _normalize_packaging_term(label)
+    if normalized in PRESENTACION_TERM_TRANSLATIONS:
+        return PRESENTACION_TERM_TRANSLATIONS[normalized]['es']
+
+    tokens = set(re.findall(r'[a-z0-9]+', normalized))
+    packaging_tokens = {
+        'case', 'cs', 'ea', 'each', 'pallet', 'plt', 'box', 'bx', 'pack', 'pk', 'bag', 'can', 'bottle',
+    }
+    packaging_aliases = {
+        'case': 'caja',
+        'cs': 'caja',
+        'ea': 'unidad',
+        'each': 'unidad',
+        'plt': 'pallet',
+        'bx': 'caja',
+        'pk': 'pack',
+    }
+    if tokens & packaging_tokens:
+        for token in sorted(tokens, key=len, reverse=True):
+            if token in packaging_aliases:
+                return packaging_aliases[token]
+        for term in sorted(PRESENTACION_TERM_TRANSLATIONS.keys(), key=len, reverse=True):
+            if term in tokens:
+                return PRESENTACION_TERM_TRANSLATIONS[term]['es']
+
+    return 'unidades'
+
+
+def _looks_like_packaging_segment(label):
+    normalized = _normalize_packaging_term(label)
+    if normalized in PRESENTACION_TERM_TRANSLATIONS:
+        return True
+    if _extract_packaging_unit_count(label):
+        return True
+    packaging_tokens = {'case', 'cs', 'ea', 'each', 'pallet', 'plt', 'box', 'bx', 'pack', 'pk'}
+    tokens = set(re.findall(r'[a-z0-9]+', normalized))
+    return bool(tokens & packaging_tokens)
+
+
+def _parse_description_packaging(description):
+    text = _normalize_text(description)
+    if not text or ' | ' not in text:
+        return None, None
+    parts = [part.strip() for part in text.split(' | ') if part.strip()]
+    if len(parts) >= 3:
+        return parts[1], parts[2]
+    if len(parts) == 2:
+        return parts[1], None
+    return None, None
+
+
+def _extract_unit_of_measure_label(payload):
+    for key in ('UnitOfMeasureRef', 'SalesUnitOfMeasure', 'PurchaseUnitOfMeasure'):
+        ref = payload.get(key)
+        if isinstance(ref, dict):
+            name = ref.get('name') or ref.get('Name') or ref.get('value')
+            if name:
+                return str(name).strip()
+        elif ref:
+            return str(ref).strip()
+    return ''
+
+
+def _parse_quickbooks_presentation(payload):
     item_name = _truncate(payload.get('Name') or f"QuickBooks Item {payload.get('Id', '')}", limit=255)
     parts = [part.strip() for part in item_name.split(' - ') if part.strip()]
+    desc_pres, desc_tipo = _parse_description_packaging(payload.get('Description') or '')
+    uom_label = _extract_unit_of_measure_label(payload)
+
+    product_name = item_name
+    presentation_name = desc_pres or uom_label or 'Unit'
+    tipo_contenido = desc_tipo
+    unidades = 1
+
     if len(parts) >= 3 and parts[0].startswith('LTG Item '):
-        return parts[1], parts[2]
-    return item_name, 'Unit'
+        product_name = parts[1]
+        presentation_name = parts[2]
+    elif len(parts) >= 2 and _looks_like_packaging_segment(parts[-1]):
+        product_name = ' - '.join(parts[:-1])
+        presentation_name = parts[-1]
+
+    if uom_label and presentation_name in {'Unit', ''}:
+        presentation_name = uom_label
+
+    if not tipo_contenido:
+        tipo_contenido = _resolve_tipo_contenido(presentation_name)
+
+    unit_count = _extract_packaging_unit_count(presentation_name) or _extract_packaging_unit_count(uom_label)
+    if unit_count:
+        unidades = unit_count
+
+    return (
+        _truncate(product_name, limit=255),
+        _truncate(presentation_name, limit=100),
+        tipo_contenido,
+        max(int(unidades), 1),
+    )
+
+
+def _parse_quickbooks_item_name(payload):
+    product_name, presentation_name, _, _ = _parse_quickbooks_presentation(payload)
+    return product_name, presentation_name
 
 
 def _extract_quickbooks_item_cost(payload):
@@ -810,7 +936,7 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
     if not quickbooks_id:
         raise QuickBooksSyncError('QuickBooks item payload is missing an Id.')
     client = client or QuickBooksAPIClient()
-    product_name, presentation_name = _parse_quickbooks_item_name(payload)
+    product_name, presentation_name, tipo_contenido, unidades = _parse_quickbooks_presentation(payload)
     description = _truncate(payload.get('Description') or payload.get('FullyQualifiedName') or '', limit=4000)
     sku = _truncate(payload.get('Sku') or '', limit=100)
     unit_price = _quantize_money(payload.get('UnitPrice') or 0)
@@ -874,8 +1000,8 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
         else:
             raise
     presentacion.nombre = presentation_name
-    presentacion.unidades = max(int(presentacion.unidades or 1), 1)
-    presentacion.tipo_contenido = presentacion.tipo_contenido or 'unidades'
+    presentacion.unidades = unidades
+    presentacion.tipo_contenido = tipo_contenido
     presentacion.last_synced_at = timezone.now()
     _update_presentacion_from_quickbooks(
         presentacion,
@@ -897,7 +1023,7 @@ def import_quickbooks_item_record(payload, *, client=None):
     if not quickbooks_id:
         raise QuickBooksSyncError('QuickBooks item payload is missing an Id.')
 
-    product_name, presentation_name = _parse_quickbooks_item_name(payload)
+    product_name, presentation_name, tipo_contenido, unidades = _parse_quickbooks_presentation(payload)
     description = _truncate(payload.get('Description') or payload.get('FullyQualifiedName') or '', limit=4000)
     sku = _truncate(payload.get('Sku') or '', limit=100)
     unit_price = _quantize_money(payload.get('UnitPrice') or 0)
@@ -959,8 +1085,8 @@ def import_quickbooks_item_record(payload, *, client=None):
             presentacion = Presentacion.objects.create(
                 producto=producto,
                 nombre=presentation_name,
-                unidades=1,
-                tipo_contenido='unidades',
+                unidades=unidades,
+                tipo_contenido=tipo_contenido,
                 quickbooks_id=quickbooks_id,
                 sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
                 last_synced_at=timezone.now(),
@@ -1002,8 +1128,8 @@ def import_quickbooks_item_record(payload, *, client=None):
                 presentacion = Presentacion.objects.create(
                     producto=producto,
                     nombre=presentation_name,
-                    unidades=1,
-                    tipo_contenido='unidades',
+                    unidades=unidades,
+                    tipo_contenido=tipo_contenido,
                     quickbooks_id=quickbooks_id,
                     sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
                     last_synced_at=timezone.now(),

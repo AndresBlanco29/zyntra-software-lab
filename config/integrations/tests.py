@@ -25,11 +25,59 @@ from config.facturacion.services import generar_invoice_desde_picking
 from config.integrations.backups import _backup_modified_time
 from config.integrations.quickbooks.services import get_connection
 from config.integrations.models import QuickBooksConnection, QuickBooksImportConflict
-from config.integrations.quickbooks.sync import sync_supplier_purchase
+from config.integrations.quickbooks.sync import _parse_quickbooks_presentation, sync_supplier_purchase
 from config.inventario.models import CompraProveedor, CompraProveedorLinea, InventarioMovimiento, Proveedor, StockPresentacion
 from config.pedidos.models import Pedido, PedidoItem
 from config.productos.models import Categoria, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
+
+
+class QuickBooksPresentationParsingTests(TestCase):
+    def test_ltg_export_name_preserves_presentation(self):
+        product, presentation, tipo, units = _parse_quickbooks_presentation({
+            'Id': '1',
+            'Name': 'LTG Item 12 - Jarritos Mango - Pallet',
+        })
+
+        self.assertEqual(product, 'Jarritos Mango')
+        self.assertEqual(presentation, 'Pallet')
+        self.assertEqual(tipo, 'pallet')
+        self.assertEqual(units, 1)
+
+    def test_product_dash_packaging_suffix_parses_case_and_units(self):
+        product, presentation, tipo, units = _parse_quickbooks_presentation({
+            'Id': '2',
+            'Name': 'Jarritos Mango - Case 24',
+        })
+
+        self.assertEqual(product, 'Jarritos Mango')
+        self.assertEqual(presentation, 'Case 24')
+        self.assertEqual(tipo, 'caja')
+        self.assertEqual(units, 24)
+
+    def test_ltg_description_pipe_format_restores_tipo_contenido(self):
+        product, presentation, tipo, units = _parse_quickbooks_presentation({
+            'Id': '3',
+            'Name': 'Imported Salsa Bottle',
+            'Description': 'Catalog item | Caja 12 | caja',
+        })
+
+        self.assertEqual(product, 'Imported Salsa Bottle')
+        self.assertEqual(presentation, 'Caja 12')
+        self.assertEqual(tipo, 'caja')
+        self.assertEqual(units, 12)
+
+    def test_unit_of_measure_ref_is_used_when_available(self):
+        product, presentation, tipo, units = _parse_quickbooks_presentation({
+            'Id': '4',
+            'Name': 'Jarritos Mango',
+            'UnitOfMeasureRef': {'name': 'Box 12'},
+        })
+
+        self.assertEqual(product, 'Jarritos Mango')
+        self.assertEqual(presentation, 'Box 12')
+        self.assertEqual(tipo, 'caja')
+        self.assertEqual(units, 12)
 
 
 @override_settings(

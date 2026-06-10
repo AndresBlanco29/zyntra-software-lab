@@ -14,5 +14,6 @@ urlpatterns = [
     path('editar-cliente/', views.editar_cliente, name='editar_cliente'),
     path('desactivar-cliente/', views.desactivar_cliente, name='desactivar_cliente'),
     path('activar-cliente/', views.activar_cliente, name='activar_cliente'),
+    path('configurar-acceso-cliente/', views.configurar_acceso_cliente, name='configurar_acceso_cliente'),
 
 ]

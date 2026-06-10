@@ -18,6 +18,8 @@ import pytz
 from django.contrib import messages
 import logging
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.password_validation import validate_password
+from django.db import transaction
 from decimal import Decimal, ROUND_HALF_UP
 
 from config.pedidos.models import PedidoItem
@@ -712,3 +714,65 @@ def activar_cliente(request):
 
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)}, status=400)
+
+
+@login_required
+@internal_permission_required('vendor.customers.manage')
+@require_POST
+def configurar_acceso_cliente(request):
+    """Assign username and password to imported customers without web access."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': _('Invalid request.')}, status=400)
+
+    cliente_id = data.get('cliente_id')
+    username = str(data.get('username') or '').strip().lower()
+    password = data.get('password') or ''
+    password_confirm = data.get('password_confirm') or ''
+
+    if not cliente_id:
+        return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
+    if not username:
+        return JsonResponse({'success': False, 'message': _('Username is required.')}, status=400)
+    if not password or not password_confirm:
+        return JsonResponse({'success': False, 'message': _('Please enter and confirm the password.')}, status=400)
+    if password != password_confirm:
+        return JsonResponse({'success': False, 'message': _('Passwords do not match.')}, status=400)
+
+    try:
+        cliente = Cliente.objects.select_related('usuario').get(id=cliente_id)
+    except Cliente.DoesNotExist:
+        return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
+
+    usuario = cliente.usuario
+    if usuario.has_usable_password():
+        return JsonResponse(
+            {'success': False, 'message': _('This customer already has web access configured.')},
+            status=400,
+        )
+
+    if Usuario.objects.filter(username=username).exclude(pk=usuario.pk).exists():
+        return JsonResponse({'success': False, 'message': _('This username is already in use.')}, status=400)
+
+    try:
+        validate_password(password, usuario)
+    except ValidationError as exc:
+        message = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
+        return JsonResponse({'success': False, 'message': message}, status=400)
+
+    with transaction.atomic():
+        usuario.username = username
+        usuario.set_password(password)
+        if not usuario.is_active:
+            usuario.is_active = True
+        usuario.save(update_fields=['username', 'password', 'is_active'])
+
+        update_fields = []
+        if not cliente.aprobado:
+            cliente.aprobado = True
+            update_fields.append('aprobado')
+        if update_fields:
+            cliente.save(update_fields=update_fields)
+
+    return JsonResponse({'success': True, 'message': _('Web access configured successfully.')})

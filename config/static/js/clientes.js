@@ -55,7 +55,12 @@ function getCustomerPageMessages() {
         customerDeactivatedTitle: dataset.msgCustomerDeactivatedTitle || 'Customer deactivated',
         customerDeactivatedBody: dataset.msgCustomerDeactivatedBody || 'The customer was deactivated successfully.',
         customerActivatedTitle: dataset.msgCustomerActivatedTitle || 'Customer activated',
-        customerActivatedBody: dataset.msgCustomerActivatedBody || 'The customer was activated successfully.'
+        customerActivatedBody: dataset.msgCustomerActivatedBody || 'The customer was activated successfully.',
+        accessFillAllFields: dataset.msgAccessFillAllFields || 'Please complete username and both password fields.',
+        accessPasswordMismatch: dataset.msgAccessPasswordMismatch || 'Passwords do not match.',
+        accessErrorPrefix: dataset.msgAccessErrorPrefix || 'Error configuring access:',
+        accessSuccessTitle: dataset.msgAccessSuccessTitle || 'Access configured',
+        accessSuccessBody: dataset.msgAccessSuccessBody || 'The customer can now sign in with the username and password you set.'
     };
 }
 
@@ -260,6 +265,77 @@ function confirmarCambioEstadoCliente() {
 window.abrirModalEstadoCliente = abrirModalEstadoCliente;
 window.confirmarCambioEstadoCliente = confirmarCambioEstadoCliente;
 window.abrirEditarCliente = abrirEditarCliente;
+
+function abrirModalAccesoCliente(clienteId, nombreCliente, usernameActual) {
+    document.getElementById('accesoClienteId').value = clienteId;
+    document.getElementById('accesoClienteNombre').textContent = nombreCliente || customerMessages.customerFallbackName;
+    document.getElementById('accesoUsername').value = usernameActual || '';
+    document.getElementById('accesoPassword').value = '';
+    document.getElementById('accesoPasswordConfirm').value = '';
+
+    const modal = new bootstrap.Modal(document.getElementById('configurarAccesoClienteModal'));
+    modal.show();
+}
+
+function guardarAccesoCliente() {
+    const clienteId = document.getElementById('accesoClienteId').value;
+    const username = document.getElementById('accesoUsername').value.trim().toLowerCase();
+    const password = document.getElementById('accesoPassword').value;
+    const passwordConfirm = document.getElementById('accesoPasswordConfirm').value;
+
+    if (!clienteId || !username || !password || !passwordConfirm) {
+        alert(customerMessages.accessFillAllFields);
+        return;
+    }
+
+    if (password !== passwordConfirm) {
+        alert(customerMessages.accessPasswordMismatch);
+        return;
+    }
+
+    fetch('/vendedores/configurar-acceso-cliente/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            cliente_id: clienteId,
+            username: username,
+            password: password,
+            password_confirm: passwordConfirm
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            alert(`${customerMessages.accessErrorPrefix} ${data.message || customerMessages.unknownError}`);
+            return;
+        }
+
+        const modalAcceso = bootstrap.Modal.getInstance(document.getElementById('configurarAccesoClienteModal'));
+        if (modalAcceso) {
+            modalAcceso.hide();
+        }
+
+        document.getElementById('tituloExitoAccesoCliente').textContent = customerMessages.accessSuccessTitle;
+        document.getElementById('textoExitoAccesoCliente').textContent = customerMessages.accessSuccessBody;
+
+        const modalExito = new bootstrap.Modal(document.getElementById('exitoAccesoClienteModal'));
+        modalExito.show();
+
+        setTimeout(() => {
+            location.reload();
+        }, 1600);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert(customerMessages.requestError);
+    });
+}
+
+window.abrirModalAccesoCliente = abrirModalAccesoCliente;
+window.guardarAccesoCliente = guardarAccesoCliente;
 
 const telefonoInput = document.getElementById('telefonoCliente');
 if (telefonoInput) {

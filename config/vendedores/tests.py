@@ -294,6 +294,58 @@ class VendedorEditarClienteTests(TestCase):
 		self.assertContains(response, 'Cliente Editable')
 		self.assertContains(response, '$239.00')
 
+	def test_pending_access_button_shows_for_imported_customer_without_password(self):
+		self.customer_user.set_unusable_password()
+		self.customer_user.save(update_fields=['password'])
+		self.client.force_login(self.vendor)
+
+		response = self.client.get(reverse('vendedores_clientes'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Acceso pendiente')
+
+	def test_vendor_can_configure_web_access_for_imported_customer(self):
+		self.customer_user.set_unusable_password()
+		self.customer_user.save(update_fields=['password'])
+		self.client.force_login(self.vendor)
+
+		response = self.client.post(
+			reverse('configurar_acceso_cliente'),
+			data=json.dumps({
+				'cliente_id': self.customer.id,
+				'username': 'lilasmarket',
+				'password': 'TempAccess123!',
+				'password_confirm': 'TempAccess123!',
+			}),
+			content_type='application/json',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertJSONEqual(response.content, {'success': True, 'message': 'Web access configured successfully.'})
+		self.customer_user.refresh_from_db()
+		self.assertEqual(self.customer_user.username, 'lilasmarket')
+		self.assertTrue(self.customer_user.has_usable_password())
+		self.assertTrue(self.customer_user.check_password('TempAccess123!'))
+
+	def test_configure_web_access_rejects_mismatched_passwords(self):
+		self.customer_user.set_unusable_password()
+		self.customer_user.save(update_fields=['password'])
+		self.client.force_login(self.vendor)
+
+		response = self.client.post(
+			reverse('configurar_acceso_cliente'),
+			data=json.dumps({
+				'cliente_id': self.customer.id,
+				'username': 'lilasmarket',
+				'password': 'TempAccess123!',
+				'password_confirm': 'OtherPassword123!',
+			}),
+			content_type='application/json',
+		)
+
+		self.assertEqual(response.status_code, 400)
+		self.assertJSONEqual(response.content, {'success': False, 'message': 'Passwords do not match.'})
+
 	def test_admin_can_edit_customer_with_manual_international_location(self):
 		self.client.force_login(self.admin)
 

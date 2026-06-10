@@ -299,6 +299,32 @@ transform:translateY(-1px);
     background: linear-gradient(135deg, #198754, #23b26e);
 }
 
+.vendor-access-pending-btn {
+    background: linear-gradient(to right, #b45309, #f59e0b);
+    border: none;
+    color: #fff;
+    font-weight: 700;
+}
+
+.vendor-access-pending-btn:hover,
+.vendor-access-pending-btn:focus {
+    background: linear-gradient(to right, #92400e, #d97706);
+    color: #fff;
+}
+
+.vendor-access-save-btn {
+    background: linear-gradient(to right, #b45309, #f59e0b);
+    border: none;
+    color: #fff;
+    font-weight: 700;
+}
+
+.vendor-access-save-btn:hover,
+.vendor-access-save-btn:focus {
+    background: linear-gradient(to right, #92400e, #d97706);
+    color: #fff;
+}
+
 .clientes-acciones-group {
 display:flex;
 flex-wrap:wrap;

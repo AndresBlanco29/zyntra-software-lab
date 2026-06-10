@@ -130,35 +130,49 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                             <p class="subtitle">
                                 {% trans "Explore nuestro inventario mayorista" %}
                             </p>
+                            {% if page_obj.paginator.count %}
+                            <p class="subtitle mb-0">
+                                {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+                                Showing {{ start }}-{{ end }} of {{ total }} products
+                                {% endblocktrans %}
+                            </p>
+                            {% endif %}
                         </div>
 
                     </div>
 
-                    <div class="selects-row d-flex w-100 gap-2 mt-2">
+                    <form method="get" id="catalogo-filter-form" class="selects-row d-flex w-100 gap-2 mt-2">
+                        {% if guest_mode %}
+                        <input type="hidden" name="guest" value="1">
+                        {% endif %}
 
                         <input
                             type="search"
                             id="buscador"
+                            name="q"
+                            value="{{ filter_q }}"
                             class="form-control"
                             style="min-width: 260px;"
-                            placeholder= {% trans "Buscar Productos" %}
+                            placeholder="{% trans 'Buscar Productos' %}"
+                            autocomplete="off"
                         >
 
-                        <select class="form-select" id="filtroCategoria">
-                            <option value=""> {% trans "Categoría" %}</option>
+                        <select class="form-select" id="filtroCategoria" name="categoria">
+                            <option value="">{% trans "Categoría" %}</option>
                             {% for c in categorias %}
-                                <option value="{{c.id}}">{{ c.nombre_traducido }}</option>
+                                <option value="{{ c.id }}" {% if filter_categoria == c.id|stringformat:"s" %}selected{% endif %}>{{ c.nombre_traducido }}</option>
                             {% endfor %}
                         </select>
 
-                        <select class="form-select" id="filtroMarca">
+                        <select class="form-select" id="filtroMarca" name="marca">
 
                             <option value="">{% trans "Marca" %}</option>
 
                             {% for m in marcas %}
-                                <option 
+                                <option
                                     value="{{ m.id }}"
-                                data-categoria="{{ m.categorias_ids }}"
+                                    data-categoria="{{ m.categorias_ids }}"
+                                    {% if filter_marca == m.id|stringformat:"s" %}selected{% endif %}
                                 >
                                     {{ m.nombre_traducido }}
                                 </option>
@@ -166,7 +180,7 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
 
                         </select>
 
-                    </div>
+                    </form>
 
                 </div>
 
@@ -265,6 +279,32 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                     {% endfor %}
 
                 </div>
+
+                {% if page_obj.paginator.num_pages > 1 %}
+                <nav aria-label="{% trans 'Product pagination' %}" class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-2">
+                    <ul class="pagination mb-0">
+                        {% if page_obj.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% if guest_mode %}guest=1&{% endif %}{% if filter_q %}q={{ filter_q|urlencode }}&{% endif %}{% if filter_categoria %}categoria={{ filter_categoria }}&{% endif %}{% if filter_marca %}marca={{ filter_marca }}&{% endif %}page={{ page_obj.previous_page_number }}">{% trans "Previous" %}</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled"><span class="page-link">{% trans "Previous" %}</span></li>
+                        {% endif %}
+
+                        <li class="page-item disabled">
+                            <span class="page-link">{% blocktrans with current=page_obj.number total=page_obj.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}</span>
+                        </li>
+
+                        {% if page_obj.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?{% if guest_mode %}guest=1&{% endif %}{% if filter_q %}q={{ filter_q|urlencode }}&{% endif %}{% if filter_categoria %}categoria={{ filter_categoria }}&{% endif %}{% if filter_marca %}marca={{ filter_marca }}&{% endif %}page={{ page_obj.next_page_number }}">{% trans "Next" %}</a>
+                        </li>
+                        {% else %}
+                        <li class="page-item disabled"><span class="page-link">{% trans "Next" %}</span></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
 
             </div>
 

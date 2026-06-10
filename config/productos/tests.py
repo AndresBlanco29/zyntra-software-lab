@@ -214,5 +214,29 @@ class CatalogCustomerPriceTierTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		names = [producto.nombre for producto in response.context['productos']]
-		self.assertEqual(names.index('Alpha Snacks'), 0)
-		self.assertLess(names.index('Totopos'), names.index('Zebra Chips'))
+		self.assertEqual(names[0], 'Alpha Snacks')
+		self.assertEqual(names[1], 'Zebra Chips')
+
+	def test_catalog_paginates_products(self):
+		for index in range(55):
+			producto = Producto.objects.create(
+				nombre=f'Catalog Page {index:03d}',
+				categoria=self.producto.categoria,
+				marca=self.producto.marca,
+				activo=True,
+			)
+			Presentacion.objects.create(
+				producto=producto,
+				nombre='Caja',
+				unidades=1,
+				tipo_contenido='caja',
+				costo=Decimal('10.00'),
+			)
+
+		self.client.force_login(self.usuario)
+		response = self.client.get(reverse('catalogo'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(len(response.context['productos']), 50)
+		self.assertEqual(response.context['page_obj'].paginator.count, 56)
+		self.assertContains(response, 'Page 1 of 2')

@@ -23,41 +23,61 @@ document.addEventListener('DOMContentLoaded', function() {
         pallets: { es: "pallets", en: "pallets" }
 
     };
-    function filtrarProductos() {
-        let texto = document.getElementById("buscador").value.toLowerCase();
-        let categoria = document.getElementById("filtroCategoria").value;
-        let marca = document.getElementById("filtroMarca").value;
 
-        let productos = document.querySelectorAll(".producto-card");
+    function submitCatalogFilters() {
+        const form = document.getElementById('catalogo-filter-form');
+        if (form) {
+            form.submit();
+        }
+    }
 
-        productos.forEach(function (producto) {
-            let nombre = producto.dataset.nombre.toLowerCase();
-            let categoriaProducto = producto.dataset.categoria;
-            let marcaProducto = producto.dataset.marca;
+    const buscador = document.getElementById('buscador');
+    const filtroCategoria = document.getElementById('filtroCategoria');
+    const filtroMarca = document.getElementById('filtroMarca');
+    let searchTimer = null;
 
-            let coincideTexto = nombre.includes(texto);
-            let coincideCategoria = categoria === "" || categoriaProducto === categoria;
-            let coincideMarca = marca === "" || marcaProducto === marca;
+    if (buscador) {
+        buscador.addEventListener('input', function () {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(submitCatalogFilters, 450);
+        });
 
-            producto.parentElement.style.display = (coincideTexto && coincideCategoria && coincideMarca) ? "" : "none";
+        buscador.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                clearTimeout(searchTimer);
+                submitCatalogFilters();
+            }
         });
     }
 
-    document.getElementById("buscador").addEventListener("keyup", filtrarProductos);
-    document.getElementById("filtroCategoria").addEventListener("change", filtrarProductos);
-    document.getElementById("filtroMarca").addEventListener("change", filtrarProductos);
+    if (filtroCategoria) {
+        filtroCategoria.addEventListener('change', function () {
+            let categoriaSeleccionada = this.value;
+            let marcas = document.querySelectorAll('#filtroMarca option');
 
-    /* filtros dinámicos de opciones de marca */
-    document.getElementById("filtroCategoria").addEventListener("change", function () {
-        let categoriaSeleccionada = this.value;
-        let marcas = document.querySelectorAll("#filtroMarca option");
+            marcas.forEach(function (marca) {
+                let categoriaMarca = (marca.dataset.categoria || '').trim();
+                let categoriasMarca = categoriaMarca ? categoriaMarca.split(/\s+/) : [];
+                marca.style.display = (categoriaSeleccionada === '' || categoriasMarca.includes(categoriaSeleccionada)) ? '' : 'none';
+            });
 
-        marcas.forEach(function (marca) {
-            let categoriaMarca = (marca.dataset.categoria || "").trim();
-            let categoriasMarca = categoriaMarca ? categoriaMarca.split(/\s+/) : [];
-            marca.style.display = (categoriaSeleccionada === "" || categoriasMarca.includes(categoriaSeleccionada)) ? "" : "none";
+            submitCatalogFilters();
         });
-    });
+    }
+
+    if (filtroMarca) {
+        filtroMarca.addEventListener('change', submitCatalogFilters);
+    }
+
+    if (filtroCategoria && filtroMarca) {
+        let categoriaSeleccionada = filtroCategoria.value;
+        document.querySelectorAll('#filtroMarca option').forEach(function (marca) {
+            let categoriaMarca = (marca.dataset.categoria || '').trim();
+            let categoriasMarca = categoriaMarca ? categoriaMarca.split(/\s+/) : [];
+            marca.style.display = (categoriaSeleccionada === '' || categoriasMarca.includes(categoriaSeleccionada)) ? '' : 'none';
+        });
+    }
 
     /* BOTONES + - */
     document.querySelectorAll(".producto-card").forEach(card => {
@@ -82,11 +102,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         btn.addEventListener("click", function () {
-            // Verificar si el usuario está autenticado
             const isAuthenticated = document.body.dataset.auth === 'true';
-            
+
             if (!isAuthenticated) {
-                // Mostrar el modal de login si no está autenticado
                 const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
                 loginModal.show();
                 return;
@@ -97,8 +115,6 @@ document.addEventListener('DOMContentLoaded', function() {
             let producto_id = card.dataset.productoId;
             let presentacion_id = card.querySelector(".presentacion-select").value;
             let cantidad = card.querySelector(".cantidad").textContent;
-
-            console.log("Presentacion enviada:", presentacion_id);
 
             fetch(agregarUrl, {
                 method: "POST",
@@ -113,7 +129,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.success) {
                         document.getElementById("contadorCarrito").textContent = data.total_items;
 
-                        // Animación visual
                         btn.textContent = addedButtonLabel;
                         setTimeout(() => {
                             btn.textContent = btn.dataset.defaultLabel;
@@ -132,7 +147,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     /* CAMBIAR TEXTO SEGÚN PRESENTACIÓN */
-
     document.querySelectorAll(".producto-card").forEach(card => {
 
         const select = card.querySelector(".presentacion-select");

@@ -18,6 +18,7 @@ from config.usuarios.permissions import internal_permission_required
 
 
 CATALOGO_CACHE_TIMEOUT = 60
+CATALOGO_PAGE_SIZE = 50
 
 
 def _is_admin_user(user):
@@ -202,6 +203,53 @@ def _get_cached_catalogo_marcas():
     return marcas
 
 
+def _catalogo_public_filter_params(request):
+    params = {}
+    query = str(request.GET.get('q') or '').strip()
+    if query:
+        params['q'] = query
+    categoria_id = str(request.GET.get('categoria') or '').strip()
+    if categoria_id.isdigit():
+        params['categoria'] = categoria_id
+    marca_id = str(request.GET.get('marca') or '').strip()
+    if marca_id.isdigit():
+        params['marca'] = marca_id
+    if request.GET.get('guest') == '1':
+        params['guest'] = '1'
+    return params
+
+
+def _catalogo_public_productos_queryset(request):
+    queryset = (
+        Producto.objects.filter(activo=True)
+        .select_related('categoria', 'marca')
+        .only(
+            'id',
+            'nombre',
+            'nombre_en',
+            'imagen',
+            'categoria_id',
+            'marca_id',
+        )
+        .prefetch_related(_presentaciones_prefetch())
+        .order_by('nombre', 'id')
+    )
+
+    filters = _catalogo_public_filter_params(request)
+    query = filters.get('q')
+    if query:
+        queryset = queryset.filter(
+            Q(nombre__icontains=query)
+            | Q(nombre_en__icontains=query)
+            | Q(codigo_barras__icontains=query)
+        )
+    if filters.get('categoria'):
+        queryset = queryset.filter(categoria_id=filters['categoria'])
+    if filters.get('marca'):
+        queryset = queryset.filter(marca_id=filters['marca'])
+    return queryset
+
+
 def catalogo(request):
     force_guest_mode = request.GET.get("guest") == "1"
     is_authenticated = bool(request.user.is_authenticated)
@@ -229,13 +277,19 @@ def catalogo(request):
     if force_guest_mode:
         catalogo_url = f"{catalogo_url}?guest=1"
 
-    productos = _sort_catalog_productos(_get_cached_catalogo_productos())
+    filter_params = _catalogo_public_filter_params(request)
+    paginator = Paginator(_catalogo_public_productos_queryset(request), CATALOGO_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    productos = _hydrate_productos(list(page_obj.object_list))
     categorias = _sort_catalog_categorias(_get_cached_catalogo_categorias())
-
     marcas = _sort_catalog_marcas(_get_cached_catalogo_marcas())
 
     context = {
         'productos': productos,
+        'page_obj': page_obj,
+        'filter_q': filter_params.get('q', ''),
+        'filter_categoria': filter_params.get('categoria', ''),
+        'filter_marca': filter_params.get('marca', ''),
         'categorias': categorias,
         'marcas': marcas,
         'guest_mode': force_guest_mode,
@@ -253,7 +307,6 @@ def catalogo(request):
     response["Expires"] = "0"
     return response
 
-CATALOGO_CACHE_TIMEOUT = 60
 ADMIN_PRODUCTOS_PAGE_SIZE = 50
 
 

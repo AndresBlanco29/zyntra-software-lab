@@ -2094,8 +2094,10 @@ def pull_quickbooks_items_to_local(*, max_results=25, client=None, force_full=Fa
     }
 
 
-def refresh_linked_quickbooks_items(*, limit=None, client=None, task_cache_key=None):
+def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None, task_cache_key=None):
     """Re-fetch only catalog rows already linked by quickbooks_id (update, not full re-import)."""
+    if limit is None:
+        limit = max_results
     client = client or QuickBooksAPIClient()
     queryset = (
         Presentacion.objects.filter(quickbooks_id__isnull=False)

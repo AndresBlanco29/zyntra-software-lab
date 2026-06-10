@@ -1,25 +1,26 @@
-document.addEventListener("DOMContentLoaded", function(){
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.getElementById("tomar-pedido-filter-form");
+    const buscador = document.getElementById("buscadorCliente");
+    let searchTimer = null;
 
-const buscador = document.getElementById("buscadorCliente");
-const filas = document.querySelectorAll("tbody tr");
+    if (!form || !buscador) {
+        return;
+    }
 
-buscador.addEventListener("keyup", function(){
+    function submitFilters() {
+        form.submit();
+    }
 
-let texto = buscador.value.toLowerCase();
+    buscador.addEventListener("input", function () {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(submitFilters, 450);
+    });
 
-filas.forEach(fila => {
-
-let nombre = fila.dataset.nombre.toLowerCase();
-let empresa = fila.dataset.empresa.toLowerCase();
-
-if(nombre.includes(texto) || empresa.includes(texto)){
-fila.style.display = "";
-}else{
-fila.style.display = "none";
-}
-
-});
-
-});
-
+    buscador.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            clearTimeout(searchTimer);
+            submitFilters();
+        }
+    });
 });

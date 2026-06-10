@@ -149,23 +149,33 @@ La Tortilla Grocery
 <p class="subtitle">
 {% trans "Explore nuestro inventario mayorista" %}
 </p>
+{% if page_obj.paginator.count %}
+<p class="subtitle mb-0">
+{% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+Showing {{ start }}-{{ end }} of {{ total }} products
+{% endblocktrans %}
+</p>
+{% endif %}
 
 </div>
 
 </div>
 
 
-<div class="d-flex gap-2 mt-2">
+<form method="get" id="catalogo-vendedor-filter-form" class="d-flex gap-2 mt-2">
 
 <input
 type="search"
 id="buscador"
+name="q"
+value="{{ filter_q }}"
 class="form-control"
 placeholder="{% trans 'Buscar Productos' %}"
+autocomplete="off"
 >
 
 
-<select class="form-select" id="filtroCategoria">
+<select class="form-select" id="filtroCategoria" name="categoria">
 
 <option value="">
 {% trans "Categoría" %}
@@ -173,7 +183,7 @@ placeholder="{% trans 'Buscar Productos' %}"
 
 {% for c in categorias %}
 
-<option value="{{c.id}}">
+<option value="{{ c.id }}" {% if filter_categoria == c.id|stringformat:"s" %}selected{% endif %}>
 {{ c.nombre }}
 </option>
 
@@ -182,7 +192,7 @@ placeholder="{% trans 'Buscar Productos' %}"
 </select>
 
 
-<select class="form-select" id="filtroMarca">
+<select class="form-select" id="filtroMarca" name="marca">
 
 <option value="">
 {% trans "Marca" %}
@@ -193,6 +203,7 @@ placeholder="{% trans 'Buscar Productos' %}"
 <option
 value="{{ m.id }}"
 data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
+{% if filter_marca == m.id|stringformat:"s" %}selected{% endif %}
 >
 
 {{ m.nombre }}
@@ -203,7 +214,7 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 
 </select>
 
-</div>
+</form>
 
 </div>
 
@@ -421,6 +432,32 @@ data-precio5="{{ p.precio_5 }}"
 {% endfor %}
 
 </div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav aria-label="{% trans 'Product pagination' %}" class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-2">
+  <ul class="pagination mb-0">
+    {% if page_obj.has_previous %}
+    <li class="page-item">
+      <a class="page-link" href="?{% if filter_q %}q={{ filter_q|urlencode }}&{% endif %}{% if filter_categoria %}categoria={{ filter_categoria }}&{% endif %}{% if filter_marca %}marca={{ filter_marca }}&{% endif %}page={{ page_obj.previous_page_number }}">{% trans "Previous" %}</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">{% trans "Previous" %}</span></li>
+    {% endif %}
+
+    <li class="page-item disabled">
+      <span class="page-link">{% blocktrans with current=page_obj.number total=page_obj.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}</span>
+    </li>
+
+    {% if page_obj.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="?{% if filter_q %}q={{ filter_q|urlencode }}&{% endif %}{% if filter_categoria %}categoria={{ filter_categoria }}&{% endif %}{% if filter_marca %}marca={{ filter_marca }}&{% endif %}page={{ page_obj.next_page_number }}">{% trans "Next" %}</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">{% trans "Next" %}</span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
 
 </div>
 

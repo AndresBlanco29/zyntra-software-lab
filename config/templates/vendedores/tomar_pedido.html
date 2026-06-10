@@ -18,7 +18,7 @@
 		<p class="vendor-order-copy mb-0">{% trans "Start with the right customer and move into the catalog with a cleaner, faster flow." %}</p>
 	</div>
 	<div class="vendor-order-hero-stat">
-		<span class="vendor-order-hero-value">{{ clientes|length }}</span>
+		<span class="vendor-order-hero-value">{{ page_obj.paginator.count }}</span>
 		<span class="vendor-order-hero-label">{% trans "Available customers" %}</span>
 	</div>
 </section>
@@ -29,14 +29,25 @@
 	<div>
 		<h5 class="mb-1">{% trans "Paso 1: Seleccionar Cliente" %}</h5>
 		<p class="mb-0">{% trans "Choose the customer you are visiting before building the order." %}</p>
+		{% if page_obj.paginator.count %}
+		<small class="text-muted">
+			{% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+			Showing {{ start }}-{{ end }} of {{ total }} customers
+			{% endblocktrans %}
+		</small>
+		{% endif %}
 	</div>
 </div>
 
-<input 
+<form method="get" id="tomar-pedido-filter-form">
+<input
 type="search"
 id="buscadorCliente"
+name="q"
+value="{{ filter_q }}"
 class="form-control vendor-order-search mb-3"
 placeholder="{% trans 'Buscar por nombre, empresa o documento' %}"
+autocomplete="off"
 >
 
 <div class="table-responsive mobile-stack-responsive">
@@ -98,6 +109,34 @@ class="btn btn-primary btn-sm vendor-order-select-btn">
 </table>
 
 </div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav aria-label="{% trans 'Customer pagination' %}" class="d-flex justify-content-center align-items-center flex-wrap gap-2 pt-3">
+	<ul class="pagination mb-0">
+		{% if page_obj.has_previous %}
+		<li class="page-item">
+			<a class="page-link" href="?{% if filter_q %}q={{ filter_q|urlencode }}&{% endif %}page={{ page_obj.previous_page_number }}">{% trans "Previous" %}</a>
+		</li>
+		{% else %}
+		<li class="page-item disabled"><span class="page-link">{% trans "Previous" %}</span></li>
+		{% endif %}
+
+		<li class="page-item disabled">
+			<span class="page-link">{% blocktrans with current=page_obj.number total=page_obj.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}</span>
+		</li>
+
+		{% if page_obj.has_next %}
+		<li class="page-item">
+			<a class="page-link" href="?{% if filter_q %}q={{ filter_q|urlencode }}&{% endif %}page={{ page_obj.next_page_number }}">{% trans "Next" %}</a>
+		</li>
+		{% else %}
+		<li class="page-item disabled"><span class="page-link">{% trans "Next" %}</span></li>
+		{% endif %}
+	</ul>
+</nav>
+{% endif %}
+
+</form>
 
 </div>
 

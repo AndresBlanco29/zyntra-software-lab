@@ -169,6 +169,7 @@ def crear_cliente(request):
     return render(request, "vendedores/crear_cliente.html")
 
 VENDEDOR_CLIENTES_PAGE_SIZE = 50
+VENDEDOR_CATALOGO_PAGE_SIZE = 50
 
 
 def _clientes_filter_params(request):
@@ -205,6 +206,72 @@ def _clientes_queryset(request):
     return queryset
 
 
+def _tomar_pedido_clientes_filter_params(request):
+    params = {}
+    query = str(request.GET.get('q') or '').strip()
+    if query:
+        params['q'] = query
+    return params
+
+
+def _tomar_pedido_clientes_queryset(request):
+    queryset = (
+        Cliente.objects.filter(aprobado=True)
+        .select_related('usuario')
+        .order_by('nombre_empresa', 'id')
+    )
+
+    query = _tomar_pedido_clientes_filter_params(request).get('q')
+    if query:
+        queryset = queryset.filter(
+            Q(nombre_empresa__icontains=query)
+            | Q(usuario__first_name__icontains=query)
+            | Q(usuario__last_name__icontains=query)
+            | Q(usuario__email__icontains=query)
+            | Q(usuario__username__icontains=query)
+            | Q(telefono__icontains=query)
+            | Q(sales_tax_number__icontains=query)
+        )
+    return queryset
+
+
+def _catalogo_vendedor_filter_params(request):
+    params = {}
+    query = str(request.GET.get('q') or '').strip()
+    if query:
+        params['q'] = query
+    categoria_id = str(request.GET.get('categoria') or '').strip()
+    if categoria_id.isdigit():
+        params['categoria'] = categoria_id
+    marca_id = str(request.GET.get('marca') or '').strip()
+    if marca_id.isdigit():
+        params['marca'] = marca_id
+    return params
+
+
+def _catalogo_vendedor_queryset(request):
+    queryset = (
+        Producto.objects.filter(activo=True)
+        .select_related('categoria', 'marca')
+        .prefetch_related('presentaciones')
+        .order_by('nombre', 'id')
+    )
+
+    filters = _catalogo_vendedor_filter_params(request)
+    query = filters.get('q')
+    if query:
+        queryset = queryset.filter(
+            Q(nombre__icontains=query)
+            | Q(nombre_en__icontains=query)
+            | Q(codigo_barras__icontains=query)
+        )
+    if filters.get('categoria'):
+        queryset = queryset.filter(categoria_id=filters['categoria'])
+    if filters.get('marca'):
+        queryset = queryset.filter(marca_id=filters['marca'])
+    return queryset
+
+
 @login_required
 @internal_permission_required('vendor.customers.view')
 def clientes(request):
@@ -227,14 +294,17 @@ def clientes(request):
 @login_required
 @internal_permission_required('vendor.orders.view', 'backoffice.orders.view')
 def tomar_pedido(request):
-
-    clientes = Cliente.objects.filter(aprobado=True).select_related("usuario")
+    filter_params = _tomar_pedido_clientes_filter_params(request)
+    paginator = Paginator(_tomar_pedido_clientes_queryset(request), VENDEDOR_CLIENTES_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get('page'))
 
     context = {
-        "clientes": clientes
+        'clientes': page_obj.object_list,
+        'page_obj': page_obj,
+        'filter_q': filter_params.get('q', ''),
     }
 
-    return render(request, "vendedores/tomar_pedido.html", context)
+    return render(request, 'vendedores/tomar_pedido.html', context)
 
 @login_required
 @internal_permission_required('vendor.orders.view', 'backoffice.orders.view')
@@ -244,7 +314,10 @@ def catalogo_vendedor(request, cliente_id):
 
     cliente = Cliente.objects.get(id=cliente_id)
 
-    productos = list(Producto.objects.filter(activo=True).prefetch_related("presentaciones"))
+    filter_params = _catalogo_vendedor_filter_params(request)
+    paginator = Paginator(_catalogo_vendedor_queryset(request), VENDEDOR_CATALOGO_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    productos = list(page_obj.object_list)
     _attach_recent_customer_order_history(cliente=cliente, productos=productos)
 
     categorias = Categoria.objects.all()
@@ -260,15 +333,19 @@ def catalogo_vendedor(request, cliente_id):
     )
 
     context = {
-        "cliente": cliente,
-        "productos": productos,
-        "categorias": categorias,
-        "marcas": marcas,
-        "total_items": total_items,
-        "total": total
+        'cliente': cliente,
+        'productos': productos,
+        'page_obj': page_obj,
+        'filter_q': filter_params.get('q', ''),
+        'filter_categoria': filter_params.get('categoria', ''),
+        'filter_marca': filter_params.get('marca', ''),
+        'categorias': categorias,
+        'marcas': marcas,
+        'total_items': total_items,
+        'total': total,
     }
 
-    return render(request, "vendedores/tomar_pedido_catalogo.html", context)
+    return render(request, 'vendedores/tomar_pedido_catalogo.html', context)
 
 @login_required
 @internal_permission_required('vendor.orders.manage', 'backoffice.orders.manage')

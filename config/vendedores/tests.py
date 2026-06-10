@@ -99,6 +99,79 @@ class VendedorPedidoTests(TestCase):
 			},
 		)
 
+	def test_tomar_pedido_paginates_approved_customers(self):
+		self.customer.aprobado = True
+		self.customer.save(update_fields=['aprobado'])
+		for index in range(55):
+			user = Usuario.objects.create_user(
+				username=f'order-customer-{index}',
+				password='secret123',
+				role='cliente',
+			)
+			Cliente.objects.create(
+				usuario=user,
+				nombre_empresa=f'Cliente Pedido {index:03d}',
+				telefono='5551234567',
+				direccion='123 Test St',
+				ciudad='Atlanta',
+				estado='GA',
+				codigo_postal='30301',
+				pais='USA',
+				sales_tax_number=f'TX-ORDER-{index:03d}',
+				certificado_tax='certificados/test.pdf',
+				aprobado=True,
+			)
+
+		self.client.force_login(self.vendor)
+		response = self.client.get(reverse('tomar_pedido'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(len(response.context['clientes']), 50)
+		self.assertEqual(response.context['page_obj'].paginator.count, 56)
+		self.assertContains(response, 'Page 1 of 2')
+
+	def test_catalogo_vendedor_paginates_products_alphabetically(self):
+		categoria = Categoria.objects.create(nombre='Catalog Pagination')
+		marca = Marca.objects.create(nombre='Marca Pagination')
+		for index in range(55):
+			Producto.objects.create(
+				nombre=f'Zeta Producto {index:03d}',
+				categoria=categoria,
+				marca=marca,
+				activo=True,
+			)
+
+		self.client.force_login(self.vendor)
+		response = self.client.get(reverse('catalogo_vendedor', args=[self.customer.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(len(response.context['productos']), 50)
+		self.assertEqual(response.context['page_obj'].paginator.count, 56)
+		self.assertContains(response, 'Page 1 of 2')
+		self.assertContains(response, 'Coca-Colaaaaaaaa')
+		product_names = [producto.nombre for producto in response.context['productos']]
+		self.assertEqual(product_names, sorted(product_names))
+
+	def test_catalogo_vendedor_search_filters_on_server(self):
+		categoria = Categoria.objects.create(nombre='Catalog Search')
+		marca = Marca.objects.create(nombre='Marca Search')
+		Producto.objects.create(
+			nombre='Unique Catalog Search Product',
+			categoria=categoria,
+			marca=marca,
+			activo=True,
+		)
+
+		self.client.force_login(self.vendor)
+		response = self.client.get(
+			reverse('catalogo_vendedor', args=[self.customer.id]),
+			{'q': 'Unique Catalog Search'},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(len(response.context['productos']), 1)
+		self.assertContains(response, 'Unique Catalog Search Product')
+
 	def test_catalogo_vendedor_shows_recent_customer_order_history(self):
 		now = timezone.now()
 		self._create_customer_order(created_at=now - timezone.timedelta(days=1), quantity=5, price='37.00')

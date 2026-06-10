@@ -7,7 +7,7 @@ from .models import Producto, Categoria, Marca, Presentacion, ConfiguracionPreci
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, get_language
 from django.core.exceptions import ValidationError
 from django.http import JsonResponse
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -116,8 +116,48 @@ def _hydrate_productos(productos):
     return productos
 
 
+def _catalog_display_name(*, nombre, nombre_en=''):
+    if get_language() == 'en' and nombre_en:
+        return nombre_en
+    return nombre
+
+
+def _catalog_sort_key(value):
+    return str(value or '').casefold()
+
+
+def _sort_catalog_productos(productos):
+    return sorted(
+        productos,
+        key=lambda producto: (
+            _catalog_sort_key(_catalog_display_name(nombre=producto.nombre, nombre_en=producto.nombre_en)),
+            producto.id,
+        ),
+    )
+
+
+def _sort_catalog_categorias(categorias):
+    return sorted(
+        categorias,
+        key=lambda categoria: (
+            _catalog_sort_key(_catalog_display_name(nombre=categoria.nombre, nombre_en=categoria.nombre_en)),
+            categoria.id,
+        ),
+    )
+
+
+def _sort_catalog_marcas(marcas):
+    return sorted(
+        marcas,
+        key=lambda marca: (
+            _catalog_sort_key(_catalog_display_name(nombre=marca.nombre, nombre_en=marca.nombre_en)),
+            marca.id,
+        ),
+    )
+
+
 def _get_cached_catalogo_productos():
-    cache_key = "catalogo:productos_activos"
+    cache_key = "catalogo:productos_activos_v2"
     productos = cache.get(cache_key)
     if productos is None:
         productos = _hydrate_productos(list(
@@ -128,23 +168,23 @@ def _get_cached_catalogo_productos():
                 "imagen",
                 "categoria_id",
                 "marca_id",
-            ).prefetch_related(_presentaciones_prefetch())
+            ).prefetch_related(_presentaciones_prefetch()).order_by("nombre", "id")
         ))
         cache.set(cache_key, productos, CATALOGO_CACHE_TIMEOUT)
     return productos
 
 
 def _get_cached_catalogo_categorias():
-    cache_key = "catalogo:categorias"
+    cache_key = "catalogo:categorias_v2"
     categorias = cache.get(cache_key)
     if categorias is None:
-        categorias = list(Categoria.objects.only("id", "nombre", "nombre_en"))
+        categorias = list(Categoria.objects.only("id", "nombre", "nombre_en").order_by("nombre", "id"))
         cache.set(cache_key, categorias, CATALOGO_CACHE_TIMEOUT)
     return categorias
 
 
 def _get_cached_catalogo_marcas():
-    cache_key = "catalogo:marcas_activas"
+    cache_key = "catalogo:marcas_activas_v2"
     marcas = cache.get(cache_key)
     if marcas is None:
         marcas = list(
@@ -154,7 +194,7 @@ def _get_cached_catalogo_marcas():
                 "nombre_en",
                 "activo",
                 "logo",
-            ).prefetch_related("categorias")
+            ).prefetch_related("categorias").order_by("nombre", "id")
         )
         for marca in marcas:
             marca.categorias_ids = " ".join(str(categoria.id) for categoria in marca.categorias.all())
@@ -189,10 +229,10 @@ def catalogo(request):
     if force_guest_mode:
         catalogo_url = f"{catalogo_url}?guest=1"
 
-    productos = _get_cached_catalogo_productos()
-    categorias = _get_cached_catalogo_categorias()
+    productos = _sort_catalog_productos(_get_cached_catalogo_productos())
+    categorias = _sort_catalog_categorias(_get_cached_catalogo_categorias())
 
-    marcas = _get_cached_catalogo_marcas()
+    marcas = _sort_catalog_marcas(_get_cached_catalogo_marcas())
 
     context = {
         'productos': productos,

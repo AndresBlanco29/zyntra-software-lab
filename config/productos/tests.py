@@ -192,3 +192,27 @@ class CatalogCustomerPriceTierTests(TestCase):
 		self.assertNotContains(response, 'Assigned tier')
 		self.assertContains(response, 'agregar-btn')
 		self.assertNotContains(response, 'Pending price assignment')
+
+	def test_catalog_lists_products_in_alphabetical_order(self):
+		self.producto.nombre = 'Zebra Chips'
+		self.producto.save(update_fields=['nombre'])
+		otro_producto = Producto.objects.create(
+			nombre='Alpha Snacks',
+			categoria=self.producto.categoria,
+			marca=self.producto.marca,
+			activo=True,
+		)
+		Presentacion.objects.create(
+			producto=otro_producto,
+			nombre='Caja',
+			unidades=1,
+			tipo_contenido='caja',
+			costo=Decimal('10.00'),
+		)
+
+		response = self.client.get(reverse('catalogo'))
+
+		self.assertEqual(response.status_code, 200)
+		names = [producto.nombre for producto in response.context['productos']]
+		self.assertEqual(names.index('Alpha Snacks'), 0)
+		self.assertLess(names.index('Totopos'), names.index('Zebra Chips'))

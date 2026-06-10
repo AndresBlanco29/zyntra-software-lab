@@ -949,56 +949,32 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
     producto.categoria = category
     producto.marca = brand
     producto.activo = bool(payload.get('Active', True))
-    if sku and (producto.codigo_barras in (None, '', sku) or not Producto.objects.exclude(pk=producto.pk).filter(codigo_barras=sku).exists()):
-        producto.codigo_barras = sku
+    if sku:
+        if producto.codigo_barras == sku:
+            pass
+        elif Producto.objects.exclude(pk=producto.pk).filter(codigo_barras=sku).exists():
+            conflicting = Producto.objects.exclude(pk=producto.pk).filter(codigo_barras=sku).first()
+            _upsert_import_conflict(
+                entity_type=QuickBooksImportConflict.ENTITY_ITEM,
+                quickbooks_id=f'{quickbooks_id}-barcode-omitted',
+                display_name=payload.get('Name') or quickbooks_id,
+                reason=(
+                    f'Duplicate codigo_barras {sku!r} when updating linked item; '
+                    f'kept existing barcode for review.'
+                ),
+                payload=payload,
+                local_model='Producto',
+                local_record_id=(conflicting.id if conflicting is not None else producto.id),
+            )
+        else:
+            producto.codigo_barras = sku
     producto.quickbooks_id = quickbooks_id
     producto.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
     producto.last_synced_at = timezone.now()
     product_update_fields = ['nombre', 'descripcion', 'categoria', 'marca', 'activo', 'codigo_barras', 'quickbooks_id', 'sync_status', 'last_synced_at']
     if image_saved:
         product_update_fields.append('imagen')
-    try:
-        producto.save(update_fields=product_update_fields)
-    except IntegrityError as exc:
-        err_text = str(exc)
-        if 'codigo_barras' in err_text or 'productos_producto.codigo_barras' in err_text:
-            # Find the conflicting local product (if any) and record a conflict,
-            # then retry saving without the codigo_barras to avoid hard failure.
-            conflicting = None
-            try:
-                if sku:
-                    conflicting = Producto.objects.exclude(pk=producto.pk).filter(codigo_barras=sku).first()
-            except Exception:
-                conflicting = None
-
-            try:
-                # After an IntegrityError the transaction may be marked as broken.
-                # Clear the rollback flag so we can record the conflict and continue.
-                transaction.set_rollback(False)
-            except Exception:
-                pass
-            try:
-                QuickBooksImportConflict.objects.create(
-                    entity_type=QuickBooksImportConflict.ENTITY_ITEM,
-                    quickbooks_id=f"{quickbooks_id}-barcode-omitted",
-                    display_name=payload.get('Name') or quickbooks_id,
-                    reason=(f"Duplicate codigo_barras detected when updating product; "
-                            f"import updated without codigo_barras for review."),
-                    payload=payload,
-                    local_model='Producto',
-                    local_record_id=(conflicting.id if conflicting is not None else producto.id),
-                )
-            except Exception:
-                # If recording the conflict still fails, continue without blocking.
-                pass
-
-            # remove codigo_barras from fields and clear it on the model
-            producto.codigo_barras = None
-            if 'codigo_barras' in product_update_fields:
-                product_update_fields = [f for f in product_update_fields if f != 'codigo_barras']
-            producto.save(update_fields=product_update_fields)
-        else:
-            raise
+    producto.save(update_fields=product_update_fields)
     presentacion.nombre = presentation_name
     presentacion.unidades = unidades
     presentacion.tipo_contenido = tipo_contenido
@@ -1172,7 +1148,8 @@ def _import_batch_result(*, entity_name, records, import_callable, task_cache_ke
         cache.set(task_cache_key, {'status': 'running', 'progress': 0, 'operation': entity_name}, timeout=60 * 60)
     for record in records:
         try:
-            result = import_callable(record)
+            with transaction.atomic():
+                result = import_callable(record)
         except Exception as exc:
             # If the failure looks like a duplicate barcode IntegrityError,
             # try once more with the item's Sku cleared to avoid unique constraint.
@@ -1181,7 +1158,8 @@ def _import_batch_result(*, entity_name, records, import_callable, task_cache_ke
                 try:
                     retry_record = dict(record)
                     retry_record['Sku'] = ''
-                    result = import_callable(retry_record)
+                    with transaction.atomic():
+                        result = import_callable(retry_record)
                     results.append(result)
                     continue
                 except Exception:

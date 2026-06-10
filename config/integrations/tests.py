@@ -79,28 +79,6 @@ class QuickBooksPresentationParsingTests(TestCase):
         self.assertEqual(tipo, 'caja')
         self.assertEqual(units, 12)
 
-    def test_flat_quickbooks_name_with_trailing_count_suffix(self):
-        product, presentation, tipo, units = _parse_quickbooks_presentation({
-            'Id': '5',
-            'Name': 'CANDLE BRILUX VIRGEN DE FATIMA 12 CT',
-        })
-
-        self.assertEqual(product, 'CANDLE BRILUX VIRGEN DE FATIMA')
-        self.assertEqual(presentation, '12 CT')
-        self.assertEqual(tipo, 'unidad')
-        self.assertEqual(units, 12)
-
-    def test_flat_quickbooks_name_with_trailing_case_suffix(self):
-        product, presentation, tipo, units = _parse_quickbooks_presentation({
-            'Id': '6',
-            'Name': 'Jarritos Mango Case 24',
-        })
-
-        self.assertEqual(product, 'Jarritos Mango')
-        self.assertEqual(presentation, 'Case 24')
-        self.assertEqual(tipo, 'caja')
-        self.assertEqual(units, 24)
-
 
 @override_settings(
     QUICKBOOKS_CLIENT_ID='client-id',

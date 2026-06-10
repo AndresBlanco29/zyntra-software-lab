@@ -271,6 +271,9 @@ class Presentacion(models.Model):
         normalized_tier = normalize_price_tier(tier, default=None)
         if normalized_tier is None:
             return None
+        if self.costo is not None:
+            porcentajes = ConfiguracionPrecios.obtener_porcentajes()
+            return _calculate_price_from_margin(self.costo, porcentajes[normalized_tier - 1])
         return getattr(self, f'precio_{normalized_tier}', self.precio_1)
 
     def save(self, *args, **kwargs):

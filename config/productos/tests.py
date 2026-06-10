@@ -174,6 +174,19 @@ class CatalogCustomerPriceTierTests(TestCase):
 	def test_presentacion_returns_price_for_assigned_tier(self):
 		self.assertEqual(self.presentacion.get_price_for_tier(3), self.presentacion.precio_3)
 
+	def test_get_price_for_tier_recalculates_from_cost_when_stored_prices_are_stale(self):
+		configuracion = ConfiguracionPrecios.obtener()
+		configuracion.porcentaje_1 = Decimal('12')
+		configuracion.save()
+
+		Presentacion.objects.filter(pk=self.presentacion.pk).update(
+			costo=Decimal('12.49'),
+			precio_1=Decimal('14.99'),
+		)
+		self.presentacion.refresh_from_db()
+
+		self.assertEqual(self.presentacion.get_price_for_tier(1), Decimal('14.19'))
+
 	def test_catalog_shows_customer_assigned_price(self):
 		self.client.force_login(self.usuario)
 
@@ -182,6 +195,26 @@ class CatalogCustomerPriceTierTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, 'Your price')
 		self.assertContains(response, f'data-price="{self.presentacion.precio_3}"')
+
+	def test_catalog_shows_recalculated_tier_price_when_quickbooks_price_is_stale(self):
+		configuracion = ConfiguracionPrecios.obtener()
+		configuracion.porcentaje_1 = Decimal('12')
+		configuracion.save()
+
+		self.usuario.cliente.nivel_precio = 1
+		self.usuario.cliente.save(update_fields=['nivel_precio'])
+
+		Presentacion.objects.filter(pk=self.presentacion.pk).update(
+			costo=Decimal('12.49'),
+			precio_1=Decimal('14.99'),
+		)
+
+		self.client.force_login(self.usuario)
+		response = self.client.get(reverse('catalogo'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '14.19')
+		self.assertNotContains(response, '14.99')
 
 	def test_catalog_hides_prices_when_customer_has_no_assigned_tier(self):
 		self.client.force_login(self.usuario_sin_precios)

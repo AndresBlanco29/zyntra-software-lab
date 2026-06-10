@@ -791,29 +791,11 @@ def _sync_stock_from_quickbooks_item(presentacion, payload):
     return True
 
 
-def _update_presentacion_from_quickbooks(presentacion, *, quickbooks_id, unit_price, item_cost):
-    Presentacion.objects.filter(pk=presentacion.pk).update(
-        nombre=presentacion.nombre,
-        unidades=presentacion.unidades,
-        tipo_contenido=presentacion.tipo_contenido,
-        quickbooks_id=quickbooks_id,
-        sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
-        last_synced_at=presentacion.last_synced_at,
-        costo=item_cost,
-        precio_1=unit_price,
-        precio_2=unit_price,
-        precio_3=unit_price,
-        precio_4=unit_price,
-        precio_5=unit_price,
-    )
+def _update_presentacion_from_quickbooks(presentacion, *, quickbooks_id, item_cost):
     presentacion.quickbooks_id = quickbooks_id
     presentacion.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
     presentacion.costo = item_cost
-    presentacion.precio_1 = unit_price
-    presentacion.precio_2 = unit_price
-    presentacion.precio_3 = unit_price
-    presentacion.precio_4 = unit_price
-    presentacion.precio_5 = unit_price
+    presentacion.save()
 
 
 def _product_conflict_exists(*, quickbooks_id, product_name, presentation_name):
@@ -898,7 +880,6 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
     _update_presentacion_from_quickbooks(
         presentacion,
         quickbooks_id=quickbooks_id,
-        unit_price=unit_price,
         item_cost=item_cost,
     )
     try:
@@ -983,17 +964,7 @@ def import_quickbooks_item_record(payload, *, client=None):
                 quickbooks_id=quickbooks_id,
                 sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
                 last_synced_at=timezone.now(),
-                precio_1=unit_price,
-                precio_2=unit_price,
-                precio_3=unit_price,
-                precio_4=unit_price,
-                precio_5=unit_price,
-            )
-            _update_presentacion_from_quickbooks(
-                presentacion,
-                quickbooks_id=quickbooks_id,
-                unit_price=unit_price,
-                item_cost=item_cost,
+                costo=item_cost,
             )
             try:
                 _sync_stock_from_quickbooks_item(presentacion, payload)
@@ -1036,17 +1007,7 @@ def import_quickbooks_item_record(payload, *, client=None):
                     quickbooks_id=quickbooks_id,
                     sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
                     last_synced_at=timezone.now(),
-                    precio_1=unit_price,
-                    precio_2=unit_price,
-                    precio_3=unit_price,
-                    precio_4=unit_price,
-                    precio_5=unit_price,
-                )
-                _update_presentacion_from_quickbooks(
-                    presentacion,
-                    quickbooks_id=quickbooks_id,
-                    unit_price=unit_price,
-                    item_cost=item_cost,
+                    costo=item_cost,
                 )
                 try:
                     _sync_stock_from_quickbooks_item(presentacion, payload)

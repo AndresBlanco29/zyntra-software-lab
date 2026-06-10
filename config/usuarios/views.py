@@ -35,6 +35,8 @@ from django.utils.translation import gettext as _
 from django.utils import timezone
 from django.db import transaction
 from django.db import OperationalError, ProgrammingError
+from django.db.models import Q
+from django.core.paginator import Paginator
 from django.conf import settings
 import mimetypes
 import os
@@ -1238,24 +1240,59 @@ def activar_usuario_interno(request, usuario_id, preset_role=None):
 
     return redirect('lista_usuarios_internos')
 
+CUSTOMER_REQUESTS_PAGE_SIZE = 50
+
+
+def _customer_requests_filter_params(request):
+    params = {}
+    query = str(request.GET.get('q') or '').strip()
+    if query:
+        params['q'] = query
+    return params
+
+
+def _customer_requests_queryset(request, view_mode):
+    queryset = (
+        Cliente.objects.select_related('usuario', 'rechazado_por', 'aprobado_por')
+        .order_by('-creado_en')
+    )
+
+    if view_mode == 'rejected':
+        queryset = queryset.filter(estado_revision=Cliente.REVIEW_STATUS_REJECTED)
+    elif view_mode == 'approved':
+        queryset = queryset.filter(estado_revision=Cliente.REVIEW_STATUS_APPROVED)
+    else:
+        queryset = queryset.filter(estado_revision=Cliente.REVIEW_STATUS_PENDING)
+
+    query = _customer_requests_filter_params(request).get('q')
+    if query:
+        queryset = queryset.filter(
+            Q(nombre_empresa__icontains=query)
+            | Q(usuario__first_name__icontains=query)
+            | Q(usuario__last_name__icontains=query)
+            | Q(usuario__username__icontains=query)
+        )
+    return queryset
+
+
 @login_required
 @internal_permission_required('admin.customer_requests.view')
 def clientes_pendientes(request):
 
     view_mode = (request.GET.get('view') or 'pending').strip().lower()
-    base_queryset = Cliente.objects.select_related('usuario', 'rechazado_por', 'aprobado_por').order_by('-creado_en')
-
-    if view_mode == 'rejected':
-        clientes = base_queryset.filter(estado_revision=Cliente.REVIEW_STATUS_REJECTED)
-    elif view_mode == 'approved':
-        clientes = base_queryset.filter(estado_revision=Cliente.REVIEW_STATUS_APPROVED)
-    else:
+    if view_mode not in ('rejected', 'approved'):
         view_mode = 'pending'
-        clientes = base_queryset.filter(estado_revision=Cliente.REVIEW_STATUS_PENDING)
+
+    base_queryset = Cliente.objects.all()
+    filter_params = _customer_requests_filter_params(request)
+    paginator = Paginator(_customer_requests_queryset(request, view_mode), CUSTOMER_REQUESTS_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get('page'))
 
     context = {
-        'clientes': clientes,
+        'clientes': page_obj.object_list,
+        'page_obj': page_obj,
         'view_mode': view_mode,
+        'filter_q': filter_params.get('q', ''),
         'pending_count': base_queryset.filter(estado_revision=Cliente.REVIEW_STATUS_PENDING).count(),
         'rejected_count': base_queryset.filter(estado_revision=Cliente.REVIEW_STATUS_REJECTED).count(),
         'approved_count': base_queryset.filter(estado_revision=Cliente.REVIEW_STATUS_APPROVED).count(),
@@ -1547,26 +1584,32 @@ def login_view(request):
         # Verificar si el usuario existe
         try:
             user_exists = Usuario.objects.get(username=username)
-            # Usuario existe, verificar contraseña
-            user = authenticate(request, username=username, password=password)
-            
-            if user is not None:
-                _clear_pending_messages(request)
-                login(request, user)
-                redirect_url = _resolve_login_redirect(user, next_url)
-
+            if not user_exists.is_active:
+                inactive_message = _('This account is inactive. Contact an administrator.')
                 if is_ajax:
-                    # Retornar JSON con éxito y la URL de redirección
-                    return JsonResponse({'success': True, 'redirect': redirect_url})
-                else:
-                    # Redirecciones normales
-                    return redirect(redirect_url)
+                    return JsonResponse({'success': False, 'error': 'account_inactive', 'message': inactive_message})
+                messages.error(request, inactive_message)
             else:
-                # Usuario existe pero contraseña es incorrecta
-                if is_ajax:
-                    return JsonResponse({'success': False, 'error': 'password_incorrect', 'message': _('Contraseña incorrecta')})
+                # Usuario existe, verificar contraseña
+                user = authenticate(request, username=username, password=password)
+                
+                if user is not None:
+                    _clear_pending_messages(request)
+                    login(request, user)
+                    redirect_url = _resolve_login_redirect(user, next_url)
+
+                    if is_ajax:
+                        # Retornar JSON con éxito y la URL de redirección
+                        return JsonResponse({'success': True, 'redirect': redirect_url})
+                    else:
+                        # Redirecciones normales
+                        return redirect(redirect_url)
                 else:
-                    messages.error(request, _('Contraseña incorrecta'))
+                    # Usuario existe pero contraseña es incorrecta
+                    if is_ajax:
+                        return JsonResponse({'success': False, 'error': 'password_incorrect', 'message': _('Contraseña incorrecta')})
+                    else:
+                        messages.error(request, _('Contraseña incorrecta'))
         
         except Usuario.DoesNotExist:
             # Usuario no existe en la base de datos
@@ -1806,6 +1849,22 @@ def login_form_modal(request):
         username = request.POST.get('username', '').lower()
         password = request.POST.get('password', '')
         
+        try:
+            user_exists = Usuario.objects.get(username=username)
+        except Usuario.DoesNotExist:
+            import json
+            return HttpResponse(
+                json.dumps({'success': False, 'error': _('El usuario no existe en la base de datos')}),
+                content_type='application/json'
+            )
+
+        if not user_exists.is_active:
+            import json
+            return HttpResponse(
+                json.dumps({'success': False, 'error': _('This account is inactive. Contact an administrator.')}),
+                content_type='application/json'
+            )
+
         user = authenticate(request, username=username, password=password)
         
         if user is not None:

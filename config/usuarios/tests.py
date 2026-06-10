@@ -581,3 +581,68 @@ class CustomerRequestReviewWorkflowTests(TestCase):
 		self.assertContains(response, reverse('actualizar_precio_cliente', args=[self.cliente.id]))
 		self.assertContains(response, 'Update customer pricing')
 		self.assertContains(response, 'name="nivel_precio"', html=False)
+
+	def test_customer_requests_paginates_approved_list(self):
+		self.cliente.estado_revision = Cliente.REVIEW_STATUS_APPROVED
+		self.cliente.aprobado = True
+		self.cliente.save(update_fields=['estado_revision', 'aprobado'])
+
+		for index in range(55):
+			user = Usuario.objects.create_user(
+				username=f'approved-customer-{index:03d}',
+				password='secret123',
+				role='cliente',
+				is_active=True,
+			)
+			Cliente.objects.create(
+				usuario=user,
+				nombre_empresa=f'Approved Company {index:03d}',
+				telefono='1234567890',
+				direccion='123 Main St',
+				ciudad='Houston',
+				estado='Texas',
+				codigo_postal='77001',
+				pais='USA',
+				sales_tax_number=f'9900{index:04d}',
+				declaracion_fiscal_aceptada=True,
+				estado_revision=Cliente.REVIEW_STATUS_APPROVED,
+				aprobado=True,
+			)
+
+		response = self.client.get(reverse('clientes_pendientes') + '?view=approved')
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(len(response.context['clientes']), 50)
+		self.assertEqual(response.context['page_obj'].paginator.count, 56)
+		self.assertContains(response, 'Page 1 of 2')
+
+	def test_customer_requests_search_by_company_name(self):
+		self.cliente.nombre_empresa = 'Unique Search Foods LLC'
+		self.cliente.save(update_fields=['nombre_empresa'])
+
+		other_user = Usuario.objects.create_user(
+			username='other-customer',
+			password='secret123',
+			role='cliente',
+			is_active=False,
+		)
+		Cliente.objects.create(
+			usuario=other_user,
+			nombre_empresa='Other Market LLC',
+			telefono='1234567890',
+			direccion='123 Main St',
+			ciudad='Houston',
+			estado='Texas',
+			codigo_postal='77001',
+			pais='USA',
+			sales_tax_number='88776655',
+			declaracion_fiscal_aceptada=True,
+			estado_revision=Cliente.REVIEW_STATUS_PENDING,
+		)
+
+		response = self.client.get(reverse('clientes_pendientes') + '?view=pending&q=Unique+Search')
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context['page_obj'].paginator.count, 1)
+		self.assertContains(response, 'Unique Search Foods LLC')
+		self.assertNotContains(response, 'Other Market LLC')

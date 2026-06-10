@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n %}
+{% load i18n pagination_tags %}
 
 {% block title %}
 {% trans "Customer requests" %}
@@ -9,17 +9,42 @@
 
 <h2 class="mb-4">{% trans "Customer Requests" %}</h2>
 
-<div class="d-flex flex-wrap gap-2 mb-4">
-	<a href="{% url 'clientes_pendientes' %}?view=pending" class="btn {% if view_mode == 'pending' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+<div class="d-flex flex-wrap gap-2 mb-3">
+	<a href="{% url 'clientes_pendientes' %}?view=pending{% if filter_q %}&q={{ filter_q|urlencode }}{% endif %}" class="btn {% if view_mode == 'pending' %}btn-primary{% else %}btn-outline-primary{% endif %}">
 		{% trans "Pending" %} ({{ pending_count }})
 	</a>
-	<a href="{% url 'clientes_pendientes' %}?view=rejected" class="btn {% if view_mode == 'rejected' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+	<a href="{% url 'clientes_pendientes' %}?view=rejected{% if filter_q %}&q={{ filter_q|urlencode }}{% endif %}" class="btn {% if view_mode == 'rejected' %}btn-danger{% else %}btn-outline-danger{% endif %}">
 		{% trans "Rejected customers" %} ({{ rejected_count }})
 	</a>
-	<a href="{% url 'clientes_pendientes' %}?view=approved" class="btn {% if view_mode == 'approved' %}btn-success{% else %}btn-outline-success{% endif %}">
+	<a href="{% url 'clientes_pendientes' %}?view=approved{% if filter_q %}&q={{ filter_q|urlencode }}{% endif %}" class="btn {% if view_mode == 'approved' %}btn-success{% else %}btn-outline-success{% endif %}">
 		{% trans "Approved" %} ({{ approved_count }})
 	</a>
 </div>
+
+<form method="get" class="d-flex flex-wrap gap-2 mb-4 align-items-center">
+	<input type="hidden" name="view" value="{{ view_mode }}">
+	<input
+		type="search"
+		name="q"
+		value="{{ filter_q }}"
+		class="form-control"
+		style="max-width: 320px;"
+		placeholder="{% trans 'Search by company or contact name' %}"
+		autocomplete="off"
+	>
+	<button type="submit" class="btn btn-outline-primary">{% trans "Search" %}</button>
+	{% if filter_q %}
+	<a href="{% url 'clientes_pendientes' %}?view={{ view_mode }}" class="btn btn-outline-secondary">{% trans "Clear" %}</a>
+	{% endif %}
+</form>
+
+{% if page_obj.paginator.count %}
+<p class="text-muted small mb-3">
+	{% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+	Showing {{ start }}-{{ end }} of {{ total }} requests
+	{% endblocktrans %}
+</p>
+{% endif %}
 
 <div class="table-responsive">
 
@@ -124,7 +149,9 @@
 
 <tr>
 <td colspan="8">
-	{% if view_mode == 'rejected' %}
+	{% if filter_q %}
+	{% trans "No customer requests match your search." %}
+	{% elif view_mode == 'rejected' %}
 	{% trans "There are no rejected customers." %}
 	{% elif view_mode == 'approved' %}
 	{% trans "There are no approved customers." %}
@@ -141,5 +168,7 @@
 </table>
 
 </div>
+
+{% pagination_controls page_obj aria_label=_('Customer request pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-3" view=view_mode q=filter_q %}
 
 {% endblock %}

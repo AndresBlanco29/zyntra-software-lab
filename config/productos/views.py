@@ -83,6 +83,7 @@ def _presentaciones_prefetch():
             "unidades",
             "tipo_contenido",
             "tipo_contenido_en",
+            "costo",
             "precio_1",
             "precio_2",
             "precio_3",
@@ -109,9 +110,16 @@ def _get_cliente_price_tier(user):
     return cliente.get_nivel_precio_normalizado()
 
 
+def _refresh_presentacion_prices(presentacion):
+    if presentacion.costo is not None:
+        presentacion.recalcular_precios()
+
+
 def _hydrate_productos(productos):
     for producto in productos:
         presentaciones = list(producto.presentaciones.all())
+        for presentacion in presentaciones:
+            _refresh_presentacion_prices(presentacion)
         producto.presentaciones_prefetch = presentaciones
         producto.primera_presentacion = presentaciones[0] if presentaciones else None
     return productos

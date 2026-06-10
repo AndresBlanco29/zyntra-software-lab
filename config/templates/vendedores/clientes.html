@@ -41,7 +41,7 @@
   </div>
   <div class="vendor-hero-stats">
     <div class="vendor-stat-pill">
-      <span class="vendor-stat-pill-value">{{ clientes|length }}</span>
+      <span class="vendor-stat-pill-value">{{ page_obj.paginator.count }}</span>
       <span class="vendor-stat-pill-label">{% trans "Customers" %}</span>
     </div>
   </div>
@@ -54,28 +54,31 @@
       <small class="vendor-panel-copy">{% trans "Search, filter and review your customer base quickly." %}</small>
     </div>
 
-    <div class="d-flex gap-2 mb-0 clientes-filters">
-      <input 
+    <form method="get" id="clientes-filter-form" class="d-flex gap-2 mb-0 clientes-filters">
+      <input
       type="search"
       id="buscadorClientes"
+      name="q"
+      value="{{ filter_q }}"
       class="form-control vendor-search-input"
       placeholder="{% trans 'Buscar por nombre, empresa o documento' %}"
+      autocomplete="off"
       >
 
-      <select id="filtroEstado" class="form-select vendor-filter-select">
-        <option value="">
+      <select id="filtroEstado" name="estado" class="form-select vendor-filter-select">
+        <option value="" {% if not filter_estado %}selected{% endif %}>
         {% trans "Todos" %}
         </option>
 
-        <option value="activo">
+        <option value="activo" {% if filter_estado == 'activo' %}selected{% endif %}>
         {% trans "Activos" %}
         </option>
 
-        <option value="inactivo">
+        <option value="inactivo" {% if filter_estado == 'inactivo' %}selected{% endif %}>
         {% trans "Inactivos" %}
         </option>
       </select>
-    </div>
+    </form>
   </div>
 </section>
 
@@ -89,6 +92,13 @@
   <div>
     <h4 class="mb-1">{% trans "Customer list" %}</h4>
     <p class="mb-0">{% trans "Clear, organized information for each account." %}</p>
+    {% if page_obj.paginator.count %}
+    <small class="text-muted">
+      {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+      Showing {{ start }}-{{ end }} of {{ total }} customers
+      {% endblocktrans %}
+    </small>
+    {% endif %}
   </div>
 </div>
 
@@ -192,6 +202,32 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 </table>
 
 </div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav aria-label="{% trans 'Customer pagination' %}" class="d-flex justify-content-center align-items-center flex-wrap gap-2 px-3 py-3 border-top">
+  <ul class="pagination mb-0">
+    {% if page_obj.has_previous %}
+    <li class="page-item">
+      <a class="page-link" href="?{% if filter_q %}q={{ filter_q|urlencode }}&{% endif %}{% if filter_estado %}estado={{ filter_estado }}&{% endif %}page={{ page_obj.previous_page_number }}">{% trans "Previous" %}</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">{% trans "Previous" %}</span></li>
+    {% endif %}
+
+    <li class="page-item disabled">
+      <span class="page-link">{% blocktrans with current=page_obj.number total=page_obj.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}</span>
+    </li>
+
+    {% if page_obj.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="?{% if filter_q %}q={{ filter_q|urlencode }}&{% endif %}{% if filter_estado %}estado={{ filter_estado }}&{% endif %}page={{ page_obj.next_page_number }}">{% trans "Next" %}</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">{% trans "Next" %}</span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
 
 </div>
 </div>

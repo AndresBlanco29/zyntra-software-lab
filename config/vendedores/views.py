@@ -1,5 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
+from django.core.paginator import Paginator
+from django.db.models import Q
 from config.clientes.models import Cliente
 from config.usuarios.models import Usuario
 from config.productos.models import Producto, Presentacion, Categoria, Marca
@@ -166,19 +168,61 @@ def crear_cliente(request):
 
     return render(request, "vendedores/crear_cliente.html")
 
+VENDEDOR_CLIENTES_PAGE_SIZE = 50
+
+
+def _clientes_filter_params(request):
+    params = {}
+    query = str(request.GET.get('q') or '').strip()
+    if query:
+        params['q'] = query
+    estado = str(request.GET.get('estado') or '').strip()
+    if estado in ('activo', 'inactivo'):
+        params['estado'] = estado
+    return params
+
+
+def _clientes_queryset(request):
+    queryset = Cliente.objects.select_related('usuario').order_by('nombre_empresa', 'id')
+
+    filters = _clientes_filter_params(request)
+    query = filters.get('q')
+    if query:
+        queryset = queryset.filter(
+            Q(nombre_empresa__icontains=query)
+            | Q(usuario__first_name__icontains=query)
+            | Q(usuario__last_name__icontains=query)
+            | Q(usuario__email__icontains=query)
+            | Q(usuario__username__icontains=query)
+            | Q(telefono__icontains=query)
+            | Q(sales_tax_number__icontains=query)
+        )
+    estado = filters.get('estado')
+    if estado == 'activo':
+        queryset = queryset.filter(aprobado=True)
+    elif estado == 'inactivo':
+        queryset = queryset.filter(aprobado=False)
+    return queryset
+
+
 @login_required
 @internal_permission_required('vendor.customers.view')
 def clientes(request):
-
-    clientes = Cliente.objects.select_related('usuario').all()
+    filter_params = _clientes_filter_params(request)
+    paginator = Paginator(_clientes_queryset(request), VENDEDOR_CLIENTES_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get('page'))
 
     context = {
-        "clientes": clientes,
+        'clientes': page_obj.object_list,
+        'page_obj': page_obj,
+        'filter_params': filter_params,
+        'filter_q': filter_params.get('q', ''),
+        'filter_estado': filter_params.get('estado', ''),
         'us_locations_json': json.dumps(US_STATE_CITIES),
         'us_states': sorted(US_STATE_CITIES.keys()),
     }
 
-    return render(request, "vendedores/clientes.html", context)
+    return render(request, 'vendedores/clientes.html', context)
 
 @login_required
 @internal_permission_required('vendor.orders.view', 'backoffice.orders.view')

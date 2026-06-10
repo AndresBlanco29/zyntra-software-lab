@@ -167,6 +167,43 @@ class VendedorEditarClienteTests(TestCase):
 			balance=Decimal('239.00'),
 		)
 
+	def test_customer_list_paginates_results(self):
+		for index in range(55):
+			user = Usuario.objects.create_user(
+				username=f'customer-page-{index}',
+				password='secret123',
+				role='cliente',
+			)
+			Cliente.objects.create(
+				usuario=user,
+				nombre_empresa=f'Cliente Paginado {index:03d}',
+				telefono='5551234567',
+				direccion='123 Test St',
+				ciudad='Atlanta',
+				estado='Georgia',
+				codigo_postal='30301',
+				pais='USA',
+				sales_tax_number=f'TX-PAGE-{index:03d}',
+				certificado_tax='certificados/test.pdf',
+			)
+
+		self.client.force_login(self.vendor)
+		response = self.client.get(reverse('vendedores_clientes'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(len(response.context['clientes']), 50)
+		self.assertEqual(response.context['page_obj'].paginator.count, 56)
+		self.assertContains(response, 'Page 1 of 2')
+
+	def test_customer_list_search_filters_on_server(self):
+		self.client.force_login(self.vendor)
+
+		response = self.client.get(reverse('vendedores_clientes'), {'q': 'Cliente Editable'})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(len(response.context['clientes']), 1)
+		self.assertContains(response, 'Cliente Editable')
+
 	def test_customer_list_matches_quickbooks_style_columns(self):
 		self.customer_user.first_name = 'Imported QB Contact'
 		self.customer_user.last_name = ''

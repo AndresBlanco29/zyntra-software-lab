@@ -1,0 +1,32 @@
+{% load i18n %}
+{% if page_obj.paginator.num_pages > 1 %}
+<nav aria-label="{{ aria_label|default:'Pagination' }}" class="{{ nav_class|default:'d-flex justify-content-center align-items-center flex-wrap gap-2' }}">
+  <ul class="pagination mb-0 flex-wrap">
+    {% if page_obj.has_previous %}
+    <li class="page-item">
+      <a class="page-link" href="?{% for key, value in query_params.items %}{{ key }}={{ value|urlencode }}&{% endfor %}page={{ page_obj.previous_page_number }}">{% trans "Previous" %}</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">{% trans "Previous" %}</span></li>
+    {% endif %}
+
+    <li class="page-item disabled">
+      <span class="page-link">{% blocktrans with current=page_obj.number total=page_obj.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}</span>
+    </li>
+
+    {% for jump_page in jump_pages %}
+    <li class="page-item">
+      <a class="page-link" href="?{% for key, value in query_params.items %}{{ key }}={{ value|urlencode }}&{% endfor %}page={{ jump_page }}">{{ jump_page }}</a>
+    </li>
+    {% endfor %}
+
+    {% if page_obj.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="?{% for key, value in query_params.items %}{{ key }}={{ value|urlencode }}&{% endfor %}page={{ page_obj.next_page_number }}">{% trans "Next" %}</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">{% trans "Next" %}</span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}

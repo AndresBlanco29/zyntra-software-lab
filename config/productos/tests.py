@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.urls import reverse
@@ -240,3 +241,29 @@ class CatalogCustomerPriceTierTests(TestCase):
 		self.assertEqual(len(response.context['productos']), 50)
 		self.assertEqual(response.context['page_obj'].paginator.count, 56)
 		self.assertContains(response, 'Page 1 of 2')
+
+	@patch('config.productos.views.CATALOGO_PAGE_SIZE', 5)
+	def test_catalog_shows_quick_jump_page_links(self):
+		for index in range(99):
+			producto = Producto.objects.create(
+				nombre=f'Catalog Jump {index:03d}',
+				categoria=self.producto.categoria,
+				marca=self.producto.marca,
+				activo=True,
+			)
+			Presentacion.objects.create(
+				producto=producto,
+				nombre='Caja',
+				unidades=1,
+				tipo_contenido='caja',
+				costo=Decimal('10.00'),
+			)
+
+		self.client.force_login(self.usuario)
+		response = self.client.get(reverse('catalogo'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context['page_obj'].paginator.num_pages, 20)
+		self.assertContains(response, 'page=10"')
+		self.assertContains(response, 'page=15"')
+		self.assertContains(response, 'page=20"')

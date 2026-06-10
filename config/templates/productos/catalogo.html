@@ -1,4 +1,4 @@
-{% load static i18n %}
+{% load static i18n pagination_tags %}
 
 <!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
@@ -280,31 +280,7 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
 
                 </div>
 
-                {% if page_obj.paginator.num_pages > 1 %}
-                <nav aria-label="{% trans 'Product pagination' %}" class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-2">
-                    <ul class="pagination mb-0">
-                        {% if page_obj.has_previous %}
-                        <li class="page-item">
-                            <a class="page-link" href="?{% if guest_mode %}guest=1&{% endif %}{% if filter_q %}q={{ filter_q|urlencode }}&{% endif %}{% if filter_categoria %}categoria={{ filter_categoria }}&{% endif %}{% if filter_marca %}marca={{ filter_marca }}&{% endif %}page={{ page_obj.previous_page_number }}">{% trans "Previous" %}</a>
-                        </li>
-                        {% else %}
-                        <li class="page-item disabled"><span class="page-link">{% trans "Previous" %}</span></li>
-                        {% endif %}
-
-                        <li class="page-item disabled">
-                            <span class="page-link">{% blocktrans with current=page_obj.number total=page_obj.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}</span>
-                        </li>
-
-                        {% if page_obj.has_next %}
-                        <li class="page-item">
-                            <a class="page-link" href="?{% if guest_mode %}guest=1&{% endif %}{% if filter_q %}q={{ filter_q|urlencode }}&{% endif %}{% if filter_categoria %}categoria={{ filter_categoria }}&{% endif %}{% if filter_marca %}marca={{ filter_marca }}&{% endif %}page={{ page_obj.next_page_number }}">{% trans "Next" %}</a>
-                        </li>
-                        {% else %}
-                        <li class="page-item disabled"><span class="page-link">{% trans "Next" %}</span></li>
-                        {% endif %}
-                    </ul>
-                </nav>
-                {% endif %}
+                {% pagination_controls page_obj aria_label=_('Product pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-2" q=filter_q categoria=filter_categoria marca=filter_marca guest=guest_mode|yesno:"1," %}
 
             </div>
 

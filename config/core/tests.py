@@ -5,7 +5,22 @@ from django.test import TestCase
 from django.urls import reverse
 
 from config.core.workflow_badges import build_delivery_workflow_badge, build_order_workflow_badge
+from config.core.pagination import get_quick_jump_pages
 from config.usuarios.models import Usuario
+
+
+class QuickJumpPaginationTests(TestCase):
+	def test_page_one_offers_ten_fifteen_twenty_and_twenty_five(self):
+		self.assertEqual(get_quick_jump_pages(1, 30), [10, 15, 20, 25])
+
+	def test_jump_pages_stay_ahead_of_current_page(self):
+		self.assertEqual(get_quick_jump_pages(12, 30), [20, 25, 30])
+
+	def test_jump_pages_respect_total_pages(self):
+		self.assertEqual(get_quick_jump_pages(1, 18), [10, 15])
+
+	def test_no_jump_pages_on_last_page(self):
+		self.assertEqual(get_quick_jump_pages(20, 20), [])
 
 
 class BackofficeSpanishTranslationsTests(TestCase):

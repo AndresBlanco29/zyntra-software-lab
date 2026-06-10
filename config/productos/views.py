@@ -1,5 +1,6 @@
 from django.core.cache import cache
-from django.db.models import Prefetch
+from django.core.paginator import Paginator
+from django.db.models import Prefetch, Q
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from .models import Producto, Categoria, Marca, Presentacion, ConfiguracionPrecios
@@ -212,18 +213,79 @@ def catalogo(request):
     response["Expires"] = "0"
     return response
 
+CATALOGO_CACHE_TIMEOUT = 60
+ADMIN_PRODUCTOS_PAGE_SIZE = 50
+
+
+def _productos_admin_filter_params(request):
+    params = {}
+    query = str(request.GET.get('q') or '').strip()
+    if query:
+        params['q'] = query
+    categoria_id = str(request.GET.get('categoria') or '').strip()
+    if categoria_id.isdigit():
+        params['categoria'] = categoria_id
+    marca_id = str(request.GET.get('marca') or '').strip()
+    if marca_id.isdigit():
+        params['marca'] = marca_id
+    return params
+
+
+def _productos_admin_queryset(request):
+    queryset = (
+        Producto.objects.select_related('categoria', 'marca')
+        .only(
+            'id',
+            'nombre',
+            'nombre_en',
+            'codigo_barras',
+            'imagen',
+            'activo',
+            'categoria_id',
+            'marca_id',
+            'categoria__id',
+            'categoria__nombre',
+            'categoria__nombre_en',
+            'marca__id',
+            'marca__nombre',
+            'marca__nombre_en',
+        )
+        .order_by('nombre', 'id')
+    )
+
+    filters = _productos_admin_filter_params(request)
+    query = filters.get('q')
+    if query:
+        queryset = queryset.filter(
+            Q(nombre__icontains=query)
+            | Q(nombre_en__icontains=query)
+            | Q(codigo_barras__icontains=query)
+        )
+    if filters.get('categoria'):
+        queryset = queryset.filter(categoria_id=filters['categoria'])
+    if filters.get('marca'):
+        queryset = queryset.filter(marca_id=filters['marca'])
+    return queryset
+
+
 @login_required
 @internal_permission_required('admin.products.view')
 def lista_productos(request):
-
-    productos = Producto.objects.all()
-    categorias = Categoria.objects.all()
-    marcas = Marca.objects.all().prefetch_related('categorias')
+    filter_params = _productos_admin_filter_params(request)
+    paginator = Paginator(_productos_admin_queryset(request), ADMIN_PRODUCTOS_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get('page'))
 
     return render(request, 'admin/productos.html', {
-        'productos': productos,
-        'categorias': categorias,
-        'marcas': marcas,
+        'productos': page_obj.object_list,
+        'page_obj': page_obj,
+        'filter_params': filter_params,
+        'filter_q': filter_params.get('q', ''),
+        'filter_categoria': filter_params.get('categoria', ''),
+        'filter_marca': filter_params.get('marca', ''),
+        'categorias': Categoria.objects.only('id', 'nombre', 'nombre_en').order_by('nombre'),
+        'marcas': Marca.objects.only('id', 'nombre', 'nombre_en').prefetch_related(
+            Prefetch('categorias', queryset=Categoria.objects.only('id'))
+        ).order_by('nombre'),
         'price_margins': _get_price_margin_values(),
     })
 

@@ -9,21 +9,24 @@
 
 <h2 class="mb-4 admin-toolbar">
 <span>{% trans "Products" %}</span>
-<div class="admin-toolbar-filters admin-toolbar-filters-wide">
+<form method="get" id="productos-filter-form" class="admin-toolbar-filters admin-toolbar-filters-wide">
   <div class="row g-2">
     <div class="col-12 col-md-4">
-      <input 
-        type="text" 
-        id="buscador" 
-        class="form-control" 
+      <input
+        type="search"
+        id="buscador"
+        name="q"
+        value="{{ filter_q }}"
+        class="form-control"
         placeholder="{% trans 'Buscar...' %}"
+        autocomplete="off"
       >
     </div>
     <div class="col-12 col-md-4">
-      <select id="filtroCategoria" class="form-select">
+      <select id="filtroCategoria" name="categoria" class="form-select">
         <option value="">{% trans "Todas las categorias" %}</option>
         {% for categoria in categorias %}
-        <option value="{{ categoria.id }}">
+        <option value="{{ categoria.id }}" {% if filter_categoria == categoria.id|stringformat:"s" %}selected{% endif %}>
           {% get_current_language as LANGUAGE_CODE %}
           {% if LANGUAGE_CODE == "en" and categoria.nombre_en %}
             {{ categoria.nombre_en }}
@@ -35,10 +38,10 @@
       </select>
     </div>
     <div class="col-12 col-md-4">
-      <select id="filtroMarca" class="form-select">
+      <select id="filtroMarca" name="marca" class="form-select">
         <option value="">{% trans "Todas las marcas" %}</option>
         {% for marca in marcas %}
-        <option value="{{ marca.id }}" data-categoria="{% for cat in marca.categorias.all %}{{ cat.id }} {% endfor %}">
+        <option value="{{ marca.id }}" data-categoria="{% for cat in marca.categorias.all %}{{ cat.id }} {% endfor %}" {% if filter_marca == marca.id|stringformat:"s" %}selected{% endif %}>
           {% get_current_language as LANGUAGE_CODE %}
           {% if LANGUAGE_CODE == "en" and marca.nombre_en %}
             {{ marca.nombre_en }}
@@ -46,11 +49,11 @@
             {{ marca.nombre }}
           {% endif %}
         </option>
-        {% endfor %}
+      {% endfor %}
       </select>
     </div>
   </div>
-</div>
+</form>
 </h2>
 
 <a href="{% url 'crear_producto' %}" class="btn btn-primary mb-3">
@@ -73,15 +76,20 @@
 {% trans "Gestionar Marcas" %}
 </a>
 
-<div class="alert alert-light border small">
-{% trans "Active margins" %}: P1 {{ price_margins.0 }}%, P2 {{ price_margins.1 }}%, P3 {{ price_margins.2 }}%, P4 {{ price_margins.3 }}%, P5 {{ price_margins.4 }}%
+<div class="alert alert-light border small d-flex flex-wrap justify-content-between align-items-center gap-2">
+  <span>{% trans "Active margins" %}: P1 {{ price_margins.0 }}%, P2 {{ price_margins.1 }}%, P3 {{ price_margins.2 }}%, P4 {{ price_margins.3 }}%, P5 {{ price_margins.4 }}%</span>
+  {% if page_obj.paginator.count %}
+  <span class="text-muted">
+    {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+    Showing {{ start }}-{{ end }} of {{ total }} products
+    {% endblocktrans %}
+  </span>
+  {% endif %}
 </div>
-
-<!-- Tabla de Productos -->
 
 <div class="table-responsive">
 
-<table class="table table-striped">
+<table class="table table-striped table-hover align-middle">
 
 <thead>
 <tr>
@@ -99,11 +107,10 @@
 
 {% for producto in productos %}
 
-<tr class="producto-row" data-nombre="{{ producto.nombre|lower }}" data-codigo="{{ producto.codigo_barras|lower }}" data-categoria="{{ producto.categoria.id }}" data-marca="{{ producto.marca.id }}">
-
+<tr>
 <td>
 {% if producto.imagen %}
-<img src="{{ producto.imagen.url }}" width="70">
+<img src="{{ producto.imagen.url }}" width="70" height="70" loading="lazy" decoding="async" alt="" style="object-fit:cover;">
 {% endif %}
 </td>
 
@@ -125,20 +132,28 @@
 </td>
 
 <td>
-  {% get_current_language as LANGUAGE_CODE %}
-  {% if LANGUAGE_CODE == "en" and producto.marca.nombre_en %}
-    {{ producto.marca.nombre_en }}
+  {% if producto.marca %}
+    {% get_current_language as LANGUAGE_CODE %}
+    {% if LANGUAGE_CODE == "en" and producto.marca.nombre_en %}
+      {{ producto.marca.nombre_en }}
+    {% else %}
+      {{ producto.marca.nombre }}
+    {% endif %}
   {% else %}
-    {{ producto.marca.nombre }}
+    <span class="text-muted">-</span>
   {% endif %}
 </td>
 
 <td>
-  {% get_current_language as LANGUAGE_CODE %}
-  {% if LANGUAGE_CODE == "en" and producto.categoria.nombre_en %}
-    {{ producto.categoria.nombre_en }}
+  {% if producto.categoria %}
+    {% get_current_language as LANGUAGE_CODE %}
+    {% if LANGUAGE_CODE == "en" and producto.categoria.nombre_en %}
+      {{ producto.categoria.nombre_en }}
+    {% else %}
+      {{ producto.categoria.nombre }}
+    {% endif %}
   {% else %}
-    {{ producto.categoria.nombre }}
+    <span class="text-muted">-</span>
   {% endif %}
 </td>
 
@@ -150,33 +165,27 @@
 {% endif %}
 </td>
 
-<td>
-
+<td class="text-nowrap">
 <a href="{% url 'editar_producto' producto.id %}" class="btn btn-sm btn-warning">
 {% trans "Editar" %}
 </a>
 
 {% if producto.activo %}
-
 <a href="{% url 'desactivar_producto' producto.id %}" class="btn btn-sm btn-danger">
 {% trans "Inhabilitar" %}
 </a>
-
 {% else %}
-
 <a href="{% url 'activar_producto' producto.id %}" class="btn btn-sm btn-success">
 {% trans "Activar" %}
 </a>
-
 {% endif %}
-
 </td>
 
 </tr>
 
 {% empty %}
 
-<tr class="producto-row" id="noProductos">
+<tr>
 <td colspan="7" class="text-center text-muted py-4">{% trans "No hay productos registrados" %}</td>
 </tr>
 
@@ -188,55 +197,69 @@
 
 </div>
 
+{% if page_obj.paginator.num_pages > 1 %}
+<nav aria-label="{% trans 'Product pagination' %}" class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <ul class="pagination mb-0">
+    {% if page_obj.has_previous %}
+    <li class="page-item">
+      <a class="page-link" href="?{% if filter_q %}q={{ filter_q|urlencode }}&{% endif %}{% if filter_categoria %}categoria={{ filter_categoria }}&{% endif %}{% if filter_marca %}marca={{ filter_marca }}&{% endif %}page={{ page_obj.previous_page_number }}">{% trans "Previous" %}</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">{% trans "Previous" %}</span></li>
+    {% endif %}
+
+    <li class="page-item disabled">
+      <span class="page-link">{% blocktrans with current=page_obj.number total=page_obj.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}</span>
+    </li>
+
+    {% if page_obj.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="?{% if filter_q %}q={{ filter_q|urlencode }}&{% endif %}{% if filter_categoria %}categoria={{ filter_categoria }}&{% endif %}{% if filter_marca %}marca={{ filter_marca }}&{% endif %}page={{ page_obj.next_page_number }}">{% trans "Next" %}</a>
+    </li>
+    {% else %}
+    <li class="page-item disabled"><span class="page-link">{% trans "Next" %}</span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  function filtrarProductos() {
-    let texto = document.getElementById("buscador").value.toLowerCase();
-    let categoria = document.getElementById("filtroCategoria").value;
-    let marca = document.getElementById("filtroMarca").value;
+  const form = document.getElementById('productos-filter-form');
+  const buscador = document.getElementById('buscador');
+  const filtroCategoria = document.getElementById('filtroCategoria');
+  const filtroMarca = document.getElementById('filtroMarca');
+  let searchTimer = null;
 
-    let productos = document.querySelectorAll(".producto-row:not(#noProductos)");
-    let visibleCount = 0;
-
-    productos.forEach(function (producto) {
-      let nombre = producto.dataset.nombre.toLowerCase();
-      let codigo = (producto.dataset.codigo || '').toLowerCase();
-      let categoriaProducto = producto.dataset.categoria;
-      let marcaProducto = producto.dataset.marca;
-
-      let coincideTexto = nombre.includes(texto) || codigo.includes(texto);
-      let coincideCategoria = categoria === "" || categoriaProducto === categoria;
-      let coincideMarca = marca === "" || marcaProducto === marca;
-
-      if (coincideTexto && coincideCategoria && coincideMarca) {
-        producto.style.display = "";
-        visibleCount++;
-      } else {
-        producto.style.display = "none";
-      }
-    });
-
-    // Mostrar u ocultar mensaje de "No hay productos"
-    let noProductosRow = document.getElementById("noProductos");
-    if (visibleCount === 0) {
-      noProductosRow.style.display = "";
-    } else {
-      noProductosRow.style.display = "none";
-    }
+  function submitFilters() {
+    form.submit();
   }
 
-  document.getElementById("buscador").addEventListener("keyup", filtrarProductos);
-  document.getElementById("filtroCategoria").addEventListener("change", filtrarProductos);
-  document.getElementById("filtroMarca").addEventListener("change", filtrarProductos);
+  buscador.addEventListener('input', function() {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(submitFilters, 450);
+  });
 
-  // Filtros dinámicos de opciones de marca
-  document.getElementById("filtroCategoria").addEventListener("change", function () {
-    let categoriaSeleccionada = this.value;
-    let marcas = document.querySelectorAll("#filtroMarca option");
+  buscador.addEventListener('keydown', function(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      clearTimeout(searchTimer);
+      submitFilters();
+    }
+  });
 
-    marcas.forEach(function (marca) {
-      let categoriaMarca = marca.dataset.categoria;
-      marca.style.display = (categoriaSeleccionada === "" || (categoriaMarca && categoriaMarca.split(' ').includes(categoriaSeleccionada))) ? "" : "none";
+  filtroCategoria.addEventListener('change', submitFilters);
+  filtroMarca.addEventListener('change', submitFilters);
+
+  filtroCategoria.addEventListener('change', function() {
+    const categoriaSeleccionada = this.value;
+    filtroMarca.querySelectorAll('option').forEach(function(marca) {
+      if (!marca.value) {
+        marca.style.display = '';
+        return;
+      }
+      const categoriaMarca = marca.dataset.categoria || '';
+      marca.style.display = (categoriaSeleccionada === '' || categoriaMarca.split(' ').includes(categoriaSeleccionada)) ? '' : 'none';
     });
   });
 });

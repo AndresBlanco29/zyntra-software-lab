@@ -80,6 +80,39 @@ class ConfiguracionPreciosTests(TestCase):
 		self.assertContains(response, 'value="17.00"')
 
 
+class AdminProductosListTests(TestCase):
+	def setUp(self):
+		self.admin = Usuario.objects.create_user(username='admin-products', password='secret123', role='admin')
+		self.categoria = Categoria.objects.create(nombre='General Test')
+		self.marca = Marca.objects.create(nombre='Marca Admin Test')
+		for index in range(55):
+			Producto.objects.create(
+				nombre=f'Producto Admin {index:03d}',
+				categoria=self.categoria,
+				marca=self.marca,
+				codigo_barras=f'BAR{index:05d}',
+			)
+
+	def test_lista_productos_paginates_results(self):
+		self.client.force_login(self.admin)
+
+		response = self.client.get(reverse('lista_productos'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(len(response.context['productos']), 50)
+		self.assertEqual(response.context['page_obj'].paginator.count, 55)
+		self.assertContains(response, 'Page 1 of 2')
+
+	def test_lista_productos_search_filters_on_server(self):
+		self.client.force_login(self.admin)
+
+		response = self.client.get(reverse('lista_productos'), {'q': 'BAR00012'})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(len(response.context['productos']), 1)
+		self.assertContains(response, 'Producto Admin 012')
+
+
 class CatalogCustomerPriceTierTests(TestCase):
 	def setUp(self):
 		categoria = Categoria.objects.create(nombre='Snacks Test')

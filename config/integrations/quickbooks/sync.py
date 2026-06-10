@@ -2094,6 +2094,54 @@ def pull_quickbooks_items_to_local(*, max_results=25, client=None, force_full=Fa
     }
 
 
+def refresh_linked_quickbooks_items(*, limit=None, client=None, task_cache_key=None):
+    """Re-fetch only catalog rows already linked by quickbooks_id (update, not full re-import)."""
+    client = client or QuickBooksAPIClient()
+    queryset = (
+        Presentacion.objects.filter(quickbooks_id__isnull=False)
+        .exclude(quickbooks_id='')
+        .order_by('producto__nombre', 'id')
+    )
+    if limit is not None:
+        queryset = queryset[:max(int(limit), 0)]
+
+    qb_ids = [str(qb_id).strip() for qb_id in queryset.values_list('quickbooks_id', flat=True) if str(qb_id or '').strip()]
+    payloads = []
+    for qb_id in qb_ids:
+        try:
+            payload = client.find_by_id('Item', qb_id)
+        except QuickBooksAPIError as exc:
+            payloads.append({'Id': qb_id, '_missing_in_qb': True, '_error': str(exc)})
+            continue
+        if payload:
+            payloads.append(_enrich_quickbooks_item_payload(payload, client=client))
+        else:
+            payloads.append({'Id': qb_id, '_missing_in_qb': True})
+
+    def _import_payload(payload):
+        if payload.get('_missing_in_qb'):
+            return {
+                'ok': False,
+                'action': 'missing',
+                'entity': 'Item',
+                'quickbooks_id': str(payload.get('Id') or ''),
+                'label': str(payload.get('Id') or ''),
+                'error': payload.get('_error') or 'Item not found in QuickBooks.',
+            }
+        return import_quickbooks_item_record(payload, client=client)
+
+    result = _import_batch_result(
+        entity_name='LinkedItem',
+        records=payloads,
+        import_callable=_import_payload,
+        task_cache_key=task_cache_key,
+    )
+    cache.delete('catalogo:productos_activos_v2')
+    result['linked_count'] = len(qb_ids)
+    result['incremental'] = True
+    return result
+
+
 def pull_quickbooks_to_local(*, max_results=25, client=None, force_full=False):
     client = client or QuickBooksAPIClient()
     connection = client.connection

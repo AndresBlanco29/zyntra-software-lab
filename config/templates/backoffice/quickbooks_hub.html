@@ -881,7 +881,16 @@
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
                 <button type="submit" class="btn btn-outline-success w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Import catalog to the app" %}</button>
               </form>
-              <p class="qb-action-note">{% trans "Brings products and presentations from QuickBooks into your system." %}</p>
+              <p class="qb-action-note">{% trans "Brings new QuickBooks items and updates changed ones using incremental sync cursors." %}</p>
+            </div>
+            <div class="qb-action-item" id="qb-refresh-linked-catalog">
+              <form method="post" action="{% url 'quickbooks_refresh_linked_items_to_local' %}" data-qb-operation="refresh_linked_items_to_local">
+                {% csrf_token %}
+                <input type="hidden" name="limit" value="0">
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <button type="submit" class="btn btn-outline-primary w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Update linked catalog only" %}</button>
+              </form>
+              <p class="qb-action-note">{% trans "Fast refresh for products already linked to QuickBooks: cost, prices, stock, packaging, and names. Does not scan the full QuickBooks catalog." %}</p>
             </div>
             <div class="qb-action-item{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}" id="qb-pull-accounting">
               <form method="post" action="{% url 'quickbooks_import_accounting_documents_to_local' %}" data-qb-operation="import_accounting_documents_to_local">

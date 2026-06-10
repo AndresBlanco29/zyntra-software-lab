@@ -51,7 +51,9 @@ from .sync import (
     import_quickbooks_items,
     import_quickbooks_accounting_documents,
     link_quickbooks_import_conflict,
+    pull_quickbooks_items_to_local,
     pull_quickbooks_to_local,
+    refresh_linked_quickbooks_items,
     QuickBooksSyncError,
     fetch_quickbooks_credit_memos,
     fetch_quickbooks_customers,
@@ -86,6 +88,8 @@ CATALOG_ONLY_BLOCKED_MESSAGE = _(
 CATALOG_ONLY_ALLOWED_VIEW_NAMES = frozenset({
     'quickbooks_import_items',
     'quickbooks_import_items_to_local',
+    'quickbooks_refresh_linked_items_to_local',
+    'quickbooks_pull_items_sync_to_local',
     'quickbooks_import_customers',
     'quickbooks_import_customers_to_local',
 })
@@ -95,6 +99,8 @@ CATALOG_ONLY_ALLOWED_PREVIEW_TYPES = frozenset({'items', 'customers'})
 CATALOG_ONLY_ALLOWED_TASK_OPERATIONS = frozenset({
     'import_items_to_local',
     'import_customers_to_local',
+    'refresh_linked_items_to_local',
+    'pull_items_sync_to_local',
 })
 
 
@@ -342,6 +348,32 @@ def _build_dashboard_feedback(*, operation, ok, result=None, error=None):
                 'created': bills.get('created_count', 0),
                 'updated': bills.get('updated_count', 0),
                 'conflicts': bills.get('conflict_count', 0),
+            }
+        )
+        feedback['details'].append(
+            _('Incremental sync used saved cursors.') if result.get('incremental') else _('Full sync ignored saved cursors.')
+        )
+        return feedback
+
+    if operation == 'refresh_linked_items_to_local':
+        feedback['title'] = _('Linked catalog refresh')
+        feedback['details'].append(
+            _('Linked items: %(linked)s. Updated: %(updated)s. Failed: %(failed)s.') % {
+                'linked': result.get('linked_count', result.get('count', 0)),
+                'updated': result.get('updated_count', 0),
+                'failed': result.get('failed_count', 0),
+            }
+        )
+        return feedback
+
+    if operation == 'pull_items_sync_to_local':
+        feedback['title'] = _('QuickBooks catalog sync')
+        feedback['details'].append(
+            _('Created: %(created)s. Updated: %(updated)s. Conflicts: %(conflicts)s. Failed: %(failed)s.') % {
+                'created': result.get('created_count', 0),
+                'updated': result.get('updated_count', 0),
+                'conflicts': result.get('conflict_count', 0),
+                'failed': result.get('failed_count', 0),
             }
         )
         feedback['details'].append(
@@ -1015,11 +1047,45 @@ def quickbooks_import_vendors_to_local(request):
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def quickbooks_import_items_to_local(request):
     try:
-        result = import_quickbooks_items(max_results=int(request.POST.get('limit', 25) or 25))
+        pull_result = pull_quickbooks_items_to_local(
+            max_results=_parse_quickbooks_import_limit(request.POST.get('limit'), default=None),
+            force_full=request.POST.get('mode') == 'full',
+        )
+        result = pull_result.get('items', {})
+        result['incremental'] = pull_result.get('incremental')
     except (ValueError, QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
         logger.warning('QuickBooks item import to local failed: %s', exc)
         return _response_or_redirect(request, operation='import_items_to_local', error=str(exc), status_code=502)
     return _response_or_redirect(request, operation='import_items_to_local', result=result)
+
+
+@require_POST
+@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+def quickbooks_refresh_linked_items_to_local(request):
+    try:
+        result = refresh_linked_quickbooks_items(
+            limit=_parse_quickbooks_import_limit(request.POST.get('limit'), default=None),
+        )
+    except (ValueError, QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
+        logger.warning('QuickBooks linked catalog refresh failed: %s', exc)
+        return _response_or_redirect(request, operation='refresh_linked_items_to_local', error=str(exc), status_code=502)
+    return _response_or_redirect(request, operation='refresh_linked_items_to_local', result=result)
+
+
+@require_POST
+@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+def quickbooks_pull_items_sync_to_local(request):
+    try:
+        pull_result = pull_quickbooks_items_to_local(
+            max_results=_parse_quickbooks_import_limit(request.POST.get('limit'), default=None),
+            force_full=request.POST.get('mode') == 'full',
+        )
+        result = pull_result.get('items', {})
+        result['incremental'] = pull_result.get('incremental')
+    except (ValueError, QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
+        logger.warning('QuickBooks catalog pull sync failed: %s', exc)
+        return _response_or_redirect(request, operation='pull_items_sync_to_local', error=str(exc), status_code=502)
+    return _response_or_redirect(request, operation='pull_items_sync_to_local', result=result)
 
 
 @require_POST
@@ -1102,7 +1168,17 @@ def quickbooks_start_task(request):
     op_map = {
         'import_customers_to_local': import_quickbooks_customers,
         'import_vendors_to_local': import_quickbooks_vendors,
-        'import_items_to_local': import_quickbooks_items,
+        'import_items_to_local': lambda **kwargs: pull_quickbooks_items_to_local(
+            max_results=kwargs.get('max_results'),
+            force_full=kwargs.get('force_full', False),
+            task_cache_key=kwargs.get('task_cache_key'),
+        ).get('items', {}),
+        'refresh_linked_items_to_local': refresh_linked_quickbooks_items,
+        'pull_items_sync_to_local': lambda **kwargs: pull_quickbooks_items_to_local(
+            max_results=kwargs.get('max_results'),
+            force_full=kwargs.get('force_full', False),
+            task_cache_key=kwargs.get('task_cache_key'),
+        ).get('items', {}),
         'import_bills_to_local': import_quickbooks_bills,
         'import_purchase_orders_to_local': import_quickbooks_purchase_orders,
         'import_accounting_documents_to_local': import_quickbooks_accounting_documents,

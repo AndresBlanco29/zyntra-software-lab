@@ -108,11 +108,18 @@ z-index:1000;
     width: 253px;
     height: calc(100vh - var(--panel-navbar-offset));
     overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     margin: 0;
     padding: 0;
     border: none;
     box-shadow: none;
     z-index: 1060;
+}
+
+.sidebar .list-group {
+    padding-bottom: 96px;
 }
 
 .content{

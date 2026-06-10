@@ -8,6 +8,7 @@ from config.productos.models import Producto, Presentacion, Categoria, Marca
 from django.views.decorators.http import require_POST
 import uuid
 import json
+import re
 from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.conf import settings
@@ -716,6 +717,18 @@ def activar_cliente(request):
         return JsonResponse({'success': False, 'message': str(e)}, status=400)
 
 
+def _validate_customer_access_password(password):
+    if not re.search(r'[A-Z]', password):
+        return _('Password must include at least one uppercase letter.')
+    if not re.search(r'[a-z]', password):
+        return _('Password must include at least one lowercase letter.')
+    if not re.search(r'\d', password):
+        return _('Password must include at least one number.')
+    if not re.search(r'[^A-Za-z0-9]', password):
+        return _('Password must include at least one special character.')
+    return None
+
+
 @login_required
 @internal_permission_required('vendor.customers.manage')
 @require_POST
@@ -739,6 +752,10 @@ def configurar_acceso_cliente(request):
         return JsonResponse({'success': False, 'message': _('Please enter and confirm the password.')}, status=400)
     if password != password_confirm:
         return JsonResponse({'success': False, 'message': _('Passwords do not match.')}, status=400)
+
+    password_rule_error = _validate_customer_access_password(password)
+    if password_rule_error:
+        return JsonResponse({'success': False, 'message': password_rule_error}, status=400)
 
     try:
         cliente = Cliente.objects.select_related('usuario').get(id=cliente_id)

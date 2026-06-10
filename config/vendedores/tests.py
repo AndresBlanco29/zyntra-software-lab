@@ -346,6 +346,28 @@ class VendedorEditarClienteTests(TestCase):
 		self.assertEqual(response.status_code, 400)
 		self.assertJSONEqual(response.content, {'success': False, 'message': 'Passwords do not match.'})
 
+	def test_configure_web_access_rejects_password_without_special_character(self):
+		self.customer_user.set_unusable_password()
+		self.customer_user.save(update_fields=['password'])
+		self.client.force_login(self.vendor)
+
+		response = self.client.post(
+			reverse('configurar_acceso_cliente'),
+			data=json.dumps({
+				'cliente_id': self.customer.id,
+				'username': 'lilasmarket',
+				'password': 'TempAccess123',
+				'password_confirm': 'TempAccess123',
+			}),
+			content_type='application/json',
+		)
+
+		self.assertEqual(response.status_code, 400)
+		self.assertJSONEqual(
+			response.content,
+			{'success': False, 'message': 'Password must include at least one special character.'},
+		)
+
 	def test_admin_can_edit_customer_with_manual_international_location(self):
 		self.client.force_login(self.admin)
 

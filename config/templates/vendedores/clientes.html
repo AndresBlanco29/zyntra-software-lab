@@ -36,6 +36,7 @@
   data-msg-access-error-prefix="{% trans 'Error configuring access:' %}"
   data-msg-access-success-title="{% trans 'Access configured' %}"
   data-msg-access-success-body="{% trans 'The customer can now sign in with the username and password you set.' %}"
+  data-msg-access-password-rules="{% trans 'The password must meet all requirements listed below.' %}"
 >
 
 <section class="vendor-hero vendor-hero--customers mb-4">
@@ -177,7 +178,7 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
   <button
     type="button"
     class="btn btn-sm vendor-access-pending-btn"
-    onclick="abrirModalAccesoCliente({{ cliente.id }}, '{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa|escapejs }}', '{{ cliente.usuario.username|escapejs }}')">
+    onclick="abrirModalAccesoCliente({{ cliente.id }}, '{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa|escapejs }}')">
     {% trans "Acceso pendiente" %}
   </button>
   {% endif %}
@@ -362,7 +363,7 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 
           <div class="mb-3">
             <label class="form-label fw-bold" for="accesoUsername">{% trans "Usuario" %}</label>
-            <input type="text" class="form-control" id="accesoUsername" name="username" autocomplete="off" required>
+            <input type="text" class="form-control" id="accesoUsername" name="username" autocomplete="off" placeholder="{% trans 'Ej: lilasmarket' %}" required>
             <small class="text-muted">{% trans "Use a simple username the customer can remember." %}</small>
           </div>
 
@@ -371,10 +372,18 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
             <input type="password" class="form-control" id="accesoPassword" name="password" autocomplete="new-password" required>
           </div>
 
-          <div class="mb-0">
+          <div class="mb-3">
             <label class="form-label fw-bold" for="accesoPasswordConfirm">{% trans "Confirmar contraseña" %}</label>
             <input type="password" class="form-control" id="accesoPasswordConfirm" name="password_confirm" autocomplete="new-password" required>
           </div>
+
+          <ul class="access-password-rules" id="accesoPasswordRules" aria-live="polite">
+            <li data-rule="uppercase">{% trans "At least one uppercase letter" %}</li>
+            <li data-rule="lowercase">{% trans "At least one lowercase letter" %}</li>
+            <li data-rule="number">{% trans "At least one number" %}</li>
+            <li data-rule="special">{% trans "At least one special character" %}</li>
+            <li data-rule="match">{% trans "Passwords match" %}</li>
+          </ul>
         </form>
       </div>
       <div class="modal-footer border-0">

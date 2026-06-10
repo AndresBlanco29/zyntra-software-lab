@@ -325,6 +325,38 @@ transform:translateY(-1px);
     color: #fff;
 }
 
+.access-password-rules {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+    display: grid;
+    gap: 0.4rem;
+}
+
+.access-password-rules li {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    padding-left: 1.35rem;
+    position: relative;
+}
+
+.access-password-rules li::before {
+    content: '○';
+    position: absolute;
+    left: 0;
+    font-weight: 700;
+}
+
+.access-password-rules li.is-met {
+    color: #15803d;
+    font-weight: 600;
+}
+
+.access-password-rules li.is-met::before {
+    content: '✓';
+    color: #15803d;
+}
+
 .clientes-acciones-group {
 display:flex;
 flex-wrap:wrap;

@@ -60,8 +60,59 @@ function getCustomerPageMessages() {
         accessPasswordMismatch: dataset.msgAccessPasswordMismatch || 'Passwords do not match.',
         accessErrorPrefix: dataset.msgAccessErrorPrefix || 'Error configuring access:',
         accessSuccessTitle: dataset.msgAccessSuccessTitle || 'Access configured',
-        accessSuccessBody: dataset.msgAccessSuccessBody || 'The customer can now sign in with the username and password you set.'
+        accessSuccessBody: dataset.msgAccessSuccessBody || 'The customer can now sign in with the username and password you set.',
+        accessPasswordRules: dataset.msgAccessPasswordRules || 'The password must meet all requirements listed below.'
     };
+}
+
+function getAccessPasswordChecks(password) {
+    return {
+        uppercase: /[A-Z]/.test(password),
+        lowercase: /[a-z]/.test(password),
+        number: /\d/.test(password),
+        special: /[^A-Za-z0-9]/.test(password),
+    };
+}
+
+function updateAccessPasswordRules() {
+    const passwordInput = document.getElementById('accesoPassword');
+    const confirmInput = document.getElementById('accesoPasswordConfirm');
+    const rulesList = document.getElementById('accesoPasswordRules');
+
+    if (!passwordInput || !confirmInput || !rulesList) {
+        return;
+    }
+
+    const password = passwordInput.value;
+    const confirmPassword = confirmInput.value;
+    const checks = getAccessPasswordChecks(password);
+
+    rulesList.querySelectorAll('li[data-rule]').forEach(function (item) {
+        const rule = item.dataset.rule;
+        if (rule === 'match') {
+            item.classList.toggle('is-met', Boolean(password) && password === confirmPassword);
+            return;
+        }
+        item.classList.toggle('is-met', checks[rule]);
+    });
+}
+
+function accessPasswordMeetsRequirements(password, confirmPassword) {
+    const checks = getAccessPasswordChecks(password);
+    return Object.values(checks).every(Boolean) && password === confirmPassword;
+}
+
+function bindAccessPasswordValidation() {
+    const passwordInput = document.getElementById('accesoPassword');
+    const confirmInput = document.getElementById('accesoPasswordConfirm');
+
+    if (!passwordInput || !confirmInput || passwordInput.dataset.rulesBound === 'true') {
+        return;
+    }
+
+    passwordInput.dataset.rulesBound = 'true';
+    passwordInput.addEventListener('input', updateAccessPasswordRules);
+    confirmInput.addEventListener('input', updateAccessPasswordRules);
 }
 
 const customerMessages = getCustomerPageMessages();
@@ -266,12 +317,15 @@ window.abrirModalEstadoCliente = abrirModalEstadoCliente;
 window.confirmarCambioEstadoCliente = confirmarCambioEstadoCliente;
 window.abrirEditarCliente = abrirEditarCliente;
 
-function abrirModalAccesoCliente(clienteId, nombreCliente, usernameActual) {
+function abrirModalAccesoCliente(clienteId, nombreCliente) {
     document.getElementById('accesoClienteId').value = clienteId;
     document.getElementById('accesoClienteNombre').textContent = nombreCliente || customerMessages.customerFallbackName;
-    document.getElementById('accesoUsername').value = usernameActual || '';
+    document.getElementById('accesoUsername').value = '';
     document.getElementById('accesoPassword').value = '';
     document.getElementById('accesoPasswordConfirm').value = '';
+
+    bindAccessPasswordValidation();
+    updateAccessPasswordRules();
 
     const modal = new bootstrap.Modal(document.getElementById('configurarAccesoClienteModal'));
     modal.show();
@@ -288,8 +342,9 @@ function guardarAccesoCliente() {
         return;
     }
 
-    if (password !== passwordConfirm) {
-        alert(customerMessages.accessPasswordMismatch);
+    if (!accessPasswordMeetsRequirements(password, passwordConfirm)) {
+        alert(customerMessages.accessPasswordRules);
+        updateAccessPasswordRules();
         return;
     }
 

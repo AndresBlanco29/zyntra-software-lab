@@ -34,21 +34,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const buscador = document.getElementById('buscador');
     const filtroCategoria = document.getElementById('filtroCategoria');
     const filtroMarca = document.getElementById('filtroMarca');
-    let searchTimer = null;
 
-    if (buscador) {
-        buscador.addEventListener('input', function () {
-            clearTimeout(searchTimer);
-            searchTimer = setTimeout(submitCatalogFilters, 450);
-        });
-
-        buscador.addEventListener('keydown', function (event) {
-            if (event.key === 'Enter') {
-                event.preventDefault();
-                clearTimeout(searchTimer);
-                submitCatalogFilters();
-            }
-        });
+    if (buscador && window.PreserveSearchFocus) {
+        window.PreserveSearchFocus.bindDebouncedSearch(buscador, submitCatalogFilters);
     }
 
     if (filtroCategoria) {

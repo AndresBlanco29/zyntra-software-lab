@@ -2,7 +2,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const form = document.getElementById("clientes-filter-form");
     const buscador = document.getElementById("buscadorClientes");
     const filtroEstado = document.getElementById("filtroEstado");
-    let searchTimer = null;
 
     if (!form || !buscador || !filtroEstado) {
         return;
@@ -12,18 +11,9 @@ document.addEventListener("DOMContentLoaded", function () {
         form.submit();
     }
 
-    buscador.addEventListener("input", function () {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(submitFilters, 450);
-    });
-
-    buscador.addEventListener("keydown", function (event) {
-        if (event.key === "Enter") {
-            event.preventDefault();
-            clearTimeout(searchTimer);
-            submitFilters();
-        }
-    });
+    if (window.PreserveSearchFocus) {
+        window.PreserveSearchFocus.bindDebouncedSearch(buscador, submitFilters);
+    }
 
     filtroEstado.addEventListener("change", submitFilters);
 });

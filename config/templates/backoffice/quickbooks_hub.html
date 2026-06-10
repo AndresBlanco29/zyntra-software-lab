@@ -513,7 +513,7 @@
   {% if quickbooks_catalog_only_mode %}
   <div class="alert alert-info border-0 shadow-sm mb-4" role="status">
     <strong>{% trans "Catalog-only mode" %}</strong> —
-    {% trans "Only QuickBooks connection checks and catalog import are enabled. Accounting imports, pull sync, and outbound sync stay disabled until you turn off QUICKBOOKS_CATALOG_ONLY_MODE." %}
+    {% trans "Catalog-only mode is active: customer and catalog preview/import are enabled. Accounting imports, pull sync, and outbound sync stay disabled until you turn off QUICKBOOKS_CATALOG_ONLY_MODE." %}
   </div>
   {% endif %}
   {% with total_pending=quickbooks_pending_customer_count|add:quickbooks_pending_presentation_count|add:quickbooks_pending_invoice_count|add:quickbooks_pending_note_count %}
@@ -765,7 +765,7 @@
             </div>
           </div>
           <div class="row g-3">
-            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
+            <div class="col-md-6">
               <div class="qb-action-item h-100">
                 <form method="get" action="{% url 'quickbooks_center' %}">
                   <input type="hidden" name="preview" value="customers">
@@ -856,7 +856,7 @@
             </div>
           </div>
           <div class="qb-action-stack">
-              <div class="qb-action-item{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}" id="qb-import-suppliers">
+              <div class="qb-action-item" id="qb-import-customers">
               <form method="post" action="{% url 'quickbooks_import_customers_to_local' %}" data-qb-operation="import_customers_to_local">
                 {% csrf_token %}
                 <input type="hidden" name="limit" value="0">
@@ -973,7 +973,7 @@
         <p class="qb-soft-copy mb-0">{% trans "Choose what you want to review from QuickBooks. The sample opens here so you can compare before importing." %}</p>
       </div>
       <div class="qb-chip-list">
-        <a href="{% url 'quickbooks_center' %}?preview=customers&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'customers' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Customers" %}</a>
+        <a href="{% url 'quickbooks_center' %}?preview=customers&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'customers' %}is-active{% endif %}">{% trans "Customers" %}</a>
         <a href="{% url 'quickbooks_center' %}?preview=vendors&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'vendors' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Suppliers" %}</a>
         <a href="{% url 'quickbooks_center' %}?preview=items&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'items' %}is-active{% endif %}">{% trans "Catalog" %}</a>
         <a href="{% url 'quickbooks_center' %}?preview=invoices&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'invoices' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Invoices" %}</a>

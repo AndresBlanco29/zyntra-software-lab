@@ -873,6 +873,35 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertEqual(stock.stock_fisico, 18)
         self.assertEqual(stock.stock_disponible, 18)
 
+    @override_settings(QUICKBOOKS_CATALOG_ONLY_MODE=True)
+    @patch('config.integrations.quickbooks.client.requests.request')
+    def test_catalog_only_mode_allows_customer_import(self, mock_request):
+        self._activate_connection()
+        mock_request.return_value = self._json_response({
+            'QueryResponse': {
+                'Customer': [
+                    {
+                        'Id': 'QB-CUST-CATALOG-ONLY',
+                        'DisplayName': 'Catalog Only Customer',
+                        'CompanyName': 'Catalog Only Customer LLC',
+                    }
+                ]
+            }
+        })
+
+        response = self.client.post(reverse('quickbooks_import_customers_to_local'), {'limit': '10'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Cliente.objects.filter(quickbooks_id='QB-CUST-CATALOG-ONLY').exists())
+
+    @override_settings(QUICKBOOKS_CATALOG_ONLY_MODE=True)
+    def test_catalog_only_mode_blocks_vendor_import(self):
+        self._activate_connection()
+
+        response = self.client.post(reverse('quickbooks_import_vendors_to_local'), {'limit': '10'})
+
+        self.assertEqual(response.status_code, 403)
+
 
 @override_settings(
     QUICKBOOKS_CLIENT_ID='client-id',

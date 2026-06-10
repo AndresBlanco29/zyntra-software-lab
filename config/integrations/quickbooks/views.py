@@ -80,12 +80,30 @@ logger = logging.getLogger(__name__)
 
 CATALOG_ONLY_BLOCKED_MESSAGE = _(
     'This QuickBooks action is disabled while catalog-only mode is active. '
-    'Only catalog preview and import are enabled.'
+    'Only catalog and customer preview/import are enabled.'
 )
+
+CATALOG_ONLY_ALLOWED_VIEW_NAMES = frozenset({
+    'quickbooks_import_items',
+    'quickbooks_import_items_to_local',
+    'quickbooks_import_customers',
+    'quickbooks_import_customers_to_local',
+})
+
+CATALOG_ONLY_ALLOWED_PREVIEW_TYPES = frozenset({'items', 'customers'})
+
+CATALOG_ONLY_ALLOWED_TASK_OPERATIONS = frozenset({
+    'import_items_to_local',
+    'import_customers_to_local',
+})
 
 
 def _quickbooks_catalog_only_enabled():
     return getattr(settings, 'QUICKBOOKS_CATALOG_ONLY_MODE', True)
+
+
+def _is_catalog_only_allowed_view(view_name):
+    return str(view_name or '') in CATALOG_ONLY_ALLOWED_VIEW_NAMES
 
 
 def _guard_quickbooks_catalog_only(request, *, operation='quickbooks'):
@@ -97,6 +115,8 @@ def _guard_quickbooks_catalog_only(request, *, operation='quickbooks'):
 def quickbooks_requires_full_mode(view_func):
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
+        if _quickbooks_catalog_only_enabled() and _is_catalog_only_allowed_view(view_func.__name__):
+            return view_func(request, *args, **kwargs)
         blocked = _guard_quickbooks_catalog_only(request, operation=view_func.__name__)
         if blocked is not None:
             return blocked
@@ -560,7 +580,7 @@ def _parse_quickbooks_import_limit(raw_value, *, default=None):
 
 def _build_quickbooks_preview_context(*, request):
     preview_type = str(request.GET.get('preview') or '').strip().lower()
-    if preview_type and _quickbooks_catalog_only_enabled() and preview_type != 'items':
+    if preview_type and _quickbooks_catalog_only_enabled() and preview_type not in CATALOG_ONLY_ALLOWED_PREVIEW_TYPES:
         return {
             'quickbooks_preview_type': preview_type,
             'quickbooks_preview_title': _('Preview disabled'),
@@ -1067,7 +1087,7 @@ def quickbooks_import_accounting_documents_to_local(request):
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def quickbooks_start_task(request):
     operation = str(request.POST.get('operation') or '').strip()
-    if _quickbooks_catalog_only_enabled() and operation != 'import_items_to_local':
+    if _quickbooks_catalog_only_enabled() and operation not in CATALOG_ONLY_ALLOWED_TASK_OPERATIONS:
         blocked = _guard_quickbooks_catalog_only(request, operation='task_start')
         if blocked is not None:
             return blocked

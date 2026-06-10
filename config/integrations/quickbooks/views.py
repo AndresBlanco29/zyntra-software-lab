@@ -40,7 +40,7 @@ from config.integrations.backups import (
 
 from .auth import QuickBooksConfigurationError, quickbooks_credentials_configured, quickbooks_credentials_setup_message
 from .client import QuickBooksAPIClient, QuickBooksAPIError
-from .services import QuickBooksServiceError, get_connection, get_connection_status, get_oauth_login_url, handle_oauth_callback
+from .services import QuickBooksServiceError, get_connection, get_connection_status, get_oauth_login_url, handle_oauth_callback, maybe_maintain_quickbooks_connection
 from .sync import (
     dismiss_quickbooks_import_conflict,
     fetch_quickbooks_bills,
@@ -705,6 +705,7 @@ def _build_quickbooks_preview_context(*, request):
 
 
 def _build_quickbooks_center_context(*, request):
+    maybe_maintain_quickbooks_connection()
     dashboard_context = get_dashboard_sync_context(request=request)
     preview_context = _build_quickbooks_preview_context(request=request)
     conflicts = QuickBooksImportConflict.objects.all()

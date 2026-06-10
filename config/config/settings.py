@@ -252,6 +252,7 @@ QUICKBOOKS_SCOPES = tuple(
 QUICKBOOKS_API_MINOR_VERSION = os.environ.get('QUICKBOOKS_API_MINOR_VERSION', '75').strip() or '75'
 # When True, only catalog preview/import is allowed in QuickBooks Center (blocks accounting sync).
 QUICKBOOKS_CATALOG_ONLY_MODE = env_bool('QUICKBOOKS_CATALOG_ONLY_MODE', default=True)
+QUICKBOOKS_TOKEN_MAINTENANCE_HOURS = int(os.environ.get('QUICKBOOKS_TOKEN_MAINTENANCE_HOURS', '12') or '12')
 
 mysql_configured = bool(
     mysql_name

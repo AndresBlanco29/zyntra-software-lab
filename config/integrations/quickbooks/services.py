@@ -1,5 +1,7 @@
 import logging
+import time
 
+from django.conf import settings
 from django.core.cache import cache
 from django.utils import timezone
 
@@ -74,6 +76,93 @@ def _is_invalid_refresh_token_error(exc):
     return 'invalid_grant' in message or 'invalid refresh token' in message
 
 
+def _is_transient_token_error(exc):
+    message = str(exc).lower()
+    transient_markers = (
+        'timeout',
+        'timed out',
+        'connection aborted',
+        'connection reset',
+        'connection error',
+        'service unavailable',
+        'service_unavailable',
+        'temporarily unavailable',
+        'service unavailable',
+        '503',
+        '502',
+        '504',
+    )
+    return any(marker in message for marker in transient_markers)
+
+
+def _token_maintenance_hours():
+    try:
+        return max(1, int(getattr(settings, 'QUICKBOOKS_TOKEN_MAINTENANCE_HOURS', 12)))
+    except (TypeError, ValueError):
+        return 12
+
+
+def _should_proactively_refresh(connection):
+    if connection.access_token_is_expired():
+        return True
+    if not connection.last_refreshed_at:
+        return True
+
+    stale_after = timezone.now() - timezone.timedelta(hours=_token_maintenance_hours())
+    if connection.last_refreshed_at <= stale_after:
+        return True
+
+    if connection.refresh_token_expires_at:
+        renew_before = timezone.now() + timezone.timedelta(days=7)
+        if connection.refresh_token_expires_at <= renew_before:
+            return True
+
+    return False
+
+
+def maintain_quickbooks_connection(*, force=False):
+    connection = get_connection()
+    if not connection.is_active:
+        return {
+            'refreshed': False,
+            'reason': 'not_connected',
+            'is_active': False,
+        }
+    if not force and not _should_proactively_refresh(connection):
+        return {
+            'refreshed': False,
+            'reason': 'still_fresh',
+            'is_active': True,
+            'last_refreshed_at': connection.last_refreshed_at.isoformat() if connection.last_refreshed_at else None,
+        }
+
+    connection = ensure_valid_access_token(connection=connection, force_refresh=True)
+    return {
+        'refreshed': True,
+        'reason': 'refreshed',
+        'is_active': connection.is_active,
+        'last_refreshed_at': connection.last_refreshed_at.isoformat() if connection.last_refreshed_at else None,
+    }
+
+
+def maybe_maintain_quickbooks_connection(*, throttle_seconds=3600):
+    if not get_connection().is_active:
+        return {'refreshed': False, 'reason': 'not_connected'}
+
+    cache_key = 'quickbooks:token_maintenance_throttle'
+    if cache.get(cache_key):
+        return {'refreshed': False, 'reason': 'throttled'}
+
+    try:
+        result = maintain_quickbooks_connection()
+    except QuickBooksServiceError as exc:
+        logger.warning('QuickBooks background token maintenance failed: %s', exc)
+        return {'refreshed': False, 'reason': 'error', 'error': str(exc)}
+
+    cache.set(cache_key, True, timeout=max(300, int(throttle_seconds or 3600)))
+    return result
+
+
 def handle_oauth_callback(*, request, code, state, realm_id):
     validate_quickbooks_settings()
     expected_state = request.session.pop('quickbooks_oauth_state', None)
@@ -98,19 +187,32 @@ def ensure_valid_access_token(*, connection=None, force_refresh=False):
     connection = connection or get_connection()
     if not connection.refresh_token:
         raise QuickBooksServiceError('QuickBooks is not connected yet.')
-    if not force_refresh and not connection.access_token_is_expired():
+    if not force_refresh and not _should_proactively_refresh(connection):
         return connection
-    try:
-        payload = refresh_access_token(refresh_token=connection.refresh_token)
-    except (QuickBooksOAuthError, QuickBooksConfigurationError) as exc:
-        if _is_invalid_refresh_token_error(exc):
-            _clear_connection_tokens(connection=connection, last_error=INVALID_REFRESH_TOKEN_MESSAGE)
-            raise QuickBooksServiceError(INVALID_REFRESH_TOKEN_MESSAGE) from exc
-        connection.last_error = str(exc)
-        connection.save(update_fields=['last_error', 'updated_at'])
-        raise QuickBooksServiceError(str(exc)) from exc
-    logger.info('QuickBooks access token refreshed for environment %s', connection.environment)
-    return save_token_payload(connection=connection, payload=payload, realm_id=connection.realm_id)
+
+    attempts = 2
+    last_exc = None
+    for attempt in range(attempts):
+        try:
+            payload = refresh_access_token(refresh_token=connection.refresh_token)
+            logger.info('QuickBooks access token refreshed for environment %s', connection.environment)
+            return save_token_payload(connection=connection, payload=payload, realm_id=connection.realm_id)
+        except (QuickBooksOAuthError, QuickBooksConfigurationError) as exc:
+            last_exc = exc
+            if _is_invalid_refresh_token_error(exc):
+                _clear_connection_tokens(connection=connection, last_error=INVALID_REFRESH_TOKEN_MESSAGE)
+                raise QuickBooksServiceError(INVALID_REFRESH_TOKEN_MESSAGE) from exc
+            if attempt < attempts - 1 and _is_transient_token_error(exc):
+                logger.warning('Transient QuickBooks token refresh failure, retrying: %s', exc)
+                time.sleep(1)
+                continue
+            connection.last_error = str(exc)
+            connection.save(update_fields=['last_error', 'updated_at'])
+            raise QuickBooksServiceError(str(exc)) from exc
+
+    connection.last_error = str(last_exc)
+    connection.save(update_fields=['last_error', 'updated_at'])
+    raise QuickBooksServiceError(str(last_exc)) from last_exc
 
 
 def get_connection_status():

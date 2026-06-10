@@ -247,6 +247,72 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertEqual(connection.refresh_token, 'refresh-2')
 
     @patch('config.integrations.quickbooks.auth.requests.post')
+    def test_maintain_quickbooks_connection_refreshes_stale_tokens(self, mock_post):
+        self._activate_connection(
+            access_token='valid-token',
+            refresh_token='refresh-1',
+            access_token_expires_at=timezone.now() + timezone.timedelta(hours=1),
+        )
+        connection = QuickBooksConnection.get_solo()
+        connection.last_refreshed_at = timezone.now() - timezone.timedelta(hours=24)
+        connection.save(update_fields=['last_refreshed_at', 'updated_at'])
+        mock_post.return_value = Mock(
+            ok=True,
+            status_code=200,
+            json=Mock(return_value={
+                'access_token': 'access-maintained',
+                'refresh_token': 'refresh-maintained',
+                'token_type': 'bearer',
+                'scope': 'com.intuit.quickbooks.accounting',
+                'expires_in': 3600,
+                'x_refresh_token_expires_in': 8640000,
+            }),
+        )
+
+        from config.integrations.quickbooks.services import maintain_quickbooks_connection
+
+        result = maintain_quickbooks_connection()
+
+        self.assertTrue(result['refreshed'])
+        connection.refresh_from_db()
+        self.assertEqual(connection.access_token, 'access-maintained')
+        self.assertEqual(connection.refresh_token, 'refresh-maintained')
+
+    @patch('config.integrations.quickbooks.auth.requests.post')
+    def test_transient_refresh_error_does_not_clear_tokens(self, mock_post):
+        self._activate_connection(
+            access_token='expired-token',
+            refresh_token='refresh-1',
+            access_token_expires_at=timezone.now() - timezone.timedelta(minutes=5),
+        )
+        mock_post.side_effect = [
+            Mock(
+                ok=False,
+                status_code=503,
+                json=Mock(return_value={'error': 'service_unavailable'}),
+                text='service unavailable',
+            ),
+            Mock(
+                ok=True,
+                status_code=200,
+                json=Mock(return_value={
+                    'access_token': 'access-retry',
+                    'refresh_token': 'refresh-retry',
+                    'token_type': 'bearer',
+                    'scope': 'com.intuit.quickbooks.accounting',
+                    'expires_in': 3600,
+                    'x_refresh_token_expires_in': 8640000,
+                }),
+            ),
+        ]
+
+        from config.integrations.quickbooks.services import ensure_valid_access_token
+
+        connection = ensure_valid_access_token(force_refresh=True)
+        self.assertEqual(connection.access_token, 'access-retry')
+        self.assertEqual(connection.refresh_token, 'refresh-retry')
+
+    @patch('config.integrations.quickbooks.auth.requests.post')
     def test_quickbooks_center_preview_invalid_refresh_token_marks_connection_inactive(self, mock_post):
         self._activate_connection(
             access_token='expired-token',

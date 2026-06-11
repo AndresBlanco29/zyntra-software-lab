@@ -42,8 +42,8 @@ from .sync import (
     dismiss_quickbooks_import_conflict,
     import_quickbooks_customers,
     import_quickbooks_items,
-    import_quickbooks_accounting_documents,
     link_quickbooks_import_conflict,
+    pull_quickbooks_accounting_documents_to_local,
     pull_quickbooks_items_to_local,
     pull_quickbooks_to_local,
     refresh_linked_quickbooks_items,
@@ -72,7 +72,7 @@ logger = logging.getLogger(__name__)
 
 CATALOG_ONLY_BLOCKED_MESSAGE = _(
     'This QuickBooks action is disabled while catalog-only mode is active. '
-    'Only catalog and customer preview/import are enabled.'
+    'Catalog, customer, and accounting document import are enabled; full pull sync and outbound sync stay disabled.'
 )
 
 CATALOG_ONLY_ALLOWED_VIEW_NAMES = frozenset({
@@ -82,15 +82,26 @@ CATALOG_ONLY_ALLOWED_VIEW_NAMES = frozenset({
     'quickbooks_pull_items_sync_to_local',
     'quickbooks_import_customers',
     'quickbooks_import_customers_to_local',
+    'quickbooks_import_invoices',
+    'quickbooks_import_credit_memos',
+    'quickbooks_import_accounting_documents_to_local',
+    'quickbooks_import_conflict_link',
 })
 
-CATALOG_ONLY_ALLOWED_PREVIEW_TYPES = frozenset({'items', 'customers'})
+CATALOG_ONLY_ALLOWED_PREVIEW_TYPES = frozenset({'items', 'customers', 'invoices', 'credit_memos'})
 
 CATALOG_ONLY_ALLOWED_TASK_OPERATIONS = frozenset({
     'import_items_to_local',
     'import_customers_to_local',
     'refresh_linked_items_to_local',
     'pull_items_sync_to_local',
+    'import_accounting_documents_to_local',
+})
+
+CATALOG_ONLY_ALLOWED_CONFLICT_ENTITY_TYPES = frozenset({
+    QuickBooksImportConflict.ENTITY_ITEM,
+    QuickBooksImportConflict.ENTITY_INVOICE,
+    QuickBooksImportConflict.ENTITY_CREDIT_MEMO,
 })
 
 
@@ -304,14 +315,22 @@ def _build_dashboard_feedback(*, operation, ok, result=None, error=None):
         return feedback
 
     if operation == 'import_accounting_documents_to_local':
-        feedback['title'] = 'QuickBooks Accounting Pull'
+        feedback['title'] = _('QuickBooks accounting pull')
         feedback['details'].append(
-            f"Matched: {result.get('matched_count', 0)}. Conflicts queued: {result.get('conflict_count', 0)}."
+            _('Created: %(created)s. Updated: %(updated)s. Conflicts queued: %(conflicts)s.') % {
+                'created': result.get('created_count', 0),
+                'updated': result.get('updated_count', 0),
+                'conflicts': result.get('conflict_count', 0),
+            }
         )
+        if result.get('incremental'):
+            feedback['details'].append(_('Incremental sync used saved invoice and credit memo cursors.'))
         for sample in result.get('results', [])[:3]:
-            feedback['details'].append(
-                f"{sample.get('label')}: linked to local record." if sample.get('ok') else sample.get('error')
-            )
+            if sample.get('ok'):
+                action_label = _('created') if sample.get('action') == 'created' else _('updated')
+                feedback['details'].append(f"{sample.get('label')}: {action_label}.")
+            else:
+                feedback['details'].append(sample.get('error') or sample.get('label'))
         return feedback
 
     if operation == 'pull_sync_to_local':
@@ -939,9 +958,11 @@ def quickbooks_import_credit_memos(request):
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 @quickbooks_requires_full_mode
 def quickbooks_import_accounting_documents_to_local(request):
+    force_full = str(request.POST.get('mode') or '').strip().lower() == 'full'
     try:
-        result = import_quickbooks_accounting_documents(
-            max_results=_parse_quickbooks_import_limit(request.POST.get('limit'), default=None)
+        result = pull_quickbooks_accounting_documents_to_local(
+            max_results=_parse_quickbooks_import_limit(request.POST.get('limit'), default=None),
+            force_full=force_full,
         )
     except (ValueError, QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
         logger.warning('QuickBooks accounting import to local failed: %s', exc)
@@ -977,7 +998,7 @@ def quickbooks_start_task(request):
             force_full=kwargs.get('force_full', False),
             task_cache_key=kwargs.get('task_cache_key'),
         ).get('items', {}),
-        'import_accounting_documents_to_local': import_quickbooks_accounting_documents,
+        'import_accounting_documents_to_local': pull_quickbooks_accounting_documents_to_local,
         'pull_sync_to_local': pull_quickbooks_to_local,
     }
 
@@ -1138,7 +1159,7 @@ def quickbooks_import_conflicts(request):
 def quickbooks_import_conflict_retry(request, conflict_id):
     try:
         conflict = QuickBooksImportConflict.objects.get(pk=conflict_id)
-        if _quickbooks_catalog_only_enabled() and conflict.entity_type != QuickBooksImportConflict.ENTITY_ITEM:
+        if _quickbooks_catalog_only_enabled() and conflict.entity_type not in CATALOG_ONLY_ALLOWED_CONFLICT_ENTITY_TYPES:
             messages.error(request, CATALOG_ONLY_BLOCKED_MESSAGE)
             return redirect(_conflicts_redirect_target(request))
         retry_quickbooks_import_conflict(conflict, user=request.user)

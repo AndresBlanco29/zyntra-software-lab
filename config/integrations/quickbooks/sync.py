@@ -16,10 +16,11 @@ from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.translation import gettext as _
 
 from config.clientes.models import Cliente
-from config.facturacion.models import Invoice, NotaAjuste
+from config.facturacion.models import Invoice, InvoiceItem, NotaAjuste
 from config.integrations.models import QuickBooksImportConflict
 from config.inventario.models import CompraProveedor, CompraProveedorLinea, Proveedor, StockPresentacion
 from config.inventario.services import registrar_recepcion_compra_proveedor
+from config.pedidos.models import Pedido, PedidoItem
 from config.productos.models import Categoria, Marca, PRESENTACION_TERM_TRANSLATIONS, Presentacion, Producto
 from config.usuarios.models import Usuario
 
@@ -2025,6 +2026,137 @@ def _create_adjustment_note_from_quickbooks_invoice(payload):
     return note
 
 
+def _parse_single_quickbooks_sales_line(line):
+    detail_type = line.get('DetailType') or ''
+    if detail_type != 'SalesItemLineDetail':
+        return None
+    detail = line.get('SalesItemLineDetail') or {}
+    item_ref = detail.get('ItemRef') or {}
+    qb_item_id = str(item_ref.get('value') or '').strip()
+    description = _normalize_text(line.get('Description') or item_ref.get('name'))
+    qty = max(int(float(detail.get('Qty') or 1)), 1)
+    unit_price = _quantize_money(
+        detail.get('UnitPrice') or (Decimal(str(line.get('Amount') or 0)) / Decimal(str(qty or 1)))
+    )
+    subtotal = _quantize_money(line.get('Amount') or (unit_price * Decimal(str(qty))))
+    presentacion = None
+    if qb_item_id:
+        presentacion = Presentacion.objects.select_related('producto').filter(quickbooks_id=qb_item_id).first()
+    product_name = presentacion.producto.nombre if presentacion else (description or item_ref.get('name') or 'QuickBooks item')
+    presentation_name = presentacion.nombre if presentacion else (description or product_name)
+    return {
+        'presentacion': presentacion,
+        'producto_nombre': _truncate(product_name, limit=255),
+        'presentacion_nombre': _truncate(presentation_name, limit=120),
+        'cantidad': qty,
+        'precio': unit_price,
+        'subtotal': subtotal,
+    }
+
+
+def _parse_quickbooks_sales_line_specs(payload):
+    specs = []
+    for line in payload.get('Line') or []:
+        detail_type = line.get('DetailType') or ''
+        if detail_type in {'SubTotalLineDetail', 'DiscountLineDetail'}:
+            continue
+        if detail_type == 'GroupLineDetail':
+            for sub_line in line.get('GroupLineDetail', {}).get('Line', []) or []:
+                parsed = _parse_single_quickbooks_sales_line(sub_line)
+                if parsed:
+                    specs.append(parsed)
+            continue
+        parsed = _parse_single_quickbooks_sales_line(line)
+        if parsed:
+            specs.append(parsed)
+    return specs
+
+
+@transaction.atomic
+def _create_invoice_from_quickbooks_invoice(payload):
+    customer = _find_local_customer_from_quickbooks_payload(payload)
+    if customer is None:
+        raise QuickBooksSyncError(
+            'No local customer matched this QuickBooks invoice, so a local invoice could not be created automatically.'
+        )
+
+    quickbooks_id = str(payload.get('Id') or '').strip()
+    doc_number = _normalize_text(payload.get('DocNumber'))
+    total_amount = _quantize_money(payload.get('TotalAmt') or payload.get('Balance') or 0)
+    balance = _quantize_money(
+        payload.get('Balance') if payload.get('Balance') not in (None, '') else total_amount
+    )
+    line_specs = _parse_quickbooks_sales_line_specs(payload)
+    if not line_specs:
+        line_specs = [{
+            'presentacion': None,
+            'producto_nombre': str(_('QuickBooks imported total')),
+            'presentacion_nombre': str(_('Summary')),
+            'cantidad': 1,
+            'precio': total_amount,
+            'subtotal': total_amount,
+        }]
+
+    pedido = Pedido.objects.create(
+        cliente=customer,
+        origen='BACKOFFICE',
+        canal_toma='QUICKBOOKS_IMPORT',
+        estado='INVOICE_GENERADA',
+        nota_cliente=_truncate(payload.get('PrivateNote') or _('Imported from QuickBooks'), limit=4000),
+        total=total_amount,
+    )
+
+    pedido_items = []
+    for spec in line_specs:
+        if spec.get('presentacion') is None:
+            continue
+        pedido_items.append(PedidoItem(
+            pedido=pedido,
+            presentacion=spec['presentacion'],
+            cantidad_solicitada=spec['cantidad'],
+            cantidad=spec['cantidad'],
+            precio=spec['precio'],
+            subtotal=spec['subtotal'],
+        ))
+    if pedido_items:
+        PedidoItem.objects.bulk_create(pedido_items)
+
+    invoice = Invoice.objects.create(
+        pedido=pedido,
+        cliente=customer,
+        metodo_entrega='LTG',
+        driver=None,
+        subtotal=total_amount,
+        total_neto=total_amount,
+        saldo_cliente=balance,
+        quickbooks_id=quickbooks_id,
+        sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
+        last_synced_at=timezone.now(),
+    )
+    if doc_number and not Invoice.objects.exclude(pk=invoice.pk).filter(numero=doc_number).exists():
+        invoice.numero = doc_number
+        invoice.save(update_fields=['numero'])
+
+    invoice_items = []
+    for spec in line_specs:
+        pedido_item = None
+        if spec.get('presentacion') is not None:
+            pedido_item = PedidoItem.objects.filter(pedido=pedido, presentacion=spec['presentacion']).first()
+        invoice_items.append(InvoiceItem(
+            invoice=invoice,
+            pedido_item=pedido_item,
+            presentacion=spec.get('presentacion'),
+            producto_nombre=spec['producto_nombre'],
+            presentacion_nombre=spec['presentacion_nombre'],
+            cantidad_facturada=spec['cantidad'],
+            precio_unitario=spec['precio'],
+            precio_venta_sugerido_unitario=spec['precio'],
+            subtotal=spec['subtotal'],
+        ))
+    InvoiceItem.objects.bulk_create(invoice_items)
+    return invoice
+
+
 def _create_adjustment_note_from_quickbooks_credit_memo(payload):
     customer = _find_local_customer_from_quickbooks_payload(payload)
     if customer is None:
@@ -2130,7 +2262,7 @@ def import_quickbooks_invoice_record(payload):
     record, local_model = _match_local_invoice_from_quickbooks(payload)
     if record is None:
         try:
-            record = _create_adjustment_note_from_quickbooks_invoice(payload)
+            record = _create_invoice_from_quickbooks_invoice(payload)
         except QuickBooksSyncError as exc:
             _upsert_import_conflict(
                 entity_type=QuickBooksImportConflict.ENTITY_INVOICE,
@@ -2148,7 +2280,7 @@ def import_quickbooks_invoice_record(payload):
                 'label': doc_number or display_name or quickbooks_id,
                 'error': str(exc),
             }
-        local_model = 'NotaAjuste'
+        local_model = 'Invoice'
         action = 'created'
     else:
         _apply_quickbooks_invoice_to_local_record(record, payload)
@@ -2221,14 +2353,28 @@ def import_quickbooks_credit_memo_record(payload):
 
 
 def import_quickbooks_accounting_documents(*, max_results=25, client=None, invoice_updated_after=None, credit_memo_updated_after=None):
-    invoice_records = fetch_quickbooks_invoices(max_results=max_results, client=client, updated_after=invoice_updated_after)
-    credit_memo_records = fetch_quickbooks_credit_memos(max_results=max_results, client=client, updated_after=credit_memo_updated_after)
+    client = client or QuickBooksAPIClient()
+    page_size = _quickbooks_catalog_page_size()
+    invoice_records = fetch_quickbooks_invoices(
+        max_results=max_results,
+        client=client,
+        updated_after=invoice_updated_after,
+        page_size=page_size,
+    )
+    credit_memo_records = fetch_quickbooks_credit_memos(
+        max_results=max_results,
+        client=client,
+        updated_after=credit_memo_updated_after,
+        page_size=page_size,
+    )
     results = [import_quickbooks_invoice_record(record) for record in invoice_records]
     results.extend(import_quickbooks_credit_memo_record(record) for record in credit_memo_records)
     return {
         'entity': 'AccountingDocument',
         'count': len(results),
         'matched_count': sum(1 for item in results if item.get('ok')),
+        'created_count': sum(1 for item in results if item.get('ok') and item.get('action') == 'created'),
+        'updated_count': sum(1 for item in results if item.get('ok') and item.get('action') == 'matched'),
         'conflict_count': sum(1 for item in results if item.get('action') == 'conflict'),
         'invoice_result': {
             'count': len(invoice_records),
@@ -2240,6 +2386,47 @@ def import_quickbooks_accounting_documents(*, max_results=25, client=None, invoi
         },
         'results': results,
     }
+
+
+def pull_quickbooks_accounting_documents_to_local(*, max_results=None, client=None, force_full=False, task_cache_key=None):
+    """Pull QuickBooks invoices and credit memos into local Invoice and NotaAjuste records."""
+    client = client or QuickBooksAPIClient()
+    connection = client.connection
+    run_started_at = timezone.now()
+    serialized_run_started_at = _serialize_cursor(run_started_at)
+
+    invoice_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('invoice')))
+    credit_memo_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('credit_memo')))
+
+    if task_cache_key:
+        cache.set(task_cache_key, {'status': 'running', 'progress': 5, 'operation': 'AccountingDocument'}, timeout=60 * 60)
+
+    result = import_quickbooks_accounting_documents(
+        max_results=max_results,
+        client=client,
+        invoice_updated_after=invoice_cursor,
+        credit_memo_updated_after=credit_memo_cursor,
+    )
+
+    connection.set_sync_cursor(
+        _sync_cursor_key('invoice'),
+        result.get('invoice_result', {}).get('latest_updated_at') or serialized_run_started_at,
+    )
+    connection.set_sync_cursor(
+        _sync_cursor_key('credit_memo'),
+        result.get('credit_memo_result', {}).get('latest_updated_at') or serialized_run_started_at,
+    )
+    connection.save(update_fields=['sync_state', 'updated_at'])
+
+    result['incremental'] = not force_full
+    result['run_started_at'] = serialized_run_started_at
+    if task_cache_key:
+        cache.set(
+            task_cache_key,
+            {'status': 'completed', 'progress': 100, 'operation': 'AccountingDocument', 'result': result},
+            timeout=60 * 60,
+        )
+    return result
 
 
 def import_quickbooks_bills(*, max_results=25, client=None, updated_after=None, task_cache_key=None):

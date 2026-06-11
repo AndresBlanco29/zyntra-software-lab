@@ -764,6 +764,7 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertTrue(Producto.objects.filter(nombre='Tortilla 12').exists())
         self.assertTrue(default_storage.exists(media_path))
 
+    @patch('config.integrations.quickbooks.client.requests.request')
     def test_pull_accounting_documents_matches_local_invoice_and_credit_note(self, mock_request):
         self._activate_connection()
         mock_request.side_effect = [
@@ -803,7 +804,8 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertContains(view_response, 'External QB Customer')
 
     @patch('config.integrations.quickbooks.client.requests.request')
-    def test_pull_accounting_documents_creates_debit_and_credit_notes_when_customer_exists(self, mock_request):
+    @patch('config.integrations.quickbooks.client.requests.request')
+    def test_pull_accounting_documents_creates_invoice_and_credit_notes_when_customer_exists(self, mock_request):
         self._activate_connection()
         self.cliente.quickbooks_id = 'QB-CUSTOMER-1'
         self.cliente.save(update_fields=['quickbooks_id'])
@@ -817,18 +819,33 @@ class QuickBooksIntegrationTests(TestCase):
         response = self.client.post(reverse('quickbooks_import_accounting_documents_to_local'), {'limit': '10'})
 
         self.assertEqual(response.status_code, 200)
-        debit_note = NotaAjuste.objects.get(quickbooks_id='QB-INV-AUTO-1')
+        invoice = Invoice.objects.get(quickbooks_id='QB-INV-AUTO-1')
         credit_note = NotaAjuste.objects.get(quickbooks_id='QB-CM-AUTO-1')
-        self.assertEqual(debit_note.tipo_documento, 'DEBITO')
-        self.assertEqual(debit_note.tipo_ajuste, 'FINANCIERO')
-        self.assertEqual(debit_note.total, Decimal('45.00'))
-        self.assertEqual(debit_note.cliente, self.cliente)
+        self.assertEqual(invoice.numero, 'QB-INV-1001')
+        self.assertEqual(invoice.total_neto, Decimal('45.00'))
+        self.assertEqual(invoice.saldo_cliente, Decimal('12.50'))
+        self.assertEqual(invoice.cliente, self.cliente)
         self.assertEqual(credit_note.tipo_documento, 'CREDITO')
         self.assertEqual(credit_note.tipo_ajuste, 'FINANCIERO')
         self.assertEqual(credit_note.tipo_credito, 'CREDIT_DUMP')
         self.assertEqual(credit_note.total, Decimal('10.00'))
         self.assertEqual(credit_note.cliente, self.cliente)
         self.assertFalse(QuickBooksImportConflict.objects.filter(quickbooks_id__in=['QB-INV-AUTO-1', 'QB-CM-AUTO-1']).exists())
+
+    @override_settings(QUICKBOOKS_CATALOG_ONLY_MODE=True)
+    @patch('config.integrations.quickbooks.client.requests.request')
+    def test_catalog_only_mode_allows_accounting_import(self, mock_request):
+        self._activate_connection()
+        self.cliente.quickbooks_id = 'QB-CUSTOMER-1'
+        self.cliente.save(update_fields=['quickbooks_id'])
+        mock_request.side_effect = [
+            self._json_response({'QueryResponse': {'Invoice': []}}),
+            self._json_response({'QueryResponse': {'CreditMemo': []}}),
+        ]
+
+        response = self.client.post(reverse('quickbooks_import_accounting_documents_to_local'), {'limit': '10'})
+
+        self.assertEqual(response.status_code, 200)
 
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_import_items_to_local_sets_physical_stock_from_qty_on_hand(self, mock_request):

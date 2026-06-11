@@ -5,6 +5,7 @@ from datetime import timezone as dt_timezone
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.db import transaction, IntegrityError
@@ -414,11 +415,108 @@ def _get_default_income_account_ref(client):
     return {'value': str(account.get('Id')), 'name': account.get('Name', '')}
 
 
-def fetch_quickbooks_items(*, max_results=25, client=None, updated_after=None, page_size=100):
+def fetch_quickbooks_items(*, max_results=25, client=None, updated_after=None, page_size=None):
     client = client or QuickBooksAPIClient()
+    resolved_page_size = page_size or getattr(settings, 'QUICKBOOKS_CATALOG_SYNC_PAGE_SIZE', 1000)
     if updated_after:
-        return client.find_updated_since('Item', updated_after, max_results=max_results, page_size=page_size)
-    return client.find_all('Item', max_results=max_results, order_by='MetaData.LastUpdatedTime', page_size=page_size)
+        return client.find_updated_since('Item', updated_after, max_results=max_results, page_size=resolved_page_size)
+    return client.find_all('Item', max_results=max_results, order_by='MetaData.LastUpdatedTime', page_size=resolved_page_size)
+
+
+def _quickbooks_catalog_page_size():
+    return min(max(int(getattr(settings, 'QUICKBOOKS_CATALOG_SYNC_PAGE_SIZE', 1000) or 1000), 1), 1000)
+
+
+def _catalog_sync_skip_images():
+    return bool(getattr(settings, 'QUICKBOOKS_CATALOG_SYNC_SKIP_IMAGES', True))
+
+
+def _fetch_quickbooks_items_by_ids(*, client, item_ids, updated_after=None, chunk_size=100):
+    """Fetch specific QuickBooks Items by Id using batched IN queries."""
+    found = {}
+    ids = [str(item_id).strip() for item_id in item_ids if str(item_id or '').strip()]
+    if not ids:
+        return found
+
+    chunk_size = max(min(int(chunk_size or 100), _quickbooks_catalog_page_size()), 1)
+    for offset in range(0, len(ids), chunk_size):
+        chunk = ids[offset:offset + chunk_size]
+        in_list = ', '.join(f"'{client._escape_query_value(item_id)}'" for item_id in chunk)
+        where_parts = [f"Id IN ({in_list})"]
+        if updated_after:
+            where_parts.append(f"MetaData.LastUpdatedTime > '{client._escape_query_value(updated_after)}'")
+        where_clause = ' AND '.join(where_parts)
+        response = client.query(
+            client._build_select_statement(
+                'Item',
+                where_clause=where_clause,
+                max_results=min(len(chunk), _quickbooks_catalog_page_size()),
+            )
+        )
+        batch = response.get('Item', [])
+        if isinstance(batch, dict):
+            batch = [batch]
+        for record in batch or []:
+            item_id = str(record.get('Id') or '').strip()
+            if item_id:
+                found[item_id] = record
+    return found
+
+
+def _fetch_quickbooks_items_map(*, client=None, wanted_ids=None, updated_after=None, max_results=None):
+    """Fetch QuickBooks Item payloads in paginated bulk queries instead of one API call per item."""
+    client = client or QuickBooksAPIClient()
+    wanted = {str(item_id).strip() for item_id in (wanted_ids or []) if str(item_id or '').strip()}
+    if wanted:
+        return _fetch_quickbooks_items_by_ids(
+            client=client,
+            item_ids=sorted(wanted),
+            updated_after=updated_after,
+        )
+
+    page_size = _quickbooks_catalog_page_size()
+    found = {}
+    start_position = 1
+    remaining = None if max_results is None else max(int(max_results), 0)
+
+    while True:
+        batch_size = page_size if remaining is None else min(page_size, remaining)
+        if batch_size <= 0:
+            break
+
+        where_clause = None
+        if updated_after:
+            where_clause = f"MetaData.LastUpdatedTime > '{client._escape_query_value(updated_after)}'"
+
+        response = client.query(
+            client._build_select_statement(
+                'Item',
+                where_clause=where_clause,
+                order_by='MetaData.LastUpdatedTime',
+                start_position=start_position,
+                max_results=batch_size,
+            )
+        )
+        batch = response.get('Item', [])
+        if isinstance(batch, dict):
+            batch = [batch]
+        if not batch:
+            break
+
+        for record in batch:
+            item_id = str(record.get('Id') or '').strip()
+            if item_id:
+                found[item_id] = record
+
+        if remaining is not None:
+            remaining -= len(batch)
+            if remaining <= 0:
+                break
+        if len(batch) < batch_size:
+            break
+        start_position += len(batch)
+
+    return found
 
 
 def _build_item_payload(presentacion, *, client, income_account_ref=None):
@@ -626,8 +724,27 @@ def _split_quickbooks_item_hierarchy(payload):
     return [part.strip() for part in full_name.split(':') if part.strip()]
 
 
-def _resolve_quickbooks_item_category_and_brand(payload):
+def _build_catalog_lookup_cache():
     fallback_category, fallback_brand = _ensure_import_category_and_brand()
+    return {
+        'fallback_category': fallback_category,
+        'fallback_brand': fallback_brand,
+        'categories': {},
+        'brands': {},
+        'brand_category_pairs': set(),
+    }
+
+
+def _resolve_quickbooks_item_category_and_brand(payload, *, lookup_cache=None):
+    if lookup_cache is not None:
+        fallback_category = lookup_cache['fallback_category']
+        fallback_brand = lookup_cache['fallback_brand']
+        categories = lookup_cache.setdefault('categories', {})
+        brands = lookup_cache.setdefault('brands', {})
+        brand_category_pairs = lookup_cache.setdefault('brand_category_pairs', set())
+    else:
+        fallback_category, fallback_brand = _ensure_import_category_and_brand()
+        categories = brands = brand_category_pairs = None
     hierarchy = _split_quickbooks_item_hierarchy(payload)
     parent_name = _normalize_text((payload.get('ParentRef') or {}).get('name'))
     class_name = _normalize_text((payload.get('ClassRef') or {}).get('name'))
@@ -658,12 +775,28 @@ def _resolve_quickbooks_item_category_and_brand(payload):
 
     category = fallback_category
     if category_name:
-        category, _ = Categoria.objects.get_or_create(nombre=category_name)
+        if categories is not None:
+            category = categories.get(category_name)
+            if category is None:
+                category, _ = Categoria.objects.get_or_create(nombre=category_name)
+                categories[category_name] = category
+        else:
+            category, _ = Categoria.objects.get_or_create(nombre=category_name)
 
     brand = fallback_brand
     if brand_name:
-        brand, _ = Marca.objects.get_or_create(nombre=brand_name)
-        brand.categorias.add(category)
+        if brands is not None:
+            brand = brands.get(brand_name)
+            if brand is None:
+                brand, _ = Marca.objects.get_or_create(nombre=brand_name)
+                brands[brand_name] = brand
+        else:
+            brand, _ = Marca.objects.get_or_create(nombre=brand_name)
+        pair_key = (brand.pk, category.pk)
+        if brand_category_pairs is None or pair_key not in brand_category_pairs:
+            brand.categorias.add(category)
+            if brand_category_pairs is not None:
+                brand_category_pairs.add(pair_key)
 
     return category, brand
 
@@ -868,7 +1001,9 @@ def _fetch_quickbooks_item_image(client, payload):
     return None
 
 
-def _save_quickbooks_item_image(*, producto, payload, client=None, force=False):
+def _save_quickbooks_item_image(*, producto, payload, client=None, force=False, skip=False):
+    if skip:
+        return False
     if not force and producto.imagen:
         return False
     image_file = _fetch_quickbooks_item_image(client, payload)
@@ -968,7 +1103,7 @@ def _product_conflict_exists(*, quickbooks_id, product_name, presentation_name):
     ).exclude(quickbooks_id=quickbooks_id).first()
 
 
-def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None):
+def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None, skip_images=False, lookup_cache=None):
     quickbooks_id = str(payload.get('Id') or '').strip()
     if not quickbooks_id:
         raise QuickBooksSyncError('QuickBooks item payload is missing an Id.')
@@ -977,9 +1112,9 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
     description = _truncate(payload.get('Description') or payload.get('FullyQualifiedName') or '', limit=4000)
     sku = _truncate(payload.get('Sku') or '', limit=100)
     item_cost = _extract_quickbooks_item_cost(payload)
-    category, brand = _resolve_quickbooks_item_category_and_brand(payload)
+    category, brand = _resolve_quickbooks_item_category_and_brand(payload, lookup_cache=lookup_cache)
     producto = presentacion.producto
-    image_saved = _save_quickbooks_item_image(producto=producto, payload=payload, client=client)
+    image_saved = _save_quickbooks_item_image(producto=producto, payload=payload, client=client, skip=skip_images)
     producto.nombre = product_name
     producto.descripcion = description
     producto.categoria = category
@@ -1024,8 +1159,13 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
 
 
 @transaction.atomic
-def import_quickbooks_item_record(payload, *, client=None):
-    payload = _enrich_quickbooks_item_payload(payload, client=client)
+def import_quickbooks_item_record(payload, *, client=None, skip_enrich=False, skip_images=None, prefetched_presentacion=None, lookup_cache=None):
+    if skip_images is None:
+        skip_images = _catalog_sync_skip_images()
+    if not skip_enrich:
+        payload = _enrich_quickbooks_item_payload(payload, client=client)
+    else:
+        payload = dict(payload or {})
     client = client or QuickBooksAPIClient()
     quickbooks_id = str(payload.get('Id') or '').strip()
     if not quickbooks_id:
@@ -1036,8 +1176,12 @@ def import_quickbooks_item_record(payload, *, client=None):
     sku = _truncate(payload.get('Sku') or '', limit=100)
     unit_price = _quantize_money(payload.get('UnitPrice') or 0)
     item_cost = _extract_quickbooks_item_cost(payload)
-    category, brand = _resolve_quickbooks_item_category_and_brand(payload)
-    existing = Presentacion.objects.select_related('producto').filter(quickbooks_id=quickbooks_id).first()
+    category, brand = _resolve_quickbooks_item_category_and_brand(payload, lookup_cache=lookup_cache)
+    existing = prefetched_presentacion
+    if existing is None:
+        existing = Presentacion.objects.select_related('producto').filter(quickbooks_id=quickbooks_id).first()
+    elif getattr(existing, 'quickbooks_id', None) and str(existing.quickbooks_id) != quickbooks_id:
+        existing = Presentacion.objects.select_related('producto').filter(quickbooks_id=quickbooks_id).first()
     if existing is None:
         conflict = _product_conflict_exists(
             quickbooks_id=quickbooks_id,
@@ -1089,7 +1233,7 @@ def import_quickbooks_item_record(payload, *, client=None):
                 sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
                 last_synced_at=timezone.now(),
             )
-            _save_quickbooks_item_image(producto=producto, payload=payload, client=client)
+            _save_quickbooks_item_image(producto=producto, payload=payload, client=client, skip=skip_images)
             presentacion = Presentacion.objects.create(
                 producto=producto,
                 nombre=presentation_name,
@@ -1132,7 +1276,7 @@ def import_quickbooks_item_record(payload, *, client=None):
                     local_model='Producto',
                     local_record_id=producto.id,
                 )
-                _save_quickbooks_item_image(producto=producto, payload=payload, client=client)
+                _save_quickbooks_item_image(producto=producto, payload=payload, client=client, skip=skip_images)
                 presentacion = Presentacion.objects.create(
                     producto=producto,
                     nombre=presentation_name,
@@ -1151,7 +1295,13 @@ def import_quickbooks_item_record(payload, *, client=None):
             else:
                 raise
     else:
-        presentacion = _apply_quickbooks_item_to_local_record(existing, payload, client=client)
+        presentacion = _apply_quickbooks_item_to_local_record(
+            existing,
+            payload,
+            client=client,
+            skip_images=skip_images,
+            lookup_cache=lookup_cache,
+        )
         producto = presentacion.producto
         action = 'updated'
 
@@ -1208,9 +1358,9 @@ def _import_batch_result(*, entity_name, records, import_callable, task_cache_ke
         else:
             results.append(result)
 
-        # update progress in cache after each record
+        # update progress in cache after each record (throttled for large batches)
         processed += 1
-        if task_cache_key and total > 0:
+        if task_cache_key and total > 0 and (processed == total or processed % 25 == 0):
             # keep some headroom for finalization; map processed/total to 5..95
             pct = int((processed / total) * 90) + 5
             pct = min(max(pct, 0), 95)
@@ -1289,7 +1439,9 @@ def import_quickbooks_vendors(*, max_results=25, client=None, updated_after=None
     return _import_batch_result(entity_name='Vendor', records=records, import_callable=import_quickbooks_vendor_record, task_cache_key=task_cache_key)
 
 
-def import_quickbooks_items(*, max_results=25, client=None, updated_after=None, task_cache_key=None):
+def import_quickbooks_items(*, max_results=25, client=None, updated_after=None, task_cache_key=None, skip_images=None):
+    if skip_images is None:
+        skip_images = _catalog_sync_skip_images()
     records = fetch_quickbooks_items(max_results=max_results, client=client, updated_after=updated_after)
     # Keep the full set of QuickBooks ids we received so we can detect
     # Items that were removed/disabled in QuickBooks and mark them
@@ -1301,7 +1453,24 @@ def import_quickbooks_items(*, max_results=25, client=None, updated_after=None, 
         all_ids = set()
         filtered = []
 
-    result = _import_batch_result(entity_name='Item', records=filtered, import_callable=import_quickbooks_item_record, task_cache_key=task_cache_key)
+    prefetched_presentaciones = {
+        str(presentacion.quickbooks_id): presentacion
+        for presentacion in Presentacion.objects.select_related('producto').filter(quickbooks_id__in=all_ids)
+    }
+    lookup_cache = _build_catalog_lookup_cache()
+
+    result = _import_batch_result(
+        entity_name='Item',
+        records=filtered,
+        import_callable=lambda record: import_quickbooks_item_record(
+            record,
+            client=client,
+            skip_images=skip_images,
+            prefetched_presentacion=prefetched_presentaciones.get(str(record.get('Id') or '').strip()),
+            lookup_cache=lookup_cache,
+        ),
+        task_cache_key=task_cache_key,
+    )
 
     # If QuickBooks no longer returns some linked items, mark their local
     # `Producto` as inactive to reflect deletion/disable in QuickBooks.
@@ -1322,6 +1491,7 @@ def import_quickbooks_items(*, max_results=25, client=None, updated_after=None, 
         # Don't let this block the main import result if something goes wrong
         pass
 
+    cache.delete('catalogo:productos_activos_v2')
     return result
 
 
@@ -2118,17 +2288,19 @@ def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None
         queryset = queryset[:max(int(limit), 0)]
 
     qb_ids = [str(qb_id).strip() for qb_id in queryset.values_list('quickbooks_id', flat=True) if str(qb_id or '').strip()]
+    items_map = _fetch_quickbooks_items_map(client=client, wanted_ids=qb_ids)
+    prefetched_presentaciones = {
+        str(presentacion.quickbooks_id): presentacion
+        for presentacion in Presentacion.objects.select_related('producto').filter(quickbooks_id__in=qb_ids)
+    }
+    lookup_cache = _build_catalog_lookup_cache()
     payloads = []
     for qb_id in qb_ids:
-        try:
-            payload = _fetch_quickbooks_item_payload(item_id=qb_id, client=client)
-        except QuickBooksAPIError as exc:
-            payloads.append({'Id': qb_id, '_missing_in_qb': True, '_error': str(exc)})
-            continue
-        if payload:
-            payloads.append(_enrich_quickbooks_item_payload(payload, client=client))
-        else:
+        payload = items_map.get(qb_id)
+        if not payload:
             payloads.append({'Id': qb_id, '_missing_in_qb': True})
+            continue
+        payloads.append(payload)
 
     def _import_payload(payload):
         if payload.get('_missing_in_qb'):
@@ -2140,7 +2312,13 @@ def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None
                 'label': str(payload.get('Id') or ''),
                 'error': payload.get('_error') or 'Item not found in QuickBooks.',
             }
-        return import_quickbooks_item_record(payload, client=client)
+        return import_quickbooks_item_record(
+            payload,
+            client=client,
+            skip_images=True,
+            prefetched_presentacion=prefetched_presentaciones.get(str(payload.get('Id') or '').strip()),
+            lookup_cache=lookup_cache,
+        )
 
     result = _import_batch_result(
         entity_name='LinkedItem',

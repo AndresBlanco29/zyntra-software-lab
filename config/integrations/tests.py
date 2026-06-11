@@ -106,8 +106,8 @@ class QuickBooksItemCostSyncTests(TestCase):
         mock_fetch.assert_called_once()
 
     @patch('config.integrations.quickbooks.sync.import_quickbooks_item_record')
-    @patch('config.integrations.quickbooks.sync._fetch_quickbooks_item_payload')
-    def test_refresh_linked_items_uses_full_item_payload_for_cost(self, mock_fetch, mock_import):
+    @patch('config.integrations.quickbooks.sync._fetch_quickbooks_items_map')
+    def test_refresh_linked_items_uses_full_item_payload_for_cost(self, mock_fetch_map, mock_import):
         categoria = Categoria.objects.create(nombre='Aceites')
         marca = Marca.objects.create(nombre='123')
         producto = Producto.objects.create(
@@ -123,18 +123,20 @@ class QuickBooksItemCostSyncTests(TestCase):
             costo=Decimal('33.00'),
             quickbooks_id='QB-OIL-1',
         )
-        mock_fetch.return_value = {
-            'Id': 'QB-OIL-1',
-            'Name': 'ACEITE 123 CANOLA OLI 12/1 LT',
-            'Type': 'Inventory',
-            'PurchaseCost': 35.99,
-            'QtyOnHand': 0,
+        mock_fetch_map.return_value = {
+            'QB-OIL-1': {
+                'Id': 'QB-OIL-1',
+                'Name': 'ACEITE 123 CANOLA OLI 12/1 LT',
+                'Type': 'Inventory',
+                'PurchaseCost': 35.99,
+                'QtyOnHand': 0,
+            }
         }
         mock_import.return_value = {'ok': True, 'action': 'updated'}
 
         refresh_linked_quickbooks_items()
 
-        mock_fetch.assert_called()
+        mock_fetch_map.assert_called_once()
         imported_payload = mock_import.call_args[0][0]
         self.assertEqual(_extract_quickbooks_item_cost(imported_payload), Decimal('35.99'))
 

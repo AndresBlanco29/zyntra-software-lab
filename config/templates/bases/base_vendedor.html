@@ -116,11 +116,8 @@ La Tortilla Grocery
 {% endif %}
 {% if request.user|has_internal_permission:'backoffice.dashboard.view' %}
   <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-import-customers" data-label="{% trans 'QuickBooks import customers' %}" data-section="QuickBooks action" data-keywords="quickbooks import customers sync customers customer import clientes importar clientes"></a>
-  <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-import-suppliers" data-label="{% trans 'QuickBooks import suppliers' %}" data-section="QuickBooks action" data-keywords="quickbooks import suppliers vendors supplier import vendor import suplidores proveedores importar proveedores vendors"></a>
   <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-import-catalog" data-label="{% trans 'QuickBooks import catalog' %}" data-section="QuickBooks action" data-keywords="quickbooks import catalog items products presentations catalog import importar catalogo importar productos items"></a>
   <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-pull-accounting" data-label="{% trans 'Pull accounting documents' %}" data-section="QuickBooks action" data-keywords="quickbooks invoices invoice credit memo pull accounting documents sync accounting facturas creditos debitos documentos contables"></a>
-  <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-import-purchase-orders" data-label="{% trans 'Import purchase orders' %}" data-section="QuickBooks action" data-keywords="quickbooks import purchase orders po pre po purchase order importar purchase orders importar po"></a>
-  <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-import-bills" data-label="{% trans 'Import bills' %}" data-section="QuickBooks action" data-keywords="quickbooks bills import bills supplier bills vendor bills importar bills facturas de proveedor"></a>
   <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-pull-sync" data-label="{% trans 'Run pull sync now' %}" data-section="QuickBooks action" data-keywords="quickbooks sync pull sync run sync sincronizar quickbooks incremental sync"></a>
   <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-full-resync" data-label="{% trans 'Run full resync' %}" data-section="QuickBooks action" data-keywords="quickbooks full resync full sync reimport resync sincronizacion completa"></a>
 {% endif %}
@@ -339,20 +336,12 @@ La Tortilla Grocery
 {% endif %}
 
 {% if request.user|has_internal_permission:'backoffice.orders.view' %}
-<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' or request.resolver_match.url_name == 'backoffice_supplier_list' or request.resolver_match.url_name == 'backoffice_supplier_detail' or request.resolver_match.url_name == 'backoffice_supplier_purchase_list' or request.resolver_match.url_name == 'backoffice_supplier_purchase_detail' %}open{% endif %}>
-  <summary class="sidebar-collapsible-summary">{% trans "Inventory & Purchasing" %}</summary>
+<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' %}open{% endif %}>
+  <summary class="sidebar-collapsible-summary">{% trans "Inventory" %}</summary>
   <div class="sidebar-collapsible-links">
     <a href="{% url 'backoffice_inventory_list' %}"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_inventory_list' or request.resolver_match.url_name == 'backoffice_inventory_detail' %}active{% endif %}">
       {% trans "Inventory" %}
-    </a>
-    <a href="{% url 'backoffice_supplier_list' %}"
-      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_supplier_list' or request.resolver_match.url_name == 'backoffice_supplier_detail' %}active{% endif %}">
-      {% trans "Suppliers" %}
-    </a>
-    <a href="{% url 'backoffice_supplier_purchase_list' %}"
-      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_supplier_purchase_list' or request.resolver_match.url_name == 'backoffice_supplier_purchase_detail' %}active{% endif %}">
-      {% trans "Pre-PO / PO" %}
     </a>
   </div>
 </details>
@@ -524,12 +513,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (source.includes('credit / debit notes') || source.includes('adjustment') || source.includes('/notes/')) {
       aliases.push('nota notas credito debito creditos debitos ajustes nota de credito nota de debito');
-    }
-    if (source.includes('supplier') || source.includes('vendor') || source.includes('/suppliers/')) {
-      aliases.push('proveedor proveedores suplidor suplidores vendors compras proveedor');
-    }
-    if (source.includes('pre po') || source.includes('purchase order') || source.includes('/purchase-orders/') || source.includes('bills')) {
-      aliases.push('orden compra ordenes compra prepo po purchase order bills bill factura proveedor facturas proveedor compras');
     }
     if (source.includes('inventory') || source.includes('/inventario/') || source.includes('/inventory/')) {
       aliases.push('inventario stock existencia existencias almacen');

@@ -6,21 +6,18 @@ from urllib.parse import quote
 from django.contrib import messages
 from django.conf import settings
 from django.core.files.storage import default_storage
-from django.core.exceptions import ObjectDoesNotExist, ValidationError
-from django.db import transaction
+from django.core.exceptions import ObjectDoesNotExist
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateformat import format as date_format
-from django.utils.dateparse import parse_date
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_GET, require_POST
 
 from config.clientes.models import Cliente
 from config.facturacion.models import Invoice, NotaAjuste
 from config.integrations.models import QuickBooksImportConflict
-from config.inventario.models import CompraProveedor, CompraProveedorLinea, Proveedor
 from config.productos.models import Presentacion
 
 from config.usuarios.permissions import get_redirect_url_for_user, internal_permission_required
@@ -43,11 +40,7 @@ from .client import QuickBooksAPIClient, QuickBooksAPIError
 from .services import QuickBooksServiceError, get_connection, get_connection_status, get_oauth_login_url, handle_oauth_callback, maybe_maintain_quickbooks_connection
 from .sync import (
     dismiss_quickbooks_import_conflict,
-    fetch_quickbooks_bills,
-    fetch_quickbooks_vendors,
     import_quickbooks_customers,
-    import_quickbooks_bills,
-    import_quickbooks_vendors,
     import_quickbooks_items,
     import_quickbooks_accounting_documents,
     link_quickbooks_import_conflict,
@@ -59,9 +52,7 @@ from .sync import (
     fetch_quickbooks_customers,
     fetch_quickbooks_invoices,
     fetch_quickbooks_items,
-    fetch_quickbooks_purchase_orders,
     retry_quickbooks_import_conflict,
-    import_quickbooks_purchase_orders,
     sync_adjustment_note_batch_by_ids,
     sync_adjustment_note_by_id,
     sync_customer_batch_by_ids,
@@ -70,7 +61,6 @@ from .sync import (
     sync_invoice_by_id,
     sync_product_batch_by_ids,
     sync_product_by_id,
-    sync_supplier_purchase,
 )
 import threading
 import uuid
@@ -484,115 +474,21 @@ def get_dashboard_sync_context(*, request=None):
     if request is not None:
         feedback = request.session.pop('quickbooks_dashboard_feedback', None)
     pending_customers = Cliente.objects.filter(quickbooks_id__isnull=True).order_by('-id')
-    recent_suppliers = Proveedor.objects.order_by('-actualizado_en', '-id')
     pending_presentations = Presentacion.objects.filter(quickbooks_id__isnull=True).select_related('producto').order_by('-id')
     pending_invoices = Invoice.objects.filter(quickbooks_id__isnull=True).select_related('cliente').order_by('-id')
     pending_notes = NotaAjuste.objects.filter(quickbooks_id__isnull=True, estado='APROBADA').select_related('cliente', 'invoice').order_by('-id')
-    recent_supplier_purchases = CompraProveedor.objects.prefetch_related('lineas__presentacion__producto').order_by('-creado_en', '-id')
     return {
         'quickbooks_pending_customers': pending_customers[:10],
-        'quickbooks_recent_suppliers': recent_suppliers[:8],
         'quickbooks_pending_presentations': pending_presentations[:10],
         'quickbooks_pending_invoices': pending_invoices[:10],
         'quickbooks_pending_notes': pending_notes[:10],
-        'quickbooks_recent_supplier_purchases': recent_supplier_purchases[:5],
-        'quickbooks_purchase_presentations': Presentacion.objects.select_related('producto').order_by('producto__nombre', 'nombre'),
-        'quickbooks_supplier_purchase_slots': range(4),
         'quickbooks_pending_customer_count': pending_customers.count(),
-        'quickbooks_supplier_count': recent_suppliers.count(),
         'quickbooks_pending_presentation_count': pending_presentations.count(),
         'quickbooks_pending_invoice_count': pending_invoices.count(),
         'quickbooks_pending_note_count': pending_notes.count(),
-        'quickbooks_pending_supplier_purchase_count': recent_supplier_purchases.filter(quickbooks_id__isnull=True).count(),
         'quickbooks_import_conflicts_count': QuickBooksImportConflict.objects.filter(status=QuickBooksImportConflict.STATUS_CONFLICT).count(),
         'quickbooks_dashboard_feedback': feedback,
     }
-
-
-def _parse_supplier_purchase_lines(request):
-    raw_presentacion_ids = request.POST.getlist('presentacion_id')
-    raw_quantities = request.POST.getlist('cantidad')
-    raw_unit_costs = request.POST.getlist('costo_unitario')
-    raw_descriptions = request.POST.getlist('descripcion')
-
-    line_specs = []
-    for index, raw_presentacion_id in enumerate(raw_presentacion_ids):
-        presentacion_id = str(raw_presentacion_id or '').strip()
-        quantity = str(raw_quantities[index] if index < len(raw_quantities) else '').strip()
-        unit_cost = str(raw_unit_costs[index] if index < len(raw_unit_costs) else '').strip()
-        description = str(raw_descriptions[index] if index < len(raw_descriptions) else '').strip()
-        if not any((presentacion_id, quantity, unit_cost, description)):
-            continue
-        if not (presentacion_id and quantity and unit_cost):
-            raise ValueError('Each supplier purchase line needs product, quantity, and unit cost.')
-        if not presentacion_id.isdigit():
-            raise ValueError(f'Invalid presentation ID: {presentacion_id}')
-        try:
-            parsed_quantity = int(quantity)
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f'Invalid quantity value: {quantity}') from exc
-        if parsed_quantity <= 0:
-            raise ValueError('Quantity must be greater than zero.')
-        line_specs.append({
-            'presentacion_id': int(presentacion_id),
-            'cantidad': parsed_quantity,
-            'costo_unitario': unit_cost,
-            'descripcion': description,
-        })
-
-    if not line_specs:
-        raise ValueError('Add at least one supplier purchase line before sending it to QuickBooks.')
-
-    presentation_map = {
-        presentacion.id: presentacion
-        for presentacion in Presentacion.objects.select_related('producto').filter(id__in=[spec['presentacion_id'] for spec in line_specs])
-    }
-    if len(presentation_map) != len({spec['presentacion_id'] for spec in line_specs}):
-        raise ValueError('One or more selected presentations no longer exist.')
-
-    for spec in line_specs:
-        spec['presentacion'] = presentation_map[spec['presentacion_id']]
-    return line_specs
-
-
-@transaction.atomic
-def _create_supplier_purchase_from_request(request):
-    supplier_name = str(request.POST.get('proveedor_nombre') or '').strip()
-    if not supplier_name:
-        raise ValueError('Supplier name is required.')
-
-    purchase_date = parse_date(str(request.POST.get('fecha_compra') or '').strip())
-    if purchase_date is None:
-        raise ValueError('Supplier purchase date is required.')
-
-    raw_due_date = str(request.POST.get('fecha_vencimiento') or '').strip()
-    due_date = parse_date(raw_due_date) if raw_due_date else None
-    if raw_due_date and due_date is None:
-        raise ValueError('Due date is invalid.')
-
-    compra = CompraProveedor.objects.create(
-        proveedor_nombre=supplier_name,
-        proveedor_email=str(request.POST.get('proveedor_email') or '').strip(),
-        proveedor_telefono=str(request.POST.get('proveedor_telefono') or '').strip(),
-        bill_number=str(request.POST.get('bill_number') or '').strip(),
-        fecha_compra=purchase_date,
-        fecha_vencimiento=due_date,
-        notas=str(request.POST.get('notas') or '').strip(),
-        estado=CompraProveedor.STATUS_DRAFT,
-        creado_por=request.user,
-    )
-    for spec in _parse_supplier_purchase_lines(request):
-        line = CompraProveedorLinea(
-            compra=compra,
-            presentacion=spec['presentacion'],
-            cantidad=spec['cantidad'],
-            costo_unitario=spec['costo_unitario'],
-            descripcion=spec['descripcion'],
-        )
-        line.full_clean()
-        line.save()
-    compra.recalcular_totales(save=True)
-    return compra
 
 
 def _quickbooks_center_preview_limit(request):
@@ -636,30 +532,21 @@ def _build_quickbooks_preview_context(*, request):
     limit = _quickbooks_center_preview_limit(request)
     fetchers = {
         'customers': lambda: fetch_quickbooks_customers(max_results=limit),
-        'vendors': lambda: fetch_quickbooks_vendors(max_results=limit),
         'items': lambda: fetch_quickbooks_items(max_results=limit),
         'invoices': lambda: fetch_quickbooks_invoices(max_results=limit),
         'credit_memos': lambda: fetch_quickbooks_credit_memos(max_results=limit),
-        'bills': lambda: fetch_quickbooks_bills(max_results=limit),
-        'purchase_orders': lambda: fetch_quickbooks_purchase_orders(max_results=limit),
     }
     labels = {
         'customers': (_('Customer preview'), _('Review the customer list before importing it into your system.')),
-        'vendors': (_('Supplier preview'), _('Review the supplier list from QuickBooks before importing it into your system.')),
         'items': (_('Catalog preview'), _('Review products and presentations coming from QuickBooks before importing them.')),
         'invoices': (_('Invoice preview'), _('Review sales documents coming from QuickBooks before matching them locally.')),
         'credit_memos': (_('Credit memo preview'), _('Review credit documents before importing or resolving them.')),
-        'bills': (_('Bill preview'), _('Review supplier Bills before importing them into local purchases and inventory.')),
-        'purchase_orders': (_('Purchase order preview'), _('Review QuickBooks purchase orders before importing them into your local Pre-PO / PO center.')),
     }
     column_map = {
         'customers': [_('Name'), _('Email'), _('Phone'), _('QuickBooks ID')],
-        'vendors': [_('Name'), _('Email'), _('Phone'), _('QuickBooks ID')],
         'items': [_('Item'), _('SKU'), _('Price'), _('QuickBooks ID')],
         'invoices': [_('Document'), _('Customer'), _('Total'), _('QuickBooks ID')],
         'credit_memos': [_('Document'), _('Customer'), _('Total'), _('QuickBooks ID')],
-        'bills': [_('Document'), _('Vendor'), _('Total'), _('QuickBooks ID')],
-        'purchase_orders': [_('Document'), _('Vendor'), _('Total'), _('QuickBooks ID')],
     }
 
     if preview_type not in fetchers:
@@ -696,25 +583,11 @@ def _build_quickbooks_preview_context(*, request):
                 record.get('PrimaryPhone', {}).get('FreeFormNumber') or '-',
                 record.get('Id') or '-',
             ])
-        elif preview_type == 'vendors':
-            rows.append([
-                record.get('DisplayName') or record.get('PrintOnCheckName') or '-',
-                record.get('PrimaryEmailAddr', {}).get('Address') or '-',
-                record.get('PrimaryPhone', {}).get('FreeFormNumber') or '-',
-                record.get('Id') or '-',
-            ])
         elif preview_type == 'items':
             rows.append([
                 record.get('Name') or '-',
                 record.get('Sku') or '-',
                 record.get('UnitPrice') or '-',
-                record.get('Id') or '-',
-            ])
-        elif preview_type in {'bills', 'purchase_orders'}:
-            rows.append([
-                record.get('DocNumber') or '-',
-                record.get('VendorRef', {}).get('name') or '-',
-                record.get('TotalAmt') or '-',
                 record.get('Id') or '-',
             ])
         else:
@@ -746,11 +619,9 @@ def _build_quickbooks_center_context(*, request):
     sync_cursors = []
     for key, label in (
         ('customer', _('Customers')),
-        ('vendor', _('Suppliers')),
         ('item', _('Catalog')),
         ('invoice', _('Invoices')),
         ('credit_memo', _('Credit memos')),
-        ('bill', _('Bills')),
     ):
         if raw_cursors.get(key):
             sync_cursors.append({'label': label, 'value': raw_cursors[key]})
@@ -974,18 +845,6 @@ def quickbooks_import_customers(request):
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 @quickbooks_requires_full_mode
-def quickbooks_import_vendors(request):
-    try:
-        result = fetch_quickbooks_vendors(max_results=request.GET.get('limit', 25))
-    except (QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
-        logger.warning('QuickBooks vendor import preview failed: %s', exc)
-        return _response_or_redirect(request, operation='import_vendors', error=str(exc), status_code=502)
-    return _response_or_redirect(request, operation='import_vendors', result={'count': len(result), 'vendors': result})
-
-
-@require_GET
-@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
-@quickbooks_requires_full_mode
 def quickbooks_import_items(request):
     try:
         result = fetch_quickbooks_items(max_results=request.GET.get('limit', 25))
@@ -993,30 +852,6 @@ def quickbooks_import_items(request):
         logger.warning('QuickBooks item import preview failed: %s', exc)
         return _response_or_redirect(request, operation='import_items', error=str(exc), status_code=502)
     return _response_or_redirect(request, operation='import_items', result={'count': len(result), 'items': result})
-
-
-@require_GET
-@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
-@quickbooks_requires_full_mode
-def quickbooks_import_bills(request):
-    try:
-        result = fetch_quickbooks_bills(max_results=request.GET.get('limit', 25))
-    except (QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
-        logger.warning('QuickBooks Bill import preview failed: %s', exc)
-        return _response_or_redirect(request, operation='import_bills', error=str(exc), status_code=502)
-    return _response_or_redirect(request, operation='import_bills', result={'count': len(result), 'bills': result})
-
-
-@require_GET
-@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
-@quickbooks_requires_full_mode
-def quickbooks_import_purchase_orders(request):
-    try:
-        result = fetch_quickbooks_purchase_orders(max_results=request.GET.get('limit', 25))
-    except (QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
-        logger.warning('QuickBooks purchase order import preview failed: %s', exc)
-        return _response_or_redirect(request, operation='import_purchase_orders', error=str(exc), status_code=502)
-    return _response_or_redirect(request, operation='import_purchase_orders', result={'count': len(result), 'purchase_orders': result})
 
 
 @require_POST
@@ -1029,18 +864,6 @@ def quickbooks_import_customers_to_local(request):
         logger.warning('QuickBooks customer import to local failed: %s', exc)
         return _response_or_redirect(request, operation='import_customers_to_local', error=str(exc), status_code=502)
     return _response_or_redirect(request, operation='import_customers_to_local', result=result)
-
-
-@require_POST
-@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
-@quickbooks_requires_full_mode
-def quickbooks_import_vendors_to_local(request):
-    try:
-        result = import_quickbooks_vendors(max_results=int(request.POST.get('limit', 25) or 25))
-    except (ValueError, QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
-        logger.warning('QuickBooks vendor import to local failed: %s', exc)
-        return _response_or_redirect(request, operation='import_vendors_to_local', error=str(exc), status_code=502)
-    return _response_or_redirect(request, operation='import_vendors_to_local', result=result)
 
 
 @require_POST
@@ -1086,30 +909,6 @@ def quickbooks_pull_items_sync_to_local(request):
         logger.warning('QuickBooks catalog pull sync failed: %s', exc)
         return _response_or_redirect(request, operation='pull_items_sync_to_local', error=str(exc), status_code=502)
     return _response_or_redirect(request, operation='pull_items_sync_to_local', result=result)
-
-
-@require_POST
-@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
-@quickbooks_requires_full_mode
-def quickbooks_import_bills_to_local(request):
-    try:
-        result = import_quickbooks_bills(max_results=int(request.POST.get('limit', 25) or 25))
-    except (ValueError, QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
-        logger.warning('QuickBooks Bill import to local failed: %s', exc)
-        return _response_or_redirect(request, operation='import_bills_to_local', error=str(exc), status_code=502)
-    return _response_or_redirect(request, operation='import_bills_to_local', result=result)
-
-
-@require_POST
-@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
-@quickbooks_requires_full_mode
-def quickbooks_import_purchase_orders_to_local(request):
-    try:
-        result = import_quickbooks_purchase_orders(max_results=int(request.POST.get('limit', 25) or 25))
-    except (ValueError, QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
-        logger.warning('QuickBooks purchase order import to local failed: %s', exc)
-        return _response_or_redirect(request, operation='import_purchase_orders_to_local', error=str(exc), status_code=502)
-    return _response_or_redirect(request, operation='import_purchase_orders_to_local', result=result)
 
 
 @require_GET
@@ -1167,7 +966,6 @@ def quickbooks_start_task(request):
     # map allowed operations to internal functions
     op_map = {
         'import_customers_to_local': import_quickbooks_customers,
-        'import_vendors_to_local': import_quickbooks_vendors,
         'import_items_to_local': lambda **kwargs: pull_quickbooks_items_to_local(
             max_results=kwargs.get('max_results'),
             force_full=kwargs.get('force_full', False),
@@ -1179,8 +977,6 @@ def quickbooks_start_task(request):
             force_full=kwargs.get('force_full', False),
             task_cache_key=kwargs.get('task_cache_key'),
         ).get('items', {}),
-        'import_bills_to_local': import_quickbooks_bills,
-        'import_purchase_orders_to_local': import_quickbooks_purchase_orders,
         'import_accounting_documents_to_local': import_quickbooks_accounting_documents,
         'pull_sync_to_local': pull_quickbooks_to_local,
     }
@@ -1448,31 +1244,6 @@ def quickbooks_sync_adjustment_note(request, note_id):
         logger.warning('QuickBooks adjustment note sync failed: %s', exc)
         return _response_or_redirect(request, operation='sync_adjustment_note', error=str(exc), status_code=502)
     return _response_or_redirect(request, operation='sync_adjustment_note', result=result)
-
-
-@require_POST
-@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
-@quickbooks_requires_full_mode
-def quickbooks_sync_supplier_purchase_create(request):
-    compra = None
-    try:
-        purchase_id = str(request.POST.get('purchase_id') or '').strip()
-        if purchase_id:
-            compra = CompraProveedor.objects.prefetch_related('lineas__presentacion__producto').get(pk=purchase_id)
-        else:
-            compra = _create_supplier_purchase_from_request(request)
-        result = sync_supplier_purchase(compra=compra)
-        if compra.estado == CompraProveedor.STATUS_DRAFT:
-            compra.estado = CompraProveedor.STATUS_SENT
-            compra.save(update_fields=['estado', 'actualizado_en'])
-    except (ObjectDoesNotExist, ValueError, ValidationError, QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
-        logger.warning('QuickBooks supplier purchase sync failed: %s', exc)
-        return _response_or_redirect(request, operation='sync_supplier_purchase', error=str(exc), status_code=502)
-
-    payload = dict(result)
-    payload['purchase_id'] = compra.id
-    payload['supplier_name'] = compra.proveedor_nombre
-    return _response_or_redirect(request, operation='sync_supplier_purchase', result=payload)
 
 
 @require_POST

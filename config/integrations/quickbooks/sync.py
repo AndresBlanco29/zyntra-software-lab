@@ -2160,14 +2160,11 @@ def pull_quickbooks_to_local(*, max_results=25, client=None, force_full=False):
     run_started_at = timezone.now()
 
     customer_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('customer')))
-    vendor_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('vendor')))
     item_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('item')))
     invoice_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('invoice')))
     credit_memo_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('credit_memo')))
-    bill_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('bill')))
 
     customers = import_quickbooks_customers(max_results=max_results, client=client, updated_after=customer_cursor)
-    vendors = import_quickbooks_vendors(max_results=max_results, client=client, updated_after=vendor_cursor)
     items = import_quickbooks_items(max_results=max_results, client=client, updated_after=item_cursor)
     accounting_documents = import_quickbooks_accounting_documents(
         max_results=max_results,
@@ -2175,23 +2172,18 @@ def pull_quickbooks_to_local(*, max_results=25, client=None, force_full=False):
         invoice_updated_after=invoice_cursor,
         credit_memo_updated_after=credit_memo_cursor,
     )
-    bills = import_quickbooks_bills(max_results=max_results, client=client, updated_after=bill_cursor)
 
     serialized_run_started_at = _serialize_cursor(run_started_at)
     connection.set_sync_cursor(_sync_cursor_key('customer'), customers.get('latest_updated_at') or serialized_run_started_at)
-    connection.set_sync_cursor(_sync_cursor_key('vendor'), vendors.get('latest_updated_at') or serialized_run_started_at)
     connection.set_sync_cursor(_sync_cursor_key('item'), items.get('latest_updated_at') or serialized_run_started_at)
     connection.set_sync_cursor(_sync_cursor_key('invoice'), accounting_documents.get('invoice_result', {}).get('latest_updated_at') or serialized_run_started_at)
     connection.set_sync_cursor(_sync_cursor_key('credit_memo'), accounting_documents.get('credit_memo_result', {}).get('latest_updated_at') or serialized_run_started_at)
-    connection.set_sync_cursor(_sync_cursor_key('bill'), bills.get('latest_updated_at') or serialized_run_started_at)
     connection.save(update_fields=['sync_state', 'updated_at'])
 
     return {
         'customers': customers,
-        'vendors': vendors,
         'items': items,
         'accounting_documents': accounting_documents,
-        'bills': bills,
         'run_started_at': serialized_run_started_at,
         'incremental': not force_full,
     }

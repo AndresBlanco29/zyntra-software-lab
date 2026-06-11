@@ -775,16 +775,6 @@
                 <p class="qb-action-note">{% trans "Only shows the customer list from QuickBooks. It does not change your system." %}</p>
               </div>
             </div>
-            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
-              <div class="qb-action-item h-100">
-                <form method="get" action="{% url 'quickbooks_center' %}">
-                  <input type="hidden" name="preview" value="vendors">
-                  <input type="hidden" name="preview_limit" value="8">
-                  <button type="submit" class="btn btn-outline-dark w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Preview suppliers" %}</button>
-                </form>
-                <p class="qb-action-note">{% trans "Only shows the supplier list from QuickBooks. It does not change your system." %}</p>
-              </div>
-            </div>
             <div class="col-md-6">
               <div class="qb-action-item h-100">
                 <form method="get" action="{% url 'quickbooks_center' %}">
@@ -813,26 +803,6 @@
                   <button type="submit" class="btn btn-outline-dark w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Preview credit memos" %}</button>
                 </form>
                 <p class="qb-action-note">{% trans "Review credit memos before importing or deciding how to match them." %}</p>
-              </div>
-            </div>
-            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
-              <div class="qb-action-item h-100">
-                <form method="get" action="{% url 'quickbooks_center' %}">
-                  <input type="hidden" name="preview" value="purchase_orders">
-                  <input type="hidden" name="preview_limit" value="8">
-                  <button type="submit" class="btn btn-outline-dark w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Preview purchase orders" %}</button>
-                </form>
-                <p class="qb-action-note">{% trans "Review QuickBooks purchase orders before importing them as supplier purchase records." %}</p>
-              </div>
-            </div>
-            <div class="col-md-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
-              <div class="qb-action-item h-100">
-                <form method="get" action="{% url 'quickbooks_center' %}">
-                  <input type="hidden" name="preview" value="bills">
-                  <input type="hidden" name="preview_limit" value="8">
-                  <button type="submit" class="btn btn-outline-dark w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Preview bills" %}</button>
-                </form>
-                <p class="qb-action-note">{% trans "Review supplier Bills before bringing them into purchases and inventory." %}</p>
               </div>
             </div>
           </div>
@@ -865,15 +835,6 @@
               </form>
               <p class="qb-action-note">{% trans "Brings customer data from QuickBooks into your system." %}</p>
             </div>
-              <div class="qb-action-item{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}" id="qb-import-suppliers-vendors">
-              <form method="post" action="{% url 'quickbooks_import_vendors_to_local' %}" data-qb-operation="import_vendors_to_local">
-                {% csrf_token %}
-                <input type="hidden" name="limit" value="25">
-                <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                <button type="submit" class="btn btn-outline-success w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Import suppliers to the app" %}</button>
-              </form>
-              <p class="qb-action-note">{% trans "Brings QuickBooks vendors into your local supplier catalog." %}</p>
-            </div>
               <div class="qb-action-item" id="qb-import-catalog">
               <form method="post" action="{% url 'quickbooks_import_items_to_local' %}" data-qb-operation="import_items_to_local">
                 {% csrf_token %}
@@ -900,24 +861,6 @@
                 <button type="submit" class="btn btn-outline-warning w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Pull accounting documents" %}</button>
               </form>
               <p class="qb-action-note">{% trans "Imports invoice history and credit memos from QuickBooks. If there is no local invoice or note yet, the system creates a financial debit or credit note automatically when it can identify the local customer." %}</p>
-            </div>
-            <div class="qb-action-item{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}" id="qb-import-purchase-orders">
-              <form method="post" action="{% url 'quickbooks_import_purchase_orders_to_local' %}" data-qb-operation="import_purchase_orders_to_local">
-                {% csrf_token %}
-                <input type="hidden" name="limit" value="25">
-                <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                <button type="submit" class="btn btn-outline-warning w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Import purchase orders to the app" %}</button>
-              </form>
-              <p class="qb-action-note">{% trans "Creates local supplier purchase records from QuickBooks purchase orders without receiving inventory yet." %}</p>
-            </div>
-            <div class="qb-action-item{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}" id="qb-import-bills">
-              <form method="post" action="{% url 'quickbooks_import_bills_to_local' %}" data-qb-operation="import_bills_to_local">
-                {% csrf_token %}
-                <input type="hidden" name="limit" value="25">
-                <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                <button type="submit" class="btn btn-outline-warning w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Import Bills to the app" %}</button>
-              </form>
-              <p class="qb-action-note">{% trans "Creates local supplier purchases from QuickBooks Bills and loads inventory when the catalog items are already linked." %}</p>
             </div>
           </div>
         </div>
@@ -983,12 +926,9 @@
       </div>
       <div class="qb-chip-list">
         <a href="{% url 'quickbooks_center' %}?preview=customers&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'customers' %}is-active{% endif %}">{% trans "Customers" %}</a>
-        <a href="{% url 'quickbooks_center' %}?preview=vendors&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'vendors' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Suppliers" %}</a>
         <a href="{% url 'quickbooks_center' %}?preview=items&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'items' %}is-active{% endif %}">{% trans "Catalog" %}</a>
         <a href="{% url 'quickbooks_center' %}?preview=invoices&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'invoices' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Invoices" %}</a>
         <a href="{% url 'quickbooks_center' %}?preview=credit_memos&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'credit_memos' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Credit memos" %}</a>
-        <a href="{% url 'quickbooks_center' %}?preview=purchase_orders&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'purchase_orders' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Purchase orders" %}</a>
-        <a href="{% url 'quickbooks_center' %}?preview=bills&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'bills' %}is-active{% endif %}{% if quickbooks_catalog_only_mode %} is-disabled{% endif %}">{% trans "Bills" %}</a>
       </div>
     </div>
 
@@ -1032,62 +972,9 @@
     {% else %}
     <div class="qb-strip">
       <div class="fw-semibold mb-1">{% trans "What should you preview first?" %}</div>
-      <div class="small text-muted">{% trans "Usually start with customers, suppliers, and catalog. Then review invoices, credit memos, purchase orders, or Bills before bringing accounting data into the system." %}</div>
+      <div class="small text-muted">{% trans "Usually start with customers and catalog. Then review invoices or credit memos before bringing accounting data into the system." %}</div>
     </div>
     {% endif %}
-  </section>
-
-  <section class="qb-section-card p-4 p-xl-5 mb-4{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
-    <div class="row g-4 align-items-start">
-      <div class="col-xl-4">
-        <h3 class="mb-2">{% trans "Supplier PO / Pre-PO" %}</h3>
-        <p class="qb-soft-copy mb-3">{% trans "Use the purchase order center to create draft supplier orders, sync them to QuickBooks, and receive inventory only after the order is verified." %}</p>
-        <div class="qb-chip-list mb-3">
-          <span class="qb-chip">{{ quickbooks_pending_supplier_purchase_count }} {% trans "pending POs" %}</span>
-          <span class="qb-chip">{{ quickbooks_recent_supplier_purchases|length }} {% trans "recent purchases" %}</span>
-        </div>
-        <div class="qb-strip">
-          <div class="fw-semibold mb-1">{% trans "What this action does" %}</div>
-          <div class="small text-muted">{% trans "It lets BackOffice create a draft supplier PO, push it to QuickBooks when needed, and load inventory only when the order is received." %}</div>
-        </div>
-      </div>
-      <div class="col-xl-8">
-        <div class="qb-action-item mb-3">
-          <div class="row g-3 align-items-center">
-            <div class="col-lg-8">
-              <div class="fw-semibold mb-1">{% trans "Open the supplier purchase order center" %}</div>
-              <div class="small text-muted">{% trans "There you can create draft Pre-PO records, send them manually to QuickBooks if automatic sync fails, and receive stock only after verification." %}</div>
-            </div>
-            <div class="col-lg-4 d-grid">
-              <a href="{% url 'backoffice_supplier_purchase_list' %}" class="btn btn-success">{% trans "Open PO center" %}</a>
-            </div>
-          </div>
-        </div>
-
-        <div class="row g-3">
-          {% for purchase in quickbooks_recent_supplier_purchases %}
-          <div class="col-md-6">
-            <div class="qb-recent-item h-100">
-              <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
-                <div class="fw-semibold">{{ purchase.po_number|default:purchase.bill_number|default:_('Purchase') }} · {{ purchase.proveedor_nombre }}</div>
-                <span class="badge text-bg-light">{{ purchase.estado }}</span>
-              </div>
-              <div class="small text-muted mb-2">{{ purchase.fecha_compra }} · {{ purchase.total }} · {{ purchase.sync_status }}</div>
-              <div class="small text-muted">
-                {% for line in purchase.lineas.all %}
-                <div>{{ line.cantidad }} x {{ line.presentacion.producto.nombre }} · {{ line.presentacion.nombre }}</div>
-                {% endfor %}
-              </div>
-            </div>
-          </div>
-          {% empty %}
-          <div class="col-12">
-            <div class="qb-strip text-muted">{% trans "Supplier purchase orders created from BackOffice will appear here." %}</div>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
   </section>
 
   <section class="qb-section-card p-4 p-xl-5 mb-4{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
@@ -1100,7 +987,6 @@
           <span class="qb-chip">{{ quickbooks_pending_presentation_count }} {% trans "items" %}</span>
           <span class="qb-chip">{{ quickbooks_pending_invoice_count }} {% trans "invoices" %}</span>
           <span class="qb-chip">{{ quickbooks_pending_note_count }} {% trans "notes" %}</span>
-          <span class="qb-chip">{{ quickbooks_pending_supplier_purchase_count }} {% trans "Bills" %}</span>
         </div>
         <div class="qb-strip">
           <div class="fw-semibold mb-1">{% trans "Use the advanced boxes only if you know the exact IDs" %}</div>

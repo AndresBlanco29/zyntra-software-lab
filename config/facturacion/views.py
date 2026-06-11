@@ -4,12 +4,13 @@ from io import BytesIO
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Case, Count, IntegerField, Q, Value, When
 from django.http import HttpResponse, JsonResponse
 from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils.dateparse import parse_datetime
+from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from django.utils.translation import gettext as _
 from reportlab.graphics.barcode import code128
@@ -821,48 +822,116 @@ def _ordered_driver_deliveries(queryset):
 	).order_by('estimated_delivery_sort', 'estimated_delivery_at', 'created_at')
 
 
+INVOICES_LIST_PAGE_SIZE = 50
+
+
+def _invoice_list_view_querysets(*, base_queryset=None):
+	queryset = base_queryset if base_queryset is not None else Invoice.objects.all()
+	return {
+		'pending': queryset.filter(
+			estado='GENERADA',
+			despachador_notificado=False,
+		).exclude(
+			delivery__estado__in=['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'],
+		),
+		'ready': queryset.filter(
+			estado='GENERADA',
+			despachador_notificado=True,
+		).exclude(
+			delivery__estado__in=['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'],
+		),
+		'delivered': queryset.filter(
+			estado='GENERADA',
+			delivery__estado__in=['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'],
+		),
+		'cancelled': queryset.filter(estado='ANULADA'),
+	}
+
+
+def _apply_invoice_list_filters(queryset, request):
+	query = (request.GET.get('q') or '').strip()
+	selected_customer_id = (request.GET.get('cliente_id') or '').strip()
+	selected_delivery_method = (request.GET.get('metodo_entrega') or '').strip()
+	selected_driver_id = (request.GET.get('driver_id') or '').strip()
+	date_from_raw = (request.GET.get('date_from') or '').strip()
+	date_to_raw = (request.GET.get('date_to') or '').strip()
+
+	valid_delivery_methods = {choice[0] for choice in Invoice.DELIVERY_METHOD_CHOICES}
+	if selected_delivery_method not in valid_delivery_methods:
+		selected_delivery_method = ''
+
+	if query:
+		search_filters = (
+			Q(numero__icontains=query)
+			| Q(cliente__nombre_empresa__icontains=query)
+			| Q(driver__username__icontains=query)
+			| Q(driver__first_name__icontains=query)
+			| Q(driver__last_name__icontains=query)
+		)
+		if query.isdigit():
+			search_filters |= Q(pedido_id=int(query))
+		queryset = queryset.filter(search_filters)
+
+	if selected_customer_id:
+		queryset = queryset.filter(cliente_id=selected_customer_id)
+
+	if selected_delivery_method:
+		queryset = queryset.filter(metodo_entrega=selected_delivery_method)
+
+	if selected_driver_id:
+		queryset = queryset.filter(driver_id=selected_driver_id)
+
+	date_from = parse_date(date_from_raw) if date_from_raw else None
+	date_to = parse_date(date_to_raw) if date_to_raw else None
+	if date_from:
+		queryset = queryset.filter(creada_en__date__gte=date_from)
+	if date_to:
+		queryset = queryset.filter(creada_en__date__lte=date_to)
+
+	return queryset, {
+		'query': query,
+		'selected_customer_id': selected_customer_id,
+		'selected_delivery_method': selected_delivery_method,
+		'selected_driver_id': selected_driver_id,
+		'date_from': date_from_raw if date_from else '',
+		'date_to': date_to_raw if date_to else '',
+	}
+
+
 @login_required
 @internal_permission_required('backoffice.orders.view')
 def backoffice_invoices_list(request):
-	base_queryset = Invoice.objects.select_related('pedido__cliente', 'driver', 'creada_por', 'delivery').prefetch_related('items', 'notas_ajuste').order_by('-creada_en')
-	view_mode = request.GET.get('view', 'pending')
-
-	pending_queryset = base_queryset.filter(
-		estado='GENERADA',
-		despachador_notificado=False,
-	).exclude(
-		delivery__estado__in=['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'],
-	)
-	ready_queryset = base_queryset.filter(
-		estado='GENERADA',
-		despachador_notificado=True,
-	).exclude(
-		delivery__estado__in=['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'],
-	)
-	delivered_queryset = base_queryset.filter(
-		estado='GENERADA',
-		delivery__estado__in=['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'],
-	)
-	cancelled_queryset = base_queryset.filter(estado='ANULADA')
-
-	querysets = {
-		'pending': pending_queryset,
-		'ready': ready_queryset,
-		'delivered': delivered_queryset,
-		'cancelled': cancelled_queryset,
-	}
+	view_mode = (request.GET.get('view') or 'pending').strip()
+	querysets = _invoice_list_view_querysets()
 	if view_mode not in querysets:
 		view_mode = 'pending'
 
-	invoices = querysets[view_mode]
+	filtered_queryset, filter_context = _apply_invoice_list_filters(querysets[view_mode], request)
+	filtered_queryset = filtered_queryset.select_related(
+		'pedido__cliente',
+		'cliente',
+		'driver',
+		'creada_por',
+		'delivery',
+	)
+	page_obj = Paginator(filtered_queryset, INVOICES_LIST_PAGE_SIZE).get_page(request.GET.get('page'))
+
+	count_querysets = _invoice_list_view_querysets()
+	customers = Cliente.objects.filter(invoices__isnull=False).distinct().order_by('nombre_empresa')
+	drivers = Usuario.objects.filter(role='driver').order_by('first_name', 'username')
 
 	return render(request, 'backoffice/invoices_list.html', {
-		'invoices': invoices,
+		'page_obj': page_obj,
+		'invoices': page_obj,
 		'view_mode': view_mode,
-		'pending_count': pending_queryset.count(),
-		'ready_count': ready_queryset.count(),
-		'delivered_count': delivered_queryset.count(),
-		'cancelled_count': cancelled_queryset.count(),
+		'pending_count': count_querysets['pending'].count(),
+		'ready_count': count_querysets['ready'].count(),
+		'delivered_count': count_querysets['delivered'].count(),
+		'cancelled_count': count_querysets['cancelled'].count(),
+		'customers': customers,
+		'drivers': drivers,
+		'delivery_method_choices': Invoice.DELIVERY_METHOD_CHOICES,
+		**filter_context,
 	})
 
 

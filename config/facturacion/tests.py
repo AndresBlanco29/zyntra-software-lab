@@ -2282,7 +2282,7 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.context['view_mode'], 'pending')
-		self.assertEqual(list(response.context['invoices'].values_list('id', flat=True)), [pending_invoice.id])
+		self.assertEqual([invoice.id for invoice in response.context['page_obj']], [pending_invoice.id])
 		self.assertEqual(response.context['pending_count'], 1)
 		self.assertEqual(response.context['ready_count'], 1)
 		self.assertEqual(response.context['cancelled_count'], 1)
@@ -2318,9 +2318,24 @@ class InvoiceFlowTests(TestCase):
 		delivered_response = self.client.get(reverse('backoffice_invoices_list'), {'view': 'delivered'})
 		cancelled_response = self.client.get(reverse('backoffice_invoices_list'), {'view': 'cancelled'})
 
-		self.assertEqual(list(ready_response.context['invoices'].values_list('id', flat=True)), [ready_invoice.id])
-		self.assertEqual(list(delivered_response.context['invoices'].values_list('id', flat=True)), [delivered_invoice.id])
-		self.assertEqual(list(cancelled_response.context['invoices'].values_list('id', flat=True)), [cancelled_invoice.id])
+		self.assertEqual([invoice.id for invoice in ready_response.context['page_obj']], [ready_invoice.id])
+		self.assertEqual([invoice.id for invoice in delivered_response.context['page_obj']], [delivered_invoice.id])
+		self.assertEqual([invoice.id for invoice in cancelled_response.context['page_obj']], [cancelled_invoice.id])
+
+	def test_backoffice_invoice_list_supports_search_and_pagination(self):
+		self.client.force_login(self.backoffice)
+		for index in range(3):
+			invoice = self._create_invoice(metodo_entrega='LTG', total=f'{10 + index}.00')
+			invoice.despachador_notificado = False
+			invoice.save(update_fields=['despachador_notificado'])
+
+		search_response = self.client.get(reverse('backoffice_invoices_list'), {'q': self.cliente.nombre_empresa[:5]})
+		self.assertEqual(search_response.status_code, 200)
+		self.assertEqual(search_response.context['page_obj'].paginator.count, 3)
+
+		page_response = self.client.get(reverse('backoffice_invoices_list'), {'page': '1'})
+		self.assertEqual(page_response.status_code, 200)
+		self.assertLessEqual(len(list(page_response.context['page_obj'])), 50)
 
 	def test_backoffice_invoice_list_renders_in_spanish_when_selected(self):
 		invoice = generar_invoice_desde_picking(

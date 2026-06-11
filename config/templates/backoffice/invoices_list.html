@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n %}
+{% load i18n pagination_tags %}
 
 {% block title %}{% trans "Invoices" %}{% endblock %}
 
@@ -24,25 +24,98 @@
   </div>
 </div>
 
-<div class="card shadow-sm">
+<div class="card shadow-sm mb-3 border-0">
   <div class="card-body">
     <div class="d-flex flex-wrap gap-2 mb-3" aria-label="{% trans 'Invoice views' %}">
-      <a href="?view=pending" class="btn {% if view_mode == 'pending' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+      <a href="?view=pending{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_customer_id %}&cliente_id={{ selected_customer_id|urlencode }}{% endif %}{% if selected_delivery_method %}&metodo_entrega={{ selected_delivery_method|urlencode }}{% endif %}{% if selected_driver_id %}&driver_id={{ selected_driver_id|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from|urlencode }}{% endif %}{% if date_to %}&date_to={{ date_to|urlencode }}{% endif %}" class="btn {% if view_mode == 'pending' %}btn-primary{% else %}btn-outline-primary{% endif %}">
         {% trans "Pending dispatch" %}
         <span class="badge text-bg-light ms-1">{{ pending_count }}</span>
       </a>
-      <a href="?view=ready" class="btn {% if view_mode == 'ready' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+      <a href="?view=ready{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_customer_id %}&cliente_id={{ selected_customer_id|urlencode }}{% endif %}{% if selected_delivery_method %}&metodo_entrega={{ selected_delivery_method|urlencode }}{% endif %}{% if selected_driver_id %}&driver_id={{ selected_driver_id|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from|urlencode }}{% endif %}{% if date_to %}&date_to={{ date_to|urlencode }}{% endif %}" class="btn {% if view_mode == 'ready' %}btn-primary{% else %}btn-outline-primary{% endif %}">
         {% trans "Ready Invoices" %}
         <span class="badge text-bg-light ms-1">{{ ready_count }}</span>
       </a>
-      <a href="?view=delivered" class="btn {% if view_mode == 'delivered' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+      <a href="?view=delivered{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_customer_id %}&cliente_id={{ selected_customer_id|urlencode }}{% endif %}{% if selected_delivery_method %}&metodo_entrega={{ selected_delivery_method|urlencode }}{% endif %}{% if selected_driver_id %}&driver_id={{ selected_driver_id|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from|urlencode }}{% endif %}{% if date_to %}&date_to={{ date_to|urlencode }}{% endif %}" class="btn {% if view_mode == 'delivered' %}btn-primary{% else %}btn-outline-primary{% endif %}">
         {% trans "Delivered Invoices" %}
         <span class="badge text-bg-light ms-1">{{ delivered_count }}</span>
       </a>
-      <a href="?view=cancelled" class="btn {% if view_mode == 'cancelled' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+      <a href="?view=cancelled{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_customer_id %}&cliente_id={{ selected_customer_id|urlencode }}{% endif %}{% if selected_delivery_method %}&metodo_entrega={{ selected_delivery_method|urlencode }}{% endif %}{% if selected_driver_id %}&driver_id={{ selected_driver_id|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from|urlencode }}{% endif %}{% if date_to %}&date_to={{ date_to|urlencode }}{% endif %}" class="btn {% if view_mode == 'cancelled' %}btn-primary{% else %}btn-outline-primary{% endif %}">
         {% trans "Cancelled Invoices" %}
         <span class="badge text-bg-light ms-1">{{ cancelled_count }}</span>
       </a>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+      <div>
+        <h5 class="mb-1">{% trans "Search filters" %}</h5>
+        <div class="small text-muted">{% trans "Search by invoice, order, customer, driver, delivery method, or date range." %}</div>
+      </div>
+      <a href="{% url 'backoffice_invoices_list' %}?view={{ view_mode }}" class="btn btn-sm btn-outline-secondary">{% trans "Clear filters" %}</a>
+    </div>
+
+    <form method="get" class="row g-3">
+      <input type="hidden" name="view" value="{{ view_mode }}">
+      <div class="col-lg-4">
+        <label class="form-label fw-semibold">{% trans "Search text" %}</label>
+        <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="{% trans 'Invoice, order, customer, or driver' %}">
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <label class="form-label fw-semibold">{% trans "Customer" %}</label>
+        <select name="cliente_id" class="form-select">
+          <option value="">{% trans "All customers" %}</option>
+          {% for customer in customers %}
+          <option value="{{ customer.id }}" {% if selected_customer_id == customer.id|stringformat:'s' %}selected{% endif %}>{{ customer.nombre_empresa }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6 col-lg-2">
+        <label class="form-label fw-semibold">{% trans "Delivery method" %}</label>
+        <select name="metodo_entrega" class="form-select">
+          <option value="">{% trans "All methods" %}</option>
+          {% for value, label in delivery_method_choices %}
+          <option value="{{ value }}" {% if selected_delivery_method == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6 col-lg-3">
+        <label class="form-label fw-semibold">{% trans "Driver" %}</label>
+        <select name="driver_id" class="form-select">
+          <option value="">{% trans "All drivers" %}</option>
+          {% for driver in drivers %}
+          <option value="{{ driver.id }}" {% if selected_driver_id == driver.id|stringformat:'s' %}selected{% endif %}>{% firstof driver.get_full_name driver.username %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6 col-lg-2">
+        <label class="form-label fw-semibold">{% trans "From date" %}</label>
+        <input type="date" name="date_from" value="{{ date_from }}" class="form-control">
+      </div>
+      <div class="col-md-6 col-lg-2">
+        <label class="form-label fw-semibold">{% trans "To date" %}</label>
+        <input type="date" name="date_to" value="{{ date_to }}" class="form-control">
+      </div>
+      <div class="col-12 d-flex gap-2 flex-wrap">
+        <button type="submit" class="btn btn-primary">{% trans "Search invoices" %}</button>
+        <a href="{% url 'backoffice_invoices_list' %}?view={{ view_mode }}" class="btn btn-outline-secondary">{% trans "Reset" %}</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+      <div>
+        <h5 class="mb-1">{% trans "Results" %}</h5>
+        {% if page_obj.paginator.count %}
+        <div class="small text-muted">
+          {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+          Showing {{ start }}-{{ end }} of {{ total }} invoices.
+          {% endblocktrans %}
+        </div>
+        {% endif %}
+      </div>
+      <span class="badge text-bg-light">{{ page_obj.paginator.count }} {% trans "invoices" %}</span>
     </div>
 
     <div class="table-responsive mobile-stack-responsive">
@@ -60,7 +133,7 @@
           </tr>
         </thead>
         <tbody>
-          {% for invoice in invoices %}
+          {% for invoice in page_obj %}
           <tr>
             <td data-label="{% trans 'Invoice' %}">
               <strong>{{ invoice.numero }}</strong>
@@ -106,6 +179,8 @@
         </tbody>
       </table>
     </div>
+
+    {% pagination_controls page_obj aria_label=_('Invoice pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0" view=view_mode q=query cliente_id=selected_customer_id metodo_entrega=selected_delivery_method driver_id=selected_driver_id date_from=date_from date_to=date_to %}
   </div>
 </div>
 {% endblock %}

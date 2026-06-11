@@ -49,6 +49,69 @@ def _parse_optional_decimal(value):
         return None
 
 
+def _parse_positive_int(value, *, default=1):
+    try:
+        parsed = int(str(value or "").strip())
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed >= 1 else default
+
+
+def _parse_new_presentacion_rows_from_post(request):
+    nombres = request.POST.getlist("presentacion_nueva_nombre")
+    tipos = request.POST.getlist("presentacion_nueva_tipo_contenido")
+    unidades_list = request.POST.getlist("presentacion_nueva_unidades")
+    costos = request.POST.getlist("presentacion_nueva_costo")
+
+    rows = []
+    for index, raw_nombre in enumerate(nombres):
+        nombre = (raw_nombre or "").strip()
+        tipo_contenido = (tipos[index] if index < len(tipos) else "unidades").strip() or "unidades"
+        unidades_raw = (unidades_list[index] if index < len(unidades_list) else "").strip()
+        costo_raw = (costos[index] if index < len(costos) else "").strip()
+
+        if not any([nombre, unidades_raw, costo_raw]):
+            continue
+
+        rows.append({
+            "nombre": nombre or _("Presentation %(number)s") % {"number": len(rows) + 1},
+            "tipo_contenido": tipo_contenido,
+            "unidades": _parse_positive_int(unidades_raw, default=1),
+            "costo": _parse_optional_decimal(costo_raw),
+        })
+    return rows
+
+
+def _create_presentaciones_for_producto(producto, rows):
+    created = []
+    for row in rows:
+        created.append(Presentacion.objects.create(producto=producto, **row))
+    return created
+
+
+def _delete_presentaciones_for_producto(producto, presentacion_ids, *, request=None):
+    from django.db.models.deletion import ProtectedError
+
+    for raw_id in presentacion_ids:
+        try:
+            presentacion_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        presentacion = Presentacion.objects.filter(pk=presentacion_id, producto=producto).first()
+        if presentacion is None:
+            continue
+        try:
+            presentacion.delete()
+        except ProtectedError:
+            if request is not None:
+                messages.error(
+                    request,
+                    _('Could not delete presentation "%(name)s" because it is already used in orders or inventory.') % {
+                        "name": presentacion.nombre,
+                    },
+                )
+
+
 def _get_price_margin_config():
     return ConfiguracionPrecios.obtener()
 
@@ -446,36 +509,7 @@ def crear_producto(request):
             descuento=descuento
         )
 
-        # Guardar la presentacion inicial si el formulario trae datos.
-        presentacion_nombre = (request.POST.get("presentacion") or "").strip()
-        tipo_contenido = (request.POST.get("tipo_contenido") or "unidades").strip() or "unidades"
-        unidades_raw = (request.POST.get("unidades") or "").strip()
-
-        costo_raw = (request.POST.get("costo") or "").strip()
-
-        has_presentacion_data = any([
-            presentacion_nombre,
-            tipo_contenido,
-            unidades_raw,
-            costo_raw,
-        ])
-
-        if has_presentacion_data:
-            try:
-                unidades = int(unidades_raw) if unidades_raw else 1
-            except ValueError:
-                unidades = 1
-
-            if unidades < 1:
-                unidades = 1
-
-            Presentacion.objects.create(
-                producto=producto,
-                nombre=presentacion_nombre or "Presentacion 1",
-                tipo_contenido=tipo_contenido,
-                unidades=unidades,
-                costo=_parse_optional_decimal(costo_raw),
-            )
+        _create_presentaciones_for_producto(producto, _parse_new_presentacion_rows_from_post(request))
 
         return redirect("lista_productos")
 
@@ -755,44 +789,26 @@ def editar_producto(request, producto_id):
 
         # -------- PRESENTACIONES --------
 
-        for p in presentaciones:
+        eliminar_ids = set(request.POST.getlist("presentacion_eliminar"))
 
-            p.nombre = request.POST.get(f"presentacion_nombre_{p.id}")
-            p.tipo_contenido = request.POST.get(f"tipo_contenido_{p.id}")
+        for presentacion in producto.presentaciones.all():
+            if str(presentacion.id) in eliminar_ids:
+                continue
 
-            unidades = request.POST.get(f"unidades_{p.id}")
+            presentacion.nombre = request.POST.get(f"presentacion_nombre_{presentacion.id}")
+            presentacion.tipo_contenido = request.POST.get(f"tipo_contenido_{presentacion.id}")
+
+            unidades = request.POST.get(f"unidades_{presentacion.id}")
             if unidades:
-                p.unidades = int(unidades)
+                presentacion.unidades = _parse_positive_int(unidades, default=presentacion.unidades or 1)
 
-            if f"costo_{p.id}" in request.POST:
-                p.costo = _parse_optional_decimal(request.POST.get(f"costo_{p.id}"))
+            if f"costo_{presentacion.id}" in request.POST:
+                presentacion.costo = _parse_optional_decimal(request.POST.get(f"costo_{presentacion.id}"))
 
-            p.save()
+            presentacion.save()
 
-        # Si el producto no tenia presentaciones, permitir crear la primera desde esta vista.
-        if not presentaciones.exists():
-            nueva_nombre = (request.POST.get("presentacion_nueva") or "").strip()
-            nuevo_tipo = (request.POST.get("tipo_contenido_nuevo") or "unidades").strip() or "unidades"
-            nuevas_unidades_raw = (request.POST.get("unidades_nuevo") or "").strip()
-
-            ncosto = (request.POST.get("costo_nuevo") or "").strip()
-
-            if any([nueva_nombre, nuevas_unidades_raw, ncosto]):
-                try:
-                    nuevas_unidades = int(nuevas_unidades_raw) if nuevas_unidades_raw else 1
-                except ValueError:
-                    nuevas_unidades = 1
-
-                if nuevas_unidades < 1:
-                    nuevas_unidades = 1
-
-                Presentacion.objects.create(
-                    producto=producto,
-                    nombre=nueva_nombre or "Presentacion 1",
-                    tipo_contenido=nuevo_tipo,
-                    unidades=nuevas_unidades,
-                    costo=_parse_optional_decimal(ncosto),
-                )
+        _delete_presentaciones_for_producto(producto, eliminar_ids, request=request)
+        _create_presentaciones_for_producto(producto, _parse_new_presentacion_rows_from_post(request))
 
         return redirect("lista_productos")
     

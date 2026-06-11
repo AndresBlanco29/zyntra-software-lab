@@ -12,7 +12,7 @@
 <div class="card shadow-sm">
 <div class="card-body">
 
-<form method="POST" enctype="multipart/form-data">
+<form method="POST" enctype="multipart/form-data" data-presentations-form data-min-rows-message="{% trans 'Debes dejar al menos una presentacion.' %}">
 
 {% csrf_token %}
 
@@ -100,79 +100,20 @@
 
 <hr class="my-4">
 
-<h5 class="mb-3">{% trans "Presentacion" %}</h5>
-
-<div class="row">
-
-<div class="col-md-4 mb-3">
-<label class="form-label">{% trans "Presentacion" %}</label>
-<input type="text" name="presentacion" class="form-control" placeholder="{% trans 'Ej: Caja, Bolsa, Pack' %}">
+<div class="d-flex justify-content-between align-items-center mb-3">
+<h5 class="mb-0">{% trans "Presentaciones" %}</h5>
+<button type="button" class="btn btn-outline-primary btn-sm" data-add-presentation>{% trans "Anadir presentacion" %}</button>
 </div>
 
-<div class="col-md-4 mb-3">
-<label class="form-label">{% trans "Tipo de contenido" %}</label>
-<input type="text" name="tipo_contenido" class="form-control" placeholder="{% trans 'Ej: Unidades, Libras, Onzas' %}">
+<p class="text-muted small">{% trans "Agrega una presentacion por cada forma de venta del producto. Ejemplo: Pallet, Caja, Unidad." %}</p>
+
+<div data-presentations-list>
+{% include "admin/partials/presentacion_row.html" with row_number=1 allow_remove=False price_margins=price_margins %}
 </div>
 
-<div class="col-md-4 mb-3">
-<label class="form-label">{% trans "Unidades" %}</label>
-<input type="number" name="unidades" class="form-control" placeholder="{% trans 'Ej: 12' %}">
-</div>
-
-</div>
-
-
-<hr class="my-4">
-
-<div data-price-formula data-price-margins="{{ price_margins|join:',' }}">
-
-<h5 class="mb-3">{% trans "Costo y precios" %}</h5>
-
-<p class="text-muted small mb-3">
-{% blocktrans with p1=price_margins.0 p2=price_margins.1 p3=price_margins.2 p4=price_margins.3 p5=price_margins.4 %}Prices are calculated automatically from cost using utility percentages: Price 1 = {{ p1 }}%, Price 2 = {{ p2 }}%, Price 3 = {{ p3 }}%, Price 4 = {{ p4 }}%, Price 5 = {{ p5 }}%. Formula: final price = cost / (1 - percentage/100). Example: 30% = cost / 0.70, 20% = cost / 0.80.{% endblocktrans %}
-</p>
-
-<div class="row">
-
-<div class="col-md-3 mb-3">
-<label class="form-label">{% trans "Costo" %}</label>
-<input type="number" step="0.01" min="0" name="costo" class="form-control" data-cost-input>
-</div>
-
-<div class="col-md-9">
-<div class="row">
-
-<div class="col-md-2 mb-3">
-<label class="form-label" data-price-label="1" data-price-label-base="{% trans 'Precio 1' %}">{% trans "Precio 1" %} ({{ price_margins.0 }}%)</label>
-<input type="number" step="0.01" class="form-control" data-price-output="1" readonly>
-</div>
-
-<div class="col-md-2 mb-3">
-<label class="form-label" data-price-label="2" data-price-label-base="{% trans 'Precio 2' %}">{% trans "Precio 2" %} ({{ price_margins.1 }}%)</label>
-<input type="number" step="0.01" class="form-control" data-price-output="2" readonly>
-</div>
-
-<div class="col-md-2 mb-3">
-<label class="form-label" data-price-label="3" data-price-label-base="{% trans 'Precio 3' %}">{% trans "Precio 3" %} ({{ price_margins.2 }}%)</label>
-<input type="number" step="0.01" class="form-control" data-price-output="3" readonly>
-</div>
-
-<div class="col-md-2 mb-3">
-<label class="form-label" data-price-label="4" data-price-label-base="{% trans 'Precio 4' %}">{% trans "Precio 4" %} ({{ price_margins.3 }}%)</label>
-<input type="number" step="0.01" class="form-control" data-price-output="4" readonly>
-</div>
-
-<div class="col-md-2 mb-3">
-<label class="form-label" data-price-label="5" data-price-label-base="{% trans 'Precio 5' %}">{% trans "Precio 5" %} ({{ price_margins.4 }}%)</label>
-<input type="number" step="0.01" class="form-control" data-price-output="5" readonly>
-</div>
-
-</div>
-</div>
-
-</div>
-
-</div>
+<template id="presentacion-row-template">
+{% include "admin/partials/presentacion_row.html" with row_number=1 allow_remove=True price_margins=price_margins %}
+</template>
 
 <button type="submit" class="btn btn-success">
 {% trans "Crear producto" %}
@@ -188,6 +129,7 @@
 </div>
 
 <script src="{% static 'js/product-price-formula.js' %}"></script>
+<script src="{% static 'js/product-presentations-form.js' %}"></script>
 
 <!-- Modal para crear categoria rapido -->
 <div class="modal fade" id="crearCategoriaModal" tabindex="-1" aria-labelledby="crearCategoriaLabel" aria-hidden="true">

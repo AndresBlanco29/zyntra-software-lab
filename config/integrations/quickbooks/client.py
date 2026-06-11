@@ -235,6 +235,17 @@ class QuickBooksAPIClient:
         entities = response.get(entity_name, [])
         return entities[0] if entities else None
 
+    def read_entity(self, entity_name, entity_id):
+        entity_id = str(entity_id or '').strip()
+        if not entity_id:
+            return None
+        response = self.request(
+            'GET',
+            self.realm_path(f'{entity_name.lower()}/{quote(entity_id, safe="")}'),
+            params={'minorversion': settings.QUICKBOOKS_API_MINOR_VERSION},
+        )
+        return response.get(entity_name) or response.get(entity_name.lower()) or response.get(entity_name.title())
+
     def find_one_by_name(self, entity_name, display_name):
         escaped_name = self._escape_query_value(display_name)
         response = self.query(f"select * from {entity_name} where Name = '{escaped_name}' maxresults 1")

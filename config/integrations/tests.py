@@ -25,7 +25,13 @@ from config.facturacion.services import generar_invoice_desde_picking
 from config.integrations.backups import _backup_modified_time
 from config.integrations.quickbooks.services import get_connection
 from config.integrations.models import QuickBooksConnection, QuickBooksImportConflict
-from config.integrations.quickbooks.sync import _parse_quickbooks_presentation, sync_supplier_purchase
+from config.integrations.quickbooks.sync import (
+    _enrich_quickbooks_item_payload,
+    _extract_quickbooks_item_cost,
+    _parse_quickbooks_presentation,
+    refresh_linked_quickbooks_items,
+    sync_supplier_purchase,
+)
 from config.inventario.models import CompraProveedor, CompraProveedorLinea, InventarioMovimiento, Proveedor, StockPresentacion
 from config.pedidos.models import Pedido, PedidoItem
 from config.productos.models import Categoria, Marca, Presentacion, Producto
@@ -78,6 +84,59 @@ class QuickBooksPresentationParsingTests(TestCase):
         self.assertEqual(presentation, 'Box 12')
         self.assertEqual(tipo, 'caja')
         self.assertEqual(units, 12)
+
+
+class QuickBooksItemCostSyncTests(TestCase):
+    @patch('config.integrations.quickbooks.sync._fetch_quickbooks_item_payload')
+    def test_enrich_fetches_purchase_cost_when_list_payload_only_has_qty_on_hand(self, mock_fetch):
+        mock_fetch.return_value = {
+            'Id': 'QB-OIL-1',
+            'Name': 'ACEITE 123 CANOLA OLI 12/1 LT',
+            'Type': 'Inventory',
+            'PurchaseCost': 35.99,
+            'QtyOnHand': 0,
+        }
+        result = _enrich_quickbooks_item_payload({
+            'Id': 'QB-OIL-1',
+            'Name': 'ACEITE 123 CANOLA OLI 12/1 LT',
+            'Type': 'Inventory',
+            'QtyOnHand': 0,
+        })
+        self.assertEqual(_extract_quickbooks_item_cost(result), Decimal('35.99'))
+        mock_fetch.assert_called_once()
+
+    @patch('config.integrations.quickbooks.sync.import_quickbooks_item_record')
+    @patch('config.integrations.quickbooks.sync._fetch_quickbooks_item_payload')
+    def test_refresh_linked_items_uses_full_item_payload_for_cost(self, mock_fetch, mock_import):
+        categoria = Categoria.objects.create(nombre='Aceites')
+        marca = Marca.objects.create(nombre='123')
+        producto = Producto.objects.create(
+            nombre='ACEITE 123 CANOLA OLI 12/1 LT',
+            categoria=categoria,
+            marca=marca,
+        )
+        Presentacion.objects.create(
+            producto=producto,
+            nombre='Unit',
+            unidades=1,
+            tipo_contenido='unidad',
+            costo=Decimal('33.00'),
+            quickbooks_id='QB-OIL-1',
+        )
+        mock_fetch.return_value = {
+            'Id': 'QB-OIL-1',
+            'Name': 'ACEITE 123 CANOLA OLI 12/1 LT',
+            'Type': 'Inventory',
+            'PurchaseCost': 35.99,
+            'QtyOnHand': 0,
+        }
+        mock_import.return_value = {'ok': True, 'action': 'updated'}
+
+        refresh_linked_quickbooks_items()
+
+        mock_fetch.assert_called()
+        imported_payload = mock_import.call_args[0][0]
+        self.assertEqual(_extract_quickbooks_item_cost(imported_payload), Decimal('35.99'))
 
 
 @override_settings(

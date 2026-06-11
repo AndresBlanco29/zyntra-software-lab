@@ -802,10 +802,28 @@ def _parse_quickbooks_item_name(payload):
 
 
 def _extract_quickbooks_item_cost(payload):
-    raw_cost = payload.get('PurchaseCost')
-    if raw_cost in (None, ''):
+    for key in ('PurchaseCost', 'PurchaseCostValue'):
+        raw_cost = payload.get(key)
+        if raw_cost not in (None, ''):
+            return _quantize_money(raw_cost)
+    return None
+
+
+def _fetch_quickbooks_item_payload(*, item_id, client=None):
+    client = client or QuickBooksAPIClient()
+    item_id = str(item_id or '').strip()
+    if not item_id:
         return None
-    return _quantize_money(raw_cost)
+    try:
+        payload = client.read_entity('Item', item_id)
+    except QuickBooksAPIError:
+        payload = None
+    if payload:
+        return payload
+    try:
+        return client.find_by_id('Item', item_id)
+    except QuickBooksAPIError:
+        return None
 
 
 def _is_image_attachable(payload):
@@ -881,22 +899,37 @@ def _extract_quickbooks_item_qty_on_hand(payload):
 
 def _enrich_quickbooks_item_payload(payload, *, client=None):
     normalized = dict(payload or {})
-    if _extract_quickbooks_item_qty_on_hand(normalized) is not None:
-        return normalized
     item_id = str(normalized.get('Id') or '').strip()
+    if not item_id:
+        return normalized
+
     item_type = str(normalized.get('Type') or '').strip().lower()
-    if not item_id or item_type not in {'inventory', 'assembly'}:
+    missing_cost = _extract_quickbooks_item_cost(normalized) is None
+    missing_qty = (
+        item_type in {'inventory', 'assembly'}
+        and _extract_quickbooks_item_qty_on_hand(normalized) is None
+    )
+    if not missing_cost and not missing_qty:
         return normalized
-    try:
-        client = client or QuickBooksAPIClient()
-        full_payload = client.find_by_id('Item', item_id)
-    except Exception:
-        return normalized
+
+    full_payload = _fetch_quickbooks_item_payload(item_id=item_id, client=client)
     if not full_payload:
         return normalized
+
     merged = dict(normalized)
+    authoritative_keys = {
+        'PurchaseCost',
+        'PurchaseCostValue',
+        'UnitPrice',
+        'QtyOnHand',
+        'QuantityOnHand',
+        'QtyOnHandValue',
+        'QuantityOnHandValue',
+        'TrackQtyOnHand',
+        'Type',
+    }
     for key, value in full_payload.items():
-        if key in {'QtyOnHand', 'QuantityOnHand', 'QtyOnHandValue', 'QuantityOnHandValue', 'Type', 'TrackQtyOnHand'}:
+        if key in authoritative_keys:
             merged[key] = value
         elif key not in merged or merged.get(key) in (None, '', [], {}):
             merged[key] = value
@@ -920,7 +953,8 @@ def _sync_stock_from_quickbooks_item(presentacion, payload):
 def _update_presentacion_from_quickbooks(presentacion, *, quickbooks_id, item_cost):
     presentacion.quickbooks_id = quickbooks_id
     presentacion.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
-    presentacion.costo = item_cost
+    if item_cost is not None:
+        presentacion.costo = item_cost
     presentacion.save()
 
 
@@ -2089,7 +2123,7 @@ def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None
     payloads = []
     for qb_id in qb_ids:
         try:
-            payload = client.find_by_id('Item', qb_id)
+            payload = _fetch_quickbooks_item_payload(item_id=qb_id, client=client)
         except QuickBooksAPIError as exc:
             payloads.append({'Id': qb_id, '_missing_in_qb': True, '_error': str(exc)})
             continue

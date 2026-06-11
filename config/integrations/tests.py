@@ -1323,7 +1323,47 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         self.assertEqual(response.status_code, 200)
         conflict.refresh_from_db()
         self.assertEqual(conflict.status, 'DISMISSED')
-        self.assertEqual(conflict.resolution_note, 'Handled outside ERP')
+
+    def test_conflict_bulk_dismiss_endpoint_marks_selected_conflicts(self):
+        first_conflict = QuickBooksImportConflict.objects.create(
+            entity_type='INVOICE',
+            quickbooks_id='QB-INV-BULK-1',
+            display_name='Invoice bulk 1',
+            status='CONFLICT',
+            payload={'Id': 'QB-INV-BULK-1'},
+        )
+        second_conflict = QuickBooksImportConflict.objects.create(
+            entity_type='INVOICE',
+            quickbooks_id='QB-INV-BULK-2',
+            display_name='Invoice bulk 2',
+            status='CONFLICT',
+            payload={'Id': 'QB-INV-BULK-2'},
+        )
+        matched_conflict = QuickBooksImportConflict.objects.create(
+            entity_type='INVOICE',
+            quickbooks_id='QB-INV-BULK-3',
+            display_name='Invoice bulk 3',
+            status='MATCHED',
+            payload={'Id': 'QB-INV-BULK-3'},
+        )
+
+        response = self.client.post(
+            reverse('quickbooks_import_conflicts_bulk_dismiss'),
+            {
+                'conflict_ids': [str(first_conflict.id), str(second_conflict.id), str(matched_conflict.id)],
+                'resolution_note': 'Customer deleted in QuickBooks',
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        first_conflict.refresh_from_db()
+        second_conflict.refresh_from_db()
+        matched_conflict.refresh_from_db()
+        self.assertEqual(first_conflict.status, 'DISMISSED')
+        self.assertEqual(second_conflict.status, 'DISMISSED')
+        self.assertEqual(first_conflict.resolution_note, 'Customer deleted in QuickBooks')
+        self.assertEqual(matched_conflict.status, 'MATCHED')
 
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_import_customers_to_local_redirects_back_to_dashboard_with_summary(self, mock_request):

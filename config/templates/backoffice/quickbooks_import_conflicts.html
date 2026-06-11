@@ -21,10 +21,34 @@
       <h5 class="mb-0">{% trans "Review items" %}</h5>
       <span class="badge text-bg-danger">{{ active_conflicts_count }} {% trans "active conflicts" %}</span>
     </div>
+
+    {% if active_conflicts_count %}
+    <form method="post" action="{% url 'quickbooks_import_conflicts_bulk_dismiss' %}" id="qb-conflicts-bulk-form" class="border rounded p-3 mb-3 bg-light">
+      {% csrf_token %}
+      <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+        <div>
+          <div class="fw-semibold mb-1">{% trans "Bulk dismiss" %}</div>
+          <div class="small text-muted">{% trans "Select the conflicts you want to close and apply one shared dismiss reason." %}</div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          <input type="text" name="resolution_note" class="form-control form-control-sm" placeholder="{% trans 'Dismiss reason' %}" style="min-width: 220px;">
+          <button type="submit" class="btn btn-sm btn-secondary" id="qb-bulk-dismiss-button" disabled>
+            {% trans "Dismiss selected" %} (<span id="qb-selected-conflicts-count">0</span>)
+          </button>
+        </div>
+      </div>
+    </form>
+    {% endif %}
+
     <div class="table-responsive">
       <table class="table align-middle mb-0">
         <thead>
           <tr>
+            <th style="width: 42px;">
+              {% if active_conflicts_count %}
+              <input type="checkbox" class="form-check-input" id="qb-select-all-conflicts" aria-label="{% trans 'Select all active conflicts' %}">
+              {% endif %}
+            </th>
             <th>{% trans "Entity" %}</th>
             <th>{% trans "QuickBooks ID" %}</th>
             <th>{% trans "Doc / label" %}</th>
@@ -38,6 +62,18 @@
         <tbody>
           {% for conflict in conflicts %}
           <tr>
+            <td>
+              {% if conflict.status == 'CONFLICT' %}
+              <input
+                type="checkbox"
+                class="form-check-input qb-conflict-checkbox"
+                name="conflict_ids"
+                value="{{ conflict.id }}"
+                form="qb-conflicts-bulk-form"
+                aria-label="{% trans 'Select conflict' %} {{ conflict.quickbooks_id }}"
+              >
+              {% endif %}
+            </td>
             <td>{{ conflict.get_entity_type_display }}</td>
             <td><code>{{ conflict.quickbooks_id }}</code></td>
             <td>
@@ -49,6 +85,8 @@
             <td>
               {% if conflict.status == 'CONFLICT' %}
               <span class="badge text-bg-danger">{% trans "Conflict" %}</span>
+              {% elif conflict.status == 'DISMISSED' %}
+              <span class="badge text-bg-secondary">{% trans "Dismissed" %}</span>
               {% else %}
               <span class="badge text-bg-success">{% trans "Matched" %}</span>
               {% endif %}
@@ -96,7 +134,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="8" class="text-center text-muted py-4">{% trans "No QuickBooks conflicts are pending review." %}</td>
+            <td colspan="9" class="text-center text-muted py-4">{% trans "No QuickBooks conflicts are pending review." %}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -104,4 +142,44 @@
     </div>
   </div>
 </div>
+
+{% if active_conflicts_count %}
+<script>
+  (function () {
+    const selectAll = document.getElementById('qb-select-all-conflicts');
+    const checkboxes = Array.from(document.querySelectorAll('.qb-conflict-checkbox'));
+    const selectedCount = document.getElementById('qb-selected-conflicts-count');
+    const dismissButton = document.getElementById('qb-bulk-dismiss-button');
+
+    function refreshBulkState() {
+      const selected = checkboxes.filter(function (checkbox) { return checkbox.checked; }).length;
+      if (selectedCount) {
+        selectedCount.textContent = String(selected);
+      }
+      if (dismissButton) {
+        dismissButton.disabled = selected === 0;
+      }
+      if (selectAll) {
+        selectAll.indeterminate = selected > 0 && selected < checkboxes.length;
+        selectAll.checked = checkboxes.length > 0 && selected === checkboxes.length;
+      }
+    }
+
+    if (selectAll) {
+      selectAll.addEventListener('change', function () {
+        checkboxes.forEach(function (checkbox) {
+          checkbox.checked = selectAll.checked;
+        });
+        refreshBulkState();
+      });
+    }
+
+    checkboxes.forEach(function (checkbox) {
+      checkbox.addEventListener('change', refreshBulkState);
+    });
+
+    refreshBulkState();
+  })();
+</script>
+{% endif %}
 {% endblock %}

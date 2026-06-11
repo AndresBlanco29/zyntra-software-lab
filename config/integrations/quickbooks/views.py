@@ -40,6 +40,7 @@ from .client import QuickBooksAPIClient, QuickBooksAPIError
 from .services import QuickBooksServiceError, get_connection, get_connection_status, get_oauth_login_url, handle_oauth_callback, maybe_maintain_quickbooks_connection
 from .sync import (
     dismiss_quickbooks_import_conflict,
+    dismiss_quickbooks_import_conflicts_bulk,
     import_quickbooks_customers,
     import_quickbooks_items,
     link_quickbooks_import_conflict,
@@ -1208,6 +1209,37 @@ def quickbooks_import_conflict_dismiss(request, conflict_id):
         messages.error(request, 'QuickBooks conflict not found.')
     else:
         messages.success(request, 'QuickBooks conflict dismissed.')
+    return redirect(_conflicts_redirect_target(request))
+
+
+@require_POST
+@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+def quickbooks_import_conflicts_bulk_dismiss(request):
+    conflict_ids = []
+    for raw_id in request.POST.getlist('conflict_ids'):
+        try:
+            parsed_id = int(raw_id)
+        except (TypeError, ValueError):
+            continue
+        if parsed_id > 0:
+            conflict_ids.append(parsed_id)
+
+    if not conflict_ids:
+        messages.error(request, _('Select at least one active conflict to dismiss.'))
+        return redirect(_conflicts_redirect_target(request))
+
+    dismissed_count = dismiss_quickbooks_import_conflicts_bulk(
+        conflict_ids=conflict_ids,
+        user=request.user,
+        resolution_note=(request.POST.get('resolution_note') or '').strip(),
+    )
+    if dismissed_count:
+        messages.success(
+            request,
+            _('Dismissed %(count)s QuickBooks conflict(s).') % {'count': dismissed_count},
+        )
+    else:
+        messages.warning(request, _('No active conflicts were dismissed.'))
     return redirect(_conflicts_redirect_target(request))
 
 

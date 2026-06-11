@@ -1439,6 +1439,30 @@ def dismiss_quickbooks_import_conflict(conflict, *, user=None, resolution_note='
     return conflict
 
 
+def dismiss_quickbooks_import_conflicts_bulk(*, conflict_ids, user=None, resolution_note=''):
+    conflicts = list(
+        QuickBooksImportConflict.objects.filter(
+            pk__in=conflict_ids,
+            status=QuickBooksImportConflict.STATUS_CONFLICT,
+        )
+    )
+    if not conflicts:
+        return 0
+
+    resolved_at = timezone.now()
+    for conflict in conflicts:
+        conflict.status = QuickBooksImportConflict.STATUS_DISMISSED
+        conflict.resolution_note = resolution_note
+        conflict.resolved_by = user
+        conflict.resolved_at = resolved_at
+
+    QuickBooksImportConflict.objects.bulk_update(
+        conflicts,
+        ['status', 'resolution_note', 'resolved_by', 'resolved_at'],
+    )
+    return len(conflicts)
+
+
 def import_quickbooks_customers(*, max_results=None, client=None, updated_after=None, task_cache_key=None):
     records = fetch_quickbooks_customers(max_results=max_results, client=client, updated_after=updated_after)
     return _import_batch_result(entity_name='Customer', records=records, import_callable=import_quickbooks_customer_record, task_cache_key=task_cache_key)

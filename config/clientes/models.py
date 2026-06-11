@@ -199,6 +199,28 @@ class Cliente(models.Model):
         auto_now_add=True
     )
 
+    vendedor_asignado = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='clientes_asignados',
+        limit_choices_to={'role': 'vendedor'},
+    )
+
+    vendedor_asignado_en = models.DateTimeField(
+        blank=True,
+        null=True,
+    )
+
+    vendedor_asignado_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='clientes_asignados_por',
+    )
+
     def get_nivel_precio_normalizado(self):
         return normalize_price_tier(self.nivel_precio, default=None)
 

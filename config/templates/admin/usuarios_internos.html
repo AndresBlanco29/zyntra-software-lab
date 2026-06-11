@@ -88,6 +88,9 @@
       <td>
         {% if usuario.role == 'vendedor' %}
           <a href="{% url 'editar_usuario_interno' usuario.id %}" class="btn btn-sm btn-warning">{% trans "Edit" %}</a>
+          {% if request.user|has_internal_permission:'admin.customers.assign' or request.user|has_internal_permission:'backoffice.customers.assign' %}
+          <a href="{% url 'asignar_clientes_vendedor' usuario.id %}" class="btn btn-sm btn-primary">{% trans "Assign customers" %}</a>
+          {% endif %}
           {% if usuario.is_active %}
             <a href="{% url 'desactivar_usuario_interno' usuario.id %}" class="btn btn-sm btn-danger">{% trans "Deactivate" %}</a>
           {% else %}

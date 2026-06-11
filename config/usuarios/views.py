@@ -18,6 +18,11 @@ from .permissions import (
 )
 from .us_locations import US_STATE_CITIES
 from config.clientes.models import Cliente
+from config.clientes.assignment import (
+    assign_all_approved_clientes_to_vendedor,
+    get_active_vendedores_queryset,
+    sync_vendedor_cliente_assignments,
+)
 from config.core.models import Testimonio, HomeContenido, ensure_homecontenido_quienes_schema
 from config.integrations.quickbooks.services import get_connection_status
 from config.integrations.quickbooks.views import get_dashboard_sync_context
@@ -35,7 +40,7 @@ from django.utils.translation import gettext as _
 from django.utils import timezone
 from django.db import transaction
 from django.db import OperationalError, ProgrammingError
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.core.paginator import Paginator
 from django.conf import settings
 import mimetypes
@@ -1120,6 +1125,92 @@ def lista_usuarios_internos(request):
 
     return render(request, 'admin/usuarios_internos.html', context)
 
+
+@login_required
+@internal_permission_required('admin.customers.assign', 'backoffice.customers.assign')
+def lista_asignacion_clientes_vendedores(request):
+    query = str(request.GET.get('q') or '').strip()
+    vendedores = (
+        get_active_vendedores_queryset()
+        .annotate(assigned_count=Count('clientes_asignados'))
+    )
+    if query:
+        vendedores = vendedores.filter(
+            Q(first_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(email__icontains=query)
+            | Q(username__icontains=query)
+        )
+
+    context = {
+        'vendedores': vendedores,
+        'search_query': query,
+        'total_clientes_aprobados': Cliente.objects.filter(aprobado=True).count(),
+    }
+    return render(request, 'admin/asignacion_clientes_vendedores.html', context)
+
+
+@login_required
+@internal_permission_required('admin.customers.assign', 'backoffice.customers.assign')
+def asignar_clientes_vendedor(request, vendedor_id):
+    vendedor = get_object_or_404(Usuario, id=vendedor_id, role='vendedor')
+
+    if request.method == 'POST':
+        if request.POST.get('assign_all') == '1':
+            count = assign_all_approved_clientes_to_vendedor(vendedor=vendedor, assigned_by=request.user)
+            messages.success(
+                request,
+                _('All approved customers (%(count)s) were assigned to %(vendor)s.')
+                % {'count': count, 'vendor': vendedor.get_full_name() or vendedor.username},
+            )
+            return redirect('asignar_clientes_vendedor', vendedor_id=vendedor.id)
+
+        result = sync_vendedor_cliente_assignments(
+            vendedor=vendedor,
+            selected_cliente_ids=request.POST.getlist('cliente_ids'),
+            assigned_by=request.user,
+        )
+        messages.success(
+            request,
+            _('Customer assignments updated for %(vendor)s: %(assigned)s assigned, %(unassigned)s unassigned.')
+            % {
+                'vendor': vendedor.get_full_name() or vendedor.username,
+                'assigned': result['assigned_count'],
+                'unassigned': result['unassigned_count'],
+            },
+        )
+        return redirect('asignar_clientes_vendedor', vendedor_id=vendedor.id)
+
+    query = str(request.GET.get('q') or '').strip()
+    clientes = (
+        Cliente.objects.filter(aprobado=True)
+        .select_related('usuario', 'vendedor_asignado')
+        .order_by('nombre_empresa', 'id')
+    )
+    if query:
+        clientes = clientes.filter(
+            Q(nombre_empresa__icontains=query)
+            | Q(usuario__first_name__icontains=query)
+            | Q(usuario__last_name__icontains=query)
+            | Q(usuario__email__icontains=query)
+            | Q(telefono__icontains=query)
+        )
+
+    assigned_ids = set(
+        Cliente.objects.filter(vendedor_asignado=vendedor).values_list('id', flat=True)
+    )
+
+    context = {
+        'vendedor': vendedor,
+        'clientes': clientes,
+        'assigned_ids': assigned_ids,
+        'search_query': query,
+        'assigned_count': len(assigned_ids),
+        'total_approved_count': Cliente.objects.filter(aprobado=True).count(),
+    }
+    return render(request, 'admin/asignar_clientes_vendedor.html', context)
+
+
 @login_required
 def editar_vendedor(request, vendedor_id):
 
@@ -1448,12 +1539,16 @@ def rechazar_cliente(request, cliente_id):
 @internal_permission_required('admin.customer_requests.view')
 def ver_cliente(request, cliente_id):
 
-    cliente = get_object_or_404(Cliente, id=cliente_id)
+    cliente = get_object_or_404(
+        Cliente.objects.select_related('usuario', 'vendedor_asignado'),
+        id=cliente_id,
+    )
 
     context = {
         'cliente': cliente,
         'view_mode': (request.GET.get('view') or 'pending').strip().lower(),
         'price_tier_choices': Cliente.PRICE_TIER_CHOICES,
+        'vendedores_activos': get_active_vendedores_queryset(),
     }
 
     return render(request, 'admin/ver_cliente.html', context)

@@ -249,8 +249,8 @@ La Tortilla Grocery
 </details>
 {% endif %}
 
-{% if request.user|has_internal_permission:'vendor.customers.manage' or request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'admin.customer_requests.view' %}
-<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'vendedores_clientes' or request.resolver_match.url_name == 'crear_cliente' or request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'catalogo_vendedor' or request.resolver_match.url_name == 'ver_pedido' or request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' or request.resolver_match.url_name == 'ver_certificado_cliente' %}open{% endif %}>
+{% if request.user|has_internal_permission:'vendor.customers.manage' or request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'admin.customer_requests.view' or request.user|has_internal_permission:'admin.customers.assign' or request.user|has_internal_permission:'backoffice.customers.assign' %}
+<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'vendedores_clientes' or request.resolver_match.url_name == 'crear_cliente' or request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'catalogo_vendedor' or request.resolver_match.url_name == 'ver_pedido' or request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' or request.resolver_match.url_name == 'ver_certificado_cliente' or request.resolver_match.url_name == 'lista_asignacion_clientes_vendedores' or request.resolver_match.url_name == 'asignar_clientes_vendedor' %}open{% endif %}>
   <summary class="sidebar-collapsible-summary">{% trans "Customers & Sales" %}</summary>
   <div class="sidebar-collapsible-links">
     {% if request.user|has_internal_permission:'vendor.customers.view' %}
@@ -278,6 +278,13 @@ La Tortilla Grocery
     <a href="{% url 'clientes_pendientes' %}"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' or request.resolver_match.url_name == 'ver_certificado_cliente' %}active{% endif %}">
       {% trans "Registration Requests" %}
+    </a>
+    {% endif %}
+
+    {% if request.user|has_internal_permission:'admin.customers.assign' or request.user|has_internal_permission:'backoffice.customers.assign' %}
+    <a href="{% url 'lista_asignacion_clientes_vendedores' %}"
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_asignacion_clientes_vendedores' or request.resolver_match.url_name == 'asignar_clientes_vendedor' %}active{% endif %}">
+      {% trans "Assign Customers to Vendors" %}
     </a>
     {% endif %}
   </div>

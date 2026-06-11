@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db.models import Q
 from config.clientes.models import Cliente
+from config.clientes.assignment import filter_clientes_for_vendedor
 from config.usuarios.models import Usuario
 from config.productos.models import Producto, Presentacion, Categoria, Marca
 from django.views.decorators.http import require_POST
@@ -154,18 +155,23 @@ def crear_cliente(request):
         )
 
         # crear cliente
-        Cliente.objects.create(
-            usuario=usuario,
-            nombre_empresa=empresa,
-            telefono=telefono,
-            direccion=direccion,
-            ciudad=ciudad,
-            estado=estado,
-            sales_tax_number=sales_tax,
-            certificado_tax=certificado,
-            declaracion_fiscal_aceptada=True,
-            declaracion_fiscal_aceptada_en=timezone.now(),
-        )
+        cliente_kwargs = {
+            'usuario': usuario,
+            'nombre_empresa': empresa,
+            'telefono': telefono,
+            'direccion': direccion,
+            'ciudad': ciudad,
+            'estado': estado,
+            'sales_tax_number': sales_tax,
+            'certificado_tax': certificado,
+            'declaracion_fiscal_aceptada': True,
+            'declaracion_fiscal_aceptada_en': timezone.now(),
+        }
+        if getattr(request.user, 'role', '') == 'vendedor':
+            cliente_kwargs['vendedor_asignado'] = request.user
+            cliente_kwargs['vendedor_asignado_en'] = timezone.now()
+            cliente_kwargs['vendedor_asignado_por'] = request.user
+        Cliente.objects.create(**cliente_kwargs)
 
         return redirect("vendedores_clientes")
 
@@ -206,7 +212,7 @@ def _clientes_queryset(request):
         queryset = queryset.filter(aprobado=True)
     elif estado == 'inactivo':
         queryset = queryset.filter(aprobado=False)
-    return queryset
+    return filter_clientes_for_vendedor(queryset, request.user)
 
 
 def _tomar_pedido_clientes_filter_params(request):
@@ -235,7 +241,7 @@ def _tomar_pedido_clientes_queryset(request):
             | Q(telefono__icontains=query)
             | Q(sales_tax_number__icontains=query)
         )
-    return queryset
+    return filter_clientes_for_vendedor(queryset, request.user)
 
 
 def _catalogo_vendedor_filter_params(request):
@@ -315,7 +321,9 @@ def catalogo_vendedor(request, cliente_id):
 
     request.session["cliente_id"] = cliente_id
 
-    cliente = Cliente.objects.get(id=cliente_id)
+    cliente = get_object_or_404(
+        filter_clientes_for_vendedor(Cliente.objects.filter(id=cliente_id), request.user)
+    )
 
     filter_params = _catalogo_vendedor_filter_params(request)
     paginator = Paginator(_catalogo_vendedor_queryset(request), VENDEDOR_CATALOGO_PAGE_SIZE)
@@ -635,7 +643,13 @@ def editar_cliente(request):
 
     try:
         location_payload = _normalize_customer_location_payload(data)
-        cliente = Cliente.objects.select_related('usuario').get(id=cliente_id)
+        try:
+            cliente = filter_clientes_for_vendedor(
+                Cliente.objects.select_related('usuario'),
+                request.user,
+            ).get(id=cliente_id)
+        except Cliente.DoesNotExist:
+            return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
 
         cliente.nombre_empresa = empresa
         cliente.telefono = telefono
@@ -651,8 +665,6 @@ def editar_cliente(request):
 
         return JsonResponse({'success': True, 'message': _('Customer updated successfully.')})
 
-    except Cliente.DoesNotExist:
-        return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
     except ValidationError as exc:
         return JsonResponse({'success': False, 'message': exc.messages[0] if getattr(exc, 'messages', None) else str(exc)}, status=400)
     except Exception as exc:
@@ -758,7 +770,10 @@ def configurar_acceso_cliente(request):
         return JsonResponse({'success': False, 'message': password_rule_error}, status=400)
 
     try:
-        cliente = Cliente.objects.select_related('usuario').get(id=cliente_id)
+        cliente = filter_clientes_for_vendedor(
+            Cliente.objects.select_related('usuario'),
+            request.user,
+        ).get(id=cliente_id)
     except Cliente.DoesNotExist:
         return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
 

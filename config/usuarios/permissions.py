@@ -39,6 +39,11 @@ PERMISSION_SECTIONS = (
                 'description': _('Approve or reject customer applications.'),
             },
             {
+                'code': 'admin.customers.assign',
+                'label': _('Assign customers to vendors'),
+                'description': _('Assign one, several or all customers to specific vendors.'),
+            },
+            {
                 'code': 'admin.products.view',
                 'label': _('Products and brands'),
                 'description': _('View products, categories and brands.'),
@@ -94,6 +99,11 @@ PERMISSION_SECTIONS = (
                 'code': 'backoffice.reports.view',
                 'label': _('Reports dashboard'),
                 'description': _('View daily closing, revenue trends, driver reconciliation and commercial performance metrics.'),
+            },
+            {
+                'code': 'backoffice.customers.assign',
+                'label': _('Assign customers to vendors'),
+                'description': _('Assign one, several or all customers to specific vendors.'),
             },
         ),
     },
@@ -191,6 +201,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         'backoffice.orders.view',
         'backoffice.orders.manage',
         'backoffice.reports.view',
+        'backoffice.customers.assign',
     },
     'seleccionador': {
         'selector.picking.view',

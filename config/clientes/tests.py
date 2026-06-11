@@ -4,10 +4,35 @@ from io import StringIO
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
+from django.urls import reverse
 
+from config.clientes.assignment import (
+    assign_all_approved_clientes_to_vendedor,
+    filter_clientes_for_vendedor,
+    sync_vendedor_cliente_assignments,
+)
 from config.clientes.models import Cliente
 from config.cotizaciones.models import Cotizacion
 from config.usuarios.models import Usuario
+
+
+def _create_customer(*, company_name, approved=False):
+    user = Usuario.objects.create_user(
+        username=f'cliente-{company_name.lower().replace(" ", "-")}',
+        password='secret123',
+        role='cliente',
+    )
+    return Cliente.objects.create(
+        usuario=user,
+        nombre_empresa=company_name,
+        telefono='5551234567',
+        direccion='123 Test St',
+        ciudad='Atlanta',
+        estado='Georgia',
+        sales_tax_number='TX-1',
+        certificado_tax='certificados/test.pdf',
+        aprobado=approved,
+    )
 
 
 class ClearCustomersCommandTests(TestCase):
@@ -55,3 +80,88 @@ class ClearCustomersCommandTests(TestCase):
         self.assertEqual(Usuario.objects.filter(role='cliente').count(), 0)
         self.assertEqual(Cotizacion.objects.count(), 0)
         self.assertIn('Customers cleared', out.getvalue())
+
+
+class CustomerVendorAssignmentTests(TestCase):
+    def setUp(self):
+        self.admin = Usuario.objects.create_user(
+            username='admin-assign',
+            password='secret123',
+            role='admin',
+        )
+        self.backoffice = Usuario.objects.create_user(
+            username='backoffice-assign',
+            password='secret123',
+            role='backoffice',
+        )
+        self.vendedor = Usuario.objects.create_user(
+            username='vendedor-assign',
+            password='secret123',
+            role='vendedor',
+            first_name='Ana',
+            last_name='Vendor',
+        )
+        self.other_vendedor = Usuario.objects.create_user(
+            username='vendedor-other',
+            password='secret123',
+            role='vendedor',
+        )
+        self.cliente_a = _create_customer(company_name='Cliente A', approved=True)
+        self.cliente_b = _create_customer(company_name='Cliente B', approved=True)
+        self.cliente_pending = _create_customer(company_name='Cliente Pending', approved=False)
+
+    def test_sync_assigns_and_unassigns_selected_customers(self):
+        self.cliente_a.vendedor_asignado = self.other_vendedor
+        self.cliente_a.save(update_fields=['vendedor_asignado'])
+
+        result = sync_vendedor_cliente_assignments(
+            vendedor=self.vendedor,
+            selected_cliente_ids=[self.cliente_a.id, self.cliente_b.id],
+            assigned_by=self.admin,
+        )
+
+        self.cliente_a.refresh_from_db()
+        self.cliente_b.refresh_from_db()
+        self.assertEqual(result['assigned_count'], 2)
+        self.assertEqual(self.cliente_a.vendedor_asignado, self.vendedor)
+        self.assertEqual(self.cliente_b.vendedor_asignado, self.vendedor)
+
+        result = sync_vendedor_cliente_assignments(
+            vendedor=self.vendedor,
+            selected_cliente_ids=[self.cliente_b.id],
+            assigned_by=self.admin,
+        )
+        self.cliente_a.refresh_from_db()
+        self.assertEqual(result['unassigned_count'], 1)
+        self.assertIsNone(self.cliente_a.vendedor_asignado)
+
+    def test_assign_all_only_updates_approved_customers(self):
+        count = assign_all_approved_clientes_to_vendedor(
+            vendedor=self.vendedor,
+            assigned_by=self.admin,
+        )
+        self.assertEqual(count, 2)
+        self.cliente_pending.refresh_from_db()
+        self.assertIsNone(self.cliente_pending.vendedor_asignado)
+
+    def test_filter_clientes_for_vendedor_limits_vendor_visibility(self):
+        self.cliente_a.vendedor_asignado = self.vendedor
+        self.cliente_a.save(update_fields=['vendedor_asignado'])
+
+        visible = list(
+            filter_clientes_for_vendedor(Cliente.objects.all(), self.vendedor).values_list('id', flat=True)
+        )
+        self.assertEqual(visible, [self.cliente_a.id])
+
+        admin_visible = filter_clientes_for_vendedor(Cliente.objects.all(), self.admin).count()
+        self.assertEqual(admin_visible, 3)
+
+    def test_backoffice_can_open_assignment_page(self):
+        self.client.force_login(self.backoffice)
+        response = self.client.get(reverse('lista_asignacion_clientes_vendedores'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_vendedor_cannot_open_assignment_page(self):
+        self.client.force_login(self.vendedor)
+        response = self.client.get(reverse('lista_asignacion_clientes_vendedores'))
+        self.assertEqual(response.status_code, 302)

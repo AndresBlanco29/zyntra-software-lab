@@ -75,6 +75,25 @@
 </div>
 
 <div class="col-md-6 mb-3">
+<strong>{% trans "Assigned vendor:" %}</strong><br>
+{% if cliente.vendedor_asignado %}
+  {{ cliente.vendedor_asignado.first_name }} {{ cliente.vendedor_asignado.last_name }}
+  <span class="text-muted">({{ cliente.vendedor_asignado.email }})</span>
+{% else %}
+  <span class="text-muted">{% trans "Unassigned" %}</span>
+{% endif %}
+{% if request.user|has_internal_permission:'admin.customers.assign' or request.user|has_internal_permission:'backoffice.customers.assign' %}
+  {% if cliente.vendedor_asignado %}
+  <div class="mt-2">
+    <a href="{% url 'asignar_clientes_vendedor' cliente.vendedor_asignado.id %}" class="btn btn-sm btn-outline-primary">
+      {% trans "Manage vendor assignments" %}
+    </a>
+  </div>
+  {% endif %}
+{% endif %}
+</div>
+
+<div class="col-md-6 mb-3">
 <strong>{% trans "Tax declaration accepted:" %}</strong><br>
 {% if cliente.declaracion_fiscal_aceptada %}
 	<span class="badge bg-success">{% trans "Yes" %}</span>

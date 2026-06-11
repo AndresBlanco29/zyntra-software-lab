@@ -2,7 +2,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import path, reverse_lazy
 
 from .forms import CustomerPasswordResetForm, CustomerSetPasswordForm
-from .views import login_view, registro_view, panel_admin, perfil_admin, clientes_pendientes, aprobar_cliente, actualizar_precio_cliente, ver_cliente, ver_certificado_cliente, rechazar_cliente, lista_vendedores, crear_vendedor, editar_vendedor, desactivar_vendedor, activar_vendedor, login_form_modal, password_reset_form_modal, password_reset_confirm_modal, registro_form_modal, verificar_username, logout_view, contenido_home, lista_testimonios, crear_testimonio, editar_testimonio, desactivar_testimonio, activar_testimonio, editar_home_contenido, lista_usuarios_internos, crear_usuario_interno, editar_usuario_interno, desactivar_usuario_interno, activar_usuario_interno, crear_backoffice, editar_backoffice, desactivar_backoffice, activar_backoffice, corregir_solicitud_cliente
+from .views import login_view, registro_view, panel_admin, perfil_admin, clientes_pendientes, aprobar_cliente, actualizar_precio_cliente, ver_cliente, ver_certificado_cliente, rechazar_cliente, lista_vendedores, crear_vendedor, editar_vendedor, desactivar_vendedor, activar_vendedor, login_form_modal, password_reset_form_modal, password_reset_confirm_modal, registro_form_modal, verificar_username, logout_view, contenido_home, lista_testimonios, crear_testimonio, editar_testimonio, desactivar_testimonio, activar_testimonio, editar_home_contenido, lista_usuarios_internos, crear_usuario_interno, editar_usuario_interno, desactivar_usuario_interno, activar_usuario_interno, crear_backoffice, editar_backoffice, desactivar_backoffice, activar_backoffice, corregir_solicitud_cliente, lista_asignacion_clientes_vendedores, asignar_clientes_vendedor
 
 urlpatterns = [
     path('login/', login_view, name='login'),
@@ -63,6 +63,9 @@ urlpatterns = [
     path('panel-admin/usuarios-internos/editar/<int:usuario_id>/', editar_usuario_interno, name='editar_usuario_interno'),
     path('panel-admin/usuarios-internos/desactivar/<int:usuario_id>/', desactivar_usuario_interno, name='desactivar_usuario_interno'),
     path('panel-admin/usuarios-internos/activar/<int:usuario_id>/', activar_usuario_interno, name='activar_usuario_interno'),
+
+    path('panel-admin/asignacion-clientes/', lista_asignacion_clientes_vendedores, name='lista_asignacion_clientes_vendedores'),
+    path('panel-admin/asignacion-clientes/vendedor/<int:vendedor_id>/', asignar_clientes_vendedor, name='asignar_clientes_vendedor'),
 
     path('panel-admin/vendedores/', lista_vendedores, name='lista_vendedores'),
     path('panel-admin/crear-vendedor/', crear_vendedor, name='crear_vendedor'),

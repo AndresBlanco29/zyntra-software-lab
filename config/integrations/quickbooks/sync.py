@@ -953,9 +953,12 @@ def _sync_stock_from_quickbooks_item(presentacion, payload):
 def _update_presentacion_from_quickbooks(presentacion, *, quickbooks_id, item_cost):
     presentacion.quickbooks_id = quickbooks_id
     presentacion.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+    presentacion.last_synced_at = timezone.now()
+    update_fields = ['quickbooks_id', 'sync_status', 'last_synced_at']
     if item_cost is not None:
         presentacion.costo = item_cost
-    presentacion.save()
+        update_fields.append('costo')
+    presentacion.save(update_fields=update_fields)
 
 
 def _product_conflict_exists(*, quickbooks_id, product_name, presentation_name):
@@ -970,10 +973,9 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
     if not quickbooks_id:
         raise QuickBooksSyncError('QuickBooks item payload is missing an Id.')
     client = client or QuickBooksAPIClient()
-    product_name, presentation_name, tipo_contenido, unidades = _parse_quickbooks_presentation(payload)
+    product_name, _, _, _ = _parse_quickbooks_presentation(payload)
     description = _truncate(payload.get('Description') or payload.get('FullyQualifiedName') or '', limit=4000)
     sku = _truncate(payload.get('Sku') or '', limit=100)
-    unit_price = _quantize_money(payload.get('UnitPrice') or 0)
     item_cost = _extract_quickbooks_item_cost(payload)
     category, brand = _resolve_quickbooks_item_category_and_brand(payload)
     producto = presentacion.producto
@@ -1009,10 +1011,6 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
     if image_saved:
         product_update_fields.append('imagen')
     producto.save(update_fields=product_update_fields)
-    presentacion.nombre = presentation_name
-    presentacion.unidades = unidades
-    presentacion.tipo_contenido = tipo_contenido
-    presentacion.last_synced_at = timezone.now()
     _update_presentacion_from_quickbooks(
         presentacion,
         quickbooks_id=quickbooks_id,

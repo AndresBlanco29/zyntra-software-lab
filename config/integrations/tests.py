@@ -29,6 +29,7 @@ from config.integrations.quickbooks.sync import (
     _enrich_quickbooks_item_payload,
     _extract_quickbooks_item_cost,
     _parse_quickbooks_presentation,
+    import_quickbooks_item_record,
     refresh_linked_quickbooks_items,
     sync_supplier_purchase,
 )
@@ -137,6 +138,54 @@ class QuickBooksItemCostSyncTests(TestCase):
         mock_fetch.assert_called()
         imported_payload = mock_import.call_args[0][0]
         self.assertEqual(_extract_quickbooks_item_cost(imported_payload), Decimal('35.99'))
+
+
+class QuickBooksLinkedItemUpdateTests(TestCase):
+    @patch('config.integrations.quickbooks.sync._save_quickbooks_item_image', return_value=False)
+    @patch('config.integrations.quickbooks.sync._enrich_quickbooks_item_payload', side_effect=lambda payload, **kwargs: payload)
+    def test_linked_update_preserves_local_presentation(self, _mock_enrich, _mock_image):
+        categoria = Categoria.objects.create(nombre='Aceites')
+        marca = Marca.objects.create(nombre='123')
+        producto = Producto.objects.create(
+            nombre='Old Product Name',
+            categoria=categoria,
+            marca=marca,
+            codigo_barras='OLD-SKU',
+        )
+        presentacion = Presentacion.objects.create(
+            producto=producto,
+            nombre='Caja',
+            nombre_en='Box',
+            unidades=12,
+            tipo_contenido='caja',
+            tipo_contenido_en='box',
+            costo=Decimal('10.00'),
+            quickbooks_id='QB-LINKED-1',
+        )
+
+        result = import_quickbooks_item_record({
+            'Id': 'QB-LINKED-1',
+            'Name': 'ACEITE 123 CANOLA OLI 12/1 LT',
+            'Description': 'Updated from QuickBooks',
+            'Sku': '012005000596',
+            'Type': 'Inventory',
+            'PurchaseCost': 35.99,
+            'QtyOnHand': 5,
+            'Active': True,
+        })
+
+        presentacion.refresh_from_db()
+        producto.refresh_from_db()
+        self.assertEqual(result['action'], 'updated')
+        self.assertEqual(presentacion.nombre, 'Caja')
+        self.assertEqual(presentacion.nombre_en, 'Box')
+        self.assertEqual(presentacion.unidades, 12)
+        self.assertEqual(presentacion.tipo_contenido, 'caja')
+        self.assertEqual(presentacion.tipo_contenido_en, 'box')
+        self.assertEqual(presentacion.costo, Decimal('35.99'))
+        self.assertEqual(producto.nombre, 'ACEITE 123 CANOLA OLI 12/1 LT')
+        self.assertEqual(producto.descripcion, 'Updated from QuickBooks')
+        self.assertEqual(producto.codigo_barras, '012005000596')
 
 
 @override_settings(

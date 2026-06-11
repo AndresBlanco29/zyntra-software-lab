@@ -670,6 +670,15 @@ def import_quickbooks_customer_record(payload):
     defaults = _build_customer_import_defaults(payload)
     existing = Cliente.objects.select_related('usuario').filter(quickbooks_id=quickbooks_id).first()
     if existing is None:
+        for name in {company_name, display_name}:
+            if not name:
+                continue
+            existing = Cliente.objects.select_related('usuario').filter(
+                Q(nombre_empresa__iexact=name) | Q(usuario__first_name__iexact=name),
+            ).filter(Q(quickbooks_id__isnull=True) | Q(quickbooks_id='')).first()
+            if existing is not None:
+                break
+    if existing is None:
         user = Usuario.objects.create_user(
             username=_build_unique_username(f'qb-customer-{quickbooks_id}-{company_name}'),
             email=email,
@@ -1970,17 +1979,118 @@ def _match_local_credit_memo_from_quickbooks(payload):
 def _find_local_customer_from_quickbooks_payload(payload):
     customer_ref = payload.get('CustomerRef') or {}
     customer_quickbooks_id = str(customer_ref.get('value') or '').strip()
-    customer_name = _truncate(customer_ref.get('name') or '', limit=255)
+    customer_name = _normalize_text(customer_ref.get('name'))
     if customer_quickbooks_id:
-        customer = Cliente.objects.select_related('usuario').filter(quickbooks_id=customer_quickbooks_id).first()
+        customer = Cliente.objects.select_related('usuario').filter(
+            Q(quickbooks_id=customer_quickbooks_id) | Q(usuario__quickbooks_id=customer_quickbooks_id)
+        ).first()
         if customer is not None:
             return customer
     if customer_name:
-        return Cliente.objects.select_related('usuario').filter(
+        customer = Cliente.objects.select_related('usuario').filter(
             Q(nombre_empresa__iexact=customer_name)
             | Q(usuario__first_name__iexact=customer_name)
         ).first()
+        if customer is not None:
+            return customer
+        candidates = list(
+            Cliente.objects.select_related('usuario').filter(
+                Q(nombre_empresa__icontains=customer_name)
+                | Q(usuario__first_name__icontains=customer_name)
+            ).order_by('id')[:2]
+        )
+        if len(candidates) == 1:
+            return candidates[0]
     return None
+
+
+def _fetch_quickbooks_customer_payload(*, customer_ref, client=None, customer_cache=None):
+    customer_ref = customer_ref or {}
+    qb_id = str(customer_ref.get('value') or '').strip()
+    cache = customer_cache if customer_cache is not None else {}
+    if qb_id and qb_id in cache:
+        return cache[qb_id]
+
+    client = client or QuickBooksAPIClient()
+    payload = None
+    if qb_id:
+        try:
+            payload = client.read_entity('Customer', qb_id) or client.find_by_id('Customer', qb_id)
+        except QuickBooksAPIError:
+            payload = None
+    if payload is None:
+        name = _normalize_text(customer_ref.get('name'))
+        if name:
+            try:
+                payload = client.find_one_by_display_name('Customer', name) or client.find_one_by_name('Customer', name)
+            except QuickBooksAPIError:
+                payload = None
+    if qb_id and payload:
+        cache[qb_id] = payload
+    return payload
+
+
+def _link_existing_local_customer_from_quickbooks_payload(cliente, qb_customer_payload):
+    qb_id = str(qb_customer_payload.get('Id') or '').strip()
+    if not qb_id:
+        return cliente
+    conflict = Cliente.objects.exclude(pk=cliente.pk).filter(quickbooks_id=qb_id).exists()
+    if conflict:
+        return None
+    return _apply_quickbooks_customer_to_local_record(cliente, qb_customer_payload)
+
+
+def _resolve_local_customer_for_quickbooks_document(payload, *, client=None, customer_cache=None):
+    customer = _find_local_customer_from_quickbooks_payload(payload)
+    if customer is not None:
+        return customer
+
+    customer_ref = payload.get('CustomerRef') or {}
+    qb_customer_payload = _fetch_quickbooks_customer_payload(
+        customer_ref=customer_ref,
+        client=client,
+        customer_cache=customer_cache,
+    )
+    if not qb_customer_payload:
+        return None
+
+    company_name = _extract_quickbooks_customer_company_name(qb_customer_payload)
+    display_name = _extract_quickbooks_customer_display_name(qb_customer_payload)
+    ref_name = _normalize_text(customer_ref.get('name'))
+    candidate_names = [name for name in {company_name, display_name, ref_name} if name]
+
+    existing_by_name = None
+    for name in candidate_names:
+        existing_by_name = Cliente.objects.select_related('usuario').filter(
+            Q(nombre_empresa__iexact=name) | Q(usuario__first_name__iexact=name),
+        ).filter(Q(quickbooks_id__isnull=True) | Q(quickbooks_id='')).first()
+        if existing_by_name is not None:
+            break
+
+    if existing_by_name is not None:
+        linked = _link_existing_local_customer_from_quickbooks_payload(existing_by_name, qb_customer_payload)
+        if linked is not None:
+            return linked
+
+    qb_id = str(qb_customer_payload.get('Id') or '').strip()
+    if qb_id:
+        existing_by_qb = Cliente.objects.select_related('usuario').filter(
+            Q(quickbooks_id=qb_id) | Q(usuario__quickbooks_id=qb_id)
+        ).first()
+        if existing_by_qb is not None:
+            return existing_by_qb
+
+    import_result = import_quickbooks_customer_record(qb_customer_payload)
+    if import_result.get('ok') and import_result.get('local_id'):
+        return Cliente.objects.select_related('usuario').get(pk=import_result['local_id'])
+
+    return _find_local_customer_from_quickbooks_payload({
+        **payload,
+        'CustomerRef': {
+            'value': str(qb_customer_payload.get('Id') or customer_ref.get('value') or '').strip(),
+            'name': display_name or company_name or ref_name,
+        },
+    })
 
 
 def _build_quickbooks_adjustment_note_number(*, doc_number, prefix, quickbooks_id):
@@ -1998,8 +2108,8 @@ def _build_quickbooks_adjustment_note_number(*, doc_number, prefix, quickbooks_i
     return candidate_number
 
 
-def _create_adjustment_note_from_quickbooks_invoice(payload):
-    customer = _find_local_customer_from_quickbooks_payload(payload)
+def _create_adjustment_note_from_quickbooks_invoice(payload, *, client=None, customer_cache=None):
+    customer = _resolve_local_customer_for_quickbooks_document(payload, client=client, customer_cache=customer_cache)
     if customer is None:
         raise QuickBooksSyncError('No local customer matched this QuickBooks invoice, so a debit note could not be created automatically.')
 
@@ -2073,8 +2183,8 @@ def _parse_quickbooks_sales_line_specs(payload):
 
 
 @transaction.atomic
-def _create_invoice_from_quickbooks_invoice(payload):
-    customer = _find_local_customer_from_quickbooks_payload(payload)
+def _create_invoice_from_quickbooks_invoice(payload, *, client=None, customer_cache=None):
+    customer = _resolve_local_customer_for_quickbooks_document(payload, client=client, customer_cache=customer_cache)
     if customer is None:
         raise QuickBooksSyncError(
             'No local customer matched this QuickBooks invoice, so a local invoice could not be created automatically.'
@@ -2157,8 +2267,8 @@ def _create_invoice_from_quickbooks_invoice(payload):
     return invoice
 
 
-def _create_adjustment_note_from_quickbooks_credit_memo(payload):
-    customer = _find_local_customer_from_quickbooks_payload(payload)
+def _create_adjustment_note_from_quickbooks_credit_memo(payload, *, client=None, customer_cache=None):
+    customer = _resolve_local_customer_for_quickbooks_document(payload, client=client, customer_cache=customer_cache)
     if customer is None:
         raise QuickBooksSyncError('No local customer matched this QuickBooks credit memo, so a credit note could not be created automatically.')
 
@@ -2253,7 +2363,8 @@ def _apply_quickbooks_credit_memo_to_local_record(note, payload):
     return note
 
 
-def import_quickbooks_invoice_record(payload):
+def import_quickbooks_invoice_record(payload, *, client=None, customer_cache=None):
+    client = client or QuickBooksAPIClient()
     quickbooks_id = str(payload.get('Id') or '').strip()
     if not quickbooks_id:
         raise QuickBooksSyncError('QuickBooks invoice payload is missing an Id.')
@@ -2262,7 +2373,7 @@ def import_quickbooks_invoice_record(payload):
     record, local_model = _match_local_invoice_from_quickbooks(payload)
     if record is None:
         try:
-            record = _create_invoice_from_quickbooks_invoice(payload)
+            record = _create_invoice_from_quickbooks_invoice(payload, client=client, customer_cache=customer_cache)
         except QuickBooksSyncError as exc:
             _upsert_import_conflict(
                 entity_type=QuickBooksImportConflict.ENTITY_INVOICE,
@@ -2303,7 +2414,8 @@ def import_quickbooks_invoice_record(payload):
     }
 
 
-def import_quickbooks_credit_memo_record(payload):
+def import_quickbooks_credit_memo_record(payload, *, client=None, customer_cache=None):
+    client = client or QuickBooksAPIClient()
     quickbooks_id = str(payload.get('Id') or '').strip()
     if not quickbooks_id:
         raise QuickBooksSyncError('QuickBooks credit memo payload is missing an Id.')
@@ -2312,7 +2424,7 @@ def import_quickbooks_credit_memo_record(payload):
     note = _match_local_credit_memo_from_quickbooks(payload)
     if note is None:
         try:
-            note = _create_adjustment_note_from_quickbooks_credit_memo(payload)
+            note = _create_adjustment_note_from_quickbooks_credit_memo(payload, client=client, customer_cache=customer_cache)
         except QuickBooksSyncError as exc:
             _upsert_import_conflict(
                 entity_type=QuickBooksImportConflict.ENTITY_CREDIT_MEMO,
@@ -2367,8 +2479,15 @@ def import_quickbooks_accounting_documents(*, max_results=25, client=None, invoi
         updated_after=credit_memo_updated_after,
         page_size=page_size,
     )
-    results = [import_quickbooks_invoice_record(record) for record in invoice_records]
-    results.extend(import_quickbooks_credit_memo_record(record) for record in credit_memo_records)
+    customer_cache = {}
+    results = [
+        import_quickbooks_invoice_record(record, client=client, customer_cache=customer_cache)
+        for record in invoice_records
+    ]
+    results.extend(
+        import_quickbooks_credit_memo_record(record, client=client, customer_cache=customer_cache)
+        for record in credit_memo_records
+    )
     return {
         'entity': 'AccountingDocument',
         'count': len(results),

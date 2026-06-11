@@ -848,6 +848,38 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
     @patch('config.integrations.quickbooks.client.requests.request')
+    def test_pull_accounting_documents_imports_missing_customer_from_quickbooks(self, mock_request):
+        self._activate_connection()
+        mock_request.side_effect = [
+            self._json_response({'QueryResponse': {'Invoice': [{
+                'Id': 'QB-INV-MISSING-CUST',
+                'DocNumber': '1061',
+                'CustomerRef': {'value': 'QB-CUSTOMER-1061', 'name': 'Customer 1061 LLC'},
+                'TotalAmt': '25.00',
+                'Balance': '25.00',
+            }]}}),
+            self._json_response({'QueryResponse': {'CreditMemo': []}}),
+            self._json_response({'Customer': {
+                'Id': 'QB-CUSTOMER-1061',
+                'DisplayName': 'Customer 1061 LLC',
+                'CompanyName': 'Customer 1061 LLC',
+                'PrimaryEmailAddr': {'Address': 'customer1061@example.com'},
+                'PrimaryPhone': {'FreeFormNumber': '5550001061'},
+                'BillAddr': {'Line1': '1061 Main', 'City': 'Dallas', 'CountrySubDivisionCode': 'TX', 'PostalCode': '75001', 'Country': 'USA'},
+            }}),
+        ]
+
+        response = self.client.post(reverse('quickbooks_import_accounting_documents_to_local'), {'limit': '10'})
+
+        self.assertEqual(response.status_code, 200)
+        invoice = Invoice.objects.get(quickbooks_id='QB-INV-MISSING-CUST')
+        customer = Cliente.objects.get(quickbooks_id='QB-CUSTOMER-1061')
+        self.assertEqual(invoice.numero, '1061')
+        self.assertEqual(invoice.cliente, customer)
+        self.assertEqual(customer.nombre_empresa, 'Customer 1061 LLC')
+        self.assertFalse(QuickBooksImportConflict.objects.filter(quickbooks_id='QB-INV-MISSING-CUST').exists())
+
+    @patch('config.integrations.quickbooks.client.requests.request')
     def test_import_items_to_local_sets_physical_stock_from_qty_on_hand(self, mock_request):
         self._activate_connection()
         mock_request.return_value = self._json_response({

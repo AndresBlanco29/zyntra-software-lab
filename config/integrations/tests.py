@@ -6,6 +6,7 @@ from decimal import Decimal
 from io import StringIO
 from pathlib import Path
 from datetime import date
+from datetime import timedelta
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
 
@@ -26,6 +27,7 @@ from config.integrations.backups import _backup_modified_time
 from config.integrations.quickbooks.services import get_connection
 from config.integrations.models import QuickBooksConnection, QuickBooksImportConflict
 from config.integrations.quickbooks.sync import (
+    _derive_quickbooks_invoice_status,
     _enrich_quickbooks_item_payload,
     _extract_quickbooks_item_cost,
     _parse_quickbooks_presentation,
@@ -248,6 +250,75 @@ class QuickBooksDeletedRecordImportTests(TestCase):
         self.assertEqual(result['action'], 'skipped')
         self.assertFalse(NotaAjuste.objects.filter(quickbooks_id='QB-CM-DELETED-CUST').exists())
         self.assertFalse(QuickBooksImportConflict.objects.filter(quickbooks_id='QB-CM-DELETED-CUST').exists())
+
+
+class QuickBooksInvoiceStatusImportTests(TestCase):
+    def test_derive_paid_status_when_balance_is_zero(self):
+        status, due_date, email_status = _derive_quickbooks_invoice_status({
+            'TotalAmt': '1559.52',
+            'Balance': '0',
+            'DueDate': '2026-06-10',
+            'EmailStatus': 'EmailSent',
+        })
+        self.assertEqual(status, 'PAID')
+        self.assertEqual(email_status, 'EMAIL_SENT')
+
+    def test_derive_due_status_with_future_due_date(self):
+        due = timezone.localdate() + timedelta(days=6)
+        status, due_date, email_status = _derive_quickbooks_invoice_status({
+            'TotalAmt': '2399.40',
+            'Balance': '2399.40',
+            'DueDate': due.isoformat(),
+            'EmailStatus': 'NeedToSend',
+        })
+        self.assertEqual(status, 'DUE')
+        self.assertEqual(due_date, due)
+        self.assertEqual(email_status, 'NEED_TO_SEND')
+
+    @patch('config.integrations.quickbooks.sync.QuickBooksAPIClient')
+    def test_derive_deposited_status_when_linked_payment_is_deposited(self, mock_client_cls):
+        mock_client = mock_client_cls.return_value
+        mock_client.read_entity.return_value = {
+            'Id': 'PAY-1',
+            'DepositToAccountRef': {'name': 'Business Checking'},
+        }
+        status, _, _ = _derive_quickbooks_invoice_status({
+            'TotalAmt': '100.00',
+            'Balance': '0',
+            'LinkedTxn': [{'TxnId': 'PAY-1', 'TxnType': 'Payment'}],
+        }, client=mock_client)
+        self.assertEqual(status, 'DEPOSITED')
+
+    def test_import_invoice_sets_qb_payment_status(self):
+        user = Usuario.objects.create_user(username='qb-status-client', password='secret123', role='cliente')
+        cliente = Cliente.objects.create(
+            usuario=user,
+            nombre_empresa='Status Customer LLC',
+            telefono='5550000001',
+            direccion='123 Main',
+            ciudad='Dallas',
+            estado='TX',
+            codigo_postal='75001',
+            pais='USA',
+            sales_tax_number='TX-1',
+            certificado_tax='certificados/test.pdf',
+        )
+        due = timezone.localdate() + timedelta(days=8)
+        result = import_quickbooks_invoice_record({
+            'Id': 'QB-INV-STATUS-1',
+            'DocNumber': 'LU101387',
+            'CustomerRef': {'value': 'C-1', 'name': cliente.nombre_empresa},
+            'TotalAmt': '2399.40',
+            'Balance': '2399.40',
+            'DueDate': due.isoformat(),
+            'EmailStatus': 'NeedToSend',
+        })
+        self.assertEqual(result['action'], 'created')
+        invoice = Invoice.objects.get(quickbooks_id='QB-INV-STATUS-1')
+        self.assertEqual(invoice.qb_payment_status, 'DUE')
+        self.assertEqual(invoice.qb_due_date, due)
+        self.assertEqual(invoice.qb_email_status, 'NEED_TO_SEND')
+        self.assertEqual(invoice.get_qb_payment_status_display_label(), 'Due in 8 days')
 
 
 @override_settings(

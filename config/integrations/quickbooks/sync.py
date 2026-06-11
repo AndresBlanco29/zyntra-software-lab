@@ -143,6 +143,94 @@ def _parse_quickbooks_date(value):
     return parse_date(str(value).strip())
 
 
+def _quickbooks_linked_payment_ids(payload):
+    linked = payload.get('LinkedTxn') or []
+    if isinstance(linked, dict):
+        linked = [linked]
+    return [
+        str(item.get('TxnId') or '').strip()
+        for item in linked
+        if str(item.get('TxnType') or '').lower() == 'payment' and str(item.get('TxnId') or '').strip()
+    ]
+
+
+def _normalize_quickbooks_email_status(value):
+    normalized = _normalize_text(value).upper().replace(' ', '_')
+    mapping = {
+        'NOTSET': 'NOT_SET',
+        'NEEDTOSEND': 'NEED_TO_SEND',
+        'EMAILSENT': 'EMAIL_SENT',
+    }
+    return mapping.get(normalized, normalized or 'NOT_SET')
+
+
+def _quickbooks_payment_is_deposited(payment_payload):
+    if not payment_payload:
+        return False
+    deposit_ref = payment_payload.get('DepositToAccountRef') or {}
+    account_name = _normalize_text(deposit_ref.get('name')).lower()
+    if not account_name:
+        return False
+    return 'undeposited' not in account_name
+
+
+def _fetch_quickbooks_invoice_deposited_status(payload, *, client=None):
+    if _as_float(payload.get('Balance') or 0) > 0:
+        return False
+    payment_ids = _quickbooks_linked_payment_ids(payload)
+    if not payment_ids or client is None:
+        return False
+    client = client or QuickBooksAPIClient()
+    for payment_id in payment_ids:
+        try:
+            payment_payload = client.read_entity('Payment', payment_id) or client.find_by_id('Payment', payment_id)
+        except QuickBooksAPIError:
+            continue
+        if _quickbooks_payment_is_deposited(payment_payload):
+            return True
+    return False
+
+
+def _derive_quickbooks_invoice_status(payload, *, client=None):
+    balance = _as_float(payload.get('Balance') or 0)
+    total = _as_float(payload.get('TotalAmt') or balance)
+    due_date = _parse_quickbooks_date(payload.get('DueDate'))
+    email_status = _normalize_quickbooks_email_status(payload.get('EmailStatus'))
+
+    if total > 0 and balance <= 0:
+        if _fetch_quickbooks_invoice_deposited_status(payload, client=client):
+            payment_status = 'DEPOSITED'
+        else:
+            payment_status = 'PAID'
+    elif due_date:
+        today = timezone.localdate()
+        if due_date > today:
+            payment_status = 'DUE'
+        elif due_date == today:
+            payment_status = 'DUE_TODAY'
+        else:
+            payment_status = 'OVERDUE'
+    else:
+        payment_status = 'OPEN'
+
+    return payment_status, due_date, email_status
+
+
+def _apply_quickbooks_invoice_status_to_local_record(invoice, payload, *, client=None):
+    payment_status, due_date, email_status = _derive_quickbooks_invoice_status(payload, client=client)
+    update_fields = []
+    if invoice.qb_payment_status != payment_status:
+        invoice.qb_payment_status = payment_status
+        update_fields.append('qb_payment_status')
+    if invoice.qb_due_date != due_date:
+        invoice.qb_due_date = due_date
+        update_fields.append('qb_due_date')
+    if invoice.qb_email_status != email_status:
+        invoice.qb_email_status = email_status
+        update_fields.append('qb_email_status')
+    return update_fields
+
+
 def _serialize_cursor(value):
     if value is None:
         return ''
@@ -2358,6 +2446,9 @@ def _create_invoice_from_quickbooks_invoice(payload, *, client=None, customer_ca
         sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
         last_synced_at=timezone.now(),
     )
+    status_fields = _apply_quickbooks_invoice_status_to_local_record(invoice, payload, client=client)
+    if status_fields:
+        invoice.save(update_fields=status_fields)
     if doc_number and not Invoice.objects.exclude(pk=invoice.pk).filter(numero=doc_number).exists():
         invoice.numero = doc_number
         invoice.save(update_fields=['numero'])
@@ -2422,7 +2513,7 @@ def _assign_unique_document_number(record, doc_number):
     return ['numero']
 
 
-def _apply_quickbooks_invoice_to_local_record(record, payload):
+def _apply_quickbooks_invoice_to_local_record(record, payload, *, client=None):
     update_fields = []
     update_fields.extend(_assign_unique_document_number(record, payload.get('DocNumber')))
     total_amount = _quantize_money(payload.get('TotalAmt') or payload.get('Balance') or 0)
@@ -2437,6 +2528,7 @@ def _apply_quickbooks_invoice_to_local_record(record, payload):
         if record.saldo_cliente != balance:
             record.saldo_cliente = balance
             update_fields.append('saldo_cliente')
+        update_fields.extend(_apply_quickbooks_invoice_status_to_local_record(record, payload, client=client))
     else:
         if record.total != total_amount:
             record.total = total_amount
@@ -2516,10 +2608,10 @@ def import_quickbooks_invoice_record(payload, *, client=None, customer_cache=Non
         local_model = 'Invoice'
         action = 'created'
     else:
-        _apply_quickbooks_invoice_to_local_record(record, payload)
+        _apply_quickbooks_invoice_to_local_record(record, payload, client=client)
         action = 'matched'
 
-    _apply_quickbooks_invoice_to_local_record(record, payload)
+    _apply_quickbooks_invoice_to_local_record(record, payload, client=client)
     _resolve_import_conflict(
         entity_type=QuickBooksImportConflict.ENTITY_INVOICE,
         quickbooks_id=quickbooks_id,

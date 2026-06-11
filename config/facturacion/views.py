@@ -824,6 +824,28 @@ def _ordered_driver_deliveries(queryset):
 
 INVOICES_LIST_PAGE_SIZE = 50
 
+INVOICE_QB_STATUS_FILTERS = {
+	'due': Q(qb_payment_status__in=['DUE', 'DUE_TODAY']),
+	'overdue': Q(qb_payment_status='OVERDUE'),
+	'paid': Q(qb_payment_status='PAID'),
+	'deposited': Q(qb_payment_status='DEPOSITED'),
+	'open': Q(qb_payment_status='OPEN'),
+	'not_sent': Q(qb_email_status__in=['NOT_SET', 'NEED_TO_SEND']),
+}
+
+
+def _invoice_qb_status_counts(queryset):
+	qb_queryset = queryset.filter(quickbooks_id__isnull=False).exclude(quickbooks_id='')
+	return {
+		'all': qb_queryset.count(),
+		'due': qb_queryset.filter(INVOICE_QB_STATUS_FILTERS['due']).count(),
+		'overdue': qb_queryset.filter(INVOICE_QB_STATUS_FILTERS['overdue']).count(),
+		'paid': qb_queryset.filter(INVOICE_QB_STATUS_FILTERS['paid']).count(),
+		'deposited': qb_queryset.filter(INVOICE_QB_STATUS_FILTERS['deposited']).count(),
+		'open': qb_queryset.filter(INVOICE_QB_STATUS_FILTERS['open']).count(),
+		'not_sent': qb_queryset.filter(INVOICE_QB_STATUS_FILTERS['not_sent']).count(),
+	}
+
 
 def _invoice_list_view_querysets(*, base_queryset=None):
 	queryset = base_queryset if base_queryset is not None else Invoice.objects.all()
@@ -853,12 +875,16 @@ def _apply_invoice_list_filters(queryset, request):
 	selected_customer_id = (request.GET.get('cliente_id') or '').strip()
 	selected_delivery_method = (request.GET.get('metodo_entrega') or '').strip()
 	selected_driver_id = (request.GET.get('driver_id') or '').strip()
+	selected_qb_status = (request.GET.get('qb_status') or '').strip().lower()
 	date_from_raw = (request.GET.get('date_from') or '').strip()
 	date_to_raw = (request.GET.get('date_to') or '').strip()
 
 	valid_delivery_methods = {choice[0] for choice in Invoice.DELIVERY_METHOD_CHOICES}
 	if selected_delivery_method not in valid_delivery_methods:
 		selected_delivery_method = ''
+
+	if selected_qb_status not in INVOICE_QB_STATUS_FILTERS:
+		selected_qb_status = ''
 
 	if query:
 		search_filters = (
@@ -888,11 +914,15 @@ def _apply_invoice_list_filters(queryset, request):
 	if date_to:
 		queryset = queryset.filter(creada_en__date__lte=date_to)
 
+	if selected_qb_status:
+		queryset = queryset.filter(quickbooks_id__isnull=False).exclude(quickbooks_id='').filter(INVOICE_QB_STATUS_FILTERS[selected_qb_status])
+
 	return queryset, {
 		'query': query,
 		'selected_customer_id': selected_customer_id,
 		'selected_delivery_method': selected_delivery_method,
 		'selected_driver_id': selected_driver_id,
+		'selected_qb_status': selected_qb_status,
 		'date_from': date_from_raw if date_from else '',
 		'date_to': date_to_raw if date_to else '',
 	}
@@ -919,6 +949,7 @@ def backoffice_invoices_list(request):
 	count_querysets = _invoice_list_view_querysets()
 	customers = Cliente.objects.filter(invoices__isnull=False).distinct().order_by('nombre_empresa')
 	drivers = Usuario.objects.filter(role='driver').order_by('first_name', 'username')
+	qb_status_counts = _invoice_qb_status_counts(count_querysets[view_mode])
 
 	return render(request, 'backoffice/invoices_list.html', {
 		'page_obj': page_obj,
@@ -928,6 +959,7 @@ def backoffice_invoices_list(request):
 		'ready_count': count_querysets['ready'].count(),
 		'delivered_count': count_querysets['delivered'].count(),
 		'cancelled_count': count_querysets['cancelled'].count(),
+		'qb_status_counts': qb_status_counts,
 		'customers': customers,
 		'drivers': drivers,
 		'delivery_method_choices': Invoice.DELIVERY_METHOD_CHOICES,

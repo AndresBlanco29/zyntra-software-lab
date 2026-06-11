@@ -54,6 +54,24 @@ class Invoice(models.Model):
 	quickbooks_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
 	sync_status = models.CharField(max_length=20, choices=QUICKBOOKS_SYNC_STATUS_CHOICES, default=QUICKBOOKS_SYNC_STATUS_PENDING, db_index=True)
 	last_synced_at = models.DateTimeField(blank=True, null=True)
+	QB_PAYMENT_STATUS_CHOICES = (
+		('', _('Not synced')),
+		('OPEN', _('Open balance')),
+		('DUE', _('Due')),
+		('DUE_TODAY', _('Due today')),
+		('OVERDUE', _('Overdue')),
+		('PAID', _('Paid')),
+		('DEPOSITED', _('Deposited')),
+	)
+	QB_EMAIL_STATUS_CHOICES = (
+		('', _('Unknown')),
+		('NOT_SET', _('Not set')),
+		('NEED_TO_SEND', _('Need to send')),
+		('EMAIL_SENT', _('Email sent')),
+	)
+	qb_payment_status = models.CharField(max_length=20, choices=QB_PAYMENT_STATUS_CHOICES, blank=True, default='', db_index=True)
+	qb_due_date = models.DateField(blank=True, null=True, db_index=True)
+	qb_email_status = models.CharField(max_length=20, choices=QB_EMAIL_STATUS_CHOICES, blank=True, default='')
 	creada_en = models.DateTimeField(auto_now_add=True)
 	actualizada_en = models.DateTimeField(auto_now=True)
 
@@ -82,6 +100,35 @@ class Invoice(models.Model):
 		if is_new and not self.numero:
 			self.numero = f'INV-{timezone.now().year}-{self.pk:06d}'
 			super().save(update_fields=['numero'])
+
+	def get_qb_payment_status_display_label(self):
+		if not self.quickbooks_id or not self.qb_payment_status:
+			return ''
+		if self.qb_payment_status == 'DUE' and self.qb_due_date:
+			days = (self.qb_due_date - timezone.localdate()).days
+			if days == 1:
+				return _('Due in 1 day')
+			if days > 1:
+				return _('Due in %(days)s days') % {'days': days}
+		if self.qb_payment_status == 'DUE_TODAY':
+			return _('Due today')
+		return dict(self.QB_PAYMENT_STATUS_CHOICES).get(self.qb_payment_status, self.qb_payment_status)
+
+	def get_qb_email_substatus_label(self):
+		if self.qb_email_status in {'NOT_SET', 'NEED_TO_SEND'}:
+			return _('Not sent')
+		return ''
+
+	def qb_status_badge_class(self):
+		mapping = {
+			'PAID': 'success',
+			'DEPOSITED': 'success',
+			'DUE': 'info',
+			'DUE_TODAY': 'warning',
+			'OVERDUE': 'danger',
+			'OPEN': 'secondary',
+		}
+		return mapping.get(self.qb_payment_status, 'secondary')
 
 
 class Delivery(models.Model):

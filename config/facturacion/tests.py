@@ -2337,6 +2337,28 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(page_response.status_code, 200)
 		self.assertLessEqual(len(list(page_response.context['page_obj'])), 50)
 
+	def test_backoffice_invoice_list_filters_by_quickbooks_payment_status(self):
+		pending_invoice = self._create_invoice(metodo_entrega='LTG', total='10.00')
+		pending_invoice.despachador_notificado = False
+		pending_invoice.quickbooks_id = 'QB-INV-PAID'
+		pending_invoice.qb_payment_status = 'PAID'
+		pending_invoice.save(update_fields=['despachador_notificado', 'quickbooks_id', 'qb_payment_status'])
+
+		due_invoice = self._create_invoice(metodo_entrega='LTG', total='20.00')
+		due_invoice.despachador_notificado = False
+		due_invoice.quickbooks_id = 'QB-INV-DUE'
+		due_invoice.qb_payment_status = 'DUE'
+		due_invoice.save(update_fields=['despachador_notificado', 'quickbooks_id', 'qb_payment_status'])
+
+		self.client.force_login(self.backoffice)
+		paid_response = self.client.get(reverse('backoffice_invoices_list'), {'qb_status': 'paid'})
+		due_response = self.client.get(reverse('backoffice_invoices_list'), {'qb_status': 'due'})
+
+		self.assertEqual([invoice.id for invoice in paid_response.context['page_obj']], [pending_invoice.id])
+		self.assertEqual([invoice.id for invoice in due_response.context['page_obj']], [due_invoice.id])
+		self.assertEqual(paid_response.context['qb_status_counts']['paid'], 1)
+		self.assertEqual(due_response.context['qb_status_counts']['due'], 1)
+
 	def test_backoffice_invoice_list_renders_in_spanish_when_selected(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,

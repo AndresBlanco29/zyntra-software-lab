@@ -33,7 +33,7 @@ class DeliveryPaymentInline(admin.TabularInline):
 
 @admin.register(Invoice)
 class InvoiceAdmin(admin.ModelAdmin):
-	list_display = ('numero', 'pedido', 'cliente', 'metodo_entrega', 'driver', 'estado', 'saldo_cliente', 'despachador_notificado', 'creada_en')
+	list_display = ('numero', 'pedido', 'cliente', 'metodo_entrega', 'driver', 'estado', 'qb_payment_status', 'saldo_cliente', 'despachador_notificado', 'creada_en')
 	search_fields = ('numero', 'cliente__nombre_empresa', 'pedido__id')
 	list_filter = ('estado', 'metodo_entrega', 'despachador_notificado')
 	inlines = [InvoiceItemInline]

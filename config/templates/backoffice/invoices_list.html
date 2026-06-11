@@ -45,6 +45,45 @@
       </a>
     </div>
 
+    <div class="border-top pt-3 mt-1">
+      <div class="d-flex justify-content-between align-items-center mb-2 gap-2 flex-wrap">
+        <div>
+          <h6 class="mb-1">{% trans "QuickBooks payment status" %}</h6>
+          <div class="small text-muted">{% trans "Filter imported QuickBooks invoices by payment status, similar to QuickBooks Online." %}</div>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap gap-2" aria-label="{% trans 'QuickBooks payment status filters' %}">
+        <a href="?view={{ view_mode }}{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_customer_id %}&cliente_id={{ selected_customer_id|urlencode }}{% endif %}{% if selected_delivery_method %}&metodo_entrega={{ selected_delivery_method|urlencode }}{% endif %}{% if selected_driver_id %}&driver_id={{ selected_driver_id|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from|urlencode }}{% endif %}{% if date_to %}&date_to={{ date_to|urlencode }}{% endif %}" class="btn btn-sm {% if not selected_qb_status %}btn-dark{% else %}btn-outline-dark{% endif %}">
+          {% trans "All QB invoices" %}
+          <span class="badge text-bg-light ms-1">{{ qb_status_counts.all }}</span>
+        </a>
+        <a href="?view={{ view_mode }}&qb_status=due{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_customer_id %}&cliente_id={{ selected_customer_id|urlencode }}{% endif %}{% if selected_delivery_method %}&metodo_entrega={{ selected_delivery_method|urlencode }}{% endif %}{% if selected_driver_id %}&driver_id={{ selected_driver_id|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from|urlencode }}{% endif %}{% if date_to %}&date_to={{ date_to|urlencode }}{% endif %}" class="btn btn-sm {% if selected_qb_status == 'due' %}btn-info{% else %}btn-outline-info{% endif %}">
+          {% trans "Due" %}
+          <span class="badge text-bg-light ms-1">{{ qb_status_counts.due }}</span>
+        </a>
+        <a href="?view={{ view_mode }}&qb_status=overdue{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_customer_id %}&cliente_id={{ selected_customer_id|urlencode }}{% endif %}{% if selected_delivery_method %}&metodo_entrega={{ selected_delivery_method|urlencode }}{% endif %}{% if selected_driver_id %}&driver_id={{ selected_driver_id|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from|urlencode }}{% endif %}{% if date_to %}&date_to={{ date_to|urlencode }}{% endif %}" class="btn btn-sm {% if selected_qb_status == 'overdue' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+          {% trans "Overdue" %}
+          <span class="badge text-bg-light ms-1">{{ qb_status_counts.overdue }}</span>
+        </a>
+        <a href="?view={{ view_mode }}&qb_status=paid{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_customer_id %}&cliente_id={{ selected_customer_id|urlencode }}{% endif %}{% if selected_delivery_method %}&metodo_entrega={{ selected_delivery_method|urlencode }}{% endif %}{% if selected_driver_id %}&driver_id={{ selected_driver_id|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from|urlencode }}{% endif %}{% if date_to %}&date_to={{ date_to|urlencode }}{% endif %}" class="btn btn-sm {% if selected_qb_status == 'paid' %}btn-success{% else %}btn-outline-success{% endif %}">
+          {% trans "Paid" %}
+          <span class="badge text-bg-light ms-1">{{ qb_status_counts.paid }}</span>
+        </a>
+        <a href="?view={{ view_mode }}&qb_status=deposited{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_customer_id %}&cliente_id={{ selected_customer_id|urlencode }}{% endif %}{% if selected_delivery_method %}&metodo_entrega={{ selected_delivery_method|urlencode }}{% endif %}{% if selected_driver_id %}&driver_id={{ selected_driver_id|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from|urlencode }}{% endif %}{% if date_to %}&date_to={{ date_to|urlencode }}{% endif %}" class="btn btn-sm {% if selected_qb_status == 'deposited' %}btn-success{% else %}btn-outline-success{% endif %}">
+          {% trans "Deposited" %}
+          <span class="badge text-bg-light ms-1">{{ qb_status_counts.deposited }}</span>
+        </a>
+        <a href="?view={{ view_mode }}&qb_status=open{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_customer_id %}&cliente_id={{ selected_customer_id|urlencode }}{% endif %}{% if selected_delivery_method %}&metodo_entrega={{ selected_delivery_method|urlencode }}{% endif %}{% if selected_driver_id %}&driver_id={{ selected_driver_id|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from|urlencode }}{% endif %}{% if date_to %}&date_to={{ date_to|urlencode }}{% endif %}" class="btn btn-sm {% if selected_qb_status == 'open' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+          {% trans "Open balance" %}
+          <span class="badge text-bg-light ms-1">{{ qb_status_counts.open }}</span>
+        </a>
+        <a href="?view={{ view_mode }}&qb_status=not_sent{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_customer_id %}&cliente_id={{ selected_customer_id|urlencode }}{% endif %}{% if selected_delivery_method %}&metodo_entrega={{ selected_delivery_method|urlencode }}{% endif %}{% if selected_driver_id %}&driver_id={{ selected_driver_id|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from|urlencode }}{% endif %}{% if date_to %}&date_to={{ date_to|urlencode }}{% endif %}" class="btn btn-sm {% if selected_qb_status == 'not_sent' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+          {% trans "Not sent" %}
+          <span class="badge text-bg-light ms-1">{{ qb_status_counts.not_sent }}</span>
+        </a>
+      </div>
+    </div>
+
     <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
       <div>
         <h5 class="mb-1">{% trans "Search filters" %}</h5>
@@ -55,6 +94,7 @@
 
     <form method="get" class="row g-3">
       <input type="hidden" name="view" value="{{ view_mode }}">
+      {% if selected_qb_status %}<input type="hidden" name="qb_status" value="{{ selected_qb_status }}">{% endif %}
       <div class="col-lg-4">
         <label class="form-label fw-semibold">{% trans "Search text" %}</label>
         <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="{% trans 'Invoice, order, customer, or driver' %}">
@@ -128,6 +168,7 @@
             <th>{% trans "Delivery method" %}</th>
             <th>{% trans "Driver" %}</th>
             <th>{% trans "Dispatch" %}</th>
+            <th>{% trans "QuickBooks status" %}</th>
             <th>{% trans "Balance" %}</th>
             <th></th>
           </tr>
@@ -156,6 +197,18 @@
                 <span class="badge bg-secondary">{% trans "Pending" %}</span>
               {% endif %}
             </td>
+            <td data-label="{% trans 'QuickBooks status' %}">
+              {% if invoice.quickbooks_id and invoice.qb_payment_status %}
+                <span class="badge bg-{{ invoice.qb_status_badge_class }}">{{ invoice.get_qb_payment_status_display_label }}</span>
+                {% with substatus=invoice.get_qb_email_substatus_label %}
+                {% if substatus %}
+                <div class="small text-muted mt-1">{{ substatus }}</div>
+                {% endif %}
+                {% endwith %}
+              {% else %}
+                <span class="text-muted">-</span>
+              {% endif %}
+            </td>
             <td data-label="{% trans 'Balance' %}">${{ invoice.saldo_cliente }}</td>
             <td data-label="{% trans 'Action' %}" class="text-end mobile-stack-table__action">
               <a href="{% url 'backoffice_invoice_detail' invoice.id %}" class="btn btn-sm btn-outline-primary">{% trans "Open" %}</a>
@@ -163,7 +216,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="8" class="text-center text-muted py-4 mobile-stack-table__empty">
+            <td colspan="9" class="text-center text-muted py-4 mobile-stack-table__empty">
               {% if view_mode == 'ready' %}
                 {% trans "No ready invoices are available right now." %}
               {% elif view_mode == 'delivered' %}
@@ -180,7 +233,7 @@
       </table>
     </div>
 
-    {% pagination_controls page_obj aria_label=_('Invoice pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0" view=view_mode q=query cliente_id=selected_customer_id metodo_entrega=selected_delivery_method driver_id=selected_driver_id date_from=date_from date_to=date_to %}
+    {% pagination_controls page_obj aria_label=_('Invoice pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0" view=view_mode q=query cliente_id=selected_customer_id metodo_entrega=selected_delivery_method driver_id=selected_driver_id date_from=date_from date_to=date_to qb_status=selected_qb_status %}
   </div>
 </div>
 {% endblock %}

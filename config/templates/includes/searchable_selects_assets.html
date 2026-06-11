@@ -1,0 +1,11 @@
+{% load static i18n %}
+<link rel="stylesheet" href="{% static 'vendor/tom-select/tom-select.bootstrap5.min.css' %}">
+<link rel="stylesheet" href="{% static 'css/searchable-selects.css' %}">
+<script>
+  window.LTG_SEARCHABLE_SELECT_I18N = {
+    placeholder: "{% trans 'Type to search...'|escapejs %}",
+    noResults: "{% trans 'No results found'|escapejs %}",
+  };
+</script>
+<script src="{% static 'vendor/tom-select/tom-select.complete.min.js' %}"></script>
+<script defer src="{% static 'js/searchable-selects.js' %}"></script>

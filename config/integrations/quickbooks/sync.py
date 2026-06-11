@@ -60,6 +60,68 @@ def _normalize_text(value, *, fallback=''):
     return (value or fallback or '').strip()
 
 
+def _looks_like_quickbooks_deleted_label(value):
+    normalized = _normalize_text(value).lower()
+    if not normalized:
+        return False
+    return '(deleted)' in normalized or '(eliminado)' in normalized
+
+
+def _quickbooks_record_is_active(payload):
+    if not payload:
+        return False
+    return bool(payload.get('Active', True))
+
+
+def _quickbooks_ref_looks_deleted(ref):
+    ref = ref or {}
+    return _looks_like_quickbooks_deleted_label(ref.get('name'))
+
+
+def _quickbooks_customer_payload_is_importable(payload):
+    if not payload or not _quickbooks_record_is_active(payload):
+        return False
+    for name in (
+        payload.get('DisplayName'),
+        payload.get('CompanyName'),
+        payload.get('PrintOnCheckName'),
+        payload.get('FullyQualifiedName'),
+    ):
+        if _looks_like_quickbooks_deleted_label(name):
+            return False
+    return True
+
+
+def _quickbooks_item_payload_is_importable(payload):
+    if not payload or not _quickbooks_record_is_active(payload):
+        return False
+    for name in (payload.get('Name'), payload.get('FullyQualifiedName')):
+        if _looks_like_quickbooks_deleted_label(name):
+            return False
+    return True
+
+
+def _quickbooks_accounting_document_is_importable(payload, *, customer_payload=None):
+    if not payload:
+        return False
+    if _quickbooks_ref_looks_deleted(payload.get('CustomerRef')):
+        return False
+    if customer_payload is not None and not _quickbooks_customer_payload_is_importable(customer_payload):
+        return False
+    return True
+
+
+def _skip_import_result(*, entity, quickbooks_id, label='', reason=''):
+    return {
+        'ok': True,
+        'action': 'skipped',
+        'entity': entity,
+        'quickbooks_id': quickbooks_id,
+        'label': label or quickbooks_id,
+        'reason': reason,
+    }
+
+
 def _truncate(value, limit=100):
     return _normalize_text(value)[:limit]
 
@@ -663,6 +725,14 @@ def import_quickbooks_customer_record(payload):
     quickbooks_id = str(payload.get('Id') or '').strip()
     if not quickbooks_id:
         raise QuickBooksSyncError('QuickBooks customer payload is missing an Id.')
+    if not _quickbooks_customer_payload_is_importable(payload):
+        display_name = _extract_quickbooks_customer_display_name(payload)
+        return _skip_import_result(
+            entity='Customer',
+            quickbooks_id=quickbooks_id,
+            label=display_name,
+            reason='QuickBooks customer is inactive or deleted.',
+        )
 
     company_name = _extract_quickbooks_customer_company_name(payload)
     display_name = _extract_quickbooks_customer_display_name(payload)
@@ -1170,16 +1240,31 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
 
 @transaction.atomic
 def import_quickbooks_item_record(payload, *, client=None, skip_enrich=False, skip_images=None, prefetched_presentacion=None, lookup_cache=None):
+    quickbooks_id = str((payload or {}).get('Id') or '').strip()
+    if not quickbooks_id:
+        raise QuickBooksSyncError('QuickBooks item payload is missing an Id.')
+    if not _quickbooks_item_payload_is_importable(payload):
+        return _skip_import_result(
+            entity='Item',
+            quickbooks_id=quickbooks_id,
+            label=(payload or {}).get('Name') or quickbooks_id,
+            reason='QuickBooks item is inactive or deleted.',
+        )
+
     if skip_images is None:
         skip_images = _catalog_sync_skip_images()
     if not skip_enrich:
         payload = _enrich_quickbooks_item_payload(payload, client=client)
     else:
         payload = dict(payload or {})
+    if not _quickbooks_item_payload_is_importable(payload):
+        return _skip_import_result(
+            entity='Item',
+            quickbooks_id=quickbooks_id,
+            label=payload.get('Name') or quickbooks_id,
+            reason='QuickBooks item is inactive or deleted.',
+        )
     client = client or QuickBooksAPIClient()
-    quickbooks_id = str(payload.get('Id') or '').strip()
-    if not quickbooks_id:
-        raise QuickBooksSyncError('QuickBooks item payload is missing an Id.')
 
     product_name, presentation_name, tipo_contenido, unidades = _parse_quickbooks_presentation(payload)
     description = _truncate(payload.get('Description') or payload.get('FullyQualifiedName') or '', limit=4000)
@@ -1381,8 +1466,9 @@ def _import_batch_result(*, entity_name, records, import_callable, task_cache_ke
         'count': len(records),
         'created_count': sum(1 for item in results if item.get('ok') and item.get('action') == 'created'),
         'updated_count': sum(1 for item in results if item.get('ok') and item.get('action') == 'updated'),
+        'skipped_count': sum(1 for item in results if item.get('action') == 'skipped'),
         'conflict_count': sum(1 for item in results if item.get('action') == 'conflict'),
-        'failed_count': sum(1 for item in results if not item.get('ok') and item.get('action') != 'conflict'),
+        'failed_count': sum(1 for item in results if not item.get('ok') and item.get('action') not in {'conflict', 'skipped'}),
         'latest_updated_at': _serialize_cursor(_latest_payload_update(records)),
         'results': results,
     }
@@ -2049,6 +2135,8 @@ def _fetch_quickbooks_customer_payload(*, customer_ref, client=None, customer_ca
                 payload = client.find_one_by_display_name('Customer', name) or client.find_one_by_name('Customer', name)
             except QuickBooksAPIError:
                 payload = None
+    if payload and not _quickbooks_customer_payload_is_importable(payload):
+        return None
     if qb_id and payload:
         cache[qb_id] = payload
     return payload
@@ -2065,11 +2153,14 @@ def _link_existing_local_customer_from_quickbooks_payload(cliente, qb_customer_p
 
 
 def _resolve_local_customer_for_quickbooks_document(payload, *, client=None, customer_cache=None):
+    customer_ref = payload.get('CustomerRef') or {}
+    if _quickbooks_ref_looks_deleted(customer_ref):
+        return None
+
     customer = _find_local_customer_from_quickbooks_payload(payload)
     if customer is not None:
         return customer
 
-    customer_ref = payload.get('CustomerRef') or {}
     qb_customer_payload = _fetch_quickbooks_customer_payload(
         customer_ref=customer_ref,
         client=client,
@@ -2394,6 +2485,13 @@ def import_quickbooks_invoice_record(payload, *, client=None, customer_cache=Non
         raise QuickBooksSyncError('QuickBooks invoice payload is missing an Id.')
     doc_number = _normalize_text(payload.get('DocNumber'))
     display_name = _truncate((payload.get('CustomerRef') or {}).get('name') or doc_number or quickbooks_id, limit=255)
+    if not _quickbooks_accounting_document_is_importable(payload):
+        return _skip_import_result(
+            entity='Invoice',
+            quickbooks_id=quickbooks_id,
+            label=doc_number or display_name or quickbooks_id,
+            reason='QuickBooks invoice references an inactive or deleted customer.',
+        )
     record, local_model = _match_local_invoice_from_quickbooks(payload)
     if record is None:
         try:
@@ -2445,6 +2543,13 @@ def import_quickbooks_credit_memo_record(payload, *, client=None, customer_cache
         raise QuickBooksSyncError('QuickBooks credit memo payload is missing an Id.')
     doc_number = _normalize_text(payload.get('DocNumber'))
     display_name = _truncate((payload.get('CustomerRef') or {}).get('name') or doc_number or quickbooks_id, limit=255)
+    if not _quickbooks_accounting_document_is_importable(payload):
+        return _skip_import_result(
+            entity='CreditMemo',
+            quickbooks_id=quickbooks_id,
+            label=doc_number or display_name or quickbooks_id,
+            reason='QuickBooks credit memo references an inactive or deleted customer.',
+        )
     note = _match_local_credit_memo_from_quickbooks(payload)
     if note is None:
         try:
@@ -2515,9 +2620,10 @@ def import_quickbooks_accounting_documents(*, max_results=25, client=None, invoi
     return {
         'entity': 'AccountingDocument',
         'count': len(results),
-        'matched_count': sum(1 for item in results if item.get('ok')),
+        'matched_count': sum(1 for item in results if item.get('ok') and item.get('action') != 'skipped'),
         'created_count': sum(1 for item in results if item.get('ok') and item.get('action') == 'created'),
         'updated_count': sum(1 for item in results if item.get('ok') and item.get('action') == 'matched'),
+        'skipped_count': sum(1 for item in results if item.get('action') == 'skipped'),
         'conflict_count': sum(1 for item in results if item.get('action') == 'conflict'),
         'invoice_result': {
             'count': len(invoice_records),

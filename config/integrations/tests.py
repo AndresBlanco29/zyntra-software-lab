@@ -29,6 +29,9 @@ from config.integrations.quickbooks.sync import (
     _enrich_quickbooks_item_payload,
     _extract_quickbooks_item_cost,
     _parse_quickbooks_presentation,
+    import_quickbooks_credit_memo_record,
+    import_quickbooks_customer_record,
+    import_quickbooks_invoice_record,
     import_quickbooks_item_record,
     refresh_linked_quickbooks_items,
 )
@@ -187,6 +190,64 @@ class QuickBooksLinkedItemUpdateTests(TestCase):
         self.assertEqual(producto.nombre, 'ACEITE 123 CANOLA OLI 12/1 LT')
         self.assertEqual(producto.descripcion, 'Updated from QuickBooks')
         self.assertEqual(producto.codigo_barras, '012005000596')
+
+
+class QuickBooksDeletedRecordImportTests(TestCase):
+    @patch('config.integrations.quickbooks.sync._save_quickbooks_item_image', return_value=False)
+    @patch('config.integrations.quickbooks.sync._enrich_quickbooks_item_payload', side_effect=lambda payload, **kwargs: payload)
+    def test_inactive_item_is_skipped(self, _mock_enrich, _mock_image):
+        result = import_quickbooks_item_record({
+            'Id': 'QB-INACTIVE-ITEM',
+            'Name': 'Inactive Product',
+            'Type': 'Inventory',
+            'Active': False,
+        })
+        self.assertEqual(result['action'], 'skipped')
+        self.assertFalse(Presentacion.objects.filter(quickbooks_id='QB-INACTIVE-ITEM').exists())
+
+    def test_inactive_customer_is_skipped(self):
+        result = import_quickbooks_customer_record({
+            'Id': 'QB-INACTIVE-CUST',
+            'DisplayName': 'Inactive Customer LLC',
+            'CompanyName': 'Inactive Customer LLC',
+            'Active': False,
+        })
+        self.assertEqual(result['action'], 'skipped')
+        self.assertFalse(Cliente.objects.filter(quickbooks_id='QB-INACTIVE-CUST').exists())
+
+    def test_deleted_customer_label_is_skipped(self):
+        result = import_quickbooks_customer_record({
+            'Id': 'QB-DELETED-CUST',
+            'DisplayName': 'Flores Produce (deleted)',
+            'CompanyName': 'Flores Produce (deleted)',
+            'Active': True,
+        })
+        self.assertEqual(result['action'], 'skipped')
+        self.assertFalse(Cliente.objects.filter(quickbooks_id='QB-DELETED-CUST').exists())
+
+    def test_invoice_with_deleted_customer_ref_is_skipped_without_conflict(self):
+        result = import_quickbooks_invoice_record({
+            'Id': 'QB-INV-DELETED-CUST',
+            'DocNumber': '2001',
+            'CustomerRef': {'value': '999', 'name': '(BHM) FLORES PRODUCE (deleted)'},
+            'TotalAmt': '50.00',
+            'Balance': '50.00',
+        })
+        self.assertEqual(result['action'], 'skipped')
+        self.assertFalse(Invoice.objects.filter(quickbooks_id='QB-INV-DELETED-CUST').exists())
+        self.assertFalse(QuickBooksImportConflict.objects.filter(quickbooks_id='QB-INV-DELETED-CUST').exists())
+
+    def test_credit_memo_with_deleted_customer_ref_is_skipped_without_conflict(self):
+        result = import_quickbooks_credit_memo_record({
+            'Id': 'QB-CM-DELETED-CUST',
+            'DocNumber': 'CM-2001',
+            'CustomerRef': {'value': '999', 'name': 'Old Customer (eliminado)'},
+            'TotalAmt': '10.00',
+            'Balance': '0.00',
+        })
+        self.assertEqual(result['action'], 'skipped')
+        self.assertFalse(NotaAjuste.objects.filter(quickbooks_id='QB-CM-DELETED-CUST').exists())
+        self.assertFalse(QuickBooksImportConflict.objects.filter(quickbooks_id='QB-CM-DELETED-CUST').exists())
 
 
 @override_settings(
@@ -880,6 +941,26 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertFalse(QuickBooksImportConflict.objects.filter(quickbooks_id='QB-INV-MISSING-CUST').exists())
 
     @patch('config.integrations.quickbooks.client.requests.request')
+    def test_pull_accounting_documents_skips_invoice_with_deleted_customer(self, mock_request):
+        self._activate_connection()
+        mock_request.side_effect = [
+            self._json_response({'QueryResponse': {'Invoice': [{
+                'Id': 'QB-INV-SKIP-DELETED',
+                'DocNumber': '3001',
+                'CustomerRef': {'value': 'QB-CUST-DELETED', 'name': '(BHM) FLORES PRODUCE (deleted)'},
+                'TotalAmt': '75.00',
+                'Balance': '75.00',
+            }]}}),
+            self._json_response({'QueryResponse': {'CreditMemo': []}}),
+        ]
+
+        response = self.client.post(reverse('quickbooks_import_accounting_documents_to_local'), {'limit': '10'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Invoice.objects.filter(quickbooks_id='QB-INV-SKIP-DELETED').exists())
+        self.assertFalse(QuickBooksImportConflict.objects.filter(quickbooks_id='QB-INV-SKIP-DELETED').exists())
+
+    @patch('config.integrations.quickbooks.client.requests.request')
     def test_import_items_to_local_sets_physical_stock_from_qty_on_hand(self, mock_request):
         self._activate_connection()
         mock_request.return_value = self._json_response({
@@ -928,6 +1009,27 @@ class QuickBooksIntegrationTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(Cliente.objects.filter(quickbooks_id='QB-CUST-CATALOG-ONLY').exists())
+
+    @patch('config.integrations.quickbooks.client.requests.request')
+    def test_import_customers_skips_inactive_records(self, mock_request):
+        self._activate_connection()
+        mock_request.return_value = self._json_response({
+            'QueryResponse': {
+                'Customer': [
+                    {
+                        'Id': 'QB-CUST-SKIP-INACTIVE',
+                        'DisplayName': 'Inactive Skip Customer',
+                        'CompanyName': 'Inactive Skip Customer LLC',
+                        'Active': False,
+                    }
+                ]
+            }
+        })
+
+        response = self.client.post(reverse('quickbooks_import_customers_to_local'), {'limit': '10'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Cliente.objects.filter(quickbooks_id='QB-CUST-SKIP-INACTIVE').exists())
 
 
 @override_settings(

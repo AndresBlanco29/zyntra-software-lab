@@ -862,6 +862,14 @@
               </form>
               <p class="qb-action-note">{% trans "Imports QuickBooks invoices into Invoices and credit memos into Credit / Debit Notes. Unmatched documents go to the review queue when the local customer cannot be identified." %}</p>
             </div>
+            <div class="qb-action-item" id="qb-refresh-invoice-status">
+              <form method="post" action="{% url 'quickbooks_refresh_linked_invoice_status_to_local' %}" data-qb-operation="refresh_linked_invoice_status_to_local">
+                {% csrf_token %}
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <button type="submit" class="btn btn-outline-primary w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Refresh invoice payment status" %}</button>
+              </form>
+              <p class="qb-action-note">{% trans "Updates overdue, due, paid, and not-sent status for invoices already linked to QuickBooks. Run this once after enabling payment status filters, or whenever invoice statuses look out of date." %}</p>
+            </div>
           </div>
         </div>
       </div>

@@ -3070,6 +3070,111 @@ def fetch_quickbooks_invoices(*, max_results=25, client=None, updated_after=None
     return client.find_all('Invoice', max_results=max_results, order_by='MetaData.LastUpdatedTime', page_size=page_size)
 
 
+def _fetch_quickbooks_invoices_by_ids(*, client, invoice_ids, chunk_size=100):
+    found = {}
+    ids = [str(invoice_id).strip() for invoice_id in invoice_ids if str(invoice_id or '').strip()]
+    if not ids:
+        return found
+
+    chunk_size = max(min(int(chunk_size or 100), _quickbooks_catalog_page_size()), 1)
+    for offset in range(0, len(ids), chunk_size):
+        chunk = ids[offset:offset + chunk_size]
+        in_list = ', '.join(f"'{client._escape_query_value(invoice_id)}'" for invoice_id in chunk)
+        response = client.query(
+            client._build_select_statement(
+                'Invoice',
+                where_clause=f'Id IN ({in_list})',
+                max_results=min(len(chunk), _quickbooks_catalog_page_size()),
+            )
+        )
+        batch = response.get('Invoice', [])
+        if isinstance(batch, dict):
+            batch = [batch]
+        for record in batch or []:
+            invoice_id = str(record.get('Id') or '').strip()
+            if invoice_id:
+                found[invoice_id] = record
+    return found
+
+
+def refresh_linked_quickbooks_invoice_status(*, client=None, task_cache_key=None):
+    """Re-fetch QuickBooks payment status for invoices already linked locally."""
+    client = client or QuickBooksAPIClient()
+    local_by_qb_id = {
+        str(invoice.quickbooks_id).strip(): invoice
+        for invoice in Invoice.objects.filter(quickbooks_id__isnull=False).exclude(quickbooks_id='')
+    }
+    if not local_by_qb_id:
+        return {
+            'entity': 'LinkedInvoiceStatus',
+            'count': 0,
+            'updated_count': 0,
+            'skipped_count': 0,
+            'missing_count': 0,
+            'linked_count': 0,
+            'incremental': True,
+        }
+
+    qb_ids = sorted(local_by_qb_id.keys())
+    invoices_map = _fetch_quickbooks_invoices_by_ids(client=client, invoice_ids=qb_ids)
+    results = []
+    if task_cache_key:
+        cache.set(task_cache_key, {'status': 'running', 'progress': 0, 'operation': 'LinkedInvoiceStatus'}, timeout=60 * 60)
+
+    total = len(qb_ids)
+    for index, qb_id in enumerate(qb_ids, start=1):
+        invoice = local_by_qb_id[qb_id]
+        payload = invoices_map.get(qb_id)
+        if not payload:
+            results.append({
+                'ok': False,
+                'action': 'missing',
+                'entity': 'Invoice',
+                'quickbooks_id': qb_id,
+                'label': invoice.numero or qb_id,
+                'error': 'Invoice not found in QuickBooks.',
+            })
+            continue
+        if not _quickbooks_accounting_document_is_importable(payload):
+            results.append(_skip_import_result(
+                entity='Invoice',
+                quickbooks_id=qb_id,
+                label=invoice.numero or qb_id,
+                reason='QuickBooks invoice references an inactive or deleted customer.',
+            ))
+            continue
+        _apply_quickbooks_invoice_to_local_record(invoice, payload, client=client)
+        results.append({
+            'ok': True,
+            'action': 'matched',
+            'entity': 'Invoice',
+            'quickbooks_id': qb_id,
+            'local_id': invoice.id,
+            'label': invoice.numero or qb_id,
+        })
+        if task_cache_key and (index == total or index % 25 == 0):
+            pct = int((index / total) * 90) + 5
+            cache.set(
+                task_cache_key,
+                {'status': 'running', 'progress': min(pct, 95), 'operation': 'LinkedInvoiceStatus', 'result': {'processed': index, 'total': total}},
+                timeout=60 * 60,
+            )
+
+    summary = {
+        'entity': 'LinkedInvoiceStatus',
+        'count': len(results),
+        'updated_count': sum(1 for item in results if item.get('ok') and item.get('action') == 'matched'),
+        'skipped_count': sum(1 for item in results if item.get('action') == 'skipped'),
+        'missing_count': sum(1 for item in results if item.get('action') == 'missing'),
+        'linked_count': len(qb_ids),
+        'incremental': True,
+        'results': results,
+    }
+    if task_cache_key:
+        cache.set(task_cache_key, {'status': 'completed', 'progress': 100, 'operation': 'LinkedInvoiceStatus', 'result': summary}, timeout=60 * 60)
+    return summary
+
+
 def sync_invoice(*, invoice, client=None):
     client = client or QuickBooksAPIClient()
     try:

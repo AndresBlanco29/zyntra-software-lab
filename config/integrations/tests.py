@@ -36,6 +36,7 @@ from config.integrations.quickbooks.sync import (
     import_quickbooks_invoice_record,
     import_quickbooks_item_record,
     refresh_linked_quickbooks_items,
+    refresh_linked_quickbooks_invoice_status,
 )
 from config.inventario.models import StockPresentacion
 from config.pedidos.models import Pedido, PedidoItem
@@ -319,6 +320,54 @@ class QuickBooksInvoiceStatusImportTests(TestCase):
         self.assertEqual(invoice.qb_due_date, due)
         self.assertEqual(invoice.qb_email_status, 'NEED_TO_SEND')
         self.assertEqual(invoice.get_qb_payment_status_display_label(), 'Due in 8 days')
+
+    @patch('config.integrations.quickbooks.sync._fetch_quickbooks_invoices_by_ids')
+    def test_refresh_linked_invoice_status_updates_unsynced_invoices(self, mock_fetch_invoices):
+        user = Usuario.objects.create_user(username='qb-refresh-client', password='secret123', role='cliente')
+        cliente = Cliente.objects.create(
+            usuario=user,
+            nombre_empresa='Refresh Customer LLC',
+            telefono='5550000002',
+            direccion='456 Main',
+            ciudad='Dallas',
+            estado='TX',
+            codigo_postal='75001',
+            pais='USA',
+            sales_tax_number='TX-2',
+            certificado_tax='certificados/test.pdf',
+        )
+        due = timezone.localdate() - timedelta(days=9)
+        import_quickbooks_invoice_record({
+            'Id': 'QB-INV-REFRESH-1',
+            'DocNumber': 'LU100902',
+            'CustomerRef': {'value': 'C-2', 'name': cliente.nombre_empresa},
+            'TotalAmt': '8716.11',
+            'Balance': '8716.11',
+            'DueDate': due.isoformat(),
+            'EmailStatus': 'NeedToSend',
+        })
+        invoice = Invoice.objects.get(quickbooks_id='QB-INV-REFRESH-1')
+        Invoice.objects.filter(pk=invoice.pk).update(qb_payment_status='', qb_email_status='', qb_due_date=None)
+        mock_fetch_invoices.return_value = {
+            'QB-INV-REFRESH-1': {
+                'Id': 'QB-INV-REFRESH-1',
+                'DocNumber': 'LU100902',
+                'CustomerRef': {'value': 'C-2', 'name': cliente.nombre_empresa},
+                'TotalAmt': '8716.11',
+                'Balance': '8716.11',
+                'DueDate': due.isoformat(),
+                'EmailStatus': 'NeedToSend',
+            }
+        }
+
+        result = refresh_linked_quickbooks_invoice_status()
+
+        invoice.refresh_from_db()
+        self.assertEqual(result['updated_count'], 1)
+        self.assertEqual(invoice.qb_payment_status, 'OVERDUE')
+        self.assertEqual(invoice.qb_due_date, due)
+        self.assertEqual(invoice.qb_email_status, 'NEED_TO_SEND')
+        self.assertEqual(invoice.get_qb_payment_status_display_label(), 'Overdue 9 days')
 
 
 @override_settings(

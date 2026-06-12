@@ -844,6 +844,7 @@ def _invoice_qb_status_counts(queryset):
 		'deposited': qb_queryset.filter(INVOICE_QB_STATUS_FILTERS['deposited']).count(),
 		'open': qb_queryset.filter(INVOICE_QB_STATUS_FILTERS['open']).count(),
 		'not_sent': qb_queryset.filter(INVOICE_QB_STATUS_FILTERS['not_sent']).count(),
+		'unsynced': qb_queryset.filter(qb_payment_status='').count(),
 	}
 
 

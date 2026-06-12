@@ -112,6 +112,12 @@ class Invoice(models.Model):
 				return _('Due in %(days)s days') % {'days': days}
 		if self.qb_payment_status == 'DUE_TODAY':
 			return _('Due today')
+		if self.qb_payment_status == 'OVERDUE' and self.qb_due_date:
+			days = (timezone.localdate() - self.qb_due_date).days
+			if days == 1:
+				return _('Overdue 1 day')
+			if days > 1:
+				return _('Overdue %(days)s days') % {'days': days}
 		return dict(self.QB_PAYMENT_STATUS_CHOICES).get(self.qb_payment_status, self.qb_payment_status)
 
 	def get_qb_email_substatus_label(self):

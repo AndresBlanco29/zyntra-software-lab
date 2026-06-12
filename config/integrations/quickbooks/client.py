@@ -53,6 +53,12 @@ class QuickBooksAPIClient:
                 detail = response.json()
             except ValueError:
                 detail = response.text
+            if isinstance(detail, str):
+                lowered = detail.lower()
+                if lowered.startswith('<!doctype') or '<html' in lowered:
+                    detail = f'HTTP {response.status_code} Bad Request'
+                elif len(detail) > 500:
+                    detail = detail[:500] + '...'
             raise QuickBooksAPIError(f'QuickBooks API request failed: {detail}')
         return response.json()
 

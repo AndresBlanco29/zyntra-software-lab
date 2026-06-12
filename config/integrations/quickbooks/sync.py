@@ -3070,27 +3070,54 @@ def fetch_quickbooks_invoices(*, max_results=25, client=None, updated_after=None
     return client.find_all('Invoice', max_results=max_results, order_by='MetaData.LastUpdatedTime', page_size=page_size)
 
 
-def _fetch_quickbooks_invoices_by_ids(*, client, invoice_ids, chunk_size=1000):
+def _quickbooks_invoice_fetch_chunk_size():
+    configured = getattr(settings, 'QUICKBOOKS_INVOICE_STATUS_FETCH_CHUNK_SIZE', 50)
+    return min(max(int(configured or 50), 1), 100)
+
+
+def _fetch_quickbooks_invoice_id_chunk(*, client, invoice_ids):
+    chunk = [str(invoice_id).strip() for invoice_id in invoice_ids if str(invoice_id or '').strip()]
+    if not chunk:
+        return []
+    if len(chunk) == 1:
+        record = client.find_by_id('Invoice', chunk[0])
+        return [record] if record else []
+
+    in_list = ', '.join(f"'{client._escape_query_value(invoice_id)}'" for invoice_id in chunk)
+    response = client.query(
+        client._build_select_statement(
+            'Invoice',
+            where_clause=f'Id IN ({in_list})',
+            max_results=len(chunk),
+        )
+    )
+    batch = response.get('Invoice', [])
+    if isinstance(batch, dict):
+        return [batch]
+    return batch or []
+
+
+def _fetch_quickbooks_invoices_by_ids(*, client, invoice_ids, chunk_size=None):
     found = {}
     ids = [str(invoice_id).strip() for invoice_id in invoice_ids if str(invoice_id or '').strip()]
     if not ids:
         return found
 
-    chunk_size = max(min(int(chunk_size or 100), _quickbooks_catalog_page_size()), 1)
+    chunk_size = chunk_size or _quickbooks_invoice_fetch_chunk_size()
+    chunk_size = min(max(int(chunk_size), 1), 100)
     for offset in range(0, len(ids), chunk_size):
         chunk = ids[offset:offset + chunk_size]
-        in_list = ', '.join(f"'{client._escape_query_value(invoice_id)}'" for invoice_id in chunk)
-        response = client.query(
-            client._build_select_statement(
-                'Invoice',
-                where_clause=f'Id IN ({in_list})',
-                max_results=min(len(chunk), _quickbooks_catalog_page_size()),
-            )
-        )
-        batch = response.get('Invoice', [])
-        if isinstance(batch, dict):
-            batch = [batch]
-        for record in batch or []:
+        try:
+            batch = _fetch_quickbooks_invoice_id_chunk(client=client, invoice_ids=chunk)
+        except QuickBooksAPIError as exc:
+            error_text = str(exc).lower()
+            if len(chunk) <= 1 or ('400' not in error_text and 'bad request' not in error_text):
+                raise
+            midpoint = len(chunk) // 2
+            found.update(_fetch_quickbooks_invoices_by_ids(client=client, invoice_ids=chunk[:midpoint], chunk_size=midpoint))
+            found.update(_fetch_quickbooks_invoices_by_ids(client=client, invoice_ids=chunk[midpoint:], chunk_size=len(chunk) - midpoint))
+            continue
+        for record in batch:
             invoice_id = str(record.get('Id') or '').strip()
             if invoice_id:
                 found[invoice_id] = record

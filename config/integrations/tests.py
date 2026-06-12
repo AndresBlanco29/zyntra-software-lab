@@ -369,6 +369,61 @@ class QuickBooksInvoiceStatusImportTests(TestCase):
         self.assertEqual(invoice.qb_email_status, 'NEED_TO_SEND')
         self.assertEqual(invoice.get_qb_payment_status_display_label(), 'Overdue 9 days')
 
+    @patch('config.integrations.quickbooks.sync._fetch_quickbooks_invoices_by_ids')
+    def test_refresh_linked_invoice_status_skips_settled_invoices_by_default(self, mock_fetch_invoices):
+        user = Usuario.objects.create_user(username='qb-refresh-client-2', password='secret123', role='cliente')
+        cliente = Cliente.objects.create(
+            usuario=user,
+            nombre_empresa='Refresh Customer 2 LLC',
+            telefono='5550000003',
+            direccion='789 Main',
+            ciudad='Dallas',
+            estado='TX',
+            codigo_postal='75001',
+            pais='USA',
+            sales_tax_number='TX-3',
+            certificado_tax='certificados/test.pdf',
+        )
+        import_quickbooks_invoice_record({
+            'Id': 'QB-INV-REFRESH-OPEN',
+            'DocNumber': 'LU100903',
+            'CustomerRef': {'value': 'C-3', 'name': cliente.nombre_empresa},
+            'TotalAmt': '100.00',
+            'Balance': '100.00',
+            'DueDate': (timezone.localdate() - timedelta(days=2)).isoformat(),
+            'EmailStatus': 'NeedToSend',
+        })
+        import_quickbooks_invoice_record({
+            'Id': 'QB-INV-REFRESH-PAID',
+            'DocNumber': 'LU100904',
+            'CustomerRef': {'value': 'C-3', 'name': cliente.nombre_empresa},
+            'TotalAmt': '200.00',
+            'Balance': '0.00',
+            'DueDate': (timezone.localdate() - timedelta(days=30)).isoformat(),
+            'EmailStatus': 'EmailSent',
+        })
+        paid_invoice = Invoice.objects.get(quickbooks_id='QB-INV-REFRESH-PAID')
+        Invoice.objects.filter(pk=paid_invoice.pk).update(qb_payment_status='PAID', qb_email_status='EMAIL_SENT')
+
+        mock_fetch_invoices.return_value = {
+            'QB-INV-REFRESH-OPEN': {
+                'Id': 'QB-INV-REFRESH-OPEN',
+                'DocNumber': 'LU100903',
+                'CustomerRef': {'value': 'C-3', 'name': cliente.nombre_empresa},
+                'TotalAmt': '100.00',
+                'Balance': '100.00',
+                'DueDate': (timezone.localdate() - timedelta(days=2)).isoformat(),
+                'EmailStatus': 'NeedToSend',
+            },
+        }
+
+        result = refresh_linked_quickbooks_invoice_status()
+
+        mock_fetch_invoices.assert_called_once()
+        fetched_ids = mock_fetch_invoices.call_args.kwargs['invoice_ids']
+        self.assertEqual(fetched_ids, ['QB-INV-REFRESH-OPEN'])
+        self.assertEqual(result['linked_count'], 1)
+
 
 @override_settings(
     QUICKBOOKS_CLIENT_ID='client-id',

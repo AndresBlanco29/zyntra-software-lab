@@ -382,9 +382,10 @@ def _build_dashboard_feedback(*, operation, ok, result=None, error=None):
     if operation == 'refresh_linked_invoice_status_to_local':
         feedback['title'] = _('QuickBooks invoice status refresh')
         feedback['details'].append(
-            _('Linked invoices: %(linked)s. Updated: %(updated)s. Skipped: %(skipped)s. Missing in QuickBooks: %(missing)s.') % {
+            _('Linked invoices: %(linked)s. Processed: %(updated)s. Changed: %(changed)s. Skipped: %(skipped)s. Missing in QuickBooks: %(missing)s.') % {
                 'linked': result.get('linked_count', result.get('count', 0)),
                 'updated': result.get('updated_count', 0),
+                'changed': result.get('changed_count', result.get('updated_count', 0)),
                 'skipped': result.get('skipped_count', 0),
                 'missing': result.get('missing_count', 0),
             }
@@ -933,8 +934,9 @@ def quickbooks_refresh_linked_items_to_local(request):
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def quickbooks_refresh_linked_invoice_status_to_local(request):
+    force_all = str(request.POST.get('force_all') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
     try:
-        result = refresh_linked_quickbooks_invoice_status()
+        result = refresh_linked_quickbooks_invoice_status(force_all=force_all)
     except (ValueError, QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
         logger.warning('QuickBooks linked invoice status refresh failed: %s', exc)
         return _response_or_redirect(request, operation='refresh_linked_invoice_status_to_local', error=str(exc), status_code=502)

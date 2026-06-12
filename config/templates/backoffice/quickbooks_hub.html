@@ -868,7 +868,7 @@
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
                 <button type="submit" class="btn btn-outline-primary w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Refresh invoice payment status" %}</button>
               </form>
-              <p class="qb-action-note">{% trans "Updates overdue, due, paid, and not-sent status for invoices already linked to QuickBooks. Run this once after enabling payment status filters, or whenever invoice statuses look out of date." %}</p>
+              <p class="qb-action-note">{% trans "Updates overdue, due, paid, and not-sent status for linked QuickBooks invoices. Open and overdue invoices are refreshed first; settled paid invoices are skipped to keep the run fast." %}</p>
             </div>
           </div>
         </div>

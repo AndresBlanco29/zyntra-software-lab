@@ -191,14 +191,14 @@ def _fetch_quickbooks_invoice_deposited_status(payload, *, client=None):
     return False
 
 
-def _derive_quickbooks_invoice_status(payload, *, client=None):
+def _derive_quickbooks_invoice_status(payload, *, client=None, skip_deposited_lookup=False):
     balance = _as_float(payload.get('Balance') or 0)
     total = _as_float(payload.get('TotalAmt') or balance)
     due_date = _parse_quickbooks_date(payload.get('DueDate'))
     email_status = _normalize_quickbooks_email_status(payload.get('EmailStatus'))
 
     if total > 0 and balance <= 0:
-        if _fetch_quickbooks_invoice_deposited_status(payload, client=client):
+        if not skip_deposited_lookup and _fetch_quickbooks_invoice_deposited_status(payload, client=client):
             payment_status = 'DEPOSITED'
         else:
             payment_status = 'PAID'
@@ -3070,7 +3070,7 @@ def fetch_quickbooks_invoices(*, max_results=25, client=None, updated_after=None
     return client.find_all('Invoice', max_results=max_results, order_by='MetaData.LastUpdatedTime', page_size=page_size)
 
 
-def _fetch_quickbooks_invoices_by_ids(*, client, invoice_ids, chunk_size=100):
+def _fetch_quickbooks_invoices_by_ids(*, client, invoice_ids, chunk_size=1000):
     found = {}
     ids = [str(invoice_id).strip() for invoice_id in invoice_ids if str(invoice_id or '').strip()]
     if not ids:
@@ -3097,12 +3097,51 @@ def _fetch_quickbooks_invoices_by_ids(*, client, invoice_ids, chunk_size=100):
     return found
 
 
-def refresh_linked_quickbooks_invoice_status(*, limit=None, max_results=None, client=None, task_cache_key=None):
+_QB_STATUS_REFRESH_PAYMENT_STATUSES = frozenset({'', 'OPEN', 'DUE', 'DUE_TODAY', 'OVERDUE'})
+_QB_STATUS_REFRESH_EMAIL_STATUSES = frozenset({'', 'NOT_SET', 'NEED_TO_SEND'})
+_QB_STATUS_REFRESH_BULK_UPDATE_SIZE = 500
+
+
+def _invoice_queryset_for_qb_status_refresh(*, force_all=False):
+    queryset = (
+        Invoice.objects.filter(quickbooks_id__isnull=False)
+        .exclude(quickbooks_id='')
+        .only('id', 'numero', 'quickbooks_id', 'qb_payment_status', 'qb_due_date', 'qb_email_status')
+        .order_by('id')
+    )
+    if force_all:
+        return queryset
+    return queryset.filter(
+        Q(qb_payment_status__in=_QB_STATUS_REFRESH_PAYMENT_STATUSES)
+        | Q(qb_email_status__in=_QB_STATUS_REFRESH_EMAIL_STATUSES)
+    )
+
+
+def _flush_qb_status_refresh_updates(invoices):
+    if not invoices:
+        return 0
+    Invoice.objects.bulk_update(
+        invoices,
+        ['qb_payment_status', 'qb_due_date', 'qb_email_status'],
+        batch_size=_QB_STATUS_REFRESH_BULK_UPDATE_SIZE,
+    )
+    return len(invoices)
+
+
+def refresh_linked_quickbooks_invoice_status(*, limit=None, max_results=None, client=None, task_cache_key=None, force_all=False):
     """Re-fetch QuickBooks payment status for invoices already linked locally."""
+    if limit is None:
+        limit = max_results
     client = client or QuickBooksAPIClient()
+    queryset = _invoice_queryset_for_qb_status_refresh(force_all=force_all)
+    if limit is not None:
+        queryset = queryset[:max(int(limit), 0)]
+
+    local_invoices = list(queryset)
     local_by_qb_id = {
         str(invoice.quickbooks_id).strip(): invoice
-        for invoice in Invoice.objects.filter(quickbooks_id__isnull=False).exclude(quickbooks_id='')
+        for invoice in local_invoices
+        if str(invoice.quickbooks_id or '').strip()
     }
     if not local_by_qb_id:
         return {
@@ -3112,12 +3151,18 @@ def refresh_linked_quickbooks_invoice_status(*, limit=None, max_results=None, cl
             'skipped_count': 0,
             'missing_count': 0,
             'linked_count': 0,
-            'incremental': True,
+            'incremental': not force_all,
         }
 
     qb_ids = sorted(local_by_qb_id.keys())
     invoices_map = _fetch_quickbooks_invoices_by_ids(client=client, invoice_ids=qb_ids)
     results = []
+    pending_updates = []
+    processed_count = 0
+    changed_count = 0
+    skipped_count = 0
+    missing_count = 0
+
     if task_cache_key:
         cache.set(task_cache_key, {'status': 'running', 'progress': 0, 'operation': 'LinkedInvoiceStatus'}, timeout=60 * 60)
 
@@ -3126,6 +3171,7 @@ def refresh_linked_quickbooks_invoice_status(*, limit=None, max_results=None, cl
         invoice = local_by_qb_id[qb_id]
         payload = invoices_map.get(qb_id)
         if not payload:
+            missing_count += 1
             results.append({
                 'ok': False,
                 'action': 'missing',
@@ -3136,6 +3182,7 @@ def refresh_linked_quickbooks_invoice_status(*, limit=None, max_results=None, cl
             })
             continue
         if not _quickbooks_accounting_document_is_importable(payload):
+            skipped_count += 1
             results.append(_skip_import_result(
                 entity='Invoice',
                 quickbooks_id=qb_id,
@@ -3143,7 +3190,25 @@ def refresh_linked_quickbooks_invoice_status(*, limit=None, max_results=None, cl
                 reason='QuickBooks invoice references an inactive or deleted customer.',
             ))
             continue
-        _apply_quickbooks_invoice_to_local_record(invoice, payload, client=client)
+
+        payment_status, due_date, email_status = _derive_quickbooks_invoice_status(
+            payload,
+            client=client,
+            skip_deposited_lookup=True,
+        )
+        changed = (
+            invoice.qb_payment_status != payment_status
+            or invoice.qb_due_date != due_date
+            or invoice.qb_email_status != email_status
+        )
+        if changed:
+            invoice.qb_payment_status = payment_status
+            invoice.qb_due_date = due_date
+            invoice.qb_email_status = email_status
+            pending_updates.append(invoice)
+            changed_count += 1
+
+        processed_count += 1
         results.append({
             'ok': True,
             'action': 'matched',
@@ -3152,7 +3217,12 @@ def refresh_linked_quickbooks_invoice_status(*, limit=None, max_results=None, cl
             'local_id': invoice.id,
             'label': invoice.numero or qb_id,
         })
-        if task_cache_key and (index == total or index % 25 == 0):
+
+        if len(pending_updates) >= _QB_STATUS_REFRESH_BULK_UPDATE_SIZE:
+            _flush_qb_status_refresh_updates(pending_updates)
+            pending_updates = []
+
+        if task_cache_key and (index == total or index % 100 == 0):
             pct = int((index / total) * 90) + 5
             cache.set(
                 task_cache_key,
@@ -3160,14 +3230,17 @@ def refresh_linked_quickbooks_invoice_status(*, limit=None, max_results=None, cl
                 timeout=60 * 60,
             )
 
+    _flush_qb_status_refresh_updates(pending_updates)
+
     summary = {
         'entity': 'LinkedInvoiceStatus',
         'count': len(results),
-        'updated_count': sum(1 for item in results if item.get('ok') and item.get('action') == 'matched'),
-        'skipped_count': sum(1 for item in results if item.get('action') == 'skipped'),
-        'missing_count': sum(1 for item in results if item.get('action') == 'missing'),
+        'updated_count': processed_count,
+        'changed_count': changed_count,
+        'skipped_count': skipped_count,
+        'missing_count': missing_count,
         'linked_count': len(qb_ids),
-        'incremental': True,
+        'incremental': not force_all,
         'results': results,
     }
     if task_cache_key:

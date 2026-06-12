@@ -3097,7 +3097,7 @@ def _fetch_quickbooks_invoices_by_ids(*, client, invoice_ids, chunk_size=100):
     return found
 
 
-def refresh_linked_quickbooks_invoice_status(*, client=None, task_cache_key=None):
+def refresh_linked_quickbooks_invoice_status(*, limit=None, max_results=None, client=None, task_cache_key=None):
     """Re-fetch QuickBooks payment status for invoices already linked locally."""
     client = client or QuickBooksAPIClient()
     local_by_qb_id = {

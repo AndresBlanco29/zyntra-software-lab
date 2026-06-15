@@ -1744,12 +1744,30 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_sync_customers_batch_endpoint_reports_success_and_failure(self, mock_request):
         self._activate_connection()
+        second_user = Usuario.objects.create_user(username='qb-batch-client-2', password='secret123', role='cliente')
+        second_cliente = Cliente.objects.create(
+            usuario=second_user,
+            nombre_empresa='Batch Customer 2',
+            telefono='5550000099',
+            direccion='456 Main',
+            ciudad='Dallas',
+            estado='TX',
+            codigo_postal='75001',
+            pais='USA',
+            sales_tax_number='TX-99',
+            certificado_tax='certificados/test.pdf',
+        )
         mock_request.side_effect = [
             self._json_response({'QueryResponse': {}}),
             self._json_response({'Customer': {'Id': '701', 'DisplayName': 'LTG Customer 1 - Cliente QuickBooks'}}),
+            self._json_response({'QueryResponse': {}}),
+            self._json_response({'Fault': {'Error': [{'Message': 'QuickBooks rejected customer'}]}}, ok=False, status_code=400),
         ]
 
-        response = self.client.post(reverse('quickbooks_sync_customers_batch'), {'ids': f'{self.cliente.pk},999999'})
+        response = self.client.post(
+            reverse('quickbooks_sync_customers_batch'),
+            {'ids': [str(self.cliente.pk), str(second_cliente.pk)]},
+        )
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()['result']
@@ -1757,6 +1775,15 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         self.assertEqual(payload['failed_count'], 1)
         self.assertTrue(any(item['ok'] for item in payload['results']))
         self.assertTrue(any(not item['ok'] for item in payload['results']))
+
+    def test_sync_customers_batch_rejects_non_pending_selection(self):
+        self._activate_connection()
+        response = self.client.post(
+            reverse('quickbooks_sync_customers_batch'),
+            {'ids': [str(self.cliente.pk), '999999']},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('not pending', response.json()['error'].lower())
 
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_batch_sync_redirects_back_to_dashboard_with_message(self, mock_request):

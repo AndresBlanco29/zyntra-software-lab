@@ -311,6 +311,12 @@ def _batch_sync_result(*, record_ids, sync_callable):
     for record_id in record_ids:
         try:
             result = sync_callable(record_id)
+        except QuickBooksSyncError as exc:
+            results.append({
+                'id': int(record_id),
+                'ok': False,
+                'error': str(exc),
+            })
         except Exception as exc:
             results.append({
                 'id': int(record_id),

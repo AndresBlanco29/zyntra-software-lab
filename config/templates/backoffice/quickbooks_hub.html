@@ -985,7 +985,7 @@
     {% endif %}
   </section>
 
-  <section class="qb-section-card p-4 p-xl-5 mb-4{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
+  <section class="qb-section-card p-4 p-xl-5 mb-4">
     <div class="row g-4 align-items-start">
       <div class="col-xl-4">
         <h3 class="mb-2">{% trans "Send local records to QuickBooks" %}</h3>
@@ -997,128 +997,94 @@
           <span class="qb-chip">{{ quickbooks_pending_note_count }} {% trans "notes" %}</span>
         </div>
         <div class="qb-strip">
-          <div class="fw-semibold mb-1">{% trans "Use the advanced boxes only if you know the exact IDs" %}</div>
-          <div class="small text-muted">{% trans "If you are not sure, use the guided selectors. The ID boxes are meant for support or advanced cleanup tasks." %}</div>
+          <div class="fw-semibold mb-1">{% trans "How to send records" %}</div>
+          <div class="small text-muted">{% trans "Pick one or more rows in the list, then click Send selected. To send everything pending, use Send all pending. Hold Ctrl or Shift to select multiple rows." %}</div>
         </div>
       </div>
       <div class="col-xl-8">
-        <div class="row g-3 mb-3">
-          <div class="col-md-6">
-            <div class="qb-action-item h-100">
-              <label class="form-label fw-semibold">{% trans "Send one customer" %}</label>
-              <form method="post" action="{% url 'quickbooks_sync_customers_batch' %}" class="d-grid gap-2">
-                {% csrf_token %}
-                <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                <select name="ids" class="form-select">
-                  {% for cliente in quickbooks_pending_customers %}
-                  <option value="{{ cliente.id }}">#{{ cliente.id }} · {{ cliente.nombre_empresa }}</option>
-                  {% empty %}
-                  <option value="">{% trans "No pending customers" %}</option>
-                  {% endfor %}
-                </select>
-                <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_customers %}disabled{% endif %}>{% trans "Sync customer now" %}</button>
-              </form>
-              <p class="qb-action-note">{% trans "Recommended when you want to send one customer without touching anything else." %}</p>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <div class="qb-action-item h-100">
-              <label class="form-label fw-semibold">{% trans "Send one catalog item" %}</label>
-              <form method="post" action="{% url 'quickbooks_sync_products_batch' %}" class="d-grid gap-2">
-                {% csrf_token %}
-                <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                <select name="ids" class="form-select">
-                  {% for presentacion in quickbooks_pending_presentations %}
-                  <option value="{{ presentacion.id }}">#{{ presentacion.id }} · {{ presentacion.producto.nombre }} / {{ presentacion.nombre }}</option>
-                  {% empty %}
-                  <option value="">{% trans "No pending items" %}</option>
-                  {% endfor %}
-                </select>
-                <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_presentations %}disabled{% endif %}>{% trans "Sync item now" %}</button>
-              </form>
-              <p class="qb-action-note">{% trans "Use this when the product must exist in QuickBooks before sending invoices." %}</p>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <div class="qb-action-item h-100">
-              <label class="form-label fw-semibold">{% trans "Send one invoice" %}</label>
-              <form method="post" action="{% url 'quickbooks_sync_invoices_batch' %}" class="d-grid gap-2">
-                {% csrf_token %}
-                <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                <select name="ids" class="form-select">
-                  {% for invoice in quickbooks_pending_invoices %}
-                  <option value="{{ invoice.id }}">#{{ invoice.id }} · {{ invoice.numero }} · {{ invoice.cliente.nombre_empresa }}</option>
-                  {% empty %}
-                  <option value="">{% trans "No pending invoices" %}</option>
-                  {% endfor %}
-                </select>
-                <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_invoices %}disabled{% endif %}>{% trans "Sync invoice now" %}</button>
-              </form>
-              <p class="qb-action-note">{% trans "Use this when the sale is ready and should be posted to QuickBooks." %}</p>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <div class="qb-action-item h-100">
-              <label class="form-label fw-semibold">{% trans "Send one adjustment note" %}</label>
-              <form method="post" action="{% url 'quickbooks_sync_adjustment_notes_batch' %}" class="d-grid gap-2">
-                {% csrf_token %}
-                <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                <select name="ids" class="form-select">
-                  {% for nota in quickbooks_pending_notes %}
-                  <option value="{{ nota.id }}">#{{ nota.id }} · {{ nota.numero }} · {{ nota.cliente.nombre_empresa }}</option>
-                  {% empty %}
-                  <option value="">{% trans "No pending approved notes" %}</option>
-                  {% endfor %}
-                </select>
-                <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_notes %}disabled{% endif %}>{% trans "Sync note now" %}</button>
-              </form>
-              <p class="qb-action-note">{% trans "Use this for approved credit or debit notes that still need to be sent." %}</p>
-            </div>
-          </div>
-        </div>
         <div class="row g-3">
           <div class="col-md-6">
             <div class="qb-action-item h-100">
-              <label class="form-label fw-semibold">{% trans "Advanced batch: customer IDs" %}</label>
+              <label class="form-label fw-semibold">{% trans "Customers" %}</label>
               <form method="post" action="{% url 'quickbooks_sync_customers_batch' %}" class="d-grid gap-2">
                 {% csrf_token %}
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                <textarea name="ids" rows="2" class="form-control" placeholder="51, 52, 53"></textarea>
-                <button type="submit" class="btn btn-outline-secondary">{% trans "Run customer batch" %}</button>
+                <select name="ids" class="form-select" multiple size="6" {% if not quickbooks_pending_customers %}disabled{% endif %}>
+                  {% for cliente in quickbooks_pending_customers %}
+                  <option value="{{ cliente.id }}">#{{ cliente.id }} · {{ cliente.nombre_empresa }}</option>
+                  {% empty %}
+                  <option value="" disabled>{% trans "No pending customers" %}</option>
+                  {% endfor %}
+                </select>
+                <div class="d-flex gap-2 flex-wrap">
+                  <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_customers %}disabled{% endif %}>{% trans "Send selected" %}</button>
+                  <button type="submit" name="send_all" value="1" class="btn btn-primary" {% if not quickbooks_pending_customer_count %}disabled{% endif %}>{% trans "Send all pending" %} ({{ quickbooks_pending_customer_count }})</button>
+                </div>
               </form>
+              <p class="qb-action-note">{% trans "Creates or links the customer in QuickBooks before invoices can be sent." %}</p>
             </div>
           </div>
           <div class="col-md-6">
             <div class="qb-action-item h-100">
-              <label class="form-label fw-semibold">{% trans "Advanced batch: presentation IDs" %}</label>
+              <label class="form-label fw-semibold">{% trans "Catalog items" %}</label>
               <form method="post" action="{% url 'quickbooks_sync_products_batch' %}" class="d-grid gap-2">
                 {% csrf_token %}
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                <textarea name="ids" rows="2" class="form-control" placeholder="1, 2, 3"></textarea>
-                <button type="submit" class="btn btn-outline-secondary">{% trans "Run item batch" %}</button>
+                <select name="ids" class="form-select" multiple size="6" {% if not quickbooks_pending_presentations %}disabled{% endif %}>
+                  {% for presentacion in quickbooks_pending_presentations %}
+                  <option value="{{ presentacion.id }}">#{{ presentacion.id }} · {{ presentacion.producto.nombre }} / {{ presentacion.nombre }}</option>
+                  {% empty %}
+                  <option value="" disabled>{% trans "No pending items" %}</option>
+                  {% endfor %}
+                </select>
+                <div class="d-flex gap-2 flex-wrap">
+                  <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_presentations %}disabled{% endif %}>{% trans "Send selected" %}</button>
+                  <button type="submit" name="send_all" value="1" class="btn btn-primary" {% if not quickbooks_pending_presentation_count %}disabled{% endif %}>{% trans "Send all pending" %} ({{ quickbooks_pending_presentation_count }})</button>
+                </div>
               </form>
+              <p class="qb-action-note">{% trans "Products must exist in QuickBooks before invoice lines can be posted." %}</p>
             </div>
           </div>
           <div class="col-md-6">
             <div class="qb-action-item h-100">
-              <label class="form-label fw-semibold">{% trans "Advanced batch: invoice IDs" %}</label>
+              <label class="form-label fw-semibold">{% trans "Invoices" %}</label>
               <form method="post" action="{% url 'quickbooks_sync_invoices_batch' %}" class="d-grid gap-2">
                 {% csrf_token %}
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                <textarea name="ids" rows="2" class="form-control" placeholder="19, 20, 21"></textarea>
-                <button type="submit" class="btn btn-outline-secondary">{% trans "Run invoice batch" %}</button>
+                <select name="ids" class="form-select" multiple size="6" {% if not quickbooks_pending_invoices %}disabled{% endif %}>
+                  {% for invoice in quickbooks_pending_invoices %}
+                  <option value="{{ invoice.id }}">#{{ invoice.id }} · {{ invoice.numero }} · {{ invoice.cliente.nombre_empresa }}</option>
+                  {% empty %}
+                  <option value="" disabled>{% trans "No pending invoices" %}</option>
+                  {% endfor %}
+                </select>
+                <div class="d-flex gap-2 flex-wrap">
+                  <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_invoices %}disabled{% endif %}>{% trans "Send selected" %}</button>
+                  <button type="submit" name="send_all" value="1" class="btn btn-primary" {% if not quickbooks_pending_invoice_count %}disabled{% endif %}>{% trans "Send all pending" %} ({{ quickbooks_pending_invoice_count }})</button>
+                </div>
               </form>
+              <p class="qb-action-note">{% trans "QuickBooks will also create or link the customer and catalog items used by the invoice." %}</p>
             </div>
           </div>
           <div class="col-md-6">
             <div class="qb-action-item h-100">
-              <label class="form-label fw-semibold">{% trans "Advanced batch: note IDs" %}</label>
+              <label class="form-label fw-semibold">{% trans "Adjustment notes" %}</label>
               <form method="post" action="{% url 'quickbooks_sync_adjustment_notes_batch' %}" class="d-grid gap-2">
                 {% csrf_token %}
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                <textarea name="ids" rows="2" class="form-control" placeholder="21, 22"></textarea>
-                <button type="submit" class="btn btn-outline-secondary">{% trans "Run note batch" %}</button>
+                <select name="ids" class="form-select" multiple size="6" {% if not quickbooks_pending_notes %}disabled{% endif %}>
+                  {% for nota in quickbooks_pending_notes %}
+                  <option value="{{ nota.id }}">#{{ nota.id }} · {{ nota.numero }} · {{ nota.cliente.nombre_empresa }}</option>
+                  {% empty %}
+                  <option value="" disabled>{% trans "No pending approved notes" %}</option>
+                  {% endfor %}
+                </select>
+                <div class="d-flex gap-2 flex-wrap">
+                  <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_notes %}disabled{% endif %}>{% trans "Send selected" %}</button>
+                  <button type="submit" name="send_all" value="1" class="btn btn-primary" {% if not quickbooks_pending_note_count %}disabled{% endif %}>{% trans "Send all pending" %} ({{ quickbooks_pending_note_count }})</button>
+                </div>
               </form>
+              <p class="qb-action-note">{% trans "Only approved credit or debit notes can be sent to QuickBooks." %}</p>
             </div>
           </div>
         </div>

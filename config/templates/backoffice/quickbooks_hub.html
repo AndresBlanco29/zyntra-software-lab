@@ -513,7 +513,7 @@
   {% if quickbooks_catalog_only_mode %}
   <div class="alert alert-info border-0 shadow-sm mb-4" role="status">
     <strong>{% trans "Catalog-only mode" %}</strong> —
-    {% trans "Customer, catalog, and accounting document import are enabled. Full pull sync and outbound sync to QuickBooks stay disabled until you turn off QUICKBOOKS_CATALOG_ONLY_MODE." %}
+    {% trans "Customer, catalog, accounting import, pull sync, review queue, and outbound send are enabled. Vendor and bill sync stay disabled until you turn off QUICKBOOKS_CATALOG_ONLY_MODE." %}
   </div>
   {% endif %}
   {% with total_pending=quickbooks_pending_customer_count|add:quickbooks_pending_presentation_count|add:quickbooks_pending_invoice_count|add:quickbooks_pending_note_count %}
@@ -874,7 +874,7 @@
         </div>
       </div>
 
-      <div class="col-12 col-xl-6{% if quickbooks_catalog_only_mode %} qb-section-locked{% endif %}">
+      <div class="col-12 col-xl-6">
         <div class="qb-step-card p-4">
           <div class="qb-step-head">
             <span class="qb-step-number">4</span>
@@ -1372,10 +1372,15 @@
         ev.preventDefault();
         const op = form.getAttribute('data-qb-operation');
         const limit = (form.querySelector('input[name=limit]')||{}).value || '';
+        const mode = (form.querySelector('input[name=mode]')||{}).value || '';
         const csrftoken = getCookie('csrftoken');
         showOverlay();
         setProgress(6);
         message.textContent = 'Iniciando tarea...';
+        const payload = new URLSearchParams({operation: op, limit: limit});
+        if (mode) {
+          payload.set('mode', mode);
+        }
         fetch('/quickbooks/task/start', {
           method: 'POST',
           credentials: 'same-origin',
@@ -1383,7 +1388,7 @@
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
             'X-CSRFToken': csrftoken
           },
-          body: new URLSearchParams({operation: op, limit: limit})
+          body: payload
         }).then(function(r){ return r.json(); }).then(function(json){
           if (json && json.task_id){
             startPolling(json.task_id);

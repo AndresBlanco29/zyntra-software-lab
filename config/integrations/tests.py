@@ -1510,6 +1510,21 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         self.assertIn('QuickBooks catalog sync complete.', stdout.getvalue())
         self.assertIn('Mode: full', stdout.getvalue())
 
+    @override_settings(QUICKBOOKS_CATALOG_ONLY_MODE=True)
+    @patch('config.integrations.quickbooks.client.requests.request')
+    def test_catalog_only_mode_allows_pull_sync(self, mock_request):
+        self._activate_connection()
+        mock_request.side_effect = [
+            self._json_response({'QueryResponse': {'Customer': []}}),
+            self._json_response({'QueryResponse': {'Item': []}}),
+            self._json_response({'QueryResponse': {'Invoice': []}}),
+            self._json_response({'QueryResponse': {'CreditMemo': []}}),
+        ]
+
+        response = self.client.post(reverse('quickbooks_pull_sync_to_local'), {'limit': '10'})
+
+        self.assertEqual(response.status_code, 200)
+
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_pull_sync_uses_saved_cursors_for_incremental_queries(self, mock_request):
         connection = self._activate_connection()

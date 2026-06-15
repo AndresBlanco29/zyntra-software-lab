@@ -74,7 +74,7 @@ logger = logging.getLogger(__name__)
 
 CATALOG_ONLY_BLOCKED_MESSAGE = _(
     'This QuickBooks action is disabled while catalog-only mode is active. '
-    'Catalog, customer, and accounting document import are enabled; full pull sync and outbound sync stay disabled.'
+    'Pull sync, review queue, catalog import, accounting import, and outbound send are enabled.'
 )
 
 CATALOG_ONLY_ALLOWED_VIEW_NAMES = frozenset({
@@ -83,12 +83,19 @@ CATALOG_ONLY_ALLOWED_VIEW_NAMES = frozenset({
     'quickbooks_refresh_linked_items_to_local',
     'quickbooks_refresh_linked_invoice_status_to_local',
     'quickbooks_pull_items_sync_to_local',
+    'quickbooks_pull_sync_to_local',
+    'quickbooks_start_task',
+    'quickbooks_task_status',
     'quickbooks_import_customers',
     'quickbooks_import_customers_to_local',
     'quickbooks_import_invoices',
     'quickbooks_import_credit_memos',
     'quickbooks_import_accounting_documents_to_local',
     'quickbooks_import_conflict_link',
+    'quickbooks_import_conflicts',
+    'quickbooks_import_conflict_retry',
+    'quickbooks_import_conflict_dismiss',
+    'quickbooks_import_conflicts_bulk_dismiss',
     'quickbooks_sync_customer',
     'quickbooks_sync_product',
     'quickbooks_sync_invoice',
@@ -108,9 +115,11 @@ CATALOG_ONLY_ALLOWED_TASK_OPERATIONS = frozenset({
     'refresh_linked_invoice_status_to_local',
     'pull_items_sync_to_local',
     'import_accounting_documents_to_local',
+    'pull_sync_to_local',
 })
 
 CATALOG_ONLY_ALLOWED_CONFLICT_ENTITY_TYPES = frozenset({
+    QuickBooksImportConflict.ENTITY_CUSTOMER,
     QuickBooksImportConflict.ENTITY_ITEM,
     QuickBooksImportConflict.ENTITY_INVOICE,
     QuickBooksImportConflict.ENTITY_CREDIT_MEMO,
@@ -346,29 +355,29 @@ def _build_dashboard_feedback(*, operation, ok, result=None, error=None):
         return feedback
 
     if operation == 'pull_sync_to_local':
-        feedback['title'] = 'QuickBooks Pull Sync'
+        feedback['title'] = _('QuickBooks pull sync')
         customers = result.get('customers', {})
-        vendors = result.get('vendors', {})
         items = result.get('items', {})
         accounting = result.get('accounting_documents', {})
-        bills = result.get('bills', {})
         feedback['details'].append(
-            f"Customers -> created {customers.get('created_count', 0)}, updated {customers.get('updated_count', 0)}, conflicts {customers.get('conflict_count', 0)}."
+            _('Customers -> created %(created)s, updated %(updated)s, conflicts %(conflicts)s.') % {
+                'created': customers.get('created_count', 0),
+                'updated': customers.get('updated_count', 0),
+                'conflicts': customers.get('conflict_count', 0),
+            }
         )
         feedback['details'].append(
-            f"Suppliers -> created {vendors.get('created_count', 0)}, updated {vendors.get('updated_count', 0)}, conflicts {vendors.get('conflict_count', 0)}."
+            _('Catalog -> created %(created)s, updated %(updated)s, conflicts %(conflicts)s.') % {
+                'created': items.get('created_count', 0),
+                'updated': items.get('updated_count', 0),
+                'conflicts': items.get('conflict_count', 0),
+            }
         )
         feedback['details'].append(
-            f"Catalog -> created {items.get('created_count', 0)}, updated {items.get('updated_count', 0)}, conflicts {items.get('conflict_count', 0)}."
-        )
-        feedback['details'].append(
-            f"Accounting docs -> matched {accounting.get('matched_count', 0)}, conflicts queued {accounting.get('conflict_count', 0)}."
-        )
-        feedback['details'].append(
-            _('Bills -> created %(created)s, updated %(updated)s, conflicts %(conflicts)s.') % {
-                'created': bills.get('created_count', 0),
-                'updated': bills.get('updated_count', 0),
-                'conflicts': bills.get('conflict_count', 0),
+            _('Accounting docs -> created %(created)s, updated %(updated)s, conflicts queued %(conflicts)s.') % {
+                'created': accounting.get('created_count', 0),
+                'updated': accounting.get('updated_count', 0),
+                'conflicts': accounting.get('conflict_count', 0),
             }
         )
         feedback['details'].append(
@@ -596,6 +605,7 @@ def get_dashboard_sync_context(*, request=None):
         'quickbooks_pending_invoice_count': pending_invoices.count(),
         'quickbooks_pending_note_count': pending_notes.count(),
         'quickbooks_outbound_sync_enabled': True,
+        'quickbooks_alignment_sync_enabled': True,
         'quickbooks_import_conflicts_count': QuickBooksImportConflict.objects.filter(status=QuickBooksImportConflict.STATUS_CONFLICT).count(),
         'quickbooks_dashboard_feedback': feedback,
     }
@@ -1086,6 +1096,7 @@ def quickbooks_start_task(request):
         limit = _parse_quickbooks_import_limit(limit_raw, default=None)
     except Exception:
         limit = None
+    force_full = str(request.POST.get('mode') or '').strip().lower() == 'full'
 
     # map allowed operations to internal functions
     op_map = {
@@ -1103,7 +1114,11 @@ def quickbooks_start_task(request):
             task_cache_key=kwargs.get('task_cache_key'),
         ).get('items', {}),
         'import_accounting_documents_to_local': pull_quickbooks_accounting_documents_to_local,
-        'pull_sync_to_local': pull_quickbooks_to_local,
+        'pull_sync_to_local': lambda **kwargs: pull_quickbooks_to_local(
+            max_results=kwargs.get('max_results'),
+            force_full=kwargs.get('force_full', False),
+            task_cache_key=kwargs.get('task_cache_key'),
+        ),
     }
 
     func = op_map.get(operation)
@@ -1114,22 +1129,23 @@ def quickbooks_start_task(request):
     cache_key = f'quickbooks_task_{task_id}'
     cache.set(cache_key, {'status': 'running', 'progress': 0, 'operation': operation}, timeout=60 * 60)
 
-    def _runner(task_key, fn, limit_value):
+    def _runner(task_key, fn, limit_value, force_full_value):
         try:
             cache.set(task_key, {'status': 'running', 'progress': 5, 'operation': operation}, timeout=60 * 60)
-            # run the operation
-            # prefer passing the task cache key to the operation so it can report progress
             try:
-                result = fn(max_results=limit_value, task_cache_key=task_key)
+                result = fn(max_results=limit_value, force_full=force_full_value, task_cache_key=task_key)
             except TypeError:
-                # fallback for functions that don't accept task_cache_key
-                result = fn(max_results=limit_value) if 'max_results' in fn.__code__.co_varnames or True else fn()
-            # mark completed
+                try:
+                    result = fn(max_results=limit_value, force_full=force_full_value)
+                except TypeError:
+                    result = fn(max_results=limit_value, task_cache_key=task_key)
+                except TypeError:
+                    result = fn(max_results=limit_value)
             cache.set(task_key, {'status': 'completed', 'progress': 100, 'operation': operation, 'result': result}, timeout=60 * 60)
         except Exception as exc:
             cache.set(task_key, {'status': 'failed', 'progress': 100, 'operation': operation, 'error': str(exc)}, timeout=60 * 60)
 
-    thread = threading.Thread(target=_runner, args=(cache_key, func, limit), daemon=True)
+    thread = threading.Thread(target=_runner, args=(cache_key, func, limit, force_full), daemon=True)
     thread.start()
 
     return JsonResponse({'task_id': task_id})

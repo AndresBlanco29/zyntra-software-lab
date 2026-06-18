@@ -118,6 +118,10 @@ def _calculate_suggested_unit_price_from_profit(base_unit_price, profit_percenta
 	return (base_unit_decimal / divisor).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
+ALLOWED_PICKING_INVOICE_DELIVERY_METHODS = frozenset({'RUTA_DRIVER', 'CUSTOMER_PICK_UP'})
+ALLOWED_DIRECT_INVOICE_DELIVERY_METHODS = frozenset({'CUSTOMER_PICK_UP'})
+
+
 def _validate_invoice_generation(pedido, metodo_entrega, driver):
 	if pedido.estado != 'VERIFICADO_AJUSTADO':
 		raise ValidationError(_('The invoice can only be generated from a verified and adjusted picking order.'))
@@ -125,8 +129,12 @@ def _validate_invoice_generation(pedido, metodo_entrega, driver):
 		raise ValidationError(_('The order is blocked by an unresolved selector note.'))
 	if hasattr(pedido, 'invoice'):
 		raise ValidationError(_('This sales order already has an invoice.'))
+	if metodo_entrega not in ALLOWED_PICKING_INVOICE_DELIVERY_METHODS:
+		raise ValidationError(_('Only customer pickup or route delivery can be selected when generating an invoice.'))
 	if metodo_entrega == 'RUTA_DRIVER' and driver is None:
 		raise ValidationError(_('A driver is required for route deliveries.'))
+	if metodo_entrega == 'CUSTOMER_PICK_UP' and driver is not None:
+		raise ValidationError(_('Driver assignment is not allowed for customer pickup invoices.'))
 	if driver is not None and getattr(driver, 'role', '') != 'driver':
 		raise ValidationError(_('Only users with driver role can be assigned.'))
 
@@ -397,8 +405,8 @@ def generar_invoice_directa_backoffice(
 	applied_customer_credit=None,
 	selected_note_applications=None,
 ):
-	if metodo_entrega not in {'LTG', 'CUSTOMER_PICK_UP'}:
-		raise ValidationError(_('Direct backoffice invoices only support LTG or customer pickup delivery methods.'))
+	if metodo_entrega not in ALLOWED_DIRECT_INVOICE_DELIVERY_METHODS:
+		raise ValidationError(_('Direct backoffice invoices only support customer pickup at the warehouse.'))
 	if not items_payload:
 		raise ValidationError(_('Add at least one item before creating the direct invoice.'))
 

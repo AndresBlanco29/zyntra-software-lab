@@ -1241,16 +1241,16 @@ def backoffice_generate_invoice(request, pedido_id):
 	if request.method != 'POST':
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
-	metodo_entrega = request.POST.get('metodo_entrega') or ''
+	metodo_entrega = (request.POST.get('metodo_entrega') or '').strip()
 	driver = None
 	estimated_delivery_at = None
-	driver_id = request.POST.get('driver_id') or ''
-	if driver_id:
-		driver = get_object_or_404(Usuario, id=driver_id, role='driver', is_active=True)
+	if metodo_entrega == 'RUTA_DRIVER':
+		driver_id = request.POST.get('driver_id') or ''
+		if driver_id:
+			driver = get_object_or_404(Usuario, id=driver_id, role='driver', is_active=True)
+		estimated_delivery_at = _parse_estimated_delivery_at(request.POST.get('estimated_delivery_at'))
 
 	try:
-		if metodo_entrega == 'RUTA_DRIVER':
-			estimated_delivery_at = _parse_estimated_delivery_at(request.POST.get('estimated_delivery_at'))
 		suggested_unit_prices = _extract_invoice_suggested_unit_prices(pedido, request.POST)
 		line_discounts = _extract_invoice_line_discounts(pedido, request.POST)
 		pending_notes_summary = summarize_pending_customer_notes(cliente=pedido.cliente)

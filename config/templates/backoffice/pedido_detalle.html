@@ -104,23 +104,22 @@
             {% csrf_token %}
             <div class="col-md-4">
               <label class="form-label fw-semibold">{% trans "Delivery method" %}</label>
-              <select name="metodo_entrega" class="form-select" required>
+              <select name="metodo_entrega" id="invoiceDeliveryMethod" class="form-select" required>
                 <option value="">{% trans "Select a delivery method..." %}</option>
+                <option value="CUSTOMER_PICK_UP">{% trans "Customer pick up at warehouse" %}</option>
                 <option value="RUTA_DRIVER">{% trans "Route with driver" %}</option>
-                <option value="LTG">{% trans "LTG delivery" %}</option>
-                <option value="CUSTOMER_PICK_UP">{% trans "Customer Pick Up" %}</option>
               </select>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-4" id="invoiceDriverField" hidden>
               <label class="form-label fw-semibold">{% trans "Driver" %}</label>
-              <select name="driver_id" class="form-select">
-                <option value="">{% trans "No driver required" %}</option>
+              <select name="driver_id" id="invoiceDriverSelect" class="form-select">
+                <option value="">{% trans "Select a driver..." %}</option>
                 {% for driver in drivers %}
                   <option value="{{ driver.id }}">{% firstof driver.get_full_name driver.username %}</option>
                 {% endfor %}
               </select>
             </div>
-            <div class="col-md-2">
+            <div class="col-md-2" id="invoiceEstimatedDeliveryField" hidden>
               <label class="form-label fw-semibold">{% trans "Estimated delivery" %}</label>
               <input type="datetime-local" name="estimated_delivery_at" class="form-control">
               <div class="form-text">{% trans "Optional. Only used for driver routes." %}</div>
@@ -498,6 +497,39 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+  const invoiceDeliveryMethod = document.getElementById('invoiceDeliveryMethod');
+  const invoiceDriverField = document.getElementById('invoiceDriverField');
+  const invoiceEstimatedDeliveryField = document.getElementById('invoiceEstimatedDeliveryField');
+  const invoiceDriverSelect = document.getElementById('invoiceDriverSelect');
+
+  function syncInvoiceDeliveryFields() {
+    if (!invoiceDeliveryMethod) {
+      return;
+    }
+    const isRoute = invoiceDeliveryMethod.value === 'RUTA_DRIVER';
+    if (invoiceDriverField) {
+      invoiceDriverField.hidden = !isRoute;
+    }
+    if (invoiceEstimatedDeliveryField) {
+      invoiceEstimatedDeliveryField.hidden = !isRoute;
+    }
+    if (invoiceDriverSelect) {
+      invoiceDriverSelect.required = isRoute;
+      if (!isRoute) {
+        invoiceDriverSelect.value = '';
+      }
+    }
+    const estimatedInput = invoiceEstimatedDeliveryField?.querySelector('input[name="estimated_delivery_at"]');
+    if (estimatedInput && !isRoute) {
+      estimatedInput.value = '';
+    }
+  }
+
+  if (invoiceDeliveryMethod) {
+    invoiceDeliveryMethod.addEventListener('change', syncInvoiceDeliveryFields);
+    syncInvoiceDeliveryFields();
+  }
+
   const orderForm = document.getElementById('backofficeOrderForm');
   const marginInputs = Array.from(document.querySelectorAll('.suggested-margin-input'));
   const valueInputs = Array.from(document.querySelectorAll('.suggested-value-input'));

@@ -501,7 +501,7 @@ class QuickBooksIntegrationTests(TestCase):
         )
         self.invoice = generar_invoice_desde_picking(
             pedido=pedido,
-            metodo_entrega='LTG',
+            metodo_entrega='CUSTOMER_PICK_UP',
             driver=None,
             usuario=self.user,
         )

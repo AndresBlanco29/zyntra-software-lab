@@ -117,7 +117,7 @@ class InvoiceFlowTests(TestCase):
 		)
 		return pedido
 
-	def _create_invoice(self, *, metodo_entrega='LTG', driver=None, total='15.00'):
+	def _create_invoice(self, *, metodo_entrega='CUSTOMER_PICK_UP', driver=None, total='15.00'):
 		pedido = self._create_verified_order(total=total)
 		return generar_invoice_desde_picking(
 			pedido=pedido,
@@ -211,7 +211,7 @@ class InvoiceFlowTests(TestCase):
 	def test_generate_invoice_accepts_manual_suggested_unit_price(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 			suggested_unit_prices={self.pedido_item.id: Decimal('2.49')},
@@ -225,7 +225,7 @@ class InvoiceFlowTests(TestCase):
 
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 			applied_customer_credit=Decimal('30.00'),
@@ -245,7 +245,7 @@ class InvoiceFlowTests(TestCase):
 
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -372,7 +372,7 @@ class InvoiceFlowTests(TestCase):
 		with self.assertRaisesMessage(ValidationError, 'Adjustment note'):
 			generar_invoice_desde_picking(
 				pedido=pedido,
-				metodo_entrega='LTG',
+				metodo_entrega='CUSTOMER_PICK_UP',
 				driver=None,
 				usuario=self.backoffice,
 				selected_note_applications={general_note.id: Decimal('5.00')},
@@ -389,7 +389,7 @@ class InvoiceFlowTests(TestCase):
 
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -401,7 +401,7 @@ class InvoiceFlowTests(TestCase):
 	def test_invoice_pdf_item_data_uses_default_30_percent_profit_for_auto_suggested_prices(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -419,7 +419,7 @@ class InvoiceFlowTests(TestCase):
 
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -440,7 +440,7 @@ class InvoiceFlowTests(TestCase):
 		with self.assertRaises(ValidationError):
 			generar_invoice_desde_picking(
 				pedido=self.pedido,
-				metodo_entrega='LTG',
+				metodo_entrega='CUSTOMER_PICK_UP',
 				driver=None,
 				usuario=self.backoffice,
 			)
@@ -451,6 +451,24 @@ class InvoiceFlowTests(TestCase):
 				pedido=self.pedido,
 				metodo_entrega='RUTA_DRIVER',
 				driver=None,
+				usuario=self.backoffice,
+			)
+
+	def test_generate_invoice_rejects_ltg_delivery_method(self):
+		with self.assertRaises(ValidationError):
+			generar_invoice_desde_picking(
+				pedido=self.pedido,
+				metodo_entrega='LTG',
+				driver=None,
+				usuario=self.backoffice,
+			)
+
+	def test_generate_invoice_rejects_driver_for_customer_pickup(self):
+		with self.assertRaises(ValidationError):
+			generar_invoice_desde_picking(
+				pedido=self.pedido,
+				metodo_entrega='CUSTOMER_PICK_UP',
+				driver=self.driver,
 				usuario=self.backoffice,
 			)
 
@@ -469,7 +487,7 @@ class InvoiceFlowTests(TestCase):
 	def test_credit_note_updates_balance(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -561,7 +579,7 @@ class InvoiceFlowTests(TestCase):
 		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
 		invoice = generar_invoice_desde_picking(
 			pedido=self._create_verified_order(total='20.00'),
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 			selected_note_applications={nota.id: Decimal('10.00')},
@@ -581,7 +599,7 @@ class InvoiceFlowTests(TestCase):
 
 		second_invoice = generar_invoice_desde_picking(
 			pedido=self._create_verified_order(total='15.00'),
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 			selected_note_applications={nota.id: Decimal('15.00')},
@@ -614,7 +632,7 @@ class InvoiceFlowTests(TestCase):
 		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
 		invoice = generar_invoice_desde_picking(
 			pedido=self._create_verified_order(total='45.00'),
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 			selected_note_applications={nota.id: Decimal('10.00')},
@@ -632,7 +650,7 @@ class InvoiceFlowTests(TestCase):
 
 		skipped_invoice = generar_invoice_desde_picking(
 			pedido=self._create_verified_order(total='20.00'),
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 			selected_note_applications={},
@@ -913,7 +931,7 @@ class InvoiceFlowTests(TestCase):
 	def test_customer_assigned_credit_note_requires_matching_invoice(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -950,7 +968,7 @@ class InvoiceFlowTests(TestCase):
 	def test_customer_assigned_credit_note_can_be_created_and_return_inventory(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -983,7 +1001,7 @@ class InvoiceFlowTests(TestCase):
 	def test_credit_note_requires_credit_type(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -1006,7 +1024,7 @@ class InvoiceFlowTests(TestCase):
 	def test_debit_note_rejects_credit_type(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -1029,7 +1047,7 @@ class InvoiceFlowTests(TestCase):
 	def test_adjustment_note_requires_positive_quantity_and_amount(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -1516,7 +1534,7 @@ class InvoiceFlowTests(TestCase):
 	def test_backoffice_invoice_detail_shows_adjustment_action_and_products(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -1800,7 +1818,7 @@ class InvoiceFlowTests(TestCase):
 	def test_backoffice_invoice_create_note_uses_prefixed_form_fields(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -1826,7 +1844,7 @@ class InvoiceFlowTests(TestCase):
 	def test_backoffice_invoice_create_debit_note_uses_prefixed_form_fields(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -1852,7 +1870,7 @@ class InvoiceFlowTests(TestCase):
 	def test_backoffice_invoice_detail_hides_credit_type_until_credit_selected(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -1880,7 +1898,7 @@ class InvoiceFlowTests(TestCase):
 	def test_backoffice_adjustment_note_create_view_renders_customer_and_invoice_selectors(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -1912,7 +1930,7 @@ class InvoiceFlowTests(TestCase):
 	def test_backoffice_adjustment_note_create_view_translates_debit_labels_in_spanish(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -2039,7 +2057,7 @@ class InvoiceFlowTests(TestCase):
 	def test_backoffice_adjustment_note_create_view_creates_customer_assigned_note(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -2067,7 +2085,7 @@ class InvoiceFlowTests(TestCase):
 	def test_backoffice_invoice_detail_uses_clear_credit_note_labels(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -2147,7 +2165,7 @@ class InvoiceFlowTests(TestCase):
 	def test_invoice_views_render_for_backoffice(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -2205,7 +2223,7 @@ class InvoiceFlowTests(TestCase):
 		)
 		other_invoice = generar_invoice_desde_picking(
 			pedido=other_order,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -2268,12 +2286,12 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(response.context['selected_creator_role'], 'driver')
 
 	def test_backoffice_invoice_list_defaults_to_pending_dispatch(self):
-		pending_invoice = self._create_invoice(metodo_entrega='LTG', total='10.00')
+		pending_invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total='10.00')
 		pending_invoice.despachador_notificado = False
 		pending_invoice.save(update_fields=['despachador_notificado'])
 
-		ready_invoice = self._create_invoice(metodo_entrega='LTG', total='20.00')
-		cancelled_invoice = self._create_invoice(metodo_entrega='LTG', total='30.00')
+		ready_invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total='20.00')
+		cancelled_invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total='30.00')
 		cancelled_invoice.estado = 'ANULADA'
 		cancelled_invoice.save(update_fields=['estado'])
 
@@ -2288,11 +2306,11 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(response.context['cancelled_count'], 1)
 
 	def test_backoffice_invoice_list_can_filter_ready_delivered_and_cancelled(self):
-		pending_invoice = self._create_invoice(metodo_entrega='LTG', total='10.00')
+		pending_invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total='10.00')
 		pending_invoice.despachador_notificado = False
 		pending_invoice.save(update_fields=['despachador_notificado'])
 
-		ready_invoice = self._create_invoice(metodo_entrega='LTG', total='20.00')
+		ready_invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total='20.00')
 
 		delivered_invoice = self._create_invoice(metodo_entrega='RUTA_DRIVER', driver=self.driver, total='30.00')
 		complete_driver_delivery(
@@ -2308,7 +2326,7 @@ class InvoiceFlowTests(TestCase):
 			evidence_files=[],
 		)
 
-		cancelled_invoice = self._create_invoice(metodo_entrega='LTG', total='40.00')
+		cancelled_invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total='40.00')
 		cancelled_invoice.estado = 'ANULADA'
 		cancelled_invoice.save(update_fields=['estado'])
 
@@ -2325,7 +2343,7 @@ class InvoiceFlowTests(TestCase):
 	def test_backoffice_invoice_list_supports_search_and_pagination(self):
 		self.client.force_login(self.backoffice)
 		for index in range(3):
-			invoice = self._create_invoice(metodo_entrega='LTG', total=f'{10 + index}.00')
+			invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total=f'{10 + index}.00')
 			invoice.despachador_notificado = False
 			invoice.save(update_fields=['despachador_notificado'])
 
@@ -2338,13 +2356,13 @@ class InvoiceFlowTests(TestCase):
 		self.assertLessEqual(len(list(page_response.context['page_obj'])), 50)
 
 	def test_backoffice_invoice_list_filters_by_quickbooks_payment_status(self):
-		pending_invoice = self._create_invoice(metodo_entrega='LTG', total='10.00')
+		pending_invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total='10.00')
 		pending_invoice.despachador_notificado = False
 		pending_invoice.quickbooks_id = 'QB-INV-PAID'
 		pending_invoice.qb_payment_status = 'PAID'
 		pending_invoice.save(update_fields=['despachador_notificado', 'quickbooks_id', 'qb_payment_status'])
 
-		due_invoice = self._create_invoice(metodo_entrega='LTG', total='20.00')
+		due_invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total='20.00')
 		due_invoice.despachador_notificado = False
 		due_invoice.quickbooks_id = 'QB-INV-DUE'
 		due_invoice.qb_payment_status = 'DUE'
@@ -2362,7 +2380,7 @@ class InvoiceFlowTests(TestCase):
 	def test_backoffice_invoice_list_renders_in_spanish_when_selected(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -2387,7 +2405,7 @@ class InvoiceFlowTests(TestCase):
 	def test_invoice_pdf_item_data_exposes_barcode_and_suggested_retail(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -2435,7 +2453,7 @@ class InvoiceFlowTests(TestCase):
 
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 			applied_customer_credit=Decimal('24.98'),
@@ -2494,7 +2512,7 @@ class InvoiceFlowTests(TestCase):
 		self.client.force_login(self.backoffice)
 
 		response = self.client.post(reverse('backoffice_generate_invoice', args=[self.pedido.id]), {
-			'metodo_entrega': 'LTG',
+			'metodo_entrega': 'CUSTOMER_PICK_UP',
 			'driver_id': '',
 			f'suggested_unit_price_{self.pedido_item.id}': '2.75',
 		})
@@ -2506,7 +2524,7 @@ class InvoiceFlowTests(TestCase):
 	def test_generar_invoice_desde_picking_applies_line_discount(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 			line_discounts={self.pedido_item.id: Decimal('10.00')},
@@ -2539,7 +2557,7 @@ class InvoiceFlowTests(TestCase):
 		self.client.force_login(self.backoffice)
 
 		response = self.client.post(reverse('backoffice_generate_invoice', args=[self.pedido.id]), {
-			'metodo_entrega': 'LTG',
+			'metodo_entrega': 'CUSTOMER_PICK_UP',
 			'driver_id': '',
 			f'line_discount_percentage_{self.pedido_item.id}': '10',
 		})
@@ -2613,7 +2631,7 @@ class InvoiceFlowTests(TestCase):
 		self.client.force_login(self.backoffice)
 
 		response = self.client.post(reverse('backoffice_generate_invoice', args=[self.pedido.id]), {
-			'metodo_entrega': 'LTG',
+			'metodo_entrega': 'CUSTOMER_PICK_UP',
 			'driver_id': '',
 			f'general_note_apply_{nota_credito.id}': '10.00',
 			f'general_note_apply_{nota_debito.id}': '30.00',
@@ -2635,7 +2653,7 @@ class InvoiceFlowTests(TestCase):
 	def test_invoice_pdf_suggested_retail_uses_default_profit_suggestion(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)
@@ -2679,7 +2697,7 @@ class InvoiceFlowTests(TestCase):
 	def test_invoice_pdf_includes_customer_signature_section_when_signed(self):
 		unsigned_invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='LTG',
+			metodo_entrega='CUSTOMER_PICK_UP',
 			driver=None,
 			usuario=self.backoffice,
 		)

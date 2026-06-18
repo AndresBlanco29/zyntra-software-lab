@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from config.productos.models import Presentacion, Producto
+from config.productos.models import Producto
 from config.productos.packaging import apply_case_packaging_defaults_to_presentacion
 
 
@@ -25,7 +25,7 @@ class Command(BaseCommand):
         updated = 0
         skipped = 0
 
-        for producto in Producto.objects.prefetch_related('presentaciones').iterator():
+        for producto in Producto.objects.prefetch_related('presentaciones').iterator(chunk_size=200):
             presentaciones = list(producto.presentaciones.all())
             if not presentaciones:
                 skipped += 1

@@ -782,6 +782,16 @@ width:100%;
             word-break: break-word;
         }
 
+        .content .mobile-stack-table.mobile-stack-table--picking td {
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            white-space: normal;
+        }
+
+        .content {
+            padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+        }
+
         .content .mobile-stack-table .mobile-stack-table__empty {
             display: block;
             padding: 18px 14px;
@@ -964,8 +974,8 @@ width:100%;
     }
 
     .language-widget {
-        bottom: 15px;
-        left: 12px;
+        bottom: max(15px, env(safe-area-inset-bottom, 0px));
+        left: max(12px, env(safe-area-inset-left, 0px));
     }
 
     .language-toggle {
@@ -978,7 +988,8 @@ width:100%;
 
     .language-menu {
         bottom: 55px;
-        left: -60px;
+        left: 0;
+        right: auto;
     }
 
     .language-option {
@@ -1049,6 +1060,7 @@ width:100%;
     margin-left: 0;
     width: 100%;
     padding: 16px;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   }
 
 }

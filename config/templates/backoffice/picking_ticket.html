@@ -5,6 +5,10 @@
 
 {% block content %}
 <style>
+  .picking-ticket-header h2 {
+    line-height: 1.25;
+  }
+
   .picking-ticket-table {
     table-layout: fixed;
     width: 100%;
@@ -37,45 +41,54 @@
   .picking-ticket-table .col-check {
     width: 22%;
   }
+
+  @media (max-width: 767.98px) {
+    .picking-ticket-table {
+      table-layout: auto;
+    }
+  }
 </style>
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h2 class="mb-0">{% trans "Picking Ticket" %} - PO #{{ pedido.id }}</h2>
-  <a href="{% url 'backoffice_picking_pdf' pedido.id %}" class="btn btn-success">{% trans "Export PDF" %}</a>
-</div>
 
-<div class="card shadow-sm mb-3">
-  <div class="card-body">
-    <p class="mb-1"><strong>{% trans "Customer" %}:</strong> {{ pedido.cliente.nombre_empresa }}</p>
-    <p class="mb-1"><strong>{% trans "Contact" %}:</strong> {{ pedido.cliente.usuario.get_full_name }}</p>
-    <p class="mb-1"><strong>{% trans "Selector" %}:</strong> {% if pedido.seleccionador %}{% firstof pedido.seleccionador.get_full_name pedido.seleccionador.username %}{% else %}-{% endif %}</p>
-    <p class="mb-1"><strong>{% trans "Status" %}:</strong> {{ pedido_estado_label }}</p>
-    <p class="mb-0"><strong>{% trans "Customer note" %}:</strong> {{ pedido.nota_cliente|default:'-' }}</p>
+<div class="picking-ticket-page">
+  <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-2 mb-3 picking-ticket-header">
+    <h2 class="mb-0 fs-4 fs-sm-3">{% trans "Picking Ticket" %} - PO #{{ pedido.id }}</h2>
+    <a href="{% url 'backoffice_picking_pdf' pedido.id %}" class="btn btn-success flex-shrink-0">{% trans "Export PDF" %}</a>
   </div>
-</div>
 
-<div class="card shadow-sm">
-  <div class="card-body">
-    <div class="table-responsive">
-      <table class="table align-middle picking-ticket-table">
-        <thead>
-          <tr>
-            <th class="col-product">{% trans "Product" %}</th>
-            <th class="col-presentation">{% trans "Presentation" %}</th>
-            <th class="col-quantity">{% trans "Quantity" %}</th>
-            <th class="col-check">{% trans "Warehouse check" %}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for item in pedido.items.all %}
-          <tr>
-            <td class="col-product">{{ item.presentacion.producto.nombre }}</td>
-            <td class="col-presentation">{{ item.presentacion.nombre }}</td>
-            <td class="col-quantity">{{ item.cantidad }}</td>
-            <td class="col-check">____</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <p class="mb-1"><strong>{% trans "Customer" %}:</strong> {{ pedido.cliente.nombre_empresa }}</p>
+      <p class="mb-1"><strong>{% trans "Contact" %}:</strong> {{ pedido.cliente.usuario.get_full_name }}</p>
+      <p class="mb-1"><strong>{% trans "Selector" %}:</strong> {% if pedido.seleccionador %}{% firstof pedido.seleccionador.get_full_name pedido.seleccionador.username %}{% else %}-{% endif %}</p>
+      <p class="mb-1"><strong>{% trans "Status" %}:</strong> {{ pedido_estado_label }}</p>
+      <p class="mb-0"><strong>{% trans "Customer note" %}:</strong> {{ pedido.nota_cliente|default:'-' }}</p>
+    </div>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body p-0 p-md-3">
+      <div class="table-responsive mobile-stack-responsive">
+        <table class="table align-middle mb-0 picking-ticket-table mobile-stack-table mobile-stack-table--picking">
+          <thead>
+            <tr>
+              <th class="col-product">{% trans "Product" %}</th>
+              <th class="col-presentation">{% trans "Presentation" %}</th>
+              <th class="col-quantity">{% trans "Quantity" %}</th>
+              <th class="col-check">{% trans "Warehouse check" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in pedido.items.all %}
+            <tr>
+              <td class="col-product" data-label="{% trans 'Product' %}">{{ item.presentacion.producto.nombre }}</td>
+              <td class="col-presentation" data-label="{% trans 'Presentation' %}">{{ item.presentacion.nombre }}</td>
+              <td class="col-quantity" data-label="{% trans 'Quantity' %}">{{ item.cantidad }}</td>
+              <td class="col-check" data-label="{% trans 'Warehouse check' %}">____</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>

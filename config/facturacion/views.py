@@ -469,6 +469,19 @@ def _parse_estimated_delivery_at(value):
 	return parsed
 
 
+def _calculate_invoice_line_discount_total(invoice):
+	total = Decimal('0.00')
+	for item in invoice.items.all():
+		discount_percentage = Decimal(str(item.descuento_porcentaje or 0))
+		if discount_percentage <= 0 or not item.precio_unitario_lista:
+			continue
+		list_price = Decimal(str(item.precio_unitario_lista))
+		final_price = Decimal(str(item.precio_unitario or 0))
+		quantity = Decimal(str(item.cantidad_facturada or 0))
+		total += (list_price - final_price) * quantity
+	return total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
 def _build_invoice_pdf_item_data(invoice):
 	items = []
 	for item in invoice.items.select_related('presentacion__producto', 'pedido_item').all():
@@ -488,14 +501,20 @@ def _build_invoice_pdf_item_data(invoice):
 				profit_percentage = ((suggested_unit_price - customer_unit_price) / suggested_unit_price * Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 			except (ArithmeticError, InvalidOperation, TypeError, ValueError):
 				profit_percentage = Decimal('0.00')
+		discount_percentage = Decimal(str(item.descuento_porcentaje or 0)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+		list_price_value = Decimal(str(item.precio_unitario_lista)) if item.precio_unitario_lista else None
+		line_discount_amount = Decimal('0.00')
+		if discount_percentage > 0 and list_price_value is not None:
+			line_discount_amount = ((list_price_value - Decimal(str(item.precio_unitario or 0))) * Decimal(str(item.cantidad_facturada or 0))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 		items.append({
 			'barcode': barcode,
 			'product_name': item.producto_nombre,
 			'pack_size': _resolve_invoice_pack_size(item),
 			'requested_quantity': str(requested_quantity),
 			'dispatched_quantity': str(item.cantidad_facturada),
-			'list_price': _format_pdf_money(item.precio_unitario_lista) if item.precio_unitario_lista else '',
-			'discount_percentage': f'{Decimal(str(item.descuento_porcentaje or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP):.2f}%' if Decimal(str(item.descuento_porcentaje or 0)) > 0 else '',
+			'list_price': _format_pdf_money(list_price_value) if list_price_value is not None else '—',
+			'discount_percentage': f'{discount_percentage:.2f}%' if discount_percentage > 0 else '—',
+			'line_discount_amount': _format_pdf_money(line_discount_amount) if line_discount_amount > 0 else '—',
 			'customer_price': _format_pdf_money(item.precio_unitario),
 			'suggested_unit_price': _format_pdf_money(suggested_unit_price),
 			'subtotal': _format_pdf_money(item.subtotal),
@@ -577,14 +596,23 @@ def _build_invoice_pdf_barcode(value, *, max_width=66):
 
 
 def _build_invoice_pdf_totals_rows(invoice, *, meta_label_style, meta_value_style, section_title_style, body_style):
-	return [
+	rows = [
 		[Paragraph(_('Subtotal'), meta_label_style), Paragraph(_format_pdf_money(invoice.subtotal), meta_value_style)],
+	]
+	line_discount_total = _calculate_invoice_line_discount_total(invoice)
+	if line_discount_total > 0:
+		rows.append([
+			Paragraph(_('Line discounts applied'), meta_label_style),
+			Paragraph(f'-{_format_pdf_money(line_discount_total)}', meta_value_style),
+		])
+	rows.extend([
 		[Paragraph(_('Customer credit applied'), meta_label_style), Paragraph(_format_pdf_money(invoice.credito_cliente_aplicado), meta_value_style)],
 		[Paragraph(_('Credit notes'), meta_label_style), Paragraph(_format_pdf_money(invoice.total_creditos), meta_value_style)],
 		[Paragraph(_('Debit notes'), meta_label_style), Paragraph(_format_pdf_money(invoice.total_debitos), meta_value_style)],
 		[Paragraph(_('Outstanding invoice balance'), meta_label_style), Paragraph(_format_pdf_money(invoice.saldo_cliente), meta_value_style)],
 		[Paragraph(_('Final invoice total'), section_title_style), Paragraph(f'<b>{_format_pdf_money(invoice.total_neto)}</b>', body_style)],
-	]
+	])
+	return rows
 
 
 def _invoice_pdf_response(invoice):
@@ -664,7 +692,7 @@ def _invoice_pdf_response(invoice):
 	]))
 	content.extend([party_table, Spacer(1, 8)])
 
-	content.append(Paragraph(_('Line items with barcode, ordered quantity, dispatched quantity and abbreviated pricing references.'), note_style))
+	content.append(Paragraph(_('Line items with barcode, ordered quantity, dispatched quantity, list price, discount and final customer pricing.'), note_style))
 	content.append(Spacer(1, 6))
 
 	for index, chunk in enumerate(item_chunks):
@@ -677,23 +705,36 @@ def _invoice_pdf_response(invoice):
 				Spacer(1, 6),
 			])
 
-		rows = [[_('Barcode'), _('Description'), _('U/M'), _('Qty ord'), _('Qty dsp'), _('Cust. / unit'), _('Subtotal'), _('SGT RTL / SRP 30%')]]
+		rows = [[
+			_('Barcode'),
+			_('Description'),
+			_('U/M'),
+			_('Qty ord'),
+			_('Qty dsp'),
+			_('List / unit'),
+			_('Disc. %'),
+			_('Cust. / unit'),
+			_('Subtotal'),
+			_('SGT RTL / SRP 30%'),
+		]]
 		for item in chunk:
 			barcode_cell = Paragraph('-', body_style)
 			if item['barcode']:
-				barcode_cell = _build_invoice_pdf_barcode(item['barcode'], max_width=80)
+				barcode_cell = _build_invoice_pdf_barcode(item['barcode'], max_width=72)
 			rows.append([
 				barcode_cell,
 				Paragraph(item['product_name'], body_style),
 				Paragraph(item['pack_size'], body_style),
 				item['requested_quantity'],
 				item['dispatched_quantity'],
+				item['list_price'],
+				item['discount_percentage'],
 				item['customer_price'],
 				item['subtotal'],
 				item['suggested_unit_price'],
 			])
 
-		table = Table(rows, colWidths=[88, 170, 34, 30, 30, 52, 52, 64], repeatRows=1)
+		table = Table(rows, colWidths=[74, 118, 28, 22, 22, 40, 28, 40, 40, 48], repeatRows=1)
 		table.setStyle(TableStyle([
 			('BACKGROUND', (0, 0), (-1, 0), BRAND_PRIMARY),
 			('TEXTCOLOR', (0, 0), (-1, 0), colors.white),

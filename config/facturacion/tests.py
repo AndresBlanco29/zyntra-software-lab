@@ -2510,6 +2510,23 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(item.subtotal, Decimal('40.50'))
 		self.assertEqual(invoice.subtotal, Decimal('40.50'))
 
+		rows = _build_invoice_pdf_item_data(invoice)
+		self.assertEqual(rows[0]['list_price'], '$15.00')
+		self.assertEqual(rows[0]['discount_percentage'], '10.00%')
+		self.assertEqual(rows[0]['customer_price'], '$13.50')
+		self.assertEqual(rows[0]['line_discount_amount'], '$4.50')
+
+		styles = getSampleStyleSheet()
+		total_rows = _build_invoice_pdf_totals_rows(
+			invoice,
+			meta_label_style=ParagraphStyle('InvoiceMetaLabelDiscountTest', parent=styles['BodyText']),
+			meta_value_style=ParagraphStyle('InvoiceMetaValueDiscountTest', parent=styles['BodyText']),
+			section_title_style=ParagraphStyle('InvoiceSectionTitleDiscountTest', parent=styles['BodyText']),
+			body_style=styles['BodyText'],
+		)
+		self.assertEqual(total_rows[1][0].text, 'Line discounts applied')
+		self.assertEqual(total_rows[1][1].text, '-$4.50')
+
 	def test_backoffice_generate_invoice_view_applies_line_discount(self):
 		self.client.force_login(self.backoffice)
 

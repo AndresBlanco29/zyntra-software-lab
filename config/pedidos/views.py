@@ -1,5 +1,6 @@
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from io import BytesIO
+from xml.sax.saxutils import escape
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -401,23 +402,36 @@ def backoffice_picking_pdf(request, pedido_id):
 		('BOTTOMPADDING', (0, 0), (-1, -1), 8),
 	]))
 
-	rows = [[_('Product'), _('Presentation'), _('Quantity'), _('Warehouse check')]]
+	rows = [[
+		Paragraph(escape(_('Product')), ParagraphStyle('PickingHeaderCell', parent=summary_label_style, textColor=colors.white, fontSize=9)),
+		Paragraph(escape(_('Presentation')), ParagraphStyle('PickingHeaderCellPresentation', parent=summary_label_style, textColor=colors.white, fontSize=9)),
+		Paragraph(escape(_('Quantity')), ParagraphStyle('PickingHeaderCellQuantity', parent=summary_label_style, textColor=colors.white, fontSize=9)),
+		Paragraph(escape(_('Warehouse check')), ParagraphStyle('PickingHeaderCellCheck', parent=summary_label_style, textColor=colors.white, fontSize=9)),
+	]]
+	item_cell_style = ParagraphStyle(
+		'PickingItemCell',
+		parent=styles['BodyText'],
+		fontSize=9,
+		leading=11,
+		textColor=BRAND_TEXT,
+		wordWrap='CJK',
+	)
 	for item in pedido.items.all():
 		rows.append([
-			item.presentacion.producto.nombre,
-			item.presentacion.nombre,
-			str(item.cantidad),
-			'______',
+			Paragraph(escape(item.presentacion.producto.nombre), item_cell_style),
+			Paragraph(escape(item.presentacion.nombre), item_cell_style),
+			Paragraph(escape(str(item.cantidad)), item_cell_style),
+			Paragraph('______', item_cell_style),
 		])
 
-	table = Table(rows, colWidths=[180, 140, 70, 120])
+	table = Table(rows, colWidths=[210, 130, 60, 110])
 	table.setStyle(TableStyle([
 		('BACKGROUND', (0, 0), (-1, 0), BRAND_PRIMARY),
-		('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-		('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
 		('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
 		('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, BRAND_SURFACE]),
-		('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+		('VALIGN', (0, 0), (-1, -1), 'TOP'),
+		('LEFTPADDING', (0, 0), (-1, -1), 6),
+		('RIGHTPADDING', (0, 0), (-1, -1), 6),
 		('BOTTOMPADDING', (0, 0), (-1, -1), 8),
 		('TOPPADDING', (0, 0), (-1, -1), 8),
 	]))

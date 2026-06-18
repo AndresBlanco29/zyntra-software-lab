@@ -4,6 +4,40 @@
 {% block title %}{% trans "Picking Ticket" %} #{{ pedido.id }}{% endblock %}
 
 {% block content %}
+<style>
+  .picking-ticket-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .picking-ticket-table th,
+  .picking-ticket-table td {
+    vertical-align: top;
+  }
+
+  .picking-ticket-table .col-product,
+  .picking-ticket-table .col-presentation {
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .picking-ticket-table .col-product {
+    width: 42%;
+  }
+
+  .picking-ticket-table .col-presentation {
+    width: 24%;
+  }
+
+  .picking-ticket-table .col-quantity {
+    width: 12%;
+  }
+
+  .picking-ticket-table .col-check {
+    width: 22%;
+  }
+</style>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2 class="mb-0">{% trans "Picking Ticket" %} - PO #{{ pedido.id }}</h2>
   <a href="{% url 'backoffice_picking_pdf' pedido.id %}" class="btn btn-success">{% trans "Export PDF" %}</a>
@@ -22,22 +56,22 @@
 <div class="card shadow-sm">
   <div class="card-body">
     <div class="table-responsive">
-      <table class="table align-middle">
+      <table class="table align-middle picking-ticket-table">
         <thead>
           <tr>
-            <th>{% trans "Product" %}</th>
-            <th>{% trans "Presentation" %}</th>
-            <th>{% trans "Quantity" %}</th>
-            <th>{% trans "Warehouse check" %}</th>
+            <th class="col-product">{% trans "Product" %}</th>
+            <th class="col-presentation">{% trans "Presentation" %}</th>
+            <th class="col-quantity">{% trans "Quantity" %}</th>
+            <th class="col-check">{% trans "Warehouse check" %}</th>
           </tr>
         </thead>
         <tbody>
           {% for item in pedido.items.all %}
           <tr>
-            <td>{{ item.presentacion.producto.nombre }}</td>
-            <td>{{ item.presentacion.nombre }}</td>
-            <td>{{ item.cantidad }}</td>
-            <td>____</td>
+            <td class="col-product">{{ item.presentacion.producto.nombre }}</td>
+            <td class="col-presentation">{{ item.presentacion.nombre }}</td>
+            <td class="col-quantity">{{ item.cantidad }}</td>
+            <td class="col-check">____</td>
           </tr>
           {% endfor %}
         </tbody>

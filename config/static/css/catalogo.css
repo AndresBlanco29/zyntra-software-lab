@@ -249,15 +249,47 @@ z-index:9999;
         font-size: 12px;
     }
 
+    .language-widget {
+        left: max(12px, env(safe-area-inset-left, 0px));
+        bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    }
+
     .language-menu {
         bottom: 55px;
-        left: -60px;
+        left: 0;
+        right: auto;
     }
 
     .language-option {
         width: 140px;
         padding: 8px 12px;
         font-size: 12px;
+    }
+
+    .main-content {
+        padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* Keep Previous | Page X of Y | Next on one row; hide spaced jump links on phones */
+    .catalog-pagination {
+        width: 100%;
+        padding-left: 72px;
+        padding-right: 12px;
+        box-sizing: border-box;
+    }
+
+    .catalog-pagination .pagination .page-item:nth-child(n+3):not(:last-child) {
+        display: none;
+    }
+
+    .catalog-pagination .pagination {
+        justify-content: center;
+        gap: 0.25rem;
+    }
+
+    .catalog-pagination .page-link {
+        padding: 0.45rem 0.75rem;
+        font-size: 0.9rem;
     }
 }
 

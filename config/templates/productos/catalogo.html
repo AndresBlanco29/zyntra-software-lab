@@ -281,7 +281,7 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
 
                 </div>
 
-                {% pagination_controls page_obj aria_label=_('Product pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-2" q=filter_q categoria=filter_categoria marca=filter_marca guest=guest_mode|yesno:"1," %}
+                {% pagination_controls page_obj aria_label=_('Product pagination') nav_class="catalog-pagination d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-2" q=filter_q categoria=filter_categoria marca=filter_marca guest=guest_mode|yesno:"1," %}
 
             </div>
 

@@ -15,7 +15,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, DeliveryNotificationLog, Invoice, NotaAjuste, NotaAjusteAplicacion
 from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, start_delivery_route, unlock_client_from_delivery
-from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_item_data, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
+from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_item_data, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_SYNCED
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
 from config.inventario.services import registrar_entrada_manual, reservar_stock_para_pedido_items
@@ -2411,6 +2411,14 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual([len(chunk) for chunk in chunks], [10, 10, 3])
 		self.assertEqual(chunks[0][0]['index'], 0)
 		self.assertEqual(chunks[-1][-1]['index'], 22)
+
+	def test_invoice_pdf_item_table_column_widths_use_full_content_width(self):
+		content_width = 564
+		column_widths = _invoice_pdf_item_table_column_widths(content_width)
+		self.assertEqual(len(column_widths), 10)
+		self.assertAlmostEqual(sum(column_widths), content_width, places=2)
+		self.assertGreater(column_widths[1], column_widths[3])
+		self.assertGreater(column_widths[-1], column_widths[6])
 
 	def test_invoice_pdf_barcode_uses_small_human_readable_font(self):
 		barcode = _build_invoice_pdf_barcode('123456789012')

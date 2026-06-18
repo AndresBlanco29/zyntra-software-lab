@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 from reportlab.graphics.barcode import code128
 from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
@@ -524,6 +525,27 @@ def _build_invoice_pdf_item_data(invoice):
 
 
 INVOICE_PDF_ITEMS_PER_PAGE = 10
+INVOICE_PDF_ITEM_COLUMN_WEIGHTS = (70, 138, 38, 28, 28, 48, 34, 48, 48, 84)
+
+
+def _invoice_pdf_item_table_column_widths(content_width):
+	total_weight = sum(INVOICE_PDF_ITEM_COLUMN_WEIGHTS)
+	return [content_width * weight / total_weight for weight in INVOICE_PDF_ITEM_COLUMN_WEIGHTS]
+
+
+def _build_invoice_pdf_item_table_header(header_style):
+	return [
+		Paragraph(_('Barcode'), header_style),
+		Paragraph(_('Description'), header_style),
+		Paragraph(_('U/M'), header_style),
+		Paragraph(_('Qty<br/>ord'), header_style),
+		Paragraph(_('Qty<br/>dsp'), header_style),
+		Paragraph(_('List<br/>/ unit'), header_style),
+		Paragraph(_('Disc.<br/>%'), header_style),
+		Paragraph(_('Cust.<br/>/ unit'), header_style),
+		Paragraph(_('Subtotal'), header_style),
+		Paragraph(_('SGT RTL<br/>/ SRP 30%'), header_style),
+	]
 
 
 def _chunk_invoice_pdf_item_rows(item_rows, size=INVOICE_PDF_ITEMS_PER_PAGE):
@@ -624,6 +646,22 @@ def _invoice_pdf_response(invoice):
 	section_title_style = ParagraphStyle('InvoiceSectionTitle', parent=styles['Heading4'], fontName='Helvetica-Bold', fontSize=8, textColor=BRAND_TEXT, spaceAfter=3)
 	note_style = ParagraphStyle('InvoiceNote', parent=styles['BodyText'], fontSize=6.5, textColor=BRAND_MUTED_TEXT, leading=8)
 	body_style = ParagraphStyle('InvoiceBody', parent=styles['BodyText'], fontSize=7.5, leading=9, textColor=BRAND_TEXT)
+	table_header_style = ParagraphStyle(
+		'InvoiceTableHeader',
+		parent=styles['BodyText'],
+		fontName='Helvetica-Bold',
+		fontSize=6.5,
+		leading=7.5,
+		textColor=colors.white,
+		alignment=TA_CENTER,
+	)
+	table_cell_center_style = ParagraphStyle(
+		'InvoiceTableCellCenter',
+		parent=body_style,
+		fontSize=7,
+		leading=8,
+		alignment=TA_CENTER,
+	)
 	page_width, _page_height = letter
 	content_width = page_width - document.leftMargin - document.rightMargin
 
@@ -705,48 +743,40 @@ def _invoice_pdf_response(invoice):
 				Spacer(1, 6),
 			])
 
-		rows = [[
-			_('Barcode'),
-			_('Description'),
-			_('U/M'),
-			_('Qty ord'),
-			_('Qty dsp'),
-			_('List / unit'),
-			_('Disc. %'),
-			_('Cust. / unit'),
-			_('Subtotal'),
-			_('SGT RTL / SRP 30%'),
-		]]
+		rows = [_build_invoice_pdf_item_table_header(table_header_style)]
+		item_column_widths = _invoice_pdf_item_table_column_widths(content_width)
+		barcode_column_width = item_column_widths[0] - 8
 		for item in chunk:
 			barcode_cell = Paragraph('-', body_style)
 			if item['barcode']:
-				barcode_cell = _build_invoice_pdf_barcode(item['barcode'], max_width=72)
+				barcode_cell = _build_invoice_pdf_barcode(item['barcode'], max_width=max(barcode_column_width, 58))
 			rows.append([
 				barcode_cell,
 				Paragraph(item['product_name'], body_style),
 				Paragraph(item['pack_size'], body_style),
-				item['requested_quantity'],
-				item['dispatched_quantity'],
-				item['list_price'],
-				item['discount_percentage'],
-				item['customer_price'],
-				item['subtotal'],
-				item['suggested_unit_price'],
+				Paragraph(item['requested_quantity'], table_cell_center_style),
+				Paragraph(item['dispatched_quantity'], table_cell_center_style),
+				Paragraph(item['list_price'], table_cell_center_style),
+				Paragraph(item['discount_percentage'], table_cell_center_style),
+				Paragraph(item['customer_price'], table_cell_center_style),
+				Paragraph(item['subtotal'], table_cell_center_style),
+				Paragraph(item['suggested_unit_price'], table_cell_center_style),
 			])
 
-		table = Table(rows, colWidths=[74, 118, 28, 22, 22, 40, 28, 40, 40, 48], repeatRows=1)
+		table = Table(rows, colWidths=item_column_widths, repeatRows=1)
 		table.setStyle(TableStyle([
 			('BACKGROUND', (0, 0), (-1, 0), BRAND_PRIMARY),
 			('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-			('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+			('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
 			('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-			('FONTSIZE', (0, 0), (-1, -1), 7),
+			('FONTSIZE', (0, 1), (-1, -1), 7),
 			('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
 			('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, BRAND_SURFACE]),
 			('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-			('ALIGN', (3, 1), (-1, -1), 'CENTER'),
 			('BOTTOMPADDING', (0, 0), (-1, -1), 5),
 			('TOPPADDING', (0, 0), (-1, -1), 5),
+			('TOPPADDING', (0, 0), (-1, 0), 6),
+			('BOTTOMPADDING', (0, 0), (-1, 0), 6),
 			('VALIGN', (0, 1), (0, -1), 'TOP'),
 			('TOPPADDING', (0, 1), (0, -1), 2),
 			('BOTTOMPADDING', (0, 1), (0, -1), 8),

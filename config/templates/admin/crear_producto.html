@@ -12,7 +12,7 @@
 <div class="card shadow-sm">
 <div class="card-body">
 
-<form method="POST" enctype="multipart/form-data" data-presentations-form data-min-rows-message="{% trans 'Debes dejar al menos una presentacion.' %}">
+<form method="POST" enctype="multipart/form-data" data-presentations-form data-min-rows-message="{% trans 'Debes dejar al menos una presentacion.' %}" data-parse-packaging-url="{% url 'parse_packaging_from_name' %}">
 
 {% csrf_token %}
 
@@ -102,7 +102,10 @@
 
 <div class="d-flex justify-content-between align-items-center mb-3">
 <h5 class="mb-0">{% trans "Presentaciones" %}</h5>
+<div class="d-flex gap-2">
+<button type="button" class="btn btn-outline-secondary btn-sm" data-detect-packaging-from-name>{% trans "Detectar caja del nombre" %}</button>
 <button type="button" class="btn btn-outline-primary btn-sm" data-add-presentation>{% trans "Anadir presentacion" %}</button>
+</div>
 </div>
 
 <p class="text-muted small">{% trans "Agrega una presentacion por cada forma de venta del producto. Ejemplo: Pallet, Caja, Unidad." %}</p>

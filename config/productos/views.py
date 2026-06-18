@@ -59,11 +59,27 @@ def _parse_positive_int(value, *, default=1):
     return parsed if parsed >= 1 else default
 
 
+def _parse_non_negative_int(value, *, default=0):
+    try:
+        parsed = int(str(value or "").strip())
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed >= 0 else default
+
+
+def _post_list(request, base_name):
+    values = request.POST.getlist(base_name)
+    if values:
+        return values
+    return request.POST.getlist(f"{base_name}[]")
+
+
 def _parse_new_presentacion_rows_from_post(request):
-    nombres = request.POST.getlist("presentacion_nueva_nombre")
-    tipos = request.POST.getlist("presentacion_nueva_tipo_contenido")
-    unidades_list = request.POST.getlist("presentacion_nueva_unidades")
-    costos = request.POST.getlist("presentacion_nueva_costo")
+    nombres = _post_list(request, "presentacion_nueva_nombre")
+    tipos = _post_list(request, "presentacion_nueva_tipo_contenido")
+    unidades_list = _post_list(request, "presentacion_nueva_unidades")
+    costos = _post_list(request, "presentacion_nueva_costo")
+    stocks = _post_list(request, "presentacion_nueva_stock")
 
     rows = []
     for index, raw_nombre in enumerate(nombres):
@@ -71,8 +87,9 @@ def _parse_new_presentacion_rows_from_post(request):
         tipo_contenido = (tipos[index] if index < len(tipos) else "unidades").strip() or "unidades"
         unidades_raw = (unidades_list[index] if index < len(unidades_list) else "").strip()
         costo_raw = (costos[index] if index < len(costos) else "").strip()
+        stock_raw = (stocks[index] if index < len(stocks) else "").strip()
 
-        if not any([nombre, unidades_raw, costo_raw]):
+        if not any([nombre, unidades_raw, costo_raw, stock_raw]):
             continue
 
         rows.append({
@@ -80,15 +97,54 @@ def _parse_new_presentacion_rows_from_post(request):
             "tipo_contenido": tipo_contenido,
             "unidades": _parse_positive_int(unidades_raw, default=1),
             "costo": _parse_optional_decimal(costo_raw),
+            "stock_inicial": _parse_non_negative_int(stock_raw, default=0),
         })
     return rows
 
 
-def _create_presentaciones_for_producto(producto, rows):
+def _apply_initial_stock_for_presentacion(presentacion, cantidad, *, creado_por=None):
+    if cantidad <= 0:
+        return
+    from config.inventario.services import registrar_entrada_manual
+
+    registrar_entrada_manual(
+        presentacion=presentacion,
+        cantidad=cantidad,
+        observacion=_("Initial stock from product setup"),
+        creado_por=creado_por,
+    )
+
+
+def _create_presentaciones_for_producto(producto, rows, *, creado_por=None):
+    from config.productos.packaging import apply_case_packaging_defaults_to_presentacion
+
     created = []
     for row in rows:
-        created.append(Presentacion.objects.create(producto=producto, **row))
+        stock_inicial = row.pop("stock_inicial", 0)
+        presentacion = Presentacion(producto=producto, **row)
+        apply_case_packaging_defaults_to_presentacion(presentacion, producto.nombre, overwrite=False)
+        presentacion.save()
+        _apply_initial_stock_for_presentacion(presentacion, stock_inicial, creado_por=creado_por)
+        created.append(presentacion)
     return created
+
+
+def _apply_additional_stock_from_post(request, producto):
+    from config.inventario.services import registrar_entrada_manual
+
+    for presentacion in producto.presentaciones.all():
+        stock_add = (request.POST.get(f"stock_adicional_{presentacion.id}") or "").strip()
+        if not stock_add:
+            continue
+        qty = _parse_non_negative_int(stock_add, default=0)
+        if qty <= 0:
+            continue
+        registrar_entrada_manual(
+            presentacion=presentacion,
+            cantidad=qty,
+            observacion=_("Manual stock adjustment from product edit"),
+            creado_por=request.user,
+        )
 
 
 def _delete_presentaciones_for_producto(producto, presentacion_ids, *, request=None):
@@ -512,9 +568,14 @@ def crear_producto(request):
             descuento=descuento
         )
 
-        _create_presentaciones_for_producto(producto, _parse_new_presentacion_rows_from_post(request))
+        _create_presentaciones_for_producto(
+            producto,
+            _parse_new_presentacion_rows_from_post(request),
+            creado_por=request.user,
+        )
 
-        return redirect("lista_productos")
+        messages.success(request, _("Product created successfully."))
+        return redirect("editar_producto", producto_id=producto.id)
 
     context = {
         "categorias": Categoria.objects.all(),
@@ -757,7 +818,7 @@ def editar_producto(request, producto_id):
     categorias = Categoria.objects.all()
     marcas = Marca.objects.all()
 
-    presentaciones = producto.presentaciones.all()
+    presentaciones = producto.presentaciones.select_related("stock_operativo").all()
 
     if request.method == "POST":
 
@@ -811,9 +872,15 @@ def editar_producto(request, producto_id):
             presentacion.save()
 
         _delete_presentaciones_for_producto(producto, eliminar_ids, request=request)
-        _create_presentaciones_for_producto(producto, _parse_new_presentacion_rows_from_post(request))
+        _create_presentaciones_for_producto(
+            producto,
+            _parse_new_presentacion_rows_from_post(request),
+            creado_por=request.user,
+        )
+        _apply_additional_stock_from_post(request, producto)
 
-        return redirect("lista_productos")
+        messages.success(request, _("Product updated successfully."))
+        return redirect("editar_producto", producto_id=producto.id)
     
     return render(request, "admin/editar_producto.html", {
         "producto": producto,
@@ -826,5 +893,30 @@ def editar_producto(request, producto_id):
             ensure_ascii=False,
         ),
     })
+
+
+@login_required
+@internal_permission_required("admin.products.manage")
+def parse_packaging_from_name(request):
+    nombre = (request.GET.get("nombre") or "").strip()
+    if not nombre:
+        return JsonResponse(
+            {"ok": False, "error": _("Product name is required.")},
+            status=400,
+        )
+
+    parsed = parse_case_packaging_from_product_name(nombre)
+    if not parsed:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": _(
+                    "No case/box pattern detected in the product name. "
+                    "Try formats like 12/16.9 LT, 6 CT, or 1 GALON."
+                ),
+            },
+        )
+
+    return JsonResponse({"ok": True, "defaults": parsed})
 
 

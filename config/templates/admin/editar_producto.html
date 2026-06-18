@@ -12,7 +12,7 @@
 <div class="card shadow-sm">
 <div class="card-body">
 
-<form method="POST" enctype="multipart/form-data" data-presentations-form data-min-rows-message="{% trans 'Debes dejar al menos una presentacion.' %}" data-packaging-defaults='{{ packaging_defaults_json|default:"{}"|escapejs }}'>
+<form method="POST" enctype="multipart/form-data" data-presentations-form data-min-rows-message="{% trans 'Debes dejar al menos una presentacion.' %}" data-parse-packaging-url="{% url 'parse_packaging_from_name' %}" data-packaging-defaults='{{ packaging_defaults_json|default:"{}"|escapejs }}'>
 
 {% csrf_token %}
 
@@ -150,9 +150,6 @@
 
 </div>
 
-<script src="{% static 'js/product-price-formula.js' %}"></script>
-<script src="{% static 'js/product-presentations-form.js' %}"></script>
-
 <div class="mb-3 form-check">
 
 <input type="checkbox" name="destacado" class="form-check-input"
@@ -179,6 +176,9 @@
 </a>
 
 </form>
+
+<script src="{% static 'js/product-price-formula.js' %}"></script>
+<script src="{% static 'js/product-presentations-form.js' %}"></script>
 
 </div>
 </div>

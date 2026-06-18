@@ -300,3 +300,56 @@ class CatalogCustomerPriceTierTests(TestCase):
 		self.assertContains(response, 'page=10"')
 		self.assertContains(response, 'page=15"')
 		self.assertContains(response, 'page=20"')
+
+
+class ProductPresentationFormTests(TestCase):
+	def setUp(self):
+		self.admin = Usuario.objects.create_user(username='admin-presentations', password='secret123', role='admin')
+		self.categoria = Categoria.objects.create(nombre='Bebidas Admin')
+		self.marca = Marca.objects.create(nombre='Marca Admin')
+
+	def test_parse_packaging_from_name_api_detects_lt_pattern(self):
+		self.client.force_login(self.admin)
+		response = self.client.get(
+			reverse('parse_packaging_from_name'),
+			{'nombre': 'AGUA 12/16.9 LT'},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(payload['ok'])
+		self.assertEqual(payload['defaults']['units_per_case'], 12)
+
+	def test_parse_packaging_from_name_api_rejects_generic_name(self):
+		self.client.force_login(self.admin)
+		response = self.client.get(
+			reverse('parse_packaging_from_name'),
+			{'nombre': 'VARIOS'},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertFalse(payload['ok'])
+
+	def test_crear_producto_saves_new_presentations_with_bracket_field_names(self):
+		self.client.force_login(self.admin)
+		response = self.client.post(reverse('crear_producto'), {
+			'nombre': 'VELA 6 CT',
+			'codigo_barras': '7500000000001',
+			'categoria': str(self.categoria.id),
+			'marca': str(self.marca.id),
+			'activo': 'on',
+			'presentacion_nueva_nombre[]': ['Caja'],
+			'presentacion_nueva_tipo_contenido[]': ['piezas'],
+			'presentacion_nueva_unidades[]': ['6'],
+			'presentacion_nueva_costo[]': ['12.50'],
+			'presentacion_nueva_stock[]': ['25'],
+		})
+
+		self.assertEqual(response.status_code, 302)
+		producto = Producto.objects.get(codigo_barras='7500000000001')
+		presentacion = producto.presentaciones.get()
+		self.assertEqual(presentacion.nombre, 'Caja')
+		self.assertEqual(presentacion.unidades, 6)
+		self.assertEqual(presentacion.stock_operativo.stock_fisico, 25)
+

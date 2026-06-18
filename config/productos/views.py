@@ -1,5 +1,6 @@
 from django.core.cache import cache
 from django.core.paginator import Paginator
+import json
 from django.db.models import Prefetch, Q
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -14,6 +15,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from config.clientes.models import Cliente
 from config.cotizaciones.models import Cotizacion
+from config.productos.packaging import parse_case_packaging_from_product_name
 from config.usuarios.permissions import internal_permission_required
 
 
@@ -818,6 +820,10 @@ def editar_producto(request, producto_id):
         "marcas": marcas,
         "presentaciones": presentaciones,
         "price_margins": _get_price_margin_values(),
+        "packaging_defaults_json": json.dumps(
+            parse_case_packaging_from_product_name(producto.nombre) or {},
+            ensure_ascii=False,
+        ),
     })
 
 

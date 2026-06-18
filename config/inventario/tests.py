@@ -44,7 +44,7 @@ class InventarioOperativoTests(TestCase):
 			tipo_contenido='unidades',
 			precio_1=Decimal('10.00'),
 		)
-		registrar_entrada_manual(presentacion=self.presentacion, cantidad=10, observacion='Initial stock', creado_por=self.backoffice)
+		registrar_entrada_manual(presentacion=self.presentacion, cantidad=100, observacion='Initial stock', creado_por=self.backoffice)
 
 	def test_order_creation_reserves_stock_and_prevents_oversell(self):
 		pedido = crear_pedido_desde_items(
@@ -54,9 +54,9 @@ class InventarioOperativoTests(TestCase):
 		)
 		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
 		item = pedido.items.get()
-		self.assertEqual(stock.stock_fisico, 10)
-		self.assertEqual(stock.stock_reservado, 4)
-		self.assertEqual(stock.stock_disponible, 6)
+		self.assertEqual(stock.stock_fisico, 100)
+		self.assertEqual(stock.stock_reservado, 40)
+		self.assertEqual(stock.stock_disponible, 60)
 		self.assertEqual(item.cantidad_reservada_inventario, 4)
 
 		with self.assertRaises(ValidationError):
@@ -78,9 +78,9 @@ class InventarioOperativoTests(TestCase):
 		item = pedido.items.get()
 
 		self.assertEqual(pedido.total, Decimal('150.00'))
-		self.assertEqual(stock.stock_fisico, 10)
+		self.assertEqual(stock.stock_fisico, 100)
 		self.assertEqual(stock.stock_reservado, 0)
-		self.assertEqual(stock.stock_disponible, 10)
+		self.assertEqual(stock.stock_disponible, 100)
 		self.assertEqual(item.cantidad_reservada_inventario, 0)
 		self.assertEqual(item.cantidad_inventario_aplicada, 0)
 
@@ -105,9 +105,9 @@ class InventarioOperativoTests(TestCase):
 
 		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
 		item.refresh_from_db()
-		self.assertEqual(stock.stock_fisico, 7)
+		self.assertEqual(stock.stock_fisico, 70)
 		self.assertEqual(stock.stock_reservado, 0)
-		self.assertEqual(stock.stock_disponible, 7)
+		self.assertEqual(stock.stock_disponible, 70)
 		self.assertEqual(item.cantidad_inventario_aplicada, 3)
 		self.assertEqual(item.cantidad_reservada_inventario, 0)
 
@@ -123,7 +123,7 @@ class InventarioOperativoTests(TestCase):
 		pedido.estado = 'PARA_VERIFICAR'
 		pedido.save(update_fields=['seleccionador', 'estado'])
 		item = pedido.items.get()
-		item.cantidad_reservada_inventario = 12
+		item.cantidad_reservada_inventario = 1
 		item.save(update_fields=['cantidad_reservada_inventario'])
 
 		registrar_entrada_manual(presentacion=self.presentacion, cantidad=5, observacion='Restock before verification', creado_por=self.backoffice)
@@ -131,18 +131,18 @@ class InventarioOperativoTests(TestCase):
 		guardar_verificacion_picking(
 			pedido=pedido,
 			seleccionador=self.selector,
-			cantidades_reales={item.id: 12},
+			cantidades_reales={item.id: 1},
 			nota='Stock was replenished before verification.',
 			nota_resuelta=True,
 		)
 
 		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
 		item.refresh_from_db()
-		self.assertEqual(stock.stock_fisico, 3)
+		self.assertEqual(stock.stock_fisico, 95)
 		self.assertEqual(stock.stock_reservado, 0)
-		self.assertEqual(stock.stock_disponible, 3)
+		self.assertEqual(stock.stock_disponible, 95)
 		self.assertEqual(item.cantidad_reservada_inventario, 0)
-		self.assertEqual(item.cantidad_inventario_aplicada, 12)
+		self.assertEqual(item.cantidad_inventario_aplicada, 1)
 
 	def test_cancelled_order_restores_reserved_and_applied_stock(self):
 		pedido = crear_pedido_desde_items(
@@ -164,9 +164,29 @@ class InventarioOperativoTests(TestCase):
 
 		cancelar_pedido_con_inventario(pedido=pedido, creado_por=self.backoffice)
 		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
-		self.assertEqual(stock.stock_fisico, 10)
+		self.assertEqual(stock.stock_fisico, 100)
 		self.assertEqual(stock.stock_reservado, 0)
-		self.assertEqual(stock.stock_disponible, 10)
+		self.assertEqual(stock.stock_disponible, 100)
+
+	def test_selling_one_case_deducts_units_per_package_from_inventory(self):
+		pedido = crear_pedido_desde_items(
+			cliente=self.cliente,
+			items_payload=[{'presentacion': self.presentacion, 'cantidad': 1, 'precio': Decimal('10.00')}],
+			origen='CLIENTE',
+		)
+		pedido.seleccionador = self.selector
+		pedido.estado = 'PARA_VERIFICAR'
+		pedido.save(update_fields=['seleccionador', 'estado'])
+		item = pedido.items.get()
+		guardar_verificacion_picking(
+			pedido=pedido,
+			seleccionador=self.selector,
+			cantidades_reales={item.id: 1},
+			nota='Venta de una caja',
+			nota_resuelta=True,
+		)
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		self.assertEqual(stock.stock_fisico, 90)
 
 	def test_credit_return_and_void_reverse_inventory(self):
 		pedido = Pedido.objects.create(cliente=self.cliente, origen='CLIENTE', estado='VERIFICADO_AJUSTADO', total=Decimal('20.00'))
@@ -198,7 +218,7 @@ class InventarioOperativoTests(TestCase):
 
 		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
 		stock.refresh_from_db()
-		self.assertEqual(stock.stock_fisico, 9)
+		self.assertEqual(stock.stock_fisico, 18)
 		self.assertTrue(InventarioMovimiento.objects.filter(nota_ajuste=nota, tipo='ENTRADA_NOTA_CREDITO').exists())
 
 		anular_nota_ajuste(nota=nota)
@@ -217,7 +237,7 @@ class InventarioOperativoTests(TestCase):
 		fractional_stock.refresh_from_db()
 		stock_presentacion = StockPresentacion.objects.get(presentacion=self.presentacion)
 		self.assertEqual(fractional_stock.stock_fisico, 0)
-		self.assertEqual(stock_presentacion.stock_fisico, 11)
+		self.assertEqual(stock_presentacion.stock_fisico, 101)
 
 	def test_fractional_stock_deconsolidates_package_when_reversal_needs_content_units(self):
 		stock_presentacion = StockPresentacion.objects.get(presentacion=self.presentacion)
@@ -328,8 +348,8 @@ class InventarioBackofficeViewsTests(TestCase):
 
 		self.assertEqual(response.status_code, 302)
 		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
-		self.assertEqual(stock.stock_fisico, 10)
-		self.assertEqual(stock.stock_disponible, 10)
+		self.assertEqual(stock.stock_fisico, 104)
+		self.assertEqual(stock.stock_disponible, 104)
 		self.assertTrue(
 			InventarioMovimiento.objects.filter(
 				presentacion=self.presentacion,
@@ -353,8 +373,8 @@ class InventarioBackofficeViewsTests(TestCase):
 
 		self.assertEqual(response.status_code, 302)
 		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
-		self.assertEqual(stock.stock_fisico, 7)
-		self.assertEqual(stock.stock_disponible, 7)
+		self.assertEqual(stock.stock_fisico, 101)
+		self.assertEqual(stock.stock_disponible, 101)
 		self.assertTrue(
 			InventarioMovimiento.objects.filter(
 				presentacion=self.presentacion,

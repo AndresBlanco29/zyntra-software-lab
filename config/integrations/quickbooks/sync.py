@@ -1095,6 +1095,15 @@ def _parse_quickbooks_presentation(payload):
     if unit_count:
         unidades = unit_count
 
+    from config.productos.packaging import parse_case_packaging_from_product_name
+    case_packaging = parse_case_packaging_from_product_name(product_name)
+    if case_packaging:
+        unidades = case_packaging['units_per_case']
+        if presentation_name in {'Unit', 'unidad', 'units', 'unidades', ''}:
+            presentation_name = case_packaging['presentation_name']
+        if not tipo_contenido or tipo_contenido in {'unidades', 'unidad', 'units', 'unit'}:
+            tipo_contenido = case_packaging['content_type']
+
     return (
         _truncate(product_name, limit=255),
         _truncate(presentation_name, limit=100),

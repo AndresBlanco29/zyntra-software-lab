@@ -12,6 +12,7 @@ from django.utils.translation import gettext as _
 
 from config.inventario.services import (
     aplicar_verificacion_picking_inventario,
+    inventory_units_for_packages,
     reemplazar_presentacion_item_pedido,
     reservar_stock_para_pedido_items,
     validar_disponibilidad_para_items,
@@ -138,7 +139,8 @@ def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales
         cantidad_real = max(int(cantidades_reales.get(item.id, item.cantidad) or 0), 0)
         cantidad_aplicada_previa = max(int(item.cantidad_inventario_aplicada or 0), 0)
         cantidad_pendiente_aplicar = max(cantidad_real - cantidad_aplicada_previa, 0)
-        faltante = max(cantidad_pendiente_aplicar - stock_fisico, 0)
+        units_needed = inventory_units_for_packages(item.presentacion, cantidad_pendiente_aplicar)
+        faltante = max(units_needed - stock_fisico, 0)
 
         evaluation[item.id] = {
             'stock_fisico': stock_fisico,

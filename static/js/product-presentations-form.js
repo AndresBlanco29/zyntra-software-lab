@@ -60,8 +60,44 @@
       var container = form.querySelector('[data-presentations-list]');
       var template = form.querySelector('#presentacion-row-template');
       var addButton = form.querySelector('[data-add-presentation]');
+      var detectButton = form.querySelector('[data-detect-packaging-from-name]');
       if (!container || !template || !addButton) {
         return;
+      }
+
+      function applyPackagingDefaults(defaults) {
+        if (!defaults || !defaults.units_per_case) {
+          window.alert('No se detecto un formato de caja en el nombre del producto.');
+          return;
+        }
+        var row = container.querySelector('[data-presentation-row]:not([hidden])');
+        if (!row) {
+          return;
+        }
+        var nameInput = row.querySelector('[name^="presentacion_nombre_"], [name="presentacion_nueva_nombre[]"]');
+        var typeInput = row.querySelector('[name^="tipo_contenido_"], [name="presentacion_nueva_tipo_contenido[]"]');
+        var unitsInput = row.querySelector('[name^="unidades_"], [name="presentacion_nueva_unidades[]"]');
+        if (nameInput) {
+          nameInput.value = defaults.presentation_name || 'Caja';
+        }
+        if (typeInput) {
+          typeInput.value = defaults.content_type || defaults.unit_size_label || typeInput.value;
+        }
+        if (unitsInput) {
+          unitsInput.value = String(defaults.units_per_case);
+        }
+      }
+
+      if (detectButton) {
+        detectButton.addEventListener('click', function () {
+          var defaults = {};
+          try {
+            defaults = JSON.parse(form.getAttribute('data-packaging-defaults') || '{}');
+          } catch (error) {
+            defaults = {};
+          }
+          applyPackagingDefaults(defaults);
+        });
       }
 
       bindRemoveButtons(container, form);

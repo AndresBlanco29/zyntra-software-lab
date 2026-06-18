@@ -91,6 +91,17 @@ class QuickBooksPresentationParsingTests(TestCase):
         self.assertEqual(tipo, 'caja')
         self.assertEqual(units, 12)
 
+    def test_product_name_slash_pattern_sets_case_units(self):
+        product, presentation, tipo, units = _parse_quickbooks_presentation({
+            'Id': '5',
+            'Name': '123 DETERGENT MAXI EFECTO COLOR 4/4.65 LT',
+        })
+
+        self.assertEqual(product, '123 DETERGENT MAXI EFECTO COLOR 4/4.65 LT')
+        self.assertEqual(presentation, 'Caja')
+        self.assertEqual(units, 4)
+        self.assertEqual(tipo, '4.65 LT')
+
 
 class QuickBooksItemCostSyncTests(TestCase):
     @patch('config.integrations.quickbooks.sync._fetch_quickbooks_item_payload')

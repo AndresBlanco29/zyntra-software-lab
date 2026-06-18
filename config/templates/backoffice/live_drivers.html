@@ -12,7 +12,7 @@
     <p class="text-muted mb-0">{% trans "Monitor every driver currently on route and watch their vehicle move in real time." %}</p>
   </div>
   <div class="d-flex gap-2">
-    <span class="badge bg-primary fs-6" id="liveDriversCountBadge">{{ tracking_payloads|length }} {% trans "active" %}</span>
+    <span class="badge bg-primary fs-6" id="liveDriversCountBadge">{{ tracking_payloads|length }} {% trans "Active drivers" %}</span>
   </div>
 </div>
 
@@ -82,7 +82,7 @@
 
     function renderList(drivers) {
       listContainer.innerHTML = '';
-      countBadge.textContent = `${drivers.length} {% trans "active" %}`;
+      countBadge.textContent = `${drivers.length} {% trans "Active drivers" %}`;
       if (!drivers.length) {
         listContainer.innerHTML = `<div class="text-muted">{% trans "No drivers are currently on route." %}</div>`;
         return;

@@ -1,6 +1,6 @@
 {% load static i18n %}
 <!doctype html>
-<html lang="es">
+<html lang="{{ LANGUAGE_CODE }}">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -21,9 +21,8 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="{%static 'css/login.css'%}">
-    
-    
-
+    <link rel="stylesheet" href="{% static 'css/language-widget.css' %}">
+    <script defer src="{% static 'js/language-session.js' %}"></script>
   </head>
   <body>
     <div
@@ -99,7 +98,7 @@
           <!-- Botón -->
           <div class="d-grid">
             <button type="submit" class="btn btn-login btn-lg">
-              Iniciar Sesión
+              {% trans "Sign in" %}
             </button>
           </div>
         </form>
@@ -113,12 +112,13 @@
         <!-- Registro -->
         <div class="text-center mt-3">
           <small>
-            ¿No tienes cuenta?
-            <a href="#" class="fw-bold text-primary">Regístrate</a>
+            {% trans "Don't have an account?" %}
+            <a href="#" class="fw-bold text-primary">{% trans "Register" %}</a>
           </small>
         </div>
       </div>
     </div>
     <script src="{%static 'js/login.js'%}"></script>
+    {% include "includes/language_widget.html" %}
   </body>
 </html>

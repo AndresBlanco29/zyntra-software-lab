@@ -28,5 +28,6 @@ Thumbs.db
 # Archivos de traducción compilados
 *.mo
 
-# (opcional) archivos de traducción fuente
+# Archivos de traducción fuente (excepto catálogos del proyecto)
 *.po
+!config/locale/**/*.po

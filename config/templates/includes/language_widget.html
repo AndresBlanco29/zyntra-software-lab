@@ -1,0 +1,24 @@
+{% load i18n static %}
+<div class="language-widget">
+  <button type="button" class="language-toggle" onclick="toggleLanguageMenu()" aria-label="{% trans 'Change language' %}">
+    🌎
+    <span class="language-current">{{ LANGUAGE_CODE|upper }}</span>
+  </button>
+  <div class="language-menu" id="languageMenu">
+    <form action="{% url 'set_language' %}" method="post" data-language-form>
+      {% csrf_token %}
+      <input name="next" type="hidden" value="{{ request.get_full_path|default:request.path }}">
+      <button type="submit" name="language" value="es" class="language-option">🇪🇸 Español</button>
+      <button type="submit" name="language" value="en" class="language-option">🇺🇸 English</button>
+    </form>
+  </div>
+</div>
+<script>
+  function toggleLanguageMenu() {
+    const menu = document.getElementById('languageMenu');
+    if (!menu) {
+      return;
+    }
+    menu.style.display = menu.style.display === 'flex' ? 'none' : 'flex';
+  }
+</script>

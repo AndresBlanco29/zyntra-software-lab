@@ -387,33 +387,7 @@ La Tortilla Grocery
 
 </div>
 
-<div class="language-widget">
-
-
-<button class="language-toggle" onclick="toggleLanguageMenu()" type="button" aria-expanded="false" aria-controls="languageMenu" title="{% trans 'Change language' %}">
-  🌎
-</button>
-
-<div class="language-menu" id="languageMenu">
-
-<form action="{% url 'set_language' %}" method="post" data-language-form>
-
-{% csrf_token %}
-<input name="next" type="hidden" value="{{ request.path }}">
-
-<button name="language" value="es" class="language-option" type="submit">
-🇪🇸 Español
-</button>
-
-<button name="language" value="en" class="language-option" type="submit">
-🇺🇸 English
-</button>
-
-</form>
-
-</div>
-
-</div>
+{% include "includes/language_widget.html" %}
 
 {% if messages %}
 <div id="flashMessages" class="d-none">

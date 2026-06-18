@@ -60,11 +60,11 @@
     });
 
     const storedLanguage = window.sessionStorage.getItem(STORAGE_KEY);
-    const targetLanguage = storedLanguage || DEFAULT_LANGUAGE;
     const currentLanguage = getCurrentLanguage();
+    const targetLanguage = storedLanguage || currentLanguage || DEFAULT_LANGUAGE;
 
     if (!storedLanguage) {
-      window.sessionStorage.setItem(STORAGE_KEY, DEFAULT_LANGUAGE);
+      window.sessionStorage.setItem(STORAGE_KEY, targetLanguage);
     }
 
     if (currentLanguage !== targetLanguage) {

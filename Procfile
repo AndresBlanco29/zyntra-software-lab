@@ -1,1 +1,1 @@
-web: python manage.py migrate --noinput && python manage.py ensure_superuser && python manage.py collectstatic --noinput && gunicorn config.config.wsgi:application --bind 0.0.0.0:$PORT --timeout 600 --graceful-timeout 120
+web: python manage.py migrate --noinput && python manage.py ensure_superuser && python config/core/fill_spanish_catalog.py && python manage.py compilemessages --ignore=.venv --ignore=venv && python manage.py collectstatic --noinput && gunicorn config.config.wsgi:application --bind 0.0.0.0:$PORT --timeout 600 --graceful-timeout 120

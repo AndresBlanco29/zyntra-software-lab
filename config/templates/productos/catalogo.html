@@ -243,7 +243,7 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                                               data-price="{% if client_price_tier == 1 %}{{ p.precio_1 }}{% elif client_price_tier == 2 %}{{ p.precio_2 }}{% elif client_price_tier == 3 %}{{ p.precio_3 }}{% elif client_price_tier == 4 %}{{ p.precio_4 }}{% else %}{{ p.precio_5 }}{% endif %}"
                                               {% endif %}
                                             >
-                                                {{ p.nombre_traducido }}
+                                                {{ p.nombre_empaque_cliente }}
                                             </option>
                                         {% endfor %}
                                     </select>

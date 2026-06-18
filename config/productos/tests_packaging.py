@@ -3,7 +3,9 @@ from django.test import TestCase
 from config.productos.packaging import (
     build_packaging_customer_description,
     content_type_looks_like_unit_size,
+    get_effective_packaging_for_display,
     parse_case_packaging_from_product_name,
+    presentation_looks_unconfigured,
 )
 
 
@@ -106,3 +108,23 @@ class PackagingCustomerDescriptionTests(TestCase):
             language='en',
         )
         self.assertEqual(description_en, '12 pieces per box')
+
+
+class EffectivePackagingDisplayTests(TestCase):
+    def test_unconfigured_candle_uses_product_name_count_suffix(self):
+        producto = type('ProductoStub', (), {'nombre': 'CANDLE BRILUX BLUE 14 D 6 CT'})()
+        presentacion = type('PresentacionStub', (), {
+            'unidades': 1,
+            'nombre': 'Unit',
+            'tipo_contenido': 'unit',
+            'producto': producto,
+            'producto_id': 1,
+            'tipo_contenido_traducido': 'unit',
+            'nombre_traducido': 'unit',
+        })()
+
+        packaging = get_effective_packaging_for_display(presentacion, language='es')
+
+        self.assertTrue(presentation_looks_unconfigured(presentacion))
+        self.assertEqual(packaging['description'], '6 piezas por caja')
+        self.assertEqual(packaging['presentation_name'], 'caja')

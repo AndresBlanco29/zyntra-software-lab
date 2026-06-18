@@ -256,13 +256,16 @@ class Presentacion(models.Model):
 
     @property
     def descripcion_empaque_cliente(self):
-        from config.productos.packaging import build_packaging_customer_description
+        from config.productos.packaging import get_effective_packaging_for_display
 
-        return build_packaging_customer_description(
-            units=self.unidades,
-            content_type=self.tipo_contenido_traducido,
-            presentation_name=self.nombre_traducido,
-        )
+        return get_effective_packaging_for_display(self)['description']
+
+    @property
+    def nombre_empaque_cliente(self):
+        from config.productos.packaging import get_effective_packaging_for_display
+
+        presentation_name = get_effective_packaging_for_display(self)['presentation_name']
+        return presentation_name[:1].upper() + presentation_name[1:] if presentation_name else ''
 
     def recalcular_precios(self):
         if self.costo is None:

@@ -184,6 +184,7 @@ def _hydrate_productos(productos):
     for producto in productos:
         presentaciones = list(producto.presentaciones.all())
         for presentacion in presentaciones:
+            presentacion.producto = producto
             _refresh_presentacion_prices(presentacion)
         producto.presentaciones_prefetch = presentaciones
         producto.primera_presentacion = presentaciones[0] if presentaciones else None

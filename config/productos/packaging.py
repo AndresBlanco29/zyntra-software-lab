@@ -31,6 +31,13 @@ GENERIC_CONTENT_TYPES = {
 
 COUNT_CONTENT_TYPES = {'piezas', 'pieza', 'pieces', 'piece'}
 
+GENERIC_PRESENTATION_NAMES = {'unit', 'unidad', 'units', 'unidades', ''}
+GENERIC_PRESENTATION_CONTENT = {
+    'unit', 'unidad', 'units', 'unidades',
+    'piezas', 'pieza', 'pieces', 'piece',
+    'caja', 'cajas', 'box', 'boxes', '',
+}
+
 UNIT_ALIASES = {
     'LTR': 'LT',
     'L': 'LT',
@@ -116,6 +123,62 @@ def content_type_looks_like_unit_size(value):
     if _normalize_content_token(text) in GENERIC_CONTENT_TYPES:
         return False
     return bool(SIZE_HINT_PATTERN.search(text))
+
+
+def presentation_looks_unconfigured(presentacion):
+    units = int(getattr(presentacion, 'unidades', 0) or 0)
+    nombre = _normalize_content_token(getattr(presentacion, 'nombre', ''))
+    tipo = _normalize_content_token(getattr(presentacion, 'tipo_contenido', ''))
+    return units <= 1 and nombre in GENERIC_PRESENTATION_NAMES and tipo in GENERIC_PRESENTATION_CONTENT
+
+
+def _localized_presentation_name(name, *, english):
+    normalized = _normalize_content_token(name)
+    if normalized in {'caja', 'cajas', 'box', 'boxes'}:
+        return 'box' if english else 'caja'
+    return (name or '').strip().lower()
+
+
+def _localized_content_type_label(content_type, *, english):
+    normalized = _normalize_content_token(content_type)
+    if normalized in COUNT_CONTENT_TYPES:
+        return 'pieces' if english else 'piezas'
+    return (content_type or '').strip()
+
+
+def get_effective_packaging_for_display(presentacion, *, language=None):
+    from django.utils.translation import get_language
+
+    active_language = (language or get_language() or 'es').lower()
+    english = active_language.startswith('en')
+
+    product = getattr(presentacion, 'producto', None)
+    product_name = getattr(product, 'nombre', '') if product is not None else ''
+    parsed = None
+    if presentation_looks_unconfigured(presentacion) and product_name:
+        parsed = parse_case_packaging_from_product_name(product_name)
+
+    if parsed:
+        units = parsed['units_per_case']
+        content_type = _localized_content_type_label(parsed['content_type'], english=english)
+        presentation_name = _localized_presentation_name(parsed['presentation_name'], english=english)
+    else:
+        units = presentacion.unidades
+        content_type = presentacion.tipo_contenido_traducido
+        presentation_name = presentacion.nombre_traducido
+
+    description = build_packaging_customer_description(
+        units=units,
+        content_type=content_type,
+        presentation_name=presentation_name,
+        language=active_language,
+    )
+    return {
+        'units': units,
+        'content_type': content_type,
+        'presentation_name': presentation_name,
+        'description': description,
+    }
 
 
 def build_packaging_customer_description(*, units, content_type, presentation_name, language=None):

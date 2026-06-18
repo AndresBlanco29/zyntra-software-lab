@@ -6,6 +6,7 @@ from config.clientes.models import Cliente
 from config.clientes.assignment import filter_clientes_for_vendedor
 from config.usuarios.models import Usuario
 from config.productos.models import Producto, Presentacion, Categoria, Marca
+from config.productos.views import _hydrate_productos
 from django.views.decorators.http import require_POST
 import uuid
 import json
@@ -328,7 +329,7 @@ def catalogo_vendedor(request, cliente_id):
     filter_params = _catalogo_vendedor_filter_params(request)
     paginator = Paginator(_catalogo_vendedor_queryset(request), VENDEDOR_CATALOGO_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get('page'))
-    productos = list(page_obj.object_list)
+    productos = _hydrate_productos(list(page_obj.object_list))
     _attach_recent_customer_order_history(cliente=cliente, productos=productos)
 
     categorias = Categoria.objects.all()

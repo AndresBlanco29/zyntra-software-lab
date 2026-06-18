@@ -1,12 +1,19 @@
 import re
 import unicodedata
 
+PACK_UNIT_TOKENS = (
+    r'LT|LTR|L|ML|OZ|FLOZ|FL\s*OZ|GAL|GALON|GALONES|KG|LB|GR|G|CT|PK|PC|EA'
+)
+
 CASE_PACK_PATTERN = re.compile(
-    r'(\d+)\s*/\s*([\d.]+)\s*(LT|LTR|L|ML|OZ|FLOZ|FL\s*OZ|GAL|KG|LB|GR|G)\b',
+    rf'(\d+)\s*/\s*([\d.]+)\s*({PACK_UNIT_TOKENS})\b',
     re.IGNORECASE,
 )
 
-SIZE_HINT_PATTERN = re.compile(r'\d|\b(LT|LTR|OZ|FLOZ|ML|GAL|KG|LB|GR|G)\b', re.IGNORECASE)
+SIZE_HINT_PATTERN = re.compile(
+    rf'\d|\b(LT|LTR|OZ|FLOZ|ML|GAL|GALON|KG|LB|GR|G|CT|PK|PC|EA)\b',
+    re.IGNORECASE,
+)
 
 GENERIC_CONTENT_TYPES = {
     'unidad', 'unidades', 'unit', 'units',
@@ -19,6 +26,11 @@ UNIT_ALIASES = {
     'L': 'LT',
     'FLOZ': 'OZ',
     'FL OZ': 'OZ',
+    'GALON': 'GAL',
+    'GALONES': 'GAL',
+    'PK': 'CT',
+    'PC': 'CT',
+    'EA': 'CT',
 }
 
 
@@ -88,6 +100,11 @@ def build_packaging_customer_description(*, units, content_type, presentation_na
         if english:
             return f'{units} units of size {content_type} per {presentation_name}'
         return f'{units} unidades de tamaño {content_type} por {presentation_name}'
+
+    if units == 1 and content_type_looks_like_unit_size(content_type):
+        if english:
+            return f'1 pack of {content_type} per {presentation_name}'
+        return f'1 paquete de {content_type} por {presentation_name}'
 
     if units > 1:
         content_label = content_type.lower() if content_type else ('units' if english else 'unidades')

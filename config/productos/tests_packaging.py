@@ -24,6 +24,21 @@ class CasePackagingParserTests(TestCase):
         self.assertEqual(parsed['units_per_case'], 12)
         self.assertEqual(parsed['unit_size_label'], '1 LT')
 
+    def test_parses_count_pattern_with_ct_suffix(self):
+        parsed = parse_case_packaging_from_product_name('ANAHUAC PICA LIMON 7 VERDE 24/100 CT')
+        self.assertEqual(parsed['units_per_case'], 24)
+        self.assertEqual(parsed['unit_size_label'], '100 CT')
+
+    def test_parses_single_pack_count_pattern(self):
+        parsed = parse_case_packaging_from_product_name('BUBA AZUL/ BLUBERRY 1/32 CT')
+        self.assertEqual(parsed['units_per_case'], 1)
+        self.assertEqual(parsed['unit_size_label'], '32 CT')
+
+    def test_parses_gallon_word_suffix(self):
+        parsed = parse_case_packaging_from_product_name('ACEITE MAZOLA 2/2 GALON')
+        self.assertEqual(parsed['units_per_case'], 2)
+        self.assertEqual(parsed['unit_size_label'], '2 GAL')
+
     def test_returns_none_when_pattern_missing(self):
         self.assertIsNone(parse_case_packaging_from_product_name('Jarritos Mango'))
 
@@ -49,4 +64,14 @@ class PackagingCustomerDescriptionTests(TestCase):
 
     def test_size_detector_recognizes_measurements(self):
         self.assertTrue(content_type_looks_like_unit_size('4.65 LT'))
+        self.assertTrue(content_type_looks_like_unit_size('100 CT'))
         self.assertFalse(content_type_looks_like_unit_size('unidades'))
+
+    def test_single_pack_count_uses_pack_wording(self):
+        description = build_packaging_customer_description(
+            units=1,
+            content_type='32 CT',
+            presentation_name='Caja',
+            language='es',
+        )
+        self.assertEqual(description, '1 paquete de 32 CT por caja')

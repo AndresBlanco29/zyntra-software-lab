@@ -336,6 +336,8 @@ def backoffice_pedido_detalle(request, pedido_id):
 				'presentation_name': item.presentacion.nombre,
 				'quantity': item.cantidad,
 				'base_unit_value': format(_pedido_item_customer_unit_price(item), '.2f'),
+				'list_unit_value': format(item.precio, '.2f'),
+				'default_discount': max(int(getattr(item.presentacion.producto, 'descuento', 0) or 0), 0),
 				'default_value': format(resolve_presentacion_suggested_unit_price(presentacion=item.presentacion, base_case_price=item.precio), '.2f'),
 				'default_percentage': format(DEFAULT_SUGGESTED_PROFIT_PERCENTAGE, '.2f'),
 			}

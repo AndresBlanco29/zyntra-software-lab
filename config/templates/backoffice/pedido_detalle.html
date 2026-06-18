@@ -216,6 +216,62 @@
             </div>
             {% endif %}
             <div class="col-12">
+              <div class="border rounded-3 p-3 bg-white mt-2">
+                <div class="fw-semibold mb-2">{% trans "Customer pricing per product" %}</div>
+                <div class="small text-muted mb-3">{% trans "Apply a discount percentage to each line before the invoice is generated. The final unit price and subtotal are calculated automatically." %}</div>
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>{% trans "Product" %}</th>
+                        <th>{% trans "Presentation" %}</th>
+                        <th>{% trans "Qty." %}</th>
+                        <th>{% trans "List price" %}</th>
+                        <th>{% trans "Discount" %} %</th>
+                        <th>{% trans "Final unit price" %}</th>
+                        <th>{% trans "Subtotal" %}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for row in invoice_suggested_price_rows %}
+                        <tr>
+                          <td>{{ row.product_name }}</td>
+                          <td>{{ row.presentation_name }}</td>
+                          <td>{{ row.quantity }}</td>
+                          <td>${{ row.list_unit_value }}</td>
+                          <td style="min-width: 120px;">
+                            <div class="input-group input-group-sm">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.01"
+                                class="form-control line-discount-input"
+                                name="line_discount_percentage_{{ row.item_id }}"
+                                value="{{ row.default_discount }}"
+                                data-list-unit-price="{{ row.list_unit_value }}"
+                                data-quantity="{{ row.quantity }}"
+                                data-final-target="line_final_unit_{{ row.item_id }}"
+                                data-subtotal-target="line_subtotal_{{ row.item_id }}"
+                                data-base-unit-target="suggested_base_{{ row.item_id }}"
+                              >
+                              <span class="input-group-text">%</span>
+                            </div>
+                          </td>
+                          <td>
+                            <span id="line_final_unit_{{ row.item_id }}" class="fw-semibold">—</span>
+                          </td>
+                          <td>
+                            <span id="line_subtotal_{{ row.item_id }}" class="fw-semibold">—</span>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div class="col-12">
               <div class="border rounded-3 p-3 bg-light-subtle mt-2">
                 <div class="fw-semibold mb-2">{% trans "Suggested resale price per unit for the final customer" %}</div>
                 <div class="small text-muted mb-3">{% trans "Leave any field as-is to keep the automatic suggested value. You can customize it before the invoice is generated." %}</div>
@@ -237,7 +293,7 @@
                           <td>{{ row.presentation_name }}</td>
                           <td>{{ row.quantity }}</td>
                           <td style="min-width: 360px; max-width: 420px;">
-                            <div class="small text-muted mb-2">{% trans "Customer unit cost" %}: ${{ row.base_unit_value }}</div>
+                            <div class="small text-muted mb-2">{% trans "Customer unit cost" %}: $<span id="suggested_customer_cost_{{ row.item_id }}">{{ row.list_unit_value }}</span></div>
                             <div class="row g-2">
                               <div class="col-md-5">
                                 <label class="form-label form-label-sm mb-1">{% trans "Profit %" %}</label>
@@ -249,9 +305,10 @@
                                     class="form-control suggested-margin-input"
                                     name="suggested_margin_percentage_{{ row.item_id }}"
                                     value="{{ row.default_percentage }}"
-                                    data-base-unit-price="{{ row.base_unit_value }}"
+                                    data-base-unit-price="{{ row.list_unit_value }}"
                                     data-value-target="suggested_value_{{ row.item_id }}"
                                     data-summary-target="suggested_summary_{{ row.item_id }}"
+                                    data-base-price-input="line_discount_percentage_{{ row.item_id }}"
                                   >
                                   <span class="input-group-text">%</span>
                                 </div>
@@ -268,9 +325,10 @@
                                     class="form-control suggested-value-input"
                                     name="suggested_unit_price_{{ row.item_id }}"
                                     value="{{ row.default_value }}"
-                                    data-base-unit-price="{{ row.base_unit_value }}"
+                                    data-base-unit-price="{{ row.list_unit_value }}"
                                     data-margin-target="suggested_margin_percentage_{{ row.item_id }}"
                                     data-summary-target="suggested_summary_{{ row.item_id }}"
+                                    data-base-price-input="line_discount_percentage_{{ row.item_id }}"
                                   >
                                 </div>
                               </div>
@@ -443,7 +501,63 @@ document.addEventListener('DOMContentLoaded', function () {
   const orderForm = document.getElementById('backofficeOrderForm');
   const marginInputs = Array.from(document.querySelectorAll('.suggested-margin-input'));
   const valueInputs = Array.from(document.querySelectorAll('.suggested-value-input'));
+  const lineDiscountInputs = Array.from(document.querySelectorAll('.line-discount-input'));
   let syncing = false;
+
+  function getDiscountedBaseUnitPrice(discountInput) {
+    const listPrice = parseNumber(discountInput ? discountInput.dataset.listUnitPrice : null);
+    const discount = parseNumber(discountInput ? discountInput.value : null) || 0;
+    if (listPrice === null || listPrice <= 0) {
+      return null;
+    }
+    return listPrice * (1 - (discount / 100));
+  }
+
+  function refreshSuggestedBasePrices(discountInput) {
+    const itemId = (discountInput.name || '').replace('line_discount_percentage_', '');
+    const discountedBase = getDiscountedBaseUnitPrice(discountInput);
+    if (discountedBase === null) {
+      return;
+    }
+    const formatted = formatNumber(discountedBase);
+    const costLabel = document.getElementById(`suggested_customer_cost_${itemId}`);
+    if (costLabel) {
+      costLabel.textContent = formatted;
+    }
+    document.querySelectorAll(`[data-base-price-input="line_discount_percentage_${itemId}"]`).forEach((input) => {
+      input.dataset.baseUnitPrice = formatted;
+    });
+    const marginInput = document.querySelector(`[name="suggested_margin_percentage_${itemId}"]`);
+    if (marginInput && !syncing) {
+      syncFromMargin(marginInput);
+    }
+  }
+
+  function refreshLinePricingPreview(input) {
+    const listPrice = parseNumber(input.dataset.listUnitPrice);
+    const quantity = parseNumber(input.dataset.quantity) || 0;
+    const discount = parseNumber(input.value) || 0;
+    const finalTarget = document.getElementById(input.dataset.finalTarget);
+    const subtotalTarget = document.getElementById(input.dataset.subtotalTarget);
+    if (listPrice === null || listPrice <= 0) {
+      if (finalTarget) {
+        finalTarget.textContent = '—';
+      }
+      if (subtotalTarget) {
+        subtotalTarget.textContent = '—';
+      }
+      return;
+    }
+    const finalUnit = listPrice * (1 - (discount / 100));
+    const subtotal = finalUnit * quantity;
+    if (finalTarget) {
+      finalTarget.textContent = `$${formatNumber(finalUnit)}`;
+    }
+    if (subtotalTarget) {
+      subtotalTarget.textContent = `$${formatNumber(subtotal)}`;
+    }
+    refreshSuggestedBasePrices(input);
+  }
 
   function parseNumber(value) {
     const normalized = String(value || '').trim().replace(',', '.');
@@ -525,6 +639,13 @@ document.addEventListener('DOMContentLoaded', function () {
       }
       syncFromValue(input);
     });
+  });
+
+  lineDiscountInputs.forEach((input) => {
+    input.addEventListener('input', function () {
+      refreshLinePricingPreview(input);
+    });
+    refreshLinePricingPreview(input);
   });
 
   if (orderForm) {

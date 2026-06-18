@@ -2495,6 +2495,54 @@ class InvoiceFlowTests(TestCase):
 		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
 		self.assertEqual(invoice.items.first().precio_venta_sugerido_unitario, Decimal('2.75'))
 
+	def test_generar_invoice_desde_picking_applies_line_discount(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='LTG',
+			driver=None,
+			usuario=self.backoffice,
+			line_discounts={self.pedido_item.id: Decimal('10.00')},
+		)
+		item = invoice.items.get()
+		self.assertEqual(item.precio_unitario_lista, Decimal('15.00'))
+		self.assertEqual(item.descuento_porcentaje, Decimal('10.00'))
+		self.assertEqual(item.precio_unitario, Decimal('13.50'))
+		self.assertEqual(item.subtotal, Decimal('40.50'))
+		self.assertEqual(invoice.subtotal, Decimal('40.50'))
+
+	def test_backoffice_generate_invoice_view_applies_line_discount(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('backoffice_generate_invoice', args=[self.pedido.id]), {
+			'metodo_entrega': 'LTG',
+			'driver_id': '',
+			f'line_discount_percentage_{self.pedido_item.id}': '10',
+		})
+
+		invoice = Invoice.objects.get(pedido=self.pedido)
+		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		item = invoice.items.get()
+		self.assertEqual(item.precio_unitario, Decimal('13.50'))
+		self.assertEqual(invoice.subtotal, Decimal('40.50'))
+
+	def test_generar_invoice_directa_backoffice_applies_line_discount(self):
+		invoice = generar_invoice_directa_backoffice(
+			cliente=self.cliente,
+			items_payload=[{
+				'presentacion': self.presentacion,
+				'cantidad': 2,
+				'precio': Decimal('20.00'),
+				'descuento_porcentaje': Decimal('25.00'),
+			}],
+			metodo_entrega='CUSTOMER_PICK_UP',
+			usuario=self.backoffice,
+		)
+		item = invoice.items.get()
+		self.assertEqual(item.precio_unitario_lista, Decimal('20.00'))
+		self.assertEqual(item.descuento_porcentaje, Decimal('25.00'))
+		self.assertEqual(item.precio_unitario, Decimal('15.00'))
+		self.assertEqual(item.subtotal, Decimal('30.00'))
+
 	def test_backoffice_generate_invoice_view_saves_estimated_delivery(self):
 		self.client.force_login(self.backoffice)
 

@@ -166,6 +166,21 @@ def _extract_invoice_suggested_unit_prices(pedido, post_data):
 	return suggested_prices
 
 
+def _parse_invoice_line_discount_percentage(value):
+	from config.facturacion.services import _parse_line_discount_percentage
+	return _parse_line_discount_percentage(value)
+
+
+def _extract_invoice_line_discounts(pedido, post_data):
+	line_discounts = {}
+	for item in pedido.items.all():
+		raw_discount = post_data.get(f'line_discount_percentage_{item.id}')
+		if raw_discount in (None, ''):
+			continue
+		line_discounts[item.id] = _parse_invoice_line_discount_percentage(raw_discount)
+	return line_discounts
+
+
 def _parse_adjustment_amount(value):
 	text = str(value or '').strip().replace(',', '.')
 	if not text:
@@ -266,12 +281,14 @@ def _parse_direct_invoice_lines(post_data):
 	raw_presentacion_ids = post_data.getlist('presentacion_id')
 	raw_quantities = post_data.getlist('cantidad')
 	raw_unit_prices = post_data.getlist('precio_unitario')
+	raw_discounts = post_data.getlist('descuento_porcentaje')
 
 	line_specs = []
 	for index, raw_presentacion_id in enumerate(raw_presentacion_ids):
 		presentacion_id = str(raw_presentacion_id or '').strip()
 		quantity = str(raw_quantities[index] if index < len(raw_quantities) else '').strip()
 		unit_price = str(raw_unit_prices[index] if index < len(raw_unit_prices) else '').strip()
+		discount = str(raw_discounts[index] if index < len(raw_discounts) else '').strip()
 		if not any((presentacion_id, quantity, unit_price)):
 			continue
 		if not (presentacion_id and quantity and unit_price):
@@ -282,6 +299,7 @@ def _parse_direct_invoice_lines(post_data):
 			parsed_unit_price = Decimal(unit_price)
 		except (TypeError, ValueError, InvalidOperation) as exc:
 			raise ValidationError(_('One or more direct invoice lines contain invalid values.')) from exc
+		parsed_discount = _parse_invoice_line_discount_percentage(discount)
 		if parsed_quantity <= 0:
 			raise ValidationError(_('Quantity must be greater than zero.'))
 		if parsed_unit_price <= 0:
@@ -290,6 +308,7 @@ def _parse_direct_invoice_lines(post_data):
 			'presentacion_id': parsed_presentacion_id,
 			'cantidad': parsed_quantity,
 			'precio': parsed_unit_price,
+			'descuento_porcentaje': parsed_discount,
 		})
 
 	if not line_specs:
@@ -310,6 +329,7 @@ def _parse_direct_invoice_lines(post_data):
 			'presentacion': presentaciones[spec['presentacion_id']],
 			'cantidad': spec['cantidad'],
 			'precio': spec['precio'],
+			'descuento_porcentaje': spec.get('descuento_porcentaje', Decimal('0.00')),
 		})
 	return items_payload
 
@@ -318,11 +338,13 @@ def _build_direct_invoice_line_drafts(post_data=None):
 	raw_presentacion_ids = post_data.getlist('presentacion_id') if post_data is not None else []
 	raw_quantities = post_data.getlist('cantidad') if post_data is not None else []
 	raw_unit_prices = post_data.getlist('precio_unitario') if post_data is not None else []
-	row_count = max(len(raw_presentacion_ids), len(raw_quantities), len(raw_unit_prices), 1)
+	raw_discounts = post_data.getlist('descuento_porcentaje') if post_data is not None else []
+	row_count = max(len(raw_presentacion_ids), len(raw_quantities), len(raw_unit_prices), len(raw_discounts), 1)
 	return [{
 		'presentacion_id': str(raw_presentacion_ids[index] if index < len(raw_presentacion_ids) else '').strip(),
 		'cantidad': str(raw_quantities[index] if index < len(raw_quantities) else '').strip(),
 		'precio_unitario': str(raw_unit_prices[index] if index < len(raw_unit_prices) else '').strip(),
+		'descuento_porcentaje': str(raw_discounts[index] if index < len(raw_discounts) else '').strip(),
 	} for index in range(row_count)]
 
 
@@ -472,6 +494,8 @@ def _build_invoice_pdf_item_data(invoice):
 			'pack_size': _resolve_invoice_pack_size(item),
 			'requested_quantity': str(requested_quantity),
 			'dispatched_quantity': str(item.cantidad_facturada),
+			'list_price': _format_pdf_money(item.precio_unitario_lista) if item.precio_unitario_lista else '',
+			'discount_percentage': f'{Decimal(str(item.descuento_porcentaje or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP):.2f}%' if Decimal(str(item.descuento_porcentaje or 0)) > 0 else '',
 			'customer_price': _format_pdf_money(item.precio_unitario),
 			'suggested_unit_price': _format_pdf_money(suggested_unit_price),
 			'subtotal': _format_pdf_money(item.subtotal),
@@ -1157,6 +1181,7 @@ def backoffice_generate_invoice(request, pedido_id):
 		if metodo_entrega == 'RUTA_DRIVER':
 			estimated_delivery_at = _parse_estimated_delivery_at(request.POST.get('estimated_delivery_at'))
 		suggested_unit_prices = _extract_invoice_suggested_unit_prices(pedido, request.POST)
+		line_discounts = _extract_invoice_line_discounts(pedido, request.POST)
 		pending_notes_summary = summarize_pending_customer_notes(cliente=pedido.cliente)
 		selected_note_applications = _parse_general_note_applications(pedido.cliente, request.POST)
 		applied_customer_credit = _parse_customer_credit_to_apply(
@@ -1170,6 +1195,7 @@ def backoffice_generate_invoice(request, pedido_id):
 			driver=driver,
 			usuario=request.user,
 			suggested_unit_prices=suggested_unit_prices,
+			line_discounts=line_discounts,
 			applied_customer_credit=applied_customer_credit,
 			selected_note_applications=selected_note_applications,
 			estimated_delivery_at=estimated_delivery_at,

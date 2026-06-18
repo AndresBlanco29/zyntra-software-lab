@@ -258,6 +258,8 @@
             <th>{% trans "U/M" %}</th>
             <th>{% trans "Requested qty." %}</th>
             <th>{% trans "Dispatched qty." %}</th>
+            <th>{% trans "List price" %}</th>
+            <th>{% trans "Discount" %} %</th>
             <th>{% trans "Unit price" %}</th>
             <th>{% trans "Sug. rtl / unit" %}</th>
             <th>{% trans "Subtotal" %}</th>
@@ -270,6 +272,8 @@
             <td>{{ item.presentacion_nombre }}</td>
             <td>{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
             <td>{{ item.cantidad_facturada }}</td>
+            <td>{% if item.precio_unitario_lista %}${{ item.precio_unitario_lista }}{% else %}—{% endif %}</td>
+            <td>{% if item.descuento_porcentaje %}{{ item.descuento_porcentaje }}%{% else %}—{% endif %}</td>
             <td>${{ item.precio_unitario }}</td>
             <td>${{ item.precio_venta_sugerido_unitario|default:'0.00' }}</td>
             <td>${{ item.subtotal }}</td>

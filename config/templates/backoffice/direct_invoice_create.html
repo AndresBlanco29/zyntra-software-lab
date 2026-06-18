@@ -81,9 +81,13 @@
                         <option value="">{% trans "Select a price" %}</option>
                       </select>
                     </div>
-                    <div class="col-lg-3 col-md-6">
+                    <div class="col-lg-2 col-md-6">
                       <label class="form-label small text-muted mb-1">{% trans "Qty" %}</label>
                       <input type="number" min="1" name="cantidad" value="{{ line.cantidad }}" class="form-control" placeholder="0">
+                    </div>
+                    <div class="col-lg-2 col-md-6">
+                      <label class="form-label small text-muted mb-1">{% trans "Discount" %} %</label>
+                      <input type="number" min="0" max="100" step="0.01" name="descuento_porcentaje" value="{{ line.descuento_porcentaje|default:'0' }}" class="form-control direct-invoice-discount-input">
                     </div>
                   </div>
                 </div>
@@ -193,9 +197,13 @@
           <option value="">{% trans "Select a price" %}</option>
         </select>
       </div>
-      <div class="col-lg-3 col-md-6">
+      <div class="col-lg-2 col-md-6">
         <label class="form-label small text-muted mb-1">{% trans "Qty" %}</label>
         <input type="number" min="1" name="cantidad" class="form-control" placeholder="0">
+      </div>
+      <div class="col-lg-2 col-md-6">
+        <label class="form-label small text-muted mb-1">{% trans "Discount" %} %</label>
+        <input type="number" min="0" max="100" step="0.01" name="descuento_porcentaje" value="0" class="form-control direct-invoice-discount-input">
       </div>
     </div>
   </div>

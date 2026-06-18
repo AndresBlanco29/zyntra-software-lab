@@ -39,6 +39,30 @@ def _quantize_money(value):
 	return _to_decimal(value, '0').quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
+def _parse_line_discount_percentage(value):
+	text = str(value or '').strip().replace(',', '.')
+	if not text:
+		return Decimal('0.00')
+	try:
+		parsed = Decimal(text)
+	except (InvalidOperation, TypeError, ValueError):
+		raise ValidationError(_('Line discount must be a valid number.'))
+	if parsed < 0:
+		raise ValidationError(_('Line discount cannot be negative.'))
+	if parsed > 100:
+		raise ValidationError(_('Line discount cannot exceed 100%.'))
+	return parsed.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def _calculate_discounted_unit_price(list_price, discount_percentage):
+	list_price = _quantize_money(list_price)
+	discount_percentage = _parse_line_discount_percentage(discount_percentage)
+	if discount_percentage <= 0:
+		return list_price
+	factor = Decimal('1') - (discount_percentage / Decimal('100'))
+	return _quantize_money(list_price * factor)
+
+
 def _clamp_non_negative_money(value):
 	return max(_quantize_money(value), Decimal('0.00'))
 
@@ -271,12 +295,14 @@ def generar_invoice_desde_picking(
 	driver,
 	usuario,
 	suggested_unit_prices=None,
+	line_discounts=None,
 	applied_customer_credit=None,
 	selected_note_applications=None,
 	estimated_delivery_at=None,
 ):
 	_validate_invoice_generation(pedido, metodo_entrega, driver)
 	suggested_unit_prices = suggested_unit_prices or {}
+	line_discounts = line_discounts or {}
 
 	invoice = Invoice.objects.create(
 		pedido=pedido,
@@ -292,12 +318,15 @@ def generar_invoice_desde_picking(
 	invoice_items = []
 	for item in pedido.items.select_related('presentacion__producto').all():
 		quantity = int(item.cantidad or 0)
-		line_total = _quantize_money(_to_decimal(item.precio) * Decimal(str(quantity)))
+		list_unit_price = _quantize_money(item.precio)
+		discount_percentage = _parse_line_discount_percentage(line_discounts.get(item.id, '0'))
+		final_unit_price = _calculate_discounted_unit_price(list_unit_price, discount_percentage)
+		line_total = _quantize_money(final_unit_price * Decimal(str(quantity)))
 		suggested_unit_price = suggested_unit_prices.get(item.id)
 		if suggested_unit_price in (None, ''):
 			suggested_unit_price = resolve_presentacion_suggested_unit_price(
 				presentacion=item.presentacion,
-				base_case_price=item.precio,
+				base_case_price=final_unit_price,
 			)
 		else:
 			suggested_unit_price = _quantize_money(suggested_unit_price)
@@ -308,7 +337,9 @@ def generar_invoice_desde_picking(
 			producto_nombre=item.presentacion.producto.nombre,
 			presentacion_nombre=item.presentacion.nombre,
 			cantidad_facturada=quantity,
-			precio_unitario=_quantize_money(item.precio),
+			precio_unitario_lista=list_unit_price if discount_percentage > 0 else None,
+			descuento_porcentaje=discount_percentage,
+			precio_unitario=final_unit_price,
 			precio_venta_sugerido_unitario=suggested_unit_price,
 			subtotal=line_total,
 		))
@@ -389,12 +420,20 @@ def generar_invoice_directa_backoffice(
 	pedido.picking_verificado_en = timezone.now()
 	pedido.save(update_fields=['estado', 'nota_backoffice', 'picking_verificado_en', 'actualizada_en'])
 
+	line_discounts = {}
+	for index, pedido_item in enumerate(pedido.items.order_by('id')):
+		if index < len(items_payload):
+			discount = items_payload[index].get('descuento_porcentaje', 0)
+			if discount:
+				line_discounts[pedido_item.id] = discount
+
 	return generar_invoice_desde_picking(
 		pedido=pedido,
 		metodo_entrega=metodo_entrega,
 		driver=None,
 		usuario=usuario,
 		suggested_unit_prices=suggested_unit_prices,
+		line_discounts=line_discounts,
 		applied_customer_credit=applied_customer_credit,
 		selected_note_applications=selected_note_applications,
 	)

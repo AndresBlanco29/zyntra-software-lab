@@ -1,12 +1,19 @@
 import re
 import unicodedata
 
+COUNT_UNIT_TOKENS = r'CT|PK|PC|EA'
+
 PACK_UNIT_TOKENS = (
-    r'LT|LTR|L|ML|OZ|FLOZ|FL\s*OZ|GAL|GALON|GALONES|KG|LB|GR|G|CT|PK|PC|EA'
+    rf'LT|LTR|L|ML|OZ|FLOZ|FL\s*OZ|GAL|GALON|GALONES|KG|LB|GR|G|{COUNT_UNIT_TOKENS}'
 )
 
 CASE_PACK_PATTERN = re.compile(
     rf'(\d+)\s*/\s*([\d.]+)\s*({PACK_UNIT_TOKENS})\b',
+    re.IGNORECASE,
+)
+
+SIMPLE_COUNT_PATTERN = re.compile(
+    rf'(\d+)\s+({COUNT_UNIT_TOKENS})\b',
     re.IGNORECASE,
 )
 
@@ -17,9 +24,12 @@ SIZE_HINT_PATTERN = re.compile(
 
 GENERIC_CONTENT_TYPES = {
     'unidad', 'unidades', 'unit', 'units',
+    'pieza', 'piezas', 'piece', 'pieces',
     'caja', 'cajas', 'box', 'boxes',
     'pallet', 'pallets', 'pack', 'packs',
 }
+
+COUNT_CONTENT_TYPES = {'piezas', 'pieza', 'pieces', 'piece'}
 
 UNIT_ALIASES = {
     'LTR': 'LT',
@@ -39,23 +49,7 @@ def _normalize_unit_token(raw_unit):
     return UNIT_ALIASES.get(token, token.replace(' ', ''))
 
 
-def parse_case_packaging_from_product_name(name):
-    """
-    Parse patterns like ``4/4.65 LT`` or ``12/1 LT`` embedded in a product name.
-
-    Returns a dict with ``units_per_case``, ``unit_size_label``, ``presentation_name``,
-    and ``content_type`` when a match is found; otherwise ``None``.
-    """
-    text = (name or '').strip()
-    if not text:
-        return None
-
-    match = None
-    for candidate in CASE_PACK_PATTERN.finditer(text):
-        match = candidate
-    if match is None:
-        return None
-
+def _parse_slash_packaging_match(match):
     units_per_case = int(match.group(1))
     if units_per_case <= 0:
         return None
@@ -70,6 +64,43 @@ def parse_case_packaging_from_product_name(name):
         'presentation_name': 'Caja',
         'content_type': unit_size_label,
     }
+
+
+def _last_pattern_match(pattern, text):
+    match = None
+    for candidate in pattern.finditer(text):
+        match = candidate
+    return match
+
+
+def parse_case_packaging_from_product_name(name):
+    """
+    Parse packaging embedded in a product name.
+
+    Supports slash patterns like ``4/4.65 LT`` or ``24/100 CT``, and simple
+    count suffixes like ``6 CT`` used on candles and similar products.
+    """
+    text = (name or '').strip()
+    if not text:
+        return None
+
+    slash_match = _last_pattern_match(CASE_PACK_PATTERN, text)
+    if slash_match is not None:
+        return _parse_slash_packaging_match(slash_match)
+
+    count_match = _last_pattern_match(SIMPLE_COUNT_PATTERN, text)
+    if count_match is not None:
+        units_per_case = int(count_match.group(1))
+        if units_per_case <= 0:
+            return None
+        return {
+            'units_per_case': units_per_case,
+            'unit_size_label': f'{units_per_case} CT',
+            'presentation_name': 'Caja',
+            'content_type': 'piezas',
+        }
+
+    return None
 
 
 def _normalize_content_token(value):
@@ -107,10 +138,14 @@ def build_packaging_customer_description(*, units, content_type, presentation_na
         return f'1 paquete de {content_type} por {presentation_name}'
 
     if units > 1:
-        content_label = content_type.lower() if content_type else ('units' if english else 'unidades')
+        content_lower = _normalize_content_token(content_type)
+        if content_lower in COUNT_CONTENT_TYPES:
+            label = 'pieces' if english else 'piezas'
+        else:
+            label = content_type.lower() if content_type else ('units' if english else 'unidades')
         if english:
-            return f'{units} {content_label} per {presentation_name}'
-        return f'{units} {content_label} por {presentation_name}'
+            return f'{units} {label} per {presentation_name}'
+        return f'{units} {label} por {presentation_name}'
 
     if content_type:
         if english:
@@ -132,7 +167,12 @@ def apply_case_packaging_defaults_to_presentacion(presentacion, product_name, *,
     if overwrite or int(getattr(presentacion, 'unidades', 0) or 0) <= 1:
         presentacion.unidades = parsed['units_per_case']
         changed = True
-    if overwrite or not (presentacion.tipo_contenido or '').strip() or (presentacion.tipo_contenido or '').strip().lower() in {'unidades', 'unidad', 'units', 'unit', 'caja', 'box'}:
+    generic_content_types = {
+        'unidades', 'unidad', 'units', 'unit',
+        'piezas', 'pieza', 'pieces', 'piece',
+        'caja', 'box',
+    }
+    if overwrite or not (presentacion.tipo_contenido or '').strip() or (presentacion.tipo_contenido or '').strip().lower() in generic_content_types:
         presentacion.tipo_contenido = parsed['content_type']
         changed = True
     return changed

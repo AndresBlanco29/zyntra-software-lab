@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -665,3 +666,23 @@ class PickingVerificationFlowTests(TestCase):
 		cancelled_response = self.client.get(reverse('backoffice_pedidos'), {'view': 'cancelled'})
 		self.assertContains(cancelled_response, 'Cancelled Orders')
 		self.assertEqual([pedido.id for pedido in cancelled_response.context['pedidos']], [cancelled_order.id])
+
+	@patch('config.pedidos.views.BACKOFFICE_PEDIDOS_PAGE_SIZE', 2)
+	def test_backoffice_order_list_paginates_filtered_orders(self, _page_size):
+		for index in range(3):
+			Pedido.objects.create(
+				cliente=self.cliente,
+				origen='CLIENTE',
+				estado='EN_GESTION',
+				total=Decimal(f'{10 + index}.00'),
+			)
+
+		self.client.force_login(self.backoffice)
+		first_page = self.client.get(reverse('backoffice_pedidos'), {'view': 'in-progress'})
+		second_page = self.client.get(reverse('backoffice_pedidos'), {'view': 'in-progress', 'page': 2})
+
+		self.assertEqual(len(list(first_page.context['pedidos'])), 2)
+		self.assertContains(first_page, 'Page 1 of')
+		self.assertContains(first_page, 'Showing 1-2 of 3 orders')
+		self.assertEqual(len(list(second_page.context['pedidos'])), 1)
+		self.assertContains(second_page, 'Page 2 of 2')

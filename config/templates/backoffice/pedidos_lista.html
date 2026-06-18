@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n %}
+{% load i18n pagination_tags %}
 
 {% block title %}{% trans "Sales Orders" %}{% endblock %}
 
@@ -24,6 +24,14 @@
     <span class="badge {% if view_mode == 'cancelled' %}bg-light text-secondary{% else %}bg-secondary{% endif %} ms-1">{{ cancelled_count }}</span>
   </a>
 </div>
+
+{% if page_obj.paginator.count %}
+<p class="text-muted small mb-3">
+  {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+  Showing {{ start }}-{{ end }} of {{ total }} orders
+  {% endblocktrans %}
+</p>
+{% endif %}
 
 <div class="card shadow-sm">
   <div class="table-responsive mobile-stack-responsive">
@@ -71,5 +79,7 @@
       </tbody>
     </table>
   </div>
+
+  {% pagination_controls page_obj aria_label=_('Sales order pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0 px-3 pb-3" view=view_mode %}
 </div>
 {% endblock %}

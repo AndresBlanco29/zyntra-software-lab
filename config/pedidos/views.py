@@ -5,6 +5,7 @@ from xml.sax.saxutils import escape
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.paginator import Paginator
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.db import transaction
@@ -45,6 +46,9 @@ from .services import (
 	recalcular_pedido,
 	validar_estado_backoffice_con_bloqueo,
 )
+
+
+BACKOFFICE_PEDIDOS_PAGE_SIZE = 50
 
 
 def _is_backoffice_user(user):
@@ -203,12 +207,14 @@ def backoffice_pedidos(request):
 		view_mode = 'pending'
 		pedidos = base_queryset.filter(estado__in=pending_statuses)
 
-	for pedido in pedidos:
+	page_obj = Paginator(pedidos, BACKOFFICE_PEDIDOS_PAGE_SIZE).get_page(request.GET.get('page'))
+	for pedido in page_obj:
 		pedido.estado_label = _pedido_state_label(pedido.estado)
 		pedido.origen_label = _pedido_origin_label(pedido.origen)
 		pedido.workflow_badge = build_order_workflow_badge(pedido)
 	return render(request, 'backoffice/pedidos_lista.html', {
-		'pedidos': pedidos,
+		'pedidos': page_obj,
+		'page_obj': page_obj,
 		'view_mode': view_mode,
 		'pending_count': base_queryset.filter(estado__in=pending_statuses).count(),
 		'in_progress_count': base_queryset.filter(estado__in=in_progress_statuses).count(),

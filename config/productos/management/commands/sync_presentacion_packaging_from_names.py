@@ -1,4 +1,5 @@
 from django.core.management.base import BaseCommand
+from django.core.cache import cache
 
 from config.productos.models import Producto
 from config.productos.packaging import apply_case_packaging_defaults_to_presentacion
@@ -46,3 +47,6 @@ class Command(BaseCommand):
                 skipped += 1
 
         self.stdout.write(self.style.SUCCESS(f'Updated {updated} presentations; skipped {skipped} products.'))
+        if updated and not dry_run:
+            cache.delete('catalogo:productos_activos_v2')
+            self.stdout.write(self.style.SUCCESS('Catalog cache cleared.'))

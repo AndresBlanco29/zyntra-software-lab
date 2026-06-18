@@ -254,6 +254,16 @@ class Presentacion(models.Model):
         target_language = "en" if get_language().startswith("en") else "es"
         return _resolve_presentacion_translation(self.nombre, self.nombre_en, target_language)
 
+    @property
+    def descripcion_empaque_cliente(self):
+        from config.productos.packaging import build_packaging_customer_description
+
+        return build_packaging_customer_description(
+            units=self.unidades,
+            content_type=self.tipo_contenido_traducido,
+            presentation_name=self.nombre_traducido,
+        )
+
     def recalcular_precios(self):
         if self.costo is None:
             return

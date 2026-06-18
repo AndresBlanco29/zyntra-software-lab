@@ -340,11 +340,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const infoTexto = card.querySelector(".info-presentacion");
 
         select.addEventListener("change", function () {
-            let unidades = this.options[this.selectedIndex].dataset.unidades;
-            let tipo = this.options[this.selectedIndex].dataset.tipo;
-            let nombre = this.options[this.selectedIndex].text;
+            const option = this.options[this.selectedIndex];
+            const summary = (option.dataset.summary || '').trim();
 
-            infoTexto.textContent = unidades + " " + tipo + " por " + nombre.toLowerCase();
+            if (summary) {
+                infoTexto.textContent = summary;
+            } else {
+                let unidades = option.dataset.unidades;
+                let tipo = option.dataset.tipo;
+                let nombre = option.text;
+                infoTexto.textContent = unidades + " " + tipo + " por " + nombre.toLowerCase();
+            }
             syncOrderHistory(card, this);
         });
 

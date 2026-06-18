@@ -144,16 +144,18 @@ document.addEventListener('DOMContentLoaded', function() {
         select.addEventListener("change", function () {
 
             let option = this.options[this.selectedIndex];
+            let summary = (option.dataset.summary || '').trim();
 
-            let unidades = option.dataset.unidades;
-            let tipo = (option.dataset.tipo || "").trim().toLowerCase();
-            let nombre = option.text.trim().toLowerCase();
-
-            let tipoTraducido = traducciones[tipo]?.[lang] || tipo;
-
-            let por = lang === "en" ? "per" : "por";
-
-            infoTexto.textContent = `${unidades} ${tipoTraducido} ${por} ${nombre}`;
+            if (summary) {
+                infoTexto.textContent = summary;
+            } else {
+                let unidades = option.dataset.unidades;
+                let tipo = (option.dataset.tipo || "").trim().toLowerCase();
+                let nombre = option.text.trim().toLowerCase();
+                let tipoTraducido = traducciones[tipo]?.[lang] || tipo;
+                let por = lang === "en" ? "per" : "por";
+                infoTexto.textContent = `${unidades} ${tipoTraducido} ${por} ${nombre}`;
+            }
 
             if (priceText && option.dataset.price) {
                 priceText.textContent = `$${option.dataset.price}`;

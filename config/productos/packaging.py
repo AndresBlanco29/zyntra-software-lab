@@ -1,9 +1,18 @@
 import re
+import unicodedata
 
 CASE_PACK_PATTERN = re.compile(
     r'(\d+)\s*/\s*([\d.]+)\s*(LT|LTR|L|ML|OZ|FLOZ|FL\s*OZ|GAL|KG|LB|GR|G)\b',
     re.IGNORECASE,
 )
+
+SIZE_HINT_PATTERN = re.compile(r'\d|\b(LT|LTR|OZ|FLOZ|ML|GAL|KG|LB|GR|G)\b', re.IGNORECASE)
+
+GENERIC_CONTENT_TYPES = {
+    'unidad', 'unidades', 'unit', 'units',
+    'caja', 'cajas', 'box', 'boxes',
+    'pallet', 'pallets', 'pack', 'packs',
+}
 
 UNIT_ALIASES = {
     'LTR': 'LT',
@@ -49,6 +58,49 @@ def parse_case_packaging_from_product_name(name):
         'presentation_name': 'Caja',
         'content_type': unit_size_label,
     }
+
+
+def _normalize_content_token(value):
+    normalized = unicodedata.normalize('NFKD', (value or '').strip().lower())
+    normalized = ''.join(char for char in normalized if not unicodedata.combining(char))
+    return re.sub(r'[^a-z0-9 ]', '', normalized).strip()
+
+
+def content_type_looks_like_unit_size(value):
+    text = (value or '').strip()
+    if not text:
+        return False
+    if _normalize_content_token(text) in GENERIC_CONTENT_TYPES:
+        return False
+    return bool(SIZE_HINT_PATTERN.search(text))
+
+
+def build_packaging_customer_description(*, units, content_type, presentation_name, language=None):
+    from django.utils.translation import get_language
+
+    units = max(int(units or 1), 1)
+    content_type = (content_type or '').strip()
+    presentation_name = (presentation_name or '').strip().lower()
+    active_language = (language or get_language() or 'es').lower()
+    english = active_language.startswith('en')
+
+    if units > 1 and content_type_looks_like_unit_size(content_type):
+        if english:
+            return f'{units} units of size {content_type} per {presentation_name}'
+        return f'{units} unidades de tamaño {content_type} por {presentation_name}'
+
+    if units > 1:
+        content_label = content_type.lower() if content_type else ('units' if english else 'unidades')
+        if english:
+            return f'{units} {content_label} per {presentation_name}'
+        return f'{units} {content_label} por {presentation_name}'
+
+    if content_type:
+        if english:
+            return f'1 {content_type.lower()} per {presentation_name}'
+        return f'1 {content_type.lower()} por {presentation_name}'
+
+    return presentation_name
 
 
 def apply_case_packaging_defaults_to_presentacion(presentacion, product_name, *, overwrite=False):

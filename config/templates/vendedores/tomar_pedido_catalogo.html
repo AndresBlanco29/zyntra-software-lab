@@ -263,7 +263,7 @@ alt="{{ producto.nombre }}"
 
 {% if p %}
 
-{{ p.unidades }} {{ p.tipo_contenido_traducido }} {% trans "por" %} {{ p.nombre_traducido|lower }}
+{{ p.descripcion_empaque_cliente }}
 
 {% endif %}
 
@@ -293,6 +293,7 @@ data-precio2="{{ p.precio_2 }}"
 data-precio3="{{ p.precio_3 }}"
 data-precio4="{{ p.precio_4 }}"
 data-precio5="{{ p.precio_5 }}"
+data-summary="{{ p.descripcion_empaque_cliente }}"
 >
 
 {{ p.nombre_traducido }}

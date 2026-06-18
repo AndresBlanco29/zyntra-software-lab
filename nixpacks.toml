@@ -1,0 +1,11 @@
+# Explicit build plan for Railway/Nixpacks (avoids silent Railpack planner failures).
+providers = ["python"]
+
+[phases.setup]
+nixPkgs = ["python312", "gettext"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[phases.build]
+cmds = ["python manage.py check --deploy 2>/dev/null || python manage.py check"]

@@ -149,7 +149,7 @@ def _localized_content_type_label(content_type, *, english):
 def get_effective_packaging_for_display(presentacion, *, language=None):
     from django.utils.translation import get_language
 
-    active_language = (language or get_language() or 'es').lower()
+    active_language = (language or get_language() or 'en').lower()
     english = active_language.startswith('en')
 
     product = getattr(presentacion, 'producto', None)
@@ -187,7 +187,7 @@ def build_packaging_customer_description(*, units, content_type, presentation_na
     units = max(int(units or 1), 1)
     content_type = (content_type or '').strip()
     presentation_name = (presentation_name or '').strip().lower()
-    active_language = (language or get_language() or 'es').lower()
+    active_language = (language or get_language() or 'en').lower()
     english = active_language.startswith('en')
 
     if units > 1 and content_type_looks_like_unit_size(content_type):

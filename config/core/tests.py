@@ -61,6 +61,23 @@ class BackofficeSpanishTranslationsTests(TestCase):
 		self.assertContains(inventory_response, 'Inventario')
 
 
+class DefaultEnglishLocaleTests(TestCase):
+	def test_home_defaults_to_english_without_explicit_language_choice(self):
+		response = self.client.get('/', HTTP_ACCEPT_LANGUAGE='es-MX,es;q=0.9,en;q=0.8')
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'lang="en"')
+		self.assertContains(response, 'About Us')
+		self.assertNotContains(response, 'Quienes Somos')
+
+	def test_explicit_spanish_cookie_still_renders_spanish(self):
+		self.client.cookies[settings.LANGUAGE_COOKIE_NAME] = 'es'
+		response = self.client.get('/', HTTP_ACCEPT_LANGUAGE='en-US,en;q=0.9')
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Quienes Somos')
+
+
 class WorkflowBadgeTests(TestCase):
 	def test_vendor_orders_use_vendor_to_backoffice_transition_badge(self):
 		badge = build_order_workflow_badge(SimpleNamespace(estado='RECIBIDO', origen='VENDEDOR', invoice=None))

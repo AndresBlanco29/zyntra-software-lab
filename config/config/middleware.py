@@ -1,8 +1,40 @@
 from django.conf import settings
 from django.http import HttpResponsePermanentRedirect, HttpResponseRedirect
+from django.utils import translation
 from urllib.parse import quote
 
 from config.usuarios.schema_repair import ensure_runtime_schema
+
+
+class DefaultEnglishUnlessChosenMiddleware:
+    """Use English by default; only honor an explicit language cookie or session choice."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        explicit_language = self._get_explicit_language(request)
+        if explicit_language and explicit_language in dict(settings.LANGUAGES):
+            translation.activate(explicit_language)
+            request.LANGUAGE_CODE = explicit_language
+        else:
+            translation.activate(settings.LANGUAGE_CODE)
+            request.LANGUAGE_CODE = settings.LANGUAGE_CODE
+        return self.get_response(request)
+
+    @staticmethod
+    def _get_explicit_language(request):
+        language = request.COOKIES.get(settings.LANGUAGE_COOKIE_NAME)
+        if language:
+            return language
+
+        session_key = getattr(settings, 'LANGUAGE_SESSION_KEY', '_language')
+        if hasattr(request, 'session'):
+            language = request.session.get(session_key)
+            if language:
+                return language
+
+        return None
 
 
 class WwwRedirectMiddleware:

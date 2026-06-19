@@ -572,6 +572,104 @@ def _get_default_income_account_ref(client):
     return {'value': str(account.get('Id')), 'name': account.get('Name', '')}
 
 
+def _get_default_expense_account_ref(client):
+    queries = (
+        "select * from Account where AccountType = 'Cost of Goods Sold' maxresults 1",
+        "select * from Account where AccountSubType = 'SuppliesMaterialsCogs' maxresults 1",
+    )
+    for query in queries:
+        accounts = client.query(query).get('Account', [])
+        if accounts:
+            account = accounts[0]
+            return {'value': str(account.get('Id')), 'name': account.get('Name', '')}
+    raise QuickBooksSyncError('QuickBooks does not have a COGS account available for inventory item sync.')
+
+
+def _get_default_asset_account_ref(client):
+    queries = (
+        "select * from Account where AccountSubType = 'Inventory' maxresults 1",
+        "select * from Account where Name = 'Inventory Asset' maxresults 1",
+    )
+    for query in queries:
+        accounts = client.query(query).get('Account', [])
+        if accounts:
+            account = accounts[0]
+            return {'value': str(account.get('Id')), 'name': account.get('Name', '')}
+    raise QuickBooksSyncError('QuickBooks does not have an inventory asset account available for inventory item sync.')
+
+
+def _quickbooks_item_is_inventory(payload):
+    return str((payload or {}).get('Type') or '').strip().lower() in {'inventory', 'assembly'}
+
+
+def _local_presentacion_qty_on_hand(presentacion):
+    stock = getattr(presentacion, 'stock_operativo', None)
+    if stock is None:
+        stock = StockPresentacion.objects.filter(presentacion_id=presentacion.pk).first()
+    if stock is None:
+        return 0
+    return max(int(stock.stock_fisico or 0), 0)
+
+
+def _build_item_payload(presentacion, *, client, income_account_ref=None, remote_payload=None):
+    use_inventory = getattr(settings, 'QUICKBOOKS_USE_INVENTORY_ITEMS', True)
+    if remote_payload is not None:
+        use_inventory = _quickbooks_item_is_inventory(remote_payload)
+    elif not use_inventory:
+        use_inventory = False
+
+    payload = {
+        'Name': _build_item_name(presentacion),
+        'Active': bool(presentacion.producto.activo),
+        'Description': _build_item_description(presentacion),
+        'UnitPrice': _as_float(presentacion.precio_3),
+        'Sku': _truncate(presentacion.producto.codigo_barras, limit=100),
+    }
+    income_ref = income_account_ref or _get_default_income_account_ref(client)
+
+    if use_inventory:
+        payload.update({
+            'Type': 'Inventory',
+            'TrackQtyOnHand': True,
+            'QtyOnHand': _local_presentacion_qty_on_hand(presentacion),
+            'InvStartDate': timezone.localdate().isoformat(),
+            'PurchaseCost': _as_float(presentacion.costo or 0),
+            'IncomeAccountRef': income_ref,
+            'ExpenseAccountRef': _get_default_expense_account_ref(client),
+            'AssetAccountRef': _get_default_asset_account_ref(client),
+        })
+    else:
+        payload.update({
+            'Type': 'NonInventory',
+            'IncomeAccountRef': income_ref,
+        })
+    return payload
+
+
+def _item_payload_needs_update(remote_payload, expected_payload):
+    compare_fields = (
+        'Name',
+        'Type',
+        'Active',
+        'Description',
+        'UnitPrice',
+        'IncomeAccountRef.value',
+        'Sku',
+    )
+    if _quickbooks_item_is_inventory(remote_payload) or str(expected_payload.get('Type') or '').lower() == 'inventory':
+        compare_fields = compare_fields + (
+            'QtyOnHand',
+            'PurchaseCost',
+            'ExpenseAccountRef.value',
+            'AssetAccountRef.value',
+        )
+    return _payload_needs_update(
+        remote_payload,
+        expected_payload,
+        compare_fields,
+    )
+
+
 def fetch_quickbooks_items(*, max_results=25, client=None, updated_after=None, page_size=None):
     client = client or QuickBooksAPIClient()
     resolved_page_size = page_size or getattr(settings, 'QUICKBOOKS_CATALOG_SYNC_PAGE_SIZE', 1000)
@@ -674,34 +772,6 @@ def _fetch_quickbooks_items_map(*, client=None, wanted_ids=None, updated_after=N
         start_position += len(batch)
 
     return found
-
-
-def _build_item_payload(presentacion, *, client, income_account_ref=None):
-    return {
-        'Name': _build_item_name(presentacion),
-        'Type': 'NonInventory',
-        'Active': bool(presentacion.producto.activo),
-        'Description': _build_item_description(presentacion),
-        'UnitPrice': _as_float(presentacion.precio_3),
-        'IncomeAccountRef': income_account_ref or _get_default_income_account_ref(client),
-        'Sku': _truncate(presentacion.producto.codigo_barras, limit=100),
-    }
-
-
-def _item_payload_needs_update(remote_payload, expected_payload):
-    return _payload_needs_update(
-        remote_payload,
-        expected_payload,
-        (
-            'Name',
-            'Type',
-            'Active',
-            'Description',
-            'UnitPrice',
-            'IncomeAccountRef.value',
-            'Sku',
-        ),
-    )
 
 
 def _normalize_username_seed(value, fallback='qb-imported-user'):
@@ -3009,6 +3079,7 @@ def _push_presentacion_to_quickbooks_item(presentacion, existing, *, client):
         presentacion,
         client=client,
         income_account_ref=existing.get('IncomeAccountRef') or None,
+        remote_payload=existing,
     )
     if _item_payload_needs_update(existing, desired_payload):
         updated = client.update_item(_build_sparse_update_payload(existing, desired_payload))
@@ -3048,7 +3119,7 @@ def push_linked_quickbooks_items(*, limit=None, client=None, task_cache_key=None
     queryset = (
         Presentacion.objects.filter(quickbooks_id__isnull=False)
         .exclude(quickbooks_id='')
-        .select_related('producto')
+        .select_related('producto', 'stock_operativo')
         .order_by('producto__nombre', 'id')
     )
     if limit is not None:
@@ -3561,11 +3632,18 @@ def sync_customer_by_id(cliente_id):
 
 
 def sync_product_by_id(presentacion_id):
-    return sync_product(presentacion=Presentacion.objects.select_related('producto').get(pk=presentacion_id))
+    return sync_product(
+        presentacion=Presentacion.objects.select_related('producto', 'stock_operativo').get(pk=presentacion_id)
+    )
 
 
 def sync_invoice_by_id(invoice_id):
-    return sync_invoice(invoice=Invoice.objects.select_related('cliente__usuario').prefetch_related('items__presentacion__producto').get(pk=invoice_id))
+    return sync_invoice(
+        invoice=Invoice.objects.select_related('cliente__usuario').prefetch_related(
+            'items__presentacion__producto',
+            'items__presentacion__stock_operativo',
+        ).get(pk=invoice_id)
+    )
 
 
 def sync_adjustment_note_by_id(note_id):

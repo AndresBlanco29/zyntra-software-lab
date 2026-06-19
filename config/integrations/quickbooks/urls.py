@@ -38,6 +38,8 @@ from .views import (
     quickbooks_sync_customer,
     quickbooks_sync_invoices_batch,
     quickbooks_sync_invoice,
+    quickbooks_push_linked_products_batch,
+    quickbooks_push_linked_products_to_quickbooks,
     quickbooks_sync_products_batch,
     quickbooks_sync_product,
     quickbooks_test_connection,
@@ -87,6 +89,8 @@ urlpatterns = [
     path('sync/adjustment-note/<int:note_id>', quickbooks_sync_adjustment_note, name='quickbooks_sync_adjustment_note'),
     path('sync/customers/batch', quickbooks_sync_customers_batch, name='quickbooks_sync_customers_batch'),
     path('sync/products/batch', quickbooks_sync_products_batch, name='quickbooks_sync_products_batch'),
+    path('push/items/linked', quickbooks_push_linked_products_to_quickbooks, name='quickbooks_push_linked_products_to_quickbooks'),
+    path('push/items/linked/batch', quickbooks_push_linked_products_batch, name='quickbooks_push_linked_products_batch'),
     path('sync/invoices/batch', quickbooks_sync_invoices_batch, name='quickbooks_sync_invoices_batch'),
     path('sync/adjustment-notes/batch', quickbooks_sync_adjustment_notes_batch, name='quickbooks_sync_adjustment_notes_batch'),
 ]

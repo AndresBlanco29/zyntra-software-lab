@@ -3004,29 +3004,35 @@ def link_quickbooks_import_conflict(conflict, *, local_record_id=None, local_mod
     }
 
 
+def _push_presentacion_to_quickbooks_item(presentacion, existing, *, client):
+    desired_payload = _build_item_payload(
+        presentacion,
+        client=client,
+        income_account_ref=existing.get('IncomeAccountRef') or None,
+    )
+    if _item_payload_needs_update(existing, desired_payload):
+        updated = client.update_item(_build_sparse_update_payload(existing, desired_payload))
+        _mark_synced(presentacion, updated.get('Id'))
+        return _sync_result(entity='Item', action='updated', payload=updated)
+    _mark_synced(presentacion, existing.get('Id'))
+    return _sync_result(entity='Item', action='existing', payload=existing)
+
+
 def sync_product(*, presentacion, client=None):
     client = client or QuickBooksAPIClient()
     try:
         if presentacion.quickbooks_id:
             existing = client.find_by_id('Item', presentacion.quickbooks_id)
             if existing:
-                desired_payload = _build_item_payload(
-                    presentacion,
-                    client=client,
-                    income_account_ref=existing.get('IncomeAccountRef') or None,
-                )
-                if _item_payload_needs_update(existing, desired_payload):
-                    updated = client.update_item(_build_sparse_update_payload(existing, desired_payload))
-                    _mark_synced(presentacion, updated.get('Id'))
-                    return _sync_result(entity='Item', action='updated', payload=updated)
-                _mark_synced(presentacion, existing.get('Id'))
-                return _sync_result(entity='Item', action='existing', payload=existing)
+                return _push_presentacion_to_quickbooks_item(presentacion, existing, client=client)
 
         item_name = _build_item_name(presentacion)
         existing = client.find_one_by_name('Item', item_name)
         if existing:
-            _mark_synced(presentacion, existing.get('Id'))
-            return _sync_result(entity='Item', action='linked', payload=existing)
+            result = _push_presentacion_to_quickbooks_item(presentacion, existing, client=client)
+            if result.get('action') == 'existing':
+                result = {**result, 'action': 'linked'}
+            return result
 
         created = client.create_item(_build_item_payload(presentacion, client=client))
         _mark_synced(presentacion, created.get('Id'))
@@ -3034,6 +3040,47 @@ def sync_product(*, presentacion, client=None):
     except (QuickBooksAPIError, QuickBooksSyncError) as exc:
         _mark_failed(presentacion)
         raise QuickBooksSyncError(str(exc)) from exc
+
+
+def push_linked_quickbooks_items(*, limit=None, client=None, task_cache_key=None):
+    """Push local changes for catalog rows already linked in QuickBooks."""
+    del client, task_cache_key
+    queryset = (
+        Presentacion.objects.filter(quickbooks_id__isnull=False)
+        .exclude(quickbooks_id='')
+        .select_related('producto')
+        .order_by('producto__nombre', 'id')
+    )
+    if limit is not None:
+        queryset = queryset[:max(int(limit), 0)]
+
+    record_ids = list(queryset.values_list('id', flat=True))
+    if not record_ids:
+        return {
+            'linked_count': 0,
+            'updated_count': 0,
+            'unchanged_count': 0,
+            'success_count': 0,
+            'failed_count': 0,
+            'results': [],
+        }
+
+    result = sync_product_batch_by_ids(record_ids)
+    updated_count = 0
+    unchanged_count = 0
+    for item in result.get('results', []):
+        if not item.get('ok'):
+            continue
+        action = (item.get('result') or {}).get('action')
+        if action == 'updated':
+            updated_count += 1
+        elif action in {'existing', 'linked'}:
+            unchanged_count += 1
+
+    result['linked_count'] = len(record_ids)
+    result['updated_count'] = updated_count
+    result['unchanged_count'] = unchanged_count
+    return result
 
 
 def _ensure_adjustment_item(client):

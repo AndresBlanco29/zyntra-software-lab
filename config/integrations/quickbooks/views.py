@@ -47,6 +47,7 @@ from .sync import (
     pull_quickbooks_accounting_documents_to_local,
     pull_quickbooks_items_to_local,
     pull_quickbooks_to_local,
+    push_linked_quickbooks_items,
     refresh_linked_quickbooks_items,
     refresh_linked_quickbooks_invoice_status,
     QuickBooksSyncError,
@@ -102,6 +103,8 @@ CATALOG_ONLY_ALLOWED_VIEW_NAMES = frozenset({
     'quickbooks_sync_adjustment_note',
     'quickbooks_sync_customers_batch',
     'quickbooks_sync_products_batch',
+    'quickbooks_push_linked_products_batch',
+    'quickbooks_push_linked_products_to_quickbooks',
     'quickbooks_sync_invoices_batch',
     'quickbooks_sync_adjustment_notes_batch',
 })
@@ -112,6 +115,7 @@ CATALOG_ONLY_ALLOWED_TASK_OPERATIONS = frozenset({
     'import_items_to_local',
     'import_customers_to_local',
     'refresh_linked_items_to_local',
+    'push_linked_products_to_quickbooks',
     'refresh_linked_invoice_status_to_local',
     'pull_items_sync_to_local',
     'import_accounting_documents_to_local',
@@ -396,6 +400,35 @@ def _build_dashboard_feedback(*, operation, ok, result=None, error=None):
         )
         return feedback
 
+    if operation == 'push_linked_products_to_quickbooks':
+        feedback['title'] = _('Linked catalog push to QuickBooks')
+        feedback['details'].append(
+            _('Linked items: %(linked)s. Updated in QuickBooks: %(updated)s. Already matched: %(unchanged)s. Failed: %(failed)s.') % {
+                'linked': result.get('linked_count', 0),
+                'updated': result.get('updated_count', 0),
+                'unchanged': result.get('unchanged_count', 0),
+                'failed': result.get('failed_count', 0),
+            }
+        )
+        return feedback
+
+    if operation == 'push_linked_products_batch':
+        feedback['title'] = _('QuickBooks linked item update')
+        feedback['details'].append(
+            _('Succeeded: %(success)s. Failed: %(failed)s.') % {
+                'success': result.get('success_count', 0),
+                'failed': result.get('failed_count', 0),
+            }
+        )
+        for sample in result.get('results', [])[:3]:
+            if sample.get('ok'):
+                action = (sample.get('result') or {}).get('action', 'processed')
+                feedback['details'].append(_('ID %(record_id)s: %(action)s') % {
+                    'record_id': sample.get('id'),
+                    'action': action,
+                })
+        return feedback
+
     if operation == 'refresh_linked_invoice_status_to_local':
         feedback['title'] = _('QuickBooks invoice status refresh')
         feedback['details'].append(
@@ -450,6 +483,7 @@ def _build_dashboard_feedback(*, operation, ok, result=None, error=None):
         batch_titles = {
             'sync_customers_batch': _('QuickBooks customer send'),
             'sync_products_batch': _('QuickBooks item send'),
+            'push_linked_products_batch': _('QuickBooks linked item update'),
             'sync_invoices_batch': _('QuickBooks invoice send'),
             'sync_adjustment_notes_batch': _('QuickBooks adjustment note send'),
         }
@@ -549,12 +583,24 @@ def _outbound_pending_querysets():
     }
 
 
+def _outbound_linked_querysets():
+    linked_presentations = (
+        Presentacion.objects.filter(quickbooks_id__isnull=False)
+        .exclude(quickbooks_id='')
+        .select_related('producto')
+        .order_by('-id')
+    )
+    return {
+        'presentations': linked_presentations,
+    }
+
+
 def _parse_outbound_sync_ids(request, *, pending_queryset):
     send_all = str(request.POST.get('send_all') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
     if send_all:
         record_ids = list(pending_queryset.order_by('id').values_list('id', flat=True)[:OUTBOUND_SYNC_MAX_IDS])
         if not record_ids:
-            raise ValueError('No pending records to send to QuickBooks.')
+            raise ValueError('No records available to sync with QuickBooks.')
         return record_ids
 
     raw_values = request.POST.getlist('ids')
@@ -582,7 +628,7 @@ def _validate_outbound_sync_ids(record_ids, pending_queryset):
     allowed_ids = set(pending_queryset.filter(pk__in=record_ids).values_list('pk', flat=True))
     invalid_ids = [record_id for record_id in record_ids if record_id not in allowed_ids]
     if invalid_ids:
-        raise ValueError('Some selected records are not pending or are no longer available.')
+        raise ValueError('Some selected records are no longer available.')
     return record_ids
 
 
@@ -591,19 +637,23 @@ def get_dashboard_sync_context(*, request=None):
     if request is not None:
         feedback = request.session.pop('quickbooks_dashboard_feedback', None)
     pending = _outbound_pending_querysets()
+    linked = _outbound_linked_querysets()
     pending_customers = pending['customers']
     pending_presentations = pending['presentations']
     pending_invoices = pending['invoices']
     pending_notes = pending['notes']
+    linked_presentations = linked['presentations']
     return {
         'quickbooks_pending_customers': pending_customers[:OUTBOUND_SYNC_SELECTOR_LIMIT],
         'quickbooks_pending_presentations': pending_presentations[:OUTBOUND_SYNC_SELECTOR_LIMIT],
         'quickbooks_pending_invoices': pending_invoices[:OUTBOUND_SYNC_SELECTOR_LIMIT],
         'quickbooks_pending_notes': pending_notes[:OUTBOUND_SYNC_SELECTOR_LIMIT],
+        'quickbooks_linked_presentations': linked_presentations[:OUTBOUND_SYNC_SELECTOR_LIMIT],
         'quickbooks_pending_customer_count': pending_customers.count(),
         'quickbooks_pending_presentation_count': pending_presentations.count(),
         'quickbooks_pending_invoice_count': pending_invoices.count(),
         'quickbooks_pending_note_count': pending_notes.count(),
+        'quickbooks_linked_presentation_count': linked_presentations.count(),
         'quickbooks_outbound_sync_enabled': True,
         'quickbooks_alignment_sync_enabled': True,
         'quickbooks_import_conflicts_count': QuickBooksImportConflict.objects.filter(status=QuickBooksImportConflict.STATUS_CONFLICT).count(),
@@ -1448,6 +1498,36 @@ def quickbooks_sync_products_batch(request):
     except ValueError as exc:
         return _response_or_redirect(request, operation='sync_products_batch', error=str(exc), status_code=400)
     return _response_or_redirect(request, operation='sync_products_batch', result=result)
+
+
+@require_POST
+@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
+def quickbooks_push_linked_products_to_quickbooks(request):
+    try:
+        result = push_linked_quickbooks_items(
+            limit=_parse_quickbooks_import_limit(request.POST.get('limit'), default=None),
+        )
+    except (ValueError, QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
+        logger.warning('QuickBooks linked catalog push failed: %s', exc)
+        return _response_or_redirect(request, operation='push_linked_products_to_quickbooks', error=str(exc), status_code=502)
+    return _response_or_redirect(request, operation='push_linked_products_to_quickbooks', result=result)
+
+
+@require_POST
+@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
+def quickbooks_push_linked_products_batch(request):
+    linked = _outbound_linked_querysets()['presentations']
+    try:
+        record_ids = _validate_outbound_sync_ids(
+            _parse_outbound_sync_ids(request, pending_queryset=linked),
+            linked,
+        )
+        result = sync_product_batch_by_ids(record_ids)
+    except ValueError as exc:
+        return _response_or_redirect(request, operation='push_linked_products_batch', error=str(exc), status_code=400)
+    return _response_or_redirect(request, operation='push_linked_products_batch', result=result)
 
 
 @require_POST

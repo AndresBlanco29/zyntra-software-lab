@@ -991,8 +991,9 @@
         <h3 class="mb-2">{% trans "Send local records to QuickBooks" %}</h3>
         <p class="qb-soft-copy mb-3">{% trans "Use this area when the record was created in your system first and still needs to be sent to QuickBooks." %}</p>
         <div class="qb-chip-list mb-3">
-          <span class="qb-chip">{{ quickbooks_pending_customer_count }} {% trans "customers" %}</span>
-          <span class="qb-chip">{{ quickbooks_pending_presentation_count }} {% trans "items" %}</span>
+          <span class="qb-chip">{{ quickbooks_pending_customer_count }} {% trans "customers pending" %}</span>
+          <span class="qb-chip">{{ quickbooks_pending_presentation_count }} {% trans "items pending" %}</span>
+          <span class="qb-chip">{{ quickbooks_linked_presentation_count }} {% trans "items linked" %}</span>
           <span class="qb-chip">{{ quickbooks_pending_invoice_count }} {% trans "invoices" %}</span>
           <span class="qb-chip">{{ quickbooks_pending_note_count }} {% trans "notes" %}</span>
         </div>
@@ -1042,7 +1043,41 @@
                   <button type="submit" name="send_all" value="1" class="btn btn-primary" {% if not quickbooks_pending_presentation_count %}disabled{% endif %}>{% trans "Send all pending" %} ({{ quickbooks_pending_presentation_count }})</button>
                 </div>
               </form>
-              <p class="qb-action-note">{% trans "Products must exist in QuickBooks before invoice lines can be posted." %}</p>
+              <p class="qb-action-note">{% trans "For products not yet in QuickBooks. Already linked products are updated in the section below." %}</p>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="qb-action-item" id="qb-push-linked-catalog">
+              <label class="form-label fw-semibold">{% trans "Update linked catalog in QuickBooks" %}</label>
+              <p class="qb-soft-copy small mb-3">{% trans "Use this when products are already linked and you changed prices, names, or descriptions in the app. This pushes Price 3 and other item fields to QuickBooks." %}</p>
+              <div class="row g-3">
+                <div class="col-lg-7">
+                  <form method="post" action="{% url 'quickbooks_push_linked_products_batch' %}" class="d-grid gap-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                    <select name="ids" class="form-select" multiple size="6" {% if not quickbooks_linked_presentations %}disabled{% endif %}>
+                      {% for presentacion in quickbooks_linked_presentations %}
+                      <option value="{{ presentacion.id }}">#{{ presentacion.id }} · {{ presentacion.producto.nombre }} / {{ presentacion.nombre }}</option>
+                      {% empty %}
+                      <option value="" disabled>{% trans "No linked items yet" %}</option>
+                      {% endfor %}
+                    </select>
+                    <div class="d-flex gap-2 flex-wrap">
+                      <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_linked_presentations %}disabled{% endif %}>{% trans "Update selected" %}</button>
+                      <button type="submit" name="send_all" value="1" class="btn btn-primary" {% if not quickbooks_linked_presentation_count %}disabled{% endif %}>{% trans "Update all linked" %} ({{ quickbooks_linked_presentation_count }})</button>
+                    </div>
+                  </form>
+                </div>
+                <div class="col-lg-5">
+                  <form method="post" action="{% url 'quickbooks_push_linked_products_to_quickbooks' %}" data-qb-operation="push_linked_products_to_quickbooks">
+                    {% csrf_token %}
+                    <input type="hidden" name="limit" value="0">
+                    <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                    <button type="submit" class="btn btn-success w-100" {% if not quickbooks_status.is_active or not quickbooks_linked_presentation_count %}disabled{% endif %}>{% trans "Update all linked items now" %}</button>
+                  </form>
+                  <p class="qb-action-note mb-0 mt-2">{% trans "Same as Update all linked, but runs as one quick action without selecting rows first." %}</p>
+                </div>
+              </div>
             </div>
           </div>
           <div class="col-md-6">

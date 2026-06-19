@@ -682,7 +682,7 @@ def _build_item_payload(presentacion, *, client, income_account_ref=None):
         'Type': 'NonInventory',
         'Active': bool(presentacion.producto.activo),
         'Description': _build_item_description(presentacion),
-        'UnitPrice': _as_float(presentacion.precio_1),
+        'UnitPrice': _as_float(presentacion.precio_3),
         'IncomeAccountRef': income_account_ref or _get_default_income_account_ref(client),
         'Sku': _truncate(presentacion.producto.codigo_barras, limit=100),
     }

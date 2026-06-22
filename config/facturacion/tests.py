@@ -3671,6 +3671,34 @@ class InvoiceVoidDeleteTests(TestCase):
 
 		self.assertFalse(Invoice.objects.filter(id=invoice_id).exists())
 
+	def test_delete_delivered_invoice_with_synced_linked_note(self):
+		driver = Usuario.objects.create_user(username='void-driver-note', password='secret123', role='driver')
+		self.invoice.metodo_entrega = 'RUTA_DRIVER'
+		self.invoice.driver = driver
+		self.invoice.save(update_fields=['metodo_entrega', 'driver', 'actualizada_en'])
+		delivery = ensure_delivery_for_invoice(self.invoice)
+		delivery.estado = 'ENTREGADA_PAGADA'
+		delivery.save(update_fields=['estado', 'updated_at'])
+		nota = crear_nota_ajuste_desde_invoice(
+			invoice=self.invoice,
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_DUMP',
+			descripcion='Nota sync test',
+			usuario=self.backoffice,
+			items_payload=[{'invoice_item': self.invoice.items.first(), 'cantidad': 1, 'monto_unitario': Decimal('17.00')}],
+		)
+		nota.quickbooks_id = 'QB-NOTE-1'
+		nota.sync_status = 'SYNCED'
+		nota.save(update_fields=['quickbooks_id', 'sync_status'])
+
+		invoice_id = self.invoice.id
+		note_id = nota.id
+		eliminar_invoice(invoice=self.invoice)
+
+		self.assertFalse(Invoice.objects.filter(id=invoice_id).exists())
+		self.assertFalse(NotaAjuste.objects.filter(id=note_id).exists())
+
 	def test_delete_credit_note_removes_record_and_reverses_inventory(self):
 		nota = crear_nota_ajuste_desde_invoice(
 			invoice=self.invoice,

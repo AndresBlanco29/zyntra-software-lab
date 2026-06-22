@@ -12,7 +12,7 @@ class Command(BaseCommand):
 		parser.add_argument(
 			'--force',
 			action='store_true',
-			help='Delete even when the invoice is locked by QuickBooks sync metadata.',
+			help='Delete even when QuickBooks sync metadata is still present on the invoice or linked notes.',
 		)
 
 	def handle(self, *args, **options):

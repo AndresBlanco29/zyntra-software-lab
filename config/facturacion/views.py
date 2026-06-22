@@ -368,6 +368,39 @@ def _build_direct_invoice_line_drafts(post_data=None):
 	} for index in range(row_count)]
 
 
+def _direct_invoice_presentation_label(presentacion):
+	return f'#{presentacion.id} · {presentacion.producto.nombre} · {presentacion.nombre}'
+
+
+def _serialize_direct_invoice_presentation_option(presentacion):
+	return {
+		'value': str(presentacion.id),
+		'text': _direct_invoice_presentation_label(presentacion),
+		'price_1': format(presentacion.precio_1, 'f'),
+		'price_2': format(presentacion.precio_2, 'f'),
+		'price_3': format(presentacion.precio_3, 'f'),
+		'price_4': format(presentacion.precio_4, 'f'),
+		'price_5': format(presentacion.precio_5, 'f'),
+	}
+
+
+def _attach_presentations_to_direct_invoice_lines(line_drafts):
+	presentacion_ids = []
+	for line in line_drafts:
+		raw_presentacion_id = str(line.get('presentacion_id') or '').strip()
+		if raw_presentacion_id.isdigit():
+			presentacion_ids.append(int(raw_presentacion_id))
+	if not presentacion_ids:
+		return line_drafts
+	presentaciones_by_id = {
+		str(presentacion.id): presentacion
+		for presentacion in Presentacion.objects.select_related('producto').filter(id__in=presentacion_ids)
+	}
+	for line in line_drafts:
+		line['presentacion'] = presentaciones_by_id.get(str(line.get('presentacion_id') or '').strip())
+	return line_drafts
+
+
 def _build_direct_invoice_context(*, selected_client_id=None, post_data=None):
 	selected_client = None
 	if selected_client_id:
@@ -387,11 +420,12 @@ def _build_direct_invoice_context(*, selected_client_id=None, post_data=None):
 		}
 		for note in pending_notes_summary['notes']:
 			note.prefill_amount = selected_general_note_values.get(note.id, '')
+	direct_invoice_lines = _attach_presentations_to_direct_invoice_lines(_build_direct_invoice_line_drafts(post_data))
 	return {
 		'customers': Cliente.objects.order_by('nombre_empresa'),
-		'presentations': Presentacion.objects.select_related('producto').order_by('producto__nombre', 'nombre'),
 		'drivers': Usuario.objects.filter(role='driver', is_active=True).order_by('first_name', 'username'),
-		'direct_invoice_lines': _build_direct_invoice_line_drafts(post_data),
+		'direct_invoice_lines': direct_invoice_lines,
+		'presentation_search_url': reverse('backoffice_direct_invoice_presentation_search'),
 		'selected_client': selected_client,
 		'pending_notes_summary': pending_notes_summary,
 		'default_price_tier': default_price_tier,
@@ -1070,6 +1104,37 @@ def backoffice_invoices_list(request):
 		'drivers': drivers,
 		'delivery_method_choices': Invoice.DELIVERY_METHOD_CHOICES,
 		**filter_context,
+	})
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_direct_invoice_presentation_search(request):
+	query = (request.GET.get('q') or '').strip()
+	selected_id = (request.GET.get('id') or '').strip()
+	if selected_id.isdigit():
+		presentacion = Presentacion.objects.select_related('producto').filter(
+			id=int(selected_id),
+			producto__activo=True,
+		).first()
+		results = [_serialize_direct_invoice_presentation_option(presentacion)] if presentacion else []
+		return JsonResponse({'results': results})
+
+	if len(query) < 2:
+		return JsonResponse({'results': []})
+
+	presentaciones = Presentacion.objects.select_related('producto').filter(producto__activo=True)
+	filters = (
+		Q(producto__nombre__icontains=query)
+		| Q(producto__nombre_en__icontains=query)
+		| Q(nombre__icontains=query)
+		| Q(producto__codigo_barras__icontains=query)
+	)
+	if query.isdigit():
+		filters |= Q(id=int(query))
+	presentaciones = presentaciones.filter(filters).order_by('producto__nombre', 'nombre', 'id')[:50]
+	return JsonResponse({
+		'results': [_serialize_direct_invoice_presentation_option(presentacion) for presentacion in presentaciones],
 	})
 
 

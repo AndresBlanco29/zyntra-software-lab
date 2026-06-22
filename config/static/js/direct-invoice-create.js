@@ -1,21 +1,7 @@
 (function () {
   'use strict';
 
-  function getSelectedPresentationOption(presentationSelect) {
-    if (!presentationSelect || !presentationSelect.value) {
-      return null;
-    }
-    var selectedValue = presentationSelect.value;
-    return Array.prototype.find.call(presentationSelect.options, function (option) {
-      return option.value === selectedValue;
-    }) || null;
-  }
-
-  function readPresentationPrice(selectedOption, tier) {
-    if (!selectedOption) {
-      return null;
-    }
-    var rawValue = selectedOption.getAttribute('data-price-' + tier);
+  function parsePriceValue(rawValue) {
     if (rawValue === null || rawValue === undefined) {
       return null;
     }
@@ -30,10 +16,166 @@
     return normalized;
   }
 
+  function getSelectedPresentationOption(presentationSelect) {
+    if (!presentationSelect || !presentationSelect.value) {
+      return null;
+    }
+    var selectedValue = presentationSelect.value;
+    return Array.prototype.find.call(presentationSelect.options, function (option) {
+      return option.value === selectedValue;
+    }) || null;
+  }
+
+  function getPresentationPriceData(presentationSelect) {
+    if (!presentationSelect || !presentationSelect.value) {
+      return null;
+    }
+
+    if (typeof TomSelect !== 'undefined') {
+      var instance = TomSelect.getInstance(presentationSelect);
+      if (instance && instance.options[presentationSelect.value]) {
+        return instance.options[presentationSelect.value];
+      }
+    }
+
+    var selectedOption = getSelectedPresentationOption(presentationSelect);
+    if (!selectedOption) {
+      return null;
+    }
+
+    var data = {
+      value: selectedOption.value,
+      text: selectedOption.textContent,
+    };
+    for (var tier = 1; tier <= 5; tier += 1) {
+      data['price_' + tier] = selectedOption.getAttribute('data-price-' + tier);
+    }
+    return data;
+  }
+
+  function readPresentationPriceFromData(priceData, tier) {
+    if (!priceData) {
+      return null;
+    }
+    return parsePriceValue(priceData['price_' + tier]);
+  }
+
+  function destroyPresentationSelectEnhancement(presentationSelect) {
+    if (typeof TomSelect === 'undefined') {
+      return;
+    }
+    var instance = TomSelect.getInstance(presentationSelect);
+    if (instance) {
+      instance.destroy();
+    }
+    delete presentationSelect.dataset.directInvoiceRemoteInitialized;
+  }
+
   function destroyPriceSelectEnhancement(priceSelect) {
     if (window.LTGSearchableSelect && typeof window.LTGSearchableSelect.destroy === 'function') {
       window.LTGSearchableSelect.destroy(priceSelect);
     }
+  }
+
+  function buildSelectedPresentationOptionData(selectedOption) {
+    if (!selectedOption || !selectedOption.value) {
+      return null;
+    }
+    var data = {
+      value: selectedOption.value,
+      text: selectedOption.textContent,
+    };
+    for (var tier = 1; tier <= 5; tier += 1) {
+      data['price_' + tier] = selectedOption.getAttribute('data-price-' + tier) || '';
+    }
+    return data;
+  }
+
+  function initPresentationRemoteSelect(presentationSelect, linesContainer) {
+    if (!presentationSelect || typeof TomSelect === 'undefined') {
+      return null;
+    }
+    if (presentationSelect.dataset.directInvoiceRemoteInitialized === 'true') {
+      return TomSelect.getInstance(presentationSelect);
+    }
+
+    var searchUrl = linesContainer.dataset.presentationSearchUrl || '';
+    var minSearchChars = parseInt(linesContainer.dataset.minSearchChars || '2', 10) || 2;
+    var i18n = window.LTG_SEARCHABLE_SELECT_I18N || {};
+    var typeToSearchLabel = linesContainer.dataset.typeToSearchLabel || i18n.placeholder || 'Type to search products...';
+    var minSearchLabel = linesContainer.dataset.minSearchLabel || 'Type at least 2 characters to search products.';
+    var noResultsLabel = i18n.noResults || 'No results found';
+
+    var instance = new TomSelect(presentationSelect, {
+      valueField: 'value',
+      labelField: 'text',
+      searchField: ['text'],
+      allowEmptyOption: true,
+      create: false,
+      maxOptions: 50,
+      openOnFocus: true,
+      dropdownParent: 'body',
+      placeholder: typeToSearchLabel,
+      shouldLoad: function (query) {
+        return query.length >= minSearchChars;
+      },
+      load: function (query, callback) {
+        if (!searchUrl || query.length < minSearchChars) {
+          callback();
+          return;
+        }
+        fetch(searchUrl + '?q=' + encodeURIComponent(query), {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+        })
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error('Search request failed');
+            }
+            return response.json();
+          })
+          .then(function (payload) {
+            callback(payload.results || []);
+          })
+          .catch(function () {
+            callback();
+          });
+      },
+      render: {
+        no_results: function () {
+          return '<div class="no-results px-3 py-2 text-muted">' + noResultsLabel + '</div>';
+        },
+        loading: function () {
+          return '<div class="px-3 py-2 text-muted">' + typeToSearchLabel + '</div>';
+        },
+        option: function (item, escape) {
+          return '<div>' + escape(item.text) + '</div>';
+        },
+      },
+      onInitialize: function () {
+        var selectedOption = getSelectedPresentationOption(presentationSelect);
+        var selectedData = buildSelectedPresentationOptionData(selectedOption);
+        if (selectedData) {
+          this.addOption(selectedData);
+          this.setValue(selectedData.value, true);
+        }
+      },
+      onDropdownOpen: function () {
+        var query = (this.control_input && this.control_input.value) || '';
+        if (query.length > 0 && query.length < minSearchChars) {
+          this.clearOptions();
+          this.refreshOptions(false);
+        }
+      },
+    });
+
+    if (instance.wrapper) {
+      instance.wrapper.classList.add('form-select');
+    }
+
+    presentationSelect.dataset.directInvoiceRemoteInitialized = 'true';
+
+    return instance;
   }
 
   function initDirectInvoiceForm() {
@@ -94,7 +236,7 @@
         return;
       }
 
-      var selectedOption = getSelectedPresentationOption(presentationSelect);
+      var priceData = getPresentationPriceData(presentationSelect);
       var selectedValue = preferDefaultTier ? '' : (priceSelect.dataset.selectedValue || priceSelect.value || '');
       var defaultTier = String(priceSelect.dataset.defaultTier || '1');
 
@@ -106,7 +248,7 @@
       placeholderOption.textContent = selectPriceLabel;
       priceSelect.appendChild(placeholderOption);
 
-      if (!selectedOption) {
+      if (!priceData) {
         priceSelect.disabled = true;
         priceSelect.dataset.selectedValue = '';
         return;
@@ -114,7 +256,7 @@
 
       var availablePrices = [];
       for (var tier = 1; tier <= 5; tier += 1) {
-        var priceValue = readPresentationPrice(selectedOption, tier);
+        var priceValue = readPresentationPriceFromData(priceData, tier);
         if (!priceValue) {
           continue;
         }
@@ -195,10 +337,7 @@
       var presentationSelect = lineElement.querySelector('.direct-invoice-presentation-select');
       var removeButton = lineElement.querySelector('.direct-invoice-remove-line');
 
-      if (window.LTGSearchableSelect && presentationSelect) {
-        window.LTGSearchableSelect.init(presentationSelect);
-      }
-
+      initPresentationRemoteSelect(presentationSelect, linesContainer);
       buildPriceOptions(lineElement, false);
       bindPresentationChange(lineElement);
 
@@ -210,13 +349,11 @@
         var lineElements = linesContainer.querySelectorAll('.direct-invoice-line');
         if (lineElements.length === 1) {
           if (presentationSelect) {
-            presentationSelect.value = '';
-            if (typeof TomSelect !== 'undefined') {
-              var tomSelectInstance = TomSelect.getInstance(presentationSelect);
-              if (tomSelectInstance) {
-                tomSelectInstance.clear(true);
-              }
-            }
+            destroyPresentationSelectEnhancement(presentationSelect);
+            delete presentationSelect.dataset.directInvoiceChangeBound;
+            presentationSelect.innerHTML = '<option value="">' + (linesContainer.dataset.typeToSearchLabel || 'Type to search products...') + '</option>';
+            initPresentationRemoteSelect(presentationSelect, linesContainer);
+            bindPresentationChange(lineElement);
           }
           var quantityInput = lineElement.querySelector('input[name="cantidad"]');
           if (quantityInput) {

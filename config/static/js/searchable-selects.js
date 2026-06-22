@@ -27,6 +27,9 @@
     if (select.classList.contains('no-search-select')) {
       return false;
     }
+    if (select.classList.contains('search-select-remote')) {
+      return false;
+    }
     if (select.closest('.ts-wrapper')) {
       return false;
     }

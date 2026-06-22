@@ -246,11 +246,46 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, 'id="direct-invoice-add-line"')
-		self.assertContains(response, 'data-price-1="15.00"')
-		self.assertContains(response, 'data-price-5="19.00"')
+		self.assertContains(response, 'search-select-remote')
+		self.assertContains(response, 'data-presentation-search-url')
+		self.assertContains(response, 'Type to search products...')
 		self.assertContains(response, 'Select one of the 5 prices')
 		self.assertContains(response, 'direct-invoice-create.js')
 		self.assertContains(response, 'direct-invoice-price-select no-search-select')
+		self.assertNotContains(response, 'data-price-1="15.00"')
+
+	def test_backoffice_direct_invoice_presentation_search_returns_matches(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_direct_invoice_presentation_search'), {'q': 'Tortilla'})
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(any(item['value'] == str(self.presentacion.id) for item in payload['results']))
+		match = next(item for item in payload['results'] if item['value'] == str(self.presentacion.id))
+		self.assertEqual(match['price_1'], '15.00')
+		self.assertIn('Caja', match['text'])
+
+	def test_backoffice_direct_invoice_presentation_search_requires_minimum_query(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_direct_invoice_presentation_search'), {'q': 'T'})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.json()['results'], [])
+
+	def test_backoffice_direct_invoice_presentation_search_loads_selected_id(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(
+			reverse('backoffice_direct_invoice_presentation_search'),
+			{'id': str(self.presentacion.id)},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertEqual(len(payload['results']), 1)
+		self.assertEqual(payload['results'][0]['value'], str(self.presentacion.id))
 
 	def test_generate_invoice_accepts_manual_suggested_unit_price(self):
 		invoice = generar_invoice_desde_picking(

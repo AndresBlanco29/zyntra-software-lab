@@ -1,27 +1,6 @@
 (function () {
   'use strict';
 
-  function readPresentationCatalog() {
-    var dataNode = document.getElementById('direct-invoice-presentations-data');
-    if (!dataNode) {
-      return [];
-    }
-    try {
-      var parsed = JSON.parse(dataNode.textContent);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (error) {
-      return [];
-    }
-  }
-
-  function buildCatalogMap(catalog) {
-    var map = {};
-    catalog.forEach(function (item) {
-      map[String(item.value)] = item;
-    });
-    return map;
-  }
-
   function getPresentationId(presentationSelect) {
     if (!presentationSelect) {
       return '';
@@ -53,30 +32,20 @@
     }) || null;
   }
 
-  function getPresentationPriceData(presentationSelect, catalogMap) {
-    var presentationId = getPresentationId(presentationSelect);
-    if (!presentationId) {
-      return null;
-    }
-
-    var catalogEntry = catalogMap[presentationId];
-    if (catalogEntry) {
-      return catalogEntry;
-    }
-
+  function getPresentationPriceData(presentationSelect) {
     var selectedOption = getSelectedPresentationOption(presentationSelect);
     if (!selectedOption) {
       return null;
     }
 
-    var optionData = {
-      value: presentationId,
+    var data = {
+      value: selectedOption.value,
       text: selectedOption.textContent,
     };
     for (var tier = 1; tier <= 5; tier += 1) {
-      optionData['price_' + tier] = selectedOption.getAttribute('data-price-' + tier);
+      data['price_' + tier] = selectedOption.getAttribute('data-price-' + tier);
     }
-    return optionData;
+    return data;
   }
 
   function parsePriceValue(rawValue) {
@@ -112,41 +81,6 @@
     delete select.dataset.directInvoicePresentationInitialized;
   }
 
-  function populatePresentationSelect(select, catalog, placeholderText) {
-    if (!select) {
-      return;
-    }
-
-    var selectedPresentacionId = String(select.dataset.selectedPresentacionId || select.value || '').trim();
-    select.innerHTML = '';
-
-    var placeholderOption = document.createElement('option');
-    placeholderOption.value = '';
-    placeholderOption.textContent = placeholderText;
-    select.appendChild(placeholderOption);
-
-    catalog.forEach(function (item) {
-      var option = document.createElement('option');
-      var value = String(item.value);
-      option.value = value;
-      option.textContent = item.text;
-      for (var tier = 1; tier <= 5; tier += 1) {
-        var priceValue = item['price_' + tier];
-        if (priceValue !== null && priceValue !== undefined && String(priceValue).trim() !== '') {
-          option.setAttribute('data-price-' + tier, priceValue);
-        }
-      }
-      if (selectedPresentacionId && selectedPresentacionId === value) {
-        option.selected = true;
-      }
-      select.appendChild(option);
-    });
-
-    if (selectedPresentacionId) {
-      select.value = selectedPresentacionId;
-    }
-  }
-
   function initPresentationSearchSelect(presentationSelect, linesContainer, onSelectionChange) {
     if (!presentationSelect || typeof TomSelect === 'undefined') {
       return null;
@@ -163,8 +97,10 @@
     var i18n = window.LTG_SEARCHABLE_SELECT_I18N || {};
     var typeToSearchLabel = linesContainer.dataset.typeToSearchLabel || i18n.placeholder || 'Type to search products...';
     var noResultsLabel = i18n.noResults || 'No results found';
+    var selectedPresentacionId = String(presentationSelect.dataset.selectedPresentacionId || '').trim();
 
     var instance = new TomSelect(presentationSelect, {
+      items: selectedPresentacionId ? [selectedPresentacionId] : [],
       allowEmptyOption: true,
       create: false,
       maxOptions: 5000,
@@ -183,7 +119,6 @@
       onChange: function (value) {
         var selectedValue = Array.isArray(value) ? (value[0] || '') : (value || '');
         presentationSelect.dataset.selectedPresentacionId = selectedValue;
-        presentationSelect.value = selectedValue;
         if (typeof onSelectionChange === 'function') {
           onSelectionChange();
         }
@@ -212,9 +147,6 @@
       return;
     }
 
-    var catalog = readPresentationCatalog();
-    var catalogMap = buildCatalogMap(catalog);
-    var typeToSearchLabel = linesContainer.dataset.typeToSearchLabel || 'Type to search products...';
     var createDirectInvoiceLabel = linesContainer.dataset.createDirectInvoiceLabel || 'Create direct invoice';
     var generateInvoiceLabel = linesContainer.dataset.generateInvoiceLabel || 'Generate invoice';
     var selectPriceLabel = linesContainer.dataset.selectPriceLabel || 'Select a price';
@@ -259,7 +191,7 @@
         return;
       }
 
-      var priceData = getPresentationPriceData(presentationSelect, catalogMap);
+      var priceData = getPresentationPriceData(presentationSelect);
       var selectedValue = preferDefaultTier ? '' : (priceSelect.dataset.selectedValue || priceSelect.value || '');
       var defaultTier = String(priceSelect.dataset.defaultTier || '1');
 
@@ -344,7 +276,6 @@
         buildPriceOptions(lineElement, true);
       }
 
-      populatePresentationSelect(presentationSelect, catalog, typeToSearchLabel);
       initPresentationSearchSelect(presentationSelect, linesContainer, handlePresentationChange);
       buildPriceOptions(lineElement, false);
 
@@ -357,8 +288,8 @@
         if (lineElements.length === 1) {
           if (presentationSelect) {
             destroyTomSelect(presentationSelect);
+            presentationSelect.value = '';
             presentationSelect.dataset.selectedPresentacionId = '';
-            populatePresentationSelect(presentationSelect, catalog, typeToSearchLabel);
             initPresentationSearchSelect(presentationSelect, linesContainer, handlePresentationChange);
           }
           var quantityInput = lineElement.querySelector('input[name="cantidad"]');

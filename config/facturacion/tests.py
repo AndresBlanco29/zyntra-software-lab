@@ -246,9 +246,8 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, 'id="direct-invoice-add-line"')
-		self.assertContains(response, 'id="direct-invoice-presentations-data"')
-		self.assertContains(response, '"price_1": "15.00"')
-		self.assertContains(response, '"price_5": "19.00"')
+		self.assertContains(response, 'data-price-1="15.00"')
+		self.assertContains(response, 'data-price-5="19.00"')
 		self.assertContains(response, 'Type to search products...')
 		self.assertContains(response, 'Select one of the 5 prices')
 		self.assertContains(response, 'direct-invoice-create.js')

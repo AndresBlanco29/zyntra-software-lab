@@ -375,18 +375,21 @@ def _direct_invoice_presentation_label(presentacion):
 def _format_direct_invoice_price(value):
 	if value is None:
 		return ''
-	return str(value)
+	decimal_value = Decimal(str(value or '0')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+	if decimal_value <= 0:
+		return ''
+	return format(decimal_value, 'f')
 
 
 def _serialize_direct_invoice_presentation_option(presentacion):
 	return {
 		'value': str(presentacion.id),
 		'text': _direct_invoice_presentation_label(presentacion),
-		'price_1': _format_direct_invoice_price(presentacion.precio_1),
-		'price_2': _format_direct_invoice_price(presentacion.precio_2),
-		'price_3': _format_direct_invoice_price(presentacion.precio_3),
-		'price_4': _format_direct_invoice_price(presentacion.precio_4),
-		'price_5': _format_direct_invoice_price(presentacion.precio_5),
+		'price_1': _format_direct_invoice_price(presentacion.get_price_for_tier(1)),
+		'price_2': _format_direct_invoice_price(presentacion.get_price_for_tier(2)),
+		'price_3': _format_direct_invoice_price(presentacion.get_price_for_tier(3)),
+		'price_4': _format_direct_invoice_price(presentacion.get_price_for_tier(4)),
+		'price_5': _format_direct_invoice_price(presentacion.get_price_for_tier(5)),
 	}
 
 

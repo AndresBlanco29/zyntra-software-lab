@@ -53,8 +53,6 @@
               <div class="form-text">{% trans "Optional. Only used for driver routes." %}</div>
             </div>
 
-            {{ presentation_options|json_script:"direct-invoice-presentations-data" }}
-
             <div class="col-12">
               <label class="form-label fw-semibold">{% trans "Invoice lines" %}</label>
               <div
@@ -85,7 +83,7 @@
                           class="form-select direct-invoice-presentation-select no-search-select"
                           data-selected-presentacion-id="{{ line.presentacion_id }}"
                         >
-                          <option value="">{% trans "Type to search products..." %}</option>
+                          {% include 'backoffice/partials/direct_invoice_presentation_options.html' with selected_presentacion_id=line.presentacion_id %}
                         </select>
                       </div>
                     </div>
@@ -194,7 +192,7 @@
         <label class="form-label small text-muted mb-1">{% trans "Product / presentation" %}</label>
         <div class="direct-invoice-presentation-search">
           <select name="presentacion_id" class="form-select direct-invoice-presentation-select no-search-select">
-            <option value="">{% trans "Type to search products..." %}</option>
+            {% include 'backoffice/partials/direct_invoice_presentation_options.html' %}
           </select>
         </div>
       </div>

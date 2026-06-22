@@ -31,11 +31,12 @@ from config.integrations.quickbooks.sync import (
     _build_item_payload,
     _convert_linked_item_to_inventory,
     _derive_quickbooks_invoice_status,
-    _ensure_inventory_items_allow_txn_date,
     _enrich_quickbooks_item_payload,
     _extract_quickbooks_item_cost,
     _get_inventory_start_date,
+    _normalize_inventory_start_date_if_needed,
     _parse_quickbooks_presentation,
+    _prepare_inventory_item_for_txn_date,
     import_quickbooks_credit_memo_record,
     import_quickbooks_customer_record,
     import_quickbooks_invoice_record,
@@ -164,24 +165,51 @@ class QuickBooksItemPayloadTests(TestCase):
 
         self.assertEqual(payload['InvStartDate'], '2015-01-01')
 
-    def test_ensure_inventory_items_allow_txn_date_backdates_late_start(self):
-        presentacion = Mock(quickbooks_id='1062')
+    def test_prepare_inventory_item_for_txn_date_recreates_late_start_item(self):
+        presentacion = Mock(pk=12, quickbooks_id='1062')
         client = Mock()
-        client.find_by_id.return_value = {
+        client.read_entity.return_value = {
+            'Id': '1062',
+            'SyncToken': '4',
+            'Type': 'Inventory',
+            'InvStartDate': '2026-06-22',
+            'IncomeAccountRef': {'value': '79', 'name': 'Sales of Product Income'},
+        }
+        recreated = {'Id': '2001', 'SyncToken': '0', 'Type': 'Inventory', 'InvStartDate': '2015-01-01'}
+
+        with patch('config.integrations.quickbooks.sync._recreate_presentacion_as_inventory_item', return_value=recreated) as mock_recreate, \
+             patch('config.integrations.quickbooks.sync._build_item_payload', return_value={'Type': 'Inventory', 'InvStartDate': '2015-01-01'}) as mock_build, \
+             patch('config.integrations.quickbooks.sync._mark_synced') as mock_mark_synced:
+            _prepare_inventory_item_for_txn_date(
+                client=client,
+                presentacion=presentacion,
+                txn_date=date(2026, 5, 1),
+            )
+
+        mock_build.assert_called_once()
+        mock_recreate.assert_called_once()
+        mock_mark_synced.assert_called_once_with(presentacion, '2001')
+
+    @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
+    @patch('config.integrations.quickbooks.sync._recreate_presentacion_as_inventory_item')
+    @patch('config.integrations.quickbooks.sync._build_item_payload')
+    def test_normalize_inventory_start_date_if_needed_recreates_item(self, mock_build, mock_recreate):
+        presentacion = Mock(pk=12)
+        existing = {
             'Id': '1062',
             'SyncToken': '4',
             'Type': 'Inventory',
             'InvStartDate': '2026-06-22',
         }
+        mock_build.return_value = {'Type': 'Inventory', 'InvStartDate': '2015-01-01'}
+        mock_recreate.return_value = {'Id': '2001', 'Type': 'Inventory', 'InvStartDate': '2015-01-01'}
 
-        _ensure_inventory_items_allow_txn_date(
-            client=client,
-            presentaciones=[presentacion],
-            txn_date=date(2026, 5, 1),
-        )
+        with patch('config.integrations.quickbooks.sync._mark_synced') as mock_mark_synced:
+            result = _normalize_inventory_start_date_if_needed(presentacion, existing, client=Mock())
 
-        client.update_item.assert_called_once()
-        self.assertEqual(client.update_item.call_args.args[0]['InvStartDate'], '2015-01-01')
+        self.assertEqual(result['Id'], '2001')
+        mock_recreate.assert_called_once()
+        mock_mark_synced.assert_called_once_with(presentacion, '2001')
 
     @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
     @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})

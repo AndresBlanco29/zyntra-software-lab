@@ -326,36 +326,90 @@ def _get_inventory_start_date(*, txn_date=None):
     return min(configured, txn_date)
 
 
-def _ensure_inventory_items_allow_txn_date(*, client, presentaciones, txn_date):
+def _prepare_inventory_item_for_txn_date(*, client, presentacion, txn_date):
+    """Ensure a linked inventory item can be used on transactions dated txn_date.
+
+    QuickBooks does not allow changing InvStartDate through the API on existing items,
+    so when the stored start date is too late we recreate the item with an earlier one.
+    """
     txn_date = _coerce_local_date(txn_date)
     if txn_date is None:
         return
-    target_start = _get_inventory_start_date(txn_date=txn_date).isoformat()
+
+    qb_id = str(getattr(presentacion, 'quickbooks_id', '') or '').strip()
+    if not qb_id:
+        return
+
+    remote = client.read_entity('Item', qb_id) or client.find_by_id('Item', qb_id)
+    if not remote or not _quickbooks_item_is_inventory(remote):
+        return
+
+    inv_start = _coerce_local_date(remote.get('InvStartDate'))
+    if inv_start and inv_start <= txn_date:
+        return
+
+    desired_payload = _build_item_payload(
+        presentacion,
+        client=client,
+        income_account_ref=remote.get('IncomeAccountRef') or None,
+        remote_payload=remote,
+    )
+    desired_payload['InvStartDate'] = _get_inventory_start_date(txn_date=txn_date).isoformat()
+
+    try:
+        recreated = _recreate_presentacion_as_inventory_item(
+            presentacion,
+            remote,
+            desired_payload,
+            client=client,
+        )
+    except QuickBooksAPIError as exc:
+        raise QuickBooksSyncError(
+            _(
+                'QuickBooks item %(item_id)s has inventory start date %(start)s, which is after invoice date %(txn)s, and could not be recreated: %(error)s'
+            ) % {
+                'item_id': qb_id,
+                'start': inv_start.isoformat() if inv_start else '?',
+                'txn': txn_date.isoformat(),
+                'error': _summarize_quickbooks_error(exc),
+            }
+        ) from exc
+
+    _mark_synced(presentacion, recreated.get('Id'))
+    logger.info(
+        'Recreated QuickBooks inventory item %s as %s so txn date %s is allowed.',
+        qb_id,
+        recreated.get('Id'),
+        txn_date.isoformat(),
+    )
+
+
+def _prepare_inventory_items_for_txn_date(*, client, presentaciones, txn_date):
     seen_ids = set()
     for presentacion in presentaciones:
-        qb_id = str(getattr(presentacion, 'quickbooks_id', '') or '').strip()
-        if not qb_id or qb_id in seen_ids:
+        local_id = getattr(presentacion, 'pk', None)
+        dedupe_key = local_id or getattr(presentacion, 'quickbooks_id', None)
+        if dedupe_key in seen_ids:
             continue
-        seen_ids.add(qb_id)
-        remote = client.find_by_id('Item', qb_id)
+        seen_ids.add(dedupe_key)
+        _prepare_inventory_item_for_txn_date(client=client, presentacion=presentacion, txn_date=txn_date)
+
+
+def _resolve_txn_date_for_inventory_items(*, client, presentaciones, txn_date):
+    """Fallback when inventory items still block the requested transaction date."""
+    txn_date = _coerce_local_date(txn_date) or timezone.localdate()
+    resolved = txn_date
+    for presentacion in presentaciones:
+        qb_id = str(getattr(presentacion, 'quickbooks_id', '') or '').strip()
+        if not qb_id:
+            continue
+        remote = client.read_entity('Item', qb_id) or client.find_by_id('Item', qb_id)
         if not remote or not _quickbooks_item_is_inventory(remote):
             continue
-        current_start = _coerce_local_date(remote.get('InvStartDate'))
-        if current_start and current_start <= txn_date:
-            continue
-        try:
-            client.update_item({
-                'Id': qb_id,
-                'SyncToken': str(remote.get('SyncToken', '')),
-                'sparse': True,
-                'InvStartDate': target_start,
-            })
-        except QuickBooksAPIError:
-            logger.warning(
-                'Could not backdate InvStartDate for QuickBooks item %s before txn %s',
-                qb_id,
-                txn_date.isoformat(),
-            )
+        inv_start = _coerce_local_date(remote.get('InvStartDate'))
+        if inv_start and inv_start > resolved:
+            resolved = inv_start
+    return resolved
 
 
 def _needs_inventory_type_conversion(existing, desired_payload):
@@ -3286,6 +3340,32 @@ def link_quickbooks_import_conflict(conflict, *, local_record_id=None, local_mod
     }
 
 
+def _normalize_inventory_start_date_if_needed(presentacion, existing, *, client):
+    if not _quickbooks_item_is_inventory(existing):
+        return existing
+
+    inv_start = _coerce_local_date(existing.get('InvStartDate'))
+    target_start = _get_inventory_start_date()
+    if inv_start and inv_start <= target_start:
+        return existing
+
+    desired_payload = _build_item_payload(
+        presentacion,
+        client=client,
+        income_account_ref=existing.get('IncomeAccountRef') or None,
+        remote_payload=existing,
+    )
+    desired_payload['InvStartDate'] = target_start.isoformat()
+    recreated = _recreate_presentacion_as_inventory_item(
+        presentacion,
+        existing,
+        desired_payload,
+        client=client,
+    )
+    _mark_synced(presentacion, recreated.get('Id'))
+    return recreated
+
+
 def _push_presentacion_to_quickbooks_item(presentacion, existing, *, client):
     existing_income_ref = existing.get('IncomeAccountRef') if _quickbooks_item_is_inventory(existing) else None
     desired_payload = _build_item_payload(
@@ -3295,6 +3375,9 @@ def _push_presentacion_to_quickbooks_item(presentacion, existing, *, client):
         remote_payload=existing,
     )
     if not _item_payload_needs_update(existing, desired_payload):
+        normalized = _normalize_inventory_start_date_if_needed(presentacion, existing, client=client)
+        if normalized is not existing:
+            return _sync_result(entity='Item', action='converted', payload=normalized)
         _mark_synced(presentacion, existing.get('Id'))
         return _sync_result(entity='Item', action='existing', payload=existing)
 
@@ -3642,12 +3725,19 @@ def sync_invoice(*, invoice, client=None):
                 return _sync_result(entity='Invoice', action='existing', payload=existing)
 
         customer_result = sync_customer(cliente=invoice.cliente, client=client)
+        txn_date = invoice.creada_en.date()
         lines = []
         adjustment_item_ref = None
         inventory_presentaciones = []
         for item in invoice.items.select_related('presentacion__producto').all():
             if item.presentacion_id:
                 sync_product(presentacion=item.presentacion, client=client)
+                _prepare_inventory_item_for_txn_date(
+                    client=client,
+                    presentacion=item.presentacion,
+                    txn_date=txn_date,
+                )
+                item.presentacion.refresh_from_db(fields=['quickbooks_id'])
                 inventory_presentaciones.append(item.presentacion)
                 item_ref = {'value': item.presentacion.quickbooks_id, 'name': _build_item_name(item.presentacion)}
             else:
@@ -3666,17 +3756,22 @@ def sync_invoice(*, invoice, client=None):
             _mark_synced(invoice, existing.get('Id'))
             return _sync_result(entity='Invoice', action='linked', payload=existing)
 
-        txn_date = invoice.creada_en.date()
-        _ensure_inventory_items_allow_txn_date(
+        resolved_txn_date = _resolve_txn_date_for_inventory_items(
             client=client,
             presentaciones=inventory_presentaciones,
             txn_date=txn_date,
         )
+        private_note = _truncate(f'La Tortilla invoice {invoice.numero}', limit=4000)
+        if resolved_txn_date != txn_date:
+            private_note = _truncate(
+                f'{private_note} | Original ERP date: {txn_date.isoformat()}',
+                limit=4000,
+            )
         created = client.create_invoice({
             'CustomerRef': {'value': customer_result['quickbooks_id']},
             'DocNumber': invoice.numero,
-            'TxnDate': txn_date.isoformat(),
-            'PrivateNote': _truncate(f'La Tortilla invoice {invoice.numero}', limit=4000),
+            'TxnDate': resolved_txn_date.isoformat(),
+            'PrivateNote': private_note,
             'Line': lines,
         })
         _mark_synced(invoice, created.get('Id'))
@@ -3686,7 +3781,7 @@ def sync_invoice(*, invoice, client=None):
         raise QuickBooksSyncError(str(exc)) from exc
 
 
-def _build_adjustment_lines(note, client):
+def _build_adjustment_lines(note, client, *, txn_date=None):
     adjustment_item_ref = None
     lines = []
     presentaciones = []
@@ -3694,6 +3789,13 @@ def _build_adjustment_lines(note, client):
         amount = _quantize_money(item.total or Decimal(str(item.monto_unitario or '0')) * Decimal(str(item.cantidad or 1)))
         if item.presentacion_id:
             sync_product(presentacion=item.presentacion, client=client)
+            if txn_date is not None:
+                _prepare_inventory_item_for_txn_date(
+                    client=client,
+                    presentacion=item.presentacion,
+                    txn_date=txn_date,
+                )
+                item.presentacion.refresh_from_db(fields=['quickbooks_id'])
             presentaciones.append(item.presentacion)
             item_ref = {'value': item.presentacion.quickbooks_id, 'name': _build_item_name(item.presentacion)}
         else:
@@ -3737,15 +3839,15 @@ def sync_adjustment_note(*, note, client=None):
                 return _sync_result(entity=entity_name, action='existing', payload=existing)
 
         customer_result = sync_customer(cliente=note.cliente, client=client)
-        lines, inventory_presentaciones = _build_adjustment_lines(note, client)
+        txn_date = note.fecha.date()
+        lines, inventory_presentaciones = _build_adjustment_lines(note, client, txn_date=txn_date)
         entity_name = 'CreditMemo' if note.tipo_documento == 'CREDITO' else 'Invoice'
         existing = _find_transaction_by_doc_number(client, entity_name, note.numero)
         if existing:
             _mark_synced(note, existing.get('Id'))
             return _sync_result(entity=entity_name, action='linked', payload=existing)
 
-        txn_date = note.fecha.date()
-        _ensure_inventory_items_allow_txn_date(
+        resolved_txn_date = _resolve_txn_date_for_inventory_items(
             client=client,
             presentaciones=inventory_presentaciones,
             txn_date=txn_date,
@@ -3753,10 +3855,15 @@ def sync_adjustment_note(*, note, client=None):
         payload = {
             'CustomerRef': {'value': customer_result['quickbooks_id']},
             'DocNumber': note.numero,
-            'TxnDate': txn_date.isoformat(),
+            'TxnDate': resolved_txn_date.isoformat(),
             'PrivateNote': _truncate(note.descripcion or note.get_motivo_display(), limit=4000),
             'Line': lines,
         }
+        if resolved_txn_date != txn_date:
+            payload['PrivateNote'] = _truncate(
+                f"{payload['PrivateNote']} | Original ERP date: {txn_date.isoformat()}",
+                limit=4000,
+            )
         if note.invoice_id and note.invoice.quickbooks_id:
             payload['CustomerMemo'] = {'value': f'Related invoice {note.invoice.numero}'}
 

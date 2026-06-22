@@ -22,6 +22,63 @@
     return map;
   }
 
+  function getPresentationId(presentationSelect) {
+    if (!presentationSelect) {
+      return '';
+    }
+    if (typeof TomSelect !== 'undefined') {
+      var instance = TomSelect.getInstance(presentationSelect);
+      if (instance) {
+        var selectedValue = instance.getValue();
+        if (Array.isArray(selectedValue)) {
+          selectedValue = selectedValue[0];
+        }
+        if (selectedValue !== null && selectedValue !== undefined && String(selectedValue).trim()) {
+          return String(selectedValue).trim();
+        }
+      }
+    }
+    return String(
+      presentationSelect.value || presentationSelect.dataset.selectedPresentacionId || ''
+    ).trim();
+  }
+
+  function getSelectedPresentationOption(presentationSelect) {
+    var presentationId = getPresentationId(presentationSelect);
+    if (!presentationId) {
+      return null;
+    }
+    return Array.prototype.find.call(presentationSelect.options, function (option) {
+      return option.value === presentationId;
+    }) || null;
+  }
+
+  function getPresentationPriceData(presentationSelect, catalogMap) {
+    var presentationId = getPresentationId(presentationSelect);
+    if (!presentationId) {
+      return null;
+    }
+
+    var catalogEntry = catalogMap[presentationId];
+    if (catalogEntry) {
+      return catalogEntry;
+    }
+
+    var selectedOption = getSelectedPresentationOption(presentationSelect);
+    if (!selectedOption) {
+      return null;
+    }
+
+    var optionData = {
+      value: presentationId,
+      text: selectedOption.textContent,
+    };
+    for (var tier = 1; tier <= 5; tier += 1) {
+      optionData['price_' + tier] = selectedOption.getAttribute('data-price-' + tier);
+    }
+    return optionData;
+  }
+
   function parsePriceValue(rawValue) {
     if (rawValue === null || rawValue === undefined) {
       return null;
@@ -74,8 +131,9 @@
       option.value = value;
       option.textContent = item.text;
       for (var tier = 1; tier <= 5; tier += 1) {
-        if (item['price_' + tier]) {
-          option.setAttribute('data-price-' + tier, item['price_' + tier]);
+        var priceValue = item['price_' + tier];
+        if (priceValue !== null && priceValue !== undefined && String(priceValue).trim() !== '') {
+          option.setAttribute('data-price-' + tier, priceValue);
         }
       }
       if (selectedPresentacionId && selectedPresentacionId === value) {
@@ -122,8 +180,10 @@
           return '<div>' + escape(item.text) + '</div>';
         },
       },
-      onChange: function () {
-        presentationSelect.dataset.selectedPresentacionId = presentationSelect.value || '';
+      onChange: function (value) {
+        var selectedValue = Array.isArray(value) ? (value[0] || '') : (value || '');
+        presentationSelect.dataset.selectedPresentacionId = selectedValue;
+        presentationSelect.value = selectedValue;
         if (typeof onSelectionChange === 'function') {
           onSelectionChange();
         }
@@ -199,8 +259,7 @@
         return;
       }
 
-      var presentationId = String(presentationSelect.value || '').trim();
-      var priceData = catalogMap[presentationId] || null;
+      var priceData = getPresentationPriceData(presentationSelect, catalogMap);
       var selectedValue = preferDefaultTier ? '' : (priceSelect.dataset.selectedValue || priceSelect.value || '');
       var defaultTier = String(priceSelect.dataset.defaultTier || '1');
 
@@ -287,7 +346,6 @@
 
       populatePresentationSelect(presentationSelect, catalog, typeToSearchLabel);
       initPresentationSearchSelect(presentationSelect, linesContainer, handlePresentationChange);
-      presentationSelect.addEventListener('change', handlePresentationChange);
       buildPriceOptions(lineElement, false);
 
       if (!removeButton) {

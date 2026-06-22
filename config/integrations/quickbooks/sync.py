@@ -655,38 +655,93 @@ def _build_item_description(presentacion):
     return _truncate(description, limit=4000)
 
 
-def _get_default_income_account_ref(client):
-    accounts = client.query("select * from Account where AccountType = 'Income' maxresults 1").get('Account', [])
-    if not accounts:
-        raise QuickBooksSyncError('QuickBooks does not have an income account available for item sync.')
-    account = accounts[0]
+def _account_ref_from_record(account):
     return {'value': str(account.get('Id')), 'name': account.get('Name', '')}
 
 
-def _get_default_expense_account_ref(client):
-    queries = (
-        "select * from Account where AccountType = 'Cost of Goods Sold' maxresults 1",
-        "select * from Account where AccountSubType = 'SuppliesMaterialsCogs' maxresults 1",
-    )
+def _first_account_ref_from_queries(client, queries):
     for query in queries:
         accounts = client.query(query).get('Account', [])
         if accounts:
-            account = accounts[0]
-            return {'value': str(account.get('Id')), 'name': account.get('Name', '')}
-    raise QuickBooksSyncError('QuickBooks does not have a COGS account available for inventory item sync.')
+            return _account_ref_from_record(accounts[0])
+    return None
+
+
+def _account_ref_from_setting(client, setting_name):
+    account_id = str(getattr(settings, setting_name, '') or '').strip()
+    if not account_id:
+        return None
+    accounts = client.query(
+        f"select Id, Name from Account where Id = '{client._escape_query_value(account_id)}' maxresults 1"
+    ).get('Account', [])
+    if not accounts:
+        raise QuickBooksSyncError(
+            f'QuickBooks account {account_id} configured in {setting_name} was not found.'
+        )
+    return _account_ref_from_record(accounts[0])
+
+
+def _get_default_income_account_ref(client):
+    account_ref = _first_account_ref_from_queries(
+        client,
+        ("select * from Account where AccountType = 'Income' maxresults 1",),
+    )
+    if not account_ref:
+        raise QuickBooksSyncError('QuickBooks does not have an income account available for item sync.')
+    return account_ref
+
+
+def _get_inventory_income_account_ref(client):
+    account_ref = _account_ref_from_setting(client, 'QUICKBOOKS_INVENTORY_INCOME_ACCOUNT_ID')
+    if account_ref:
+        return account_ref
+    account_ref = _first_account_ref_from_queries(
+        client,
+        (
+            "select * from Account where AccountSubType = 'SalesOfProductIncome' maxresults 1",
+            "select * from Account where Name = 'Sales of Product Income' maxresults 1",
+        ),
+    )
+    if not account_ref:
+        raise QuickBooksSyncError(
+            'QuickBooks does not have a Sales of Product Income account available for inventory item sync.'
+        )
+    return account_ref
+
+
+def _get_default_expense_account_ref(client):
+    account_ref = _account_ref_from_setting(client, 'QUICKBOOKS_INVENTORY_EXPENSE_ACCOUNT_ID')
+    if account_ref:
+        return account_ref
+    account_ref = _first_account_ref_from_queries(
+        client,
+        (
+            "select * from Account where AccountType = 'Cost of Goods Sold' maxresults 1",
+            "select * from Account where AccountSubType = 'SuppliesMaterialsCogs' maxresults 1",
+        ),
+    )
+    if not account_ref:
+        raise QuickBooksSyncError('QuickBooks does not have a COGS account available for inventory item sync.')
+    return account_ref
 
 
 def _get_default_asset_account_ref(client):
-    queries = (
-        "select * from Account where AccountSubType = 'Inventory' maxresults 1",
-        "select * from Account where Name = 'Inventory Asset' maxresults 1",
+    account_ref = _account_ref_from_setting(client, 'QUICKBOOKS_INVENTORY_ASSET_ACCOUNT_ID')
+    if account_ref:
+        return account_ref
+    account_ref = _first_account_ref_from_queries(
+        client,
+        (
+            "select * from Account where AccountType = 'Other Current Asset' and AccountSubType = 'Inventory' maxresults 1",
+            "select * from Account where AccountSubType = 'Inventory' maxresults 1",
+            "select * from Account where Name = 'Inventory Asset' maxresults 1",
+        ),
     )
-    for query in queries:
-        accounts = client.query(query).get('Account', [])
-        if accounts:
-            account = accounts[0]
-            return {'value': str(account.get('Id')), 'name': account.get('Name', '')}
-    raise QuickBooksSyncError('QuickBooks does not have an inventory asset account available for inventory item sync.')
+    if not account_ref:
+        raise QuickBooksSyncError(
+            'QuickBooks does not have an inventory asset account available for inventory item sync.'
+        )
+    return account_ref
 
 
 def _quickbooks_item_is_inventory(payload):
@@ -715,7 +770,14 @@ def _build_item_payload(presentacion, *, client, income_account_ref=None, remote
         'UnitPrice': _as_float(presentacion.precio_3),
         'Sku': _truncate(presentacion.producto.codigo_barras, limit=100),
     }
-    income_ref = income_account_ref or _get_default_income_account_ref(client)
+
+    if use_inventory:
+        if remote_payload is not None and _quickbooks_item_is_inventory(remote_payload) and income_account_ref:
+            income_ref = income_account_ref
+        else:
+            income_ref = _get_inventory_income_account_ref(client)
+    else:
+        income_ref = income_account_ref or _get_default_income_account_ref(client)
 
     if use_inventory:
         payload.update({
@@ -3165,10 +3227,11 @@ def link_quickbooks_import_conflict(conflict, *, local_record_id=None, local_mod
 
 
 def _push_presentacion_to_quickbooks_item(presentacion, existing, *, client):
+    existing_income_ref = existing.get('IncomeAccountRef') if _quickbooks_item_is_inventory(existing) else None
     desired_payload = _build_item_payload(
         presentacion,
         client=client,
-        income_account_ref=existing.get('IncomeAccountRef') or None,
+        income_account_ref=existing_income_ref or None,
         remote_payload=existing,
     )
     if not _item_payload_needs_update(existing, desired_payload):

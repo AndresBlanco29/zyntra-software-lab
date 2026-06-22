@@ -124,23 +124,44 @@ class QuickBooksItemPayloadTests(TestCase):
     @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
     @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
     @patch('config.integrations.quickbooks.sync._get_default_expense_account_ref', return_value={'value': '80', 'name': 'COGS'})
-    @patch('config.integrations.quickbooks.sync._get_default_income_account_ref', return_value={'value': '79', 'name': 'Sales'})
+    @patch('config.integrations.quickbooks.sync._get_inventory_income_account_ref', return_value={'value': '79', 'name': 'Sales of Product Income'})
     def test_build_item_payload_converts_linked_noninventory_to_inventory(self, *_mocks):
         payload = _build_item_payload(
             self.presentacion,
             client=Mock(),
+            income_account_ref={'value': '55', 'name': 'Services Income'},
             remote_payload={
                 'Id': '1062',
                 'Type': 'NonInventory',
-                'IncomeAccountRef': {'value': '79', 'name': 'Sales'},
+                'IncomeAccountRef': {'value': '55', 'name': 'Services Income'},
             },
         )
 
         self.assertEqual(payload['Type'], 'Inventory')
         self.assertTrue(payload['TrackQtyOnHand'])
         self.assertEqual(payload['QtyOnHand'], 18)
+        self.assertEqual(payload['IncomeAccountRef']['value'], '79')
         self.assertEqual(payload['AssetAccountRef']['value'], '81')
         self.assertEqual(payload['ExpenseAccountRef']['value'], '80')
+
+    @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
+    @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
+    @patch('config.integrations.quickbooks.sync._get_default_expense_account_ref', return_value={'value': '80', 'name': 'COGS'})
+    @patch('config.integrations.quickbooks.sync._get_inventory_income_account_ref', return_value={'value': '79', 'name': 'Sales of Product Income'})
+    def test_build_item_payload_preserves_inventory_income_account_on_update(self, *_mocks):
+        payload = _build_item_payload(
+            self.presentacion,
+            client=Mock(),
+            income_account_ref={'value': '79', 'name': 'Sales of Product Income'},
+            remote_payload={
+                'Id': '1062',
+                'Type': 'Inventory',
+                'IncomeAccountRef': {'value': '79', 'name': 'Sales of Product Income'},
+            },
+        )
+
+        self.assertEqual(payload['Type'], 'Inventory')
+        self.assertEqual(payload['IncomeAccountRef']['value'], '79')
 
     @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=False)
     @patch('config.integrations.quickbooks.sync._get_default_income_account_ref', return_value={'value': '79', 'name': 'Sales'})
@@ -161,7 +182,7 @@ class QuickBooksItemPayloadTests(TestCase):
     @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
     @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
     @patch('config.integrations.quickbooks.sync._get_default_expense_account_ref', return_value={'value': '80', 'name': 'COGS'})
-    @patch('config.integrations.quickbooks.sync._get_default_income_account_ref', return_value={'value': '79', 'name': 'Sales'})
+    @patch('config.integrations.quickbooks.sync._get_inventory_income_account_ref', return_value={'value': '79', 'name': 'Sales of Product Income'})
     def test_convert_linked_item_to_inventory_falls_back_to_recreate(self, *_mocks):
         existing = {
             'Id': '1062',

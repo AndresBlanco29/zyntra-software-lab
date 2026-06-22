@@ -1,0 +1,13 @@
+{% load i18n l10n %}
+<option value="">{% trans "Type to search products..." %}</option>
+{% for presentacion in presentations %}
+<option
+  value="{{ presentacion.id }}"
+  data-price-1="{{ presentacion.precio_1|unlocalize }}"
+  data-price-2="{{ presentacion.precio_2|unlocalize }}"
+  data-price-3="{{ presentacion.precio_3|unlocalize }}"
+  data-price-4="{{ presentacion.precio_4|unlocalize }}"
+  data-price-5="{{ presentacion.precio_5|unlocalize }}"
+  {% if selected_presentacion_id == presentacion.id|stringformat:'s' %}selected{% endif %}
+>#{{ presentacion.id }} · {{ presentacion.producto.nombre }} · {{ presentacion.nombre }}</option>
+{% endfor %}

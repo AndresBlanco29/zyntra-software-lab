@@ -427,15 +427,14 @@ def _build_direct_invoice_context(*, selected_client_id=None, post_data=None):
 		for note in pending_notes_summary['notes']:
 			note.prefill_amount = selected_general_note_values.get(note.id, '')
 	direct_invoice_lines = _attach_presentations_to_direct_invoice_lines(_build_direct_invoice_line_drafts(post_data))
-	presentation_options = [
-		_serialize_direct_invoice_presentation_option(presentacion)
-		for presentacion in Presentacion.objects.select_related('producto').order_by('producto__nombre', 'nombre', 'id')
-	]
+	presentations = list(
+		Presentacion.objects.select_related('producto').order_by('producto__nombre', 'nombre', 'id')
+	)
 	return {
 		'customers': Cliente.objects.order_by('nombre_empresa'),
 		'drivers': Usuario.objects.filter(role='driver', is_active=True).order_by('first_name', 'username'),
 		'direct_invoice_lines': direct_invoice_lines,
-		'presentation_options': presentation_options,
+		'presentations': presentations,
 		'presentation_search_url': reverse('backoffice_direct_invoice_presentation_search'),
 		'selected_client': selected_client,
 		'pending_notes_summary': pending_notes_summary,

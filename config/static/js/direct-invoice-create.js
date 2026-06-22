@@ -16,19 +16,6 @@
     return normalized;
   }
 
-  function readPresentationOptionsFromPage() {
-    var optionsElement = document.getElementById('direct-invoice-presentation-options');
-    if (!optionsElement || !optionsElement.textContent) {
-      return [];
-    }
-    try {
-      var parsed = JSON.parse(optionsElement.textContent);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (error) {
-      return [];
-    }
-  }
-
   function getSelectedPresentationOption(presentationSelect) {
     if (!presentationSelect || !presentationSelect.value) {
       return null;
@@ -39,8 +26,9 @@
     }) || null;
   }
 
-  function getPresentationPriceData(presentationSelect, presentationOptionsByValue) {
-    if (!presentationSelect || !presentationSelect.value) {
+  function getPresentationPriceData(presentationSelect) {
+    var selectedOption = getSelectedPresentationOption(presentationSelect);
+    if (!selectedOption) {
       return null;
     }
 
@@ -49,15 +37,6 @@
       if (instance && instance.options && instance.options[presentationSelect.value]) {
         return instance.options[presentationSelect.value];
       }
-    }
-
-    if (presentationOptionsByValue && presentationOptionsByValue[presentationSelect.value]) {
-      return presentationOptionsByValue[presentationSelect.value];
-    }
-
-    var selectedOption = getSelectedPresentationOption(presentationSelect);
-    if (!selectedOption) {
-      return null;
     }
 
     var data = {
@@ -77,77 +56,10 @@
     return parsePriceValue(priceData['price_' + tier]);
   }
 
-  function destroyPresentationSelectEnhancement(presentationSelect) {
-    if (typeof TomSelect === 'undefined') {
-      return;
-    }
-    var instance = TomSelect.getInstance(presentationSelect);
-    if (instance) {
-      instance.destroy();
-    }
-    delete presentationSelect.dataset.directInvoiceSelectInitialized;
-  }
-
   function destroyPriceSelectEnhancement(priceSelect) {
     if (window.LTGSearchableSelect && typeof window.LTGSearchableSelect.destroy === 'function') {
       window.LTGSearchableSelect.destroy(priceSelect);
     }
-  }
-
-  function initPresentationSelect(presentationSelect, linesContainer, presentationOptions, onSelectionChange) {
-    if (!presentationSelect || typeof TomSelect === 'undefined') {
-      return null;
-    }
-    if (presentationSelect.dataset.directInvoiceSelectInitialized === 'true') {
-      return TomSelect.getInstance(presentationSelect);
-    }
-
-    var existingInstance = TomSelect.getInstance(presentationSelect);
-    if (existingInstance) {
-      existingInstance.destroy();
-    }
-
-    var i18n = window.LTG_SEARCHABLE_SELECT_I18N || {};
-    var typeToSearchLabel = linesContainer.dataset.typeToSearchLabel || i18n.placeholder || 'Type to search products...';
-    var noResultsLabel = i18n.noResults || 'No results found';
-    var selectedValue = presentationSelect.value || '';
-
-    var instance = new TomSelect(presentationSelect, {
-      valueField: 'value',
-      labelField: 'text',
-      searchField: ['text'],
-      options: presentationOptions,
-      allowEmptyOption: true,
-      create: false,
-      maxOptions: null,
-      openOnFocus: true,
-      dropdownParent: 'body',
-      placeholder: typeToSearchLabel,
-      render: {
-        no_results: function () {
-          return '<div class="no-results px-3 py-2 text-muted">' + noResultsLabel + '</div>';
-        },
-        option: function (item, escape) {
-          return '<div>' + escape(item.text) + '</div>';
-        },
-      },
-      onChange: function () {
-        if (typeof onSelectionChange === 'function') {
-          onSelectionChange();
-        }
-      },
-    });
-
-    if (instance.wrapper) {
-      instance.wrapper.classList.add('form-select');
-    }
-
-    if (selectedValue) {
-      instance.setValue(selectedValue, true);
-    }
-
-    presentationSelect.dataset.directInvoiceSelectInitialized = 'true';
-    return instance;
   }
 
   function initDirectInvoiceForm() {
@@ -159,14 +71,6 @@
     var linesContainer = document.getElementById('direct-invoice-lines');
     var addLineButton = document.getElementById('direct-invoice-add-line');
     var lineTemplate = document.getElementById('direct-invoice-line-template');
-    var presentationOptions = readPresentationOptionsFromPage();
-    var presentationOptionsByValue = {};
-
-    presentationOptions.forEach(function (option) {
-      if (option && option.value) {
-        presentationOptionsByValue[String(option.value)] = option;
-      }
-    });
 
     if (!linesContainer || !addLineButton || !lineTemplate) {
       return;
@@ -216,7 +120,7 @@
         return;
       }
 
-      var priceData = getPresentationPriceData(presentationSelect, presentationOptionsByValue);
+      var priceData = getPresentationPriceData(presentationSelect);
       var selectedValue = preferDefaultTier ? '' : (priceSelect.dataset.selectedValue || priceSelect.value || '');
       var defaultTier = String(priceSelect.dataset.defaultTier || '1');
 
@@ -290,19 +194,18 @@
       });
     }
 
+    function handlePresentationChange(lineElement) {
+      var priceSelect = lineElement.querySelector('.direct-invoice-price-select');
+      if (priceSelect) {
+        priceSelect.dataset.selectedValue = '';
+      }
+      buildPriceOptions(lineElement, true);
+    }
+
     function setupLine(lineElement) {
       var presentationSelect = lineElement.querySelector('.direct-invoice-presentation-select');
       var removeButton = lineElement.querySelector('.direct-invoice-remove-line');
 
-      function handlePresentationChange() {
-        var priceSelect = lineElement.querySelector('.direct-invoice-price-select');
-        if (priceSelect) {
-          priceSelect.dataset.selectedValue = '';
-        }
-        buildPriceOptions(lineElement, true);
-      }
-
-      initPresentationSelect(presentationSelect, linesContainer, presentationOptions, handlePresentationChange);
       buildPriceOptions(lineElement, false);
 
       if (!removeButton) {
@@ -313,9 +216,16 @@
         var lineElements = linesContainer.querySelectorAll('.direct-invoice-line');
         if (lineElements.length === 1) {
           if (presentationSelect) {
-            destroyPresentationSelectEnhancement(presentationSelect);
-            presentationSelect.innerHTML = '';
-            initPresentationSelect(presentationSelect, linesContainer, presentationOptions, handlePresentationChange);
+            if (typeof TomSelect !== 'undefined') {
+              var instance = TomSelect.getInstance(presentationSelect);
+              if (instance) {
+                instance.clear(true);
+              } else {
+                presentationSelect.value = '';
+              }
+            } else {
+              presentationSelect.value = '';
+            }
           }
           var quantityInput = lineElement.querySelector('input[name="cantidad"]');
           if (quantityInput) {
@@ -333,18 +243,37 @@
       });
     }
 
+    linesContainer.addEventListener('change', function (event) {
+      var presentationSelect = event.target.closest('.direct-invoice-presentation-select');
+      if (!presentationSelect) {
+        return;
+      }
+      var lineElement = presentationSelect.closest('.direct-invoice-line');
+      if (lineElement) {
+        handlePresentationChange(lineElement);
+      }
+    });
+
     linesContainer.querySelectorAll('.direct-invoice-line').forEach(setupLine);
     updateRemoveButtons();
 
     addLineButton.addEventListener('click', function () {
       var fragment = lineTemplate.content.cloneNode(true);
       linesContainer.appendChild(fragment);
-      setupLine(linesContainer.lastElementChild);
+      var newLine = linesContainer.lastElementChild;
+      var presentationSelect = newLine.querySelector('.direct-invoice-presentation-select');
+      if (window.LTGSearchableSelect && presentationSelect) {
+        window.LTGSearchableSelect.init(presentationSelect);
+      }
+      setupLine(newLine);
       updateRemoveButtons();
     });
   }
 
   document.addEventListener('DOMContentLoaded', function () {
+    if (window.LTGSearchableSelect && typeof window.LTGSearchableSelect.initAll === 'function') {
+      window.LTGSearchableSelect.initAll(document);
+    }
     initDirectInvoiceForm();
   });
 })();

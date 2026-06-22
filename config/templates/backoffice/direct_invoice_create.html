@@ -55,7 +55,6 @@
 
             <div class="col-12">
               <label class="form-label fw-semibold">{% trans "Invoice lines" %}</label>
-              {{ presentation_options|json_script:"direct-invoice-presentation-options" }}
               <div
                 id="direct-invoice-lines"
                 class="vstack gap-3"
@@ -80,10 +79,7 @@
                       <label class="form-label small text-muted mb-1">{% trans "Product / presentation" %}</label>
                       <div class="direct-invoice-presentation-search">
                         <select name="presentacion_id" class="form-select direct-invoice-presentation-select">
-                          <option value="">{% trans "Type to search products..." %}</option>
-                          {% if line.presentacion %}
-                          <option value="{{ line.presentacion.id }}" selected>#{{ line.presentacion.id }} · {{ line.presentacion.producto.nombre }} · {{ line.presentacion.nombre }}</option>
-                          {% endif %}
+                          {% include 'backoffice/partials/direct_invoice_presentation_options.html' with selected_presentacion_id=line.presentacion_id %}
                         </select>
                       </div>
                     </div>
@@ -192,7 +188,7 @@
         <label class="form-label small text-muted mb-1">{% trans "Product / presentation" %}</label>
         <div class="direct-invoice-presentation-search">
           <select name="presentacion_id" class="form-select direct-invoice-presentation-select">
-            <option value="">{% trans "Type to search products..." %}</option>
+            {% include 'backoffice/partials/direct_invoice_presentation_options.html' %}
           </select>
         </div>
       </div>

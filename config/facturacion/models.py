@@ -94,6 +94,26 @@ class Invoice(models.Model):
 	def is_voided(self):
 		return self.estado == 'ANULADA'
 
+	def delivery_blocks_void_delete(self):
+		delivery = getattr(self, 'delivery', None)
+		return bool(delivery and delivery.estado in {'EN_RUTA', 'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'})
+
+	def can_void_from_backoffice(self):
+		from config.integrations.quickbooks.sync import is_sync_locked
+
+		return (
+			not is_sync_locked(self)
+			and self.estado == 'GENERADA'
+			and not self.delivery_blocks_void_delete()
+		)
+
+	def can_delete_from_backoffice(self):
+		from config.integrations.quickbooks.sync import is_sync_locked
+
+		return not is_sync_locked(self) and (
+			self.can_void_from_backoffice() or self.estado == 'ANULADA'
+		)
+
 	def clean(self):
 		if self.pedido_id and self.pedido.estado not in {'VERIFICADO_AJUSTADO', 'INVOICE_GENERADA'}:
 			raise ValidationError({'pedido': _('The invoice can only be generated from a verified and adjusted picking order.')})

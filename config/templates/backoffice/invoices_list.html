@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n pagination_tags %}
+{% load i18n pagination_tags permissions_tags %}
 
 {% block title %}{% trans "Invoices" %}{% endblock %}
 
@@ -180,7 +180,7 @@
             <th>{% trans "Dispatch" %}</th>
             <th>{% trans "QuickBooks status" %}</th>
             <th>{% trans "Balance" %}</th>
-            <th></th>
+            <th class="text-end">{% trans "Actions" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -220,8 +220,47 @@
               {% endif %}
             </td>
             <td data-label="{% trans 'Balance' %}">${{ invoice.saldo_cliente }}</td>
-            <td data-label="{% trans 'Action' %}" class="text-end mobile-stack-table__action">
-              <a href="{% url 'backoffice_invoice_detail' invoice.id %}" class="btn btn-sm btn-outline-primary">{% trans "Open" %}</a>
+            <td data-label="{% trans 'Actions' %}" class="text-end mobile-stack-table__action">
+              <div class="d-inline-flex align-items-center justify-content-end gap-1 flex-wrap invoice-list-actions">
+                {% if request.user|has_internal_permission:'backoffice.orders.manage' %}
+                  {% if invoice.can_void_from_backoffice or invoice.can_delete_from_backoffice %}
+                  <div class="btn-group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{% trans 'Invoice actions' %} {{ invoice.numero }}">
+                      {% trans "Actions" %}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      {% if invoice.can_void_from_backoffice %}
+                      <li>
+                        <button
+                          type="button"
+                          class="dropdown-item text-warning invoice-void-trigger"
+                          data-void-url="{% url 'backoffice_invoice_void' invoice.id %}"
+                          data-invoice-numero="{{ invoice.numero }}"
+                        >
+                          {% trans "Void" %}
+                        </button>
+                      </li>
+                      {% endif %}
+                      {% if invoice.can_delete_from_backoffice %}
+                      <li>
+                        <form
+                          method="post"
+                          action="{% url 'backoffice_invoice_delete' invoice.id %}"
+                          class="m-0"
+                          onsubmit="return confirm('{% trans "Delete this invoice permanently? No record will remain." %}');"
+                        >
+                          {% csrf_token %}
+                          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                          <button type="submit" class="dropdown-item text-danger">{% trans "Delete" %}</button>
+                        </form>
+                      </li>
+                      {% endif %}
+                    </ul>
+                  </div>
+                  {% endif %}
+                {% endif %}
+                <a href="{% url 'backoffice_invoice_detail' invoice.id %}" class="btn btn-sm btn-outline-primary">{% trans "Open" %}</a>
+              </div>
             </td>
           </tr>
           {% empty %}
@@ -246,4 +285,52 @@
     {% pagination_controls page_obj aria_label=_('Invoice pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0" view=view_mode q=query cliente_id=selected_customer_id metodo_entrega=selected_delivery_method driver_id=selected_driver_id date_from=date_from date_to=date_to qb_status=selected_qb_status %}
   </div>
 </div>
+
+{% if request.user|has_internal_permission:'backoffice.orders.manage' %}
+<div class="modal fade" id="invoiceVoidModal" tabindex="-1" aria-labelledby="invoiceVoidModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="invoiceVoidForm" action="">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <div class="modal-header">
+          <h5 class="modal-title" id="invoiceVoidModalLabel">{% trans "Void invoice" %}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-3" id="invoiceVoidModalDescription"></p>
+          <label class="form-label" for="invoiceVoidMotivo">{% trans "Void reason" %}</label>
+          <input type="text" class="form-control" id="invoiceVoidMotivo" name="motivo" maxlength="500" placeholder="{% trans "Optional reason" %}">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+          <button type="submit" class="btn btn-warning">{% trans "Void" %}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const modalElement = document.getElementById('invoiceVoidModal');
+  if (!modalElement) {
+    return;
+  }
+  const modal = new bootstrap.Modal(modalElement);
+  const form = document.getElementById('invoiceVoidForm');
+  const description = document.getElementById('invoiceVoidModalDescription');
+  const motivoInput = document.getElementById('invoiceVoidMotivo');
+
+  document.querySelectorAll('.invoice-void-trigger').forEach(function (button) {
+    button.addEventListener('click', function () {
+      const invoiceNumero = button.dataset.invoiceNumero;
+      form.action = button.dataset.voidUrl;
+      description.textContent = "{% trans 'Void invoice' %} " + invoiceNumero + "? {% trans 'Products will return to inventory and a void record will be saved.' %}";
+      motivoInput.value = '';
+      modal.show();
+    });
+  });
+});
+</script>
+{% endif %}
 {% endblock %}

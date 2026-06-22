@@ -1302,22 +1302,13 @@ def backoffice_invoice_detail(request, invoice_id):
 		leida=False,
 	).update(leida=True)
 	driver_created_notes_count = invoice.notas_ajuste.filter(creada_por__role='driver').count()
-	delivery = getattr(invoice, 'delivery', None)
-	can_modify_invoice = (
-		not is_sync_locked(invoice)
-		and invoice.estado == 'GENERADA'
-		and not (delivery and delivery.estado in {'EN_RUTA', 'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'})
-	)
-	can_delete_invoice = not is_sync_locked(invoice) and (
-		can_modify_invoice or invoice.estado == 'ANULADA'
-	)
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
 		'driver_created_notes_count': driver_created_notes_count,
 		'advanced_adjustment_note_url': f"{reverse('backoffice_adjustment_note_create')}?cliente_id={invoice.cliente_id}&invoice_id={invoice.id}",
 		'invoice_quickbooks_locked': is_sync_locked(invoice),
-		'can_void_invoice': can_modify_invoice,
-		'can_delete_invoice': can_delete_invoice,
+		'can_void_invoice': invoice.can_void_from_backoffice(),
+		'can_delete_invoice': invoice.can_delete_from_backoffice(),
 		'void_registro': invoice.registros_anulacion.order_by('-anulado_en', '-id').first(),
 	})
 
@@ -1475,6 +1466,10 @@ def backoffice_invoice_void(request, invoice_id):
 	if request.method != 'POST':
 		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
 
+	next_url = str(request.POST.get('next') or '').strip()
+	if not next_url:
+		next_url = reverse('backoffice_invoice_detail', kwargs={'invoice_id': invoice.id})
+
 	try:
 		_validate_invoice_is_not_quickbooks_locked(invoice)
 		motivo = str(request.POST.get('motivo') or '').strip()
@@ -1483,26 +1478,27 @@ def backoffice_invoice_void(request, invoice_id):
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:
 		messages.success(request, _('Invoice voided successfully. Products were returned to inventory and a void record was saved.'))
-	return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
+	return redirect(next_url)
 
 
 @login_required
 @internal_permission_required('backoffice.orders.manage')
 def backoffice_invoice_delete(request, invoice_id):
 	invoice = get_object_or_404(Invoice.objects.select_related('pedido', 'cliente'), id=invoice_id)
-	pedido_id = invoice.pedido_id
 	if request.method != 'POST':
 		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
+
+	next_url = str(request.POST.get('next') or '').strip() or reverse('backoffice_invoices_list')
 
 	try:
 		_validate_invoice_is_not_quickbooks_locked(invoice)
 		eliminar_invoice(invoice=invoice)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
-		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
+		return redirect(next_url)
 
 	messages.success(request, _('Invoice deleted permanently. Products were returned to inventory when applicable.'))
-	return redirect('backoffice_invoices_list')
+	return redirect(next_url)
 
 
 @login_required

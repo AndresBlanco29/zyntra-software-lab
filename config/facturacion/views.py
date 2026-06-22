@@ -372,15 +372,21 @@ def _direct_invoice_presentation_label(presentacion):
 	return f'#{presentacion.id} · {presentacion.producto.nombre} · {presentacion.nombre}'
 
 
+def _format_direct_invoice_price(value):
+	if value is None:
+		return ''
+	return str(value)
+
+
 def _serialize_direct_invoice_presentation_option(presentacion):
 	return {
 		'value': str(presentacion.id),
 		'text': _direct_invoice_presentation_label(presentacion),
-		'price_1': format(presentacion.precio_1, 'f'),
-		'price_2': format(presentacion.precio_2, 'f'),
-		'price_3': format(presentacion.precio_3, 'f'),
-		'price_4': format(presentacion.precio_4, 'f'),
-		'price_5': format(presentacion.precio_5, 'f'),
+		'price_1': _format_direct_invoice_price(presentacion.precio_1),
+		'price_2': _format_direct_invoice_price(presentacion.precio_2),
+		'price_3': _format_direct_invoice_price(presentacion.precio_3),
+		'price_4': _format_direct_invoice_price(presentacion.precio_4),
+		'price_5': _format_direct_invoice_price(presentacion.precio_5),
 	}
 
 

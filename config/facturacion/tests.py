@@ -264,6 +264,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertTrue(any(item['value'] == str(self.presentacion.id) for item in payload['results']))
 		match = next(item for item in payload['results'] if item['value'] == str(self.presentacion.id))
 		self.assertEqual(match['price_1'], '15.00')
+		self.assertEqual(match['price_5'], '19.00')
 		self.assertIn('Caja', match['text'])
 
 	def test_backoffice_direct_invoice_presentation_search_requires_minimum_query(self):
@@ -286,6 +287,8 @@ class InvoiceFlowTests(TestCase):
 		payload = response.json()
 		self.assertEqual(len(payload['results']), 1)
 		self.assertEqual(payload['results'][0]['value'], str(self.presentacion.id))
+		self.assertEqual(payload['results'][0]['price_1'], '15.00')
+		self.assertEqual(payload['results'][0]['price_5'], '19.00')
 
 	def test_generate_invoice_accepts_manual_suggested_unit_price(self):
 		invoice = generar_invoice_desde_picking(

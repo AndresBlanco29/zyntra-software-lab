@@ -21,16 +21,46 @@
   <span class="badge text-bg-primary">{% trans "Synced" %}</span>
 </div>
 {% endif %}
+{% if invoice.estado == 'ANULADA' %}
+<div class="alert alert-danger mb-3">
+  <strong>{% trans "This invoice was voided." %}</strong>
+  <div class="small mb-0">
+    {% if invoice.anulada_en %}{% trans "Voided on" %} {{ invoice.anulada_en|date:"d/m/Y H:i" }}{% endif %}
+    {% if invoice.anulada_por %} · {% trans "By" %} {% firstof invoice.anulada_por.get_full_name invoice.anulada_por.username %}{% endif %}
+    {% if invoice.motivo_anulacion %} · {{ invoice.motivo_anulacion }}{% endif %}
+  </div>
+</div>
+{% endif %}
+{% if void_registro %}
+<div class="alert alert-secondary mb-3">
+  <strong>{% trans "Void record saved." %}</strong>
+  <div class="small mb-0">{% trans "Audit entry" %} #{{ void_registro.id }} · {% trans "Document ID" %} {{ void_registro.documento_id }}</div>
+</div>
+{% endif %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
     <h2 class="mb-1">{{ invoice.numero }}</h2>
     <p class="text-muted mb-0">{% trans "Invoice generated from verified picking quantities." %}</p>
   </div>
-  <div class="d-flex gap-2">
-    {% if not invoice_quickbooks_locked %}
+  <div class="d-flex flex-wrap gap-2">
+    {% if not invoice_quickbooks_locked and invoice.estado == 'GENERADA' %}
     <a href="{{ advanced_adjustment_note_url }}" class="btn btn-outline-primary">{% trans "Advanced note" %}</a>
     {% endif %}
+    {% if can_void_invoice %}
+    <form method="post" action="{% url 'backoffice_invoice_void' invoice.id %}" class="d-flex gap-2 align-items-center" onsubmit="return confirm('{% trans "Void this invoice? Products will return to inventory and a void record will be saved." %}');">
+      {% csrf_token %}
+      <input type="text" name="motivo" class="form-control form-control-sm" placeholder="{% trans "Void reason" %}" maxlength="500">
+      <button type="submit" class="btn btn-outline-warning">{% trans "Void" %}</button>
+    </form>
+    {% endif %}
+    {% if can_delete_invoice %}
+    <form method="post" action="{% url 'backoffice_invoice_delete' invoice.id %}" onsubmit="return confirm('{% trans "Delete this invoice permanently? No record will remain." %}');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-danger">{% trans "Delete" %}</button>
+    </form>
+    {% endif %}
     <a href="{% url 'backoffice_invoices_list' %}" class="btn btn-outline-secondary">{% trans "Back to list" %}</a>
+    <a href="{% url 'backoffice_void_records_list' %}" class="btn btn-outline-secondary">{% trans "Void records" %}</a>
     <a href="{% url 'backoffice_invoice_pdf' invoice.id %}" class="btn btn-success">{% trans "Export PDF" %}</a>
   </div>
 </div>
@@ -50,7 +80,7 @@
           </div>
           <div class="col-md-4">
             <div class="text-muted small">{% trans "Status" %}</div>
-            <div><span class="badge bg-primary">{{ invoice.get_estado_display }}</span></div>
+            <div><span class="badge {% if invoice.estado == 'ANULADA' %}bg-danger{% else %}bg-primary{% endif %}">{{ invoice.get_estado_display }}</span></div>
           </div>
           <div class="col-md-4">
             <div class="text-muted small">{% trans "Delivery method" %}</div>
@@ -342,20 +372,37 @@
                   {% elif invoice_quickbooks_locked %}
                     <span class="badge text-bg-secondary">{% trans "Invoice locked" %}</span>
                   {% elif nota.estado == 'BORRADOR' %}
-                    <div class="d-flex gap-2 justify-content-end">
+                    <div class="d-flex gap-2 justify-content-end flex-wrap">
                       <form method="post" action="{% url 'backoffice_invoice_approve_note' nota.id %}">
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm btn-success">{% trans "Approve" %}</button>
                       </form>
-                      <form method="post" action="{% url 'backoffice_invoice_cancel_note' nota.id %}">
+                      <form method="post" action="{% url 'backoffice_invoice_cancel_note' nota.id %}" class="d-flex gap-1">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Void" %}</button>
+                        <input type="hidden" name="motivo" value="">
+                        <button type="submit" class="btn btn-sm btn-outline-warning">{% trans "Void" %}</button>
+                      </form>
+                      <form method="post" action="{% url 'backoffice_invoice_delete_note' nota.id %}" onsubmit="return confirm('{% trans "Delete this note permanently?" %}');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Delete" %}</button>
                       </form>
                     </div>
                   {% elif nota.estado == 'APROBADA' %}
-                    <form method="post" action="{% url 'backoffice_invoice_cancel_note' nota.id %}">
+                    <div class="d-flex gap-2 justify-content-end flex-wrap">
+                      <form method="post" action="{% url 'backoffice_invoice_cancel_note' nota.id %}" class="d-flex gap-1">
+                        {% csrf_token %}
+                        <input type="text" name="motivo" class="form-control form-control-sm" placeholder="{% trans "Void reason" %}" maxlength="500">
+                        <button type="submit" class="btn btn-sm btn-outline-warning">{% trans "Void" %}</button>
+                      </form>
+                      <form method="post" action="{% url 'backoffice_invoice_delete_note' nota.id %}" onsubmit="return confirm('{% trans "Delete this note permanently? Inventory will be reversed first if needed." %}');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Delete" %}</button>
+                      </form>
+                    </div>
+                  {% elif nota.estado == 'ANULADA' %}
+                    <form method="post" action="{% url 'backoffice_invoice_delete_note' nota.id %}" onsubmit="return confirm('{% trans "Delete this voided note permanently?" %}');">
                       {% csrf_token %}
-                      <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Void" %}</button>
+                      <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Delete" %}</button>
                     </form>
                   {% endif %}
                 </td>

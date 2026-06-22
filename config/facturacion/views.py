@@ -38,18 +38,21 @@ from config.pedidos.models import Pedido
 from config.usuarios.models import Usuario
 from config.usuarios.permissions import internal_permission_required
 
-from .models import Delivery, DeliveryEvidencePhoto, Invoice, NotaAjuste, NotaAjusteEvidencePhoto
+from .models import Delivery, DeliveryEvidencePhoto, FacturacionRegistroAnulacion, Invoice, NotaAjuste, NotaAjusteEvidencePhoto
 from .services import (
 	DEFAULT_SUGGESTED_PROFIT_PERCENTAGE,
 	_normalize_uploaded_file,
 	_normalize_uploaded_files,
 	aprobar_nota_ajuste,
+	anular_invoice,
 	anular_nota_ajuste,
 	build_google_maps_route_url,
 	calculate_delivery_collectible_balance,
 	complete_driver_delivery,
 	crear_nota_ajuste,
 	crear_nota_ajuste_desde_invoice,
+	eliminar_invoice,
+	eliminar_nota_ajuste,
 	ensure_delivery_for_invoice,
 	generar_invoice_directa_backoffice,
 	generar_invoice_desde_picking,
@@ -1299,11 +1302,23 @@ def backoffice_invoice_detail(request, invoice_id):
 		leida=False,
 	).update(leida=True)
 	driver_created_notes_count = invoice.notas_ajuste.filter(creada_por__role='driver').count()
+	delivery = getattr(invoice, 'delivery', None)
+	can_modify_invoice = (
+		not is_sync_locked(invoice)
+		and invoice.estado == 'GENERADA'
+		and not (delivery and delivery.estado in {'EN_RUTA', 'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'})
+	)
+	can_delete_invoice = not is_sync_locked(invoice) and (
+		can_modify_invoice or invoice.estado == 'ANULADA'
+	)
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
 		'driver_created_notes_count': driver_created_notes_count,
 		'advanced_adjustment_note_url': f"{reverse('backoffice_adjustment_note_create')}?cliente_id={invoice.cliente_id}&invoice_id={invoice.id}",
 		'invoice_quickbooks_locked': is_sync_locked(invoice),
+		'can_void_invoice': can_modify_invoice,
+		'can_delete_invoice': can_delete_invoice,
+		'void_registro': invoice.registros_anulacion.order_by('-anulado_en', '-id').first(),
 	})
 
 
@@ -1420,14 +1435,85 @@ def backoffice_invoice_cancel_note(request, note_id):
 
 	try:
 		_validate_note_is_not_quickbooks_locked(nota)
-		anular_nota_ajuste(nota=nota)
+		motivo = str(request.POST.get('motivo') or '').strip()
+		anular_nota_ajuste(nota=nota, usuario=request.user, motivo=motivo)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:
-		messages.success(request, _('Adjustment note cancelled successfully.'))
+		messages.success(request, _('Adjustment note voided successfully. Inventory and balances were reversed when applicable.'))
 	if nota.invoice_id:
 		return redirect('backoffice_invoice_detail', invoice_id=nota.invoice_id)
 	return redirect(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}")
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_invoice_delete_note(request, note_id):
+	nota = get_object_or_404(NotaAjuste.objects.select_related('invoice', 'cliente'), id=note_id)
+	invoice_id = nota.invoice_id
+	if request.method != 'POST':
+		if invoice_id:
+			return redirect('backoffice_invoice_detail', invoice_id=invoice_id)
+		return redirect(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}")
+
+	try:
+		_validate_note_is_not_quickbooks_locked(nota)
+		eliminar_nota_ajuste(nota=nota)
+	except ValidationError as exc:
+		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+	else:
+		messages.success(request, _('Adjustment note deleted permanently.'))
+	if invoice_id:
+		return redirect('backoffice_invoice_detail', invoice_id=invoice_id)
+	return redirect(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}")
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_invoice_void(request, invoice_id):
+	invoice = get_object_or_404(Invoice.objects.select_related('pedido', 'cliente'), id=invoice_id)
+	if request.method != 'POST':
+		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
+
+	try:
+		_validate_invoice_is_not_quickbooks_locked(invoice)
+		motivo = str(request.POST.get('motivo') or '').strip()
+		anular_invoice(invoice=invoice, usuario=request.user, motivo=motivo)
+	except ValidationError as exc:
+		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+	else:
+		messages.success(request, _('Invoice voided successfully. Products were returned to inventory and a void record was saved.'))
+	return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_invoice_delete(request, invoice_id):
+	invoice = get_object_or_404(Invoice.objects.select_related('pedido', 'cliente'), id=invoice_id)
+	pedido_id = invoice.pedido_id
+	if request.method != 'POST':
+		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
+
+	try:
+		_validate_invoice_is_not_quickbooks_locked(invoice)
+		eliminar_invoice(invoice=invoice)
+	except ValidationError as exc:
+		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
+
+	messages.success(request, _('Invoice deleted permanently. Products were returned to inventory when applicable.'))
+	return redirect('backoffice_invoices_list')
+
+
+@login_required
+@internal_permission_required('backoffice.orders.view')
+def backoffice_void_records_list(request):
+	registros = (
+		FacturacionRegistroAnulacion.objects
+		.select_related('cliente', 'anulado_por', 'invoice', 'nota')
+		.order_by('-anulado_en', '-id')[:200]
+	)
+	return render(request, 'backoffice/void_records_list.html', {'registros': registros})
 
 
 @login_required

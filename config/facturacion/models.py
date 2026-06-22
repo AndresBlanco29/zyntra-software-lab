@@ -74,12 +74,25 @@ class Invoice(models.Model):
 	qb_email_status = models.CharField(max_length=20, choices=QB_EMAIL_STATUS_CHOICES, blank=True, default='')
 	creada_en = models.DateTimeField(auto_now_add=True)
 	actualizada_en = models.DateTimeField(auto_now=True)
+	anulada_en = models.DateTimeField(blank=True, null=True)
+	anulada_por = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='invoices_anuladas',
+	)
+	motivo_anulacion = models.TextField(blank=True)
 
 	class Meta:
 		ordering = ('-creada_en',)
 
 	def __str__(self):
 		return self.numero or f'Invoice #{self.pk}'
+
+	@property
+	def is_voided(self):
+		return self.estado == 'ANULADA'
 
 	def clean(self):
 		if self.pedido_id and self.pedido.estado not in {'VERIFICADO_AJUSTADO', 'INVOICE_GENERADA'}:
@@ -541,12 +554,24 @@ class NotaAjuste(models.Model):
 	creada_en = models.DateTimeField(auto_now_add=True)
 	aprobada_en = models.DateTimeField(blank=True, null=True)
 	anulada_en = models.DateTimeField(blank=True, null=True)
+	anulada_por = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='notas_ajuste_anuladas',
+	)
+	motivo_anulacion = models.TextField(blank=True)
 
 	class Meta:
 		ordering = ('-creada_en',)
 
 	def __str__(self):
 		return self.numero or f'Adjustment #{self.pk}'
+
+	@property
+	def is_voided(self):
+		return self.estado == 'ANULADA'
 
 	def clean(self):
 		resolved_cliente = self.cliente
@@ -619,3 +644,36 @@ class NotaAjusteAplicacion(models.Model):
 			raise ValidationError({'monto': _('Applied amount must be greater than zero.')})
 		if self.nota_id and self.invoice_id and self.nota.cliente_id != self.invoice.cliente_id:
 			raise ValidationError({'invoice': _('The selected invoice does not belong to the note customer.')})
+
+
+class FacturacionRegistroAnulacion(models.Model):
+	DOCUMENT_TYPE_CHOICES = (
+		('INVOICE', _('Invoice')),
+		('NOTA_CREDITO', _('Credit note')),
+		('NOTA_DEBITO', _('Debit note')),
+	)
+
+	tipo_documento = models.CharField(max_length=20, choices=DOCUMENT_TYPE_CHOICES, db_index=True)
+	numero_documento = models.CharField(max_length=30, db_index=True)
+	documento_id = models.PositiveIntegerField(db_index=True)
+	cliente = models.ForeignKey(Cliente, on_delete=models.PROTECT, related_name='registros_anulacion_facturacion')
+	invoice = models.ForeignKey(Invoice, on_delete=models.SET_NULL, null=True, blank=True, related_name='registros_anulacion')
+	nota = models.ForeignKey(NotaAjuste, on_delete=models.SET_NULL, null=True, blank=True, related_name='registros_anulacion')
+	motivo = models.TextField(blank=True)
+	snapshot = models.JSONField(default=dict, blank=True)
+	anulado_por = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='registros_anulacion_facturacion',
+	)
+	anulado_en = models.DateTimeField(auto_now_add=True, db_index=True)
+
+	class Meta:
+		ordering = ('-anulado_en', '-id')
+		verbose_name = _('Voided document record')
+		verbose_name_plural = _('Voided document records')
+
+	def __str__(self):
+		return f'{self.get_tipo_documento_display()} {self.numero_documento}'

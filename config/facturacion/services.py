@@ -8,12 +8,12 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from config.inventario.services import _apply_fractional_inventory_change, _apply_inventory_change, _lock_fractional_stock_records, _lock_stock_records, aplicar_verificacion_picking_inventario, inventory_units_for_packages
+from config.inventario.services import _apply_fractional_inventory_change, _apply_inventory_change, _lock_fractional_stock_records, _lock_stock_records, aplicar_verificacion_picking_inventario, inventory_units_for_packages, restaurar_inventario_por_anulacion_factura
 from config.notificaciones.models import crear_notificacion_backoffice
 from config.pedidos.services import crear_pedido_desde_items
 from config.productos.models import Presentacion
 
-from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, DeliveryPayment, Invoice, InvoiceItem, NotaAjuste, NotaAjusteAplicacion, NotaAjusteItem
+from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, DeliveryPayment, FacturacionRegistroAnulacion, Invoice, InvoiceItem, NotaAjuste, NotaAjusteAplicacion, NotaAjusteItem
 
 
 DEFAULT_SUGGESTED_PROFIT_PERCENTAGE = Decimal('30.00')
@@ -1207,28 +1207,220 @@ def aprobar_nota_ajuste(*, nota, usuario):
 
 
 @transaction.atomic
-def anular_nota_ajuste(*, nota):
+def anular_nota_ajuste(*, nota, usuario=None, motivo='', crear_registro=True):
 	_ensure_quickbooks_not_locked(nota=nota, invoice=nota.invoice if nota.invoice_id else None)
 	if nota.estado == 'ANULADA':
 		return nota
 
 	if nota.estado == 'APROBADA':
-		if nota.tipo_documento == 'CREDITO':
-			_apply_note_to_invoice(nota=nota, multiplier=-1)
-			_apply_note_to_customer_balance(nota=nota, multiplier=-1)
-			if nota.inventario_estado == 'PROCESADO':
-				_apply_credit_note_inventory(nota=nota, movement_type='REVERSO_NOTA_CREDITO', delta_fisico=-1)
-		else:
-			_apply_note_to_invoice(nota=nota, multiplier=-1)
-			if nota.monto_aplicado_cliente:
-				_apply_customer_balance_delta(cliente=nota.cliente, delta=nota.monto_aplicado_cliente)
+		_revert_nota_ajuste_effects(nota=nota, usuario=usuario)
 
 	nota.estado = 'ANULADA'
 	nota.anulada_en = timezone.now()
+	nota.anulada_por = usuario
+	nota.motivo_anulacion = (motivo or '').strip()
 	if nota.inventario_estado == 'PROCESADO':
 		nota.inventario_estado = 'ANULADO'
-	nota.save(update_fields=['estado', 'anulada_en', 'inventario_estado'])
+	nota.save(update_fields=['estado', 'anulada_en', 'anulada_por', 'motivo_anulacion', 'inventario_estado'])
+
+	if crear_registro:
+		_create_void_registro(
+			tipo_documento='NOTA_CREDITO' if nota.tipo_documento == 'CREDITO' else 'NOTA_DEBITO',
+			numero_documento=nota.numero,
+			documento_id=nota.id,
+			cliente=nota.cliente,
+			invoice=nota.invoice,
+			nota=nota,
+			motivo=nota.motivo_anulacion,
+			usuario=usuario,
+			snapshot=_build_nota_void_snapshot(nota),
+		)
 	return nota
+
+
+@transaction.atomic
+def eliminar_nota_ajuste(*, nota):
+	_ensure_quickbooks_not_locked(nota=nota, invoice=nota.invoice if nota.invoice_id else None)
+	if nota.estado == 'APROBADA':
+		_revert_nota_ajuste_effects(nota=nota, usuario=nota.anulada_por or nota.aprobada_por)
+	FacturacionRegistroAnulacion.objects.filter(nota=nota).delete()
+	nota.delete()
+
+
+def _revert_nota_ajuste_effects(*, nota, usuario=None):
+	if nota.tipo_documento == 'CREDITO':
+		_apply_note_to_invoice(nota=nota, multiplier=-1)
+		_apply_note_to_customer_balance(nota=nota, multiplier=-1)
+		if nota.inventario_estado == 'PROCESADO':
+			_apply_credit_note_inventory(nota=nota, movement_type='REVERSO_NOTA_CREDITO', delta_fisico=-1, created_by=usuario)
+	else:
+		_apply_note_to_invoice(nota=nota, multiplier=-1)
+		if nota.monto_aplicado_cliente:
+			_apply_customer_balance_delta(cliente=nota.cliente, delta=nota.monto_aplicado_cliente)
+
+
+def _build_nota_void_snapshot(nota):
+	return {
+		'numero': nota.numero,
+		'tipo_documento': nota.tipo_documento,
+		'tipo_ajuste': nota.tipo_ajuste,
+		'tipo_credito': nota.tipo_credito,
+		'total': str(nota.total),
+		'impacto_saldo': str(nota.impacto_saldo),
+		'inventario_estado': nota.inventario_estado,
+		'items': [
+			{
+				'descripcion': item.descripcion,
+				'cantidad': item.cantidad,
+				'total': str(item.total),
+				'presentacion_id': item.presentacion_id,
+			}
+			for item in nota.items.all()
+		],
+	}
+
+
+def _build_invoice_void_snapshot(invoice):
+	return {
+		'numero': invoice.numero,
+		'subtotal': str(invoice.subtotal),
+		'total_neto': str(invoice.total_neto),
+		'saldo_cliente': str(invoice.saldo_cliente),
+		'metodo_entrega': invoice.metodo_entrega,
+		'items': [
+			{
+				'producto_nombre': item.producto_nombre,
+				'presentacion_nombre': item.presentacion_nombre,
+				'cantidad_facturada': item.cantidad_facturada,
+				'subtotal': str(item.subtotal),
+				'presentacion_id': item.presentacion_id,
+			}
+			for item in invoice.items.all()
+		],
+	}
+
+
+def _create_void_registro(*, tipo_documento, numero_documento, documento_id, cliente, invoice=None, nota=None, motivo='', usuario=None, snapshot=None):
+	return FacturacionRegistroAnulacion.objects.create(
+		tipo_documento=tipo_documento,
+		numero_documento=numero_documento,
+		documento_id=documento_id,
+		cliente=cliente,
+		invoice=invoice,
+		nota=nota,
+		motivo=(motivo or '').strip(),
+		snapshot=snapshot or {},
+		anulado_por=usuario,
+	)
+
+
+def _validate_invoice_void_delete_allowed(invoice):
+	if invoice.estado == 'ANULADA':
+		raise ValidationError(_('This invoice is already voided.'))
+	delivery = getattr(invoice, 'delivery', None)
+	if delivery and delivery.estado in {'EN_RUTA', 'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'}:
+		raise ValidationError(_('Cannot void or delete an invoice that is already on route or delivered.'))
+
+
+def _reverse_invoice_customer_note_applications(*, invoice):
+	for application in NotaAjusteAplicacion.objects.select_for_update().filter(invoice=invoice).select_related('nota'):
+		nota = application.nota
+		amount = _quantize_money(application.monto)
+		if amount <= 0:
+			continue
+		if nota.tipo_documento == 'CREDITO':
+			invoice.total_creditos = _quantize_money(Decimal(str(invoice.total_creditos or '0.00')) - amount)
+			_apply_customer_balance_delta(cliente=nota.cliente, delta=amount)
+		else:
+			invoice.total_debitos = _quantize_money(Decimal(str(invoice.total_debitos or '0.00')) - amount)
+			_apply_customer_balance_delta(cliente=nota.cliente, delta=-amount)
+		nota.monto_aplicado_invoice = _quantize_money(Decimal(str(nota.monto_aplicado_invoice or '0.00')) - amount)
+		nota.monto_aplicado_cliente = _quantize_money(Decimal(str(nota.monto_aplicado_cliente or '0.00')) + amount)
+		nota.save(update_fields=['monto_aplicado_invoice', 'monto_aplicado_cliente'])
+		application.delete()
+	_recalculate_invoice_balances(invoice)
+
+
+def _reverse_invoice_customer_credit(*, invoice):
+	applied_credit = _quantize_money(invoice.credito_cliente_aplicado)
+	if applied_credit > 0:
+		_apply_customer_balance_delta(cliente=invoice.cliente, delta=applied_credit)
+		invoice.credito_cliente_aplicado = Decimal('0.00')
+		_recalculate_invoice_balances(invoice)
+
+
+def _void_linked_invoice_notes(*, invoice, usuario, motivo=''):
+	for nota in NotaAjuste.objects.select_for_update().filter(invoice=invoice, estado='APROBADA').order_by('id'):
+		child_motivo = motivo or _('Voided automatically because invoice %(invoice)s was voided.') % {'invoice': invoice.numero}
+		anular_nota_ajuste(nota=nota, usuario=usuario, motivo=child_motivo, crear_registro=True)
+
+
+@transaction.atomic
+def anular_invoice(*, invoice, usuario, motivo=''):
+	_ensure_quickbooks_not_locked(invoice=invoice)
+	_validate_invoice_void_delete_allowed(invoice)
+	motivo = (motivo or '').strip()
+
+	_void_linked_invoice_notes(invoice=invoice, usuario=usuario, motivo=motivo)
+	_reverse_invoice_customer_note_applications(invoice=invoice)
+	_reverse_invoice_customer_credit(invoice=invoice)
+	restaurar_inventario_por_anulacion_factura(pedido=invoice.pedido, invoice=invoice, creado_por=usuario)
+
+	pedido = invoice.pedido
+	pedido.estado = 'VERIFICADO_AJUSTADO'
+	pedido.save(update_fields=['estado', 'actualizada_en'])
+
+	invoice.estado = 'ANULADA'
+	invoice.anulada_en = timezone.now()
+	invoice.anulada_por = usuario
+	invoice.motivo_anulacion = motivo
+	invoice.despachador_notificado = False
+	invoice.notificado_en = None
+	invoice.save(update_fields=[
+		'estado',
+		'anulada_en',
+		'anulada_por',
+		'motivo_anulacion',
+		'despachador_notificado',
+		'notificado_en',
+		'actualizada_en',
+	])
+
+	_create_void_registro(
+		tipo_documento='INVOICE',
+		numero_documento=invoice.numero,
+		documento_id=invoice.id,
+		cliente=invoice.cliente,
+		invoice=invoice,
+		motivo=motivo,
+		usuario=usuario,
+		snapshot=_build_invoice_void_snapshot(invoice),
+	)
+	return invoice
+
+
+@transaction.atomic
+def eliminar_invoice(*, invoice):
+	_ensure_quickbooks_not_locked(invoice=invoice)
+	if invoice.estado != 'ANULADA':
+		_validate_invoice_void_delete_allowed(invoice)
+
+	for nota in list(NotaAjuste.objects.filter(invoice=invoice).order_by('id')):
+		eliminar_nota_ajuste(nota=nota)
+
+	if invoice.estado != 'ANULADA':
+		_reverse_invoice_customer_note_applications(invoice=invoice)
+		_reverse_invoice_customer_credit(invoice=invoice)
+		restaurar_inventario_por_anulacion_factura(pedido=invoice.pedido, invoice=invoice, creado_por=invoice.anulada_por or invoice.creada_por)
+
+	pedido = invoice.pedido
+	pedido_id = pedido.id
+	FacturacionRegistroAnulacion.objects.filter(invoice=invoice).delete()
+	invoice.delete()
+	pedido.refresh_from_db()
+	pedido.estado = 'VERIFICADO_AJUSTADO'
+	pedido.save(update_fields=['estado', 'actualizada_en'])
+	return pedido_id
 
 
 @transaction.atomic

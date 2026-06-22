@@ -13,8 +13,8 @@ from django.utils import timezone
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 
 from config.clientes.models import Cliente
-from config.facturacion.models import Delivery, DeliveryNotificationLog, Invoice, NotaAjuste, NotaAjusteAplicacion
-from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, start_delivery_route, unlock_client_from_delivery
+from config.facturacion.models import Delivery, DeliveryNotificationLog, FacturacionRegistroAnulacion, Invoice, NotaAjuste, NotaAjusteAplicacion
+from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, generar_invoice_desde_picking, generar_invoice_directa_backoffice, start_delivery_route, unlock_client_from_delivery
 from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_item_data, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_SYNCED
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
@@ -3561,3 +3561,93 @@ class InvoiceFlowTests(TestCase):
 		self.assertIn('waypoints=', maps_url)
 		self.assertIn('111+Alpha+St', maps_url)
 		self.assertIn('222+Beta+St', maps_url)
+
+
+class InvoiceVoidDeleteTests(TestCase):
+	def setUp(self):
+		self.backoffice = Usuario.objects.create_user(username='void-backoffice', password='secret123', role='backoffice')
+		self.cliente_user = Usuario.objects.create_user(username='void-cliente', password='secret123', role='cliente')
+		self.cliente = Cliente.objects.create(
+			usuario=self.cliente_user,
+			nombre_empresa='Cliente Void',
+			telefono='5551112222',
+			direccion='123 Main St',
+			ciudad='Dallas',
+			estado='TX',
+			codigo_postal='75001',
+			pais='USA',
+			sales_tax_number='TX-123',
+			certificado_tax='certificados/test.pdf',
+		)
+		categoria = Categoria.objects.create(nombre='Tortillas')
+		marca = Marca.objects.create(nombre='Marca Void')
+		producto = Producto.objects.create(nombre='Tortilla Void', categoria=categoria, marca=marca)
+		self.presentacion = Presentacion.objects.create(
+			producto=producto,
+			nombre='Caja',
+			unidades=12,
+			tipo_contenido='unidades',
+			precio_3=Decimal('17.00'),
+		)
+		registrar_entrada_manual(presentacion=self.presentacion, cantidad=50, observacion='Seed stock')
+		self.pedido = Pedido.objects.create(cliente=self.cliente, origen='CLIENTE', estado='VERIFICADO_AJUSTADO', total=Decimal('51.00'))
+		self.pedido_item = PedidoItem.objects.create(
+			pedido=self.pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=3,
+			cantidad=3,
+			cantidad_inventario_aplicada=3,
+			precio=Decimal('17.00'),
+			subtotal=Decimal('51.00'),
+		)
+		self.invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+	def test_void_invoice_restores_inventory_and_creates_record(self):
+		stock_before = StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico
+
+		anular_invoice(invoice=self.invoice, usuario=self.backoffice, motivo='Cliente cancelo')
+
+		self.invoice.refresh_from_db()
+		self.pedido_item.refresh_from_db()
+		stock_after = StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico
+		self.assertEqual(self.invoice.estado, 'ANULADA')
+		self.assertEqual(self.pedido_item.cantidad_inventario_aplicada, 0)
+		self.assertEqual(stock_after, stock_before + 36)
+		self.assertTrue(FacturacionRegistroAnulacion.objects.filter(invoice=self.invoice, tipo_documento='INVOICE').exists())
+		self.assertEqual(self.pedido.estado, 'VERIFICADO_AJUSTADO')
+
+	def test_delete_invoice_removes_record_and_restores_inventory(self):
+		stock_before = StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico
+		invoice_id = self.invoice.id
+
+		eliminar_invoice(invoice=self.invoice)
+
+		self.assertFalse(Invoice.objects.filter(id=invoice_id).exists())
+		self.assertFalse(FacturacionRegistroAnulacion.objects.filter(documento_id=invoice_id).exists())
+		self.pedido_item.refresh_from_db()
+		self.assertEqual(self.pedido_item.cantidad_inventario_aplicada, 0)
+		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, stock_before + 36)
+
+	def test_delete_credit_note_removes_record_and_reverses_inventory(self):
+		nota = crear_nota_ajuste_desde_invoice(
+			invoice=self.invoice,
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Devolucion test',
+			usuario=self.backoffice,
+			items_payload=[{'invoice_item': self.invoice.items.first(), 'cantidad': 1, 'monto_unitario': Decimal('17.00')}],
+		)
+		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
+		stock_after_credit = StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico
+		note_id = nota.id
+
+		eliminar_nota_ajuste(nota=nota)
+
+		self.assertFalse(NotaAjuste.objects.filter(id=note_id).exists())
+		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, stock_after_credit - 12)

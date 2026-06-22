@@ -708,3 +708,36 @@ def cancelar_pedido_con_inventario(*, pedido, creado_por=None):
                 pedido_item=item,
                 creado_por=creado_por,
             )
+
+
+@transaction.atomic
+def restaurar_inventario_por_anulacion_factura(*, pedido, invoice, creado_por=None):
+    items = list(
+        PedidoItem.objects.select_for_update()
+        .select_related('presentacion__producto')
+        .filter(pedido=pedido)
+        .order_by('presentacion_id', 'id')
+    )
+    if not items:
+        return
+    stock_map = _lock_stock_records(item.presentacion_id for item in items)
+    for item in items:
+        stock = stock_map[item.presentacion_id]
+        if item.cantidad_inventario_aplicada:
+            applied_units = inventory_units_for_packages(item.presentacion, item.cantidad_inventario_aplicada)
+            _apply_inventory_change(
+                stock=stock,
+                categoria='AJUSTE',
+                tipo='ANULACION_PEDIDO',
+                cantidad=item.cantidad_inventario_aplicada,
+                delta_fisico=applied_units,
+                delta_reservado=0,
+                referencia=f'INV-{invoice.numero}',
+                idempotency_key=f'INV-VOID-FISICO-{invoice.id}-{item.id}',
+                pedido=pedido,
+                pedido_item=item,
+                invoice=invoice,
+                creado_por=creado_por,
+            )
+            item.cantidad_inventario_aplicada = 0
+            item.save(update_fields=['cantidad_inventario_aplicada'])

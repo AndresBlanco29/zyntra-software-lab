@@ -430,11 +430,16 @@ def _build_direct_invoice_context(*, selected_client_id=None, post_data=None):
 	presentations = list(
 		Presentacion.objects.select_related('producto').order_by('producto__nombre', 'nombre', 'id')
 	)
+	presentation_options = [
+		_serialize_direct_invoice_presentation_option(presentacion)
+		for presentacion in presentations
+	]
 	return {
 		'customers': Cliente.objects.order_by('nombre_empresa'),
 		'drivers': Usuario.objects.filter(role='driver', is_active=True).order_by('first_name', 'username'),
 		'direct_invoice_lines': direct_invoice_lines,
 		'presentations': presentations,
+		'presentation_options': presentation_options,
 		'presentation_search_url': reverse('backoffice_direct_invoice_presentation_search'),
 		'selected_client': selected_client,
 		'pending_notes_summary': pending_notes_summary,

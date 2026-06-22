@@ -1,6 +1,8 @@
 from decimal import Decimal
 
 from django.db import migrations, models
+from config.core.migration_utils import wrap_add_field_operations
+
 
 
 class Migration(migrations.Migration):
@@ -9,7 +11,7 @@ class Migration(migrations.Migration):
         ('facturacion', '0004_delivery_live_tracking'),
     ]
 
-    operations = [
+    operations = wrap_add_field_operations('facturacion', [
         migrations.AddField(
             model_name='invoiceitem',
             name='precio_venta_sugerido_unitario',
@@ -19,7 +21,9 @@ class Migration(migrations.Migration):
             code=lambda apps, schema_editor: _populate_suggested_unit_prices(apps),
             reverse_code=migrations.RunPython.noop,
         ),
-    ]
+    
+    ])
+
 
 
 def _populate_suggested_unit_prices(apps):

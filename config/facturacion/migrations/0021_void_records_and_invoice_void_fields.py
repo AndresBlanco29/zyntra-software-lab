@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
+from config.core.migration_utils import wrap_add_field_operations
 
 
 class Migration(migrations.Migration):
@@ -10,7 +11,7 @@ class Migration(migrations.Migration):
         ('facturacion', '0020_invoiceitem_line_discount'),
     ]
 
-    operations = [
+    operations = wrap_add_field_operations('facturacion', [
         migrations.AddField(
             model_name='invoice',
             name='anulada_en',
@@ -57,4 +58,6 @@ class Migration(migrations.Migration):
                 'ordering': ('-anulado_en', '-id'),
             },
         ),
-    ]
+    
+    ])
+

@@ -1,4 +1,6 @@
 from django.db import migrations, models
+from config.core.migration_utils import wrap_add_field_operations
+
 
 
 def seed_reserved_inventory(apps, schema_editor):
@@ -15,7 +17,7 @@ class Migration(migrations.Migration):
 		('pedidos', '0006_pedido_estado_invoice_generada'),
 	]
 
-	operations = [
+	operations = wrap_add_field_operations('pedidos', [
 		migrations.AddField(
 			model_name='pedidoitem',
 			name='cantidad_inventario_aplicada',
@@ -27,4 +29,5 @@ class Migration(migrations.Migration):
 			field=models.PositiveIntegerField(default=0),
 		),
 		migrations.RunPython(seed_reserved_inventory, migrations.RunPython.noop),
-	]
+	
+	])

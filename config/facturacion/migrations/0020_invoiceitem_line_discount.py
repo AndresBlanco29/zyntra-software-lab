@@ -1,6 +1,8 @@
 from decimal import Decimal
 
 from django.db import migrations, models
+from config.core.migration_utils import wrap_add_field_operations
+
 
 
 class Migration(migrations.Migration):
@@ -9,7 +11,7 @@ class Migration(migrations.Migration):
 		('facturacion', '0019_invoice_quickbooks_payment_status'),
 	]
 
-	operations = [
+	operations = wrap_add_field_operations('facturacion', [
 		migrations.AddField(
 			model_name='invoiceitem',
 			name='descuento_porcentaje',
@@ -20,4 +22,6 @@ class Migration(migrations.Migration):
 			name='precio_unitario_lista',
 			field=models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
 		),
-	]
+	
+	])
+

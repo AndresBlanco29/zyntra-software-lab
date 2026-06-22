@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
+from config.core.migration_utils import wrap_add_field_operations
 
 
 def copy_requested_quantity(apps, schema_editor):
@@ -17,7 +18,7 @@ class Migration(migrations.Migration):
 		migrations.swappable_dependency(settings.AUTH_USER_MODEL),
 	]
 
-	operations = [
+	operations = wrap_add_field_operations('pedidos', [
 		migrations.AddField(
 			model_name='pedido',
 			name='nota_seleccionador',
@@ -59,4 +60,5 @@ class Migration(migrations.Migration):
 			field=models.CharField(choices=[('RECIBIDO', 'Recibido'), ('EN_GESTION', 'En gestion'), ('LISTO_PARA_PICKING', 'Listo para picking'), ('PARA_VERIFICAR', 'Para verificar'), ('VERIFICADO_AJUSTADO', 'Verificado y ajustado'), ('DESPACHADO', 'Despachado'), ('CANCELADO', 'Cancelado')], default='RECIBIDO', max_length=30),
 		),
 		migrations.RunPython(copy_requested_quantity, migrations.RunPython.noop),
-	]
+	
+	])

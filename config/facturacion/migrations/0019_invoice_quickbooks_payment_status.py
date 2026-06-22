@@ -1,4 +1,6 @@
 from django.db import migrations, models
+from config.core.migration_utils import wrap_add_field_operations
+
 
 
 class Migration(migrations.Migration):
@@ -7,7 +9,7 @@ class Migration(migrations.Migration):
         ('facturacion', '0018_alter_notaajuste_motivo'),
     ]
 
-    operations = [
+    operations = wrap_add_field_operations('facturacion', [
         migrations.AddField(
             model_name='invoice',
             name='qb_due_date',
@@ -23,4 +25,6 @@ class Migration(migrations.Migration):
             name='qb_payment_status',
             field=models.CharField(blank=True, choices=[('', 'Not synced'), ('OPEN', 'Open balance'), ('DUE', 'Due'), ('DUE_TODAY', 'Due today'), ('OVERDUE', 'Overdue'), ('PAID', 'Paid'), ('DEPOSITED', 'Deposited')], db_index=True, default='', max_length=20),
         ),
-    ]
+    
+    ])
+

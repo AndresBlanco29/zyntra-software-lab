@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.db import migrations, models
 import django.utils.timezone
+from config.core.migration_utils import wrap_add_field_operations
 
 
 def migrate_existing_note_values(apps, schema_editor):
@@ -28,7 +29,7 @@ class Migration(migrations.Migration):
 		('facturacion', '0009_notaajuste_cliente'),
 	]
 
-	operations = [
+	operations = wrap_add_field_operations('facturacion', [
 		migrations.AddField(
 			model_name='invoice',
 			name='credito_cliente_aplicado',
@@ -65,4 +66,5 @@ class Migration(migrations.Migration):
 			name='cliente',
 			field=models.ForeignKey(on_delete=models.PROTECT, related_name='notas_ajuste', to='clientes.cliente'),
 		),
-	]
+	
+	])

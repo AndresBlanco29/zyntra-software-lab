@@ -1,4 +1,6 @@
 from django.db import migrations, models
+from config.core.migration_utils import wrap_add_field_operations
+
 
 
 class Migration(migrations.Migration):
@@ -7,7 +9,7 @@ class Migration(migrations.Migration):
         ('facturacion', '0015_notaajusteaplicacion'),
     ]
 
-    operations = [
+    operations = wrap_add_field_operations('facturacion', [
         migrations.AddField(
             model_name='invoice',
             name='last_synced_at',
@@ -38,4 +40,5 @@ class Migration(migrations.Migration):
             name='sync_status',
             field=models.CharField(choices=[('PENDING', 'Pending'), ('SYNCED', 'Synced'), ('FAILED', 'Failed')], db_index=True, default='PENDING', max_length=20),
         ),
-    ]
+    
+    ])

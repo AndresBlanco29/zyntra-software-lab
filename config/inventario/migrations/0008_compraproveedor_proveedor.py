@@ -1,4 +1,6 @@
 from django.db import migrations, models
+from config.core.migration_utils import wrap_add_field_operations
+
 
 
 def link_purchase_orders_to_suppliers(apps, schema_editor):
@@ -22,11 +24,13 @@ class Migration(migrations.Migration):
         ('inventario', '0007_proveedor'),
     ]
 
-    operations = [
+    operations = wrap_add_field_operations('inventario', [
         migrations.AddField(
             model_name='compraproveedor',
             name='proveedor',
             field=models.ForeignKey(blank=True, null=True, on_delete=models.deletion.SET_NULL, related_name='compras', to='inventario.proveedor'),
         ),
         migrations.RunPython(link_purchase_orders_to_suppliers, migrations.RunPython.noop),
-    ]
+    
+    ])
+

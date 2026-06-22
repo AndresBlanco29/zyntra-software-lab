@@ -1,4 +1,6 @@
 from django.db import migrations, models
+from config.core.migration_utils import wrap_add_field_operations
+
 
 
 class Migration(migrations.Migration):
@@ -7,7 +9,7 @@ class Migration(migrations.Migration):
 		('facturacion', '0003_notaajuste_inventario_procesado'),
 	]
 
-	operations = [
+	operations = wrap_add_field_operations('facturacion', [
 		migrations.AddField(
 			model_name='delivery',
 			name='current_accuracy_meters',
@@ -38,4 +40,5 @@ class Migration(migrations.Migration):
 			name='location_updated_at',
 			field=models.DateTimeField(blank=True, null=True),
 		),
-	]
+	
+	])

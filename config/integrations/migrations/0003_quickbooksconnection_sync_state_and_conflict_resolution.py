@@ -1,5 +1,7 @@
 from django.conf import settings
 from django.db import migrations, models
+from config.core.migration_utils import wrap_add_field_operations
+
 
 
 class Migration(migrations.Migration):
@@ -9,7 +11,7 @@ class Migration(migrations.Migration):
         ('integrations', '0002_quickbooksimportconflict'),
     ]
 
-    operations = [
+    operations = wrap_add_field_operations('integrations', [
         migrations.AddField(
             model_name='quickbooksconnection',
             name='sync_state',
@@ -30,4 +32,5 @@ class Migration(migrations.Migration):
             name='status',
             field=models.CharField(choices=[('CONFLICT', 'Conflict'), ('MATCHED', 'Matched'), ('DISMISSED', 'Dismissed')], default='CONFLICT', max_length=20),
         ),
-    ]
+    
+    ])

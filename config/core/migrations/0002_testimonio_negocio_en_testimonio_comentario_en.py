@@ -1,5 +1,12 @@
 from django.db import migrations, models
 
+from config.core.migration_utils import separate_add_fields
+
+TESTIMONIO_FIELD_SPECS = [
+    ('comentario_en', models.TextField(blank=True, null=True)),
+    ('negocio_en', models.CharField(blank=True, max_length=150, null=True)),
+]
+
 
 class Migration(migrations.Migration):
 
@@ -8,14 +15,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='testimonio',
-            name='comentario_en',
-            field=models.TextField(blank=True, null=True),
-        ),
-        migrations.AddField(
-            model_name='testimonio',
-            name='negocio_en',
-            field=models.CharField(blank=True, max_length=150, null=True),
-        ),
+        separate_add_fields('core', 'testimonio', TESTIMONIO_FIELD_SPECS),
     ]

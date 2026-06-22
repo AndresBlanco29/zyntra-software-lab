@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
 import django.utils.timezone
+from config.core.migration_utils import wrap_add_field_operations
 
 
 def _backfill_supplier_purchase_orders(apps, schema_editor):
@@ -33,7 +34,7 @@ class Migration(migrations.Migration):
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
-    operations = [
+    operations = wrap_add_field_operations('inventario', [
         migrations.AddField(
             model_name='compraproveedor',
             name='estado',
@@ -73,4 +74,6 @@ class Migration(migrations.Migration):
             code=_backfill_supplier_purchase_orders,
             reverse_code=migrations.RunPython.noop,
         ),
-    ]
+    
+    ])
+

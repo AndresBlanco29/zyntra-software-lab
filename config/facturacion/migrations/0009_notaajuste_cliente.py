@@ -1,4 +1,6 @@
 from django.db import migrations, models
+from config.core.migration_utils import wrap_add_field_operations
+
 
 
 def populate_note_customer(apps, schema_editor):
@@ -16,7 +18,7 @@ class Migration(migrations.Migration):
 		('facturacion', '0008_alter_notaajuste_motivo'),
 	]
 
-	operations = [
+	operations = wrap_add_field_operations('facturacion', [
 		migrations.AddField(
 			model_name='notaajuste',
 			name='cliente',
@@ -28,4 +30,5 @@ class Migration(migrations.Migration):
 			field=models.ForeignKey(blank=True, null=True, on_delete=models.PROTECT, related_name='notas_ajuste', to='facturacion.invoice'),
 		),
 		migrations.RunPython(populate_note_customer, migrations.RunPython.noop),
-	]
+	
+	])

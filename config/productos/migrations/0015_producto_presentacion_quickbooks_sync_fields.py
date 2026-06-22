@@ -1,4 +1,6 @@
 from django.db import migrations, models
+from config.core.migration_utils import wrap_add_field_operations
+
 
 
 class Migration(migrations.Migration):
@@ -7,7 +9,7 @@ class Migration(migrations.Migration):
         ('productos', '0014_alter_configuracionprecios_options'),
     ]
 
-    operations = [
+    operations = wrap_add_field_operations('productos', [
         migrations.AddField(
             model_name='presentacion',
             name='last_synced_at',
@@ -38,4 +40,5 @@ class Migration(migrations.Migration):
             name='quickbooks_id',
             field=models.CharField(blank=True, db_index=True, max_length=100, null=True),
         ),
-    ]
+    
+    ])

@@ -78,7 +78,7 @@
                     <div class="col-lg-5">
                       <label class="form-label small text-muted mb-1">{% trans "Product / presentation" %}</label>
                       <div class="direct-invoice-presentation-search">
-                        <select name="presentacion_id" class="form-select direct-invoice-presentation-select">
+                        <select name="presentacion_id" class="form-select direct-invoice-presentation-select no-search-select">
                           {% include 'backoffice/partials/direct_invoice_presentation_options.html' with selected_presentacion_id=line.presentacion_id %}
                         </select>
                       </div>
@@ -187,7 +187,7 @@
       <div class="col-lg-5">
         <label class="form-label small text-muted mb-1">{% trans "Product / presentation" %}</label>
         <div class="direct-invoice-presentation-search">
-          <select name="presentacion_id" class="form-select direct-invoice-presentation-select">
+          <select name="presentacion_id" class="form-select direct-invoice-presentation-select no-search-select">
             {% include 'backoffice/partials/direct_invoice_presentation_options.html' %}
           </select>
         </div>

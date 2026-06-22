@@ -251,6 +251,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(response, 'Type to search products...')
 		self.assertContains(response, 'Select one of the 5 prices')
 		self.assertContains(response, 'direct-invoice-create.js')
+		self.assertContains(response, 'direct-invoice-presentation-select no-search-select')
 		self.assertContains(response, 'direct-invoice-price-select no-search-select')
 
 	def test_backoffice_direct_invoice_presentation_search_returns_matches(self):

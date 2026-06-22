@@ -53,6 +53,8 @@
               <div class="form-text">{% trans "Optional. Only used for driver routes." %}</div>
             </div>
 
+            {{ presentation_options|json_script:"direct-invoice-presentations-data" }}
+
             <div class="col-12">
               <label class="form-label fw-semibold">{% trans "Invoice lines" %}</label>
               <div
@@ -214,6 +216,5 @@
   </div>
 </template>
 
-{{ presentation_options|json_script:"direct-invoice-presentations-data" }}
 <script defer src="{% static 'js/direct-invoice-create.js' %}"></script>
 {% endblock %}

@@ -6,7 +6,6 @@ from config.clientes.models import Cliente
 from config.cotizaciones.models import Cotizacion
 from config.notificaciones.alerts import get_urgent_workspace_alerts
 from config.notificaciones.context_processors import workspace_urgent_alerts
-from config.notificaciones.models import Notificacion
 from config.pedidos.models import Pedido
 from config.usuarios.models import Usuario
 
@@ -37,30 +36,24 @@ class WorkspaceUrgentAlertsTests(TestCase):
 	def test_customer_user_does_not_receive_workspace_alerts(self):
 		self.assertIsNone(get_urgent_workspace_alerts(self.customer_user))
 
-	def test_backoffice_user_receives_aggregated_urgent_alerts(self):
-		Pedido.objects.create(cliente=self.cliente, origen='CLIENTE', estado='RECIBIDO')
-		Pedido.objects.create(cliente=self.cliente, origen='CLIENTE', estado='LISTO_PARA_PICKING')
+	def test_backoffice_user_receives_customer_quote_alerts_only(self):
 		Cotizacion.objects.create(cliente=self.cliente, estado='ENVIADA')
-		Notificacion.objects.create(
-			tipo='PEDIDO',
-			titulo='New order received',
-			mensaje='Order #99 is waiting for review.',
-			url='/backoffice/pedidos/',
-			leida=False,
-			usuario=self.backoffice,
-		)
+		Cotizacion.objects.create(cliente=self.cliente, estado='LISTA_PARA_CONFIRMACION')
+		Cotizacion.objects.create(cliente=self.cliente, estado='CONFIRMADA_CLIENTE')
+		Pedido.objects.create(cliente=self.cliente, origen='CLIENTE', estado='RECIBIDO')
 
 		alerts = get_urgent_workspace_alerts(self.backoffice)
 
 		self.assertIsNotNone(alerts)
-		self.assertEqual(alerts['total_count'], 4)
-		self.assertEqual(len(alerts['summary_items']), 4)
-		self.assertEqual(len(alerts['recent_notifications']), 1)
-		self.assertEqual(alerts['summary_items'][0]['label'], 'New customer orders')
+		self.assertEqual(alerts['total_count'], 3)
+		self.assertEqual(len(alerts['summary_items']), 3)
+		self.assertEqual(len(alerts['recent_quotes']), 3)
+		self.assertEqual(alerts['summary_items'][0]['label'], 'Pending review')
 		self.assertEqual(alerts['summary_items'][0]['count'], 1)
+		self.assertEqual(alerts['summary_items'][1]['label'], 'Waiting for customer')
 		self.assertEqual(alerts['summary_items'][1]['count'], 1)
+		self.assertEqual(alerts['summary_items'][2]['label'], 'Confirmed, not finished')
 		self.assertEqual(alerts['summary_items'][2]['count'], 1)
-		self.assertEqual(alerts['summary_items'][3]['count'], 1)
 
 	def test_context_processor_injects_alerts_for_internal_users(self):
 		request = RequestFactory().get('/')
@@ -71,10 +64,10 @@ class WorkspaceUrgentAlertsTests(TestCase):
 		self.assertIn('workspace_urgent_alerts', context)
 		self.assertIsNotNone(context['workspace_urgent_alerts'])
 
-	def test_backoffice_dashboard_includes_navbar_requests_button(self):
+	def test_backoffice_dashboard_includes_navbar_quotes_button(self):
 		self.client.force_login(self.backoffice)
 		response = self.client.get(reverse('backoffice_dashboard'))
 
 		self.assertContains(response, 'navbar-urgent-alerts')
-		self.assertContains(response, 'Requests')
-		self.assertContains(response, 'id="system-notifications"')
+		self.assertContains(response, 'Quotes')
+		self.assertContains(response, 'Customer quotes')

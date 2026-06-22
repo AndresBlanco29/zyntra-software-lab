@@ -27,108 +27,56 @@ def _append_alert(items, *, label, detail, url, count, priority='medium', kind='
 def get_urgent_workspace_alerts(user):
     if not _is_internal_panel_user(user):
         return None
+    if not user.has_internal_permission('backoffice.quotes.view'):
+        return None
 
+    from config.cotizaciones.models import Cotizacion
+
+    base_queryset = Cotizacion.objects.select_related('cliente').order_by('-fecha')
+    quotes_url = reverse('backoffice_cotizaciones')
     summary_items = []
-    recent_notifications = []
-    total_count = 0
 
-    if user.has_internal_permission('backoffice.orders.view'):
-        from config.pedidos.models import Pedido
+    pending_review = base_queryset.filter(estado='ENVIADA').count()
+    _append_alert(
+        summary_items,
+        label=_('Pending review'),
+        detail=_('New quotes sent by customers waiting for BackOffice'),
+        url=quotes_url,
+        count=pending_review,
+        priority='high',
+        kind='quotes-pending',
+    )
 
-        received_orders = Pedido.objects.filter(estado='RECIBIDO').count()
-        _append_alert(
-            summary_items,
-            label=_('New customer orders'),
-            detail=_('Orders received and waiting for backoffice review'),
-            url=reverse('backoffice_pedidos'),
-            count=received_orders,
-            priority='high',
-            kind='orders-received',
-        )
+    awaiting_customer = base_queryset.filter(estado='LISTA_PARA_CONFIRMACION').count()
+    _append_alert(
+        summary_items,
+        label=_('Waiting for customer'),
+        detail=_('Quotes sent to the customer that are still open'),
+        url=quotes_url,
+        count=awaiting_customer,
+        priority='medium',
+        kind='quotes-awaiting-customer',
+    )
 
-        ready_for_picking = Pedido.objects.filter(estado='LISTO_PARA_PICKING').count()
-        _append_alert(
-            summary_items,
-            label=_('Orders ready for picking'),
-            detail=_('Verified orders waiting in the warehouse queue'),
-            url=reverse('backoffice_pedidos'),
-            count=ready_for_picking,
-            priority='high',
-            kind='picking',
-        )
+    confirmed_pending = base_queryset.filter(estado='CONFIRMADA_CLIENTE').count()
+    _append_alert(
+        summary_items,
+        label=_('Confirmed, not finished'),
+        detail=_('Customer confirmed the quote and BackOffice still needs to complete it'),
+        url=f'{quotes_url}?view=confirmed',
+        count=confirmed_pending,
+        priority='high',
+        kind='quotes-confirmed',
+    )
 
-        in_progress_orders = Pedido.objects.filter(estado='EN_GESTION').count()
-        _append_alert(
-            summary_items,
-            label=_('Orders in progress'),
-            detail=_('Sales orders currently being processed'),
-            url=f"{reverse('backoffice_pedidos')}?view=in-progress",
-            count=in_progress_orders,
-            priority='medium',
-            kind='orders-progress',
-        )
+    active_statuses = ['ENVIADA', 'LISTA_PARA_CONFIRMACION', 'CONFIRMADA_CLIENTE']
+    recent_quotes = list(base_queryset.filter(estado__in=active_statuses)[:8])
 
-    if user.has_internal_permission('backoffice.quotes.view'):
-        from config.cotizaciones.models import Cotizacion
-
-        pending_quotes = Cotizacion.objects.filter(estado__in=['ENVIADA', 'LISTA_PARA_CONFIRMACION']).count()
-        _append_alert(
-            summary_items,
-            label=_('Pending quotes'),
-            detail=_('Customer quote requests waiting for review'),
-            url=reverse('backoffice_cotizaciones'),
-            count=pending_quotes,
-            priority='high',
-            kind='quotes',
-        )
-
-    if user.has_internal_permission('backoffice.dashboard.view'):
-        from config.facturacion.models import NotaAjuste
-        from config.inventario.models import StockPresentacion
-        from config.notificaciones.models import Notificacion
-
-        pending_notes = NotaAjuste.objects.filter(estado='BORRADOR').count()
-        _append_alert(
-            summary_items,
-            label=_('Adjustment notes pending approval'),
-            detail=_('Credit or debit notes waiting for review'),
-            url=reverse('backoffice_adjustment_notes_list'),
-            count=pending_notes,
-            priority='high',
-            kind='notes',
-        )
-
-        out_of_stock = StockPresentacion.objects.filter(stock_disponible__lte=0).count()
-        _append_alert(
-            summary_items,
-            label=_('Products without stock'),
-            detail=_('Presentations with zero available inventory'),
-            url=reverse('backoffice_inventory_list'),
-            count=out_of_stock,
-            priority='medium',
-            kind='inventory',
-        )
-
-        unread_notifications = Notificacion.objects.filter(leida=False).order_by('-creada_en')
-        unread_count = unread_notifications.count()
-        recent_notifications = list(unread_notifications[:8])
-        if unread_count:
-            _append_alert(
-                summary_items,
-                label=_('Unread system alerts'),
-                detail=_('Orders, quotes, and adjustment messages'),
-                url=f"{reverse('backoffice_dashboard')}#system-notifications",
-                count=unread_count,
-                priority='high',
-                kind='notifications',
-            )
-
-    for item in summary_items:
-        total_count += item['count']
+    total_count = pending_review + awaiting_customer + confirmed_pending
 
     return {
         'total_count': total_count,
         'summary_items': summary_items,
-        'recent_notifications': recent_notifications,
-        'dashboard_url': reverse('backoffice_dashboard'),
+        'recent_quotes': recent_quotes,
+        'quotes_url': quotes_url,
     }

@@ -1049,7 +1049,7 @@
           <div class="col-12">
             <div class="qb-action-item" id="qb-push-linked-catalog">
               <label class="form-label fw-semibold">{% trans "Update linked catalog in QuickBooks" %}</label>
-              <p class="qb-soft-copy small mb-3">{% trans "Use this when products are already linked and you changed prices, names, descriptions, or inventory quantities in the app. Inventory items in QuickBooks will also receive the current on-hand quantity before you send invoices." %}</p>
+              <p class="qb-soft-copy small mb-3">{% trans "Use this when products are already linked and you changed prices, names, descriptions, or inventory quantities in the app. Linked Non-inventory items in QuickBooks will be converted to Inventory with the current on-hand quantity when you update them here." %}</p>
               <div class="row g-3">
                 <div class="col-lg-7">
                   <form method="post" action="{% url 'quickbooks_push_linked_products_batch' %}" class="d-grid gap-2">

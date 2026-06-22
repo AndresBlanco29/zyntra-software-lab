@@ -613,10 +613,9 @@ def _local_presentacion_qty_on_hand(presentacion):
 
 def _build_item_payload(presentacion, *, client, income_account_ref=None, remote_payload=None):
     use_inventory = getattr(settings, 'QUICKBOOKS_USE_INVENTORY_ITEMS', True)
-    if remote_payload is not None:
+    if remote_payload is not None and not use_inventory:
+        # When inventory export is disabled, preserve the existing QuickBooks item type on updates.
         use_inventory = _quickbooks_item_is_inventory(remote_payload)
-    elif not use_inventory:
-        use_inventory = False
 
     payload = {
         'Name': _build_item_name(presentacion),

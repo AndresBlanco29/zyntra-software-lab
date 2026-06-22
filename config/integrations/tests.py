@@ -27,6 +27,7 @@ from config.integrations.backups import _backup_modified_time
 from config.integrations.quickbooks.services import get_connection
 from config.integrations.models import QuickBooksConnection, QuickBooksImportConflict
 from config.integrations.quickbooks.sync import (
+    _build_item_payload,
     _derive_quickbooks_invoice_status,
     _enrich_quickbooks_item_payload,
     _extract_quickbooks_item_cost,
@@ -101,6 +102,59 @@ class QuickBooksPresentationParsingTests(TestCase):
         self.assertEqual(presentation, 'Caja')
         self.assertEqual(units, 4)
         self.assertEqual(tipo, '4.65 LT')
+
+
+class QuickBooksItemPayloadTests(TestCase):
+    def setUp(self):
+        categoria = Categoria.objects.create(nombre='QB payload category')
+        marca = Marca.objects.create(nombre='QB payload brand')
+        producto = Producto.objects.create(nombre='QB payload product', categoria=categoria, marca=marca, activo=True)
+        self.presentacion = Presentacion.objects.create(
+            producto=producto,
+            nombre='Caja',
+            unidades=1,
+            tipo_contenido='caja',
+            costo=Decimal('6.00'),
+            precio_3=Decimal('12.00'),
+        )
+        StockPresentacion.objects.create(presentacion=self.presentacion, stock_fisico=18, stock_disponible=18)
+
+    @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
+    @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
+    @patch('config.integrations.quickbooks.sync._get_default_expense_account_ref', return_value={'value': '80', 'name': 'COGS'})
+    @patch('config.integrations.quickbooks.sync._get_default_income_account_ref', return_value={'value': '79', 'name': 'Sales'})
+    def test_build_item_payload_converts_linked_noninventory_to_inventory(self, *_mocks):
+        payload = _build_item_payload(
+            self.presentacion,
+            client=Mock(),
+            remote_payload={
+                'Id': '1062',
+                'Type': 'NonInventory',
+                'IncomeAccountRef': {'value': '79', 'name': 'Sales'},
+            },
+        )
+
+        self.assertEqual(payload['Type'], 'Inventory')
+        self.assertTrue(payload['TrackQtyOnHand'])
+        self.assertEqual(payload['QtyOnHand'], 18)
+        self.assertEqual(payload['AssetAccountRef']['value'], '81')
+        self.assertEqual(payload['ExpenseAccountRef']['value'], '80')
+
+    @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=False)
+    @patch('config.integrations.quickbooks.sync._get_default_income_account_ref', return_value={'value': '79', 'name': 'Sales'})
+    def test_build_item_payload_preserves_noninventory_when_setting_disabled(self, *_mocks):
+        payload = _build_item_payload(
+            self.presentacion,
+            client=Mock(),
+            remote_payload={
+                'Id': '1062',
+                'Type': 'NonInventory',
+                'IncomeAccountRef': {'value': '79', 'name': 'Sales'},
+            },
+        )
+
+        self.assertEqual(payload['Type'], 'NonInventory')
+        self.assertNotIn('QtyOnHand', payload)
 
 
 class QuickBooksItemCostSyncTests(TestCase):

@@ -9,9 +9,44 @@ from config.core.migration_utils import add_model_fields_if_missing, build_field
 
 def populate_review_status(apps, schema_editor):
     Cliente = apps.get_model('clientes', 'Cliente')
+    table_name = Cliente._meta.db_table
+    existing = existing_table_columns(schema_editor, table_name)
+    quote_name = schema_editor.connection.ops.quote_name
+    quoted_table = quote_name(table_name)
+
+    with schema_editor.connection.cursor() as cursor:
+        if 'estado_revision' in existing:
+            cursor.execute(
+                f"UPDATE {quoted_table} SET {quote_name('estado_revision')} = %s WHERE {quote_name('aprobado')} = %s",
+                ['APROBADO', True],
+            )
+            cursor.execute(
+                f"UPDATE {quoted_table} SET {quote_name('estado_revision')} = %s WHERE {quote_name('aprobado')} = %s",
+                ['PENDIENTE', False],
+            )
+
+        if 'correction_token' in existing:
+            cursor.execute(
+                f"SELECT {quote_name('id')} FROM {quoted_table} WHERE {quote_name('correction_token')} IS NULL",
+            )
+            for (row_id,) in cursor.fetchall():
+                cursor.execute(
+                    f"UPDATE {quoted_table} SET {quote_name('correction_token')} = %s WHERE {quote_name('id')} = %s",
+                    [str(uuid.uuid4()), row_id],
+                )
+
+
+def populate_review_status_state(apps, schema_editor):
+    Cliente = apps.get_model('clientes', 'Cliente')
+    field_names = {field.name for field in Cliente._meta.fields}
+    if 'estado_revision' not in field_names:
+        return
 
     Cliente.objects.filter(aprobado=True).update(estado_revision='APROBADO')
     Cliente.objects.filter(aprobado=False).update(estado_revision='PENDIENTE')
+
+    if 'correction_token' not in field_names:
+        return
 
     for cliente in Cliente.objects.filter(correction_token__isnull=True).iterator():
         cliente.correction_token = uuid.uuid4()
@@ -151,7 +186,7 @@ class Migration(migrations.Migration):
                     name='rechazado_por',
                     field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='clientes_rechazados_admin', to=settings.AUTH_USER_MODEL),
                 ),
-                migrations.RunPython(populate_review_status, migrations.RunPython.noop),
+                migrations.RunPython(populate_review_status_state, migrations.RunPython.noop),
                 migrations.AlterField(
                     model_name='cliente',
                     name='correction_token',

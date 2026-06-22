@@ -31,8 +31,10 @@ from config.integrations.quickbooks.sync import (
     _build_item_payload,
     _convert_linked_item_to_inventory,
     _derive_quickbooks_invoice_status,
+    _ensure_inventory_items_allow_txn_date,
     _enrich_quickbooks_item_payload,
     _extract_quickbooks_item_cost,
+    _get_inventory_start_date,
     _parse_quickbooks_presentation,
     import_quickbooks_credit_memo_record,
     import_quickbooks_customer_record,
@@ -143,6 +145,43 @@ class QuickBooksItemPayloadTests(TestCase):
         self.assertEqual(payload['IncomeAccountRef']['value'], '79')
         self.assertEqual(payload['AssetAccountRef']['value'], '81')
         self.assertEqual(payload['ExpenseAccountRef']['value'], '80')
+
+    def test_get_inventory_start_date_defaults_to_early_date(self):
+        self.assertEqual(_get_inventory_start_date(), date(2015, 1, 1))
+        self.assertEqual(_get_inventory_start_date(txn_date=date(2024, 3, 15)), date(2015, 1, 1))
+
+    @override_settings(QUICKBOOKS_INVENTORY_START_DATE='2020-06-01')
+    def test_get_inventory_start_date_respects_setting_and_txn_date(self):
+        self.assertEqual(_get_inventory_start_date(), date(2020, 6, 1))
+        self.assertEqual(_get_inventory_start_date(txn_date=date(2019, 1, 1)), date(2019, 1, 1))
+
+    @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
+    @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
+    @patch('config.integrations.quickbooks.sync._get_default_expense_account_ref', return_value={'value': '80', 'name': 'COGS'})
+    @patch('config.integrations.quickbooks.sync._get_inventory_income_account_ref', return_value={'value': '79', 'name': 'Sales of Product Income'})
+    def test_build_item_payload_uses_early_inventory_start_date(self, *_mocks):
+        payload = _build_item_payload(self.presentacion, client=Mock())
+
+        self.assertEqual(payload['InvStartDate'], '2015-01-01')
+
+    def test_ensure_inventory_items_allow_txn_date_backdates_late_start(self):
+        presentacion = Mock(quickbooks_id='1062')
+        client = Mock()
+        client.find_by_id.return_value = {
+            'Id': '1062',
+            'SyncToken': '4',
+            'Type': 'Inventory',
+            'InvStartDate': '2026-06-22',
+        }
+
+        _ensure_inventory_items_allow_txn_date(
+            client=client,
+            presentaciones=[presentacion],
+            txn_date=date(2026, 5, 1),
+        )
+
+        client.update_item.assert_called_once()
+        self.assertEqual(client.update_item.call_args.args[0]['InvStartDate'], '2015-01-01')
 
     @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
     @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
@@ -1836,6 +1875,7 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
             self._json_response({'QueryResponse': {'Account': [{'Id': '79', 'Name': 'Sales of Product Income'}]}}),
             self._json_response({'Item': {'Id': '801', 'Name': 'LTG Item 1 - Tortilla 12 - Caja'}}),
             self._json_response({'QueryResponse': {}}),
+            self._json_response({'Item': {'Id': '801', 'Name': 'LTG Item 1 - Tortilla 12 - Caja'}}),
             self._json_response({'Invoice': {'Id': '901', 'DocNumber': self.invoice.numero}}),
         ]
 

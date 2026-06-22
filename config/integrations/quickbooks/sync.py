@@ -1,7 +1,7 @@
 import logging
 import re
 import unicodedata
-from datetime import timezone as dt_timezone
+from datetime import date, datetime, timezone as dt_timezone
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 
@@ -298,6 +298,66 @@ def _summarize_quickbooks_error(error):
     return message or _('QuickBooks rejected the item update.')
 
 
+def _parse_inventory_start_date_setting():
+    raw = str(getattr(settings, 'QUICKBOOKS_INVENTORY_START_DATE', '') or '').strip()
+    if raw:
+        parsed = parse_date(raw)
+        if parsed:
+            return parsed
+    return date(2015, 1, 1)
+
+
+def _coerce_local_date(value):
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return timezone.localtime(value).date() if timezone.is_aware(value) else value.date()
+    if isinstance(value, date):
+        return value
+    parsed = parse_date(str(value))
+    return parsed
+
+
+def _get_inventory_start_date(*, txn_date=None):
+    configured = _parse_inventory_start_date_setting()
+    txn_date = _coerce_local_date(txn_date)
+    if txn_date is None:
+        return configured
+    return min(configured, txn_date)
+
+
+def _ensure_inventory_items_allow_txn_date(*, client, presentaciones, txn_date):
+    txn_date = _coerce_local_date(txn_date)
+    if txn_date is None:
+        return
+    target_start = _get_inventory_start_date(txn_date=txn_date).isoformat()
+    seen_ids = set()
+    for presentacion in presentaciones:
+        qb_id = str(getattr(presentacion, 'quickbooks_id', '') or '').strip()
+        if not qb_id or qb_id in seen_ids:
+            continue
+        seen_ids.add(qb_id)
+        remote = client.find_by_id('Item', qb_id)
+        if not remote or not _quickbooks_item_is_inventory(remote):
+            continue
+        current_start = _coerce_local_date(remote.get('InvStartDate'))
+        if current_start and current_start <= txn_date:
+            continue
+        try:
+            client.update_item({
+                'Id': qb_id,
+                'SyncToken': str(remote.get('SyncToken', '')),
+                'sparse': True,
+                'InvStartDate': target_start,
+            })
+        except QuickBooksAPIError:
+            logger.warning(
+                'Could not backdate InvStartDate for QuickBooks item %s before txn %s',
+                qb_id,
+                txn_date.isoformat(),
+            )
+
+
 def _needs_inventory_type_conversion(existing, desired_payload):
     return (
         not _quickbooks_item_is_inventory(existing)
@@ -318,7 +378,7 @@ def _sync_inventory_qty_after_conversion(*, client, item_payload, presentacion):
             'SyncToken': str(refreshed.get('SyncToken', '')),
             'sparse': True,
             'QtyOnHand': target_qty,
-            'InvStartDate': timezone.localdate().isoformat(),
+            'InvStartDate': _get_inventory_start_date().isoformat(),
         })
     except QuickBooksAPIError:
         logger.warning(
@@ -784,7 +844,7 @@ def _build_item_payload(presentacion, *, client, income_account_ref=None, remote
             'Type': 'Inventory',
             'TrackQtyOnHand': True,
             'QtyOnHand': _local_presentacion_qty_on_hand(presentacion),
-            'InvStartDate': timezone.localdate().isoformat(),
+            'InvStartDate': _get_inventory_start_date().isoformat(),
             'PurchaseCost': _as_float(presentacion.costo or 0),
             'IncomeAccountRef': income_ref,
             'ExpenseAccountRef': _get_default_expense_account_ref(client),
@@ -3584,9 +3644,11 @@ def sync_invoice(*, invoice, client=None):
         customer_result = sync_customer(cliente=invoice.cliente, client=client)
         lines = []
         adjustment_item_ref = None
+        inventory_presentaciones = []
         for item in invoice.items.select_related('presentacion__producto').all():
             if item.presentacion_id:
                 sync_product(presentacion=item.presentacion, client=client)
+                inventory_presentaciones.append(item.presentacion)
                 item_ref = {'value': item.presentacion.quickbooks_id, 'name': _build_item_name(item.presentacion)}
             else:
                 adjustment_item_ref = adjustment_item_ref or _build_adjustment_item_ref(client)
@@ -3604,10 +3666,16 @@ def sync_invoice(*, invoice, client=None):
             _mark_synced(invoice, existing.get('Id'))
             return _sync_result(entity='Invoice', action='linked', payload=existing)
 
+        txn_date = invoice.creada_en.date()
+        _ensure_inventory_items_allow_txn_date(
+            client=client,
+            presentaciones=inventory_presentaciones,
+            txn_date=txn_date,
+        )
         created = client.create_invoice({
             'CustomerRef': {'value': customer_result['quickbooks_id']},
             'DocNumber': invoice.numero,
-            'TxnDate': invoice.creada_en.date().isoformat(),
+            'TxnDate': txn_date.isoformat(),
             'PrivateNote': _truncate(f'La Tortilla invoice {invoice.numero}', limit=4000),
             'Line': lines,
         })
@@ -3621,10 +3689,12 @@ def sync_invoice(*, invoice, client=None):
 def _build_adjustment_lines(note, client):
     adjustment_item_ref = None
     lines = []
+    presentaciones = []
     for item in note.items.select_related('presentacion__producto').all():
         amount = _quantize_money(item.total or Decimal(str(item.monto_unitario or '0')) * Decimal(str(item.cantidad or 1)))
         if item.presentacion_id:
             sync_product(presentacion=item.presentacion, client=client)
+            presentaciones.append(item.presentacion)
             item_ref = {'value': item.presentacion.quickbooks_id, 'name': _build_item_name(item.presentacion)}
         else:
             adjustment_item_ref = adjustment_item_ref or _build_adjustment_item_ref(client)
@@ -3637,7 +3707,7 @@ def _build_adjustment_lines(note, client):
             unit_price=item.monto_unitario,
         ))
     if lines:
-        return lines
+        return lines, presentaciones
 
     adjustment_item_ref = _build_adjustment_item_ref(client)
     amount = _quantize_money(note.total or note.monto or note.impacto_saldo)
@@ -3651,7 +3721,7 @@ def _build_adjustment_lines(note, client):
             quantity=1,
             unit_price=amount,
         )
-    ]
+    ], []
 
 
 def sync_adjustment_note(*, note, client=None):
@@ -3667,17 +3737,23 @@ def sync_adjustment_note(*, note, client=None):
                 return _sync_result(entity=entity_name, action='existing', payload=existing)
 
         customer_result = sync_customer(cliente=note.cliente, client=client)
-        lines = _build_adjustment_lines(note, client)
+        lines, inventory_presentaciones = _build_adjustment_lines(note, client)
         entity_name = 'CreditMemo' if note.tipo_documento == 'CREDITO' else 'Invoice'
         existing = _find_transaction_by_doc_number(client, entity_name, note.numero)
         if existing:
             _mark_synced(note, existing.get('Id'))
             return _sync_result(entity=entity_name, action='linked', payload=existing)
 
+        txn_date = note.fecha.date()
+        _ensure_inventory_items_allow_txn_date(
+            client=client,
+            presentaciones=inventory_presentaciones,
+            txn_date=txn_date,
+        )
         payload = {
             'CustomerRef': {'value': customer_result['quickbooks_id']},
             'DocNumber': note.numero,
-            'TxnDate': note.fecha.date().isoformat(),
+            'TxnDate': txn_date.isoformat(),
             'PrivateNote': _truncate(note.descripcion or note.get_motivo_display(), limit=4000),
             'Line': lines,
         }

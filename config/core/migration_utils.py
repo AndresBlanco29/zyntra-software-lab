@@ -70,3 +70,22 @@ def wrap_add_field_operations(app_label, operations):
             wrapped.append(operation)
     flush()
     return wrapped
+
+
+def create_model_if_missing(model_class, schema_editor):
+    table_name = model_class._meta.db_table
+    if table_exists(schema_editor, table_name):
+        return
+    schema_editor.create_model(model_class)
+
+
+def separate_create_model(model_class, create_model_operation):
+    def forward(apps, schema_editor):
+        create_model_if_missing(model_class, schema_editor)
+
+    return migrations.SeparateDatabaseAndState(
+        database_operations=[
+            migrations.RunPython(forward, migrations.RunPython.noop),
+        ],
+        state_operations=[create_model_operation],
+    )

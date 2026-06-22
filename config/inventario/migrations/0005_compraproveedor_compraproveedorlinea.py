@@ -2,8 +2,15 @@
 
 import django.db.models.deletion
 import django.utils.timezone
+from config.core.migration_utils import create_model_if_missing
+from config.inventario.models import CompraProveedor, CompraProveedorLinea
 from django.conf import settings
 from django.db import migrations, models
+
+
+def create_compra_proveedor_models_if_missing(apps, schema_editor):
+    create_model_if_missing(CompraProveedor, schema_editor)
+    create_model_if_missing(CompraProveedorLinea, schema_editor)
 
 
 class Migration(migrations.Migration):
@@ -15,43 +22,50 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.CreateModel(
-            name='CompraProveedor',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('proveedor_nombre', models.CharField(max_length=255)),
-                ('proveedor_email', models.EmailField(blank=True, max_length=254)),
-                ('proveedor_telefono', models.CharField(blank=True, max_length=40)),
-                ('bill_number', models.CharField(blank=True, max_length=100)),
-                ('fecha_compra', models.DateField(default=django.utils.timezone.localdate)),
-                ('fecha_vencimiento', models.DateField(blank=True, null=True)),
-                ('notas', models.TextField(blank=True)),
-                ('subtotal', models.DecimalField(decimal_places=2, default=0, max_digits=12)),
-                ('total', models.DecimalField(decimal_places=2, default=0, max_digits=12)),
-                ('quickbooks_id', models.CharField(blank=True, db_index=True, max_length=100, null=True)),
-                ('sync_status', models.CharField(choices=[('PENDING', 'Pending'), ('SYNCED', 'Synced'), ('FAILED', 'Failed')], db_index=True, default='PENDING', max_length=20)),
-                ('last_synced_at', models.DateTimeField(blank=True, null=True)),
-                ('creado_en', models.DateTimeField(auto_now_add=True)),
-                ('actualizado_en', models.DateTimeField(auto_now=True)),
-                ('creado_por', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='compras_proveedor_creadas', to=settings.AUTH_USER_MODEL)),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunPython(create_compra_proveedor_models_if_missing, migrations.RunPython.noop),
             ],
-            options={
-                'ordering': ('-fecha_compra', '-id'),
-            },
-        ),
-        migrations.CreateModel(
-            name='CompraProveedorLinea',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('cantidad', models.PositiveIntegerField(default=1)),
-                ('costo_unitario', models.DecimalField(decimal_places=2, max_digits=12)),
-                ('subtotal', models.DecimalField(decimal_places=2, default=0, max_digits=12)),
-                ('descripcion', models.CharField(blank=True, max_length=255)),
-                ('compra', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='lineas', to='inventario.compraproveedor')),
-                ('presentacion', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='compras_proveedor_lineas', to='productos.presentacion')),
+            state_operations=[
+                migrations.CreateModel(
+                    name='CompraProveedor',
+                    fields=[
+                        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                        ('proveedor_nombre', models.CharField(max_length=255)),
+                        ('proveedor_email', models.EmailField(blank=True, max_length=254)),
+                        ('proveedor_telefono', models.CharField(blank=True, max_length=40)),
+                        ('bill_number', models.CharField(blank=True, max_length=100)),
+                        ('fecha_compra', models.DateField(default=django.utils.timezone.localdate)),
+                        ('fecha_vencimiento', models.DateField(blank=True, null=True)),
+                        ('notas', models.TextField(blank=True)),
+                        ('subtotal', models.DecimalField(decimal_places=2, default=0, max_digits=12)),
+                        ('total', models.DecimalField(decimal_places=2, default=0, max_digits=12)),
+                        ('quickbooks_id', models.CharField(blank=True, db_index=True, max_length=100, null=True)),
+                        ('sync_status', models.CharField(choices=[('PENDING', 'Pending'), ('SYNCED', 'Synced'), ('FAILED', 'Failed')], db_index=True, default='PENDING', max_length=20)),
+                        ('last_synced_at', models.DateTimeField(blank=True, null=True)),
+                        ('creado_en', models.DateTimeField(auto_now_add=True)),
+                        ('actualizado_en', models.DateTimeField(auto_now=True)),
+                        ('creado_por', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='compras_proveedor_creadas', to=settings.AUTH_USER_MODEL)),
+                    ],
+                    options={
+                        'ordering': ('-fecha_compra', '-id'),
+                    },
+                ),
+                migrations.CreateModel(
+                    name='CompraProveedorLinea',
+                    fields=[
+                        ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                        ('cantidad', models.PositiveIntegerField(default=1)),
+                        ('costo_unitario', models.DecimalField(decimal_places=2, max_digits=12)),
+                        ('subtotal', models.DecimalField(decimal_places=2, default=0, max_digits=12)),
+                        ('descripcion', models.CharField(blank=True, max_length=255)),
+                        ('compra', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='lineas', to='inventario.compraproveedor')),
+                        ('presentacion', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='compras_proveedor_lineas', to='productos.presentacion')),
+                    ],
+                    options={
+                        'ordering': ('id',),
+                    },
+                ),
             ],
-            options={
-                'ordering': ('id',),
-            },
         ),
     ]

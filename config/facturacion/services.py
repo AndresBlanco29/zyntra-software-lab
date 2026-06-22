@@ -1322,6 +1322,19 @@ def _validate_invoice_void_delete_allowed(invoice):
 		raise ValidationError(_('Cannot void or delete an invoice that is already on route or delivered.'))
 
 
+def _validate_invoice_delete_allowed(invoice):
+	if invoice.estado == 'ANULADA':
+		return
+	delivery = getattr(invoice, 'delivery', None)
+	if delivery and delivery.estado in {'EN_RUTA', 'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'}:
+		from config.integrations.quickbooks.sync import is_sync_locked
+
+		if is_sync_locked(invoice):
+			raise ValidationError(_('Cannot delete a delivered invoice that is synced with QuickBooks.'))
+		return
+	_validate_invoice_void_delete_allowed(invoice)
+
+
 def _reverse_invoice_customer_note_applications(*, invoice):
 	for application in NotaAjusteAplicacion.objects.select_for_update().filter(invoice=invoice).select_related('nota'):
 		nota = application.nota
@@ -1403,7 +1416,7 @@ def anular_invoice(*, invoice, usuario, motivo=''):
 def eliminar_invoice(*, invoice):
 	_ensure_quickbooks_not_locked(invoice=invoice)
 	if invoice.estado != 'ANULADA':
-		_validate_invoice_void_delete_allowed(invoice)
+		_validate_invoice_delete_allowed(invoice)
 
 	for nota in list(NotaAjuste.objects.filter(invoice=invoice).order_by('id')):
 		eliminar_nota_ajuste(nota=nota)

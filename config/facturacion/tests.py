@@ -14,7 +14,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, DeliveryNotificationLog, FacturacionRegistroAnulacion, Invoice, NotaAjuste, NotaAjusteAplicacion
-from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, generar_invoice_desde_picking, generar_invoice_directa_backoffice, start_delivery_route, unlock_client_from_delivery
+from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, start_delivery_route, unlock_client_from_delivery
 from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_item_data, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_SYNCED
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
@@ -3632,6 +3632,26 @@ class InvoiceVoidDeleteTests(TestCase):
 		self.pedido_item.refresh_from_db()
 		self.assertEqual(self.pedido_item.cantidad_inventario_aplicada, 0)
 		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, stock_before + 36)
+
+	def test_delete_delivered_invoice_allowed_when_not_synced_to_quickbooks(self):
+		driver = Usuario.objects.create_user(username='void-driver', password='secret123', role='driver')
+		self.invoice.metodo_entrega = 'RUTA_DRIVER'
+		self.invoice.driver = driver
+		self.invoice.save(update_fields=['metodo_entrega', 'driver', 'actualizada_en'])
+		delivery = ensure_delivery_for_invoice(self.invoice)
+		delivery.estado = 'ENTREGADA_PAGADA'
+		delivery.save(update_fields=['estado', 'updated_at'])
+		self.invoice.refresh_from_db()
+		self.assertTrue(self.invoice.delivery_blocks_void_delete())
+		self.assertFalse(self.invoice.can_void_from_backoffice())
+		self.assertTrue(self.invoice.can_delete_from_backoffice())
+
+		invoice_id = self.invoice.id
+		delivery_id = delivery.id
+		eliminar_invoice(invoice=self.invoice)
+
+		self.assertFalse(Invoice.objects.filter(id=invoice_id).exists())
+		self.assertFalse(Delivery.objects.filter(id=delivery_id).exists())
 
 	def test_delete_credit_note_removes_record_and_reverses_inventory(self):
 		nota = crear_nota_ajuste_desde_invoice(

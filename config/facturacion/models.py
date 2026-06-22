@@ -110,9 +110,13 @@ class Invoice(models.Model):
 	def can_delete_from_backoffice(self):
 		from config.integrations.quickbooks.sync import is_sync_locked
 
-		return not is_sync_locked(self) and (
-			self.can_void_from_backoffice() or self.estado == 'ANULADA'
-		)
+		if is_sync_locked(self):
+			return False
+		if self.estado == 'ANULADA':
+			return True
+		if self.can_void_from_backoffice():
+			return True
+		return self.delivery_blocks_void_delete()
 
 	def clean(self):
 		if self.pedido_id and self.pedido.estado not in {'VERIFICADO_AJUSTADO', 'INVOICE_GENERADA'}:

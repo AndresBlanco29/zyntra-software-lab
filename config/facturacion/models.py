@@ -611,7 +611,9 @@ class NotaAjuste(models.Model):
 		return not self.is_backoffice_locked and self.estado in {'BORRADOR', 'APROBADA'}
 
 	def can_delete_from_backoffice(self):
-		return not self.is_backoffice_locked and self.estado in {'BORRADOR', 'APROBADA', 'ANULADA'}
+		if self.estado not in {'BORRADOR', 'APROBADA', 'ANULADA'}:
+			return False
+		return not self.is_invoice_locked()
 
 	def clean(self):
 		resolved_cliente = self.cliente

@@ -97,10 +97,8 @@
             </div>
             {% endif %}
             {% if nota.estado == 'BORRADOR' %}
-            {% if nota.quickbooks_id and nota.sync_status == 'SYNCED' %}
-            <div class="small text-primary">{% trans "This note is locked because it is already synced with QuickBooks." %}</div>
-            {% else %}
-            <div class="d-flex gap-2">
+            {% if nota.can_void_from_backoffice %}
+            <div class="d-flex gap-2 flex-wrap">
               <form method="post" action="{% url 'backoffice_invoice_approve_note' nota.id %}">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-sm btn-success">{% trans "Approve" %}</button>
@@ -110,15 +108,40 @@
                 <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Void" %}</button>
               </form>
             </div>
+            {% elif nota.can_delete_from_backoffice %}
+            <form method="post" action="{% url 'backoffice_invoice_delete_note' nota.id %}" onsubmit="return confirm('{% trans "Delete this note permanently?" %}');">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Delete" %}</button>
+            </form>
+            {% elif nota.is_backoffice_locked %}
+            <div class="small text-primary">{% trans "This note is locked because it is already synced with QuickBooks." %}</div>
             {% endif %}
             {% elif nota.estado == 'APROBADA' %}
-            {% if nota.quickbooks_id and nota.sync_status == 'SYNCED' %}
+            {% if nota.can_delete_from_backoffice %}
+            <div class="d-flex gap-2 flex-wrap align-items-center">
+              <div class="small text-muted">{% trans "This note is approved and has already impacted the customer balance." %}</div>
+              <form method="post" action="{% url 'backoffice_invoice_delete_note' nota.id %}" onsubmit="return confirm('{% trans "Delete this note permanently? Inventory and balances will be reversed when applicable." %}');">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Delete" %}</button>
+              </form>
+            </div>
+            {% elif nota.is_quickbooks_locked %}
             <div class="small text-primary">{% trans "This note is approved and locked because it was already synced with QuickBooks." %}</div>
             {% else %}
             <div class="small text-success">{% trans "This note is already approved and has already impacted the customer balance." %}</div>
             {% endif %}
             {% else %}
+            {% if nota.can_delete_from_backoffice %}
+            <form method="post" action="{% url 'backoffice_invoice_delete_note' nota.id %}" onsubmit="return confirm('{% trans "Delete this voided note permanently?" %}');">
+              {% csrf_token %}
+              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+              <button type="submit" class="btn btn-sm btn-outline-danger">{% trans "Delete" %}</button>
+            </form>
+            {% else %}
             <div class="small text-muted">{% trans "This note was voided and no longer affects the customer balance." %}</div>
+            {% endif %}
             {% endif %}
           </div>
           {% endfor %}

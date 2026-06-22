@@ -1459,7 +1459,6 @@ def backoffice_invoice_delete_note(request, note_id):
 			next_url = f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}"
 
 	try:
-		_validate_note_is_not_quickbooks_locked(nota)
 		eliminar_nota_ajuste(nota=nota)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))

@@ -3717,3 +3717,23 @@ class InvoiceVoidDeleteTests(TestCase):
 
 		self.assertFalse(NotaAjuste.objects.filter(id=note_id).exists())
 		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, stock_after_credit - 12)
+
+	def test_delete_synced_general_note_allowed_from_backoffice(self):
+		nota = crear_nota_ajuste(
+			cliente=self.cliente,
+			tipo_documento='DEBITO',
+			motivo='OTHER',
+			descripcion='prueba',
+			usuario=self.backoffice,
+			monto=Decimal('10.00'),
+		)
+		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
+		nota.quickbooks_id = 'QB-DEBIT-1'
+		nota.sync_status = 'SYNCED'
+		nota.save(update_fields=['quickbooks_id', 'sync_status'])
+		self.assertTrue(nota.can_delete_from_backoffice())
+
+		note_id = nota.id
+		eliminar_nota_ajuste(nota=nota)
+
+		self.assertFalse(NotaAjuste.objects.filter(id=note_id).exists())

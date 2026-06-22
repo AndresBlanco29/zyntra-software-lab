@@ -1238,9 +1238,18 @@ def anular_nota_ajuste(*, nota, usuario=None, motivo='', crear_registro=True):
 	return nota
 
 
+def _nota_allows_quickbooks_bypass_on_delete(nota):
+	if nota.estado not in {'BORRADOR', 'APROBADA', 'ANULADA'}:
+		return False
+	if nota.invoice_id and nota.is_invoice_locked():
+		return False
+	return True
+
+
 @transaction.atomic
 def eliminar_nota_ajuste(*, nota, force_quickbooks=False):
-	if not force_quickbooks:
+	purge_quickbooks_lock = force_quickbooks or _nota_allows_quickbooks_bypass_on_delete(nota)
+	if not purge_quickbooks_lock:
 		_ensure_quickbooks_not_locked(nota=nota, invoice=nota.invoice if nota.invoice_id else None)
 	if nota.estado == 'APROBADA':
 		_revert_nota_ajuste_effects(nota=nota, usuario=nota.anulada_por or nota.aprobada_por)

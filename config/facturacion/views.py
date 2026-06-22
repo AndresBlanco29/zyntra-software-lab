@@ -277,6 +277,22 @@ def _extract_adjustment_note_request(invoice, post_data, *, field_prefix=''):
 	if not has_note_request:
 		return None
 
+	if not tipo_documento:
+		raise ValidationError(_('Select a note type to save the adjustment.'))
+
+	if tipo_documento == 'CREDITO' and not tipo_credito and tipo_ajuste == 'PRODUCTO':
+		tipo_credito = 'CREDIT_DUMP'
+
+	return {
+		'tipo_ajuste': tipo_ajuste,
+		'tipo_documento': tipo_documento,
+		'motivo': motivo,
+		'tipo_credito': tipo_credito,
+		'descripcion': descripcion,
+		'monto': monto,
+		'items_payload': items_payload,
+	}
+
 
 def _parse_direct_invoice_lines(post_data):
 	raw_presentacion_ids = post_data.getlist('presentacion_id')
@@ -379,18 +395,6 @@ def _build_direct_invoice_context(*, selected_client_id=None, post_data=None):
 		'backoffice_note_value': str(post_data.get('nota_backoffice') if post_data is not None else '' or '').strip(),
 		'use_customer_credit_checked': str(post_data.get('use_customer_credit') if post_data is not None else '').strip().lower() in {'1', 'true', 'on', 'yes'},
 		'customer_credit_to_apply_value': str(post_data.get('customer_credit_to_apply') if post_data is not None else '' or '').strip(),
-	}
-	if not tipo_documento:
-		raise ValidationError(_('Select a note type to save the adjustment.'))
-
-	return {
-		'tipo_ajuste': tipo_ajuste,
-		'tipo_documento': tipo_documento,
-		'motivo': motivo,
-		'tipo_credito': tipo_credito,
-		'descripcion': descripcion,
-		'monto': monto,
-		'items_payload': items_payload,
 	}
 
 

@@ -1299,6 +1299,40 @@ class InvoiceFlowTests(TestCase):
 		self.assertIn('approve or reject', notificacion.mensaje)
 		self.assertEqual(notificacion.url, f'/facturacion/backoffice/invoices/{invoice.id}/')
 
+	def test_driver_complete_view_can_create_credit_note_with_evidence_without_disabled_credit_type_field(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.post(
+			reverse('driver_delivery_complete', args=[invoice.delivery.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'payment_method_1': 'CASH',
+				'payment_amount_1': '30.00',
+				'monto_pagado': '30.00',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+				'driver_note_tipo_documento': 'CREDITO',
+				'driver_note_motivo': 'DAMAGE',
+				'driver_note_descripcion': 'Caja dañada al entregar',
+				f'driver_note_qty_{invoice.items.first().id}': '1',
+				f'driver_note_amount_{invoice.items.first().id}': '15.00',
+				'driver_note_evidence_photos': SimpleUploadedFile('damage.jpg', b'fake-image-bytes', content_type='image/jpeg'),
+			},
+		)
+
+		invoice.refresh_from_db()
+		nota = invoice.notas_ajuste.get()
+		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertEqual(invoice.delivery.estado, 'ENTREGADA_PAGADA')
+		self.assertEqual(nota.tipo_credito, 'CREDIT_DUMP')
+		self.assertEqual(nota.evidence_photos.count(), 1)
+
 	def test_driver_complete_view_rejects_payment_above_credit_adjusted_balance(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,

@@ -1424,6 +1424,13 @@ def backoffice_invoice_cancel_note(request, note_id):
 			return redirect('backoffice_invoice_detail', invoice_id=nota.invoice_id)
 		return redirect(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}")
 
+	next_url = str(request.POST.get('next') or '').strip()
+	if not next_url:
+		if nota.invoice_id:
+			next_url = reverse('backoffice_invoice_detail', kwargs={'invoice_id': nota.invoice_id})
+		else:
+			next_url = f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}"
+
 	try:
 		_validate_note_is_not_quickbooks_locked(nota)
 		motivo = str(request.POST.get('motivo') or '').strip()
@@ -1432,20 +1439,24 @@ def backoffice_invoice_cancel_note(request, note_id):
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:
 		messages.success(request, _('Adjustment note voided successfully. Inventory and balances were reversed when applicable.'))
-	if nota.invoice_id:
-		return redirect('backoffice_invoice_detail', invoice_id=nota.invoice_id)
-	return redirect(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}")
+	return redirect(next_url)
 
 
 @login_required
 @internal_permission_required('backoffice.orders.manage')
 def backoffice_invoice_delete_note(request, note_id):
 	nota = get_object_or_404(NotaAjuste.objects.select_related('invoice', 'cliente'), id=note_id)
-	invoice_id = nota.invoice_id
 	if request.method != 'POST':
-		if invoice_id:
-			return redirect('backoffice_invoice_detail', invoice_id=invoice_id)
+		if nota.invoice_id:
+			return redirect('backoffice_invoice_detail', invoice_id=nota.invoice_id)
 		return redirect(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}")
+
+	next_url = str(request.POST.get('next') or '').strip()
+	if not next_url:
+		if nota.invoice_id:
+			next_url = reverse('backoffice_invoice_detail', kwargs={'invoice_id': nota.invoice_id})
+		else:
+			next_url = f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}"
 
 	try:
 		_validate_note_is_not_quickbooks_locked(nota)
@@ -1454,9 +1465,7 @@ def backoffice_invoice_delete_note(request, note_id):
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:
 		messages.success(request, _('Adjustment note deleted permanently.'))
-	if invoice_id:
-		return redirect('backoffice_invoice_detail', invoice_id=invoice_id)
-	return redirect(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={nota.cliente_id}")
+	return redirect(next_url)
 
 
 @login_required

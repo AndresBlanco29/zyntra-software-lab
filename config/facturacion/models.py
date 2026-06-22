@@ -593,6 +593,26 @@ class NotaAjuste(models.Model):
 	def is_voided(self):
 		return self.estado == 'ANULADA'
 
+	def is_quickbooks_locked(self):
+		from config.integrations.quickbooks.sync import is_sync_locked
+
+		return is_sync_locked(self)
+
+	def is_invoice_locked(self):
+		from config.integrations.quickbooks.sync import is_sync_locked
+
+		invoice = getattr(self, 'invoice', None)
+		return bool(invoice and is_sync_locked(invoice))
+
+	def is_backoffice_locked(self):
+		return self.is_quickbooks_locked or self.is_invoice_locked()
+
+	def can_void_from_backoffice(self):
+		return not self.is_backoffice_locked and self.estado in {'BORRADOR', 'APROBADA'}
+
+	def can_delete_from_backoffice(self):
+		return not self.is_backoffice_locked and self.estado in {'BORRADOR', 'APROBADA', 'ANULADA'}
+
 	def clean(self):
 		resolved_cliente = self.cliente
 		if resolved_cliente is None and self.invoice_id:

@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n %}
+{% load i18n permissions_tags %}
 
 {% block title %}{% trans "Credit / Debit Notes" %}{% endblock %}
 
@@ -151,7 +151,7 @@
             <th>{% trans "Status" %}</th>
             <th>{% trans "Value" %}</th>
             <th>{% trans "Operational detail" %}</th>
-            <th></th>
+            <th class="text-end">{% trans "Actions" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -211,12 +211,49 @@
               </div>
               {% endif %}
             </td>
-            <td data-label="{% trans 'Action' %}" class="text-end mobile-stack-table__action">
-              <div class="d-grid gap-2 justify-content-end">
+            <td data-label="{% trans 'Actions' %}" class="text-end mobile-stack-table__action">
+              <div class="d-inline-flex align-items-center justify-content-end gap-1 flex-wrap">
+                {% if request.user|has_internal_permission:'backoffice.orders.manage' %}
+                  {% if note.can_void_from_backoffice or note.can_delete_from_backoffice %}
+                  <div class="btn-group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{% trans 'Note actions' %} {{ note.numero }}">
+                      {% trans "Actions" %}
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                      {% if note.can_void_from_backoffice %}
+                      <li>
+                        <button
+                          type="button"
+                          class="dropdown-item text-warning note-void-trigger"
+                          data-void-url="{% url 'backoffice_invoice_cancel_note' note.id %}"
+                          data-note-numero="{{ note.numero }}"
+                        >
+                          {% trans "Void" %}
+                        </button>
+                      </li>
+                      {% endif %}
+                      {% if note.can_delete_from_backoffice %}
+                      <li>
+                        <form
+                          method="post"
+                          action="{% url 'backoffice_invoice_delete_note' note.id %}"
+                          class="m-0"
+                          onsubmit="return confirm({% if note.estado == 'ANULADA' %}'{% trans "Delete this voided note permanently?" %}'{% elif note.estado == 'APROBADA' %}'{% trans "Delete this note permanently? Inventory will be reversed first if needed." %}'{% else %}'{% trans "Delete this note permanently?" %}'{% endif %});"
+                        >
+                          {% csrf_token %}
+                          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                          <button type="submit" class="dropdown-item text-danger">{% trans "Delete" %}</button>
+                        </form>
+                      </li>
+                      {% endif %}
+                    </ul>
+                  </div>
+                  {% endif %}
+                {% endif %}
                 {% if note.invoice %}
                 <a href="{% url 'backoffice_invoice_detail' note.invoice.id %}" class="btn btn-sm btn-outline-primary">{% trans "Open invoice" %}</a>
                 {% endif %}
-                <a href="{% url 'backoffice_adjustment_note_create' %}?cliente_id={{ note.cliente_id }}{% if note.invoice_id %}&invoice_id={{ note.invoice_id }}{% endif %}" class="btn btn-sm btn-outline-secondary">{% trans "Open note center" %}</a>
+                <a href="{% url 'backoffice_adjustment_note_create' %}?cliente_id={{ note.cliente_id }}{% if note.invoice_id %}&invoice_id={{ note.invoice_id }}{% endif %}" class="btn btn-sm btn-outline-secondary">{% trans "Open" %}</a>
               </div>
             </td>
           </tr>
@@ -232,4 +269,52 @@
     </div>
   </div>
 </div>
+
+{% if request.user|has_internal_permission:'backoffice.orders.manage' %}
+<div class="modal fade" id="noteVoidModal" tabindex="-1" aria-labelledby="noteVoidModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="noteVoidForm" action="">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <div class="modal-header">
+          <h5 class="modal-title" id="noteVoidModalLabel">{% trans "Void note" %}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-3" id="noteVoidModalDescription"></p>
+          <label class="form-label" for="noteVoidMotivo">{% trans "Void reason" %}</label>
+          <input type="text" class="form-control" id="noteVoidMotivo" name="motivo" maxlength="500" placeholder="{% trans "Optional reason" %}">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+          <button type="submit" class="btn btn-warning">{% trans "Void" %}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const modalElement = document.getElementById('noteVoidModal');
+  if (!modalElement) {
+    return;
+  }
+  const modal = new bootstrap.Modal(modalElement);
+  const form = document.getElementById('noteVoidForm');
+  const description = document.getElementById('noteVoidModalDescription');
+  const motivoInput = document.getElementById('noteVoidMotivo');
+
+  document.querySelectorAll('.note-void-trigger').forEach(function (button) {
+    button.addEventListener('click', function () {
+      const noteNumero = button.dataset.noteNumero;
+      form.action = button.dataset.voidUrl;
+      description.textContent = "{% trans 'Void note' %} " + noteNumero + "? {% trans 'Inventory and balances will be reversed when applicable.' %}";
+      motivoInput.value = '';
+      modal.show();
+    });
+  });
+});
+</script>
+{% endif %}
 {% endblock %}

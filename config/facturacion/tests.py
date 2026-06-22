@@ -197,6 +197,48 @@ class InvoiceFlowTests(TestCase):
 		self.assertTrue(invoice.despachador_notificado)
 		self.assertFalse(hasattr(invoice, 'delivery'))
 
+	def test_generar_invoice_directa_backoffice_creates_driver_route_with_delivery(self):
+		invoice = generar_invoice_directa_backoffice(
+			cliente=self.cliente,
+			items_payload=[{
+				'presentacion': self.presentacion,
+				'cantidad': 2,
+				'precio': Decimal('18.00'),
+			}],
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+			nota_backoffice='Entrega directa con driver',
+		)
+
+		invoice.refresh_from_db()
+		self.assertEqual(invoice.metodo_entrega, 'RUTA_DRIVER')
+		self.assertEqual(invoice.driver_id, self.driver.id)
+		self.assertTrue(invoice.despachador_notificado)
+		self.assertTrue(hasattr(invoice, 'delivery'))
+		self.assertEqual(invoice.delivery.invoice_id, invoice.id)
+
+	def test_backoffice_direct_invoice_create_view_creates_driver_route_invoice(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('backoffice_direct_invoice_create'), {
+			'cliente_id': str(self.cliente.id),
+			'metodo_entrega': 'RUTA_DRIVER',
+			'driver_id': str(self.driver.id),
+			'estimated_delivery_at': '2026-04-18T09:30',
+			'presentacion_id': [str(self.presentacion.id), ''],
+			'cantidad': ['2', ''],
+			'precio_unitario': ['17.00', ''],
+			'nota_backoffice': 'Venta directa con ruta',
+		})
+
+		invoice = Invoice.objects.latest('id')
+		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertEqual(invoice.metodo_entrega, 'RUTA_DRIVER')
+		self.assertEqual(invoice.driver_id, self.driver.id)
+		self.assertTrue(invoice.despachador_notificado)
+		self.assertEqual(timezone.localtime(invoice.delivery.estimated_delivery_at).strftime('%Y-%m-%d %H:%M'), '2026-04-18 09:30')
+
 	def test_backoffice_direct_invoice_create_view_renders_dynamic_product_row_with_price_options(self):
 		self.client.force_login(self.backoffice)
 

@@ -119,7 +119,7 @@ def _calculate_suggested_unit_price_from_profit(base_unit_price, profit_percenta
 
 
 ALLOWED_PICKING_INVOICE_DELIVERY_METHODS = frozenset({'RUTA_DRIVER', 'CUSTOMER_PICK_UP'})
-ALLOWED_DIRECT_INVOICE_DELIVERY_METHODS = frozenset({'CUSTOMER_PICK_UP'})
+ALLOWED_DIRECT_INVOICE_DELIVERY_METHODS = frozenset({'CUSTOMER_PICK_UP', 'RUTA_DRIVER'})
 
 
 def _validate_invoice_generation(pedido, metodo_entrega, driver):
@@ -404,9 +404,15 @@ def generar_invoice_directa_backoffice(
 	suggested_unit_prices=None,
 	applied_customer_credit=None,
 	selected_note_applications=None,
+	driver=None,
+	estimated_delivery_at=None,
 ):
 	if metodo_entrega not in ALLOWED_DIRECT_INVOICE_DELIVERY_METHODS:
-		raise ValidationError(_('Direct backoffice invoices only support customer pickup at the warehouse.'))
+		raise ValidationError(_('Direct backoffice invoices only support customer pickup or route delivery with a driver.'))
+	if metodo_entrega == 'RUTA_DRIVER' and driver is None:
+		raise ValidationError(_('A driver is required for route deliveries.'))
+	if metodo_entrega == 'CUSTOMER_PICK_UP' and driver is not None:
+		raise ValidationError(_('Driver assignment is not allowed for customer pickup invoices.'))
 	if not items_payload:
 		raise ValidationError(_('Add at least one item before creating the direct invoice.'))
 
@@ -438,12 +444,13 @@ def generar_invoice_directa_backoffice(
 	return generar_invoice_desde_picking(
 		pedido=pedido,
 		metodo_entrega=metodo_entrega,
-		driver=None,
+		driver=driver,
 		usuario=usuario,
 		suggested_unit_prices=suggested_unit_prices,
 		line_discounts=line_discounts,
 		applied_customer_credit=applied_customer_credit,
 		selected_note_applications=selected_note_applications,
+		estimated_delivery_at=estimated_delivery_at,
 	)
 
 

@@ -390,11 +390,14 @@ def _build_direct_invoice_context(*, selected_client_id=None, post_data=None):
 	return {
 		'customers': Cliente.objects.order_by('nombre_empresa'),
 		'presentations': Presentacion.objects.select_related('producto').order_by('producto__nombre', 'nombre'),
+		'drivers': Usuario.objects.filter(role='driver', is_active=True).order_by('first_name', 'username'),
 		'direct_invoice_lines': _build_direct_invoice_line_drafts(post_data),
 		'selected_client': selected_client,
 		'pending_notes_summary': pending_notes_summary,
 		'default_price_tier': default_price_tier,
 		'selected_delivery_method': str(post_data.get('metodo_entrega') if post_data is not None else 'CUSTOMER_PICK_UP' or 'CUSTOMER_PICK_UP').strip() or 'CUSTOMER_PICK_UP',
+		'selected_driver_id': str(post_data.get('driver_id') if post_data is not None else '' or '').strip(),
+		'selected_estimated_delivery_at': str(post_data.get('estimated_delivery_at') if post_data is not None else '' or '').strip(),
 		'backoffice_note_value': str(post_data.get('nota_backoffice') if post_data is not None else '' or '').strip(),
 		'use_customer_credit_checked': str(post_data.get('use_customer_credit') if post_data is not None else '').strip().lower() in {'1', 'true', 'on', 'yes'},
 		'customer_credit_to_apply_value': str(post_data.get('customer_credit_to_apply') if post_data is not None else '' or '').strip(),
@@ -1086,6 +1089,13 @@ def backoffice_direct_invoice_create(request):
 			return render(request, 'backoffice/direct_invoice_create.html', context)
 		try:
 			metodo_entrega = str(request.POST.get('metodo_entrega') or '').strip()
+			driver = None
+			estimated_delivery_at = None
+			if metodo_entrega == 'RUTA_DRIVER':
+				driver_id = request.POST.get('driver_id') or ''
+				if driver_id:
+					driver = get_object_or_404(Usuario, id=driver_id, role='driver', is_active=True)
+				estimated_delivery_at = _parse_estimated_delivery_at(request.POST.get('estimated_delivery_at'))
 			items_payload = _parse_direct_invoice_lines(request.POST)
 			pending_notes_summary = summarize_pending_customer_notes(cliente=selected_client)
 			selected_note_applications = _parse_general_note_applications(selected_client, request.POST)
@@ -1102,6 +1112,8 @@ def backoffice_direct_invoice_create(request):
 				nota_backoffice=str(request.POST.get('nota_backoffice') or '').strip(),
 				applied_customer_credit=applied_customer_credit,
 				selected_note_applications=selected_note_applications,
+				driver=driver,
+				estimated_delivery_at=estimated_delivery_at,
 			)
 		except ValidationError as exc:
 			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))

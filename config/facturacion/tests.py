@@ -246,13 +246,12 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, 'id="direct-invoice-add-line"')
-		self.assertContains(response, 'search-select-remote')
-		self.assertContains(response, 'data-presentation-search-url')
+		self.assertContains(response, 'id="direct-invoice-presentation-options"')
+		self.assertContains(response, '"price_1": "15.00"')
 		self.assertContains(response, 'Type to search products...')
 		self.assertContains(response, 'Select one of the 5 prices')
 		self.assertContains(response, 'direct-invoice-create.js')
 		self.assertContains(response, 'direct-invoice-price-select no-search-select')
-		self.assertNotContains(response, 'data-price-1="15.00"')
 
 	def test_backoffice_direct_invoice_presentation_search_returns_matches(self):
 		self.client.force_login(self.backoffice)

@@ -55,18 +55,16 @@
 
             <div class="col-12">
               <label class="form-label fw-semibold">{% trans "Invoice lines" %}</label>
+              {{ presentation_options|json_script:"direct-invoice-presentation-options" }}
               <div
                 id="direct-invoice-lines"
                 class="vstack gap-3"
-                data-presentation-search-url="{{ presentation_search_url }}"
-                data-min-search-chars="0"
                 data-select-price-label="{% trans 'Select a price' %}"
                 data-no-prices-label="{% trans 'This product has no configured prices.' %}"
                 data-price-label="{% trans 'Price' %}"
                 data-create-direct-invoice-label="{% trans 'Create direct invoice' %}"
                 data-generate-invoice-label="{% trans 'Generate invoice' %}"
                 data-type-to-search-label="{% trans 'Type to search products...' %}"
-                data-min-search-label="{% trans 'Type to search products.' %}"
               >
                 {% for line in direct_invoice_lines %}
                 <div class="border rounded-3 p-3 direct-invoice-line">
@@ -81,18 +79,10 @@
                     <div class="col-lg-5">
                       <label class="form-label small text-muted mb-1">{% trans "Product / presentation" %}</label>
                       <div class="direct-invoice-presentation-search">
-                        <select name="presentacion_id" class="form-select direct-invoice-presentation-select search-select-remote">
+                        <select name="presentacion_id" class="form-select direct-invoice-presentation-select">
                           <option value="">{% trans "Type to search products..." %}</option>
                           {% if line.presentacion %}
-                          <option
-                            value="{{ line.presentacion.id }}"
-                            selected
-                            data-price-1="{{ line.presentacion.precio_1|unlocalize }}"
-                            data-price-2="{{ line.presentacion.precio_2|unlocalize }}"
-                            data-price-3="{{ line.presentacion.precio_3|unlocalize }}"
-                            data-price-4="{{ line.presentacion.precio_4|unlocalize }}"
-                            data-price-5="{{ line.presentacion.precio_5|unlocalize }}"
-                          >#{{ line.presentacion.id }} · {{ line.presentacion.producto.nombre }} · {{ line.presentacion.nombre }}</option>
+                          <option value="{{ line.presentacion.id }}" selected>#{{ line.presentacion.id }} · {{ line.presentacion.producto.nombre }} · {{ line.presentacion.nombre }}</option>
                           {% endif %}
                         </select>
                       </div>
@@ -201,7 +191,7 @@
       <div class="col-lg-5">
         <label class="form-label small text-muted mb-1">{% trans "Product / presentation" %}</label>
         <div class="direct-invoice-presentation-search">
-          <select name="presentacion_id" class="form-select direct-invoice-presentation-select search-select-remote">
+          <select name="presentacion_id" class="form-select direct-invoice-presentation-select">
             <option value="">{% trans "Type to search products..." %}</option>
           </select>
         </div>

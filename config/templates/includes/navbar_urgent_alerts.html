@@ -1,0 +1,66 @@
+{% load i18n %}
+{% if workspace_urgent_alerts %}
+<div class="navbar-urgent-alerts dropdown">
+  <button
+    type="button"
+    class="navbar-urgent-alerts-toggle dropdown-toggle"
+    id="navbarUrgentAlertsToggle"
+    data-bs-toggle="dropdown"
+    data-bs-auto-close="outside"
+    aria-expanded="false"
+    aria-label="{% trans 'Urgent requests and notifications' %}">
+    <span class="navbar-urgent-alerts-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false">
+        <path d="M12 2.25a5.25 5.25 0 0 0-5.25 5.25v2.086c0 .414-.164.811-.456 1.104l-1.189 1.189a1.125 1.125 0 0 0-.33.797v.324c0 .621.504 1.125 1.125 1.125h11.7c.621 0 1.125-.504 1.125-1.125v-.324a1.125 1.125 0 0 0-.33-.797l-1.189-1.189a1.562 1.562 0 0 1-.456-1.104V7.5A5.25 5.25 0 0 0 12 2.25Zm0 18a2.625 2.625 0 0 0 2.583-2.125H9.417A2.625 2.625 0 0 0 12 20.25Z"></path>
+      </svg>
+    </span>
+    <span class="navbar-urgent-alerts-label">{% trans "Requests" %}</span>
+    {% if workspace_urgent_alerts.total_count %}
+      <span class="navbar-urgent-alerts-badge">{{ workspace_urgent_alerts.total_count }}</span>
+    {% endif %}
+  </button>
+
+  <div class="dropdown-menu dropdown-menu-end navbar-urgent-alerts-menu" aria-labelledby="navbarUrgentAlertsToggle">
+    <div class="navbar-urgent-alerts-menu-header">
+      <strong>{% trans "Urgent requests" %}</strong>
+      <span class="text-muted small">{% trans "Needs attention now" %}</span>
+    </div>
+
+    {% if workspace_urgent_alerts.summary_items %}
+      <div class="navbar-urgent-alerts-summary">
+        {% for item in workspace_urgent_alerts.summary_items %}
+          <a href="{{ item.url }}" class="navbar-urgent-alerts-item navbar-urgent-alerts-item--{{ item.priority }}">
+            <span class="navbar-urgent-alerts-item-copy">
+              <span class="navbar-urgent-alerts-item-label">{{ item.label }}</span>
+              <span class="navbar-urgent-alerts-item-detail">{{ item.detail }}</span>
+            </span>
+            <span class="navbar-urgent-alerts-item-count">{{ item.count }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="navbar-urgent-alerts-empty">{% trans "No urgent requests right now." %}</div>
+    {% endif %}
+
+    {% if workspace_urgent_alerts.recent_notifications %}
+      <div class="navbar-urgent-alerts-recent-header">{% trans "Latest alerts" %}</div>
+      <div class="navbar-urgent-alerts-recent">
+        {% for notificacion in workspace_urgent_alerts.recent_notifications %}
+          <a href="{{ notificacion.url|default:workspace_urgent_alerts.dashboard_url }}" class="navbar-urgent-alerts-recent-item">
+            <span class="navbar-urgent-alerts-recent-title">{{ notificacion.titulo }}</span>
+            {% if notificacion.mensaje %}
+              <span class="navbar-urgent-alerts-recent-message">{{ notificacion.mensaje|truncatechars:90 }}</span>
+            {% endif %}
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="navbar-urgent-alerts-footer">
+      <a href="{{ workspace_urgent_alerts.dashboard_url }}#system-notifications" class="navbar-urgent-alerts-footer-link">
+        {% trans "Open dashboard notifications" %}
+      </a>
+    </div>
+  </div>
+</div>
+{% endif %}

@@ -16,10 +16,6 @@
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
 <link rel="stylesheet" href="{% static 'css/layout_vendedor.css' %}">
 {% include "includes/searchable_selects_assets.html" %}
-<style>
-  .navbar-custom .container-fluid { display: grid; grid-template-columns: minmax(220px, auto) minmax(320px, 680px) auto; align-items: center; gap: 18px; }
-  .navbar-search-icon svg { width: 18px; height: 18px; max-width: 18px; max-height: 18px; }
-</style>
 
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
 <script src="{% static 'js/preserve-search-focus.js' %}"></script>
@@ -45,6 +41,7 @@ La Tortilla Grocery
 </a>
 </div>
 
+<div class="navbar-center-tools">
 <div
   class="navbar-search"
   id="panelQuickSearch"
@@ -66,6 +63,9 @@ La Tortilla Grocery
       spellcheck="false">
   </div>
   <div id="panelSearchResults" class="navbar-search-results" hidden></div>
+</div>
+
+{% include "includes/navbar_urgent_alerts.html" %}
 </div>
 
 <div class="ms-auto">

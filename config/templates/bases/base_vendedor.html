@@ -109,7 +109,6 @@ La Tortilla Grocery
   <a class="quick-search-shortcut" href="{% url 'tomar_pedido' %}" data-label="{% trans 'Take order' %}" data-section="{% trans 'Quick action' %}" data-keywords="new order create order sales order take order pedido venta crear pedido orden"></a>
 {% endif %}
 {% if request.user|has_internal_permission:'backoffice.orders.view' %}
-  <a class="quick-search-shortcut" href="{% url 'backoffice_direct_invoice_create' %}" data-label="{% trans 'Create direct invoice' %}" data-section="{% trans 'Quick action' %}" data-keywords="invoice invoices create invoice new invoice direct invoice factura facturas crear factura factura directa"></a>
   <a class="quick-search-shortcut" href="{% url 'backoffice_adjustment_note_create' %}" data-label="{% trans 'Create credit or debit note' %}" data-section="{% trans 'Quick action' %}" data-keywords="credit note debit note notes adjustment note create note nota de credito nota de debito crear nota"></a>
 {% endif %}
 {% if request.user|has_internal_permission:'admin.products.view' %}
@@ -290,7 +289,7 @@ La Tortilla Grocery
 {% endif %}
 
 {% if request.user|has_internal_permission:'backoffice.dashboard.view' or request.user|has_internal_permission:'backoffice.quotes.view' or request.user|has_internal_permission:'backoffice.orders.view' %}
-<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'backoffice_dashboard' or request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' or request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' or request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_direct_invoice_create' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' or request.resolver_match.url_name == 'backoffice_adjustment_notes_list' or request.resolver_match.url_name == 'backoffice_adjustment_note_create' %}open{% endif %}>
+<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'backoffice_dashboard' or request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' or request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' or request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' or request.resolver_match.url_name == 'backoffice_adjustment_notes_list' or request.resolver_match.url_name == 'backoffice_adjustment_note_create' %}open{% endif %}>
   <summary class="sidebar-collapsible-summary">{% trans "Commercial" %}</summary>
   <div class="sidebar-collapsible-links">
     {% if request.user|has_internal_permission:'backoffice.dashboard.view' %}
@@ -324,7 +323,7 @@ La Tortilla Grocery
       {% trans "Live Drivers" %}
     </a>
     <a href="{% url 'backoffice_invoices_list' %}"
-      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_direct_invoice_create' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' %}active{% endif %}">
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' %}active{% endif %}">
       {% trans "Invoices" %}
     </a>
     <a href="{% url 'backoffice_adjustment_notes_list' %}"

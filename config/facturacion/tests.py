@@ -173,30 +173,6 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(pedido_item.cantidad_inventario_aplicada, 2)
 		self.assertTrue(InventarioMovimiento.objects.filter(pedido=invoice.pedido, tipo='SALIDA_PICKING').exists())
 
-	def test_backoffice_direct_invoice_create_view_creates_invoice_without_driver_workflow(self):
-		self.client.force_login(self.backoffice)
-
-		response = self.client.post(reverse('backoffice_direct_invoice_create'), {
-			'cliente_id': str(self.cliente.id),
-			'metodo_entrega': 'CUSTOMER_PICK_UP',
-			'presentacion_id': [str(self.presentacion.id), ''],
-			'cantidad': ['2', ''],
-			'precio_unitario': ['17.00', ''],
-			'nota_backoffice': 'Venta directa en bodega',
-		})
-
-		invoice = Invoice.objects.latest('id')
-		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
-		self.assertEqual(invoice.metodo_entrega, 'CUSTOMER_PICK_UP')
-		self.assertEqual(invoice.driver, None)
-		self.assertEqual(invoice.pedido.origen, 'BACKOFFICE')
-		self.assertEqual(invoice.pedido.nota_backoffice, 'Venta directa en bodega')
-		self.assertEqual(invoice.items.first().cantidad_facturada, 2)
-		self.assertEqual(invoice.items.first().precio_unitario, Decimal('17.00'))
-		self.assertEqual(invoice.saldo_cliente, Decimal('34.00'))
-		self.assertTrue(invoice.despachador_notificado)
-		self.assertFalse(hasattr(invoice, 'delivery'))
-
 	def test_generar_invoice_directa_backoffice_creates_driver_route_with_delivery(self):
 		invoice = generar_invoice_directa_backoffice(
 			cliente=self.cliente,
@@ -217,89 +193,6 @@ class InvoiceFlowTests(TestCase):
 		self.assertTrue(invoice.despachador_notificado)
 		self.assertTrue(hasattr(invoice, 'delivery'))
 		self.assertEqual(invoice.delivery.invoice_id, invoice.id)
-
-	def test_backoffice_direct_invoice_create_view_creates_driver_route_invoice(self):
-		self.client.force_login(self.backoffice)
-
-		response = self.client.post(reverse('backoffice_direct_invoice_create'), {
-			'cliente_id': str(self.cliente.id),
-			'metodo_entrega': 'RUTA_DRIVER',
-			'driver_id': str(self.driver.id),
-			'estimated_delivery_at': '2026-04-18T09:30',
-			'presentacion_id': [str(self.presentacion.id), ''],
-			'cantidad': ['2', ''],
-			'precio_unitario': ['17.00', ''],
-			'nota_backoffice': 'Venta directa con ruta',
-		})
-
-		invoice = Invoice.objects.latest('id')
-		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
-		self.assertEqual(invoice.metodo_entrega, 'RUTA_DRIVER')
-		self.assertEqual(invoice.driver_id, self.driver.id)
-		self.assertTrue(invoice.despachador_notificado)
-		self.assertEqual(timezone.localtime(invoice.delivery.estimated_delivery_at).strftime('%Y-%m-%d %H:%M'), '2026-04-18 09:30')
-
-	def test_backoffice_direct_invoice_create_view_renders_dynamic_product_row_with_price_options(self):
-		self.client.force_login(self.backoffice)
-
-		response = self.client.get(reverse('backoffice_direct_invoice_create'))
-
-		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'id="direct-invoice-add-line"')
-		self.assertContains(response, 'data-price-1="15.00"')
-		self.assertContains(response, 'data-price-5="19.00"')
-		self.assertContains(response, 'Type to search products...')
-		self.assertContains(response, 'Select one of the 5 prices')
-		self.assertContains(response, 'direct-invoice-create.js')
-		self.assertContains(response, 'direct-invoice-presentation-select no-search-select')
-		self.assertContains(response, 'direct-invoice-price-select no-search-select')
-		self.assertContains(response, 'data-selected-presentacion-id')
-
-	def test_backoffice_direct_invoice_presentation_search_returns_matches(self):
-		self.client.force_login(self.backoffice)
-
-		response = self.client.get(reverse('backoffice_direct_invoice_presentation_search'), {'q': 'Tortilla'})
-
-		self.assertEqual(response.status_code, 200)
-		payload = response.json()
-		self.assertTrue(any(item['value'] == str(self.presentacion.id) for item in payload['results']))
-		match = next(item for item in payload['results'] if item['value'] == str(self.presentacion.id))
-		self.assertEqual(match['price_1'], '15.00')
-		self.assertEqual(match['price_5'], '19.00')
-		self.assertIn('Caja', match['text'])
-
-	def test_backoffice_direct_invoice_presentation_search_returns_initial_results(self):
-		self.client.force_login(self.backoffice)
-
-		response = self.client.get(reverse('backoffice_direct_invoice_presentation_search'))
-
-		self.assertEqual(response.status_code, 200)
-		payload = response.json()
-		self.assertTrue(any(item['value'] == str(self.presentacion.id) for item in payload['results']))
-
-	def test_backoffice_direct_invoice_presentation_search_accepts_hash_id_query(self):
-		self.client.force_login(self.backoffice)
-
-		response = self.client.get(reverse('backoffice_direct_invoice_presentation_search'), {'q': f'#{self.presentacion.id}'})
-
-		self.assertEqual(response.status_code, 200)
-		payload = response.json()
-		self.assertTrue(any(item['value'] == str(self.presentacion.id) for item in payload['results']))
-
-	def test_backoffice_direct_invoice_presentation_search_loads_selected_id(self):
-		self.client.force_login(self.backoffice)
-
-		response = self.client.get(
-			reverse('backoffice_direct_invoice_presentation_search'),
-			{'id': str(self.presentacion.id)},
-		)
-
-		self.assertEqual(response.status_code, 200)
-		payload = response.json()
-		self.assertEqual(len(payload['results']), 1)
-		self.assertEqual(payload['results'][0]['value'], str(self.presentacion.id))
-		self.assertEqual(payload['results'][0]['price_1'], '15.00')
-		self.assertEqual(payload['results'][0]['price_5'], '19.00')
 
 	def test_generate_invoice_accepts_manual_suggested_unit_price(self):
 		invoice = generar_invoice_desde_picking(
@@ -2343,7 +2236,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(list_response, reverse('backoffice_adjustment_notes_list'))
 		self.assertContains(list_response, 'Credit / Debit Notes')
 		self.assertNotContains(list_response, 'Create note')
-		self.assertContains(list_response, reverse('backoffice_direct_invoice_create'))
+		self.assertNotContains(list_response, 'Create direct invoice')
 
 	def test_backoffice_adjustment_notes_list_can_filter_by_customer_creator_and_invoice_query(self):
 		invoice = generar_invoice_desde_picking(

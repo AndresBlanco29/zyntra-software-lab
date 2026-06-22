@@ -3653,6 +3653,24 @@ class InvoiceVoidDeleteTests(TestCase):
 		self.assertFalse(Invoice.objects.filter(id=invoice_id).exists())
 		self.assertFalse(Delivery.objects.filter(id=delivery_id).exists())
 
+	def test_delete_delivered_invoice_allowed_when_synced_to_quickbooks(self):
+		driver = Usuario.objects.create_user(username='void-driver-synced', password='secret123', role='driver')
+		self.invoice.metodo_entrega = 'RUTA_DRIVER'
+		self.invoice.driver = driver
+		self.invoice.quickbooks_id = 'QB-123'
+		self.invoice.sync_status = 'SYNCED'
+		self.invoice.save(update_fields=['metodo_entrega', 'driver', 'quickbooks_id', 'sync_status', 'actualizada_en'])
+		delivery = ensure_delivery_for_invoice(self.invoice)
+		delivery.estado = 'ENTREGADA_PAGADA'
+		delivery.save(update_fields=['estado', 'updated_at'])
+		self.invoice.refresh_from_db()
+		self.assertTrue(self.invoice.can_delete_from_backoffice())
+
+		invoice_id = self.invoice.id
+		eliminar_invoice(invoice=self.invoice)
+
+		self.assertFalse(Invoice.objects.filter(id=invoice_id).exists())
+
 	def test_delete_credit_note_removes_record_and_reverses_inventory(self):
 		nota = crear_nota_ajuste_desde_invoice(
 			invoice=self.invoice,

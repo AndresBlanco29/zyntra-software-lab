@@ -1322,15 +1322,16 @@ def _validate_invoice_void_delete_allowed(invoice):
 		raise ValidationError(_('Cannot void or delete an invoice that is already on route or delivered.'))
 
 
+def _invoice_allows_quickbooks_bypass_on_delete(invoice):
+	if invoice.estado == 'ANULADA':
+		return True
+	return invoice.delivery_blocks_void_delete()
+
+
 def _validate_invoice_delete_allowed(invoice):
 	if invoice.estado == 'ANULADA':
 		return
-	delivery = getattr(invoice, 'delivery', None)
-	if delivery and delivery.estado in {'EN_RUTA', 'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'}:
-		from config.integrations.quickbooks.sync import is_sync_locked
-
-		if is_sync_locked(invoice):
-			raise ValidationError(_('Cannot delete a delivered invoice that is synced with QuickBooks.'))
+	if invoice.delivery_blocks_void_delete():
 		return
 	_validate_invoice_void_delete_allowed(invoice)
 
@@ -1413,8 +1414,9 @@ def anular_invoice(*, invoice, usuario, motivo=''):
 
 
 @transaction.atomic
-def eliminar_invoice(*, invoice):
-	_ensure_quickbooks_not_locked(invoice=invoice)
+def eliminar_invoice(*, invoice, force_quickbooks=False):
+	if not force_quickbooks and not _invoice_allows_quickbooks_bypass_on_delete(invoice):
+		_ensure_quickbooks_not_locked(invoice=invoice)
 	if invoice.estado != 'ANULADA':
 		_validate_invoice_delete_allowed(invoice)
 

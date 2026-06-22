@@ -249,6 +249,8 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(response, 'data-price-1="15.00"')
 		self.assertContains(response, 'data-price-5="19.00"')
 		self.assertContains(response, 'Select one of the 5 prices')
+		self.assertContains(response, 'direct-invoice-create.js')
+		self.assertContains(response, 'direct-invoice-price-select no-search-select')
 
 	def test_generate_invoice_accepts_manual_suggested_unit_price(self):
 		invoice = generar_invoice_desde_picking(

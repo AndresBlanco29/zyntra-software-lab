@@ -1,5 +1,5 @@
 {% extends 'bases/base_vendedor.html' %}
-{% load i18n %}
+{% load i18n l10n static %}
 
 {% block title %}{% trans "Create Direct Invoice" %}{% endblock %}
 
@@ -33,14 +33,14 @@
             </div>
             <div class="col-md-5">
               <label class="form-label fw-semibold">{% trans "Delivery method" %}</label>
-              <select name="metodo_entrega" id="directInvoiceDeliveryMethod" class="form-select" required>
+              <select name="metodo_entrega" id="directInvoiceDeliveryMethod" class="form-select no-search-select" required>
                 <option value="CUSTOMER_PICK_UP" {% if selected_delivery_method == 'CUSTOMER_PICK_UP' %}selected{% endif %}>{% trans "Customer pick up at warehouse" %}</option>
                 <option value="RUTA_DRIVER" {% if selected_delivery_method == 'RUTA_DRIVER' %}selected{% endif %}>{% trans "Route with driver" %}</option>
               </select>
             </div>
             <div class="col-md-4" id="directInvoiceDriverField" {% if selected_delivery_method != 'RUTA_DRIVER' %}hidden{% endif %}>
               <label class="form-label fw-semibold">{% trans "Driver" %}</label>
-              <select name="driver_id" id="directInvoiceDriverSelect" class="form-select">
+              <select name="driver_id" id="directInvoiceDriverSelect" class="form-select no-search-select">
                 <option value="">{% trans "Select a driver..." %}</option>
                 {% for driver in drivers %}
                 <option value="{{ driver.id }}" {% if selected_driver_id == driver.id|stringformat:'s' %}selected{% endif %}>{% firstof driver.get_full_name driver.username %}</option>
@@ -61,13 +61,15 @@
                 data-select-price-label="{% trans 'Select a price' %}"
                 data-no-prices-label="{% trans 'This product has no configured prices.' %}"
                 data-price-label="{% trans 'Price' %}"
+                data-create-direct-invoice-label="{% trans 'Create direct invoice' %}"
+                data-generate-invoice-label="{% trans 'Generate invoice' %}"
               >
                 {% for line in direct_invoice_lines %}
                 <div class="border rounded-3 p-3 direct-invoice-line">
                   <div class="d-flex justify-content-between align-items-center mb-3 gap-3">
                     <div>
                       <div class="fw-semibold">{% trans "Product" %}</div>
-                      <div class="text-muted small">{% trans "Select the product and then choose one of its five configured prices." %}</div>
+                      <div class="text-muted small">{% trans "Type to search the product list, then choose one of its five configured prices." %}</div>
                     </div>
                     <button type="button" class="btn btn-outline-secondary btn-sm direct-invoice-remove-line">{% trans "Remove product" %}</button>
                   </div>
@@ -79,11 +81,11 @@
                         {% for presentacion in presentations %}
                         <option
                           value="{{ presentacion.id }}"
-                          data-price-1="{{ presentacion.precio_1 }}"
-                          data-price-2="{{ presentacion.precio_2 }}"
-                          data-price-3="{{ presentacion.precio_3 }}"
-                          data-price-4="{{ presentacion.precio_4 }}"
-                          data-price-5="{{ presentacion.precio_5 }}"
+                          data-price-1="{{ presentacion.precio_1|unlocalize }}"
+                          data-price-2="{{ presentacion.precio_2|unlocalize }}"
+                          data-price-3="{{ presentacion.precio_3|unlocalize }}"
+                          data-price-4="{{ presentacion.precio_4|unlocalize }}"
+                          data-price-5="{{ presentacion.precio_5|unlocalize }}"
                           {% if line.presentacion_id == presentacion.id|stringformat:'s' %}selected{% endif %}
                         >#{{ presentacion.id }} · {{ presentacion.producto.nombre }} · {{ presentacion.nombre }}</option>
                         {% endfor %}
@@ -91,7 +93,7 @@
                     </div>
                     <div class="col-lg-4 col-md-6">
                       <label class="form-label small text-muted mb-1">{% trans "Select one of the 5 prices" %}</label>
-                      <select name="precio_unitario" class="form-select direct-invoice-price-select" data-selected-value="{{ line.precio_unitario }}" data-default-tier="{{ default_price_tier }}">
+                      <select name="precio_unitario" class="form-select direct-invoice-price-select no-search-select" data-selected-value="{{ line.precio_unitario }}" data-default-tier="{{ default_price_tier }}">
                         <option value="">{% trans "Select a price" %}</option>
                       </select>
                     </div>
@@ -185,7 +187,7 @@
     <div class="d-flex justify-content-between align-items-center mb-3 gap-3">
       <div>
         <div class="fw-semibold">{% trans "Product" %}</div>
-        <div class="text-muted small">{% trans "Select the product and then choose one of its five configured prices." %}</div>
+        <div class="text-muted small">{% trans "Type to search the product list, then choose one of its five configured prices." %}</div>
       </div>
       <button type="button" class="btn btn-outline-secondary btn-sm direct-invoice-remove-line">{% trans "Remove product" %}</button>
     </div>
@@ -197,18 +199,18 @@
           {% for presentacion in presentations %}
           <option
             value="{{ presentacion.id }}"
-            data-price-1="{{ presentacion.precio_1 }}"
-            data-price-2="{{ presentacion.precio_2 }}"
-            data-price-3="{{ presentacion.precio_3 }}"
-            data-price-4="{{ presentacion.precio_4 }}"
-            data-price-5="{{ presentacion.precio_5 }}"
+            data-price-1="{{ presentacion.precio_1|unlocalize }}"
+            data-price-2="{{ presentacion.precio_2|unlocalize }}"
+            data-price-3="{{ presentacion.precio_3|unlocalize }}"
+            data-price-4="{{ presentacion.precio_4|unlocalize }}"
+            data-price-5="{{ presentacion.precio_5|unlocalize }}"
           >#{{ presentacion.id }} · {{ presentacion.producto.nombre }} · {{ presentacion.nombre }}</option>
           {% endfor %}
         </select>
       </div>
       <div class="col-lg-4 col-md-6">
         <label class="form-label small text-muted mb-1">{% trans "Select one of the 5 prices" %}</label>
-        <select name="precio_unitario" class="form-select direct-invoice-price-select" data-default-tier="{{ default_price_tier }}">
+        <select name="precio_unitario" class="form-select direct-invoice-price-select no-search-select" data-default-tier="{{ default_price_tier }}">
           <option value="">{% trans "Select a price" %}</option>
         </select>
       </div>
@@ -224,172 +226,5 @@
   </div>
 </template>
 
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const deliveryMethod = document.getElementById('directInvoiceDeliveryMethod');
-    const driverField = document.getElementById('directInvoiceDriverField');
-    const estimatedDeliveryField = document.getElementById('directInvoiceEstimatedDeliveryField');
-    const driverSelect = document.getElementById('directInvoiceDriverSelect');
-    const submitButton = document.getElementById('directInvoiceSubmitButton');
-    const createDirectInvoiceLabel = '{% trans "Create direct invoice" %}';
-    const generateInvoiceLabel = '{% trans "Generate invoice" %}';
-
-    function syncDirectInvoiceDeliveryFields() {
-      if (!deliveryMethod) {
-        return;
-      }
-      const isRoute = deliveryMethod.value === 'RUTA_DRIVER';
-      if (driverField) {
-        driverField.hidden = !isRoute;
-      }
-      if (estimatedDeliveryField) {
-        estimatedDeliveryField.hidden = !isRoute;
-      }
-      if (driverSelect) {
-        driverSelect.required = isRoute;
-        if (!isRoute) {
-          driverSelect.value = '';
-        }
-      }
-      const estimatedInput = estimatedDeliveryField?.querySelector('input[name="estimated_delivery_at"]');
-      if (estimatedInput && !isRoute) {
-        estimatedInput.value = '';
-      }
-      if (submitButton) {
-        submitButton.textContent = isRoute ? generateInvoiceLabel : createDirectInvoiceLabel;
-      }
-    }
-
-    if (deliveryMethod) {
-      deliveryMethod.addEventListener('change', syncDirectInvoiceDeliveryFields);
-      syncDirectInvoiceDeliveryFields();
-    }
-
-    const linesContainer = document.getElementById('direct-invoice-lines');
-    const addLineButton = document.getElementById('direct-invoice-add-line');
-    const lineTemplate = document.getElementById('direct-invoice-line-template');
-
-    if (!linesContainer || !addLineButton || !lineTemplate) {
-      return;
-    }
-
-    const selectPriceLabel = linesContainer.dataset.selectPriceLabel;
-    const noPricesLabel = linesContainer.dataset.noPricesLabel;
-    const priceLabel = linesContainer.dataset.priceLabel;
-
-    function buildPriceOptions(lineElement, preferDefaultTier) {
-      const presentationSelect = lineElement.querySelector('.direct-invoice-presentation-select');
-      const priceSelect = lineElement.querySelector('.direct-invoice-price-select');
-      const selectedOption = presentationSelect.options[presentationSelect.selectedIndex];
-      const selectedValue = preferDefaultTier ? '' : (priceSelect.dataset.selectedValue || priceSelect.value || '');
-      const defaultTier = String(priceSelect.dataset.defaultTier || '1');
-
-      priceSelect.innerHTML = '';
-
-      const placeholderOption = document.createElement('option');
-      placeholderOption.value = '';
-      placeholderOption.textContent = selectPriceLabel;
-      priceSelect.appendChild(placeholderOption);
-
-      if (!selectedOption || !selectedOption.value) {
-        priceSelect.disabled = true;
-        priceSelect.dataset.selectedValue = '';
-        return;
-      }
-
-      const availablePrices = [];
-      for (let tier = 1; tier <= 5; tier += 1) {
-        const priceValue = selectedOption.dataset[`price${tier}`];
-        if (!priceValue || Number(priceValue) <= 0) {
-          continue;
-        }
-        availablePrices.push({ tier: String(tier), value: priceValue });
-      }
-
-      if (!availablePrices.length) {
-        placeholderOption.textContent = noPricesLabel;
-        priceSelect.disabled = true;
-        priceSelect.dataset.selectedValue = '';
-        return;
-      }
-
-      priceSelect.disabled = false;
-      let matchedOption = null;
-      let defaultOption = null;
-
-      availablePrices.forEach(function (priceEntry, index) {
-        const option = document.createElement('option');
-        option.value = priceEntry.value;
-        option.dataset.tier = priceEntry.tier;
-        option.textContent = `${priceLabel} ${priceEntry.tier} - $${priceEntry.value}`;
-        if (priceEntry.value === selectedValue) {
-          option.selected = true;
-          matchedOption = option;
-        }
-        if (priceEntry.tier === defaultTier) {
-          defaultOption = option;
-        }
-        if (index === 0 && !defaultOption) {
-          defaultOption = option;
-        }
-        priceSelect.appendChild(option);
-      });
-
-      if (!matchedOption && defaultOption) {
-        defaultOption.selected = true;
-      }
-
-      priceSelect.dataset.selectedValue = '';
-    }
-
-    function updateRemoveButtons() {
-      const lineElements = linesContainer.querySelectorAll('.direct-invoice-line');
-      lineElements.forEach(function (lineElement) {
-        const removeButton = lineElement.querySelector('.direct-invoice-remove-line');
-        if (!removeButton) {
-          return;
-        }
-        removeButton.disabled = lineElements.length === 1;
-      });
-    }
-
-    function setupLine(lineElement) {
-      const presentationSelect = lineElement.querySelector('.direct-invoice-presentation-select');
-      const removeButton = lineElement.querySelector('.direct-invoice-remove-line');
-
-      buildPriceOptions(lineElement, false);
-
-      presentationSelect.addEventListener('change', function () {
-        const priceSelect = lineElement.querySelector('.direct-invoice-price-select');
-        priceSelect.dataset.selectedValue = '';
-        buildPriceOptions(lineElement, true);
-      });
-
-      removeButton.addEventListener('click', function () {
-        const lineElements = linesContainer.querySelectorAll('.direct-invoice-line');
-        if (lineElements.length === 1) {
-          lineElement.querySelector('.direct-invoice-presentation-select').value = '';
-          lineElement.querySelector('input[name="cantidad"]').value = '';
-          const priceSelect = lineElement.querySelector('.direct-invoice-price-select');
-          priceSelect.dataset.selectedValue = '';
-          buildPriceOptions(lineElement, false);
-          return;
-        }
-        lineElement.remove();
-        updateRemoveButtons();
-      });
-    }
-
-    linesContainer.querySelectorAll('.direct-invoice-line').forEach(setupLine);
-    updateRemoveButtons();
-
-    addLineButton.addEventListener('click', function () {
-      const fragment = lineTemplate.content.cloneNode(true);
-      const lineElement = fragment.querySelector('.direct-invoice-line');
-      linesContainer.appendChild(fragment);
-      setupLine(linesContainer.lastElementChild);
-      updateRemoveButtons();
-    });
-  });
-</script>
+<script defer src="{% static 'js/direct-invoice-create.js' %}"></script>
 {% endblock %}

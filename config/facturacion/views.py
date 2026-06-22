@@ -1121,24 +1121,23 @@ def backoffice_direct_invoice_presentation_search(request):
 	if selected_id.isdigit():
 		presentacion = Presentacion.objects.select_related('producto').filter(
 			id=int(selected_id),
-			producto__activo=True,
 		).first()
 		results = [_serialize_direct_invoice_presentation_option(presentacion)] if presentacion else []
 		return JsonResponse({'results': results})
 
-	if len(query) < 2:
-		return JsonResponse({'results': []})
-
-	presentaciones = Presentacion.objects.select_related('producto').filter(producto__activo=True)
-	filters = (
-		Q(producto__nombre__icontains=query)
-		| Q(producto__nombre_en__icontains=query)
-		| Q(nombre__icontains=query)
-		| Q(producto__codigo_barras__icontains=query)
-	)
-	if query.isdigit():
-		filters |= Q(id=int(query))
-	presentaciones = presentaciones.filter(filters).order_by('producto__nombre', 'nombre', 'id')[:50]
+	presentaciones = Presentacion.objects.select_related('producto')
+	if query:
+		normalized_id_query = query.lstrip('#').strip()
+		filters = (
+			Q(producto__nombre__icontains=query)
+			| Q(producto__nombre_en__icontains=query)
+			| Q(nombre__icontains=query)
+			| Q(producto__codigo_barras__icontains=query)
+		)
+		if normalized_id_query.isdigit():
+			filters |= Q(id=int(normalized_id_query))
+		presentaciones = presentaciones.filter(filters)
+	presentaciones = presentaciones.order_by('producto__nombre', 'nombre', 'id')[:50]
 	return JsonResponse({
 		'results': [_serialize_direct_invoice_presentation_option(presentacion) for presentacion in presentaciones],
 	})

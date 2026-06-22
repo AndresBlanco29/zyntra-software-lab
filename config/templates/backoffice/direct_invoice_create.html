@@ -59,14 +59,14 @@
                 id="direct-invoice-lines"
                 class="vstack gap-3"
                 data-presentation-search-url="{{ presentation_search_url }}"
-                data-min-search-chars="2"
+                data-min-search-chars="0"
                 data-select-price-label="{% trans 'Select a price' %}"
                 data-no-prices-label="{% trans 'This product has no configured prices.' %}"
                 data-price-label="{% trans 'Price' %}"
                 data-create-direct-invoice-label="{% trans 'Create direct invoice' %}"
                 data-generate-invoice-label="{% trans 'Generate invoice' %}"
                 data-type-to-search-label="{% trans 'Type to search products...' %}"
-                data-min-search-label="{% trans 'Type at least 2 characters to search products.' %}"
+                data-min-search-label="{% trans 'Type to search products.' %}"
               >
                 {% for line in direct_invoice_lines %}
                 <div class="border rounded-3 p-3 direct-invoice-line">

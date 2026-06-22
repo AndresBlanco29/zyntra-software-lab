@@ -267,13 +267,23 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(match['price_5'], '19.00')
 		self.assertIn('Caja', match['text'])
 
-	def test_backoffice_direct_invoice_presentation_search_requires_minimum_query(self):
+	def test_backoffice_direct_invoice_presentation_search_returns_initial_results(self):
 		self.client.force_login(self.backoffice)
 
-		response = self.client.get(reverse('backoffice_direct_invoice_presentation_search'), {'q': 'T'})
+		response = self.client.get(reverse('backoffice_direct_invoice_presentation_search'))
 
 		self.assertEqual(response.status_code, 200)
-		self.assertEqual(response.json()['results'], [])
+		payload = response.json()
+		self.assertTrue(any(item['value'] == str(self.presentacion.id) for item in payload['results']))
+
+	def test_backoffice_direct_invoice_presentation_search_accepts_hash_id_query(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_direct_invoice_presentation_search'), {'q': f'#{self.presentacion.id}'})
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(any(item['value'] == str(self.presentacion.id) for item in payload['results']))
 
 	def test_backoffice_direct_invoice_presentation_search_loads_selected_id(self):
 		self.client.force_login(self.backoffice)

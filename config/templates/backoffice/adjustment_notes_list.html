@@ -214,12 +214,21 @@
             <td data-label="{% trans 'Actions' %}" class="text-end mobile-stack-table__action">
               <div class="d-inline-flex align-items-center justify-content-end gap-1 flex-wrap">
                 {% if request.user|has_internal_permission:'backoffice.orders.manage' %}
-                  {% if note.can_void_from_backoffice or note.can_delete_from_backoffice %}
+                  {% if note.can_approve_from_backoffice or note.can_void_from_backoffice or note.can_delete_from_backoffice %}
                   <div class="btn-group">
                     <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{% trans 'Note actions' %} {{ note.numero }}">
                       {% trans "Actions" %}
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
+                      {% if note.can_approve_from_backoffice %}
+                      <li>
+                        <form method="post" action="{% url 'backoffice_invoice_approve_note' note.id %}" class="m-0">
+                          {% csrf_token %}
+                          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                          <button type="submit" class="dropdown-item text-success">{% trans "Approve" %}</button>
+                        </form>
+                      </li>
+                      {% endif %}
                       {% if note.can_void_from_backoffice %}
                       <li>
                         <button

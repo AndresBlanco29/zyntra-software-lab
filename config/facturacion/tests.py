@@ -2151,6 +2151,38 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(nota.estado, 'APROBADA')
 		self.assertEqual(self.cliente.balance, Decimal('18.00'))
 
+	def test_draft_general_debit_note_can_be_approved_from_backoffice(self):
+		nota = crear_nota_ajuste(
+			cliente=self.cliente,
+			invoice=None,
+			tipo_ajuste='FINANCIERO',
+			tipo_documento='DEBITO',
+			motivo='OTHER',
+			descripcion='PRUEBA NOTA DEBITO',
+			usuario=self.backoffice,
+			items_payload=[],
+			monto=Decimal('10.00'),
+		)
+		self.assertTrue(nota.can_approve_from_backoffice())
+		self.assertTrue(nota.can_void_from_backoffice())
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_adjustment_note_create'), {
+			'cliente_id': self.cliente.id,
+		})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, nota.numero)
+		self.assertContains(response, 'Approve')
+
+		approve_response = self.client.post(reverse('backoffice_invoice_approve_note', args=[nota.id]))
+		nota.refresh_from_db()
+		self.cliente.refresh_from_db()
+
+		self.assertRedirects(approve_response, f"{reverse('backoffice_adjustment_note_create')}?cliente_id={self.cliente.id}")
+		self.assertEqual(nota.estado, 'APROBADA')
+		self.assertEqual(self.cliente.balance, Decimal('-10.00'))
+
 	def test_backoffice_adjustment_note_create_view_shows_saved_product_lines_for_general_notes(self):
 		nota = crear_nota_ajuste(
 			cliente=self.cliente,

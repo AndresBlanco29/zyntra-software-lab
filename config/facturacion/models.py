@@ -605,10 +605,13 @@ class NotaAjuste(models.Model):
 		return bool(invoice and is_sync_locked(invoice))
 
 	def is_backoffice_locked(self):
-		return self.is_quickbooks_locked or self.is_invoice_locked()
+		return self.is_quickbooks_locked() or self.is_invoice_locked()
+
+	def can_approve_from_backoffice(self):
+		return self.estado == 'BORRADOR' and not self.is_backoffice_locked()
 
 	def can_void_from_backoffice(self):
-		return not self.is_backoffice_locked and self.estado in {'BORRADOR', 'APROBADA'}
+		return not self.is_backoffice_locked() and self.estado in {'BORRADOR', 'APROBADA'}
 
 	def can_delete_from_backoffice(self):
 		if self.estado not in {'BORRADOR', 'APROBADA', 'ANULADA'}:

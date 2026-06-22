@@ -402,6 +402,7 @@ def _build_dashboard_feedback(*, operation, ok, result=None, error=None):
 
     if operation == 'push_linked_products_to_quickbooks':
         feedback['title'] = _('Linked catalog push to QuickBooks')
+        feedback['ok'] = result.get('failed_count', 0) == 0
         feedback['details'].append(
             _('Linked items: %(linked)s. Updated in QuickBooks: %(updated)s. Already matched: %(unchanged)s. Failed: %(failed)s.') % {
                 'linked': result.get('linked_count', 0),
@@ -410,22 +411,40 @@ def _build_dashboard_feedback(*, operation, ok, result=None, error=None):
                 'failed': result.get('failed_count', 0),
             }
         )
+        for sample in result.get('results', []):
+            if sample.get('ok'):
+                action = (sample.get('result') or {}).get('action', 'processed')
+                feedback['details'].append(_('ID %(record_id)s: %(action)s') % {
+                    'record_id': sample.get('id'),
+                    'action': action,
+                })
+            elif sample.get('error'):
+                feedback['details'].append(_('ID %(record_id)s failed: %(error)s') % {
+                    'record_id': sample.get('id'),
+                    'error': sample.get('error'),
+                })
         return feedback
 
     if operation == 'push_linked_products_batch':
         feedback['title'] = _('QuickBooks linked item update')
+        feedback['ok'] = result.get('failed_count', 0) == 0
         feedback['details'].append(
             _('Succeeded: %(success)s. Failed: %(failed)s.') % {
                 'success': result.get('success_count', 0),
                 'failed': result.get('failed_count', 0),
             }
         )
-        for sample in result.get('results', [])[:3]:
+        for sample in result.get('results', []):
             if sample.get('ok'):
                 action = (sample.get('result') or {}).get('action', 'processed')
                 feedback['details'].append(_('ID %(record_id)s: %(action)s') % {
                     'record_id': sample.get('id'),
                     'action': action,
+                })
+            elif sample.get('error'):
+                feedback['details'].append(_('ID %(record_id)s failed: %(error)s') % {
+                    'record_id': sample.get('id'),
+                    'error': sample.get('error'),
                 })
         return feedback
 
@@ -518,11 +537,15 @@ def _response_or_redirect(request, *, operation, result=None, error=None, status
     redirect_to = _resolve_dashboard_redirect(request)
     if redirect_to:
         feedback = _build_dashboard_feedback(operation=operation, ok=error is None, result=result, error=error)
+        if error is None and result and result.get('failed_count', 0):
+            feedback['ok'] = False
         request.session['quickbooks_dashboard_feedback'] = feedback
-        if error is None:
-            messages.success(request, feedback['details'][0] if feedback['details'] else 'QuickBooks operation completed successfully.')
-        else:
+        if error is not None:
             messages.error(request, str(error))
+        elif feedback.get('ok') is False:
+            messages.warning(request, feedback['details'][0] if feedback['details'] else _('QuickBooks operation completed with errors.'))
+        else:
+            messages.success(request, feedback['details'][0] if feedback['details'] else 'QuickBooks operation completed successfully.')
         return redirect(redirect_to)
     return _sync_payload(operation=operation, result=result, error=error, status_code=status_code)
 

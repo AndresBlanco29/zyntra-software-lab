@@ -24,10 +24,12 @@ from config.clientes.models import Cliente
 from config.facturacion.models import Invoice, NotaAjuste
 from config.facturacion.services import generar_invoice_desde_picking
 from config.integrations.backups import _backup_modified_time
+from config.integrations.quickbooks.client import QuickBooksAPIError
 from config.integrations.quickbooks.services import get_connection
 from config.integrations.models import QuickBooksConnection, QuickBooksImportConflict
 from config.integrations.quickbooks.sync import (
     _build_item_payload,
+    _convert_linked_item_to_inventory,
     _derive_quickbooks_invoice_status,
     _enrich_quickbooks_item_payload,
     _extract_quickbooks_item_cost,
@@ -155,6 +157,30 @@ class QuickBooksItemPayloadTests(TestCase):
 
         self.assertEqual(payload['Type'], 'NonInventory')
         self.assertNotIn('QtyOnHand', payload)
+
+    @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
+    @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
+    @patch('config.integrations.quickbooks.sync._get_default_expense_account_ref', return_value={'value': '80', 'name': 'COGS'})
+    @patch('config.integrations.quickbooks.sync._get_default_income_account_ref', return_value={'value': '79', 'name': 'Sales'})
+    def test_convert_linked_item_to_inventory_falls_back_to_recreate(self, *_mocks):
+        existing = {
+            'Id': '1062',
+            'SyncToken': '3',
+            'Type': 'NonInventory',
+            'Name': 'LTG Item 1062 - Demo - Caja',
+            'IncomeAccountRef': {'value': '79', 'name': 'Sales'},
+        }
+        desired_payload = _build_item_payload(self.presentacion, client=Mock(), remote_payload=existing)
+        client = Mock()
+        client.update_item.side_effect = QuickBooksAPIError('QuickBooks API request failed: conversion rejected')
+        client.create_item.return_value = {'Id': '2001', 'SyncToken': '0', 'Type': 'Inventory', 'QtyOnHand': 18}
+        client.find_by_id.return_value = {'Id': '2001', 'SyncToken': '0', 'Type': 'Inventory', 'QtyOnHand': 18}
+
+        updated = _convert_linked_item_to_inventory(self.presentacion, existing, desired_payload, client=client)
+
+        self.assertEqual(updated['Id'], '2001')
+        client.create_item.assert_called_once()
+        self.assertEqual(client.create_item.call_args.args[0]['Type'], 'Inventory')
 
 
 class QuickBooksItemCostSyncTests(TestCase):

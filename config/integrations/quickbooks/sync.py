@@ -285,6 +285,97 @@ def _build_sparse_update_payload(remote_payload, expected_payload):
     return payload
 
 
+def _summarize_quickbooks_error(error):
+    message = str(error or '').strip()
+    detail_match = re.search(r"'Detail': '([^']+)'", message)
+    if detail_match:
+        return detail_match.group(1)
+    message_match = re.search(r"'Message': '([^']+)'", message)
+    if message_match:
+        return message_match.group(1)
+    if len(message) > 240:
+        return message[:240] + '...'
+    return message or _('QuickBooks rejected the item update.')
+
+
+def _needs_inventory_type_conversion(existing, desired_payload):
+    return (
+        not _quickbooks_item_is_inventory(existing)
+        and str(desired_payload.get('Type') or '').strip().lower() == 'inventory'
+    )
+
+
+def _sync_inventory_qty_after_conversion(*, client, item_payload, presentacion):
+    target_qty = _local_presentacion_qty_on_hand(presentacion)
+    if target_qty <= 0:
+        return item_payload
+    try:
+        refreshed = client.find_by_id('Item', item_payload.get('Id'))
+        if not refreshed:
+            return item_payload
+        return client.update_item({
+            'Id': str(refreshed.get('Id', '')),
+            'SyncToken': str(refreshed.get('SyncToken', '')),
+            'sparse': True,
+            'QtyOnHand': target_qty,
+            'InvStartDate': timezone.localdate().isoformat(),
+        })
+    except QuickBooksAPIError:
+        logger.warning(
+            'QuickBooks accepted inventory conversion for item %s but rejected QtyOnHand=%s',
+            item_payload.get('Id'),
+            target_qty,
+        )
+        return item_payload
+
+
+def _recreate_presentacion_as_inventory_item(presentacion, existing, desired_payload, *, client):
+    try:
+        client.update_item({
+            'Id': str(existing.get('Id', '')),
+            'SyncToken': str(existing.get('SyncToken', '')),
+            'sparse': True,
+            'Active': False,
+        })
+    except QuickBooksAPIError:
+        logger.warning('Could not deactivate QuickBooks item %s before inventory recreation.', existing.get('Id'))
+
+    create_payload = dict(desired_payload)
+    for key in ('Id', 'SyncToken', 'sparse'):
+        create_payload.pop(key, None)
+
+    try:
+        created = client.create_item(create_payload)
+    except QuickBooksAPIError:
+        alt_name = _truncate(f"{create_payload.get('Name', '')} [Inventory]", limit=100)
+        create_payload['Name'] = alt_name
+        created = client.create_item(create_payload)
+    return _sync_inventory_qty_after_conversion(client=client, item_payload=created, presentacion=presentacion)
+
+
+def _convert_linked_item_to_inventory(presentacion, existing, desired_payload, *, client):
+    conversion_payload = dict(desired_payload)
+    conversion_payload['Id'] = str(existing.get('Id', ''))
+    conversion_payload['SyncToken'] = str(existing.get('SyncToken', ''))
+    conversion_payload['sparse'] = False
+    conversion_payload['TrackQtyOnHand'] = True
+    conversion_payload['QtyOnHand'] = 0
+    if not conversion_payload.get('PurchaseCost'):
+        conversion_payload['PurchaseCost'] = _as_float(presentacion.costo or 0)
+
+    try:
+        updated = client.update_item(conversion_payload)
+    except QuickBooksAPIError:
+        updated = _recreate_presentacion_as_inventory_item(
+            presentacion,
+            existing,
+            desired_payload,
+            client=client,
+        )
+        return updated
+    return _sync_inventory_qty_after_conversion(client=client, item_payload=updated, presentacion=presentacion)
+
+
 def _mark_synced(instance, quickbooks_id):
     instance.quickbooks_id = str(quickbooks_id or '')
     instance.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
@@ -3080,12 +3171,23 @@ def _push_presentacion_to_quickbooks_item(presentacion, existing, *, client):
         income_account_ref=existing.get('IncomeAccountRef') or None,
         remote_payload=existing,
     )
-    if _item_payload_needs_update(existing, desired_payload):
-        updated = client.update_item(_build_sparse_update_payload(existing, desired_payload))
+    if not _item_payload_needs_update(existing, desired_payload):
+        _mark_synced(presentacion, existing.get('Id'))
+        return _sync_result(entity='Item', action='existing', payload=existing)
+
+    if _needs_inventory_type_conversion(existing, desired_payload):
+        updated = _convert_linked_item_to_inventory(
+            presentacion,
+            existing,
+            desired_payload,
+            client=client,
+        )
         _mark_synced(presentacion, updated.get('Id'))
-        return _sync_result(entity='Item', action='updated', payload=updated)
-    _mark_synced(presentacion, existing.get('Id'))
-    return _sync_result(entity='Item', action='existing', payload=existing)
+        return _sync_result(entity='Item', action='converted', payload=updated)
+
+    updated = client.update_item(_build_sparse_update_payload(existing, desired_payload))
+    _mark_synced(presentacion, updated.get('Id'))
+    return _sync_result(entity='Item', action='updated', payload=updated)
 
 
 def sync_product(*, presentacion, client=None):
@@ -3109,7 +3211,7 @@ def sync_product(*, presentacion, client=None):
         return _sync_result(entity='Item', action='created', payload=created)
     except (QuickBooksAPIError, QuickBooksSyncError) as exc:
         _mark_failed(presentacion)
-        raise QuickBooksSyncError(str(exc)) from exc
+        raise QuickBooksSyncError(_summarize_quickbooks_error(exc)) from exc
 
 
 def push_linked_quickbooks_items(*, limit=None, client=None, task_cache_key=None):
@@ -3142,7 +3244,7 @@ def push_linked_quickbooks_items(*, limit=None, client=None, task_cache_key=None
         if not item.get('ok'):
             continue
         action = (item.get('result') or {}).get('action')
-        if action == 'updated':
+        if action in {'updated', 'converted'}:
             updated_count += 1
         elif action in {'existing', 'linked'}:
             unchanged_count += 1

@@ -22,7 +22,7 @@ from config.core.pdf_branding import (
 from config.core.workflow_badges import build_order_workflow_badge
 from config.usuarios.permissions import internal_permission_required
 from config.usuarios.models import Usuario
-from config.inventario.services import ajustar_cantidad_item_pedido_despues_picking, ajustar_reserva_item_pedido, cancelar_pedido_con_inventario, eliminar_item_pedido_con_inventario, reemplazar_presentacion_item_pedido, reemplazar_presentacion_item_pedido_despues_picking, reservar_stock_para_pedido_items
+from config.inventario.services import ajustar_cantidad_item_pedido_despues_picking, ajustar_reserva_item_pedido, cancelar_pedido_con_inventario, eliminar_item_pedido_con_inventario, reemplazar_presentacion_item_pedido, reemplazar_presentacion_item_pedido_despues_picking
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
@@ -40,10 +40,12 @@ from config.inventario.models import StockPresentacion
 
 from .models import Pedido, PedidoItem
 from .services import (
+	actualizar_cantidad_linea_pedido_sin_aplicar_inventario,
 	asignar_picking_a_seleccionador,
 	evaluar_stock_fisico_verificacion_picking,
 	guardar_verificacion_picking,
 	recalcular_pedido,
+	reemplazar_presentacion_linea_pedido_sin_aplicar_inventario,
 	validar_estado_backoffice_con_bloqueo,
 )
 
@@ -279,14 +281,18 @@ def backoffice_pedido_detalle(request, pedido_id):
 							nueva_presentacion = get_object_or_404(Presentacion.objects.select_related('producto'), id=nueva_presentacion_id)
 							if item.cantidad_inventario_aplicada:
 								item = reemplazar_presentacion_item_pedido_despues_picking(item=item, nueva_presentacion=nueva_presentacion, creado_por=request.user)
-							else:
+							elif int(item.cantidad_reservada_inventario or 0) > 0:
 								item = reemplazar_presentacion_item_pedido(item=item, nueva_presentacion=nueva_presentacion, creado_por=request.user)
+							else:
+								item = reemplazar_presentacion_linea_pedido_sin_aplicar_inventario(item=item, nueva_presentacion=nueva_presentacion)
 
 						nueva_cantidad = _parse_non_negative_quantity(request.POST.get(f'cantidad_{item.id}'), item.cantidad)
 						if item.cantidad_inventario_aplicada:
 							item = ajustar_cantidad_item_pedido_despues_picking(item=item, nueva_cantidad=nueva_cantidad, creado_por=request.user)
-						else:
+						elif int(item.cantidad_reservada_inventario or 0) > 0:
 							item = ajustar_reserva_item_pedido(item=item, nueva_cantidad=nueva_cantidad, creado_por=request.user)
+						else:
+							item = actualizar_cantidad_linea_pedido_sin_aplicar_inventario(item=item, nueva_cantidad=nueva_cantidad)
 						item.precio = _parse_decimal(request.POST.get(f'precio_{item.id}'), item.precio)
 						item.subtotal = item.precio * item.cantidad
 						item.save(update_fields=['precio', 'subtotal'])
@@ -296,7 +302,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 						presentacion = get_object_or_404(Presentacion.objects.select_related('producto'), id=nueva_presentacion_id)
 						cantidad_nueva = _parse_quantity(request.POST.get('cantidad_nueva'), 1)
 						precio_nuevo = _parse_decimal(request.POST.get('precio_nuevo'), 0)
-						nuevo_item = PedidoItem.objects.create(
+						PedidoItem.objects.create(
 							pedido=pedido,
 							presentacion=presentacion,
 							cantidad_solicitada=cantidad_nueva,
@@ -304,7 +310,6 @@ def backoffice_pedido_detalle(request, pedido_id):
 							precio=precio_nuevo,
 							subtotal=precio_nuevo * cantidad_nueva,
 						)
-						reservar_stock_para_pedido_items(pedido=pedido, pedido_items=[nuevo_item], creado_por=request.user)
 
 					recalcular_pedido(pedido)
 		except ValidationError as exc:

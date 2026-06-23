@@ -509,6 +509,32 @@ class PickingVerificationFlowTests(TestCase):
 		content = js_path.read_text(encoding='utf-8')
 		self.assertIn('dropdown_input', content)
 
+	def test_backoffice_can_add_product_without_available_stock(self):
+		self.pedido.estado = 'RECIBIDO'
+		self.pedido.save(update_fields=['estado', 'actualizada_en'])
+		StockPresentacion.objects.filter(presentacion=self.presentacion_extra).update(
+			stock_fisico=0,
+			stock_reservado=0,
+			stock_disponible=0,
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), {
+			'estado': 'RECIBIDO',
+			'presentacion_nueva': str(self.presentacion_extra.id),
+			'cantidad_nueva': '3',
+			'precio_nuevo': '6.00',
+			f'cantidad_{self.item.id}': '2',
+			f'precio_{self.item.id}': '12.00',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		nuevo_item = PedidoItem.objects.get(pedido=self.pedido, presentacion=self.presentacion_extra)
+		self.assertEqual(nuevo_item.cantidad, 3)
+		self.assertEqual(nuevo_item.cantidad_reservada_inventario, 0)
+		self.pedido.refresh_from_db()
+		self.assertEqual(self.pedido.total, Decimal('42.00'))
+
 	def test_backoffice_can_edit_quantities_after_verified_picking(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		guardar_verificacion_picking(

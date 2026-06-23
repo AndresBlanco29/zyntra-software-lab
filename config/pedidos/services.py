@@ -55,6 +55,22 @@ def recalcular_pedido(pedido):
     return pedido
 
 
+def actualizar_cantidad_linea_pedido_sin_aplicar_inventario(*, item, nueva_cantidad):
+    objetivo = max(int(nueva_cantidad), 0)
+    item.cantidad = objetivo
+    item.cantidad_solicitada = objetivo
+    item.save(update_fields=['cantidad', 'cantidad_solicitada'])
+    return item
+
+
+def reemplazar_presentacion_linea_pedido_sin_aplicar_inventario(*, item, nueva_presentacion):
+    if nueva_presentacion.producto_id != item.presentacion.producto_id:
+        raise ValidationError(_('Unit of measure can only be changed to another presentation of the same product.'))
+    item.presentacion = nueva_presentacion
+    item.save(update_fields=['presentacion'])
+    return item
+
+
 @transaction.atomic
 def crear_pedido_desde_items(
     *,

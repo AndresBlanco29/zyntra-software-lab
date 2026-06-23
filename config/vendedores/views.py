@@ -25,8 +25,11 @@ from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from decimal import Decimal, ROUND_HALF_UP
 
-from config.pedidos.models import PedidoItem
-from config.pedidos.services import crear_pedido_desde_items, notificar_backoffice_pedido
+from config.pedidos.services import (
+    crear_pedido_desde_items,
+    get_recent_customer_order_items_by_presentation,
+    notificar_backoffice_pedido,
+)
 from config.usuarios.permissions import internal_permission_required
 from config.usuarios.us_locations import US_STATE_CITIES, match_state_name, match_city_for_state
 
@@ -55,24 +58,12 @@ def _attach_recent_customer_order_history(*, cliente, productos):
     if not presentation_map:
         return
 
-    recent_items = (
-        PedidoItem.objects
-        .select_related('pedido')
-        .filter(
-            pedido__cliente=cliente,
-            presentacion_id__in=presentation_map.keys(),
-        )
-        .exclude(pedido__estado='CANCELADO')
-        .order_by('presentacion_id', '-pedido__creada_en', '-pedido_id', '-id')
+    history_by_presentation = get_recent_customer_order_items_by_presentation(
+        cliente=cliente,
+        presentation_ids=presentation_map.keys(),
     )
-
-    history_counts = {presentacion_id: 0 for presentacion_id in presentation_map}
-    for pedido_item in recent_items:
-        presentacion_id = pedido_item.presentacion_id
-        if history_counts[presentacion_id] >= 3:
-            continue
-        presentation_map[presentacion_id].recent_customer_orders.append(pedido_item)
-        history_counts[presentacion_id] += 1
+    for presentacion_id, recent_items in history_by_presentation.items():
+        presentation_map[presentacion_id].recent_customer_orders = recent_items
 
 
 def _normalize_customer_location_payload(data):

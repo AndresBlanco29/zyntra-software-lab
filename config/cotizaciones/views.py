@@ -18,7 +18,12 @@ from django.views.decorators.http import require_POST
 from config.clientes.models import Cliente
 from config.notificaciones.models import crear_notificacion_backoffice
 from config.pedidos.models import Pedido
-from config.pedidos.services import crear_pedido_desde_items, notificar_backoffice_pedido, notificar_cliente_pedido
+from config.pedidos.services import (
+    crear_pedido_desde_items,
+    get_recent_customer_order_items_by_presentation,
+    notificar_backoffice_pedido,
+    notificar_cliente_pedido,
+)
 from config.productos.models import ConfiguracionPrecios, Presentacion
 from config.usuarios.permissions import internal_permission_required
 
@@ -133,8 +138,13 @@ def _build_quote_item_rows(cotizacion):
     margin_values = ConfiguracionPrecios.obtener().porcentajes_lista()
     rows = []
     display_total = Decimal('0.00')
+    quote_items = list(cotizacion.items.select_related('presentacion__producto'))
+    recent_orders_by_presentation = get_recent_customer_order_items_by_presentation(
+        cliente=cotizacion.cliente,
+        presentation_ids=[item.presentacion_id for item in quote_items],
+    )
 
-    for item in cotizacion.items.select_related('presentacion__producto'):
+    for item in quote_items:
         current_price = _default_backoffice_quote_price(item, cotizacion)
         display_subtotal = (current_price * Decimal(str(item.cantidad))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         price_options = []
@@ -167,6 +177,7 @@ def _build_quote_item_rows(cotizacion):
                 Decimal('1.01'),
             ),
             'current_utility_percentage': _calculate_quote_utility_percentage(item.presentacion.costo, current_price),
+            'recent_customer_orders': recent_orders_by_presentation.get(item.presentacion_id, []),
         })
         display_total += display_subtotal
 

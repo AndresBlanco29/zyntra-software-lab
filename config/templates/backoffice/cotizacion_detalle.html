@@ -49,7 +49,19 @@
               {% for row in cotizacion_item_rows %}
               {% with item=row.item %}
               <tr>
-                <td>{{ item.presentacion.producto.nombre }}</td>
+                <td>
+                  <div>{{ item.presentacion.producto.nombre }}</div>
+                  {% if row.recent_customer_orders %}
+                  <div class="quote-order-history mt-1">
+                    {% for pedido_item in row.recent_customer_orders %}
+                    <div class="quote-order-history-entry border rounded bg-light-subtle px-2 py-1 small text-muted mb-1">
+                      <div>{{ pedido_item.pedido.creada_en|date:"n/j/Y" }}</div>
+                      <div class="fw-semibold text-body-secondary">{% blocktrans with quantity=pedido_item.cantidad price=pedido_item.precio|floatformat:2 %}{{ quantity }} @ ${{ price }}{% endblocktrans %}</div>
+                    </div>
+                    {% endfor %}
+                  </div>
+                  {% endif %}
+                </td>
                 <td>{{ item.presentacion.nombre }}</td>
                 <td>
                   <input type="number" min="1" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" class="form-control form-control-sm quote-quantity-input" data-item-id="{{ item.id }}">

@@ -523,6 +523,37 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertRedirects(response, reverse('backoffice_pedido_detalle', args=[pedido.id]))
 		self.assertEqual(Pedido.objects.filter(cotizacion=self.cotizacion).count(), 1)
 
+	def test_backoffice_can_void_quote_without_inventory_changes(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_cotizacion_void', args=[self.cotizacion.id]))
+
+		self.assertRedirects(response, reverse('backoffice_cotizaciones'))
+		self.cotizacion.refresh_from_db()
+		self.assertEqual(self.cotizacion.estado, 'CANCELADA_CLIENTE')
+
+	def test_backoffice_can_delete_quote_without_generated_order(self):
+		cotizacion_id = self.cotizacion.id
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_cotizacion_delete', args=[cotizacion_id]))
+
+		self.assertRedirects(response, reverse('backoffice_cotizaciones'))
+		self.assertFalse(Cotizacion.objects.filter(id=cotizacion_id).exists())
+
+	def test_backoffice_cannot_delete_quote_with_generated_order(self):
+		Pedido.objects.create(
+			cliente=self.cliente,
+			vendedor=self.cotizacion.vendedor,
+			cotizacion=self.cotizacion,
+			origen='CLIENTE',
+			estado='RECIBIDO',
+			total=Decimal('25.00'),
+		)
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_cotizacion_delete', args=[self.cotizacion.id]))
+
+		self.assertRedirects(response, reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]))
+		self.assertTrue(Cotizacion.objects.filter(id=self.cotizacion.id).exists())
+
 
 class CustomerReceivedQuotesViewTests(TestCase):
 	def setUp(self):

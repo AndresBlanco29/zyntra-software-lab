@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.http import HttpResponseRedirect, JsonResponse
@@ -202,6 +203,30 @@ def _get_generated_order_from_quote(cotizacion):
         return cotizacion.pedido_generado
     except Pedido.DoesNotExist:
         return None
+
+
+def _puede_anular_cotizacion_desde_backoffice(cotizacion):
+    return cotizacion.estado not in {'CANCELADA_CLIENTE', 'RECHAZADA'}
+
+
+def _puede_eliminar_cotizacion_desde_backoffice(cotizacion):
+    return _get_generated_order_from_quote(cotizacion) is None
+
+
+@transaction.atomic
+def _anular_cotizacion_desde_backoffice(*, cotizacion):
+    if not _puede_anular_cotizacion_desde_backoffice(cotizacion):
+        raise ValidationError(_('This quote cannot be voided.'))
+    cotizacion.estado = 'CANCELADA_CLIENTE'
+    cotizacion.save(update_fields=['estado'])
+    return cotizacion
+
+
+@transaction.atomic
+def _eliminar_cotizacion_desde_backoffice(*, cotizacion):
+    if not _puede_eliminar_cotizacion_desde_backoffice(cotizacion):
+        raise ValidationError(_('This quote cannot be deleted because a sales order was already generated from it.'))
+    cotizacion.delete()
 
 
 def _build_order_items_payload_from_quote(cotizacion):
@@ -572,12 +597,44 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
         'display_total': display_total,
         'can_send_customer_quote': can_send_customer_quote,
         'can_generate_backoffice_order': can_generate_backoffice_order,
+        'can_void_cotizacion': _puede_anular_cotizacion_desde_backoffice(cotizacion),
+        'can_delete_cotizacion': _puede_eliminar_cotizacion_desde_backoffice(cotizacion),
         'confirm_url': confirm_url,
         'telefono_contacto': telefono_contacto,
         'whatsapp_link': whatsapp_link,
         'outbound_message': outbound_message,
     }
     return render(request, 'backoffice/cotizacion_detalle.html', context)
+
+
+@login_required
+@require_POST
+@internal_permission_required('backoffice.quotes.manage')
+def backoffice_cotizacion_void(request, cotizacion_id):
+    cotizacion = get_object_or_404(Cotizacion.objects.select_related('cliente__usuario'), id=cotizacion_id)
+    try:
+        _anular_cotizacion_desde_backoffice(cotizacion=cotizacion)
+    except ValidationError as exc:
+        messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+        return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
+
+    messages.success(request, _('Quote voided successfully. Inventory was not changed.'))
+    return redirect('backoffice_cotizaciones')
+
+
+@login_required
+@require_POST
+@internal_permission_required('backoffice.quotes.manage')
+def backoffice_cotizacion_delete(request, cotizacion_id):
+    cotizacion = get_object_or_404(Cotizacion.objects.select_related('cliente__usuario'), id=cotizacion_id)
+    try:
+        _eliminar_cotizacion_desde_backoffice(cotizacion=cotizacion)
+    except ValidationError as exc:
+        messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+        return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
+
+    messages.success(request, _('Quote deleted permanently. Inventory was not changed.'))
+    return redirect('backoffice_cotizaciones')
 
 
 @login_required

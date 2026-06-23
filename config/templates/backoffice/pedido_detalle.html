@@ -364,6 +364,28 @@
   {% endfor %}
 {% endif %}
 
+{% if can_void_pedido or can_delete_pedido %}
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      {% if can_void_pedido %}
+      <form method="post" action="{% url 'backoffice_pedido_void' pedido.id %}" onsubmit="return confirm('{% trans "Void this sales order? Inventory will not be changed." %}');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-warning">{% trans "Void order" %}</button>
+      </form>
+      {% endif %}
+      {% if can_delete_pedido %}
+      <form method="post" action="{% url 'backoffice_pedido_delete' pedido.id %}" onsubmit="return confirm('{% trans "Delete this sales order permanently? Inventory will not be changed." %}');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-danger">{% trans "Delete order" %}</button>
+      </form>
+      {% endif %}
+    </div>
+    <div class="small text-muted mt-2 mb-0">{% trans "Sales orders never change inventory. Stock is only affected during picking or invoicing." %}</div>
+  </div>
+</div>
+{% endif %}
+
 <form method="post" class="card shadow-sm mb-3" id="backofficeOrderForm">
   {% csrf_token %}
   <div class="card-body">

@@ -23,7 +23,7 @@ from config.core.pdf_branding import (
 from config.core.workflow_badges import build_order_workflow_badge
 from config.usuarios.permissions import internal_permission_required
 from config.usuarios.models import Usuario
-from config.inventario.services import ajustar_cantidad_item_pedido_despues_picking, ajustar_reserva_item_pedido, cancelar_pedido_con_inventario, eliminar_item_pedido_con_inventario, reemplazar_presentacion_item_pedido, reemplazar_presentacion_item_pedido_despues_picking
+from config.inventario.services import ajustar_cantidad_item_pedido_despues_picking, ajustar_reserva_item_pedido, reemplazar_presentacion_item_pedido, reemplazar_presentacion_item_pedido_despues_picking
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
@@ -42,9 +42,14 @@ from config.inventario.models import StockPresentacion
 from .models import Pedido, PedidoItem
 from .services import (
 	actualizar_cantidad_linea_pedido_sin_aplicar_inventario,
+	anular_pedido_desde_backoffice,
 	asignar_picking_a_seleccionador,
+	eliminar_linea_pedido_desde_backoffice,
+	eliminar_pedido_desde_backoffice,
 	evaluar_stock_fisico_verificacion_picking,
 	guardar_verificacion_picking,
+	puede_anular_pedido_desde_backoffice,
+	puede_eliminar_pedido_desde_backoffice,
 	recalcular_pedido,
 	reemplazar_presentacion_linea_pedido_sin_aplicar_inventario,
 	validar_estado_backoffice_con_bloqueo,
@@ -260,7 +265,6 @@ def backoffice_pedido_detalle(request, pedido_id):
 			with transaction.atomic():
 				if hasattr(pedido, 'invoice'):
 					raise ValidationError(_('Orders with a generated invoice are locked on this screen.'))
-				estado_anterior = pedido.estado
 				nuevo_estado = request.POST.get('estado') or pedido.estado
 				validar_estado_backoffice_con_bloqueo(pedido, nuevo_estado)
 
@@ -269,12 +273,10 @@ def backoffice_pedido_detalle(request, pedido_id):
 				pedido.save(update_fields=['estado', 'nota_backoffice', 'actualizada_en'])
 
 				lineas_bloqueadas = bool(pedido.seleccionador_id and pedido.estado == 'PARA_VERIFICAR')
-				if nuevo_estado == 'CANCELADO' and estado_anterior != 'CANCELADO':
-					cancelar_pedido_con_inventario(pedido=pedido, creado_por=request.user)
-				elif not lineas_bloqueadas:
+				if not lineas_bloqueadas:
 					for item in list(pedido.items.select_related('presentacion__producto')):
 						if request.POST.get(f'eliminar_{item.id}'):
-							eliminar_item_pedido_con_inventario(item=item, creado_por=request.user)
+							eliminar_linea_pedido_desde_backoffice(item=item, creado_por=request.user)
 							continue
 
 						nueva_presentacion_id = request.POST.get(f'presentacion_{item.id}')
@@ -334,6 +336,8 @@ def backoffice_pedido_detalle(request, pedido_id):
 		'drivers': Usuario.objects.filter(role='driver', is_active=True).order_by('first_name', 'last_name', 'username'),
 		'selectores': Usuario.objects.filter(role='seleccionador', is_active=True).order_by('first_name', 'last_name', 'username'),
 		'lineas_bloqueadas_para_picking': bool(pedido.seleccionador_id and pedido.estado == 'PARA_VERIFICAR') or hasattr(pedido, 'invoice'),
+		'can_void_pedido': puede_anular_pedido_desde_backoffice(pedido),
+		'can_delete_pedido': puede_eliminar_pedido_desde_backoffice(pedido),
 		'invoice_suggested_price_rows': [
 			{
 				'item_id': item.id,
@@ -425,6 +429,39 @@ def backoffice_buscar_presentaciones(request):
 		})
 
 	return JsonResponse({'results': results})
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_pedido_void(request, pedido_id):
+	pedido = get_object_or_404(Pedido.objects.select_related('cliente'), id=pedido_id)
+	if request.method != 'POST':
+		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+	try:
+		anular_pedido_desde_backoffice(pedido=pedido)
+	except ValidationError as exc:
+		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+	else:
+		messages.success(request, _('Sales order voided successfully. Inventory was not changed.'))
+	return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_pedido_delete(request, pedido_id):
+	pedido = get_object_or_404(Pedido.objects.select_related('cliente'), id=pedido_id)
+	if request.method != 'POST':
+		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+	try:
+		eliminar_pedido_desde_backoffice(pedido=pedido)
+	except ValidationError as exc:
+		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+	messages.success(request, _('Sales order deleted permanently. Inventory was not changed.'))
+	return redirect('backoffice_pedidos')
 
 
 @login_required

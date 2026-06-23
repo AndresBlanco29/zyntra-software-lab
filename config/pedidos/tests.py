@@ -553,6 +553,37 @@ class PickingVerificationFlowTests(TestCase):
 		self.pedido.refresh_from_db()
 		self.assertEqual(self.pedido.total, Decimal('42.00'))
 
+	def test_void_pedido_does_not_change_stock(self):
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		stock_before = (stock.stock_fisico, stock.stock_reservado, stock.stock_disponible)
+		self.pedido.estado = 'RECIBIDO'
+		self.pedido.save(update_fields=['estado', 'actualizada_en'])
+
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_pedido_void', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 302)
+		self.pedido.refresh_from_db()
+		self.assertEqual(self.pedido.estado, 'CANCELADO')
+		stock.refresh_from_db()
+		self.assertEqual((stock.stock_fisico, stock.stock_reservado, stock.stock_disponible), stock_before)
+
+	def test_delete_pedido_removes_record_without_changing_stock(self):
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		stock_before = (stock.stock_fisico, stock.stock_reservado, stock.stock_disponible)
+		pedido_id = self.pedido.id
+		self.item.cantidad_inventario_aplicada = 0
+		self.item.cantidad_reservada_inventario = 0
+		self.item.save(update_fields=['cantidad_inventario_aplicada', 'cantidad_reservada_inventario'])
+
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_pedido_delete', args=[pedido_id]))
+
+		self.assertEqual(response.status_code, 302)
+		self.assertFalse(Pedido.objects.filter(id=pedido_id).exists())
+		stock.refresh_from_db()
+		self.assertEqual((stock.stock_fisico, stock.stock_reservado, stock.stock_disponible), stock_before)
+
 	def test_backoffice_can_edit_quantities_after_verified_picking(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		guardar_verificacion_picking(

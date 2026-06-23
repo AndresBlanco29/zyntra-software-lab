@@ -12,6 +12,7 @@ from django.utils.translation import gettext as _
 
 from config.inventario.services import (
     aplicar_verificacion_picking_inventario,
+    eliminar_item_pedido_con_inventario,
     inventory_units_for_packages,
     reemplazar_presentacion_item_pedido,
     reservar_stock_para_pedido_items,
@@ -139,6 +140,42 @@ def crear_pedido_desde_items(
 def validar_estado_backoffice_con_bloqueo(pedido, nuevo_estado):
     if pedido.picking_bloqueado and nuevo_estado != pedido.estado:
         raise ValidationError(_('This sales order is blocked by an unresolved picking note.'))
+
+
+def puede_anular_pedido_desde_backoffice(pedido):
+    return pedido.estado != 'CANCELADO' and not hasattr(pedido, 'invoice')
+
+
+def puede_eliminar_pedido_desde_backoffice(pedido):
+    if hasattr(pedido, 'invoice'):
+        return False
+    return not PedidoItem.objects.filter(pedido=pedido, cantidad_inventario_aplicada__gt=0).exists()
+
+
+@transaction.atomic
+def anular_pedido_desde_backoffice(*, pedido):
+    if not puede_anular_pedido_desde_backoffice(pedido):
+        raise ValidationError(_('This sales order cannot be voided.'))
+    pedido.estado = 'CANCELADO'
+    pedido.save(update_fields=['estado', 'actualizada_en'])
+    return pedido
+
+
+@transaction.atomic
+def eliminar_pedido_desde_backoffice(*, pedido):
+    if not puede_eliminar_pedido_desde_backoffice(pedido):
+        raise ValidationError(
+            _('This sales order cannot be deleted because it has an invoice or picking already affected inventory.')
+        )
+    pedido.delete()
+
+
+@transaction.atomic
+def eliminar_linea_pedido_desde_backoffice(*, item, creado_por=None):
+    if int(item.cantidad_inventario_aplicada or 0) > 0:
+        eliminar_item_pedido_con_inventario(item=item, creado_por=creado_por)
+        return
+    item.delete()
 
 
 def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales):

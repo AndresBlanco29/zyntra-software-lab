@@ -27,6 +27,7 @@
 <body
 data-agregar-url="{% url 'agregar_producto_pedido' %}"
 data-csrf="{{ csrf_token }}"
+data-cliente-id="{{ cliente.id }}"
 data-msg-added="{% trans 'Added' %} ✔"
 data-msg-add-default="{% trans 'Add to Order' %}"
 >
@@ -220,6 +221,26 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 
 </div>
 
+<div class="card shadow-sm mb-4 bulk-price-tier-panel">
+<div class="card-body py-3">
+<div class="row g-2 align-items-end">
+<div class="col-md-8 col-lg-7">
+<label for="bulkPriceTierSelect" class="form-label fw-semibold mb-1">{% trans "Assign one price tier to all products" %}</label>
+<select id="bulkPriceTierSelect" class="form-select form-select-sm">
+<option value="">{% trans "Select one of the 5 prices" %}</option>
+{% for option in bulk_price_options %}
+<option value="{{ option.key }}">{{ option.label }}</option>
+{% endfor %}
+</select>
+<div class="form-text mb-0">{% trans "Apply a price tier to every product in the catalog so you can add items faster without choosing the price on each card." %}</div>
+</div>
+<div class="col-md-4 col-lg-5 d-grid d-md-flex justify-content-md-end">
+<button type="button" class="btn btn-outline-primary btn-sm" id="applyBulkPriceTierButton">{% trans "Apply to all products" %}</button>
+</div>
+</div>
+</div>
+</div>
+
 
 <hr />
 
@@ -372,23 +393,23 @@ data-summary="{{ p.descripcion_empaque_cliente }}"
 {% trans "Seleccionar precio" %}
 </option>
 
-<option value="{{ producto.presentaciones.first.precio_1 }}">
+<option value="{{ producto.presentaciones.first.precio_1 }}" data-price-key="precio_1">
 {% trans "Precio" %} 1 - ${{ producto.presentaciones.first.precio_1 }}
 </option>
 
-<option value="{{ producto.presentaciones.first.precio_2 }}">
+<option value="{{ producto.presentaciones.first.precio_2 }}" data-price-key="precio_2">
 {% trans "Precio" %} 2 - ${{ producto.presentaciones.first.precio_2 }}
 </option>
 
-<option value="{{ producto.presentaciones.first.precio_3 }}">
+<option value="{{ producto.presentaciones.first.precio_3 }}" data-price-key="precio_3">
 {% trans "Precio" %} 3 - ${{ producto.presentaciones.first.precio_3 }}
 </option>
 
-<option value="{{ producto.presentaciones.first.precio_4 }}">
+<option value="{{ producto.presentaciones.first.precio_4 }}" data-price-key="precio_4">
 {% trans "Precio" %} 4 - ${{ producto.presentaciones.first.precio_4 }}
 </option>
 
-<option value="{{ producto.presentaciones.first.precio_5 }}">
+<option value="{{ producto.presentaciones.first.precio_5 }}" data-price-key="precio_5">
 {% trans "Precio" %} 5 - ${{ producto.presentaciones.first.precio_5 }}
 </option>
 

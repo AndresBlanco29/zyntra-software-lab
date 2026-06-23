@@ -5,7 +5,7 @@ from django.db.models import Q
 from config.clientes.models import Cliente
 from config.clientes.assignment import filter_clientes_for_vendedor
 from config.usuarios.models import Usuario
-from config.productos.models import Producto, Presentacion, Categoria, Marca
+from config.productos.models import Producto, Presentacion, Categoria, Marca, ConfiguracionPrecios
 from config.productos.views import _hydrate_productos
 from django.views.decorators.http import require_POST
 import uuid
@@ -207,6 +207,19 @@ def _clientes_queryset(request):
     return filter_clientes_for_vendedor(queryset, request.user)
 
 
+def _build_catalog_bulk_price_options():
+    return [
+        {
+            'key': f'precio_{index}',
+            'label': _('Price %(number)s (%(percentage)s%%)') % {
+                'number': index,
+                'percentage': margin,
+            },
+        }
+        for index, margin in enumerate(ConfiguracionPrecios.obtener().porcentajes_lista(), start=1)
+    ]
+
+
 def _tomar_pedido_clientes_filter_params(request):
     params = {}
     query = str(request.GET.get('q') or '').strip()
@@ -346,6 +359,7 @@ def catalogo_vendedor(request, cliente_id):
         'marcas': marcas,
         'total_items': total_items,
         'total': total,
+        'bulk_price_options': _build_catalog_bulk_price_options(),
     }
 
     return render(request, 'vendedores/tomar_pedido_catalogo.html', context)

@@ -213,6 +213,17 @@ class VendedorPedidoTests(TestCase):
 		self.assertEqual(len(response.context['productos']), 1)
 		self.assertContains(response, 'Unique Catalog Search Product')
 
+	def test_catalogo_vendedor_shows_bulk_price_tier_selector(self):
+		self.client.force_login(self.vendor)
+		response = self.client.get(reverse('catalogo_vendedor', args=[self.customer.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Assign one price tier to all products')
+		self.assertContains(response, 'Apply to all products')
+		self.assertContains(response, 'option value="precio_1"')
+		self.assertContains(response, 'option value="precio_5"')
+		self.assertContains(response, f'data-cliente-id="{self.customer.id}"', html=False)
+
 	def test_catalogo_vendedor_shows_recent_customer_order_history(self):
 		now = timezone.now()
 		self._create_customer_invoice(created_at=now - timezone.timedelta(days=1), quantity=5, price='37.00')

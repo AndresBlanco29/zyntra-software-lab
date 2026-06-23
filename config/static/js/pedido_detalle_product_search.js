@@ -19,11 +19,13 @@
     var hiddenInput = document.getElementById('presentacionNuevaId');
     var resultsBox = document.getElementById('newProductSearchResults');
     var selectedLabel = document.getElementById('newProductSelectedLabel');
-    var priceInput = document.getElementById('precioNuevoPedido');
+    var priceSelect = document.getElementById('precioNuevoPedido');
     var searchUrl = root.dataset.searchUrl;
     var pedidoId = root.dataset.pedidoId;
     var emptyMessage = root.dataset.emptyMessage || 'No products found.';
     var minCharsMessage = root.dataset.minCharsMessage || 'Type at least 2 characters to search.';
+    var pricePlaceholder = root.dataset.pricePlaceholder || 'Select price...';
+    var priceLocked = priceSelect && priceSelect.dataset.locked === 'true';
 
     var debounceTimer = null;
     var activeIndex = -1;
@@ -34,6 +36,49 @@
       resultsBox.innerHTML = '';
       activeIndex = -1;
       lastResults = [];
+    }
+
+    function resetPriceSelect() {
+      if (!priceSelect) {
+        return;
+      }
+
+      priceSelect.innerHTML = '';
+      var placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = pricePlaceholder;
+      priceSelect.appendChild(placeholder);
+      priceSelect.value = '';
+      priceSelect.disabled = true;
+    }
+
+    function populatePriceSelect(item) {
+      if (!priceSelect || priceLocked) {
+        return;
+      }
+
+      priceSelect.innerHTML = '';
+      var placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = pricePlaceholder;
+      priceSelect.appendChild(placeholder);
+
+      (item.prices || []).forEach(function (priceOption) {
+        var option = document.createElement('option');
+        option.value = priceOption.value;
+        option.textContent = priceOption.label;
+        option.dataset.priceKey = priceOption.key;
+        if (priceOption.key === item.default_price_key) {
+          option.selected = true;
+        }
+        priceSelect.appendChild(option);
+      });
+
+      if (!priceSelect.value && item.price) {
+        priceSelect.value = item.price;
+      }
+
+      priceSelect.disabled = false;
     }
 
     function highlightActive() {
@@ -70,9 +115,7 @@
       searchInput.value = item.label;
       selectedLabel.textContent = item.label;
       selectedLabel.hidden = false;
-      if (priceInput) {
-        priceInput.value = item.price;
-      }
+      populatePriceSelect(item);
       hideResults();
     }
 
@@ -101,10 +144,13 @@
         });
     }
 
+    resetPriceSelect();
+
     searchInput.addEventListener('input', function () {
       hiddenInput.value = '';
       selectedLabel.hidden = true;
       selectedLabel.textContent = '';
+      resetPriceSelect();
 
       var query = searchInput.value.trim();
       if (query.length < 2) {

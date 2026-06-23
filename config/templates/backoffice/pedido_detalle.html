@@ -476,7 +476,8 @@
           data-search-url="{% url 'backoffice_buscar_presentaciones' %}"
           data-pedido-id="{{ pedido.id }}"
           data-empty-message="{% trans 'No products found.'|escapejs %}"
-          data-min-chars-message="{% trans 'Type at least 2 characters to search.'|escapejs %}">
+          data-min-chars-message="{% trans 'Type at least 2 characters to search.'|escapejs %}"
+          data-price-placeholder="{% trans 'Select price...'|escapejs %}">
           <input
             type="search"
             id="buscadorProductoPedido"
@@ -495,7 +496,9 @@
       </div>
       <div class="col-md-2">
         <label class="form-label fw-semibold" for="precioNuevoPedido">{% trans "Price" %}</label>
-        <input type="number" min="0" step="0.01" id="precioNuevoPedido" name="precio_nuevo" class="form-control" placeholder="{% trans 'Price' %}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+        <select id="precioNuevoPedido" name="precio_nuevo" class="form-select" disabled {% if lineas_bloqueadas_para_picking %}data-locked="true"{% endif %}>
+          <option value="">{% trans "Select price..." %}</option>
+        </select>
       </div>
     </div>
 

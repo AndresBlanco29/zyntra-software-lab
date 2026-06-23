@@ -502,6 +502,7 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'searchable-selects.js')
 		self.assertContains(response, 'buscadorProductoPedido')
 		self.assertContains(response, 'pedido_detalle_product_search.js')
+		self.assertContains(response, 'id="precioNuevoPedido"', html=False)
 		self.assertContains(response, 'name="presentacion_nueva"', html=False)
 
 	def test_backoffice_search_presentaciones_returns_matching_products(self):
@@ -515,6 +516,9 @@ class PickingVerificationFlowTests(TestCase):
 		payload = response.json()
 		self.assertTrue(any(result['id'] == self.presentacion.id for result in payload['results']))
 		self.assertTrue(any('Producto test' in result['label'] for result in payload['results']))
+		matched = next(result for result in payload['results'] if result['id'] == self.presentacion.id)
+		self.assertEqual(len(matched['prices']), 5)
+		self.assertIn('default_price_key', matched)
 
 	def test_searchable_selects_script_uses_dropdown_input_plugin(self):
 		from pathlib import Path

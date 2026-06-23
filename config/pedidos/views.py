@@ -362,6 +362,30 @@ def _default_presentacion_price_for_pedido(*, presentacion, pedido):
 	return _quantize_money(price or 0)
 
 
+def _default_presentacion_price_key_for_pedido(*, pedido):
+	cliente = getattr(pedido, 'cliente', None)
+	tier = cliente.get_nivel_precio_normalizado() if cliente and hasattr(cliente, 'get_nivel_precio_normalizado') else None
+	if tier is None:
+		return 'precio_1'
+	return f'precio_{tier}'
+
+
+def _build_presentacion_price_options(*, presentacion, pedido=None):
+	prices = []
+	for index in range(1, 6):
+		key = f'precio_{index}'
+		value = _quantize_money(getattr(presentacion, key, 0) or 0)
+		prices.append({
+			'key': key,
+			'value': format(value, '.2f'),
+			'label': f'{_("Price")} {index} - ${format(value, ".2f")}',
+		})
+
+	default_key = _default_presentacion_price_key_for_pedido(pedido=pedido) if pedido else 'precio_1'
+	default_price = _default_presentacion_price_for_pedido(presentacion=presentacion, pedido=pedido) if pedido else _quantize_money(presentacion.precio_1 or 0)
+	return prices, default_key, format(default_price, '.2f')
+
+
 @login_required
 @internal_permission_required('backoffice.orders.view')
 def backoffice_buscar_presentaciones(request):
@@ -388,11 +412,16 @@ def backoffice_buscar_presentaciones(request):
 
 	results = []
 	for presentacion in presentaciones:
-		default_price = _default_presentacion_price_for_pedido(presentacion=presentacion, pedido=pedido) if pedido else _quantize_money(presentacion.precio_1 or 0)
+		price_options, default_price_key, default_price = _build_presentacion_price_options(
+			presentacion=presentacion,
+			pedido=pedido,
+		)
 		results.append({
 			'id': presentacion.id,
 			'label': f'{presentacion.producto.nombre} - {presentacion.nombre}',
-			'price': format(default_price, '.2f'),
+			'price': default_price,
+			'default_price_key': default_price_key,
+			'prices': price_options,
 		})
 
 	return JsonResponse({'results': results})

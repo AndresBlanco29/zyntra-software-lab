@@ -22,25 +22,9 @@
     }
 }
 
-@keyframes app-search-navbar-pulse {
-    0%,
-    100% {
-        border-color: rgba(255, 255, 255, 0.34);
-        box-shadow: 0 14px 32px rgba(4, 24, 64, 0.18);
-    }
-
-    50% {
-        border-color: rgba(255, 212, 0, 0.82);
-        box-shadow:
-            0 0 0 3px rgba(255, 212, 0, 0.28),
-            0 18px 34px rgba(4, 24, 64, 0.24);
-    }
-}
-
-input[type="search"]:not(.select2-search__field),
+input[type="search"]:not(.select2-search__field):not(.navbar-search-input),
 input[name="q"],
-input[id^="buscador"],
-input#panelSearchInput {
+input[id^="buscador"] {
     min-height: 46px;
     min-width: min(100%, 320px);
     border: 2px solid var(--app-search-border);
@@ -55,18 +39,16 @@ input#panelSearchInput {
         background-color 0.2s ease;
 }
 
-input[type="search"]:not(.select2-search__field):hover,
+input[type="search"]:not(.select2-search__field):not(.navbar-search-input):hover,
 input[name="q"]:hover,
-input[id^="buscador"]:hover,
-input#panelSearchInput:hover {
+input[id^="buscador"]:hover {
     transform: translateY(-1px);
     border-color: #1f4fa3;
 }
 
-input[type="search"]:not(.select2-search__field):focus,
+input[type="search"]:not(.select2-search__field):not(.navbar-search-input):focus,
 input[name="q"]:focus,
-input[id^="buscador"]:focus,
-input#panelSearchInput:focus {
+input[id^="buscador"]:focus {
     animation: none;
     border-color: #0b3d91;
     box-shadow:
@@ -76,30 +58,10 @@ input#panelSearchInput:focus {
     outline: none;
 }
 
-input[type="search"]:not(.select2-search__field)::placeholder,
+input[type="search"]:not(.select2-search__field):not(.navbar-search-input)::placeholder,
 input[name="q"]::placeholder,
-input[id^="buscador"]::placeholder,
-input#panelSearchInput::placeholder {
+input[id^="buscador"]::placeholder {
     color: #5f6f86;
-    font-weight: 600;
-}
-
-.navbar-search {
-    max-width: 760px;
-}
-
-.navbar-search-field {
-    min-height: 54px;
-    animation: app-search-navbar-pulse 2.4s ease-in-out infinite;
-}
-
-.navbar-search.is-open .navbar-search-field,
-.navbar-search-field:focus-within {
-    animation: none;
-}
-
-.navbar-search-input {
-    font-size: 1rem;
     font-weight: 600;
 }
 
@@ -126,7 +88,7 @@ input#panelSearchInput::placeholder {
 }
 
 form.d-flex > input[name="q"],
-form.d-flex > input[type="search"] {
+form.d-flex > input[type="search"]:not(.navbar-search-input) {
     flex: 1 1 420px;
     min-width: min(100%, 320px);
 }
@@ -152,10 +114,9 @@ form.d-flex > input[type="search"] {
 }
 
 @media (max-width: 767.98px) {
-    input[type="search"]:not(.select2-search__field),
+    input[type="search"]:not(.select2-search__field):not(.navbar-search-input),
     input[name="q"],
-    input[id^="buscador"],
-    input#panelSearchInput {
+    input[id^="buscador"] {
         min-width: 100%;
     }
 
@@ -166,11 +127,9 @@ form.d-flex > input[type="search"] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    input[type="search"]:not(.select2-search__field),
+    input[type="search"]:not(.select2-search__field):not(.navbar-search-input),
     input[name="q"],
-    input[id^="buscador"],
-    input#panelSearchInput,
-    .navbar-search-field {
+    input[id^="buscador"] {
         animation: none;
     }
 }

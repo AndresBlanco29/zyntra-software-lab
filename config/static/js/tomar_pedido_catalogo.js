@@ -322,9 +322,12 @@ document.addEventListener('DOMContentLoaded', function() {
             let producto_id = card.dataset.productoId;
             let presentacion_id = card.querySelector(".presentacion-select").value;
             let cantidad = card.querySelector(".cantidad").textContent;
-            let precio = card.querySelector(".precio-select").value;
+            let precioSelect = card.querySelector(".precio-select");
+            let precio = precioSelect.value;
+            const selectedPriceOption = precioSelect.selectedOptions[0];
+            const precioKey = selectedPriceOption?.dataset.priceKey || '';
 
-            console.log("DEBUG - Intento agregar:", { precio, presentacion_id, cantidad });
+            console.log("DEBUG - Intento agregar:", { precio, precioKey, presentacion_id, cantidad });
 
             // VALIDACIÓN: Si no hay precio seleccionado, mostrar modal y DETENER
             if (!precio || precio === "" || precio === null) {
@@ -342,7 +345,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     "X-CSRFToken": csrfToken,
                     "Content-Type": "application/x-www-form-urlencoded"
                 },
-                body: `producto_id=${producto_id}&presentacion_id=${presentacion_id}&cantidad=${cantidad}&precio=${precio}`
+                body: `producto_id=${producto_id}&presentacion_id=${presentacion_id}&cantidad=${cantidad}&precio=${precio}&precio_key=${encodeURIComponent(precioKey)}`
             })
             .then(response => {
                 console.log("DEBUG - Respuesta del servidor:", response.status);

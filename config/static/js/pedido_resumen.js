@@ -179,19 +179,20 @@ let precio5 = option.dataset.precio5
 let id = this.dataset.id
 
 let precioSelect = document.querySelector(`.precio-resumen[data-id="${id}"]`)
+const currentPriceKey = precioSelect?.selectedOptions?.[0]?.dataset.priceKey || 'precio_1'
 
 precioSelect.innerHTML = `
-<option value="${precio1}">Precio 1 - $${precio1}</option>
-<option value="${precio2}">Precio 2 - $${precio2}</option>
-<option value="${precio3}">Precio 3 - $${precio3}</option>
-<option value="${precio4}">Precio 4 - $${precio4}</option>
-<option value="${precio5}">Precio 5 - $${precio5}</option>
+<option value="${precio1}" data-price-key="precio_1">Precio 1 - $${precio1}</option>
+<option value="${precio2}" data-price-key="precio_2">Precio 2 - $${precio2}</option>
+<option value="${precio3}" data-price-key="precio_3">Precio 3 - $${precio3}</option>
+<option value="${precio4}" data-price-key="precio_4">Precio 4 - $${precio4}</option>
+<option value="${precio5}" data-price-key="precio_5">Precio 5 - $${precio5}</option>
 `
 
-// 🔥 Seleccionamos automáticamente precio 1
-precioSelect.value = precio1
+const matchingOption = precioSelect.querySelector(`option[data-price-key="${currentPriceKey}"]`)
+precioSelect.value = matchingOption ? matchingOption.value : precio1
+const selectedPriceKey = matchingOption ? currentPriceKey : 'precio_1'
 
-// 🔥 Guardamos presentación
 fetch(actualizarURL,{
 method:"POST",
 headers:{
@@ -200,16 +201,14 @@ headers:{
 },
 body:`producto_id=${id}&presentacion_id=${this.value}&accion=cambiar_presentacion`
 })
-
-// 🔥 Guardamos precio automáticamente
-fetch(actualizarURL,{
+.then(() => fetch(actualizarURL,{
 method:"POST",
 headers:{
 "X-CSRFToken":csrf,
 "Content-Type":"application/x-www-form-urlencoded"
 },
-body:`producto_id=${id}&precio=${precio1}&accion=cambiar_precio`
-})
+body:`producto_id=${id}&precio=${precioSelect.value}&precio_key=${encodeURIComponent(selectedPriceKey)}&accion=cambiar_precio`
+}))
 .then(res=>res.json())
 .then(data=>{
 
@@ -242,6 +241,7 @@ select.addEventListener("change", function(){
 
 let id = this.dataset.id
 let precio = this.value
+const precioKey = this.selectedOptions[0]?.dataset.priceKey || ''
 
 fetch(actualizarURL,{
 
@@ -252,7 +252,7 @@ headers:{
 "Content-Type":"application/x-www-form-urlencoded"
 },
 
-body:`producto_id=${id}&precio=${precio}&accion=cambiar_precio`
+body:`producto_id=${id}&precio=${precio}&precio_key=${encodeURIComponent(precioKey)}&accion=cambiar_precio`
 
 })
 .then(res=>res.json())

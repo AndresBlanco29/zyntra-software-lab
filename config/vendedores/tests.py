@@ -143,6 +143,27 @@ class VendedorPedidoTests(TestCase):
 		self.assertEqual(item.cantidad_reservada_inventario, 0)
 		self.assertEqual(item.cantidad_inventario_aplicada, 0)
 
+	def test_agregar_producto_pedido_preserves_selected_price_tier_in_order_summary(self):
+		self.client.force_login(self.vendor)
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session.save()
+
+		response = self.client.post(reverse('agregar_producto_pedido'), {
+			'presentacion_id': self.presentacion.id,
+			'cantidad': 2,
+			'precio': str(self.presentacion.precio_2),
+			'precio_key': 'precio_2',
+		})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertTrue(response.json()['success'])
+
+		summary_response = self.client.get(reverse('ver_pedido'))
+		self.assertEqual(summary_response.status_code, 200)
+		self.assertContains(summary_response, 'data-price-key="precio_2" selected', html=False)
+		self.assertContains(summary_response, f'Precio 2 - ${self.presentacion.precio_2}', html=False)
+
 	def test_tomar_pedido_paginates_approved_customers(self):
 		self.customer.aprobado = True
 		self.customer.save(update_fields=['aprobado'])

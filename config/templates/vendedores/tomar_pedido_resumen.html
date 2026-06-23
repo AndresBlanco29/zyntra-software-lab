@@ -223,28 +223,28 @@ min="1"
 {% for p in item.presentaciones %}
 {% if p.id|stringformat:"s" == item.presentacion_id|stringformat:"s" %}
 
-<option value="{{ p.precio_1 }}"
-{% if item.precio == p.precio_1 %}selected{% endif %}>
+<option value="{{ p.precio_1 }}" data-price-key="precio_1"
+{% if item.precio_key == 'precio_1' %}selected{% endif %}>
 {% trans "Precio" %} 1 - ${{ p.precio_1 }}
 </option>
 
-<option value="{{ p.precio_2 }}"
-{% if item.precio == p.precio_2 %}selected{% endif %}>
+<option value="{{ p.precio_2 }}" data-price-key="precio_2"
+{% if item.precio_key == 'precio_2' %}selected{% endif %}>
 {% trans "Precio" %} 2 - ${{ p.precio_2 }}
 </option>
 
-<option value="{{ p.precio_3 }}"
-{% if item.precio == p.precio_3 %}selected{% endif %}>
+<option value="{{ p.precio_3 }}" data-price-key="precio_3"
+{% if item.precio_key == 'precio_3' %}selected{% endif %}>
 {% trans "Precio" %} 3 - ${{ p.precio_3 }}
 </option>
 
-<option value="{{ p.precio_4 }}"
-{% if item.precio == p.precio_4 %}selected{% endif %}>
+<option value="{{ p.precio_4 }}" data-price-key="precio_4"
+{% if item.precio_key == 'precio_4' %}selected{% endif %}>
 {% trans "Precio" %} 4 - ${{ p.precio_4 }}
 </option>
 
-<option value="{{ p.precio_5 }}"
-{% if item.precio == p.precio_5 %}selected{% endif %}>
+<option value="{{ p.precio_5 }}" data-price-key="precio_5"
+{% if item.precio_key == 'precio_5' %}selected{% endif %}>
 {% trans "Precio" %} 5 - ${{ p.precio_5 }}
 </option>
 

@@ -48,6 +48,37 @@ def _money_string(value):
     return format(_money_decimal(value), '.2f')
 
 
+def _normalize_precio_key(value):
+    precio_key = str(value or '').strip().lower()
+    if precio_key in {f'precio_{index}' for index in range(1, 6)}:
+        return precio_key
+    return ''
+
+
+def _infer_precio_key(*, presentacion, precio):
+    precio_decimal = _money_decimal(precio)
+    for index in range(1, 6):
+        tier_price = _money_decimal(getattr(presentacion, f'precio_{index}', 0) or 0)
+        if tier_price == precio_decimal:
+            return f'precio_{index}'
+    return ''
+
+
+def _resolve_cart_item_price(*, presentacion, precio, precio_key=''):
+    normalized_key = _normalize_precio_key(precio_key)
+    if normalized_key:
+        tier_price = _money_decimal(getattr(presentacion, normalized_key, 0) or 0)
+        if tier_price > 0:
+            return float(tier_price), normalized_key
+
+    inferred_key = _infer_precio_key(presentacion=presentacion, precio=precio)
+    if inferred_key:
+        tier_price = _money_decimal(getattr(presentacion, inferred_key, 0) or 0)
+        return float(tier_price), inferred_key
+
+    return float(_money_decimal(precio)), ''
+
+
 def _attach_recent_customer_order_history(*, cliente, productos):
     presentation_map = {}
     for producto in productos:
@@ -378,6 +409,7 @@ def agregar_producto_pedido(request):
         carrito = request.session.get("pedido", {})
 
         precio = request.POST.get("precio")
+        precio_key = _normalize_precio_key(request.POST.get("precio_key"))
 
         # Validación: rechazar si precio no está seleccionado
         if not precio or precio == "":
@@ -386,22 +418,29 @@ def agregar_producto_pedido(request):
                 "error": "Debes seleccionar un precio antes de agregar el producto."
             }, status=400)
 
-        precio = float(precio.replace(",", "."))
+        precio, precio_key = _resolve_cart_item_price(
+            presentacion=presentacion,
+            precio=precio,
+            precio_key=precio_key,
+        )
 
         if presentacion_id in carrito:
-
             carrito[presentacion_id]["cantidad"] += cantidad
-
+            carrito[presentacion_id]["precio"] = precio
+            if precio_key:
+                carrito[presentacion_id]["precio_key"] = precio_key
         else:
-
-            carrito[presentacion_id] = {
+            carrito_item = {
                 "presentacion_id": presentacion_id,
                 "producto_id": presentacion.producto.id,
                 "nombre": presentacion.producto.nombre,
                 "presentacion_nombre": presentacion.nombre,
                 "precio": precio,
-                "cantidad": cantidad
+                "cantidad": cantidad,
             }
+            if precio_key:
+                carrito_item["precio_key"] = precio_key
+            carrito[presentacion_id] = carrito_item
 
         request.session["pedido"] = carrito
 
@@ -438,8 +477,18 @@ def ver_pedido(request):
         producto = Producto.objects.get(id=item["producto_id"])
 
         presentaciones = Presentacion.objects.filter(producto=producto)
+        presentacion = Presentacion.objects.get(id=item["presentacion_id"])
+        precio, precio_key = _resolve_cart_item_price(
+            presentacion=presentacion,
+            precio=item.get("precio", 0),
+            precio_key=item.get("precio_key", ''),
+        )
+        if precio_key and item.get("precio_key") != precio_key:
+            carrito[key]["precio_key"] = precio_key
+        if float(item.get("precio", 0) or 0) != precio:
+            carrito[key]["precio"] = precio
 
-        subtotal = _money_decimal(item["precio"] * item["cantidad"])
+        subtotal = _money_decimal(precio * item["cantidad"])
 
         total += subtotal
 
@@ -447,11 +496,16 @@ def ver_pedido(request):
             "id": key,
             "nombre": item["nombre"],
             "presentacion_id": item["presentacion_id"],
-            "precio": item["precio"],
+            "precio": precio,
+            "precio_key": precio_key,
             "cantidad": item["cantidad"],
             "subtotal": subtotal,
             "presentaciones": presentaciones
         })
+
+    if carrito:
+        request.session["pedido"] = carrito
+        request.session.modified = True
 
     context = {
         "productos": productos,
@@ -459,8 +513,6 @@ def ver_pedido(request):
         "cliente": cliente,
         "cliente_id": cliente_id
     }
-
-    print(carrito)
 
     return render(
         request,
@@ -523,10 +575,18 @@ def actualizar_cantidad_pedido(request):
         elif accion == "cambiar_precio":
 
             precio = request.POST.get("precio")
+            precio_key = _normalize_precio_key(request.POST.get("precio_key"))
 
             if precio:
-                precio = precio.replace(",", ".")
-                carrito[producto_id]["precio"] = float(precio)
+                presentacion = Presentacion.objects.get(id=carrito[producto_id]["presentacion_id"])
+                resolved_precio, resolved_key = _resolve_cart_item_price(
+                    presentacion=presentacion,
+                    precio=precio,
+                    precio_key=precio_key,
+                )
+                carrito[producto_id]["precio"] = resolved_precio
+                if resolved_key:
+                    carrito[producto_id]["precio_key"] = resolved_key
 
         elif accion == "cambiar_presentacion":
 
@@ -534,9 +594,24 @@ def actualizar_cantidad_pedido(request):
 
             if presentacion_id:
                 presentacion = Presentacion.objects.get(id=presentacion_id)
+                current_key = _normalize_precio_key(carrito[producto_id].get("precio_key"))
+                if not current_key:
+                    current_key = _infer_precio_key(
+                        presentacion=Presentacion.objects.get(id=carrito[producto_id]["presentacion_id"]),
+                        precio=carrito[producto_id]["precio"],
+                    )
 
                 carrito[producto_id]["presentacion_id"] = presentacion_id
                 carrito[producto_id]["presentacion_nombre"] = presentacion.nombre
+
+                resolved_precio, resolved_key = _resolve_cart_item_price(
+                    presentacion=presentacion,
+                    precio=carrito[producto_id]["precio"],
+                    precio_key=current_key,
+                )
+                carrito[producto_id]["precio"] = resolved_precio
+                if resolved_key:
+                    carrito[producto_id]["precio_key"] = resolved_key
 
     # Guardar sesión
     request.session["pedido"] = carrito

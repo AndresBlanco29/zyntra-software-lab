@@ -1466,3 +1466,33 @@ def unlock_client_from_delivery(*, delivery, backoffice_user):
 	delivery.client_unlocked_at = timezone.now()
 	delivery.save(update_fields=['client_blocked_on_delivery', 'client_unlocked_by', 'client_unlocked_at', 'updated_at'])
 	return delivery
+
+
+def get_recent_customer_invoice_items_by_presentation(*, cliente, presentation_ids, limit=3):
+	presentation_ids = [presentation_id for presentation_id in presentation_ids if presentation_id]
+	if not cliente or not presentation_ids:
+		return {}
+
+	recent_items = (
+		InvoiceItem.objects
+		.select_related('invoice')
+		.filter(
+			invoice__cliente=cliente,
+			invoice__estado='GENERADA',
+			presentacion_id__in=presentation_ids,
+		)
+		.order_by('presentacion_id', '-invoice__creada_en', '-invoice_id', '-id')
+	)
+
+	history = {presentation_id: [] for presentation_id in presentation_ids}
+	history_counts = {presentation_id: 0 for presentation_id in presentation_ids}
+	for invoice_item in recent_items:
+		presentacion_id = invoice_item.presentacion_id
+		if presentacion_id not in history:
+			continue
+		if history_counts[presentacion_id] >= limit:
+			continue
+		history[presentacion_id].append(invoice_item)
+		history_counts[presentacion_id] += 1
+
+	return history

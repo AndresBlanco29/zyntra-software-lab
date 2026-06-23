@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from config.clientes.models import Cliente
 from config.cotizaciones.models import Cotizacion, CotizacionItem
+from config.facturacion.models import Invoice, InvoiceItem
 from config.pedidos.models import Pedido, PedidoItem
 from config.productos.models import Categoria, ConfiguracionPrecios, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
@@ -90,17 +91,17 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertContains(response, 'option value="precio_5"')
 		self.assertContains(response, 'data-price-key="precio_1"', html=False)
 
-	def _create_customer_order(self, *, created_at, quantity, price):
+	def _create_customer_invoice(self, *, created_at, quantity, price):
 		pedido = Pedido.objects.create(
 			cliente=self.cliente,
 			vendedor=self.backoffice,
 			origen='VENDEDOR',
-			estado='RECIBIDO',
+			estado='INVOICE_GENERADA',
 			total=Decimal(str(price)) * Decimal(str(quantity)),
 		)
 		Pedido.objects.filter(id=pedido.id).update(creada_en=created_at, actualizada_en=created_at)
 		pedido.refresh_from_db()
-		PedidoItem.objects.create(
+		pedido_item = PedidoItem.objects.create(
 			pedido=pedido,
 			presentacion=self.presentacion,
 			cantidad_solicitada=quantity,
@@ -108,14 +109,34 @@ class BackofficeQuotePricingTests(TestCase):
 			precio=Decimal(str(price)),
 			subtotal=Decimal(str(price)) * Decimal(str(quantity)),
 		)
-		return pedido
+		invoice = Invoice.objects.create(
+			pedido=pedido,
+			cliente=self.cliente,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			estado='GENERADA',
+			subtotal=Decimal(str(price)) * Decimal(str(quantity)),
+			total_neto=Decimal(str(price)) * Decimal(str(quantity)),
+		)
+		Invoice.objects.filter(id=invoice.id).update(creada_en=created_at, actualizada_en=created_at)
+		invoice.refresh_from_db()
+		InvoiceItem.objects.create(
+			invoice=invoice,
+			pedido_item=pedido_item,
+			presentacion=self.presentacion,
+			producto_nombre=self.presentacion.producto.nombre,
+			presentacion_nombre=self.presentacion.nombre,
+			cantidad_facturada=quantity,
+			precio_unitario=Decimal(str(price)),
+			subtotal=Decimal(str(price)) * Decimal(str(quantity)),
+		)
+		return invoice
 
 	def test_backoffice_quote_detail_shows_recent_customer_order_history(self):
 		now = timezone.now()
-		self._create_customer_order(created_at=now - timezone.timedelta(days=1), quantity=60, price='14.99')
-		self._create_customer_order(created_at=now - timezone.timedelta(days=8), quantity=12, price='13.50')
-		self._create_customer_order(created_at=now - timezone.timedelta(days=15), quantity=8, price='12.75')
-		self._create_customer_order(created_at=now - timezone.timedelta(days=22), quantity=4, price='11.00')
+		self._create_customer_invoice(created_at=now - timezone.timedelta(days=1), quantity=60, price='14.99')
+		self._create_customer_invoice(created_at=now - timezone.timedelta(days=8), quantity=12, price='13.50')
+		self._create_customer_invoice(created_at=now - timezone.timedelta(days=15), quantity=8, price='12.75')
+		self._create_customer_invoice(created_at=now - timezone.timedelta(days=22), quantity=4, price='11.00')
 
 		self.client.force_login(self.backoffice)
 		response = self.client.get(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]))
@@ -125,6 +146,31 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertContains(response, '12 @ $13.50')
 		self.assertContains(response, '8 @ $12.75')
 		self.assertNotContains(response, '4 @ $11.00')
+
+	def test_backoffice_quote_detail_ignores_unbilled_sales_orders(self):
+		now = timezone.now()
+		pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			vendedor=self.backoffice,
+			origen='VENDEDOR',
+			estado='RECIBIDO',
+			total=Decimal('899.40'),
+		)
+		Pedido.objects.filter(id=pedido.id).update(creada_en=now - timezone.timedelta(days=1))
+		PedidoItem.objects.create(
+			pedido=pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=60,
+			cantidad=60,
+			precio=Decimal('14.99'),
+			subtotal=Decimal('899.40'),
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertNotContains(response, '60 @ $14.99')
 
 	def test_backoffice_quote_detail_uses_customer_assigned_price_when_request_arrives(self):
 		self.cliente.estado_revision = Cliente.REVIEW_STATUS_APPROVED

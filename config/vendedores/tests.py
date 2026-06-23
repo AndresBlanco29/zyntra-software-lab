@@ -6,6 +6,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from config.clientes.models import Cliente
+from config.facturacion.models import Invoice, InvoiceItem
 from config.pedidos.models import Pedido, PedidoItem
 from config.productos.models import Categoria, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
@@ -50,6 +51,46 @@ class VendedorPedidoTests(TestCase):
 			password='secret123',
 			role='backoffice',
 		)
+
+	def _create_customer_invoice(self, *, created_at, quantity, price):
+		pedido = Pedido.objects.create(
+			cliente=self.customer,
+			vendedor=self.vendor,
+			origen='VENDEDOR',
+			estado='INVOICE_GENERADA',
+			total=Decimal(str(price)) * Decimal(str(quantity)),
+		)
+		Pedido.objects.filter(id=pedido.id).update(creada_en=created_at, actualizada_en=created_at)
+		pedido.refresh_from_db()
+		pedido_item = PedidoItem.objects.create(
+			pedido=pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=quantity,
+			cantidad=quantity,
+			precio=Decimal(str(price)),
+			subtotal=Decimal(str(price)) * Decimal(str(quantity)),
+		)
+		invoice = Invoice.objects.create(
+			pedido=pedido,
+			cliente=self.customer,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			estado='GENERADA',
+			subtotal=Decimal(str(price)) * Decimal(str(quantity)),
+			total_neto=Decimal(str(price)) * Decimal(str(quantity)),
+		)
+		Invoice.objects.filter(id=invoice.id).update(creada_en=created_at, actualizada_en=created_at)
+		invoice.refresh_from_db()
+		InvoiceItem.objects.create(
+			invoice=invoice,
+			pedido_item=pedido_item,
+			presentacion=self.presentacion,
+			producto_nombre=self.presentacion.producto.nombre,
+			presentacion_nombre=self.presentacion.nombre,
+			cantidad_facturada=quantity,
+			precio_unitario=Decimal(str(price)),
+			subtotal=Decimal(str(price)) * Decimal(str(quantity)),
+		)
+		return invoice
 
 	def _create_customer_order(self, *, created_at, quantity, price):
 		pedido = Pedido.objects.create(
@@ -174,10 +215,10 @@ class VendedorPedidoTests(TestCase):
 
 	def test_catalogo_vendedor_shows_recent_customer_order_history(self):
 		now = timezone.now()
-		self._create_customer_order(created_at=now - timezone.timedelta(days=1), quantity=5, price='37.00')
-		self._create_customer_order(created_at=now - timezone.timedelta(days=8), quantity=2, price='36.50')
-		self._create_customer_order(created_at=now - timezone.timedelta(days=15), quantity=4, price='35.75')
-		self._create_customer_order(created_at=now - timezone.timedelta(days=22), quantity=7, price='34.10')
+		self._create_customer_invoice(created_at=now - timezone.timedelta(days=1), quantity=5, price='37.00')
+		self._create_customer_invoice(created_at=now - timezone.timedelta(days=8), quantity=2, price='36.50')
+		self._create_customer_invoice(created_at=now - timezone.timedelta(days=15), quantity=4, price='35.75')
+		self._create_customer_invoice(created_at=now - timezone.timedelta(days=22), quantity=7, price='34.10')
 
 		self.client.force_login(self.vendor)
 		response = self.client.get(reverse('catalogo_vendedor', args=[self.customer.id]))
@@ -188,6 +229,16 @@ class VendedorPedidoTests(TestCase):
 		self.assertContains(response, '2 @ $36.50')
 		self.assertContains(response, '4 @ $35.75')
 		self.assertNotContains(response, '7 @ $34.10')
+
+	def test_catalogo_vendedor_ignores_unbilled_sales_orders(self):
+		now = timezone.now()
+		self._create_customer_order(created_at=now - timezone.timedelta(days=1), quantity=60, price='14.99')
+
+		self.client.force_login(self.vendor)
+		response = self.client.get(reverse('catalogo_vendedor', args=[self.customer.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertNotContains(response, '60 @ $14.99')
 
 	def test_backoffice_can_access_order_taking_catalog(self):
 		self.client.force_login(self.backoffice)

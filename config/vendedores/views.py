@@ -25,9 +25,9 @@ from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from decimal import Decimal, ROUND_HALF_UP
 
+from config.facturacion.services import get_recent_customer_invoice_items_by_presentation
 from config.pedidos.services import (
     crear_pedido_desde_items,
-    get_recent_customer_order_items_by_presentation,
     notificar_backoffice_pedido,
 )
 from config.usuarios.permissions import internal_permission_required
@@ -52,18 +52,18 @@ def _attach_recent_customer_order_history(*, cliente, productos):
     presentation_map = {}
     for producto in productos:
         for presentacion in producto.presentaciones.all():
-            presentacion.recent_customer_orders = []
+            presentacion.recent_customer_sales = []
             presentation_map[presentacion.id] = presentacion
 
     if not presentation_map:
         return
 
-    history_by_presentation = get_recent_customer_order_items_by_presentation(
+    history_by_presentation = get_recent_customer_invoice_items_by_presentation(
         cliente=cliente,
         presentation_ids=presentation_map.keys(),
     )
     for presentacion_id, recent_items in history_by_presentation.items():
-        presentation_map[presentacion_id].recent_customer_orders = recent_items
+        presentation_map[presentacion_id].recent_customer_sales = recent_items
 
 
 def _normalize_customer_location_payload(data):

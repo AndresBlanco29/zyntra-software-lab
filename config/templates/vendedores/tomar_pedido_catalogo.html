@@ -327,15 +327,15 @@ data-summary="{{ p.descripcion_empaque_cliente }}"
 
 <div class="order-history-list {% if not forloop.first %}d-none{% endif %}" data-order-history-list data-presentacion-id="{{ p.id }}">
 
-{% if p.recent_customer_orders %}
+{% if p.recent_customer_sales %}
 
 <div class="d-flex flex-wrap gap-2">
 
-{% for pedido_item in p.recent_customer_orders %}
+{% for invoice_item in p.recent_customer_sales %}
 
 <div class="border rounded-3 bg-white px-2 py-2 small flex-fill order-history-entry">
-<div class="fw-semibold">{{ pedido_item.pedido.creada_en|date:"n/j/Y" }}</div>
-<div>{% blocktrans with quantity=pedido_item.cantidad price=pedido_item.precio|floatformat:2 %}{{ quantity }} @ ${{ price }}{% endblocktrans %}</div>
+<div class="fw-semibold">{{ invoice_item.invoice.creada_en|date:"n/j/Y" }}</div>
+<div>{% blocktrans with quantity=invoice_item.cantidad_facturada price=invoice_item.precio_unitario|floatformat:2 %}{{ quantity }} @ ${{ price }}{% endblocktrans %}</div>
 </div>
 
 {% endfor %}

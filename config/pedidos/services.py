@@ -361,31 +361,3 @@ def notificar_cliente_pedido(pedido):
     email.attach_alternative(html_content, 'text/html')
     email.send(fail_silently=False)
     return True
-
-
-def get_recent_customer_order_items_by_presentation(*, cliente, presentation_ids, limit=3):
-    presentation_ids = [presentation_id for presentation_id in presentation_ids if presentation_id]
-    if not cliente or not presentation_ids:
-        return {}
-
-    recent_items = (
-        PedidoItem.objects
-        .select_related('pedido')
-        .filter(
-            pedido__cliente=cliente,
-            presentacion_id__in=presentation_ids,
-        )
-        .exclude(pedido__estado='CANCELADO')
-        .order_by('presentacion_id', '-pedido__creada_en', '-pedido_id', '-id')
-    )
-
-    history = {presentation_id: [] for presentation_id in presentation_ids}
-    history_counts = {presentation_id: 0 for presentation_id in presentation_ids}
-    for pedido_item in recent_items:
-        presentacion_id = pedido_item.presentacion_id
-        if history_counts[presentacion_id] >= limit:
-            continue
-        history[presentacion_id].append(pedido_item)
-        history_counts[presentacion_id] += 1
-
-    return history

@@ -22,8 +22,8 @@ body {
     }
 
     .catalog-header .selects-row > #buscador {
-        width: 300px;
-        min-width: 220px;
+        width: 460px;
+        min-width: 360px;
     }
 
     .catalog-header .selects-row select {

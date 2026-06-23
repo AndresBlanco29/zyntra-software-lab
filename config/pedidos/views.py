@@ -6,7 +6,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.paginator import Paginator
-from django.http import HttpResponse
+from django.db.models import Q
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.db import transaction
 from django.utils.translation import gettext as _
@@ -333,7 +334,6 @@ def backoffice_pedido_detalle(request, pedido_id):
 		'drivers': Usuario.objects.filter(role='driver', is_active=True).order_by('first_name', 'last_name', 'username'),
 		'selectores': Usuario.objects.filter(role='seleccionador', is_active=True).order_by('first_name', 'last_name', 'username'),
 		'lineas_bloqueadas_para_picking': bool(pedido.seleccionador_id and pedido.estado == 'PARA_VERIFICAR') or hasattr(pedido, 'invoice'),
-		'presentaciones': Presentacion.objects.select_related('producto').filter(producto__activo=True).order_by('producto__nombre', 'nombre'),
 		'invoice_suggested_price_rows': [
 			{
 				'item_id': item.id,
@@ -351,6 +351,51 @@ def backoffice_pedido_detalle(request, pedido_id):
 		],
 	}
 	return render(request, 'backoffice/pedido_detalle.html', context)
+
+
+def _default_presentacion_price_for_pedido(*, presentacion, pedido):
+	cliente = getattr(pedido, 'cliente', None)
+	tier = cliente.get_nivel_precio_normalizado() if cliente and hasattr(cliente, 'get_nivel_precio_normalizado') else None
+	price = presentacion.get_price_for_tier(tier)
+	if price is None:
+		price = presentacion.precio_1
+	return _quantize_money(price or 0)
+
+
+@login_required
+@internal_permission_required('backoffice.orders.view')
+def backoffice_buscar_presentaciones(request):
+	query = (request.GET.get('q') or '').strip()
+	if len(query) < 2:
+		return JsonResponse({'results': []})
+
+	presentaciones = (
+		Presentacion.objects.select_related('producto')
+		.filter(producto__activo=True)
+		.filter(
+			Q(producto__nombre__icontains=query)
+			| Q(producto__nombre_en__icontains=query)
+			| Q(nombre__icontains=query)
+			| Q(producto__codigo_barras__icontains=query)
+		)
+		.order_by('producto__nombre', 'nombre')[:30]
+	)
+
+	pedido = None
+	pedido_id = (request.GET.get('pedido_id') or '').strip()
+	if pedido_id.isdigit():
+		pedido = Pedido.objects.select_related('cliente').filter(id=int(pedido_id)).first()
+
+	results = []
+	for presentacion in presentaciones:
+		default_price = _default_presentacion_price_for_pedido(presentacion=presentacion, pedido=pedido) if pedido else _quantize_money(presentacion.precio_1 or 0)
+		results.append({
+			'id': presentacion.id,
+			'label': f'{presentacion.producto.nombre} - {presentacion.nombre}',
+			'price': format(default_price, '.2f'),
+		})
+
+	return JsonResponse({'results': results})
 
 
 @login_required

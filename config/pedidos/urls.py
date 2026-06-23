@@ -4,6 +4,7 @@ from . import views
 
 urlpatterns = [
     path('backoffice/', views.backoffice_dashboard, name='backoffice_dashboard'),
+    path('backoffice/presentaciones/buscar/', views.backoffice_buscar_presentaciones, name='backoffice_buscar_presentaciones'),
     path('backoffice/ordenes/', views.backoffice_pedidos, name='backoffice_pedidos'),
     path('backoffice/<int:pedido_id>/', views.backoffice_pedido_detalle, name='backoffice_pedido_detalle'),
     path('backoffice/<int:pedido_id>/asignar-picking/', views.backoffice_asignar_picking, name='backoffice_asignar_picking'),

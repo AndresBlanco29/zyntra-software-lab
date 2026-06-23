@@ -1,9 +1,10 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n %}
+{% load static i18n %}
 
 {% block title %}{% trans "Order" %} #{{ pedido.id }}{% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="{% static 'css/pedido-product-search.css' %}">
 <h2 class="mb-3">{% trans "Sales Order" %} #{{ pedido.id }}</h2>
 <p class="text-muted">{% trans "Customer" %}: {{ pedido.cliente.nombre_empresa }} | {% trans "Origin" %}: {{ pedido_origen_label }}</p>
 {% if pedido.workflow_badge %}
@@ -466,20 +467,35 @@
 
     <hr>
     <h6 class="mb-3">{% trans "Add a new product to this order" %}</h6>
-    <div class="row g-2 mb-3">
+    <div class="row g-2 mb-3 align-items-end">
       <div class="col-md-6">
-        <select name="presentacion_nueva" class="form-select" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
-          <option value="">{% trans "Select a presentation..." %}</option>
-          {% for p in presentaciones %}
-          <option value="{{ p.id }}">{{ p.producto.nombre }} - {{ p.nombre }}</option>
-          {% endfor %}
-        </select>
+        <label class="form-label fw-semibold" for="buscadorProductoPedido">{% trans "Search product" %}</label>
+        <div
+          class="product-search-field position-relative"
+          id="newProductSearchRoot"
+          data-search-url="{% url 'backoffice_buscar_presentaciones' %}"
+          data-pedido-id="{{ pedido.id }}"
+          data-empty-message="{% trans 'No products found.'|escapejs %}"
+          data-min-chars-message="{% trans 'Type at least 2 characters to search.'|escapejs %}">
+          <input
+            type="search"
+            id="buscadorProductoPedido"
+            class="form-control"
+            placeholder="{% trans 'Search products by full name...' %}"
+            autocomplete="off"
+            {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+          <input type="hidden" name="presentacion_nueva" id="presentacionNuevaId" value="">
+          <div id="newProductSearchResults" class="product-search-results list-group shadow-sm" hidden></div>
+          <div id="newProductSelectedLabel" class="small text-success fw-semibold mt-1" hidden></div>
+        </div>
       </div>
       <div class="col-md-2">
-        <input type="number" min="1" name="cantidad_nueva" class="form-control" placeholder="{% trans 'Qty.' %}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+        <label class="form-label fw-semibold" for="cantidadNuevaPedido">{% trans "Qty." %}</label>
+        <input type="number" min="1" id="cantidadNuevaPedido" name="cantidad_nueva" class="form-control" placeholder="{% trans 'Qty.' %}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
       </div>
       <div class="col-md-2">
-        <input type="number" min="0" step="0.01" name="precio_nuevo" class="form-control" placeholder="{% trans 'Price' %}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+        <label class="form-label fw-semibold" for="precioNuevoPedido">{% trans "Price" %}</label>
+        <input type="number" min="0" step="0.01" id="precioNuevoPedido" name="precio_nuevo" class="form-control" placeholder="{% trans 'Price' %}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
       </div>
     </div>
 
@@ -695,4 +711,5 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 });
 </script>
+<script defer src="{% static 'js/pedido_detalle_product_search.js' %}"></script>
 {% endblock %}

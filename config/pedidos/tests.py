@@ -500,7 +500,21 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, 'tom-select.complete.min.js')
 		self.assertContains(response, 'searchable-selects.js')
+		self.assertContains(response, 'buscadorProductoPedido')
+		self.assertContains(response, 'pedido_detalle_product_search.js')
 		self.assertContains(response, 'name="presentacion_nueva"', html=False)
+
+	def test_backoffice_search_presentaciones_returns_matching_products(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_buscar_presentaciones'), {
+			'q': 'Producto test',
+			'pedido_id': self.pedido.id,
+		})
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(any(result['id'] == self.presentacion.id for result in payload['results']))
+		self.assertTrue(any('Producto test' in result['label'] for result in payload['results']))
 
 	def test_searchable_selects_script_uses_dropdown_input_plugin(self):
 		from pathlib import Path

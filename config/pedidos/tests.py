@@ -493,6 +493,22 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, f'value="{self.presentacion_unidad.id}"', html=False)
 		self.assertContains(response, f'>{self.presentacion_unidad.nombre}</option>', html=False)
 
+	def test_backoffice_detail_includes_searchable_select_assets(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'tom-select.complete.min.js')
+		self.assertContains(response, 'searchable-selects.js')
+		self.assertContains(response, 'name="presentacion_nueva"', html=False)
+
+	def test_searchable_selects_script_uses_dropdown_input_plugin(self):
+		from pathlib import Path
+
+		js_path = Path(settings.BASE_DIR) / 'static' / 'js' / 'searchable-selects.js'
+		content = js_path.read_text(encoding='utf-8')
+		self.assertIn('dropdown_input', content)
+
 	def test_backoffice_can_edit_quantities_after_verified_picking(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		guardar_verificacion_picking(

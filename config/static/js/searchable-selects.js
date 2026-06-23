@@ -14,6 +14,17 @@
     return classes.join(' ');
   }
 
+  function meaningfulOptionCount(select) {
+    var count = 0;
+    for (var i = 0; i < select.options.length; i++) {
+      var option = select.options[i];
+      if (option.value || (option.textContent || '').trim()) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
   function shouldEnhance(select) {
     if (!select || select.tagName !== 'SELECT') {
       return false;
@@ -36,29 +47,36 @@
     if (typeof TomSelect !== 'undefined' && TomSelect.getInstance(select)) {
       return false;
     }
+    if (meaningfulOptionCount(select) <= 2) {
+      return false;
+    }
     return true;
   }
 
+  function buildPlugins(select) {
+    var plugins = ['dropdown_input'];
+    if (select.multiple) {
+      plugins.unshift('remove_button');
+    }
+    return plugins;
+  }
+
   function buildTomSelectOptions(select) {
-    var options = {
+    return {
       create: false,
       allowEmptyOption: true,
       maxOptions: null,
+      openOnFocus: true,
       dropdownParent: 'body',
       sortField: { field: 'text', direction: 'asc' },
       placeholder: i18n.placeholder,
+      plugins: buildPlugins(select),
       render: {
         no_results: function () {
           return '<div class="no-results px-3 py-2 text-muted">' + i18n.noResults + '</div>';
         },
       },
     };
-
-    if (select.multiple) {
-      options.plugins = ['remove_button'];
-    }
-
-    return options;
   }
 
   function initSearchableSelect(select) {
@@ -66,15 +84,20 @@
       return null;
     }
 
-    var instance = new TomSelect(select, buildTomSelectOptions(select));
-    var wrapper = instance.wrapper;
-    if (wrapper) {
-      getTomSelectClass(select).split(' ').filter(Boolean).forEach(function (className) {
-        wrapper.classList.add(className);
-      });
+    try {
+      var instance = new TomSelect(select, buildTomSelectOptions(select));
+      var wrapper = instance.wrapper;
+      if (wrapper) {
+        getTomSelectClass(select).split(' ').filter(Boolean).forEach(function (className) {
+          wrapper.classList.add(className);
+        });
+      }
+      select.dataset.searchSelectInitialized = 'true';
+      return instance;
+    } catch (error) {
+      console.warn('LTGSearchableSelect: could not enhance select', select.name || select.id, error);
+      return null;
     }
-    select.dataset.searchSelectInitialized = 'true';
-    return instance;
   }
 
   function initAll(root) {

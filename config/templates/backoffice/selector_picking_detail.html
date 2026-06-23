@@ -156,7 +156,9 @@
         return;
       }
 
-      var selectedOption = select.options[select.selectedIndex];
+      var selectedOption = Array.from(select.options).find(function (option) {
+        return option.value === select.value;
+      });
       stepper.dataset.stockPhysical = selectedOption ? Number(selectedOption.dataset.stockPhysical || 0) : 0;
     }
 
@@ -284,8 +286,12 @@
     addProductRowButton.addEventListener('click', function () {
       var row = buildAddedProductRow();
       pickerItemsTableBody.appendChild(row);
+      var addedSelect = row.querySelector('[data-added-product-select]');
+      if (window.LTGSearchableSelect && addedSelect) {
+        window.LTGSearchableSelect.init(addedSelect);
+      }
       initQuantityStepper(row.querySelector('[data-quantity-stepper]'));
-      row.querySelector('[data-added-product-select]').addEventListener('change', function () {
+      addedSelect.addEventListener('change', function () {
         syncAddedProductRow(row);
         updateFormState();
       });

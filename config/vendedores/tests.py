@@ -112,7 +112,7 @@ class VendedorPedidoTests(TestCase):
 		)
 		return pedido
 
-	def test_enviar_pedido_returns_json_error_when_stock_is_unavailable(self):
+	def test_enviar_pedido_allows_order_without_available_stock(self):
 		self.client.force_login(self.vendor)
 		session = self.client.session
 		session['cliente_id'] = self.customer.id
@@ -130,15 +130,18 @@ class VendedorPedidoTests(TestCase):
 
 		response = self.client.post(reverse('enviar_pedido'), {'tipo_orden': 'VISITA'})
 
-		self.assertEqual(response.status_code, 409)
-		self.assertEqual(Pedido.objects.count(), 0)
+		self.assertEqual(response.status_code, 200)
+		pedido = Pedido.objects.get()
 		self.assertJSONEqual(
 			response.content,
 			{
-				'success': False,
-				'error': 'Insufficient available stock for Coca-Colaaaaaaaa - caja. Requested 1, available 0.',
+				'success': True,
+				'pedido_id': pedido.id,
 			},
 		)
+		item = pedido.items.get()
+		self.assertEqual(item.cantidad_reservada_inventario, 0)
+		self.assertEqual(item.cantidad_inventario_aplicada, 0)
 
 	def test_tomar_pedido_paginates_approved_customers(self):
 		self.customer.aprobado = True

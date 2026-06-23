@@ -600,6 +600,8 @@ def enviar_pedido(request):
             nota_cliente=(request.POST.get('nota') or '').strip(),
             acepta_terminos=False,
             canal_toma=tipo_orden,
+            bypass_stock_check=True,
+            reservar_inventario=False,
         )
     except ValidationError as exc:
         error_message = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)

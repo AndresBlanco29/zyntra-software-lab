@@ -21,6 +21,8 @@ from config.core.pdf_branding import (
 	build_pdf_brand_banner,
 )
 from config.core.workflow_badges import build_order_workflow_badge
+from config.clientes.credit_limit import evaluate_customer_credit_limit, resolve_credit_limit_alert
+from config.clientes.models import ClienteCreditoLimiteAlerta
 from config.usuarios.permissions import internal_permission_required
 from config.usuarios.models import Usuario
 from config.inventario.services import ajustar_cantidad_item_pedido_despues_picking, ajustar_reserva_item_pedido, reemplazar_presentacion_item_pedido, reemplazar_presentacion_item_pedido_despues_picking
@@ -480,6 +482,14 @@ def backoffice_pedido_detalle(request, pedido_id):
 		'discount_preset_options': _build_pedido_discount_preset_options(),
 		'presentation_price_map': _build_pedido_presentation_price_map(pedido=pedido, pedido_items=pedido_items),
 		'default_price_key': _default_presentacion_price_key_for_pedido(pedido=pedido),
+		'credit_limit_evaluation': evaluate_customer_credit_limit(cliente=pedido.cliente, additional_amount=pedido.total),
+		'pending_credit_limit_alert': (
+			ClienteCreditoLimiteAlerta.objects.filter(
+				pedido=pedido,
+				estado=ClienteCreditoLimiteAlerta.ESTADO_PENDIENTE,
+			).order_by('-creado_en').first()
+		),
+		'show_credit_limit_alert_modal': request.GET.get('credit_limit_alert') == '1',
 		**edit_lock_context,
 	}
 	return render(request, 'backoffice/pedido_detalle.html', context)
@@ -698,6 +708,34 @@ def backoffice_resolver_bloqueo_picking(request, pedido_id):
 				_('The order was unlocked, but inventory could not be applied yet: %(reason)s') % {'reason': inventory_warning},
 			)
 
+	return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_resolve_credit_limit(request, pedido_id):
+	pedido = get_object_or_404(Pedido.objects.select_related('cliente'), id=pedido_id)
+	if request.method != 'POST':
+		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+	action = (request.POST.get('action') or '').strip().lower()
+	try:
+		with transaction.atomic():
+			resolve_credit_limit_alert(pedido=pedido, usuario=request.user, action=action)
+	except ValueError:
+		messages.error(request, _('The credit limit alert is no longer pending review.'))
+		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+	if action == 'release':
+		messages.success(
+			request,
+			_('Credit limit exception released for this order. You can now generate the invoice.'),
+		)
+	else:
+		messages.error(
+			request,
+			_('This order was blocked and the customer was placed on credit hold. The invoice cannot be issued.'),
+		)
 	return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
 

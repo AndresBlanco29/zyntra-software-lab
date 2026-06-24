@@ -193,6 +193,14 @@ class Cliente(models.Model):
         default=False
     )
 
+    credit_limit = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text='Maximum total due balance allowed for this customer. Leave empty for no limit.',
+    )
+
     balance = models.DecimalField(
         max_digits=12,
         decimal_places=2,
@@ -292,5 +300,60 @@ class Cliente(models.Model):
         """Unapplied store credit available to apply on invoices."""
         return self.customer_credit_balance
 
+    def get_credit_limit_remaining(self):
+        if self.credit_limit is None:
+            return None
+        return max(Decimal(str(self.credit_limit)) - self.due_balance, Decimal('0.00'))
+
     def __str__(self):
         return self.nombre_empresa
+
+
+class ClienteCreditoLimiteAlerta(models.Model):
+    ESTADO_PENDIENTE = 'PENDIENTE'
+    ESTADO_LIBERADO = 'LIBERADO'
+    ESTADO_BLOQUEADO = 'BLOQUEADO'
+
+    ESTADO_CHOICES = (
+        (ESTADO_PENDIENTE, 'Pending review'),
+        (ESTADO_LIBERADO, 'Released'),
+        (ESTADO_BLOQUEADO, 'Blocked'),
+    )
+
+    cliente = models.ForeignKey(
+        Cliente,
+        on_delete=models.CASCADE,
+        related_name='alertas_limite_credito',
+    )
+    pedido = models.ForeignKey(
+        'pedidos.Pedido',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='alertas_limite_credito',
+    )
+    monto_adeudado = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    monto_operacion = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    limite_credito = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    exceso = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default=ESTADO_PENDIENTE, db_index=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    resuelto_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='alertas_limite_credito_resueltas',
+    )
+    resuelto_en = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ('-creado_en',)
+
+    def __str__(self):
+        return f'Credit limit alert #{self.id} - {self.cliente.nombre_empresa}'
+
+    @property
+    def saldo_proyectado(self):
+        total = Decimal(str(self.monto_adeudado or '0.00')) + Decimal(str(self.monto_operacion or '0.00'))
+        return total.quantize(Decimal('0.01'))

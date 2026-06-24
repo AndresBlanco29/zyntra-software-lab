@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load static i18n permissions_tags pagination_tags %}
+{% load static i18n permissions_tags pagination_tags l10n %}
 
 {% block title %}
 {% trans "Clientes" %}
@@ -41,6 +41,10 @@
   data-msg-terms-success-title="{% trans 'Payment terms updated' %}"
   data-msg-terms-success-body="{% trans 'The customer payment terms were saved successfully.' %}"
   data-msg-terms-select-required="{% trans 'Please select a payment term.' %}"
+  data-msg-credit-limit-error-prefix="{% trans 'Error saving credit limit:' %}"
+  data-msg-credit-limit-success-title="{% trans 'Credit limit updated' %}"
+  data-msg-credit-limit-success-body="{% trans 'The customer credit limit was saved successfully.' %}"
+  data-msg-credit-limit-invalid="{% trans 'Enter a valid credit limit amount.' %}"
 >
 
 <section class="vendor-hero vendor-hero--customers mb-4">
@@ -192,6 +196,13 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
   class="btn btn-sm vendor-terms-btn"
   onclick="abrirModalTerminosCliente({{ cliente.id }}, '{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa|escapejs }}', '{{ cliente.terminos_pago|escapejs }}')">
 {% trans "Terms" %}
+</button>
+
+<button
+  type="button"
+  class="btn btn-sm vendor-credit-limit-btn"
+  onclick="abrirModalLimiteCreditoCliente({{ cliente.id }}, '{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa|escapejs }}', '{{ cliente.credit_limit|default_if_none:''|unlocalize }}', '{{ cliente.due_balance|unlocalize }}')">
+{% trans "Credit limit" %}
 </button>
 
 {% if request.user|has_internal_permission:'vendor.customers.manage' %}
@@ -411,6 +422,64 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
       </div>
       <div class="modal-footer border-0 justify-content-center pb-3">
         <button type="button" class="btn" style="background: linear-gradient(to right, #0b3d91, #1565c0); color: white; font-weight: 700; padding: 10px 25px;" data-bs-dismiss="modal">{% trans "Cerrar" %}</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIGURAR LIMITE DE CREDITO -->
+<div class="modal fade" id="configurarLimiteCreditoClienteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);">
+      <div class="modal-header border-0" style="background: linear-gradient(135deg, #7c2d12, #ea580c); border-radius: 12px 12px 0 0;">
+        <div>
+          <h5 class="modal-title text-white fw-bold mb-1">{% trans "Credit limit" %}</h5>
+          <p class="text-white-50 small mb-0" id="limiteCreditoClienteNombre"></p>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <p class="text-muted small mb-3">{% trans "Set the maximum total due balance this customer can owe La Tortilla. Leave empty for no limit." %}</p>
+        <form id="formConfigurarLimiteCreditoCliente" onsubmit="return false;">
+          {% csrf_token %}
+          <input type="hidden" id="limiteCreditoClienteId" name="cliente_id">
+          <div class="mb-3">
+            <label class="form-label fw-bold" for="limiteCreditoMonto">{% trans "Credit limit" %}</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input type="number" min="0" step="0.01" class="form-control" id="limiteCreditoMonto" name="credit_limit" placeholder="2000.00">
+            </div>
+          </div>
+          <div class="border rounded-3 p-3 bg-light-subtle small">
+            <div class="d-flex justify-content-between mb-1"><span class="text-muted">{% trans "Current due balance" %}</span><strong id="limiteCreditoDueBalance">$0.00</strong></div>
+            <div class="d-flex justify-content-between"><span class="text-muted">{% trans "Remaining limit" %}</span><strong id="limiteCreditoRemaining">-</strong></div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Cancelar" %}</button>
+        <button type="button" class="btn vendor-credit-limit-save-btn" onclick="guardarLimiteCreditoCliente()">{% trans "Guardar" %}</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ÉXITO CONFIGURAR LIMITE DE CREDITO -->
+<div class="modal fade" id="exitoLimiteCreditoClienteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);">
+      <div class="modal-header border-0" style="background: linear-gradient(135deg, #7c2d12, #ea580c); border-radius: 12px 12px 0 0;">
+        <div class="w-100 text-center text-white" style="padding: 20px 0;">
+          <i class="bi bi-check-circle" style="font-size: 3rem; display: block; margin-bottom: 10px;"></i>
+        </div>
+        <button type="button" class="btn-close btn-close-white position-absolute" style="top: 10px; right: 15px;" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center p-4">
+        <h5 class="fw-bold mb-2" style="color: #7c2d12;" id="tituloExitoLimiteCreditoCliente"></h5>
+        <p class="text-muted" id="textoExitoLimiteCreditoCliente"></p>
+      </div>
+      <div class="modal-footer border-0 justify-content-center pb-3">
+        <button type="button" class="btn vendor-credit-limit-save-btn" data-bs-dismiss="modal">{% trans "Cerrar" %}</button>
       </div>
     </div>
   </div>

@@ -55,7 +55,11 @@ function getCustomerPageMessages() {
         termsErrorPrefix: dataset.msgTermsErrorPrefix || 'Error saving payment terms:',
         termsSuccessTitle: dataset.msgTermsSuccessTitle || 'Payment terms updated',
         termsSuccessBody: dataset.msgTermsSuccessBody || 'The customer payment terms were saved successfully.',
-        termsSelectRequired: dataset.msgTermsSelectRequired || 'Please select a payment term.'
+        termsSelectRequired: dataset.msgTermsSelectRequired || 'Please select a payment term.',
+        creditLimitErrorPrefix: dataset.msgCreditLimitErrorPrefix || 'Error saving credit limit:',
+        creditLimitSuccessTitle: dataset.msgCreditLimitSuccessTitle || 'Credit limit updated',
+        creditLimitSuccessBody: dataset.msgCreditLimitSuccessBody || 'The customer credit limit was saved successfully.',
+        creditLimitInvalid: dataset.msgCreditLimitInvalid || 'Enter a valid credit limit amount.'
     };
 }
 
@@ -378,6 +382,114 @@ function guardarTerminosCliente() {
 
 window.abrirModalTerminosCliente = abrirModalTerminosCliente;
 window.guardarTerminosCliente = guardarTerminosCliente;
+
+function formatMoney(value) {
+    const amount = Number(value || 0);
+    if (Number.isNaN(amount)) {
+        return '$0.00';
+    }
+    return '$' + amount.toFixed(2);
+}
+
+function updateCreditLimitRemainingPreview() {
+    const limitInput = document.getElementById('limiteCreditoMonto');
+    const dueBalanceLabel = document.getElementById('limiteCreditoDueBalance');
+    const remainingLabel = document.getElementById('limiteCreditoRemaining');
+    if (!limitInput || !dueBalanceLabel || !remainingLabel) {
+        return;
+    }
+
+    const dueBalance = Number(dueBalanceLabel.dataset.dueBalance || '0');
+    const limitValue = limitInput.value.trim();
+    if (!limitValue) {
+        remainingLabel.textContent = '-';
+        return;
+    }
+
+    const limit = Number(limitValue);
+    if (Number.isNaN(limit)) {
+        remainingLabel.textContent = '-';
+        return;
+    }
+
+    remainingLabel.textContent = formatMoney(Math.max(limit - dueBalance, 0));
+}
+
+function abrirModalLimiteCreditoCliente(clienteId, nombreCliente, limiteActual, dueBalance) {
+    document.getElementById('limiteCreditoClienteId').value = clienteId;
+    document.getElementById('limiteCreditoClienteNombre').textContent = nombreCliente || customerMessages.customerFallbackName;
+    document.getElementById('limiteCreditoMonto').value = limiteActual || '';
+    const dueBalanceLabel = document.getElementById('limiteCreditoDueBalance');
+    dueBalanceLabel.textContent = formatMoney(dueBalance);
+    dueBalanceLabel.dataset.dueBalance = dueBalance || '0';
+    updateCreditLimitRemainingPreview();
+
+    const modal = new bootstrap.Modal(document.getElementById('configurarLimiteCreditoClienteModal'));
+    modal.show();
+}
+
+function guardarLimiteCreditoCliente() {
+    const clienteId = document.getElementById('limiteCreditoClienteId').value;
+    const limitInput = document.getElementById('limiteCreditoMonto');
+    const limitValue = limitInput ? limitInput.value.trim() : '';
+
+    if (!clienteId) {
+        return;
+    }
+
+    if (limitValue && Number.isNaN(Number(limitValue))) {
+        alert(customerMessages.creditLimitInvalid);
+        return;
+    }
+
+    fetch('/vendedores/configurar-limite-credito-cliente/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            cliente_id: clienteId,
+            credit_limit: limitValue
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            alert(`${customerMessages.creditLimitErrorPrefix} ${data.message || customerMessages.unknownError}`);
+            return;
+        }
+
+        const modalLimite = bootstrap.Modal.getInstance(document.getElementById('configurarLimiteCreditoClienteModal'));
+        if (modalLimite) {
+            modalLimite.hide();
+        }
+
+        document.getElementById('tituloExitoLimiteCreditoCliente').textContent = customerMessages.creditLimitSuccessTitle;
+        document.getElementById('textoExitoLimiteCreditoCliente').textContent = customerMessages.creditLimitSuccessBody;
+
+        const modalExito = new bootstrap.Modal(document.getElementById('exitoLimiteCreditoClienteModal'));
+        modalExito.show();
+
+        setTimeout(function () {
+            location.reload();
+        }, 1600);
+    })
+    .catch(function (error) {
+        console.error('Error:', error);
+        alert(customerMessages.requestError);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    const limitInput = document.getElementById('limiteCreditoMonto');
+    if (limitInput) {
+        limitInput.addEventListener('input', updateCreditLimitRemainingPreview);
+    }
+});
+
+window.abrirModalLimiteCreditoCliente = abrirModalLimiteCreditoCliente;
+window.guardarLimiteCreditoCliente = guardarLimiteCreditoCliente;
 
 function abrirModalAccesoCliente(clienteId, nombreCliente) {
     document.getElementById('accesoClienteId').value = clienteId;

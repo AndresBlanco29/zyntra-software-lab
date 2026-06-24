@@ -63,6 +63,8 @@ class Pedido(models.Model):
 	picking_bloqueado = models.BooleanField(default=False)
 	picking_asignado_en = models.DateTimeField(blank=True, null=True)
 	picking_verificado_en = models.DateTimeField(blank=True, null=True)
+	credit_limit_liberado = models.BooleanField(default=False)
+	credit_limit_bloqueado = models.BooleanField(default=False)
 	acepta_terminos = models.BooleanField(default=False)
 	acepta_terminos_en = models.DateTimeField(blank=True, null=True)
 	total = models.DecimalField(max_digits=12, decimal_places=2, default=0)

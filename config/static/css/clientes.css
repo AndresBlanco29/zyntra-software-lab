@@ -319,6 +319,22 @@ transform:translateY(-1px);
     font-weight: 700;
 }
 
+.vendor-credit-limit-btn,
+.vendor-credit-limit-save-btn {
+    background: linear-gradient(to right, #c2410c, #ea580c);
+    border: none;
+    color: #fff;
+    font-weight: 700;
+}
+
+.vendor-credit-limit-btn:hover,
+.vendor-credit-limit-btn:focus,
+.vendor-credit-limit-save-btn:hover,
+.vendor-credit-limit-save-btn:focus {
+    background: linear-gradient(to right, #9a3412, #c2410c);
+    color: #fff;
+}
+
 .vendor-terms-btn,
 .vendor-terms-save-btn {
     background: linear-gradient(to right, #334155, #475569);

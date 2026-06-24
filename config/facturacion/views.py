@@ -20,6 +20,14 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+from config.clientes.credit_limit import (
+	CreditLimitBlockedError,
+	CreditLimitExceededError,
+	create_credit_limit_alert,
+	evaluate_customer_credit_limit,
+	notify_credit_limit_alert,
+	validate_credit_limit_for_pedido_invoice,
+)
 from config.clientes.models import Cliente
 from config.core.datetime_formats import format_local_date, format_local_datetime
 from config.core.product_ordering import order_invoice_items_for_display
@@ -1177,6 +1185,7 @@ def backoffice_generate_invoice(request, pedido_id):
 			request.POST,
 			available_credit=pending_notes_summary['available_credit_excluding_notes'],
 		)
+		validate_credit_limit_for_pedido_invoice(pedido=pedido, request_amount=pedido.total)
 		invoice = generar_invoice_desde_picking(
 			pedido=pedido,
 			metodo_entrega=metodo_entrega,
@@ -1188,6 +1197,23 @@ def backoffice_generate_invoice(request, pedido_id):
 			selected_note_applications=selected_note_applications,
 			estimated_delivery_at=estimated_delivery_at,
 		)
+	except CreditLimitBlockedError as exc:
+		messages.error(
+			request,
+			_('This order is blocked because the customer exceeded the credit limit. Remaining limit: $%(remaining)s. Exceeded by: $%(excess)s.') % {
+				'remaining': exc.evaluation.remaining_limit,
+				'excess': exc.evaluation.excess_amount,
+			},
+		)
+		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+	except CreditLimitExceededError as exc:
+		alerta = create_credit_limit_alert(cliente=pedido.cliente, pedido=pedido, evaluation=exc.evaluation)
+		notify_credit_limit_alert(alerta=alerta, pedido_id=pedido.id)
+		messages.warning(
+			request,
+			_('The customer exceeded the credit limit. Review the alert and choose Release or Block before generating the invoice.'),
+		)
+		return redirect(f"{reverse('backoffice_pedido_detalle', args=[pedido.id])}?credit_limit_alert=1")
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)

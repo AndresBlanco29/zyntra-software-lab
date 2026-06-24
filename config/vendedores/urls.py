@@ -13,6 +13,7 @@ urlpatterns = [
     path("pedido/actualizar/",views.actualizar_cantidad_pedido,name="actualizar_cantidad_pedido"),
     path('editar-cliente/', views.editar_cliente, name='editar_cliente'),
     path('configurar-terminos-cliente/', views.configurar_terminos_cliente, name='configurar_terminos_cliente'),
+    path('configurar-limite-credito-cliente/', views.configurar_limite_credito_cliente, name='configurar_limite_credito_cliente'),
     path('desactivar-cliente/', views.desactivar_cliente, name='desactivar_cliente'),
     path('activar-cliente/', views.activar_cliente, name='activar_cliente'),
     path('configurar-acceso-cliente/', views.configurar_acceso_cliente, name='configurar_acceso_cliente'),

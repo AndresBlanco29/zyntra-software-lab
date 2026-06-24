@@ -583,3 +583,31 @@ class VendedorEditarClienteTests(TestCase):
 		self.assertEqual(response.status_code, 400)
 		payload = response.json()
 		self.assertFalse(payload['success'])
+
+	def test_customer_list_shows_credit_limit_button(self):
+		self.client.force_login(self.vendor)
+
+		response = self.client.get(reverse('vendedores_clientes'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Credit limit')
+		self.assertContains(response, 'abrirModalLimiteCreditoCliente')
+
+	def test_vendor_can_configure_customer_credit_limit(self):
+		self.client.force_login(self.vendor)
+
+		response = self.client.post(
+			reverse('configurar_limite_credito_cliente'),
+			data=json.dumps({
+				'cliente_id': self.customer.id,
+				'credit_limit': '2000.00',
+			}),
+			content_type='application/json',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(payload['success'])
+		self.customer.refresh_from_db()
+		self.assertEqual(self.customer.credit_limit, Decimal('2000.00'))
+		self.assertEqual(payload['remaining_limit'], '2000.00')

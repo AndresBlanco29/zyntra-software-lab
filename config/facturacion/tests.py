@@ -222,6 +222,52 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(invoice.saldo_cliente, Decimal('15.00'))
 		self.assertEqual(self.cliente.balance, Decimal('0.00'))
 
+	def test_backoffice_generate_invoice_blocks_when_credit_limit_exceeded(self):
+		self.cliente.credit_limit = Decimal('2000.00')
+		self.cliente.balance = Decimal('1900.00')
+		self.cliente.save(update_fields=['credit_limit', 'balance'])
+		self.pedido.total = Decimal('2000.00')
+		self.pedido.save(update_fields=['total', 'actualizada_en'])
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('backoffice_generate_invoice', args=[self.pedido.id]), {
+			'metodo_entrega': 'CUSTOMER_PICK_UP',
+			'driver_id': '',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.assertIn('credit_limit_alert=1', response.url)
+		self.assertFalse(Invoice.objects.filter(pedido=self.pedido).exists())
+		self.assertTrue(self.cliente.alertas_limite_credito.filter(pedido=self.pedido, estado='PENDIENTE').exists())
+
+	def test_backoffice_generate_invoice_allows_release_after_credit_limit_alert(self):
+		self.cliente.credit_limit = Decimal('2000.00')
+		self.cliente.balance = Decimal('1900.00')
+		self.cliente.save(update_fields=['credit_limit', 'balance'])
+		self.pedido.total = Decimal('2000.00')
+		self.pedido.save(update_fields=['total', 'actualizada_en'])
+		self.client.force_login(self.backoffice)
+
+		first_response = self.client.post(reverse('backoffice_generate_invoice', args=[self.pedido.id]), {
+			'metodo_entrega': 'CUSTOMER_PICK_UP',
+			'driver_id': '',
+		})
+		self.assertIn('credit_limit_alert=1', first_response.url)
+
+		release_response = self.client.post(reverse('backoffice_resolve_credit_limit', args=[self.pedido.id]), {
+			'action': 'release',
+		})
+		self.assertRedirects(release_response, reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+		self.pedido.refresh_from_db()
+		self.assertTrue(self.pedido.credit_limit_liberado)
+
+		second_response = self.client.post(reverse('backoffice_generate_invoice', args=[self.pedido.id]), {
+			'metodo_entrega': 'CUSTOMER_PICK_UP',
+			'driver_id': '',
+		})
+		invoice = Invoice.objects.get(pedido=self.pedido)
+		self.assertRedirects(second_response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+
 	def test_generate_invoice_keeps_zero_quantity_lines_with_zero_subtotal(self):
 		self.pedido_item.cantidad = 0
 		self.pedido_item.subtotal = Decimal('0.00')

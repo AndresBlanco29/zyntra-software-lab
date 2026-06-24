@@ -1,10 +1,33 @@
 {% extends "bases/base_vendedor.html" %}
-{% load static i18n l10n %}
+{% load static i18n l10n permissions_tags %}
 
 {% block title %}{% trans "Order" %} #{{ pedido.id }}{% endblock %}
 
 {% block content %}
 <link rel="stylesheet" href="{% static 'css/pedido-product-search.css' %}">
+<style>
+  .credit-limit-alert-banner {
+    border-width: 2px !important;
+    animation: creditLimitPulse 1.4s ease-in-out infinite;
+  }
+  .credit-limit-alert-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    background: #dc3545;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  @keyframes creditLimitPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.35); }
+    50% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+  }
+</style>
 <h2 class="mb-3">{% trans "Sales Order" %} #{{ pedido.id }}</h2>
 <p class="text-muted">{% trans "Customer" %}: {{ pedido.cliente.nombre_empresa }} | {% trans "Origin" %}: {{ pedido_origen_label }}</p>
 {% if pedido.workflow_badge %}
@@ -12,6 +35,64 @@
   <span class="workflow-role-badge {% if pedido.workflow_badge.kind == 'split' %}workflow-role-badge--split{% endif %}" style="--workflow-start: {{ pedido.workflow_badge.color_start }}; --workflow-end: {{ pedido.workflow_badge.color_end }}; --workflow-text: {{ pedido.workflow_badge.text_color }};">
     {{ pedido.workflow_badge.label }}
   </span>
+</div>
+{% endif %}
+
+{% if credit_limit_evaluation.has_limit %}
+<div class="alert {% if credit_limit_evaluation.exceeds_limit %}alert-danger{% else %}alert-info{% endif %} border-0 shadow-sm mb-3 credit-limit-summary-banner">
+  <div class="d-flex flex-wrap justify-content-between gap-3 align-items-start">
+    <div>
+      <div class="fw-bold text-uppercase small mb-1">{% trans "Customer credit limit" %}</div>
+      <div>{% trans "Limit" %}: <strong>${{ credit_limit_evaluation.credit_limit|floatformat:2 }}</strong> |
+      {% trans "Due balance" %}: <strong>${{ credit_limit_evaluation.due_balance|floatformat:2 }}</strong> |
+      {% trans "This order" %}: <strong>${{ credit_limit_evaluation.request_amount|floatformat:2 }}</strong></div>
+      <div class="small mt-1">
+        {% trans "Remaining limit" %}: <strong>${{ credit_limit_evaluation.remaining_limit|floatformat:2 }}</strong>
+        {% if credit_limit_evaluation.exceeds_limit %}
+        | {% trans "Would exceed by" %}: <strong>${{ credit_limit_evaluation.excess_amount|floatformat:2 }}</strong>
+        {% endif %}
+      </div>
+    </div>
+    {% if pedido.credit_limit_liberado %}
+    <span class="badge text-bg-success">{% trans "Exception released for this order" %}</span>
+    {% elif pedido.credit_limit_bloqueado %}
+    <span class="badge text-bg-danger">{% trans "Blocked by credit limit" %}</span>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if pending_credit_limit_alert %}
+<div class="alert alert-danger border-danger shadow-lg mb-3 credit-limit-alert-banner" role="alert">
+  <div class="d-flex align-items-start gap-3">
+    <div class="credit-limit-alert-icon">!</div>
+    <div class="flex-grow-1">
+      <h4 class="alert-heading mb-2">{% trans "Credit limit exceeded — admin review required" %}</h4>
+      <p class="mb-2">{% blocktrans with customer=pedido.cliente.nombre_empresa %}The customer <strong>{{ customer }}</strong> is trying to generate an invoice / order that exceeds the configured credit limit.{% endblocktrans %}</p>
+      <ul class="mb-3">
+        <li>{% trans "Credit limit" %}: <strong>${{ pending_credit_limit_alert.limite_credito|floatformat:2 }}</strong></li>
+        <li>{% trans "Current due balance" %}: <strong>${{ pending_credit_limit_alert.monto_adeudado|floatformat:2 }}</strong></li>
+        <li>{% trans "This order / invoice amount" %}: <strong>${{ pending_credit_limit_alert.monto_operacion|floatformat:2 }}</strong></li>
+        <li>{% trans "Projected due balance" %}: <strong>${{ pending_credit_limit_alert.saldo_proyectado|floatformat:2 }}</strong></li>
+        <li>{% trans "Exceeded by" %}: <strong>${{ pending_credit_limit_alert.exceso|floatformat:2 }}</strong></li>
+      </ul>
+      {% if request.user|has_internal_permission:'backoffice.orders.manage' %}
+      <div class="d-flex flex-wrap gap-2">
+        <form method="post" action="{% url 'backoffice_resolve_credit_limit' pedido.id %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="release">
+          <button type="submit" class="btn btn-success btn-lg">{% trans "Release" %}</button>
+        </form>
+        <form method="post" action="{% url 'backoffice_resolve_credit_limit' pedido.id %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="block">
+          <button type="submit" class="btn btn-danger btn-lg">{% trans "Block invoice" %}</button>
+        </form>
+      </div>
+      <div class="small text-muted mt-2">{% trans "Release allows this order to generate the invoice despite the exceeded limit. Block prevents issuing the invoice and places the customer on credit hold." %}</div>
+      {% endif %}
+    </div>
+  </div>
 </div>
 {% endif %}
 
@@ -117,7 +198,7 @@
             <a href="{% url 'backoffice_invoice_detail' invoice.id %}" class="btn btn-outline-primary">{% trans "View invoice" %}</a>
             <a href="{% url 'backoffice_invoice_pdf' invoice.id %}" class="btn btn-success">{% trans "Export invoice PDF" %}</a>
           </div>
-        {% elif pedido.estado == 'VERIFICADO_AJUSTADO' and not pedido.picking_bloqueado %}
+        {% elif pedido.estado == 'VERIFICADO_AJUSTADO' and not pedido.picking_bloqueado and not pedido.credit_limit_bloqueado %}
           <form method="post" action="{% url 'backoffice_generate_invoice' pedido.id %}" class="row g-2">
             {% csrf_token %}
             <div class="col-md-4">
@@ -143,8 +224,17 @@
               <div class="form-text">{% trans "Optional. Only used for driver routes." %}</div>
             </div>
             <div class="col-md-2 d-flex align-items-end">
-              <button type="submit" class="btn btn-primary w-100">{% trans "Generate invoice" %}</button>
+              <button type="submit" class="btn btn-primary w-100" {% if pending_credit_limit_alert and not pedido.credit_limit_liberado %}disabled{% endif %}>{% trans "Generate invoice" %}</button>
             </div>
+            {% if pedido.credit_limit_bloqueado %}
+            <div class="col-12">
+              <div class="alert alert-danger mb-0">{% trans "Invoice generation is blocked because this order exceeded the customer credit limit." %}</div>
+            </div>
+            {% elif pending_credit_limit_alert and not pedido.credit_limit_liberado %}
+            <div class="col-12">
+              <div class="alert alert-warning mb-0">{% trans "Review the credit limit alert above and choose Release or Block before generating the invoice." %}</div>
+            </div>
+            {% endif %}
             {% if pending_customer_notes_summary.notes %}
             <div class="col-12">
               <div class="border rounded-3 p-3 bg-warning-subtle">
@@ -1172,6 +1262,14 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 });
+{% if show_credit_limit_alert_modal %}
+document.addEventListener('DOMContentLoaded', function () {
+  const alertBanner = document.querySelector('.credit-limit-alert-banner');
+  if (alertBanner) {
+    alertBanner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+});
+{% endif %}
 </script>
 <script defer src="{% static 'js/pedido_detalle_product_search.js' %}"></script>
 <script defer src="{% static 'js/pedido_edit_lock.js' %}"></script>

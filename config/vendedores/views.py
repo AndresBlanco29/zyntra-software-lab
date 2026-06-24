@@ -23,7 +23,7 @@ import logging
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from config.facturacion.services import get_recent_customer_invoice_items_by_presentation
 from config.pedidos.services import (
@@ -915,6 +915,52 @@ def configurar_terminos_cliente(request):
         'message': _('Payment terms updated successfully.'),
         'terminos_pago': cliente.terminos_pago,
         'terminos_pago_label': cliente.get_terminos_pago_label(),
+    })
+
+
+@login_required
+@require_POST
+def configurar_limite_credito_cliente(request):
+    """Save the maximum due balance allowed for a customer."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': _('Invalid request.')}, status=400)
+
+    cliente_id = data.get('cliente_id')
+    raw_limit = data.get('credit_limit')
+
+    if not cliente_id:
+        return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
+
+    try:
+        cliente = filter_clientes_for_vendedor(
+            Cliente.objects.all(),
+            request.user,
+        ).get(id=cliente_id)
+    except Cliente.DoesNotExist:
+        return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
+
+    if raw_limit in (None, ''):
+        cliente.credit_limit = None
+    else:
+        try:
+            credit_limit = Decimal(str(raw_limit)).quantize(Decimal('0.01'))
+        except (InvalidOperation, TypeError, ValueError):
+            return JsonResponse({'success': False, 'message': _('Enter a valid credit limit amount.')}, status=400)
+        if credit_limit < 0:
+            return JsonResponse({'success': False, 'message': _('Credit limit cannot be negative.')}, status=400)
+        cliente.credit_limit = credit_limit
+
+    cliente.save(update_fields=['credit_limit'])
+
+    remaining_limit = cliente.get_credit_limit_remaining()
+    return JsonResponse({
+        'success': True,
+        'message': _('Credit limit updated successfully.'),
+        'credit_limit': str(cliente.credit_limit) if cliente.credit_limit is not None else '',
+        'remaining_limit': str(remaining_limit) if remaining_limit is not None else '',
+        'due_balance': str(cliente.due_balance),
     })
 
 

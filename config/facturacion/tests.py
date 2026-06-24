@@ -2484,7 +2484,7 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertEqual(len(items), 1)
 		self.assertEqual(items[0]['barcode'], '7501234567890')
-		self.assertEqual(items[0]['pack_size'], 'Caja x 12')
+		self.assertEqual(items[0]['pack_size'], 'CS')
 		self.assertEqual(items[0]['requested_quantity'], '4')
 		self.assertEqual(items[0]['dispatched_quantity'], '3')
 		self.assertEqual(items[0]['customer_price'], '$15.00')
@@ -2543,12 +2543,12 @@ class InvoiceFlowTests(TestCase):
 			['Alpha Soda', 'Tortilla 12', 'Zulu Soda'],
 		)
 
-	def test_invoice_pdf_item_rows_are_chunked_in_groups_of_ten(self):
+	def test_invoice_pdf_item_rows_are_chunked_in_groups_of_sixteen(self):
 		rows = [{'index': number} for number in range(23)]
 
 		chunks = _chunk_invoice_pdf_item_rows(rows)
 
-		self.assertEqual([len(chunk) for chunk in chunks], [10, 10, 3])
+		self.assertEqual([len(chunk) for chunk in chunks], [16, 7])
 		self.assertEqual(chunks[0][0]['index'], 0)
 		self.assertEqual(chunks[-1][-1]['index'], 22)
 
@@ -2567,7 +2567,7 @@ class InvoiceFlowTests(TestCase):
 		inner_barcode = barcode._cellvalues[0][0]
 		self.assertEqual(inner_barcode.fontName, 'Helvetica')
 		self.assertEqual(inner_barcode.fontSize, 5.5)
-		self.assertEqual(inner_barcode.barHeight, 18)
+		self.assertEqual(inner_barcode.barHeight, 15)
 
 	def test_invoice_pdf_terms_shows_client_due_balance_only(self):
 		self.cliente.balance = Decimal('20408.57')
@@ -2615,10 +2615,10 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertEqual(rows[1][0].text, 'Customer credit applied')
 		self.assertEqual(rows[1][1].text, '$24.98')
-		self.assertEqual(rows[-2][0].text, 'Outstanding invoice balance')
+		self.assertEqual(rows[-1][0].text, 'Total invoice')
 		self.assertEqual(rows[-1][1].text, '<b>$20.02</b>')
 
-	def test_invoice_pdf_totals_rows_use_final_invoice_total_when_balance_is_zero(self):
+	def test_invoice_pdf_totals_rows_use_total_invoice_label(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
 			metodo_entrega='RUTA_DRIVER',
@@ -2644,10 +2644,10 @@ class InvoiceFlowTests(TestCase):
 			body_style=styles['BodyText'],
 		)
 
-		self.assertEqual(rows[-2][0].text, 'Outstanding invoice balance')
-		self.assertEqual(rows[-2][1].text, '$0.00')
-		self.assertEqual(rows[-1][0].text, 'Final invoice total')
+		self.assertEqual(rows[-1][0].text, 'Total invoice')
 		self.assertEqual(rows[-1][1].text, '<b>$25.60</b>')
+		self.assertEqual(rows[-2][0].text, 'Debit notes')
+		self.assertEqual(rows[-2][1].text, '$11.36')
 
 	def test_backoffice_generate_invoice_view_saves_custom_suggested_unit_price(self):
 		self.client.force_login(self.backoffice)

@@ -1608,6 +1608,27 @@ msgstr "Outstanding invoice balance"
 msgid "Final invoice total"
 msgstr "Final invoice total"
 
+msgid "Total invoice"
+msgstr "Total factura"
+
+msgid "QtyOrd"
+msgstr "QtyOrd"
+
+msgid "Qtyshp"
+msgstr "Qtyshp"
+
+msgid "price"
+msgstr "precio"
+
+msgid "Disc/promo"
+msgstr "Disc/promo"
+
+msgid "net price"
+msgstr "precio neto"
+
+msgid "total"
+msgstr "total"
+
 msgid "Customer no."
 msgstr "Cliente no."
 

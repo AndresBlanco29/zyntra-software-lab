@@ -31,6 +31,7 @@ from config.core.pdf_branding import (
 	BRAND_SOFT_BLUE,
 	BRAND_SURFACE,
 	BRAND_TEXT,
+	NumberedPdfCanvas,
 	build_pdf_logo_image,
 )
 from config.integrations.quickbooks.sync import is_sync_locked
@@ -428,7 +429,7 @@ def _build_invoice_pdf_item_data(invoice):
 		items.append({
 			'barcode': barcode,
 			'product_name': item.producto_nombre,
-			'pack_size': _resolve_invoice_pack_size(item),
+			'pack_size': INVOICE_PDF_UNIT_OF_MEASURE,
 			'requested_quantity': str(requested_quantity),
 			'dispatched_quantity': str(item.cantidad_facturada),
 			'list_price': _format_pdf_money(list_price_value) if list_price_value is not None else '—',
@@ -443,7 +444,8 @@ def _build_invoice_pdf_item_data(invoice):
 	return items
 
 
-INVOICE_PDF_ITEMS_PER_PAGE = 10
+INVOICE_PDF_ITEMS_PER_PAGE = 16
+INVOICE_PDF_UNIT_OF_MEASURE = 'CS'
 INVOICE_PDF_SHOW_SUGGESTED_RETAIL = False
 INVOICE_PDF_ITEM_COLUMN_WEIGHTS_BASE = (70, 138, 38, 28, 28, 48, 34, 48, 48)
 INVOICE_PDF_SUGGESTED_RETAIL_COLUMN_WEIGHT = 84
@@ -465,12 +467,12 @@ def _build_invoice_pdf_item_table_header(header_style):
 		Paragraph(_('Barcode'), header_style),
 		Paragraph(_('Description'), header_style),
 		Paragraph(_('U/M'), header_style),
-		Paragraph(_('Qty<br/>ord'), header_style),
-		Paragraph(_('Qty<br/>dsp'), header_style),
-		Paragraph(_('List<br/>/ unit'), header_style),
-		Paragraph(_('Disc.<br/>$ / unit'), header_style),
-		Paragraph(_('Cust.<br/>/ unit'), header_style),
-		Paragraph(_('Subtotal'), header_style),
+		Paragraph(_('QtyOrd'), header_style),
+		Paragraph(_('Qtyshp'), header_style),
+		Paragraph(_('price'), header_style),
+		Paragraph(_('Disc/promo'), header_style),
+		Paragraph(_('net price'), header_style),
+		Paragraph(_('total'), header_style),
 	]
 	if INVOICE_PDF_SHOW_SUGGESTED_RETAIL:
 		columns.append(Paragraph(_('SGT RTL<br/>/ SRP 30%'), header_style))
@@ -527,10 +529,10 @@ def _build_invoice_pdf_compact_header(*, styles, invoice_number, generated_on, t
 
 
 def _build_invoice_pdf_barcode(value, *, max_width=66):
-	barcode = code128.Code128(value, barHeight=18, barWidth=0.45, humanReadable=True)
+	barcode = code128.Code128(value, barHeight=15, barWidth=0.45, humanReadable=True)
 	if barcode.width > max_width:
 		scaled_bar_width = max(0.2, round(0.45 * (max_width / float(barcode.width)), 3))
-		barcode = code128.Code128(value, barHeight=18, barWidth=scaled_bar_width, humanReadable=True)
+		barcode = code128.Code128(value, barHeight=15, barWidth=scaled_bar_width, humanReadable=True)
 	barcode.fontName = 'Helvetica'
 	barcode.fontSize = 5.5
 	barcode.hAlign = 'CENTER'
@@ -560,8 +562,7 @@ def _build_invoice_pdf_totals_rows(invoice, *, meta_label_style, meta_value_styl
 		[Paragraph(_('Customer credit applied'), meta_label_style), Paragraph(_format_pdf_money(invoice.credito_cliente_aplicado), meta_value_style)],
 		[Paragraph(_('Credit notes'), meta_label_style), Paragraph(_format_pdf_money(invoice.total_creditos), meta_value_style)],
 		[Paragraph(_('Debit notes'), meta_label_style), Paragraph(_format_pdf_money(invoice.total_debitos), meta_value_style)],
-		[Paragraph(_('Outstanding invoice balance'), meta_label_style), Paragraph(_format_pdf_money(invoice.saldo_cliente), meta_value_style)],
-		[Paragraph(_('Final invoice total'), section_title_style), Paragraph(f'<b>{_format_pdf_money(invoice.total_neto)}</b>', body_style)],
+		[Paragraph(_('Total invoice'), section_title_style), Paragraph(f'<b>{_format_pdf_money(invoice.total_neto)}</b>', body_style)],
 	])
 	return rows
 
@@ -654,10 +655,7 @@ def _invoice_pdf_response(invoice):
 		('TOPPADDING', (0, 0), (-1, -1), 5),
 		('BOTTOMPADDING', (0, 0), (-1, -1), 5),
 	]))
-	content.extend([party_table, Spacer(1, 8)])
-
-	content.append(Paragraph(_('Line items with barcode, ordered quantity, dispatched quantity, list price, discount and final customer pricing.'), note_style))
-	content.append(Spacer(1, 6))
+	content.extend([party_table, Spacer(1, 6)])
 
 	for index, chunk in enumerate(item_chunks):
 		if index > 0:
@@ -701,13 +699,13 @@ def _invoice_pdf_response(invoice):
 			('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
 			('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, BRAND_SURFACE]),
 			('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-			('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-			('TOPPADDING', (0, 0), (-1, -1), 5),
-			('TOPPADDING', (0, 0), (-1, 0), 6),
-			('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+			('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+			('TOPPADDING', (0, 0), (-1, -1), 3),
+			('TOPPADDING', (0, 0), (-1, 0), 5),
+			('BOTTOMPADDING', (0, 0), (-1, 0), 5),
 			('VALIGN', (0, 1), (0, -1), 'TOP'),
-			('TOPPADDING', (0, 1), (0, -1), 2),
-			('BOTTOMPADDING', (0, 1), (0, -1), 8),
+			('TOPPADDING', (0, 1), (0, -1), 1),
+			('BOTTOMPADDING', (0, 1), (0, -1), 5),
 			('LEFTPADDING', (0, 0), (-1, -1), 4),
 			('RIGHTPADDING', (0, 0), (-1, -1), 4),
 		]))
@@ -736,8 +734,6 @@ def _invoice_pdf_response(invoice):
 		('BOTTOMPADDING', (0, 0), (-1, -1), 5),
 	]))
 	content.extend([
-		Paragraph(_('Pricing note'), section_title_style),
-		Paragraph(_('Suggested retail per unit defaults to a 30% profit suggestion over the customer unit cost. It is a reference for resale, not a mandatory selling price.'), note_style),
 		Spacer(1, 6),
 		totals_table,
 	])
@@ -759,7 +755,14 @@ def _invoice_pdf_response(invoice):
 				signature_image,
 			])
 
-	document.build(content)
+	document.build(
+		content,
+		canvasmaker=lambda *args, **kwargs: NumberedPdfCanvas(
+			*args,
+			page_label_template=_('Page %(current)s of %(total)s'),
+			**kwargs,
+		),
+	)
 	pdf = buffer.getvalue()
 	buffer.close()
 

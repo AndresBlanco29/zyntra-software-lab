@@ -4,6 +4,7 @@ from django.conf import settings
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
 from reportlab.platypus import Image, Paragraph, Table, TableStyle
 
 
@@ -94,3 +95,31 @@ def build_pdf_brand_banner(*, styles, title, subtitle='', total_width=540):
         ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
     ]))
     return banner
+
+
+class NumberedPdfCanvas(canvas.Canvas):
+	def __init__(self, *args, page_label_template='Page %(current)s of %(total)s', **kwargs):
+		canvas.Canvas.__init__(self, *args, **kwargs)
+		self.page_label_template = page_label_template
+		self._saved_page_states = []
+
+	def showPage(self):
+		self._saved_page_states.append(dict(self.__dict__))
+		self._startPage()
+
+	def save(self):
+		page_count = len(self._saved_page_states)
+		for page_state in self._saved_page_states:
+			self.__dict__.update(page_state)
+			self._draw_page_number(page_count)
+			canvas.Canvas.showPage(self)
+		canvas.Canvas.save(self)
+
+	def _draw_page_number(self, page_count):
+		self.setFont('Helvetica', 8)
+		self.setFillColor(BRAND_MUTED_TEXT)
+		self.drawRightString(
+			self._pagesize[0] - 24,
+			14,
+			self.page_label_template % {'current': self._pageNumber, 'total': page_count},
+		)

@@ -343,6 +343,7 @@ class PickingVerificationFlowTests(TestCase):
 			f'cantidad_real_{self.item.id}': '2',
 			'nota_seleccionador': 'Todo correcto',
 			'nota_seleccionador_resuelta': 'on',
+			f'linea_revisada_{self.item.id}': 'on',
 		})
 
 		self.assertEqual(response.status_code, 302)
@@ -357,6 +358,7 @@ class PickingVerificationFlowTests(TestCase):
 			f'cantidad_real_{self.item.id}': '2',
 			'nota_seleccionador': 'Cambio de U/M en picking',
 			'nota_seleccionador_resuelta': 'on',
+			f'linea_revisada_{self.item.id}': 'on',
 		})
 
 		self.assertEqual(response.status_code, 302)
@@ -378,6 +380,8 @@ class PickingVerificationFlowTests(TestCase):
 			'cantidad_nueva': '1',
 			'nota_seleccionador': 'Agregado por picker',
 			'nota_seleccionador_resuelta': 'on',
+			f'linea_revisada_{self.item.id}': 'on',
+			'linea_revisada_adicional[]': 'on',
 		})
 
 		self.assertEqual(response.status_code, 302)
@@ -536,6 +540,7 @@ class PickingVerificationFlowTests(TestCase):
 			f'cantidad_real_{self.item.id}': '2',
 			'nota_seleccionador': 'Mantener cantidad digitada',
 			'nota_seleccionador_resuelta': 'on',
+			f'linea_revisada_{self.item.id}': 'on',
 		})
 
 		self.assertEqual(response.status_code, 302)
@@ -555,6 +560,23 @@ class PickingVerificationFlowTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, f'name="cantidad_real_{self.item.id}" value="0"', html=False)
+		self.assertContains(response, f'name="linea_revisada_{self.item.id}"', html=False)
+		self.assertContains(response, 'Reviewed')
+
+	def test_selector_must_review_every_line_before_saving(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+
+		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			f'cantidad_real_{self.item.id}': '2',
+			'nota_seleccionador': 'Todo correcto',
+			'nota_seleccionador_resuelta': 'on',
+		})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Check every product line in the Reviewed column', html=False)
+		self.pedido.refresh_from_db()
+		self.assertNotEqual(self.pedido.estado, 'VERIFICADO_AJUSTADO')
 
 	def test_selector_detail_disables_picker_approval_when_physical_stock_is_insufficient(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
@@ -571,6 +593,7 @@ class PickingVerificationFlowTests(TestCase):
 		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
 			f'cantidad_real_{self.item.id}': '2',
 			'nota_seleccionador': 'Sin stock fisico',
+			f'linea_revisada_{self.item.id}': 'on',
 		})
 
 		self.assertEqual(response.status_code, 302)
@@ -586,6 +609,7 @@ class PickingVerificationFlowTests(TestCase):
 			f'cantidad_real_{self.item.id}': '0',
 			'nota_seleccionador': '',
 			'nota_seleccionador_resuelta': 'on',
+			f'linea_revisada_{self.item.id}': 'on',
 		})
 
 		self.assertEqual(response.status_code, 302)

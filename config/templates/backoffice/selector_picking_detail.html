@@ -54,11 +54,12 @@
             <th>U/M</th>
             <th>QTY ORD</th>
             <th>QTY PICK</th>
+            <th class="text-center" style="width: 110px;">{% trans "Reviewed" %}</th>
           </tr>
         </thead>
         <tbody id="pickerItemsTableBody">
           {% for item in item_rows %}
-          <tr>
+          <tr data-picker-order-line>
             <td data-label="{% trans 'Product' %}">{{ item.product }}</td>
             <td data-label="U/M">
               <select class="form-select form-select-sm" name="presentacion_{{ item.id }}">
@@ -73,6 +74,17 @@
                 <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="down" aria-label="{% trans 'Decrease real quantity' %}">-</button>
                 <input type="number" min="0" class="form-control quantity-stepper__input" name="cantidad_real_{{ item.id }}" value="{{ item.actual_quantity }}" required>
                 <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="up" aria-label="{% trans 'Increase real quantity' %}">+</button>
+              </div>
+            </td>
+            <td data-label="{% trans 'Reviewed' %}" class="text-center">
+              <div class="form-check d-inline-flex justify-content-center mb-0">
+                <input
+                  type="checkbox"
+                  class="form-check-input picker-line-reviewed"
+                  id="lineaRevisada{{ item.id }}"
+                  name="linea_revisada_{{ item.id }}"
+                  aria-label="{% blocktrans with product=item.product %}I reviewed {{ product }}{% endblocktrans %}">
+                <label class="form-check-label visually-hidden" for="lineaRevisada{{ item.id }}">{% trans "Reviewed" %}</label>
               </div>
             </td>
           </tr>
@@ -99,12 +111,18 @@
                 <button type="button" class="btn btn-outline-danger btn-sm" data-remove-product-row>{% trans "Remove" %}</button>
               </div>
             </td>
+            <td data-label="{% trans 'Reviewed' %}" class="text-center">
+              <div class="form-check d-inline-flex justify-content-center mb-0">
+                <input type="checkbox" class="form-check-input picker-line-reviewed" name="linea_revisada_adicional[]" value="on" aria-label="{% trans 'I reviewed this added product' %}">
+              </div>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    <div class="form-text mt-2">{% trans "Products added here will be marked in red for BackOffice review." %}</div>
+    <div class="form-text mt-2">{% trans "Check each line in the Reviewed column to confirm you verified every product before saving." %}</div>
+    <div class="form-text">{% trans "Products added here will be marked in red for BackOffice review." %}</div>
 
     <div class="row g-3 mt-1">
       <div class="col-12">
@@ -148,6 +166,29 @@
     var addProductRowButton = document.getElementById('addProductRowButton');
     var pickerItemsTableBody = document.getElementById('pickerItemsTableBody');
     var availablePresentationOptionsHtml = '{% for presentacion in available_presentations %}<option value="{{ presentacion.id }}" data-stock-physical="{{ presentacion.stock_operativo.stock_fisico|default:0 }}">{{ presentacion.producto.nombre|escapejs }} - {{ presentacion.nombre_traducido|escapejs }}</option>{% endfor %}';
+    var reviewValidationMessage = '{% trans "Check every product line in the Reviewed column before saving."|escapejs %}';
+
+    function getRequiredReviewCheckboxes() {
+      var checkboxes = Array.from(document.querySelectorAll('[data-picker-order-line] .picker-line-reviewed'));
+      document.querySelectorAll('[data-added-product-row]').forEach(function (row) {
+        var select = row.querySelector('[data-added-product-select]');
+        var reviewCheckbox = row.querySelector('.picker-line-reviewed');
+        if (select && select.value && reviewCheckbox) {
+          checkboxes.push(reviewCheckbox);
+        }
+      });
+      return checkboxes;
+    }
+
+    function syncReviewRowHighlights() {
+      getRequiredReviewCheckboxes().forEach(function (checkbox) {
+        var row = checkbox.closest('tr');
+        if (!row) {
+          return;
+        }
+        row.classList.toggle('table-warning', !checkbox.checked);
+      });
+    }
 
     function syncAddedProductRow(row) {
       var select = row.querySelector('[data-added-product-select]');
@@ -206,8 +247,28 @@
             '</div>' +
             '<button type="button" class="btn btn-outline-danger btn-sm" data-remove-product-row>{% trans "Remove" %}</button>' +
           '</div>' +
+        '</td>' +
+        '<td data-label="{% trans "Reviewed" %}" class="text-center">' +
+          '<div class="form-check d-inline-flex justify-content-center mb-0">' +
+            '<input type="checkbox" class="form-check-input picker-line-reviewed" name="linea_revisada_adicional[]" value="on" aria-label="{% trans "I reviewed this added product"|escapejs %}">' +
+          '</div>' +
         '</td>';
       return row;
+    }
+
+    function validateRequiredLineReviews() {
+      var missing = getRequiredReviewCheckboxes().filter(function (checkbox) {
+        return !checkbox.checked;
+      });
+      syncReviewRowHighlights();
+      if (missing.length) {
+        window.alert(reviewValidationMessage);
+        if (missing[0]) {
+          missing[0].focus();
+        }
+        return false;
+      }
+      return true;
     }
 
     function updateFormState() {
@@ -249,10 +310,21 @@
       initQuantityStepper(stepper);
     });
 
+    document.querySelectorAll('.picker-line-reviewed').forEach(function (checkbox) {
+      checkbox.addEventListener('change', syncReviewRowHighlights);
+    });
+
+    form.addEventListener('submit', function (event) {
+      if (!validateRequiredLineReviews()) {
+        event.preventDefault();
+      }
+    });
+
     document.querySelectorAll('[data-added-product-row]').forEach(function (row) {
       syncAddedProductRow(row);
       row.querySelector('[data-added-product-select]').addEventListener('change', function () {
         syncAddedProductRow(row);
+        syncReviewRowHighlights();
         updateFormState();
       });
     });
@@ -279,6 +351,7 @@
       var row = select.closest('[data-added-product-row]');
       if (row) {
         syncAddedProductRow(row);
+        syncReviewRowHighlights();
         updateFormState();
       }
     });
@@ -291,8 +364,13 @@
         window.LTGSearchableSelect.init(addedSelect);
       }
       initQuantityStepper(row.querySelector('[data-quantity-stepper]'));
+      var addedReviewCheckbox = row.querySelector('.picker-line-reviewed');
+      if (addedReviewCheckbox) {
+        addedReviewCheckbox.addEventListener('change', syncReviewRowHighlights);
+      }
       addedSelect.addEventListener('change', function () {
         syncAddedProductRow(row);
+        syncReviewRowHighlights();
         updateFormState();
       });
       syncAddedProductRow(row);

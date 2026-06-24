@@ -107,6 +107,21 @@ def _parse_non_negative_quantity(value, default=0):
 	return max(quantity, 0)
 
 
+def _validate_selector_line_reviews(request, *, pedido, posted_new_presentations):
+	for item in pedido.items.all():
+		if request.POST.get(f'linea_revisada_{item.id}') != 'on':
+			raise ValidationError(
+				_('Check every product line in the Reviewed column to confirm you verified the full picking list before saving.')
+			)
+
+	additional_rows_with_product = sum(1 for presentacion_id in posted_new_presentations if (presentacion_id or '').strip())
+	reviewed_additional_rows = len(request.POST.getlist('linea_revisada_adicional[]'))
+	if reviewed_additional_rows < additional_rows_with_product:
+		raise ValidationError(
+			_('Check every product line in the Reviewed column to confirm you verified the full picking list before saving.')
+		)
+
+
 def _quantize_money(value):
 	return Decimal(str(value or '0')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
@@ -881,6 +896,7 @@ def selector_picking_detail(request, pedido_id):
 		form_note_resolved = nota_resuelta
 
 		try:
+			_validate_selector_line_reviews(request, pedido=pedido, posted_new_presentations=posted_new_presentations)
 			guardar_verificacion_picking(
 				pedido=pedido,
 				seleccionador=request.user,

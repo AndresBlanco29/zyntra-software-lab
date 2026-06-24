@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from config.clientes.models import Cliente
-from config.productos.models import Categoria, ConfiguracionPrecios, Marca, Presentacion, Producto
+from config.productos.models import Categoria, ConfiguracionDescuentos, ConfiguracionPrecios, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
 
 
@@ -79,6 +79,72 @@ class ConfiguracionPreciosTests(TestCase):
 		self.assertContains(response, 'value="14.10"')
 		self.assertContains(response, 'value="15.68"')
 		self.assertContains(response, 'value="17.00"')
+
+
+class ConfiguracionDescuentosTests(TestCase):
+	def setUp(self):
+		self.admin = Usuario.objects.create_user(username='admin-discounts', password='secret123', role='admin')
+
+	def test_obtener_creates_default_discount_presets(self):
+		configuracion = ConfiguracionDescuentos.obtener()
+
+		self.assertEqual(configuracion.descuento_1, Decimal('0.25'))
+		self.assertEqual(configuracion.descuento_2, Decimal('0.50'))
+		self.assertEqual(len(configuracion.opciones_activas()), 10)
+
+	def test_opciones_activas_skips_zero_amounts(self):
+		configuracion = ConfiguracionDescuentos.obtener()
+		configuracion.descuento_3 = Decimal('0.00')
+		configuracion.descuento_4 = Decimal('0.00')
+		configuracion.save()
+
+		options = configuracion.opciones_activas()
+		self.assertEqual(len(options), 8)
+		self.assertEqual(options[0]['key'], 'descuento_1')
+		self.assertEqual(options[0]['value'], '0.25')
+
+	def test_configurar_descuentos_rejects_negative_values(self):
+		self.client.force_login(self.admin)
+
+		response = self.client.post(reverse('configurar_descuentos'), {
+			'descuento_1': '-0.50',
+			'descuento_2': '0.50',
+			'descuento_3': '0.75',
+			'descuento_4': '1.00',
+			'descuento_5': '1.50',
+			'descuento_6': '2.00',
+			'descuento_7': '2.50',
+			'descuento_8': '3.00',
+			'descuento_9': '4.00',
+			'descuento_10': '5.00',
+		})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Discount amounts must be zero or greater.')
+		configuracion = ConfiguracionDescuentos.obtener()
+		self.assertEqual(configuracion.descuento_1, Decimal('0.25'))
+
+	def test_configurar_descuentos_rounds_values_to_two_decimals(self):
+		self.client.force_login(self.admin)
+
+		response = self.client.post(reverse('configurar_descuentos'), {
+			'descuento_1': '0.255',
+			'descuento_2': '0.50',
+			'descuento_3': '0.00',
+			'descuento_4': '1.00',
+			'descuento_5': '1.50',
+			'descuento_6': '2.00',
+			'descuento_7': '2.50',
+			'descuento_8': '3.00',
+			'descuento_9': '4.00',
+			'descuento_10': '5.00',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		configuracion = ConfiguracionDescuentos.obtener()
+		self.assertEqual(configuracion.descuento_1, Decimal('0.26'))
+		self.assertEqual(configuracion.descuento_3, Decimal('0.00'))
+		self.assertEqual(len(configuracion.opciones_activas()), 9)
 
 
 class AdminProductosListTests(TestCase):

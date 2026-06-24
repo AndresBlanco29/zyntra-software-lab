@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.core.exceptions import ValidationError
-from .models import Producto, Presentacion, Categoria, Marca, ConfiguracionPrecios
+from .models import Producto, Presentacion, Categoria, Marca, ConfiguracionPrecios, ConfiguracionDescuentos
 
 
 class PresentacionInline(admin.TabularInline):
@@ -94,6 +94,17 @@ class ConfiguracionPreciosAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return not ConfiguracionPrecios.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ConfiguracionDescuentos)
+class ConfiguracionDescuentosAdmin(admin.ModelAdmin):
+    list_display = tuple(f"descuento_{index}" for index in range(1, 11))
+
+    def has_add_permission(self, request):
+        return not ConfiguracionDescuentos.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
         return False

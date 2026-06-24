@@ -1,0 +1,39 @@
+{% extends "bases/base_vendedor.html" %}
+{% load static i18n %}
+
+{% block title %}
+{% trans "Configure preset discounts" %}
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4">{% trans "Configure preset discounts" %}</h2>
+
+<div class="card shadow-sm">
+<div class="card-body">
+
+<form method="POST">
+{% csrf_token %}
+
+<p class="text-muted">
+{% trans "Set up to 10 preset dollar discounts for sales orders. Leave a slot at 0 to hide it from the selectors. Active discounts appear in each order line and in the bulk apply tool." %}
+</p>
+
+<div class="row">
+{% for amount in discount_presets %}
+<div class="col-md-2 col-sm-4 mb-3">
+<label class="form-label">{% blocktrans with number=forloop.counter %}Discount {{ number }} ($){% endblocktrans %}</label>
+<input type="number" step="0.01" min="0" name="descuento_{{ forloop.counter }}" class="form-control" value="{{ amount }}">
+</div>
+{% endfor %}
+</div>
+
+<button type="submit" class="btn btn-success">{% trans "Save preset discounts" %}</button>
+<a href="{% url 'lista_productos' %}" class="btn btn-secondary">{% trans "Back" %}</a>
+
+</form>
+
+</div>
+</div>
+
+{% endblock %}

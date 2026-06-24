@@ -23,7 +23,7 @@ from config.pedidos.services import (
 	guardar_verificacion_picking,
 	resolver_bloqueo_picking_desde_backoffice,
 )
-from config.productos.models import Categoria, Marca, Presentacion, Producto
+from config.productos.models import Categoria, ConfiguracionDescuentos, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
 
 
@@ -664,7 +664,12 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'bulkPriceTierSelect')
 		self.assertContains(response, 'applyBulkPriceTierButton')
 		self.assertContains(response, 'Apply to all products')
+		self.assertContains(response, 'bulkDiscountPresetSelect')
+		self.assertContains(response, 'applyBulkDiscountButton')
+		self.assertContains(response, 'Apply discount to all products')
 		self.assertContains(response, 'pedido-item-price-preset')
+		self.assertContains(response, 'pedido-item-discount-preset')
+		self.assertContains(response, 'configurar-descuentos')
 		self.assertContains(response, 'pedido-presentation-price-map')
 
 	def test_backoffice_search_presentaciones_returns_matching_products(self):
@@ -1208,6 +1213,22 @@ class PedidoItemDiscountTests(TestCase):
 		self.assertEqual(self.item.precio_unitario_neto, Decimal('10.00'))
 		self.assertEqual(self.item.subtotal, Decimal('20.00'))
 		self.assertEqual(self.pedido.total, Decimal('20.00'))
+
+	def test_backoffice_detail_selects_matching_discount_preset_for_saved_amount(self):
+		configuracion = ConfiguracionDescuentos.obtener()
+		configuracion.descuento_2 = Decimal('0.50')
+		configuracion.save()
+
+		self.item.descuento_aplicado = True
+		self.item.descuento_monto = Decimal('0.50')
+		self.item.subtotal = Decimal('23.00')
+		self.item.save(update_fields=['descuento_aplicado', 'descuento_monto', 'subtotal'])
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'data-discount-key="descuento_2" selected', html=False)
 
 	def test_invoice_pricing_section_reflects_saved_dollar_discount(self):
 		self.item.descuento_aplicado = True

@@ -4,7 +4,7 @@ import json
 from django.db.models import Prefetch, Q
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from .models import Producto, Categoria, Marca, Presentacion, ConfiguracionPrecios
+from .models import Producto, Categoria, Marca, Presentacion, ConfiguracionPrecios, ConfiguracionDescuentos
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
@@ -615,6 +615,48 @@ def configurar_precios(request):
     return render(request, "admin/configurar_precios.html", {
         "configuracion": configuracion,
         "price_margins": price_margins,
+    })
+
+
+def _get_discount_preset_config():
+    return ConfiguracionDescuentos.obtener()
+
+
+def _get_discount_preset_values(configuracion=None):
+    configuracion = configuracion or _get_discount_preset_config()
+    return [_format_decimal(amount) for amount in configuracion.descuentos_lista()]
+
+
+@login_required
+@internal_permission_required('admin.products.manage')
+def configurar_descuentos(request):
+    configuracion = _get_discount_preset_config()
+    discount_presets = _get_discount_preset_values(configuracion)
+
+    if request.method == "POST":
+        for index in range(1, 11):
+            field_name = f"descuento_{index}"
+            setattr(
+                configuracion,
+                field_name,
+                _parse_decimal(request.POST.get(field_name), getattr(configuracion, field_name)),
+            )
+        discount_presets = _get_discount_preset_values(configuracion)
+        try:
+            configuracion.save()
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+            return render(request, "admin/configurar_descuentos.html", {
+                "configuracion": configuracion,
+                "discount_presets": discount_presets,
+            })
+
+        messages.success(request, _("Preset discounts updated successfully."))
+        return redirect("configurar_descuentos")
+
+    return render(request, "admin/configurar_descuentos.html", {
+        "configuracion": configuracion,
+        "discount_presets": discount_presets,
     })
 
 

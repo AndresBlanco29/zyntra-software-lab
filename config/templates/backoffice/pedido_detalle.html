@@ -502,6 +502,21 @@
         <button type="button" class="btn btn-outline-primary btn-sm" id="applyBulkPriceTierButton">{% trans "Apply to all products" %}</button>
       </div>
     </div>
+    <div class="row g-2 align-items-end mb-3">
+      <div class="col-md-8 col-lg-7">
+        <label for="bulkDiscountPresetSelect" class="form-label fw-semibold mb-1">{% trans "Assign one preset discount to all products" %}</label>
+        <select id="bulkDiscountPresetSelect" class="form-select form-select-sm">
+          <option value="">{% trans "Select one of the preset discounts" %}</option>
+          {% for option in discount_preset_options %}
+          <option value="{{ option.value|unlocalize }}" data-discount-key="{{ option.key }}">{{ option.label }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">{% trans "This enables the discount on every line and applies the selected dollar amount." %} <a href="{% url 'configurar_descuentos' %}">{% trans "Configure preset discounts" %}</a></div>
+      </div>
+      <div class="col-md-4 col-lg-5 d-grid d-md-flex justify-content-md-end">
+        <button type="button" class="btn btn-outline-primary btn-sm" id="applyBulkDiscountButton">{% trans "Apply discount to all products" %}</button>
+      </div>
+    </div>
     {% endif %}
     <div class="table-responsive">
       <table class="table align-middle">
@@ -512,7 +527,7 @@
             <th>{% trans "Requested qty." %}</th>
             <th>{% trans "Quantity" %}</th>
             <th style="width: 180px;">{% trans "Price" %}</th>
-            <th>{% trans "Discount" %}</th>
+            <th style="width: 180px;">{% trans "Discount" %}</th>
             <th>{% trans "You pay" %}</th>
             <th>{% trans "Subtotal" %}</th>
             <th>{% trans "Remove" %}</th>
@@ -563,18 +578,27 @@
                   {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
                 <label class="form-check-label small" for="descuentoAplicado{{ item.id }}">{% trans "Apply discount" %}</label>
               </div>
-              <div class="input-group input-group-sm mb-1 pedido-item-discount-input-wrap {% if not item.descuento_aplicado %}d-none{% endif %}">
-                <span class="input-group-text">$</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  class="form-control pedido-item-discount-amount"
-                  name="descuento_monto_{{ item.id }}"
-                  value="{{ item.descuento_monto }}"
-                  data-item-id="{{ item.id }}"
-                  placeholder="0.00"
-                  {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+              <div class="pedido-item-discount-fields {% if not item.descuento_aplicado %}d-none{% endif %}">
+                <select class="form-select form-select-sm mb-1 pedido-item-discount-preset" data-target-input="descuento_monto_{{ item.id }}" data-item-id="{{ item.id }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+                  <option value="">{% trans "Manual discount" %}</option>
+                  {% for option in item.discount_preset_options %}
+                  <option value="{{ option.value|unlocalize }}" data-discount-key="{{ option.key }}" {% if item.selected_discount_preset_key == option.key %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+                <div class="input-group input-group-sm mb-1">
+                  <span class="input-group-text">$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    class="form-control pedido-item-discount-amount"
+                    id="descuento_monto_{{ item.id }}"
+                    name="descuento_monto_{{ item.id }}"
+                    value="{{ item.descuento_monto|unlocalize }}"
+                    data-item-id="{{ item.id }}"
+                    placeholder="0.00"
+                    {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+                </div>
               </div>
               <div class="small text-muted pedido-item-discount-summary" data-item-id="{{ item.id }}"></div>
             </td>
@@ -693,7 +717,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const listPriceInput = document.querySelector(`.pedido-item-list-price[data-item-id="${itemId}"]`);
     const toggle = document.querySelector(`.pedido-item-discount-toggle[data-item-id="${itemId}"]`);
     const amountInput = document.querySelector(`.pedido-item-discount-amount[data-item-id="${itemId}"]`);
-    const amountWrap = amountInput ? amountInput.closest('.pedido-item-discount-input-wrap') : null;
+    const discountFields = document.querySelector(`.pedido-item-discount-cell[data-item-id="${itemId}"] .pedido-item-discount-fields`);
+    const discountPreset = document.querySelector(`.pedido-item-discount-preset[data-item-id="${itemId}"]`);
     const summary = document.querySelector(`.pedido-item-discount-summary[data-item-id="${itemId}"]`);
     const netPrice = document.querySelector(`.pedido-item-net-price[data-item-id="${itemId}"]`);
     const savings = document.querySelector(`.pedido-item-savings[data-item-id="${itemId}"]`);
@@ -709,11 +734,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const discountEnabled = toggle.checked;
     const discountAmount = discountEnabled ? (parseNumber(amountInput ? amountInput.value : null) || 0) : 0;
 
-    if (amountWrap) {
-      amountWrap.classList.toggle('d-none', !discountEnabled);
+    if (discountFields) {
+      discountFields.classList.toggle('d-none', !discountEnabled);
     }
     if (amountInput) {
       amountInput.disabled = !discountEnabled || amountInput.hasAttribute('data-locked');
+    }
+    if (discountPreset) {
+      discountPreset.disabled = !discountEnabled || discountPreset.hasAttribute('disabled');
     }
 
     const netUnit = Math.max(0, listPrice - discountAmount);
@@ -764,7 +792,27 @@ document.addEventListener('DOMContentLoaded', function () {
   const defaultPriceKey = orderForm?.dataset.defaultPriceKey || 'precio_1';
   const bulkPriceTierSelect = document.getElementById('bulkPriceTierSelect');
   const applyBulkPriceTierButton = document.getElementById('applyBulkPriceTierButton');
+  const bulkDiscountPresetSelect = document.getElementById('bulkDiscountPresetSelect');
+  const applyBulkDiscountButton = document.getElementById('applyBulkDiscountButton');
   const manualPriceLabel = '{% trans "Manual price"|escapejs %}';
+
+  function syncPedidoDiscountPresetFromInput(presetSelect, amountInput) {
+    if (!presetSelect || !amountInput) {
+      return;
+    }
+    const inputValue = parseDecimalValue(amountInput.value);
+    let matchedValue = '';
+    Array.from(presetSelect.options).forEach((option) => {
+      if (!option.value) {
+        return;
+      }
+      const optionValue = parseDecimalValue(option.value);
+      if (inputValue !== null && optionValue !== null && optionValue === inputValue) {
+        matchedValue = option.value;
+      }
+    });
+    presetSelect.value = matchedValue;
+  }
 
   function parseDecimalValue(value) {
     const normalized = String(value || '').trim().replace(',', '.');
@@ -871,6 +919,49 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         presetSelect.value = matchingOption.value;
         presetSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
+  }
+
+  document.querySelectorAll('.pedido-item-discount-preset').forEach((presetSelect) => {
+    const amountInput = document.getElementById(presetSelect.dataset.targetInput);
+    if (!amountInput) {
+      return;
+    }
+
+    presetSelect.addEventListener('change', function () {
+      if (presetSelect.value) {
+        amountInput.value = presetSelect.value;
+      }
+      refreshPedidoItemDiscountRow(presetSelect.dataset.itemId);
+    });
+
+    amountInput.addEventListener('input', function () {
+      syncPedidoDiscountPresetFromInput(presetSelect, amountInput);
+    });
+
+    syncPedidoDiscountPresetFromInput(presetSelect, amountInput);
+  });
+
+  if (applyBulkDiscountButton && bulkDiscountPresetSelect) {
+    applyBulkDiscountButton.addEventListener('click', function () {
+      const selectedDiscountValue = bulkDiscountPresetSelect.value;
+      if (!selectedDiscountValue) {
+        return;
+      }
+
+      document.querySelectorAll('[data-pedido-item-row]').forEach((row) => {
+        const itemId = row.dataset.pedidoItemRow;
+        const toggle = row.querySelector(`.pedido-item-discount-toggle[data-item-id="${itemId}"]`);
+        const presetSelect = row.querySelector(`.pedido-item-discount-preset[data-item-id="${itemId}"]`);
+        const amountInput = row.querySelector(`.pedido-item-discount-amount[data-item-id="${itemId}"]`);
+        if (!toggle || !presetSelect || !amountInput) {
+          return;
+        }
+        toggle.checked = true;
+        presetSelect.value = selectedDiscountValue;
+        amountInput.value = selectedDiscountValue;
+        refreshPedidoItemDiscountRow(itemId);
       });
     });
   }

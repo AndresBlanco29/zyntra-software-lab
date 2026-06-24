@@ -350,3 +350,81 @@ class ConfiguracionPrecios(models.Model):
 
     def __str__(self):
         return _("Price configuration")
+
+
+DEFAULT_PRESET_DISCOUNT_AMOUNTS = (
+    Decimal("0.25"),
+    Decimal("0.50"),
+    Decimal("0.75"),
+    Decimal("1.00"),
+    Decimal("1.50"),
+    Decimal("2.00"),
+    Decimal("2.50"),
+    Decimal("3.00"),
+    Decimal("4.00"),
+    Decimal("5.00"),
+)
+
+
+def _validate_discount_preset_amount(value):
+    amount = _quantize_money(value or 0)
+    if amount < 0:
+        raise ValidationError(_("Discount amounts must be zero or greater."))
+    return amount
+
+
+class ConfiguracionDescuentos(models.Model):
+    descuento_1 = models.DecimalField(max_digits=10, decimal_places=2, default=DEFAULT_PRESET_DISCOUNT_AMOUNTS[0])
+    descuento_2 = models.DecimalField(max_digits=10, decimal_places=2, default=DEFAULT_PRESET_DISCOUNT_AMOUNTS[1])
+    descuento_3 = models.DecimalField(max_digits=10, decimal_places=2, default=DEFAULT_PRESET_DISCOUNT_AMOUNTS[2])
+    descuento_4 = models.DecimalField(max_digits=10, decimal_places=2, default=DEFAULT_PRESET_DISCOUNT_AMOUNTS[3])
+    descuento_5 = models.DecimalField(max_digits=10, decimal_places=2, default=DEFAULT_PRESET_DISCOUNT_AMOUNTS[4])
+    descuento_6 = models.DecimalField(max_digits=10, decimal_places=2, default=DEFAULT_PRESET_DISCOUNT_AMOUNTS[5])
+    descuento_7 = models.DecimalField(max_digits=10, decimal_places=2, default=DEFAULT_PRESET_DISCOUNT_AMOUNTS[6])
+    descuento_8 = models.DecimalField(max_digits=10, decimal_places=2, default=DEFAULT_PRESET_DISCOUNT_AMOUNTS[7])
+    descuento_9 = models.DecimalField(max_digits=10, decimal_places=2, default=DEFAULT_PRESET_DISCOUNT_AMOUNTS[8])
+    descuento_10 = models.DecimalField(max_digits=10, decimal_places=2, default=DEFAULT_PRESET_DISCOUNT_AMOUNTS[9])
+
+    class Meta:
+        verbose_name = _("Discount configuration")
+        verbose_name_plural = _("Discount configuration")
+
+    def clean(self):
+        for index in range(1, 11):
+            field_name = f"descuento_{index}"
+            setattr(self, field_name, _validate_discount_preset_amount(getattr(self, field_name)))
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        return
+
+    @classmethod
+    def obtener(cls):
+        defaults = {f"descuento_{index}": amount for index, amount in enumerate(DEFAULT_PRESET_DISCOUNT_AMOUNTS, start=1)}
+        configuracion, _ = cls.objects.get_or_create(pk=1, defaults=defaults)
+        return configuracion
+
+    def descuentos_lista(self):
+        return [_quantize_money(getattr(self, f"descuento_{index}") or 0) for index in range(1, 11)]
+
+    def opciones_activas(self):
+        options = []
+        for index, amount in enumerate(self.descuentos_lista(), start=1):
+            if amount <= 0:
+                continue
+            options.append({
+                "key": f"descuento_{index}",
+                "value": format(amount, ".2f"),
+                "label": _("Discount %(number)s - $%(amount)s") % {
+                    "number": index,
+                    "amount": format(amount, ".2f"),
+                },
+            })
+        return options
+
+    def __str__(self):
+        return _("Discount configuration")

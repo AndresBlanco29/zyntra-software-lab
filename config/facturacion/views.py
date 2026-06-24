@@ -69,6 +69,13 @@ def _format_pdf_money(value):
 	return f'${amount:,.2f}'
 
 
+def _build_invoice_pdf_terms_paragraph(invoice, body_style):
+	return Paragraph(
+		f'<b>{_("Terms")}</b><br/><b>{_("DUE BALANCE")}</b>: {_format_pdf_money(invoice.cliente.balance)}',
+		body_style,
+	)
+
+
 def _validate_invoice_is_not_quickbooks_locked(invoice):
 	if is_sync_locked(invoice):
 		raise ValidationError(_('Invoice %(invoice)s is locked because it is already synced with QuickBooks.') % {'invoice': invoice.numero})
@@ -634,10 +641,7 @@ def _invoice_pdf_response(invoice):
 				f'<b>{_("Ship to")}</b><br/>{invoice.cliente.nombre_empresa}<br/>{ship_to}',
 				body_style,
 			),
-			Paragraph(
-				f'<b>{_("Terms")}</b><br/>{_("Outstanding invoice balance")}: {_format_pdf_money(invoice.saldo_cliente)}<br/>{_("Final invoice total")}: {_format_pdf_money(invoice.total_neto)}<br/>{_("Customer credit applied")}: {_format_pdf_money(invoice.credito_cliente_aplicado)}<br/>{_("Delivery method")}: {invoice.get_metodo_entrega_display()}',
-				body_style,
-			),
+			_build_invoice_pdf_terms_paragraph(invoice, body_style),
 		],
 	], colWidths=[180, 180, 180])
 	party_table.setStyle(TableStyle([

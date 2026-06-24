@@ -5159,6 +5159,9 @@ msgstr "Cliente disponible credit"
 msgid "Current due balance"
 msgstr "Saldo adeudado actual"
 
+msgid "DUE BALANCE"
+msgstr "SALDO ADEUDADO"
+
 msgid "Open in Google Maps"
 msgstr "Open en Google Maps"
 

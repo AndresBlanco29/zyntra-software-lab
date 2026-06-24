@@ -515,6 +515,7 @@
   "Customer assignments updated for %(vendor)s: %(assigned)s assigned, %(unassigned)s unassigned.": "Cliente assignments actualizado para %(vendor)s: %(assigned)s assigned, %(unassigned)s unassigned.",
   "Customer available credit": "Cliente disponible credit",
   "Current due balance": "Saldo adeudado actual",
+  "DUE BALANCE": "SALDO ADEUDADO",
   "Customer balance": "Cliente balance",
   "Customer balance increased with an additional charge.": "Cliente balance increased con un additional charge.",
   "Customer credit applied": "Cliente crédito applied",

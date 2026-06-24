@@ -222,7 +222,7 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 				for presentation in product_presentations
 			],
 			'requested_quantity': item.cantidad_solicitada,
-			'actual_quantity': actual_quantity_overrides.get(item.id, item.cantidad),
+			'actual_quantity': actual_quantity_overrides.get(item.id, 0),
 			'stock_physical': int(getattr(getattr(item.presentacion, 'stock_operativo', None), 'stock_fisico', 0) or 0),
 			'applied_quantity': int(item.cantidad_inventario_aplicada or 0),
 		})
@@ -839,7 +839,7 @@ def selector_picking_detail(request, pedido_id):
 	additional_item_rows = []
 	stock_evaluation = evaluar_stock_fisico_verificacion_picking(
 		pedido_items=list(pedido.items.all()),
-		cantidades_reales={item.id: item.cantidad for item in pedido.items.all()},
+		cantidades_reales={item.id: 0 for item in pedido.items.all()},
 	)
 	form_has_stock_shortage = any(item_result['has_shortage'] for item_result in stock_evaluation.values())
 
@@ -849,7 +849,7 @@ def selector_picking_detail(request, pedido_id):
 			for item in pedido.items.all()
 		}
 		cantidades_reales = {
-			item.id: _parse_non_negative_quantity(request.POST.get(f'cantidad_real_{item.id}'), item.cantidad)
+			item.id: _parse_non_negative_quantity(request.POST.get(f'cantidad_real_{item.id}'), 0)
 			for item in pedido.items.all()
 		}
 		additional_items = []

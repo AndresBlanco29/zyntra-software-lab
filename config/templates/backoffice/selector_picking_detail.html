@@ -93,7 +93,7 @@
               <div class="d-flex gap-2 align-items-center">
                 <div class="input-group quantity-stepper flex-grow-1" data-quantity-stepper data-stock-physical="0" data-applied-quantity="0">
                   <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="down" aria-label="{% trans 'Decrease real quantity' %}">-</button>
-                  <input type="number" min="1" class="form-control quantity-stepper__input" name="cantidad_nueva[]" value="{{ row.cantidad }}">
+                  <input type="number" min="0" class="form-control quantity-stepper__input" name="cantidad_nueva[]" value="{{ row.cantidad|default:0 }}">
                   <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="up" aria-label="{% trans 'Increase real quantity' %}">+</button>
                 </div>
                 <button type="button" class="btn btn-outline-danger btn-sm" data-remove-product-row>{% trans "Remove" %}</button>
@@ -201,7 +201,7 @@
           '<div class="d-flex gap-2 align-items-center">' +
             '<div class="input-group quantity-stepper flex-grow-1" data-quantity-stepper data-stock-physical="0" data-applied-quantity="0">' +
               '<button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="down" aria-label="{% trans "Decrease real quantity" %}">-</button>' +
-              '<input type="number" min="1" class="form-control quantity-stepper__input" name="cantidad_nueva[]" value="1">' +
+              '<input type="number" min="0" class="form-control quantity-stepper__input" name="cantidad_nueva[]" value="0">' +
               '<button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="up" aria-label="{% trans "Increase real quantity" %}">+</button>' +
             '</div>' +
             '<button type="button" class="btn btn-outline-danger btn-sm" data-remove-product-row>{% trans "Remove" %}</button>' +

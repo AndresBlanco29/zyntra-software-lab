@@ -547,6 +547,15 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertFalse(self.pedido.nota_seleccionador_resuelta)
 		self.assertEqual(self.item.cantidad, 2)
 
+	def test_selector_picking_detail_starts_qty_pick_at_zero(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+
+		response = self.client.get(reverse('selector_picking_detail', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, f'name="cantidad_real_{self.item.id}" value="0"', html=False)
+
 	def test_selector_detail_disables_picker_approval_when_physical_stock_is_insufficient(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		self.client.force_login(self.selector)
@@ -555,10 +564,18 @@ class PickingVerificationFlowTests(TestCase):
 		response = self.client.get(reverse('selector_picking_detail', args=[self.pedido.id]))
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'Physical stock is insufficient. A note is required and the order will remain blocked for BackOffice review.', html=False)
 		self.assertContains(response, 'name="nota_seleccionador_resuelta"', html=False)
-		self.assertContains(response, 'disabled>', html=False)
-		self.assertContains(response, 'badge bg-danger', html=False)
+		self.assertNotContains(response, 'disabled>', html=False)
+		self.assertContains(response, 'badge bg-success', html=False)
+
+		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			f'cantidad_real_{self.item.id}': '2',
+			'nota_seleccionador': 'Sin stock fisico',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.pedido.refresh_from_db()
+		self.assertTrue(self.pedido.picking_bloqueado)
 
 	def test_selector_can_save_zero_quantity_when_item_will_not_ship(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)

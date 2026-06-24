@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from config.clientes.models import Cliente
+from config.facturacion.services import generar_invoice_desde_picking
 from config.inventario.models import StockPresentacion
 from config.inventario.services import registrar_entrada_manual
 from config.notificaciones.models import Notificacion
@@ -106,6 +107,56 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(self.pedido.seleccionador, self.selector)
 		self.assertEqual(self.item.cantidad_solicitada, 2)
 		self.assertTrue(Notificacion.objects.filter(usuario=self.selector, titulo__icontains='picking').exists())
+
+	def test_backoffice_detail_keeps_lines_editable_during_selector_verification(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertFalse(response.context['lineas_bloqueadas_para_picking'])
+		self.assertFalse(response.context['pedido_form_disabled'])
+		self.assertNotContains(response, 'locked while the selector verification workflow is active')
+
+	def test_backoffice_can_edit_lines_while_pending_selector_verification(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), {
+			'estado': 'PARA_VERIFICAR',
+			'nota_backoffice': 'Ajuste manual antes de factura',
+			f'cantidad_{self.item.id}': '1',
+			f'precio_{self.item.id}': '12.00',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.item.refresh_from_db()
+		self.assertEqual(self.item.cantidad, 1)
+
+	def test_backoffice_detail_locks_lines_after_invoice_generation(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 2},
+			nota='Verificado',
+			nota_resuelta=True,
+		)
+		generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertTrue(response.context['lineas_bloqueadas_para_picking'])
+		self.assertTrue(response.context['pedido_form_disabled'])
+		self.assertContains(response, 'Order lines are locked because this order already has an invoice generated.')
 
 	def test_verification_requires_note(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)

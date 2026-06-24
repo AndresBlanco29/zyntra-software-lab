@@ -535,11 +535,7 @@
 
     {% if lineas_bloqueadas_para_picking %}
     <div class="alert alert-warning mt-3 mb-0">
-      {% if invoice %}
-        {% trans "Order lines are locked because this order already has an invoice generated." %}
-      {% else %}
-        {% trans "Order lines are locked while the selector verification workflow is active. Quantities can only be adjusted from the selector panel." %}
-      {% endif %}
+      {% trans "Order lines are locked because this order already has an invoice generated." %}
     </div>
     {% endif %}
 

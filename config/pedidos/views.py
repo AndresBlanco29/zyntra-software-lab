@@ -261,71 +261,69 @@ def backoffice_pedido_detalle(request, pedido_id):
 				pedido.nota_backoffice = (request.POST.get('nota_backoffice') or '').strip()
 				pedido.save(update_fields=['estado', 'nota_backoffice', 'actualizada_en'])
 
-				lineas_bloqueadas = bool(pedido.seleccionador_id and pedido.estado == 'PARA_VERIFICAR')
-				if not lineas_bloqueadas:
-					for item in list(pedido.items.select_related('presentacion__producto')):
-						if request.POST.get(f'eliminar_{item.id}'):
-							eliminar_linea_pedido_desde_backoffice(item=item, creado_por=request.user)
-							continue
+				for item in list(pedido.items.select_related('presentacion__producto')):
+					if request.POST.get(f'eliminar_{item.id}'):
+						eliminar_linea_pedido_desde_backoffice(item=item, creado_por=request.user)
+						continue
 
-						nueva_presentacion_id = request.POST.get(f'presentacion_{item.id}')
-						if nueva_presentacion_id and str(item.presentacion_id) != str(nueva_presentacion_id):
-							nueva_presentacion = get_object_or_404(Presentacion.objects.select_related('producto'), id=nueva_presentacion_id)
-							if item.cantidad_inventario_aplicada:
-								item = reemplazar_presentacion_item_pedido_despues_picking(item=item, nueva_presentacion=nueva_presentacion, creado_por=request.user)
-							elif int(item.cantidad_reservada_inventario or 0) > 0:
-								item = reemplazar_presentacion_item_pedido(item=item, nueva_presentacion=nueva_presentacion, creado_por=request.user)
-							else:
-								item = reemplazar_presentacion_linea_pedido_sin_aplicar_inventario(item=item, nueva_presentacion=nueva_presentacion)
-
-						nueva_cantidad = _parse_non_negative_quantity(request.POST.get(f'cantidad_{item.id}'), item.cantidad)
+					nueva_presentacion_id = request.POST.get(f'presentacion_{item.id}')
+					if nueva_presentacion_id and str(item.presentacion_id) != str(nueva_presentacion_id):
+						nueva_presentacion = get_object_or_404(Presentacion.objects.select_related('producto'), id=nueva_presentacion_id)
 						if item.cantidad_inventario_aplicada:
-							item = ajustar_cantidad_item_pedido_despues_picking(item=item, nueva_cantidad=nueva_cantidad, creado_por=request.user)
+							item = reemplazar_presentacion_item_pedido_despues_picking(item=item, nueva_presentacion=nueva_presentacion, creado_por=request.user)
 						elif int(item.cantidad_reservada_inventario or 0) > 0:
-							item = ajustar_reserva_item_pedido(item=item, nueva_cantidad=nueva_cantidad, creado_por=request.user)
+							item = reemplazar_presentacion_item_pedido(item=item, nueva_presentacion=nueva_presentacion, creado_por=request.user)
 						else:
-							item = actualizar_cantidad_linea_pedido_sin_aplicar_inventario(item=item, nueva_cantidad=nueva_cantidad)
-						item.precio = _parse_decimal(request.POST.get(f'precio_{item.id}'), item.precio)
-						item.descuento_aplicado, item.descuento_monto = normalizar_descuento_item_pedido(
-							precio=item.precio,
-							descuento_aplicado=request.POST.get(f'descuento_aplicado_{item.id}'),
-							descuento_monto=_parse_decimal(request.POST.get(f'descuento_monto_{item.id}'), item.descuento_monto),
-						)
-						item.subtotal = calcular_subtotal_item_pedido(
-							precio=item.precio,
-							cantidad=item.cantidad,
-							descuento_aplicado=item.descuento_aplicado,
-							descuento_monto=item.descuento_monto,
-						)
-						item.save(update_fields=['precio', 'descuento_aplicado', 'descuento_monto', 'subtotal'])
+							item = reemplazar_presentacion_linea_pedido_sin_aplicar_inventario(item=item, nueva_presentacion=nueva_presentacion)
 
-					nueva_presentacion_id = request.POST.get('presentacion_nueva')
-					if nueva_presentacion_id:
-						presentacion = get_object_or_404(Presentacion.objects.select_related('producto'), id=nueva_presentacion_id)
-						cantidad_nueva = _parse_quantity(request.POST.get('cantidad_nueva'), 1)
-						precio_nuevo = _parse_decimal(request.POST.get('precio_nuevo'), 0)
-						descuento_aplicado_nuevo, descuento_monto_nuevo = normalizar_descuento_item_pedido(
+					nueva_cantidad = _parse_non_negative_quantity(request.POST.get(f'cantidad_{item.id}'), item.cantidad)
+					if item.cantidad_inventario_aplicada:
+						item = ajustar_cantidad_item_pedido_despues_picking(item=item, nueva_cantidad=nueva_cantidad, creado_por=request.user)
+					elif int(item.cantidad_reservada_inventario or 0) > 0:
+						item = ajustar_reserva_item_pedido(item=item, nueva_cantidad=nueva_cantidad, creado_por=request.user)
+					else:
+						item = actualizar_cantidad_linea_pedido_sin_aplicar_inventario(item=item, nueva_cantidad=nueva_cantidad)
+					item.precio = _parse_decimal(request.POST.get(f'precio_{item.id}'), item.precio)
+					item.descuento_aplicado, item.descuento_monto = normalizar_descuento_item_pedido(
+						precio=item.precio,
+						descuento_aplicado=request.POST.get(f'descuento_aplicado_{item.id}'),
+						descuento_monto=_parse_decimal(request.POST.get(f'descuento_monto_{item.id}'), item.descuento_monto),
+					)
+					item.subtotal = calcular_subtotal_item_pedido(
+						precio=item.precio,
+						cantidad=item.cantidad,
+						descuento_aplicado=item.descuento_aplicado,
+						descuento_monto=item.descuento_monto,
+					)
+					item.save(update_fields=['precio', 'descuento_aplicado', 'descuento_monto', 'subtotal'])
+
+				nueva_presentacion_id = request.POST.get('presentacion_nueva')
+				if nueva_presentacion_id:
+					presentacion = get_object_or_404(Presentacion.objects.select_related('producto'), id=nueva_presentacion_id)
+					cantidad_nueva = _parse_quantity(request.POST.get('cantidad_nueva'), 1)
+					precio_nuevo = _parse_decimal(request.POST.get('precio_nuevo'), 0)
+					descuento_aplicado_nuevo, descuento_monto_nuevo = normalizar_descuento_item_pedido(
+						precio=precio_nuevo,
+						descuento_aplicado=request.POST.get('descuento_aplicado_nuevo'),
+						descuento_monto=_parse_decimal(request.POST.get('descuento_monto_nuevo'), 0),
+					)
+					PedidoItem.objects.create(
+						pedido=pedido,
+						presentacion=presentacion,
+						cantidad_solicitada=cantidad_nueva,
+						cantidad=cantidad_nueva,
+						precio=precio_nuevo,
+						descuento_aplicado=descuento_aplicado_nuevo,
+						descuento_monto=descuento_monto_nuevo,
+						subtotal=calcular_subtotal_item_pedido(
 							precio=precio_nuevo,
-							descuento_aplicado=request.POST.get('descuento_aplicado_nuevo'),
-							descuento_monto=_parse_decimal(request.POST.get('descuento_monto_nuevo'), 0),
-						)
-						PedidoItem.objects.create(
-							pedido=pedido,
-							presentacion=presentacion,
-							cantidad_solicitada=cantidad_nueva,
 							cantidad=cantidad_nueva,
-							precio=precio_nuevo,
 							descuento_aplicado=descuento_aplicado_nuevo,
 							descuento_monto=descuento_monto_nuevo,
-							subtotal=calcular_subtotal_item_pedido(
-								precio=precio_nuevo,
-								cantidad=cantidad_nueva,
-								descuento_aplicado=descuento_aplicado_nuevo,
-								descuento_monto=descuento_monto_nuevo,
-							),
-						)
+						),
+					)
 
-					recalcular_pedido(pedido)
+				recalcular_pedido(pedido)
 		except ValidationError as exc:
 			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 			return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
@@ -337,7 +335,6 @@ def backoffice_pedido_detalle(request, pedido_id):
 	edit_lock_context = build_pedido_edit_lock_context(pedido=pedido, user=request.user)
 	pedido_form_disabled = (
 		edit_lock_context['pedido_edit_blocked']
-		or bool(pedido.seleccionador_id and pedido.estado == 'PARA_VERIFICAR')
 		or hasattr(pedido, 'invoice')
 	)
 	can_manage_pedido = (
@@ -359,7 +356,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 		'state_choices': _pedido_state_choices(),
 		'drivers': Usuario.objects.filter(role='driver', is_active=True).order_by('first_name', 'last_name', 'username'),
 		'selectores': Usuario.objects.filter(role='seleccionador', is_active=True).order_by('first_name', 'last_name', 'username'),
-		'lineas_bloqueadas_para_picking': bool(pedido.seleccionador_id and pedido.estado == 'PARA_VERIFICAR') or hasattr(pedido, 'invoice'),
+		'lineas_bloqueadas_para_picking': hasattr(pedido, 'invoice'),
 		'pedido_form_disabled': pedido_form_disabled,
 		'can_manage_pedido': can_manage_pedido,
 		'can_void_pedido': puede_anular_pedido_desde_backoffice(pedido) and can_manage_pedido,

@@ -1182,3 +1182,52 @@ class PedidoItemDiscountTests(TestCase):
 		self.assertEqual(self.item.precio_unitario_neto, Decimal('10.00'))
 		self.assertEqual(self.item.subtotal, Decimal('20.00'))
 		self.assertEqual(self.pedido.total, Decimal('20.00'))
+
+	def test_invoice_pricing_section_reflects_saved_dollar_discount(self):
+		self.item.descuento_aplicado = True
+		self.item.descuento_monto = Decimal('2.00')
+		self.item.subtotal = Decimal('20.00')
+		self.item.save(update_fields=['descuento_aplicado', 'descuento_monto', 'subtotal'])
+		self.pedido.estado = 'VERIFICADO_AJUSTADO'
+		self.pedido.total = Decimal('20.00')
+		self.pedido.save(update_fields=['estado', 'total'])
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		rows = response.context['invoice_suggested_price_rows']
+		self.assertEqual(len(rows), 1)
+		self.assertTrue(rows[0]['descuento_aplicado'])
+		self.assertEqual(rows[0]['descuento_monto'], '2.00')
+		self.assertEqual(rows[0]['final_unit_value'], '10.00')
+		self.assertEqual(rows[0]['line_subtotal_value'], '20.00')
+		self.assertContains(response, '$-2.00')
+		self.assertContains(response, '$10.00')
+		self.assertContains(response, '$20.00')
+
+	def test_generate_invoice_uses_saved_dollar_discount_from_order_line(self):
+		from config.facturacion.services import generar_invoice_desde_picking
+
+		self.item.descuento_aplicado = True
+		self.item.descuento_monto = Decimal('2.00')
+		self.item.precio = Decimal('12.00')
+		self.item.cantidad = 2
+		self.item.subtotal = Decimal('20.00')
+		self.item.save(update_fields=['descuento_aplicado', 'descuento_monto', 'precio', 'cantidad', 'subtotal'])
+		self.pedido.estado = 'VERIFICADO_AJUSTADO'
+		self.pedido.total = Decimal('20.00')
+		self.pedido.save(update_fields=['estado', 'total'])
+
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+			line_discounts={self.item.id: Decimal('0')},
+		)
+		item = invoice.items.get()
+
+		self.assertEqual(item.descuento_monto_unitario, Decimal('2.00'))
+		self.assertEqual(item.precio_unitario, Decimal('10.00'))
+		self.assertEqual(item.subtotal, Decimal('20.00'))

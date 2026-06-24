@@ -235,7 +235,7 @@
             <div class="col-12">
               <div class="border rounded-3 p-3 bg-white mt-2">
                 <div class="fw-semibold mb-2">{% trans "Customer pricing per product" %}</div>
-                <div class="small text-muted mb-3">{% trans "Apply a discount percentage to each line before the invoice is generated. The final unit price and subtotal are calculated automatically." %}</div>
+                <div class="small text-muted mb-3">{% trans "Discounts saved on the order below are reflected here automatically. You can still add a percentage discount on lines without a saved discount before generating the invoice." %}</div>
                 <div class="table-responsive">
                   <table class="table table-sm align-middle mb-0">
                     <thead>
@@ -244,8 +244,8 @@
                         <th>{% trans "Presentation" %}</th>
                         <th>{% trans "Qty." %}</th>
                         <th>{% trans "List price" %}</th>
-                        <th>{% trans "Discount" %} %</th>
-                        <th>{% trans "Final unit price" %}</th>
+                        <th>{% trans "Discount" %}</th>
+                        <th>{% trans "You pay" %}</th>
                         <th>{% trans "Subtotal" %}</th>
                       </tr>
                     </thead>
@@ -256,7 +256,22 @@
                           <td>{{ row.presentation_name }}</td>
                           <td>{{ row.quantity }}</td>
                           <td>${{ row.list_unit_value }}</td>
-                          <td style="min-width: 120px;">
+                          <td style="min-width: 140px;">
+                            {% if row.descuento_aplicado %}
+                            <div class="fw-semibold text-success">-${{ row.descuento_monto }}</div>
+                            <div class="small text-muted">{% trans "per unit" %}</div>
+                            <input
+                              type="hidden"
+                              class="line-discount-input"
+                              name="line_discount_percentage_{{ row.item_id }}"
+                              value="{{ row.default_discount }}"
+                              data-list-unit-price="{{ row.list_unit_value }}"
+                              data-quantity="{{ row.quantity }}"
+                              data-final-target="line_final_unit_{{ row.item_id }}"
+                              data-subtotal-target="line_subtotal_{{ row.item_id }}"
+                              data-base-unit-target="suggested_base_{{ row.item_id }}"
+                            >
+                            {% else %}
                             <div class="input-group input-group-sm">
                               <input
                                 type="number"
@@ -274,12 +289,13 @@
                               >
                               <span class="input-group-text">%</span>
                             </div>
+                            {% endif %}
                           </td>
                           <td>
-                            <span id="line_final_unit_{{ row.item_id }}" class="fw-semibold">—</span>
+                            <span id="line_final_unit_{{ row.item_id }}" class="fw-semibold">${{ row.final_unit_value }}</span>
                           </td>
                           <td>
-                            <span id="line_subtotal_{{ row.item_id }}" class="fw-semibold">—</span>
+                            <span id="line_subtotal_{{ row.item_id }}" class="fw-semibold">${{ row.line_subtotal_value }}</span>
                           </td>
                         </tr>
                       {% endfor %}
@@ -310,7 +326,7 @@
                           <td>{{ row.presentation_name }}</td>
                           <td>{{ row.quantity }}</td>
                           <td style="min-width: 360px; max-width: 420px;">
-                            <div class="small text-muted mb-2">{% trans "Customer unit cost" %}: $<span id="suggested_customer_cost_{{ row.item_id }}">{{ row.list_unit_value }}</span></div>
+                            <div class="small text-muted mb-2">{% trans "Customer unit cost" %}: $<span id="suggested_customer_cost_{{ row.item_id }}">{{ row.final_unit_value }}</span></div>
                             <div class="row g-2">
                               <div class="col-md-5">
                                 <label class="form-label form-label-sm mb-1">{% trans "Profit %" %}</label>
@@ -322,7 +338,7 @@
                                     class="form-control suggested-margin-input"
                                     name="suggested_margin_percentage_{{ row.item_id }}"
                                     value="{{ row.default_percentage }}"
-                                    data-base-unit-price="{{ row.list_unit_value }}"
+                                    data-base-unit-price="{{ row.final_unit_value }}"
                                     data-value-target="suggested_value_{{ row.item_id }}"
                                     data-summary-target="suggested_summary_{{ row.item_id }}"
                                     data-base-price-input="line_discount_percentage_{{ row.item_id }}"
@@ -342,7 +358,7 @@
                                     class="form-control suggested-value-input"
                                     name="suggested_unit_price_{{ row.item_id }}"
                                     value="{{ row.default_value }}"
-                                    data-base-unit-price="{{ row.list_unit_value }}"
+                                    data-base-unit-price="{{ row.final_unit_value }}"
                                     data-margin-target="suggested_margin_percentage_{{ row.item_id }}"
                                     data-summary-target="suggested_summary_{{ row.item_id }}"
                                     data-base-price-input="line_discount_percentage_{{ row.item_id }}"

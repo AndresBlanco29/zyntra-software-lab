@@ -45,6 +45,7 @@ from .services import (
 	anular_pedido_desde_backoffice,
 	asignar_picking_a_seleccionador,
 	build_pedido_edit_lock_context,
+	calcular_precio_unitario_neto_item,
 	calcular_subtotal_item_pedido,
 	eliminar_linea_pedido_desde_backoffice,
 	eliminar_pedido_desde_backoffice,
@@ -125,6 +126,50 @@ def _pedido_item_customer_unit_price(item):
 	if units <= 0:
 		return _quantize_money(case_price)
 	return (case_price / Decimal(str(units))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
+def _invoice_line_discount_percentage_for_item(item):
+	if item.descuento_aplicado:
+		discount_amount = _quantize_money(item.descuento_monto)
+		list_price = _parse_decimal(item.precio, 0)
+		if discount_amount > 0 and list_price > 0:
+			return ((discount_amount / list_price) * Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+	product_discount = max(int(getattr(item.presentacion.producto, 'descuento', 0) or 0), 0)
+	return Decimal(str(product_discount))
+
+
+def _invoice_line_net_unit_price(item):
+	return calcular_precio_unitario_neto_item(
+		precio=item.precio,
+		descuento_aplicado=item.descuento_aplicado,
+		descuento_monto=item.descuento_monto,
+	)
+
+
+def _build_invoice_suggested_price_row(item):
+	net_unit_price = _invoice_line_net_unit_price(item)
+	quantity = int(item.cantidad or 0)
+	line_subtotal = calcular_subtotal_item_pedido(
+		precio=item.precio,
+		cantidad=quantity,
+		descuento_aplicado=item.descuento_aplicado,
+		descuento_monto=item.descuento_monto,
+	)
+	return {
+		'item_id': item.id,
+		'product_name': item.presentacion.producto.nombre,
+		'presentation_name': item.presentacion.nombre,
+		'quantity': quantity,
+		'base_unit_value': format(_pedido_item_customer_unit_price(item), '.2f'),
+		'list_unit_value': format(item.precio, '.2f'),
+		'default_discount': format(_invoice_line_discount_percentage_for_item(item), '.2f'),
+		'descuento_aplicado': bool(item.descuento_aplicado),
+		'descuento_monto': format(_quantize_money(item.descuento_monto), '.2f'),
+		'final_unit_value': format(net_unit_price, '.2f'),
+		'line_subtotal_value': format(line_subtotal, '.2f'),
+		'default_value': format(resolve_presentacion_suggested_unit_price(presentacion=item.presentacion, base_case_price=net_unit_price), '.2f'),
+		'default_percentage': format(DEFAULT_SUGGESTED_PROFIT_PERCENTAGE, '.2f'),
+	}
 
 
 def _pedido_state_label(state):
@@ -409,17 +454,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 		'can_void_pedido': puede_anular_pedido_desde_backoffice(pedido) and can_manage_pedido,
 		'can_delete_pedido': puede_eliminar_pedido_desde_backoffice(pedido) and can_manage_pedido,
 		'invoice_suggested_price_rows': [
-			{
-				'item_id': item.id,
-				'product_name': item.presentacion.producto.nombre,
-				'presentation_name': item.presentacion.nombre,
-				'quantity': item.cantidad,
-				'base_unit_value': format(_pedido_item_customer_unit_price(item), '.2f'),
-				'list_unit_value': format(item.precio, '.2f'),
-				'default_discount': max(int(getattr(item.presentacion.producto, 'descuento', 0) or 0), 0),
-				'default_value': format(resolve_presentacion_suggested_unit_price(presentacion=item.presentacion, base_case_price=item.precio), '.2f'),
-				'default_percentage': format(DEFAULT_SUGGESTED_PROFIT_PERCENTAGE, '.2f'),
-			}
+			_build_invoice_suggested_price_row(item)
 			for item in pedido.items.select_related('presentacion__producto')
 			if item.cantidad > 0
 		],

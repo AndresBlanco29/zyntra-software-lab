@@ -437,16 +437,24 @@ def _build_invoice_pdf_item_data(invoice):
 
 
 INVOICE_PDF_ITEMS_PER_PAGE = 10
-INVOICE_PDF_ITEM_COLUMN_WEIGHTS = (70, 138, 38, 28, 28, 48, 34, 48, 48, 84)
+INVOICE_PDF_SHOW_SUGGESTED_RETAIL = False
+INVOICE_PDF_ITEM_COLUMN_WEIGHTS_BASE = (70, 138, 38, 28, 28, 48, 34, 48, 48)
+INVOICE_PDF_SUGGESTED_RETAIL_COLUMN_WEIGHT = 84
+
+
+def _invoice_pdf_item_column_weights():
+	if INVOICE_PDF_SHOW_SUGGESTED_RETAIL:
+		return INVOICE_PDF_ITEM_COLUMN_WEIGHTS_BASE + (INVOICE_PDF_SUGGESTED_RETAIL_COLUMN_WEIGHT,)
+	return INVOICE_PDF_ITEM_COLUMN_WEIGHTS_BASE
 
 
 def _invoice_pdf_item_table_column_widths(content_width):
-	total_weight = sum(INVOICE_PDF_ITEM_COLUMN_WEIGHTS)
-	return [content_width * weight / total_weight for weight in INVOICE_PDF_ITEM_COLUMN_WEIGHTS]
+	total_weight = sum(_invoice_pdf_item_column_weights())
+	return [content_width * weight / total_weight for weight in _invoice_pdf_item_column_weights()]
 
 
 def _build_invoice_pdf_item_table_header(header_style):
-	return [
+	columns = [
 		Paragraph(_('Barcode'), header_style),
 		Paragraph(_('Description'), header_style),
 		Paragraph(_('U/M'), header_style),
@@ -456,8 +464,10 @@ def _build_invoice_pdf_item_table_header(header_style):
 		Paragraph(_('Disc.<br/>$ / unit'), header_style),
 		Paragraph(_('Cust.<br/>/ unit'), header_style),
 		Paragraph(_('Subtotal'), header_style),
-		Paragraph(_('SGT RTL<br/>/ SRP 30%'), header_style),
 	]
+	if INVOICE_PDF_SHOW_SUGGESTED_RETAIL:
+		columns.append(Paragraph(_('SGT RTL<br/>/ SRP 30%'), header_style))
+	return columns
 
 
 def _chunk_invoice_pdf_item_rows(item_rows, size=INVOICE_PDF_ITEMS_PER_PAGE):
@@ -662,7 +672,7 @@ def _invoice_pdf_response(invoice):
 			barcode_cell = Paragraph('-', body_style)
 			if item['barcode']:
 				barcode_cell = _build_invoice_pdf_barcode(item['barcode'], max_width=max(barcode_column_width, 58))
-			rows.append([
+			row = [
 				barcode_cell,
 				Paragraph(item['product_name'], body_style),
 				Paragraph(item['pack_size'], body_style),
@@ -672,8 +682,10 @@ def _invoice_pdf_response(invoice):
 				Paragraph(item['discount_amount_unit'], table_cell_center_style),
 				Paragraph(item['customer_price'], table_cell_center_style),
 				Paragraph(item['subtotal'], table_cell_center_style),
-				Paragraph(item['suggested_unit_price'], table_cell_center_style),
-			])
+			]
+			if INVOICE_PDF_SHOW_SUGGESTED_RETAIL:
+				row.append(Paragraph(item['suggested_unit_price'], table_cell_center_style))
+			rows.append(row)
 
 		table = Table(rows, colWidths=item_column_widths, repeatRows=1)
 		table.setStyle(TableStyle([

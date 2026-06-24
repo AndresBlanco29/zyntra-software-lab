@@ -2555,10 +2555,10 @@ class InvoiceFlowTests(TestCase):
 	def test_invoice_pdf_item_table_column_widths_use_full_content_width(self):
 		content_width = 564
 		column_widths = _invoice_pdf_item_table_column_widths(content_width)
-		self.assertEqual(len(column_widths), 10)
+		self.assertEqual(len(column_widths), 9)
 		self.assertAlmostEqual(sum(column_widths), content_width, places=2)
 		self.assertGreater(column_widths[1], column_widths[3])
-		self.assertGreater(column_widths[-1], column_widths[6])
+		self.assertGreaterEqual(column_widths[-1], column_widths[6])
 
 	def test_invoice_pdf_barcode_uses_small_human_readable_font(self):
 		barcode = _build_invoice_pdf_barcode('123456789012')

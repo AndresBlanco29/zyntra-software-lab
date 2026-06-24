@@ -106,6 +106,16 @@
             <div class="fw-semibold">{% if invoice.delivery.estimated_delivery_at %}{{ invoice.delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
           </div>
           {% endif %}
+          {% if invoice.cliente.terminos_pago %}
+          <div class="col-md-4">
+            <div class="text-muted small">{% trans "Payment terms" %}</div>
+            <div class="fw-semibold">{{ invoice.cliente.get_terminos_pago_label }}</div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-muted small">{% trans "Due date" %}</div>
+            <div class="fw-semibold">{% if invoice_payment_due_date %}{{ invoice_payment_due_date|date:"d/m/Y" }}{% else %}-{% endif %}</div>
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>

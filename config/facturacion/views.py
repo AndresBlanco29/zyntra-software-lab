@@ -58,6 +58,7 @@ from .services import (
 	ensure_delivery_for_invoice,
 	generar_invoice_desde_picking,
 	list_pending_customer_notes,
+	resolve_invoice_payment_due_date,
 	resolve_presentacion_suggested_unit_price,
 	summarize_pending_customer_notes,
 	start_delivery_route,
@@ -81,8 +82,7 @@ def _build_invoice_pdf_terms_paragraph(invoice, body_style):
 
 
 def _resolve_invoice_pdf_due_date_label(invoice):
-	invoice_date = timezone.localtime(invoice.creada_en).date()
-	due_date = invoice.cliente.get_payment_due_date(invoice_date)
+	due_date = resolve_invoice_payment_due_date(invoice)
 	if due_date is None:
 		return '-'
 	return due_date.strftime('%m/%d/%Y')
@@ -1211,6 +1211,7 @@ def backoffice_invoice_detail(request, invoice_id):
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
 		'invoice_items': order_invoice_items_for_display(invoice),
+		'invoice_payment_due_date': resolve_invoice_payment_due_date(invoice),
 		'driver_created_notes_count': driver_created_notes_count,
 		'advanced_adjustment_note_url': f"{reverse('backoffice_adjustment_note_create')}?cliente_id={invoice.cliente_id}&invoice_id={invoice.id}",
 		'invoice_quickbooks_locked': is_sync_locked(invoice),
@@ -1430,7 +1431,7 @@ def backoffice_void_records_list(request):
 @login_required
 @internal_permission_required('backoffice.orders.view')
 def backoffice_invoice_pdf(request, invoice_id):
-	invoice = get_object_or_404(Invoice.objects.select_related('pedido__cliente', 'driver').prefetch_related('items__presentacion__producto', 'items__pedido_item__movimientos_inventario', 'items__pedido_item', 'notas_ajuste'), id=invoice_id)
+	invoice = get_object_or_404(Invoice.objects.select_related('pedido__cliente', 'driver', 'delivery').prefetch_related('items__presentacion__producto', 'items__pedido_item__movimientos_inventario', 'items__pedido_item', 'notas_ajuste'), id=invoice_id)
 	return _invoice_pdf_response(invoice)
 
 

@@ -362,17 +362,17 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
             <label class="payment-terms-option">
               <input type="radio" name="terminos_pago" value="NET7">
               <span class="payment-terms-option-label">NET7</span>
-              <span class="payment-terms-option-copy">{% trans "Pay within 7 calendar days of invoice date" %}</span>
+              <span class="payment-terms-option-copy">{% trans "Pay within 7 calendar days after the estimated delivery date" %}</span>
             </label>
             <label class="payment-terms-option">
               <input type="radio" name="terminos_pago" value="NET14">
               <span class="payment-terms-option-label">NET14</span>
-              <span class="payment-terms-option-copy">{% trans "Pay within 14 calendar days of invoice date" %}</span>
+              <span class="payment-terms-option-copy">{% trans "Pay within 14 calendar days after the estimated delivery date" %}</span>
             </label>
             <label class="payment-terms-option">
               <input type="radio" name="terminos_pago" value="NET21">
               <span class="payment-terms-option-label">NET21</span>
-              <span class="payment-terms-option-copy">{% trans "Pay within 21 calendar days of invoice date" %}</span>
+              <span class="payment-terms-option-copy">{% trans "Pay within 21 calendar days after the estimated delivery date" %}</span>
             </label>
           </div>
         </form>

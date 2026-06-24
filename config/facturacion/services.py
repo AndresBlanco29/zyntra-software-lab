@@ -28,6 +28,17 @@ def _ensure_quickbooks_not_locked(*, invoice=None, nota=None):
 		raise ValidationError(_('Invoice %(invoice)s is locked because it is already synced with QuickBooks.') % {'invoice': invoice.numero})
 
 
+def resolve_invoice_payment_base_date(invoice):
+	delivery = getattr(invoice, 'delivery', None)
+	if delivery is not None and delivery.estimated_delivery_at:
+		return timezone.localtime(delivery.estimated_delivery_at).date()
+	return timezone.localtime(invoice.creada_en).date()
+
+
+def resolve_invoice_payment_due_date(invoice):
+	return invoice.cliente.get_payment_due_date(resolve_invoice_payment_base_date(invoice))
+
+
 def _to_decimal(value, default='0'):
 	try:
 		return Decimal(str(value if value is not None else default))

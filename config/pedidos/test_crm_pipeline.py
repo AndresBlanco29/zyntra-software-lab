@@ -123,6 +123,7 @@ class CrmPipelineTests(TestCase):
 
 		self.assertEqual(len(cards), 1)
 		self.assertEqual(cards[0].pedido_id, pedido.id)
+		self.assertIn(f'/facturacion/backoffice/invoices/{invoice.pk}/', cards[0].detail_url)
 
 	def test_column_period_total_sums_only_orders_created_in_period(self):
 		self._create_pedido(total=Decimal('100.00'))

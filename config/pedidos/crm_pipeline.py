@@ -159,8 +159,9 @@ def _resolve_column_key(pedido):
 
 
 def _detail_url(pedido):
-	if hasattr(pedido, 'invoice') and pedido.invoice_id:
-		return reverse('backoffice_invoice_detail', args=[pedido.invoice_id])
+	invoice = getattr(pedido, 'invoice', None)
+	if invoice is not None:
+		return reverse('backoffice_invoice_detail', args=[invoice.pk])
 	return reverse('backoffice_pedido_detalle', args=[pedido.id])
 
 

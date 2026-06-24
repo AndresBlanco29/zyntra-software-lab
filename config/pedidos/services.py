@@ -238,7 +238,9 @@ def acquire_pedido_edit_lock(*, pedido, user):
 
 def refresh_pedido_edit_lock(*, pedido, user):
     lock = get_active_pedido_edit_lock(pedido)
-    if not lock or lock.locked_by_id != user.id:
+    if not lock:
+        return acquire_pedido_edit_lock(pedido=pedido, user=user)
+    if lock.locked_by_id != user.id:
         editor_name = _pedido_edit_lock_display_name(getattr(lock, 'locked_by', None))
         raise ValidationError(
             _('This sales order is currently being edited by %(user)s.') % {'user': editor_name or _('another user')}

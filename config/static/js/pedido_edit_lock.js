@@ -16,6 +16,7 @@
     var releaseUrl = form.dataset.pedidoLockReleaseUrl;
     var csrfToken = getCsrfToken(form);
     var heartbeatMs = 60000;
+    var lockConflictHandled = false;
 
     function releaseLock() {
       if (!releaseUrl || !csrfToken) {
@@ -44,8 +45,27 @@
       });
     }
 
+    function handleLockConflict(response) {
+      if (lockConflictHandled) {
+        return;
+      }
+      lockConflictHandled = true;
+
+      response.json().then(function (payload) {
+        var message = (payload && payload.error) || 'This sales order is being edited by another user.';
+        window.alert(message);
+      }).catch(function () {
+        window.alert('This sales order is being edited by another user.');
+      });
+
+      var fieldset = form.querySelector('fieldset');
+      if (fieldset) {
+        fieldset.disabled = true;
+      }
+    }
+
     function pingLock() {
-      if (!pingUrl || !csrfToken) {
+      if (!pingUrl || !csrfToken || lockConflictHandled) {
         return;
       }
 
@@ -60,17 +80,18 @@
         body: 'csrfmiddlewaretoken=' + encodeURIComponent(csrfToken),
       }).then(function (response) {
         if (response.status === 409) {
-          window.location.reload();
+          handleLockConflict(response);
         }
       }).catch(function () {
         // Ignore transient network errors; stale lock timeout will recover access.
       });
     }
 
+    pingLock();
     window.setInterval(pingLock, heartbeatMs);
-    window.addEventListener('pagehide', releaseLock);
+    window.addEventListener('beforeunload', releaseLock);
     form.addEventListener('submit', function () {
-      window.removeEventListener('pagehide', releaseLock);
+      window.removeEventListener('beforeunload', releaseLock);
     });
   });
 })();

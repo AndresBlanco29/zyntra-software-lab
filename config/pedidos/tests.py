@@ -1121,6 +1121,20 @@ class PedidoEditLockTests(TestCase):
 		self.assertEqual(ping_response.status_code, 200)
 		self.assertGreater(lock.last_seen_at, original_seen_at)
 
+	def test_edit_lock_ping_reacquires_after_release(self):
+		client_one = Client()
+		client_one.force_login(self.backoffice_one)
+		client_one.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+		release_response = client_one.post(reverse('backoffice_pedido_edit_lock_release', args=[self.pedido.id]))
+		self.assertEqual(release_response.status_code, 200)
+		self.assertFalse(PedidoEditLock.objects.filter(pedido=self.pedido).exists())
+
+		ping_response = client_one.post(reverse('backoffice_pedido_edit_lock_ping', args=[self.pedido.id]))
+
+		self.assertEqual(ping_response.status_code, 200)
+		lock = PedidoEditLock.objects.get(pedido=self.pedido)
+		self.assertEqual(lock.locked_by_id, self.backoffice_one.id)
+
 	def test_edit_lock_release_removes_lock(self):
 		client_one = Client()
 		client_one.force_login(self.backoffice_one)

@@ -1119,6 +1119,17 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   if (orderForm) {
+    orderForm.addEventListener('keydown', function (event) {
+      if (event.key !== 'Enter') {
+        return;
+      }
+      const target = event.target;
+      if (!target || target.tagName === 'TEXTAREA' || target.type === 'submit' || target.type === 'button') {
+        return;
+      }
+      event.preventDefault();
+    });
+
     orderForm.addEventListener('submit', function (event) {
       const modifiedDeleteChecked = orderForm.querySelector('input[data-picker-modified="true"]:checked');
       if (!modifiedDeleteChecked) {

@@ -15,7 +15,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, DeliveryNotificationLog, FacturacionRegistroAnulacion, Invoice, NotaAjuste, NotaAjusteAplicacion
 from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, start_delivery_route, unlock_client_from_delivery
-from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_item_data, _build_invoice_pdf_terms_paragraph, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
+from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_item_data, _build_invoice_pdf_terms_paragraph, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_pdf_due_date_label, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_SYNCED
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
 from config.inventario.services import registrar_entrada_manual, reservar_stock_para_pedido_items
@@ -2621,6 +2621,45 @@ class InvoiceFlowTests(TestCase):
 		self.assertIn('NET7', terms_paragraph.text)
 		self.assertIn('DUE BALANCE', terms_paragraph.text)
 		self.assertIn('$20,408.57', terms_paragraph.text)
+
+	def test_invoice_pdf_due_date_uses_payment_terms_from_invoice_date(self):
+		self.cliente.terminos_pago = Cliente.PAYMENT_TERMS_NET7
+		self.cliente.save(update_fields=['terminos_pago'])
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		invoice_date = timezone.localtime(invoice.creada_en).date()
+		expected_due_date = self.cliente.get_payment_due_date(invoice_date)
+
+		self.assertEqual(_resolve_invoice_pdf_due_date_label(invoice), expected_due_date.strftime('%m/%d/%Y'))
+
+	def test_invoice_pdf_due_date_shows_dash_when_terms_not_configured(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+		self.assertEqual(_resolve_invoice_pdf_due_date_label(invoice), '-')
+
+	def test_invoice_pdf_due_date_for_prepay_matches_invoice_date(self):
+		self.cliente.terminos_pago = Cliente.PAYMENT_TERMS_PREPAY
+		self.cliente.save(update_fields=['terminos_pago'])
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+		self.assertEqual(
+			_resolve_invoice_pdf_due_date_label(invoice),
+			timezone.localtime(invoice.creada_en).date().strftime('%m/%d/%Y'),
+		)
 
 	def test_invoice_pdf_totals_rows_include_customer_credit_applied(self):
 		self.cliente.balance = Decimal('30.00')

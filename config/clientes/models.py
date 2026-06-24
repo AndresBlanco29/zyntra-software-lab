@@ -1,4 +1,5 @@
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db import models
@@ -43,6 +44,14 @@ class Cliente(models.Model):
         (PAYMENT_TERMS_NET14, 'NET14'),
         (PAYMENT_TERMS_NET21, 'NET21'),
     )
+
+    PAYMENT_TERMS_DUE_DAYS = {
+        PAYMENT_TERMS_PREPAY: 0,
+        PAYMENT_TERMS_COD: 0,
+        PAYMENT_TERMS_NET7: 7,
+        PAYMENT_TERMS_NET14: 14,
+        PAYMENT_TERMS_NET21: 21,
+    }
 
     usuario = models.OneToOneField(
         Usuario,
@@ -252,6 +261,17 @@ class Cliente(models.Model):
         if not self.terminos_pago:
             return ''
         return dict(self.PAYMENT_TERMS_CHOICES).get(self.terminos_pago, self.terminos_pago)
+
+    def get_payment_terms_due_days(self):
+        if not self.terminos_pago:
+            return None
+        return self.PAYMENT_TERMS_DUE_DAYS.get(self.terminos_pago)
+
+    def get_payment_due_date(self, base_date):
+        due_days = self.get_payment_terms_due_days()
+        if due_days is None:
+            return None
+        return base_date + timedelta(days=due_days)
 
     @property
     def available_credit(self):

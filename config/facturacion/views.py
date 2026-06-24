@@ -80,6 +80,14 @@ def _build_invoice_pdf_terms_paragraph(invoice, body_style):
 	return Paragraph('<br/>'.join(lines), body_style)
 
 
+def _resolve_invoice_pdf_due_date_label(invoice):
+	invoice_date = timezone.localtime(invoice.creada_en).date()
+	due_date = invoice.cliente.get_payment_due_date(invoice_date)
+	if due_date is None:
+		return '-'
+	return due_date.strftime('%m/%d/%Y')
+
+
 def _validate_invoice_is_not_quickbooks_locked(invoice):
 	if is_sync_locked(invoice):
 		raise ValidationError(_('Invoice %(invoice)s is locked because it is already synced with QuickBooks.') % {'invoice': invoice.numero})
@@ -621,7 +629,7 @@ def _invoice_pdf_response(invoice):
 		[
 			Paragraph(_('Customer no.'), meta_label_style), Paragraph(str(invoice.cliente_id), meta_value_style),
 			Paragraph(_('Order no.'), meta_label_style), Paragraph(str(invoice.pedido_id), meta_value_style),
-			Paragraph(_('Date'), meta_label_style), Paragraph(timezone.localtime(invoice.creada_en).strftime('%m/%d/%Y'), meta_value_style),
+			Paragraph(_('Due date'), meta_label_style), Paragraph(_resolve_invoice_pdf_due_date_label(invoice), meta_value_style),
 		],
 		[
 			Paragraph(_('Sales rep'), meta_label_style), Paragraph(sales_rep, meta_value_style),

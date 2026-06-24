@@ -6390,7 +6390,16 @@ msgid ""
 msgstr "Insufficient físico stock detected. You can still save this verificación soVolverOffice can revisar y take action."
 
 msgid "Approved by picker"
-msgstr "Approved por picker"
+msgstr "Aprobado por el picker"
+
+msgid "Boxes ordered"
+msgstr "Cajas pedidas"
+
+msgid "Boxes dispatched"
+msgstr "Cajas despachadas"
+
+msgid "Boxes not sent"
+msgstr "Cajas no enviadas"
 
 msgid "Save verification"
 msgstr "Save verification"

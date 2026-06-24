@@ -68,7 +68,7 @@
                 {% endfor %}
               </select>
             </td>
-            <td data-label="QTY ORD">{{ item.requested_quantity }}</td>
+            <td data-label="QTY ORD" data-requested-quantity="{{ item.requested_quantity }}">{{ item.requested_quantity }}</td>
             <td data-label="QTY PICK" class="mobile-stack-table__input-cell">
               <div class="input-group quantity-stepper" data-quantity-stepper data-stock-physical="{{ item.stock_physical }}" data-applied-quantity="{{ item.applied_quantity }}">
                 <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="down" aria-label="{% trans 'Decrease real quantity' %}">-</button>
@@ -145,6 +145,25 @@
         <div class="form-check">
           <input class="form-check-input" type="checkbox" id="notaResuelta" name="nota_seleccionador_resuelta" {% if form_note_resolved %}checked{% endif %} {% if form_has_stock_shortage %}disabled{% else %}required{% endif %}>
           <label class="form-check-label" for="notaResuelta">{% trans "Approved by picker" %}</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-light border-0 mt-4 mb-0" id="pickerDispatchSummary">
+      <div class="card-body py-3">
+        <div class="row g-3 text-center">
+          <div class="col-md-4">
+            <div class="small text-muted">{% trans "Boxes ordered" %}</div>
+            <div class="fs-4 fw-semibold" id="pickerSummaryOrdered">0</div>
+          </div>
+          <div class="col-md-4">
+            <div class="small text-muted">{% trans "Boxes dispatched" %}</div>
+            <div class="fs-4 fw-semibold text-success" id="pickerSummaryDispatched">0</div>
+          </div>
+          <div class="col-md-4">
+            <div class="small text-muted">{% trans "Boxes not sent" %}</div>
+            <div class="fs-4 fw-semibold text-danger" id="pickerSummaryNotSent">0</div>
+          </div>
         </div>
       </div>
     </div>
@@ -271,6 +290,36 @@
       return true;
     }
 
+    function updateDispatchSummary() {
+      var orderedTotal = 0;
+      var dispatchedTotal = 0;
+      var notSentTotal = 0;
+
+      document.querySelectorAll('[data-picker-order-line]').forEach(function (row) {
+        var orderedCell = row.querySelector('[data-requested-quantity]');
+        var pickInput = row.querySelector('.quantity-stepper__input');
+        var ordered = Number(orderedCell ? orderedCell.dataset.requestedQuantity : 0) || 0;
+        var picked = Number(pickInput ? pickInput.value : 0) || 0;
+
+        orderedTotal += ordered;
+        dispatchedTotal += picked;
+        notSentTotal += Math.max(ordered - picked, 0);
+      });
+
+      document.querySelectorAll('[data-added-product-row]').forEach(function (row) {
+        var select = row.querySelector('[data-added-product-select]');
+        var pickInput = row.querySelector('.quantity-stepper__input');
+        if (!select || !select.value || !pickInput) {
+          return;
+        }
+        dispatchedTotal += Number(pickInput.value || 0) || 0;
+      });
+
+      document.getElementById('pickerSummaryOrdered').textContent = orderedTotal;
+      document.getElementById('pickerSummaryDispatched').textContent = dispatchedTotal;
+      document.getElementById('pickerSummaryNotSent').textContent = notSentTotal;
+    }
+
     function updateFormState() {
       var hasShortage = false;
 
@@ -304,6 +353,7 @@
       }
 
       form.dataset.hasShortage = hasShortage ? 'true' : 'false';
+      updateDispatchSummary();
     }
 
     document.querySelectorAll('[data-quantity-stepper]').forEach(function (stepper) {

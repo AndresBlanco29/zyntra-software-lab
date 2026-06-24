@@ -216,7 +216,7 @@
                   </div>
                   <div class="col-md-3">
                     <div class="form-check mt-4 pt-2">
-                      <input class="form-check-input" type="checkbox" name="use_customer_credit" id="useCustomerCredit" checked>
+                      <input class="form-check-input" type="checkbox" name="use_customer_credit" id="useCustomerCredit" value="on">
                       <label class="form-check-label fw-semibold" for="useCustomerCredit">{% trans "Apply customer credit" %}</label>
                     </div>
                   </div>
@@ -224,7 +224,7 @@
                     <label class="form-label fw-semibold">{% trans "Credit to apply" %}</label>
                     <div class="input-group">
                       <span class="input-group-text">$</span>
-                      <input type="number" min="0" step="0.01" max="{{ pending_customer_notes_summary.available_credit_excluding_notes }}" name="customer_credit_to_apply" class="form-control" value="{{ pending_customer_notes_summary.available_credit_excluding_notes|floatformat:2 }}">
+                      <input type="number" min="0" step="0.01" max="{{ pending_customer_notes_summary.available_credit_excluding_notes }}" name="customer_credit_to_apply" id="customerCreditToApply" class="form-control" value="0.00" data-max-credit="{{ pending_customer_notes_summary.available_credit_excluding_notes|floatformat:2 }}" disabled>
                     </div>
                     <div class="form-text">{% trans "Use the full amount for automatic application or edit it to apply only part of the remaining credit that is not tied to pending customer notes." %}</div>
                   </div>
@@ -709,6 +709,29 @@ document.addEventListener('DOMContentLoaded', function () {
   if (invoiceDeliveryMethod) {
     invoiceDeliveryMethod.addEventListener('change', syncInvoiceDeliveryFields);
     syncInvoiceDeliveryFields();
+  }
+
+  const useCustomerCredit = document.getElementById('useCustomerCredit');
+  const customerCreditToApply = document.getElementById('customerCreditToApply');
+
+  function syncCustomerCreditFields() {
+    if (!useCustomerCredit || !customerCreditToApply) {
+      return;
+    }
+    const enabled = useCustomerCredit.checked;
+    customerCreditToApply.disabled = !enabled;
+    if (!enabled) {
+      customerCreditToApply.value = '0.00';
+      return;
+    }
+    if ((parseFloat(customerCreditToApply.value) || 0) <= 0) {
+      customerCreditToApply.value = customerCreditToApply.dataset.maxCredit || '0.00';
+    }
+  }
+
+  if (useCustomerCredit) {
+    useCustomerCredit.addEventListener('change', syncCustomerCreditFields);
+    syncCustomerCreditFields();
   }
 
   const orderForm = document.getElementById('backofficeOrderForm');

@@ -419,10 +419,10 @@ class ConfiguracionDescuentos(models.Model):
             options.append({
                 "key": f"descuento_{index}",
                 "value": format(amount, ".2f"),
-                "label": _("Discount %(number)s - $%(amount)s") % {
+                "label": str(_("Discount %(number)s - $%(amount)s") % {
                     "number": index,
                     "amount": format(amount, ".2f"),
-                },
+                }),
             })
         return options
 

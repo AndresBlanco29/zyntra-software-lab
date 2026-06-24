@@ -505,7 +505,7 @@
     <div class="row g-2 align-items-end mb-3">
       <div class="col-md-8 col-lg-7">
         <label for="bulkDiscountPresetSelect" class="form-label fw-semibold mb-1">{% trans "Assign one preset discount to all products" %}</label>
-        <select id="bulkDiscountPresetSelect" class="form-select form-select-sm">
+        <select id="bulkDiscountPresetSelect" class="form-select form-select-sm no-search-select">
           <option value="">{% trans "Select one of the preset discounts" %}</option>
           {% for option in discount_preset_options %}
           <option value="{{ option.value|unlocalize }}" data-discount-key="{{ option.key }}">{{ option.label }}</option>
@@ -579,9 +579,9 @@
                 <label class="form-check-label small" for="descuentoAplicado{{ item.id }}">{% trans "Apply discount" %}</label>
               </div>
               <div class="pedido-item-discount-fields {% if not item.descuento_aplicado %}d-none{% endif %}">
-                <select class="form-select form-select-sm mb-1 pedido-item-discount-preset" data-target-input="descuento_monto_{{ item.id }}" data-item-id="{{ item.id }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+                <select class="form-select form-select-sm mb-1 pedido-item-discount-preset no-search-select" data-target-input="descuento_monto_{{ item.id }}" data-item-id="{{ item.id }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
                   <option value="">{% trans "Manual discount" %}</option>
-                  {% for option in item.discount_preset_options %}
+                  {% for option in discount_preset_options %}
                   <option value="{{ option.value|unlocalize }}" data-discount-key="{{ option.key }}" {% if item.selected_discount_preset_key == option.key %}selected{% endif %}>{{ option.label }}</option>
                   {% endfor %}
                 </select>
@@ -718,7 +718,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const toggle = document.querySelector(`.pedido-item-discount-toggle[data-item-id="${itemId}"]`);
     const amountInput = document.querySelector(`.pedido-item-discount-amount[data-item-id="${itemId}"]`);
     const discountFields = document.querySelector(`.pedido-item-discount-cell[data-item-id="${itemId}"] .pedido-item-discount-fields`);
-    const discountPreset = document.querySelector(`.pedido-item-discount-preset[data-item-id="${itemId}"]`);
     const summary = document.querySelector(`.pedido-item-discount-summary[data-item-id="${itemId}"]`);
     const netPrice = document.querySelector(`.pedido-item-net-price[data-item-id="${itemId}"]`);
     const savings = document.querySelector(`.pedido-item-savings[data-item-id="${itemId}"]`);
@@ -739,9 +738,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (amountInput) {
       amountInput.disabled = !discountEnabled || amountInput.hasAttribute('data-locked');
-    }
-    if (discountPreset) {
-      discountPreset.disabled = !discountEnabled || discountPreset.hasAttribute('disabled');
     }
 
     const netUnit = Math.max(0, listPrice - discountAmount);
@@ -784,6 +780,13 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
   document.querySelectorAll('.pedido-item-discount-toggle').forEach((toggle) => {
+    toggle.addEventListener('change', function () {
+      const presetSelect = document.querySelector(`.pedido-item-discount-preset[data-item-id="${toggle.dataset.itemId}"]`);
+      if (presetSelect && window.LTGSearchableSelect) {
+        window.LTGSearchableSelect.destroy(presetSelect);
+      }
+      refreshPedidoItemDiscountRow(toggle.dataset.itemId);
+    });
     refreshPedidoItemDiscountRow(toggle.dataset.itemId);
   });
 

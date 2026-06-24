@@ -29,7 +29,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from config.facturacion.models import NotaAjuste
+from config.clientes.models import Cliente
 from config.facturacion.services import DEFAULT_SUGGESTED_PROFIT_PERCENTAGE, resolve_presentacion_suggested_unit_price, summarize_pending_customer_notes
 from config.integrations.quickbooks.services import get_connection_status
 from config.integrations.quickbooks.views import get_dashboard_sync_context
@@ -38,6 +38,7 @@ from config.productos.models import Presentacion
 from config.inventario.models import StockPresentacion
 
 from .models import Pedido, PedidoItem
+from .crm_pipeline import build_crm_pipeline
 from .dispatch_orders import build_dispatch_order_page, get_dispatch_order_counts
 from .services import (
 	actualizar_cantidad_linea_pedido_sin_aplicar_inventario,
@@ -217,6 +218,46 @@ def backoffice_pedidos(request):
 		'page_obj': page_obj,
 		'view_mode': view_mode,
 		**counts,
+	})
+
+
+@login_required
+@internal_permission_required('backoffice.orders.view')
+def backoffice_crm_pipeline(request):
+	period = (request.GET.get('period') or 'today').strip()
+	if period not in {'today', 'week', 'month'}:
+		period = 'today'
+
+	vendedor_id = request.GET.get('vendedor') or None
+	cliente_id = request.GET.get('cliente') or None
+	try:
+		vendedor_id = int(vendedor_id) if vendedor_id else None
+	except (TypeError, ValueError):
+		vendedor_id = None
+	try:
+		cliente_id = int(cliente_id) if cliente_id else None
+	except (TypeError, ValueError):
+		cliente_id = None
+
+	pipeline = build_crm_pipeline(
+		period=period,
+		search_term=request.GET.get('q') or '',
+		vendedor_id=vendedor_id,
+		cliente_id=cliente_id,
+	)
+	vendedores = (
+		Usuario.objects.filter(role='vendedor', is_active=True)
+		.order_by('first_name', 'last_name', 'username')
+	)
+	clientes = (
+		Cliente.objects.filter(pedidos__isnull=False)
+		.distinct()
+		.order_by('nombre_empresa')
+	)
+	return render(request, 'backoffice/crm_pipeline.html', {
+		**pipeline,
+		'vendedores': vendedores,
+		'clientes': clientes,
 	})
 
 

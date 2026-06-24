@@ -15,6 +15,7 @@
 
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
 <link rel="stylesheet" href="{% static 'css/layout_vendedor.css' %}">
+{% block extra_head %}{% endblock %}
 {% include "includes/searchable_selects_assets.html" %}
 
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
@@ -289,7 +290,7 @@ La Tortilla Grocery
 {% endif %}
 
 {% if request.user|has_internal_permission:'backoffice.dashboard.view' or request.user|has_internal_permission:'backoffice.quotes.view' or request.user|has_internal_permission:'backoffice.orders.view' %}
-<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'backoffice_dashboard' or request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' or request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' or request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' or request.resolver_match.url_name == 'backoffice_adjustment_notes_list' or request.resolver_match.url_name == 'backoffice_adjustment_note_create' %}open{% endif %}>
+<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'backoffice_dashboard' or request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_crm_pipeline' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' or request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' or request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' or request.resolver_match.url_name == 'backoffice_adjustment_notes_list' or request.resolver_match.url_name == 'backoffice_adjustment_note_create' %}open{% endif %}>
   <summary class="sidebar-collapsible-summary">{% trans "Commercial" %}</summary>
   <div class="sidebar-collapsible-links">
     {% if request.user|has_internal_permission:'backoffice.dashboard.view' %}
@@ -307,6 +308,10 @@ La Tortilla Grocery
     {% endif %}
 
     {% if request.user|has_internal_permission:'backoffice.orders.view' or request.user|has_internal_permission:'backoffice.quotes.view' %}
+    <a href="{% url 'backoffice_crm_pipeline' %}"
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_crm_pipeline' %}active{% endif %}">
+      {% trans "Sales pipeline" %}
+    </a>
     <a href="{% url 'backoffice_pedidos' %}"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' %}active{% endif %}">
       {% trans "Orders" %}

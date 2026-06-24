@@ -1,0 +1,117 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n static %}
+
+{% block title %}{% trans "Sales pipeline" %}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/crm_pipeline.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="crm-pipeline-page">
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+      <h2 class="mb-1">{% trans "Sales pipeline" %}</h2>
+      <p class="text-muted mb-0">{% trans "Track confirmed orders through picking, BackOffice, driver delivery and completion." %}</p>
+    </div>
+    <a href="{% url 'backoffice_pedidos' %}" class="btn btn-outline-secondary btn-sm">{% trans "Table view" %}</a>
+  </div>
+
+  <form method="get" class="card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-lg-3">
+          <label class="form-label">{% trans "Period" %}</label>
+          <div class="btn-group w-100" role="group" aria-label="{% trans 'Period filter' %}">
+            <input type="radio" class="btn-check" name="period" id="periodToday" value="today" {% if period == 'today' %}checked{% endif %} onchange="this.form.submit()">
+            <label class="btn btn-outline-primary" for="periodToday">{% trans "Today" %}</label>
+            <input type="radio" class="btn-check" name="period" id="periodWeek" value="week" {% if period == 'week' %}checked{% endif %} onchange="this.form.submit()">
+            <label class="btn btn-outline-primary" for="periodWeek">{% trans "Week" %}</label>
+            <input type="radio" class="btn-check" name="period" id="periodMonth" value="month" {% if period == 'month' %}checked{% endif %} onchange="this.form.submit()">
+            <label class="btn btn-outline-primary" for="periodMonth">{% trans "Month" %}</label>
+          </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <label class="form-label" for="crmVendorFilter">{% trans "Salesperson" %}</label>
+          <select class="form-select" id="crmVendorFilter" name="vendedor" onchange="this.form.submit()">
+            <option value="">{% trans "All salespeople" %}</option>
+            {% for vendedor in vendedores %}
+            <option value="{{ vendedor.id }}" {% if vendedor_id == vendedor.id %}selected{% endif %}>
+              {{ vendedor.get_full_name|default:vendedor.username }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <label class="form-label" for="crmCustomerFilter">{% trans "Customer" %}</label>
+          <select class="form-select" id="crmCustomerFilter" name="cliente" onchange="this.form.submit()">
+            <option value="">{% trans "All customers" %}</option>
+            {% for cliente in clientes %}
+            <option value="{{ cliente.id }}" {% if cliente_id == cliente.id %}selected{% endif %}>{{ cliente.nombre_empresa }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-lg-3">
+          <label class="form-label" for="crmSearchInput">{% trans "Search" %}</label>
+          <div class="input-group">
+            <input type="search" class="form-control" id="crmSearchInput" name="q" value="{{ search_term }}" placeholder="{% trans 'Customer, order #, salesperson' %}">
+            <button type="submit" class="btn btn-primary">{% trans "Search" %}</button>
+          </div>
+        </div>
+      </div>
+      <div class="form-text mt-2">
+        {% blocktrans with start=period_start|date:"d/m/Y" end=period_end|date:"d/m/Y" %}
+        Open orders from previous days stay visible. Completed deliveries only appear for {{ start }}{% if period != 'today' %} – {{ end }}{% endif %}.
+        {% endblocktrans %}
+      </div>
+    </div>
+  </form>
+
+  <div class="crm-pipeline-board" role="list">
+    {% for column in columns %}
+    <section class="crm-pipeline-column" style="--crm-column-accent: {{ column.accent }};" role="listitem" aria-label="{{ column.title }}">
+      <header class="crm-pipeline-column__header">
+        <div class="crm-pipeline-column__title-row">
+          <h3 class="crm-pipeline-column__title">{{ column.title }}</h3>
+          <span class="crm-pipeline-column__count">{{ column.card_count }}</span>
+        </div>
+        <div class="crm-pipeline-column__total">${{ column.period_total }}</div>
+        <div class="crm-pipeline-column__total-label">
+          {% if period == 'today' %}
+            {% trans "Orders taken today" %}
+          {% elif period == 'week' %}
+            {% trans "Orders taken this week" %}
+          {% else %}
+            {% trans "Orders taken this month" %}
+          {% endif %}
+        </div>
+      </header>
+      <div class="crm-pipeline-column__body">
+        {% for card in column.cards %}
+        <a href="{{ card.detail_url }}" class="crm-pipeline-card">
+          <div class="crm-pipeline-card__top">
+            <span class="crm-pipeline-card__ref">#{{ card.pedido_id }}</span>
+            <span class="crm-pipeline-card__total">${{ card.total }}</span>
+          </div>
+          <div class="crm-pipeline-card__customer">{{ card.customer_name }}</div>
+          <div class="crm-pipeline-card__manager">{{ card.manager_name }}</div>
+          <div class="crm-pipeline-card__meta">
+            <span>{{ card.created_at|date:"d/m/Y H:i" }}</span>
+            {% if card.is_blocked %}
+            <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">{% trans "Blocked" %}</span>
+            {% elif card.is_pickup %}
+            <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">{% trans "Pickup" %}</span>
+            {% else %}
+            <span class="crm-pipeline-card__status">{{ card.status_label }}</span>
+            {% endif %}
+          </div>
+        </a>
+        {% empty %}
+        <div class="crm-pipeline-column__empty">{% trans "No orders in this stage." %}</div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

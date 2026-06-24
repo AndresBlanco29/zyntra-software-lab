@@ -112,6 +112,7 @@
   <div class="card-body">
     <h5 class="mb-3">{% trans "Quick actions" %}</h5>
     <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'backoffice_crm_pipeline' %}" class="btn btn-outline-primary">{% trans "Sales pipeline" %}</a>
       <a href="{% url 'backoffice_pedidos' %}" class="btn btn-primary">{% trans "Manage orders" %}</a>
       <a href="{% url 'backoffice_inventory_list' %}" class="btn btn-outline-dark">{% trans "Manage inventory" %}</a>
     </div>

@@ -44,6 +44,81 @@ function formatMoney(value) {
     return numericValue.toFixed(2)
 }
 
+function updateOrderTotals(total) {
+    const total1 = document.getElementById('totalPedido')
+    const total2 = document.getElementById('totalFinal')
+
+    if (!total1 || !total2) {
+        return
+    }
+
+    total1.innerText = '$' + formatMoney(total)
+    total2.innerText = '$' + formatMoney(total)
+    total1.classList.add('total-update')
+    total2.classList.add('total-update')
+    setTimeout(() => {
+        total1.classList.remove('total-update')
+        total2.classList.remove('total-update')
+    }, 350)
+}
+
+function refreshDiscountRow(id, data) {
+    const wrap = document.querySelector(`.descuento-input-wrap input.descuento-monto[data-id="${id}"]`)?.closest('.descuento-input-wrap')
+    const resumen = document.querySelector(`.descuento-resumen[data-id="${id}"]`)
+    const netPrice = document.querySelector(`.precio-neto[data-id="${id}"]`)
+    const savings = document.querySelector(`.ahorro-linea[data-id="${id}"]`)
+    const listPriceSelect = document.querySelector(`.precio-resumen[data-id="${id}"]`)
+    const listPrice = listPriceSelect ? Number(listPriceSelect.value || 0) : 0
+    const discountApplied = Boolean(data ? data.discount_applied : document.querySelector(`.descuento-toggle[data-id="${id}"]`)?.checked)
+    const discountAmount = Number(data ? data.discount_amount : document.querySelector(`.descuento-monto[data-id="${id}"]`)?.value || 0)
+
+    if (wrap) {
+        wrap.classList.toggle('d-none', !discountApplied)
+    }
+    if (resumen) {
+        if (discountApplied && discountAmount > 0) {
+            const netUnit = Math.max(0, listPrice - discountAmount)
+            resumen.textContent = `Lista $${formatMoney(listPrice)} - $${formatMoney(discountAmount)} = $${formatMoney(netUnit)} / unidad`
+        } else {
+            resumen.textContent = ''
+        }
+    }
+    if (netPrice && data && data.net_unit_price) {
+        netPrice.textContent = '$' + formatMoney(data.net_unit_price)
+    }
+    if (savings) {
+        const lineSavings = data && data.line_savings ? Number(data.line_savings) : 0
+        savings.classList.toggle('d-none', !(discountApplied && lineSavings > 0))
+        if (discountApplied && lineSavings > 0) {
+            savings.textContent = `Ahorras $${formatMoney(lineSavings)}`
+        }
+    }
+}
+
+function persistDiscount(id) {
+    const toggle = document.querySelector(`.descuento-toggle[data-id="${id}"]`)
+    const amountInput = document.querySelector(`.descuento-monto[data-id="${id}"]`)
+    if (!toggle || !amountInput) {
+        return Promise.resolve()
+    }
+
+    return fetch(actualizarURL, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrf,
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `producto_id=${id}&accion=cambiar_descuento&descuento_aplicado=${toggle.checked ? '1' : '0'}&descuento_monto=${encodeURIComponent(amountInput.value || '0')}`
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById(`subtotal-${id}`).innerText = '$' + formatMoney(data.subtotal)
+        updateOrderTotals(data.total)
+        refreshDiscountRow(id, data)
+        return data
+    })
+}
+
 function hideFeedback() {
     if (!feedbackBox) return
     feedbackBox.classList.add('d-none')
@@ -213,21 +288,8 @@ body:`producto_id=${id}&precio=${precioSelect.value}&precio_key=${encodeURICompo
 .then(data=>{
 
 document.getElementById(`subtotal-${id}`).innerText = "$"+formatMoney(data.subtotal)
-const total1 = document.getElementById("totalPedido")
-const total2 = document.getElementById("totalFinal")
-
-total1.innerText = "$"+formatMoney(data.total)
-total2.innerText = "$"+formatMoney(data.total)
-
-total1.classList.add("total-update")
-total2.classList.add("total-update")
-
-setTimeout(()=>{
-total1.classList.remove("total-update")
-total2.classList.remove("total-update")
-},350)
-
-
+updateOrderTotals(data.total)
+refreshDiscountRow(id, data)
 
 })
 
@@ -259,20 +321,8 @@ body:`producto_id=${id}&precio=${precio}&precio_key=${encodeURIComponent(precioK
 .then(data=>{
 
 document.getElementById(`subtotal-${id}`).innerText = "$"+formatMoney(data.subtotal)
-const total1 = document.getElementById("totalPedido")
-const total2 = document.getElementById("totalFinal")
-
-total1.innerText = "$"+formatMoney(data.total)
-total2.innerText = "$"+formatMoney(data.total)
-
-total1.classList.add("total-update")
-total2.classList.add("total-update")
-
-setTimeout(()=>{
-total1.classList.remove("total-update")
-total2.classList.remove("total-update")
-},350)
-
+updateOrderTotals(data.total)
+refreshDiscountRow(id, data)
 
 })
 
@@ -336,21 +386,8 @@ body:`producto_id=${id}&accion=set&cantidad=${cantidad}`
 .then(data=>{
 
 document.getElementById(`subtotal-${id}`).innerText = "$"+formatMoney(data.subtotal)
-
-const total1 = document.getElementById("totalPedido")
-const total2 = document.getElementById("totalFinal")
-
-total1.innerText = "$"+formatMoney(data.total)
-total2.innerText = "$"+formatMoney(data.total)
-
-total1.classList.add("total-update")
-total2.classList.add("total-update")
-
-setTimeout(()=>{
-total1.classList.remove("total-update")
-total2.classList.remove("total-update")
-},350)
-
+updateOrderTotals(data.total)
+refreshDiscountRow(id, data)
 
 })
 
@@ -381,25 +418,33 @@ body:`producto_id=${id}&accion=${accion}`
 document.querySelector(`.cantidad-input[data-id="${id}"]`).value = data.cantidad
 
 document.getElementById(`subtotal-${id}`).innerText = "$"+formatMoney(data.subtotal)
-
-const total1 = document.getElementById("totalPedido")
-const total2 = document.getElementById("totalFinal")
-
-total1.innerText = "$"+formatMoney(data.total)
-total2.innerText = "$"+formatMoney(data.total)
-
-total1.classList.add("total-update")
-total2.classList.add("total-update")
-
-setTimeout(()=>{
-total1.classList.remove("total-update")
-total2.classList.remove("total-update")
-},350)
-
+updateOrderTotals(data.total)
+refreshDiscountRow(id, data)
 
 })
 
 }
+
+document.querySelectorAll('.descuento-toggle').forEach(toggle => {
+    toggle.addEventListener('change', function () {
+        const id = this.dataset.id
+        const wrap = document.querySelector(`.descuento-monto[data-id="${id}"]`)?.closest('.descuento-input-wrap')
+        if (wrap) {
+            wrap.classList.toggle('d-none', !this.checked)
+        }
+        persistDiscount(id)
+    })
+})
+
+document.querySelectorAll('.descuento-monto').forEach(input => {
+    input.addEventListener('change', function () {
+        persistDiscount(this.dataset.id)
+    })
+})
+
+document.querySelectorAll('.descuento-toggle').forEach(toggle => {
+    refreshDiscountRow(toggle.dataset.id)
+})
 
 // Fin de DOMContentLoaded
 })

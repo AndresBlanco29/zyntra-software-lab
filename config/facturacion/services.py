@@ -327,8 +327,18 @@ def generar_invoice_desde_picking(
 	for item in pedido.items.select_related('presentacion__producto').all():
 		quantity = int(item.cantidad or 0)
 		list_unit_price = _quantize_money(item.precio)
-		discount_percentage = _parse_line_discount_percentage(line_discounts.get(item.id, '0'))
-		final_unit_price = _calculate_discounted_unit_price(list_unit_price, discount_percentage)
+		discount_amount_unit = Decimal('0.00')
+		if item.descuento_aplicado and _quantize_money(item.descuento_monto) > 0:
+			discount_amount_unit = _quantize_money(item.descuento_monto)
+			final_unit_price = _clamp_non_negative_money(list_unit_price - discount_amount_unit)
+			discount_percentage = Decimal('0.00')
+			if list_unit_price > 0:
+				discount_percentage = ((discount_amount_unit / list_unit_price) * Decimal('100')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+		else:
+			discount_percentage = _parse_line_discount_percentage(line_discounts.get(item.id, '0'))
+			final_unit_price = _calculate_discounted_unit_price(list_unit_price, discount_percentage)
+			if discount_percentage > 0:
+				discount_amount_unit = _quantize_money(list_unit_price - final_unit_price)
 		line_total = _quantize_money(final_unit_price * Decimal(str(quantity)))
 		suggested_unit_price = suggested_unit_prices.get(item.id)
 		if suggested_unit_price in (None, ''):
@@ -345,8 +355,9 @@ def generar_invoice_desde_picking(
 			producto_nombre=item.presentacion.producto.nombre,
 			presentacion_nombre=item.presentacion.nombre,
 			cantidad_facturada=quantity,
-			precio_unitario_lista=list_unit_price if discount_percentage > 0 else None,
+			precio_unitario_lista=list_unit_price if discount_percentage > 0 or discount_amount_unit > 0 else None,
 			descuento_porcentaje=discount_percentage,
+			descuento_monto_unitario=discount_amount_unit,
 			precio_unitario=final_unit_price,
 			precio_venta_sugerido_unitario=suggested_unit_price,
 			subtotal=line_total,

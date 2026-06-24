@@ -147,6 +147,8 @@ La Tortilla Grocery
 <th>{% trans "Presentación" %}</th>
 <th>{% trans "Cantidad" %}</th>
 <th>{% trans "Precio" %}</th>
+<th>{% trans "Descuento" %}</th>
+<th>{% trans "Pagas" %}</th>
 <th>{% trans "Subtotal" %}</th>
 <th>{% trans "Acción" %}</th>
 
@@ -255,6 +257,36 @@ min="1"
 
 </td>
 
+<td data-label="{% trans "Descuento" %}" class="pedido-discount-cell" data-id="{{ item.id }}">
+<div class="form-check mb-2">
+<input
+  type="checkbox"
+  class="form-check-input descuento-toggle"
+  id="descuentoToggle{{ item.id }}"
+  data-id="{{ item.id }}"
+  {% if item.descuento_aplicado %}checked{% endif %}>
+<label class="form-check-label small" for="descuentoToggle{{ item.id }}">{% trans "Aplicar descuento" %}</label>
+</div>
+<div class="input-group input-group-sm mb-1 descuento-input-wrap {% if not item.descuento_aplicado %}d-none{% endif %}">
+<span class="input-group-text">$</span>
+<input
+  type="number"
+  min="0"
+  step="0.01"
+  class="form-control descuento-monto"
+  data-id="{{ item.id }}"
+  value="{{ item.descuento_monto|floatformat:2 }}">
+</div>
+<div class="small text-muted descuento-resumen" data-id="{{ item.id }}"></div>
+</td>
+
+<td data-label="{% trans "Pagas" %}">
+<div class="fw-semibold precio-neto" data-id="{{ item.id }}">${{ item.precio_neto|floatformat:2 }}</div>
+<div class="small text-success ahorro-linea {% if not item.descuento_aplicado %}d-none{% endif %}" data-id="{{ item.id }}">
+{% blocktrans with amount=item.ahorro_linea %}Ahorras ${{ amount }}{% endblocktrans %}
+</div>
+</td>
+
 <td data-label="{% trans "Subtotal" %}" id="subtotal-{{ item.id }}">
 ${{ item.subtotal|floatformat:2 }}
 </td>
@@ -270,7 +302,7 @@ ${{ item.subtotal|floatformat:2 }}
 {% empty %}
 
 <tr>
-<td colspan="6" class="text-center text-muted py-4 mobile-stack-table__empty">
+<td colspan="8" class="text-center text-muted py-4 mobile-stack-table__empty">
 {% trans "No hay productos en el pedido." %}
 </td>
 </tr>

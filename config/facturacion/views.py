@@ -375,6 +375,11 @@ def _parse_estimated_delivery_at(value):
 def _calculate_invoice_line_discount_total(invoice):
 	total = Decimal('0.00')
 	for item in invoice.items.all():
+		discount_amount_unit = Decimal(str(item.descuento_monto_unitario or 0))
+		if discount_amount_unit > 0:
+			quantity = Decimal(str(item.cantidad_facturada or 0))
+			total += discount_amount_unit * quantity
+			continue
 		discount_percentage = Decimal(str(item.descuento_porcentaje or 0))
 		if discount_percentage <= 0 or not item.precio_unitario_lista:
 			continue
@@ -405,9 +410,12 @@ def _build_invoice_pdf_item_data(invoice):
 			except (ArithmeticError, InvalidOperation, TypeError, ValueError):
 				profit_percentage = Decimal('0.00')
 		discount_percentage = Decimal(str(item.descuento_porcentaje or 0)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+		discount_amount_unit = Decimal(str(item.descuento_monto_unitario or 0)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 		list_price_value = Decimal(str(item.precio_unitario_lista)) if item.precio_unitario_lista else None
 		line_discount_amount = Decimal('0.00')
-		if discount_percentage > 0 and list_price_value is not None:
+		if discount_amount_unit > 0:
+			line_discount_amount = (discount_amount_unit * Decimal(str(item.cantidad_facturada or 0))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+		elif discount_percentage > 0 and list_price_value is not None:
 			line_discount_amount = ((list_price_value - Decimal(str(item.precio_unitario or 0))) * Decimal(str(item.cantidad_facturada or 0))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 		items.append({
 			'barcode': barcode,
@@ -416,6 +424,7 @@ def _build_invoice_pdf_item_data(invoice):
 			'requested_quantity': str(requested_quantity),
 			'dispatched_quantity': str(item.cantidad_facturada),
 			'list_price': _format_pdf_money(list_price_value) if list_price_value is not None else '—',
+			'discount_amount_unit': _format_pdf_money(discount_amount_unit) if discount_amount_unit > 0 else '—',
 			'discount_percentage': f'{discount_percentage:.2f}%' if discount_percentage > 0 else '—',
 			'line_discount_amount': _format_pdf_money(line_discount_amount) if line_discount_amount > 0 else '—',
 			'customer_price': _format_pdf_money(item.precio_unitario),
@@ -443,7 +452,7 @@ def _build_invoice_pdf_item_table_header(header_style):
 		Paragraph(_('Qty<br/>ord'), header_style),
 		Paragraph(_('Qty<br/>dsp'), header_style),
 		Paragraph(_('List<br/>/ unit'), header_style),
-		Paragraph(_('Disc.<br/>%'), header_style),
+		Paragraph(_('Disc.<br/>$ / unit'), header_style),
 		Paragraph(_('Cust.<br/>/ unit'), header_style),
 		Paragraph(_('Subtotal'), header_style),
 		Paragraph(_('SGT RTL<br/>/ SRP 30%'), header_style),
@@ -659,7 +668,7 @@ def _invoice_pdf_response(invoice):
 				Paragraph(item['requested_quantity'], table_cell_center_style),
 				Paragraph(item['dispatched_quantity'], table_cell_center_style),
 				Paragraph(item['list_price'], table_cell_center_style),
-				Paragraph(item['discount_percentage'], table_cell_center_style),
+				Paragraph(item['discount_amount_unit'], table_cell_center_style),
 				Paragraph(item['customer_price'], table_cell_center_style),
 				Paragraph(item['subtotal'], table_cell_center_style),
 				Paragraph(item['suggested_unit_price'], table_cell_center_style),

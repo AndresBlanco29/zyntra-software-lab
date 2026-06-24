@@ -106,10 +106,28 @@ class PedidoItem(models.Model):
 	cantidad_inventario_aplicada = models.PositiveIntegerField(default=0)
 	cantidad = models.PositiveIntegerField(default=1)
 	precio = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+	descuento_aplicado = models.BooleanField(default=False)
+	descuento_monto = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 	subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
 	def __str__(self):
 		return f"{self.presentacion.producto.nombre} x {self.cantidad}"
+
+	@property
+	def precio_unitario_neto(self):
+		from .services import calcular_precio_unitario_neto_item
+
+		return calcular_precio_unitario_neto_item(
+			precio=self.precio,
+			descuento_aplicado=self.descuento_aplicado,
+			descuento_monto=self.descuento_monto,
+		)
+
+	@property
+	def descuento_linea_total(self):
+		if not self.descuento_aplicado:
+			return Decimal('0.00')
+		return (self.descuento_monto or Decimal('0.00')) * Decimal(str(self.cantidad or 0))
 
 	@property
 	def selector_changed_presentation(self):

@@ -503,6 +503,7 @@ class InvoiceItem(models.Model):
 	cantidad_facturada = models.PositiveIntegerField(default=1)
 	precio_unitario_lista = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 	descuento_porcentaje = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+	descuento_monto_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
 	precio_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
 	precio_venta_sugerido_unitario = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 	subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))

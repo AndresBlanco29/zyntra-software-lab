@@ -49,10 +49,41 @@ def _resolve_pedido_item_price(*, pedido, presentacion):
     return _quantize_money(price or 0)
 
 
+def calcular_precio_unitario_neto_item(*, precio, descuento_aplicado=False, descuento_monto=0):
+    precio_decimal = _quantize_money(precio)
+    if not descuento_aplicado:
+        return precio_decimal
+    descuento = _quantize_money(descuento_monto)
+    return _quantize_money(max(Decimal('0.00'), precio_decimal - descuento))
+
+
+def calcular_subtotal_item_pedido(*, precio, cantidad, descuento_aplicado=False, descuento_monto=0):
+    net_unit_price = calcular_precio_unitario_neto_item(
+        precio=precio,
+        descuento_aplicado=descuento_aplicado,
+        descuento_monto=descuento_monto,
+    )
+    return _quantize_money(net_unit_price * Decimal(str(cantidad or 0)))
+
+
+def normalizar_descuento_item_pedido(*, precio, descuento_aplicado, descuento_monto):
+    aplicado = bool(descuento_aplicado)
+    monto = _quantize_money(descuento_monto if aplicado else 0)
+    precio_decimal = _quantize_money(precio)
+    if aplicado and monto > precio_decimal:
+        raise ValidationError(_('Discount cannot be greater than the unit price.'))
+    return aplicado, monto
+
+
 def recalcular_pedido(pedido):
     total = Decimal('0.00')
     for item in PedidoItem.objects.filter(pedido=pedido):
-        item.subtotal = _quantize_money(_to_decimal(item.precio) * Decimal(str(item.cantidad or 0)))
+        item.subtotal = calcular_subtotal_item_pedido(
+            precio=item.precio,
+            cantidad=item.cantidad,
+            descuento_aplicado=item.descuento_aplicado,
+            descuento_monto=item.descuento_monto,
+        )
         item.save(update_fields=['subtotal'])
         total += item.subtotal
     pedido.total = _quantize_money(total)
@@ -115,7 +146,17 @@ def crear_pedido_desde_items(
         presentacion = payload['presentacion']
         cantidad = max(int(payload.get('cantidad') or 1), 1)
         precio = _quantize_money(payload.get('precio', 0))
-        subtotal = _quantize_money(precio * Decimal(str(cantidad)))
+        descuento_aplicado, descuento_monto = normalizar_descuento_item_pedido(
+            precio=precio,
+            descuento_aplicado=payload.get('descuento_aplicado', False),
+            descuento_monto=payload.get('descuento_monto', 0),
+        )
+        subtotal = calcular_subtotal_item_pedido(
+            precio=precio,
+            cantidad=cantidad,
+            descuento_aplicado=descuento_aplicado,
+            descuento_monto=descuento_monto,
+        )
         pedido_items.append(
             PedidoItem(
                 pedido=pedido,
@@ -123,6 +164,8 @@ def crear_pedido_desde_items(
                 cantidad_solicitada=cantidad,
                 cantidad=cantidad,
                 precio=precio,
+                descuento_aplicado=descuento_aplicado,
+                descuento_monto=descuento_monto,
                 subtotal=subtotal,
             )
         )

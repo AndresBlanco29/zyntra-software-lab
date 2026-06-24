@@ -44,11 +44,13 @@ from .services import (
 	anular_pedido_desde_backoffice,
 	asignar_picking_a_seleccionador,
 	build_pedido_edit_lock_context,
+	calcular_subtotal_item_pedido,
 	eliminar_linea_pedido_desde_backoffice,
 	eliminar_pedido_desde_backoffice,
 	ensure_pedido_edit_lock_owner,
 	evaluar_stock_fisico_verificacion_picking,
 	guardar_verificacion_picking,
+	normalizar_descuento_item_pedido,
 	puede_anular_pedido_desde_backoffice,
 	puede_eliminar_pedido_desde_backoffice,
 	recalcular_pedido,
@@ -284,21 +286,43 @@ def backoffice_pedido_detalle(request, pedido_id):
 						else:
 							item = actualizar_cantidad_linea_pedido_sin_aplicar_inventario(item=item, nueva_cantidad=nueva_cantidad)
 						item.precio = _parse_decimal(request.POST.get(f'precio_{item.id}'), item.precio)
-						item.subtotal = item.precio * item.cantidad
-						item.save(update_fields=['precio', 'subtotal'])
+						item.descuento_aplicado, item.descuento_monto = normalizar_descuento_item_pedido(
+							precio=item.precio,
+							descuento_aplicado=request.POST.get(f'descuento_aplicado_{item.id}'),
+							descuento_monto=_parse_decimal(request.POST.get(f'descuento_monto_{item.id}'), item.descuento_monto),
+						)
+						item.subtotal = calcular_subtotal_item_pedido(
+							precio=item.precio,
+							cantidad=item.cantidad,
+							descuento_aplicado=item.descuento_aplicado,
+							descuento_monto=item.descuento_monto,
+						)
+						item.save(update_fields=['precio', 'descuento_aplicado', 'descuento_monto', 'subtotal'])
 
 					nueva_presentacion_id = request.POST.get('presentacion_nueva')
 					if nueva_presentacion_id:
 						presentacion = get_object_or_404(Presentacion.objects.select_related('producto'), id=nueva_presentacion_id)
 						cantidad_nueva = _parse_quantity(request.POST.get('cantidad_nueva'), 1)
 						precio_nuevo = _parse_decimal(request.POST.get('precio_nuevo'), 0)
+						descuento_aplicado_nuevo, descuento_monto_nuevo = normalizar_descuento_item_pedido(
+							precio=precio_nuevo,
+							descuento_aplicado=request.POST.get('descuento_aplicado_nuevo'),
+							descuento_monto=_parse_decimal(request.POST.get('descuento_monto_nuevo'), 0),
+						)
 						PedidoItem.objects.create(
 							pedido=pedido,
 							presentacion=presentacion,
 							cantidad_solicitada=cantidad_nueva,
 							cantidad=cantidad_nueva,
 							precio=precio_nuevo,
-							subtotal=precio_nuevo * cantidad_nueva,
+							descuento_aplicado=descuento_aplicado_nuevo,
+							descuento_monto=descuento_monto_nuevo,
+							subtotal=calcular_subtotal_item_pedido(
+								precio=precio_nuevo,
+								cantidad=cantidad_nueva,
+								descuento_aplicado=descuento_aplicado_nuevo,
+								descuento_monto=descuento_monto_nuevo,
+							),
 						)
 
 					recalcular_pedido(pedido)

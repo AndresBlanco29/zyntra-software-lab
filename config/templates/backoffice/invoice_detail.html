@@ -289,7 +289,8 @@
             <th>{% trans "Requested qty." %}</th>
             <th>{% trans "Dispatched qty." %}</th>
             <th>{% trans "List price" %}</th>
-            <th>{% trans "Discount" %} %</th>
+            <th>{% trans "Discount" %}</th>
+            <th>{% trans "Disc. %" %}</th>
             <th>{% trans "Unit price" %}</th>
             <th>{% trans "Sug. rtl / unit" %}</th>
             <th>{% trans "Subtotal" %}</th>
@@ -303,6 +304,14 @@
             <td>{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
             <td>{{ item.cantidad_facturada }}</td>
             <td>{% if item.precio_unitario_lista %}${{ item.precio_unitario_lista }}{% else %}—{% endif %}</td>
+            <td>
+              {% if item.descuento_monto_unitario and item.descuento_monto_unitario > 0 %}
+                <span class="text-success fw-semibold">-${{ item.descuento_monto_unitario }}</span>
+                <div class="small text-muted">{% blocktrans with total=item.descuento_monto_unitario|floatformat:2 qty=item.cantidad_facturada %}${{ total }} / unit · {{ qty }} units{% endblocktrans %}</div>
+              {% else %}
+                —
+              {% endif %}
+            </td>
             <td>{% if item.descuento_porcentaje %}{{ item.descuento_porcentaje }}%{% else %}—{% endif %}</td>
             <td>${{ item.precio_unitario }}</td>
             <td>${{ item.precio_venta_sugerido_unitario|default:'0.00' }}</td>

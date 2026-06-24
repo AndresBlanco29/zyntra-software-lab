@@ -976,3 +976,61 @@ class PedidoEditLockTests(TestCase):
 		self.assertEqual(delete_response.url, reverse('backoffice_pedidos'))
 		self.assertFalse(Pedido.objects.filter(id=pedido_id).exists())
 		self.assertFalse(PedidoEditLock.objects.filter(pedido_id=pedido_id).exists())
+
+
+class PedidoItemDiscountTests(TestCase):
+	def setUp(self):
+		self.backoffice = Usuario.objects.create_user(username='backoffice-discount', password='secret123', role='backoffice')
+		customer_user = Usuario.objects.create_user(username='customer-discount', password='secret123', role='cliente', email='customer-discount@example.com')
+		self.cliente = Cliente.objects.create(
+			usuario=customer_user,
+			nombre_empresa='Cliente Discount',
+			telefono='5551234567',
+			direccion='123 Main St',
+			ciudad='Marietta',
+			estado='GA',
+			codigo_postal='30062',
+			pais='USA',
+			sales_tax_number='TAX-DISC',
+			certificado_tax=SimpleUploadedFile('certificado.txt', b'certificado'),
+			aprobado=True,
+		)
+		categoria = Categoria.objects.create(nombre='Categoria discount')
+		marca = Marca.objects.create(nombre='Marca discount')
+		producto = Producto.objects.create(nombre='Producto discount', categoria=categoria, marca=marca, activo=True)
+		self.presentacion = Presentacion.objects.create(
+			producto=producto,
+			nombre='Caja',
+			unidades=1,
+			tipo_contenido='caja',
+			costo=Decimal('10.00'),
+			precio_1=Decimal('12.00'),
+		)
+		self.pedido = Pedido.objects.create(cliente=self.cliente, origen='VENDEDOR', estado='RECIBIDO', total=Decimal('24.00'))
+		self.item = PedidoItem.objects.create(
+			pedido=self.pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=2,
+			cantidad=2,
+			precio=Decimal('12.00'),
+			subtotal=Decimal('24.00'),
+		)
+
+	def test_backoffice_can_apply_dollar_discount_to_order_item(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), {
+			'estado': 'RECIBIDO',
+			f'cantidad_{self.item.id}': '2',
+			f'precio_{self.item.id}': '12.00',
+			f'descuento_aplicado_{self.item.id}': 'on',
+			f'descuento_monto_{self.item.id}': '2.00',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.item.refresh_from_db()
+		self.pedido.refresh_from_db()
+		self.assertTrue(self.item.descuento_aplicado)
+		self.assertEqual(self.item.descuento_monto, Decimal('2.00'))
+		self.assertEqual(self.item.precio_unitario_neto, Decimal('10.00'))
+		self.assertEqual(self.item.subtotal, Decimal('20.00'))
+		self.assertEqual(self.pedido.total, Decimal('20.00'))

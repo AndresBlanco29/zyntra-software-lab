@@ -27,7 +27,10 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from config.facturacion.services import get_recent_customer_invoice_items_by_presentation
 from config.pedidos.services import (
+    calcular_precio_unitario_neto_item,
+    calcular_subtotal_item_pedido,
     crear_pedido_desde_items,
+    normalizar_descuento_item_pedido,
     notificar_backoffice_pedido,
 )
 from config.usuarios.permissions import internal_permission_required
@@ -46,6 +49,38 @@ def _money_decimal(value):
 
 def _money_string(value):
     return format(_money_decimal(value), '.2f')
+
+
+def _cart_item_subtotal(item):
+    return calcular_subtotal_item_pedido(
+        precio=item.get('precio', 0),
+        cantidad=item.get('cantidad', 0),
+        descuento_aplicado=item.get('descuento_aplicado', False),
+        descuento_monto=item.get('descuento_monto', 0),
+    )
+
+
+def _cart_total(carrito):
+    return _money_decimal(sum(_cart_item_subtotal(item) for item in carrito.values()))
+
+
+def _cart_item_pricing_payload(item):
+    subtotal = _cart_item_subtotal(item)
+    net_unit = calcular_precio_unitario_neto_item(
+        precio=item.get('precio', 0),
+        descuento_aplicado=item.get('descuento_aplicado', False),
+        descuento_monto=item.get('descuento_monto', 0),
+    )
+    discount_enabled = bool(item.get('descuento_aplicado'))
+    discount_amount = _money_decimal(item.get('descuento_monto', 0) if discount_enabled else 0)
+    quantity = int(item.get('cantidad', 0) or 0)
+    return {
+        'subtotal': _money_string(subtotal),
+        'net_unit_price': _money_string(net_unit),
+        'discount_amount': _money_string(discount_amount),
+        'line_savings': _money_string(discount_amount * quantity),
+        'discount_applied': discount_enabled,
+    }
 
 
 def _normalize_precio_key(value):
@@ -488,7 +523,7 @@ def ver_pedido(request):
         if float(item.get("precio", 0) or 0) != precio:
             carrito[key]["precio"] = precio
 
-        subtotal = _money_decimal(precio * item["cantidad"])
+        subtotal = _cart_item_subtotal(item)
 
         total += subtotal
 
@@ -499,6 +534,17 @@ def ver_pedido(request):
             "precio": precio,
             "precio_key": precio_key,
             "cantidad": item["cantidad"],
+            "descuento_aplicado": bool(item.get("descuento_aplicado")),
+            "descuento_monto": _money_decimal(item.get("descuento_monto", 0) if item.get("descuento_aplicado") else 0),
+            "precio_neto": calcular_precio_unitario_neto_item(
+                precio=precio,
+                descuento_aplicado=item.get("descuento_aplicado", False),
+                descuento_monto=item.get("descuento_monto", 0),
+            ),
+            "ahorro_linea": _money_decimal(
+                (_money_decimal(item.get("descuento_monto", 0) if item.get("descuento_aplicado") else 0))
+                * int(item.get("cantidad", 0) or 0)
+            ),
             "subtotal": subtotal,
             "presentaciones": presentaciones
         })
@@ -613,23 +659,31 @@ def actualizar_cantidad_pedido(request):
                 if resolved_key:
                     carrito[producto_id]["precio_key"] = resolved_key
 
+        elif accion == "cambiar_descuento":
+            aplicado = request.POST.get("descuento_aplicado") == "1"
+            monto = request.POST.get("descuento_monto", "0")
+            aplicado, monto = normalizar_descuento_item_pedido(
+                precio=carrito[producto_id]["precio"],
+                descuento_aplicado=aplicado,
+                descuento_monto=monto,
+            )
+            carrito[producto_id]["descuento_aplicado"] = aplicado
+            carrito[producto_id]["descuento_monto"] = float(monto)
+
     # Guardar sesión
     request.session["pedido"] = carrito
 
     cantidad = carrito[producto_id]["cantidad"]
-    precio = carrito[producto_id]["precio"]
-
-    subtotal = _money_decimal(cantidad * precio)
-
-    # Recalcular total
-    total = _money_decimal(sum(
-        item["precio"] * item["cantidad"]
-        for item in carrito.values()
-    ))
+    pricing = _cart_item_pricing_payload(carrito[producto_id])
+    total = _cart_total(carrito)
 
     return JsonResponse({
         "cantidad": cantidad,
-        "subtotal": _money_string(subtotal),
+        "subtotal": pricing["subtotal"],
+        "net_unit_price": pricing["net_unit_price"],
+        "discount_amount": pricing["discount_amount"],
+        "line_savings": pricing["line_savings"],
+        "discount_applied": pricing["discount_applied"],
         "total": _money_string(total)
     })
 
@@ -664,6 +718,8 @@ def enviar_pedido(request):
             "presentacion": presentacion,
             "cantidad": item["cantidad"],
             "precio": item["precio"],
+            "descuento_aplicado": item.get("descuento_aplicado", False),
+            "descuento_monto": item.get("descuento_monto", 0),
         })
 
     try:

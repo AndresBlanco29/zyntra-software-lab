@@ -197,7 +197,10 @@ class Cliente(models.Model):
         max_digits=12,
         decimal_places=2,
         default=Decimal('0.00'),
-        help_text='Positive = amount the customer owes La Tortilla (due balance). Negative = credit in favor of the customer.',
+        help_text=(
+            'QuickBooks A/R balance: positive = customer owes La Tortilla (due balance / debit); '
+            'negative = credit in favor of the customer (credit note balance).'
+        ),
     )
 
     terminos_pago = models.CharField(
@@ -276,13 +279,18 @@ class Cliente(models.Model):
 
     @property
     def due_balance(self):
-        """Amount the customer owes La Tortilla (positive balance only)."""
+        """Amount the customer owes La Tortilla (QuickBooks positive balance)."""
         return self.balance if self.balance > 0 else Decimal('0.00')
 
     @property
+    def customer_credit_balance(self):
+        """Credit in favor of the customer (QuickBooks negative balance, shown as a positive amount)."""
+        return abs(self.balance) if self.balance < 0 else Decimal('0.00')
+
+    @property
     def available_credit(self):
-        """Deprecated alias kept for internal invoice flows; positive balance is due balance, not store credit."""
-        return self.due_balance
+        """Unapplied store credit available to apply on invoices."""
+        return self.customer_credit_balance
 
     def __str__(self):
         return self.nombre_empresa

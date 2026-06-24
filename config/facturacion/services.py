@@ -247,7 +247,8 @@ def summarize_pending_customer_notes(*, cliente, notes=None):
 			credit_total += remaining_amount
 		else:
 			debit_total += remaining_amount
-	available_credit_excluding_notes = _clamp_non_negative_money(_clamp_non_negative_money(cliente.balance) - credit_total)
+	stored_credit = _clamp_non_negative_money(-min(Decimal(str(cliente.balance or '0.00')), Decimal('0.00')))
+	available_credit_excluding_notes = _clamp_non_negative_money(stored_credit - credit_total)
 	return {
 		'notes': notes,
 		'credit_total': _quantize_money(credit_total),
@@ -296,10 +297,10 @@ def _apply_selected_customer_notes_to_invoice(*, invoice, note_applications, usu
 			raise ValidationError(_('The selected amount exceeds the remaining amount for note %(note)s.') % {'note': nota.numero})
 		if nota.tipo_documento == 'CREDITO':
 			invoice.total_creditos = _quantize_money(Decimal(str(invoice.total_creditos or '0.00')) + amount_to_apply)
-			_apply_customer_balance_delta(cliente=invoice.cliente, delta=-amount_to_apply)
+			_apply_customer_balance_delta(cliente=invoice.cliente, delta=amount_to_apply)
 		else:
 			invoice.total_debitos = _quantize_money(Decimal(str(invoice.total_debitos or '0.00')) + amount_to_apply)
-			_apply_customer_balance_delta(cliente=invoice.cliente, delta=amount_to_apply)
+			_apply_customer_balance_delta(cliente=invoice.cliente, delta=-amount_to_apply)
 		nota.monto_aplicado_invoice = _quantize_money(Decimal(str(nota.monto_aplicado_invoice or '0.00')) + amount_to_apply)
 		nota.monto_aplicado_cliente = _quantize_money(remaining_amount - amount_to_apply)
 		nota.save(update_fields=['monto_aplicado_invoice', 'monto_aplicado_cliente'])
@@ -382,7 +383,7 @@ def generar_invoice_desde_picking(
 	invoice.subtotal = _quantize_money(total)
 	invoice.save(update_fields=['subtotal', 'actualizada_en'])
 	_apply_selected_customer_notes_to_invoice(invoice=invoice, note_applications=selected_note_applications or {}, usuario=usuario)
-	cliente_credit_available = _clamp_non_negative_money(pedido.cliente.balance)
+	cliente_credit_available = _clamp_non_negative_money(-min(Decimal(str(pedido.cliente.balance or '0.00')), Decimal('0.00')))
 	applied_credit = _clamp_non_negative_money(applied_customer_credit or '0.00')
 	if applied_credit > cliente_credit_available:
 		raise ValidationError(_('The customer does not have enough available credit.'))
@@ -390,7 +391,7 @@ def generar_invoice_desde_picking(
 	if applied_credit > remaining_total_after_notes:
 		raise ValidationError(_('The applied customer credit cannot exceed the remaining invoice total after selected notes.'))
 	if applied_credit > 0:
-		_apply_customer_balance_delta(cliente=pedido.cliente, delta=-applied_credit)
+		_apply_customer_balance_delta(cliente=pedido.cliente, delta=applied_credit)
 	invoice.credito_cliente_aplicado = applied_credit
 	totals = _calculate_invoice_totals(
 		subtotal=total,
@@ -1167,9 +1168,13 @@ def crear_nota_ajuste_desde_invoice(
 
 
 def _apply_note_to_customer_balance(*, nota, multiplier):
-	if nota.monto_aplicado_cliente:
-		delta = Decimal(str(nota.monto_aplicado_cliente)) * Decimal(str(multiplier))
-		_apply_customer_balance_delta(cliente=nota.cliente, delta=delta)
+	if not nota.monto_aplicado_cliente:
+		return
+	amount = _quantize_money(Decimal(str(nota.monto_aplicado_cliente)) * Decimal(str(multiplier)))
+	if nota.tipo_documento == 'CREDITO':
+		_apply_customer_balance_delta(cliente=nota.cliente, delta=-amount)
+	else:
+		_apply_customer_balance_delta(cliente=nota.cliente, delta=amount)
 
 
 def _apply_note_to_invoice(*, nota, multiplier):
@@ -1222,8 +1227,7 @@ def aprobar_nota_ajuste(*, nota, usuario):
 	else:
 		_allocate_debit_note_amount(nota=nota)
 		_apply_note_to_invoice(nota=nota, multiplier=1)
-		if nota.monto_aplicado_cliente:
-			_apply_customer_balance_delta(cliente=nota.cliente, delta=-nota.monto_aplicado_cliente)
+		_apply_note_to_customer_balance(nota=nota, multiplier=1)
 		if nota.inventario_estado == 'PENDIENTE':
 			nota.inventario_estado = 'NO_APLICA'
 
@@ -1293,8 +1297,7 @@ def _revert_nota_ajuste_effects(*, nota, usuario=None):
 			_apply_credit_note_inventory(nota=nota, movement_type='REVERSO_NOTA_CREDITO', delta_fisico=-1, created_by=usuario)
 	else:
 		_apply_note_to_invoice(nota=nota, multiplier=-1)
-		if nota.monto_aplicado_cliente:
-			_apply_customer_balance_delta(cliente=nota.cliente, delta=nota.monto_aplicado_cliente)
+		_apply_note_to_customer_balance(nota=nota, multiplier=-1)
 
 
 def _build_nota_void_snapshot(nota):
@@ -1382,10 +1385,10 @@ def _reverse_invoice_customer_note_applications(*, invoice):
 			continue
 		if nota.tipo_documento == 'CREDITO':
 			invoice.total_creditos = _quantize_money(Decimal(str(invoice.total_creditos or '0.00')) - amount)
-			_apply_customer_balance_delta(cliente=nota.cliente, delta=amount)
+			_apply_customer_balance_delta(cliente=nota.cliente, delta=-amount)
 		else:
 			invoice.total_debitos = _quantize_money(Decimal(str(invoice.total_debitos or '0.00')) - amount)
-			_apply_customer_balance_delta(cliente=nota.cliente, delta=-amount)
+			_apply_customer_balance_delta(cliente=nota.cliente, delta=amount)
 		nota.monto_aplicado_invoice = _quantize_money(Decimal(str(nota.monto_aplicado_invoice or '0.00')) - amount)
 		nota.monto_aplicado_cliente = _quantize_money(Decimal(str(nota.monto_aplicado_cliente or '0.00')) + amount)
 		nota.save(update_fields=['monto_aplicado_invoice', 'monto_aplicado_cliente'])
@@ -1396,7 +1399,7 @@ def _reverse_invoice_customer_note_applications(*, invoice):
 def _reverse_invoice_customer_credit(*, invoice):
 	applied_credit = _quantize_money(invoice.credito_cliente_aplicado)
 	if applied_credit > 0:
-		_apply_customer_balance_delta(cliente=invoice.cliente, delta=applied_credit)
+		_apply_customer_balance_delta(cliente=invoice.cliente, delta=-applied_credit)
 		invoice.credito_cliente_aplicado = Decimal('0.00')
 		_recalculate_invoice_balances(invoice)
 

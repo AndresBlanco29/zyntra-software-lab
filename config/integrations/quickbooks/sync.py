@@ -1093,6 +1093,7 @@ def _extract_quickbooks_customer_phone(payload):
 
 
 def _extract_quickbooks_customer_balance(payload):
+    """QuickBooks Customer Balance / OpenBalance (A/R): positive = customer owes, negative = customer credit."""
     return _quantize_money(payload.get('Balance') or payload.get('OpenBalance') or 0)
 
 

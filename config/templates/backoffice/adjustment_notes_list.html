@@ -173,6 +173,9 @@
               {% else %}
               <div class="small text-muted">{% trans "General customer balance note" %}</div>
               <div class="small text-muted">{% trans "Customer due balance" %}: ${{ note.cliente.due_balance }}</div>
+              {% if note.cliente.customer_credit_balance > 0 %}
+              <div class="small text-muted">{% trans "Customer credit" %}: ${{ note.cliente.customer_credit_balance }}</div>
+              {% endif %}
               {% endif %}
             </td>
             <td data-label="{% trans 'Origin' %}">

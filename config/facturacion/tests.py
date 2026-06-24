@@ -206,7 +206,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(invoice.items.first().precio_venta_sugerido_unitario, Decimal('2.49'))
 
 	def test_generate_invoice_applies_customer_credit_and_reduces_customer_balance(self):
-		self.cliente.balance = Decimal('30.00')
+		self.cliente.balance = Decimal('-30.00')
 		self.cliente.save(update_fields=['balance'])
 
 		invoice = generar_invoice_desde_picking(
@@ -501,7 +501,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, 26)
 		self.assertTrue(InventarioMovimiento.objects.filter(nota_ajuste=nota, tipo='ENTRADA_NOTA_CREDITO').exists())
 
-	def test_credit_note_without_invoice_increases_customer_balance(self):
+	def test_credit_note_without_invoice_increases_customer_credit_balance(self):
 		nota = crear_nota_ajuste(
 			cliente=self.cliente,
 			invoice=None,
@@ -519,11 +519,11 @@ class InvoiceFlowTests(TestCase):
 		self.cliente.refresh_from_db()
 		nota.refresh_from_db()
 
-		self.assertEqual(self.cliente.balance, Decimal('25.00'))
+		self.assertEqual(self.cliente.balance, Decimal('-25.00'))
 		self.assertEqual(nota.monto_aplicado_invoice, Decimal('0.00'))
 		self.assertEqual(nota.monto_aplicado_cliente, Decimal('25.00'))
 
-	def test_debit_note_without_invoice_decreases_customer_balance(self):
+	def test_debit_note_without_invoice_increases_customer_due_balance(self):
 		self.cliente.balance = Decimal('40.00')
 		self.cliente.save(update_fields=['balance'])
 
@@ -544,7 +544,7 @@ class InvoiceFlowTests(TestCase):
 		self.cliente.refresh_from_db()
 		nota.refresh_from_db()
 
-		self.assertEqual(self.cliente.balance, Decimal('30.00'))
+		self.assertEqual(self.cliente.balance, Decimal('50.00'))
 		self.assertEqual(nota.monto_aplicado_invoice, Decimal('0.00'))
 		self.assertEqual(nota.monto_aplicado_cliente, Decimal('10.00'))
 
@@ -580,7 +580,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(nota.monto_aplicado_cliente, Decimal('15.00'))
 		self.assertEqual(invoice.total_creditos, Decimal('10.00'))
 		self.assertEqual(invoice.saldo_cliente, Decimal('10.00'))
-		self.assertEqual(self.cliente.balance, Decimal('15.00'))
+		self.assertEqual(self.cliente.balance, Decimal('-15.00'))
 		self.assertTrue(NotaAjusteAplicacion.objects.filter(nota=nota, invoice=invoice, monto=Decimal('10.00')).exists())
 
 		second_invoice = generar_invoice_desde_picking(
@@ -632,7 +632,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(nota.monto_aplicado_cliente, Decimal('90.00'))
 		self.assertEqual(invoice.total_debitos, Decimal('10.00'))
 		self.assertEqual(invoice.saldo_cliente, Decimal('55.00'))
-		self.assertEqual(self.cliente.balance, Decimal('-90.00'))
+		self.assertEqual(self.cliente.balance, Decimal('90.00'))
 
 		skipped_invoice = generar_invoice_desde_picking(
 			pedido=self._create_verified_order(total='20.00'),
@@ -649,7 +649,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(skipped_invoice.saldo_cliente, Decimal('20.00'))
 		self.assertEqual(nota.monto_aplicado_cliente, Decimal('90.00'))
 
-	def test_product_credit_note_without_invoice_restocks_inventory_and_increases_customer_balance(self):
+	def test_product_credit_note_without_invoice_restocks_inventory_and_increases_customer_credit_balance(self):
 		nota = crear_nota_ajuste(
 			cliente=self.cliente,
 			invoice=None,
@@ -673,7 +673,7 @@ class InvoiceFlowTests(TestCase):
 		self.cliente.refresh_from_db()
 		nota.refresh_from_db()
 
-		self.assertEqual(self.cliente.balance, Decimal('30.00'))
+		self.assertEqual(self.cliente.balance, Decimal('-30.00'))
 		self.assertEqual(nota.inventario_estado, 'PROCESADO')
 		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, 27)
 
@@ -703,7 +703,7 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertEqual(nota.total, Decimal('16.25'))
 		self.assertEqual(nota.items.count(), 2)
-		self.assertEqual(self.cliente.balance, Decimal('16.25'))
+		self.assertEqual(self.cliente.balance, Decimal('-16.25'))
 		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, 26)
 		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion_unidad).stock_fisico, 11)
 
@@ -883,7 +883,7 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertEqual(invoice.total_creditos, Decimal('15.00'))
 		self.assertEqual(invoice.saldo_cliente, Decimal('0.00'))
-		self.assertEqual(self.cliente.balance, Decimal('15.00'))
+		self.assertEqual(self.cliente.balance, Decimal('-15.00'))
 		self.assertEqual(nota.monto_aplicado_invoice, Decimal('15.00'))
 		self.assertEqual(nota.monto_aplicado_cliente, Decimal('15.00'))
 
@@ -2041,7 +2041,7 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertRedirects(approve_response, f"{reverse('backoffice_adjustment_note_create')}?cliente_id={self.cliente.id}")
 		self.assertEqual(nota.estado, 'APROBADA')
-		self.assertEqual(self.cliente.balance, Decimal('18.00'))
+		self.assertEqual(self.cliente.balance, Decimal('-18.00'))
 
 	def test_draft_general_debit_note_can_be_approved_from_backoffice(self):
 		nota = crear_nota_ajuste(
@@ -2073,7 +2073,7 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertRedirects(approve_response, f"{reverse('backoffice_adjustment_note_create')}?cliente_id={self.cliente.id}")
 		self.assertEqual(nota.estado, 'APROBADA')
-		self.assertEqual(self.cliente.balance, Decimal('-10.00'))
+		self.assertEqual(self.cliente.balance, Decimal('10.00'))
 
 	def test_backoffice_adjustment_note_create_view_shows_saved_product_lines_for_general_notes(self):
 		nota = crear_nota_ajuste(
@@ -2679,7 +2679,7 @@ class InvoiceFlowTests(TestCase):
 		)
 
 	def test_invoice_pdf_totals_rows_include_customer_credit_applied(self):
-		self.cliente.balance = Decimal('30.00')
+		self.cliente.balance = Decimal('-30.00')
 		self.cliente.save(update_fields=['balance'])
 
 		invoice = generar_invoice_desde_picking(
@@ -2879,7 +2879,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(invoice.saldo_cliente, Decimal('65.00'))
 		self.assertEqual(nota_credito.monto_aplicado_cliente, Decimal('30.00'))
 		self.assertEqual(nota_debito.monto_aplicado_cliente, Decimal('70.00'))
-		self.assertEqual(self.cliente.balance, Decimal('-40.00'))
+		self.assertEqual(self.cliente.balance, Decimal('40.00'))
 
 	def test_invoice_pdf_suggested_retail_uses_default_profit_suggestion(self):
 		invoice = generar_invoice_desde_picking(

@@ -78,7 +78,10 @@ def _build_invoice_pdf_terms_paragraph(invoice, body_style):
 	payment_terms_label = cliente.get_terminos_pago_label()
 	if payment_terms_label:
 		lines.append(f'<b>{payment_terms_label}</b>')
-	lines.append(f'<b>{_("DUE BALANCE")}</b>: {_format_pdf_money(cliente.balance)}')
+	if cliente.balance > 0:
+		lines.append(f'<b>{_("DUE BALANCE")}</b>: {_format_pdf_money(cliente.balance)}')
+	elif cliente.balance < 0:
+		lines.append(f'<b>{_("CUSTOMER CREDIT")}</b>: {_format_pdf_money(cliente.customer_credit_balance)}')
 	return Paragraph('<br/>'.join(lines), body_style)
 
 

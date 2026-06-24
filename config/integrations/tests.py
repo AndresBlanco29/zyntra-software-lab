@@ -1498,9 +1498,44 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         imported = Cliente.objects.get(quickbooks_id='QB-CUST-1')
         self.assertEqual(imported.nombre_empresa, 'Imported QB Customer')
         self.assertEqual(imported.balance, Decimal('239.00'))
+        self.assertEqual(imported.due_balance, Decimal('239.00'))
+        self.assertEqual(imported.customer_credit_balance, Decimal('0.00'))
         self.assertEqual(imported.usuario.first_name, 'Imported QB Contact')
         self.assertEqual(imported.usuario.email, 'qb-imported@example.com')
         self.assertEqual(imported.sync_status, 'SYNCED')
+
+    @patch('config.integrations.quickbooks.client.requests.request')
+    def test_import_customers_to_local_preserves_negative_quickbooks_credit_balance(self, mock_request):
+        self._activate_connection()
+        mock_request.return_value = self._json_response({
+            'QueryResponse': {
+                'Customer': [
+                    {
+                        'Id': 'QB-CUST-CREDIT',
+                        'DisplayName': 'Credit Customer',
+                        'CompanyName': 'Credit Customer LLC',
+                        'PrimaryEmailAddr': {'Address': 'credit@example.com'},
+                        'PrimaryPhone': {'FreeFormNumber': '5557779999'},
+                        'Balance': '-125.50',
+                        'BillAddr': {
+                            'Line1': '88 Credit Ave',
+                            'City': 'Houston',
+                            'CountrySubDivisionCode': 'TX',
+                            'PostalCode': '77002',
+                            'Country': 'USA',
+                        },
+                    }
+                ]
+            }
+        })
+
+        response = self.client.post(reverse('quickbooks_import_customers_to_local'), {'limit': '10'})
+
+        self.assertEqual(response.status_code, 200)
+        imported = Cliente.objects.get(quickbooks_id='QB-CUST-CREDIT')
+        self.assertEqual(imported.balance, Decimal('-125.50'))
+        self.assertEqual(imported.due_balance, Decimal('0.00'))
+        self.assertEqual(imported.customer_credit_balance, Decimal('125.50'))
 
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_import_customers_to_local_without_limit_imports_all_available_pages(self, mock_request):

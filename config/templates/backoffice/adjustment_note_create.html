@@ -52,6 +52,9 @@
         <div class="fw-semibold">{{ selected_client.nombre_empresa }}</div>
         <div class="small text-muted">{{ selected_client.direccion }}, {{ selected_client.ciudad }}</div>
         <div class="small mt-2"><span class="text-muted">{% trans "Current due balance" %}:</span> ${{ selected_client.due_balance }}</div>
+        {% if selected_client.customer_credit_balance > 0 %}
+        <div class="small"><span class="text-muted">{% trans "Customer credit" %}:</span> ${{ selected_client.customer_credit_balance }}</div>
+        {% endif %}
 
         {% if customer_general_notes %}
         <hr>

@@ -210,8 +210,14 @@
               <div class="border rounded-3 p-3 bg-success-subtle">
                 <div class="row g-3 align-items-end">
                   <div class="col-md-4">
-                    <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Customer due balance" %}</div>
-                    <div class="fw-semibold">${{ pedido.cliente.due_balance }}</div>
+                    <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Customer account balance" %}</div>
+                    {% if pedido.cliente.balance > 0 %}
+                    <div class="fw-semibold">${{ pedido.cliente.due_balance }} <span class="small text-muted">({% trans "Due balance" %})</span></div>
+                    {% elif pedido.cliente.balance < 0 %}
+                    <div class="fw-semibold text-success">${{ pedido.cliente.customer_credit_balance }} <span class="small text-muted">({% trans "Customer credit" %})</span></div>
+                    {% else %}
+                    <div class="fw-semibold">$0.00</div>
+                    {% endif %}
                     <div class="small text-muted">{% trans "Available credit not tied to pending notes" %}: ${{ pending_customer_notes_summary.available_credit_excluding_notes }}</div>
                   </div>
                   <div class="col-md-3">

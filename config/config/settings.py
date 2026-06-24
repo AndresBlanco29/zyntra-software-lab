@@ -252,8 +252,11 @@ QUICKBOOKS_SCOPES = tuple(
     if scope.strip()
 )
 QUICKBOOKS_API_MINOR_VERSION = os.environ.get('QUICKBOOKS_API_MINOR_VERSION', '75').strip() or '75'
-# When True, only catalog preview/import is allowed in QuickBooks Center (blocks accounting sync).
+# When True, only catalog preview/import is allowed in QuickBooks Center (blocks vendor/bill sync).
 QUICKBOOKS_CATALOG_ONLY_MODE = env_bool('QUICKBOOKS_CATALOG_ONLY_MODE', default=True)
+# When False (default), QuickBooks invoices and credit memos are not imported into the app.
+# Local invoices are exported to QuickBooks only.
+QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS = env_bool('QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS', default=False)
 QUICKBOOKS_TOKEN_MAINTENANCE_HOURS = int(os.environ.get('QUICKBOOKS_TOKEN_MAINTENANCE_HOURS', '12') or '12')
 # QuickBooks catalog sync tuning: larger pages and deferred image downloads speed up import/refresh.
 QUICKBOOKS_CATALOG_SYNC_PAGE_SIZE = min(max(int(os.environ.get('QUICKBOOKS_CATALOG_SYNC_PAGE_SIZE', '1000') or 1000), 1), 1000)

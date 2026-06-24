@@ -31,6 +31,10 @@ class Command(BaseCommand):
             if items_only:
                 result = pull_quickbooks_items_to_local(max_results=limit, force_full=bool(options.get('full')))
             elif accounting_only:
+                if not getattr(settings, 'QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS', False):
+                    raise CommandError(
+                        'QuickBooks invoice import is disabled. Set QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS=True to enable it.'
+                    )
                 result = pull_quickbooks_accounting_documents_to_local(max_results=limit, force_full=bool(options.get('full')))
             else:
                 result = pull_quickbooks_to_local(max_results=limit, force_full=bool(options.get('full')))

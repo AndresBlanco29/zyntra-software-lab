@@ -3036,7 +3036,29 @@ def import_quickbooks_credit_memo_record(payload, *, client=None, customer_cache
     }
 
 
+def quickbooks_accounting_import_enabled():
+    return getattr(settings, 'QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS', False)
+
+
+def _empty_accounting_documents_import_result():
+    return {
+        'entity': 'AccountingDocument',
+        'count': 0,
+        'matched_count': 0,
+        'created_count': 0,
+        'updated_count': 0,
+        'skipped_count': 0,
+        'conflict_count': 0,
+        'invoice_result': {'count': 0, 'latest_updated_at': None},
+        'credit_memo_result': {'count': 0, 'latest_updated_at': None},
+        'results': [],
+        'disabled': True,
+    }
+
+
 def import_quickbooks_accounting_documents(*, max_results=25, client=None, invoice_updated_after=None, credit_memo_updated_after=None):
+    if not quickbooks_accounting_import_enabled():
+        return _empty_accounting_documents_import_result()
     client = client or QuickBooksAPIClient()
     page_size = _quickbooks_catalog_page_size()
     invoice_records = fetch_quickbooks_invoices(
@@ -3082,6 +3104,10 @@ def import_quickbooks_accounting_documents(*, max_results=25, client=None, invoi
 
 def pull_quickbooks_accounting_documents_to_local(*, max_results=None, client=None, force_full=False, task_cache_key=None):
     """Pull QuickBooks invoices and credit memos into local Invoice and NotaAjuste records."""
+    if not quickbooks_accounting_import_enabled():
+        raise QuickBooksSyncError(
+            'QuickBooks invoice import is disabled. Invoices are only exported from this app to QuickBooks.'
+        )
     client = client or QuickBooksAPIClient()
     connection = client.connection
     run_started_at = timezone.now()
@@ -3223,18 +3249,22 @@ def pull_quickbooks_to_local(*, max_results=25, client=None, force_full=False):
 
     customers = import_quickbooks_customers(max_results=max_results, client=client, updated_after=customer_cursor)
     items = import_quickbooks_items(max_results=max_results, client=client, updated_after=item_cursor)
-    accounting_documents = import_quickbooks_accounting_documents(
-        max_results=max_results,
-        client=client,
-        invoice_updated_after=invoice_cursor,
-        credit_memo_updated_after=credit_memo_cursor,
-    )
+    if quickbooks_accounting_import_enabled():
+        accounting_documents = import_quickbooks_accounting_documents(
+            max_results=max_results,
+            client=client,
+            invoice_updated_after=invoice_cursor,
+            credit_memo_updated_after=credit_memo_cursor,
+        )
+    else:
+        accounting_documents = _empty_accounting_documents_import_result()
 
     serialized_run_started_at = _serialize_cursor(run_started_at)
     connection.set_sync_cursor(_sync_cursor_key('customer'), customers.get('latest_updated_at') or serialized_run_started_at)
     connection.set_sync_cursor(_sync_cursor_key('item'), items.get('latest_updated_at') or serialized_run_started_at)
-    connection.set_sync_cursor(_sync_cursor_key('invoice'), accounting_documents.get('invoice_result', {}).get('latest_updated_at') or serialized_run_started_at)
-    connection.set_sync_cursor(_sync_cursor_key('credit_memo'), accounting_documents.get('credit_memo_result', {}).get('latest_updated_at') or serialized_run_started_at)
+    if quickbooks_accounting_import_enabled():
+        connection.set_sync_cursor(_sync_cursor_key('invoice'), accounting_documents.get('invoice_result', {}).get('latest_updated_at') or serialized_run_started_at)
+        connection.set_sync_cursor(_sync_cursor_key('credit_memo'), accounting_documents.get('credit_memo_result', {}).get('latest_updated_at') or serialized_run_started_at)
     connection.save(update_fields=['sync_state', 'updated_at'])
 
     return {

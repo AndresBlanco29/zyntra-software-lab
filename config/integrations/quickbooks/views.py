@@ -48,6 +48,7 @@ from .sync import (
     pull_quickbooks_items_to_local,
     pull_quickbooks_to_local,
     push_linked_quickbooks_items,
+    quickbooks_accounting_import_enabled,
     refresh_linked_quickbooks_items,
     refresh_linked_quickbooks_invoice_status,
     QuickBooksSyncError,
@@ -75,8 +76,17 @@ logger = logging.getLogger(__name__)
 
 CATALOG_ONLY_BLOCKED_MESSAGE = _(
     'This QuickBooks action is disabled while catalog-only mode is active. '
-    'Pull sync, review queue, catalog import, accounting import, and outbound send are enabled.'
+    'Customer and catalog import, pull sync, review queue, and outbound send are enabled.'
 )
+
+ACCOUNTING_IMPORT_DISABLED_MESSAGE = _(
+    'QuickBooks invoice import is disabled. Invoices are only exported from this app to QuickBooks.'
+)
+
+ACCOUNTING_IMPORT_ENTITY_TYPES = frozenset({
+    QuickBooksImportConflict.ENTITY_INVOICE,
+    QuickBooksImportConflict.ENTITY_CREDIT_MEMO,
+})
 
 CATALOG_ONLY_ALLOWED_VIEW_NAMES = frozenset({
     'quickbooks_import_items',
@@ -89,9 +99,6 @@ CATALOG_ONLY_ALLOWED_VIEW_NAMES = frozenset({
     'quickbooks_task_status',
     'quickbooks_import_customers',
     'quickbooks_import_customers_to_local',
-    'quickbooks_import_invoices',
-    'quickbooks_import_credit_memos',
-    'quickbooks_import_accounting_documents_to_local',
     'quickbooks_import_conflict_link',
     'quickbooks_import_conflicts',
     'quickbooks_import_conflict_retry',
@@ -109,7 +116,7 @@ CATALOG_ONLY_ALLOWED_VIEW_NAMES = frozenset({
     'quickbooks_sync_adjustment_notes_batch',
 })
 
-CATALOG_ONLY_ALLOWED_PREVIEW_TYPES = frozenset({'items', 'customers', 'invoices', 'credit_memos'})
+CATALOG_ONLY_ALLOWED_PREVIEW_TYPES = frozenset({'items', 'customers'})
 
 CATALOG_ONLY_ALLOWED_TASK_OPERATIONS = frozenset({
     'import_items_to_local',
@@ -118,20 +125,21 @@ CATALOG_ONLY_ALLOWED_TASK_OPERATIONS = frozenset({
     'push_linked_products_to_quickbooks',
     'refresh_linked_invoice_status_to_local',
     'pull_items_sync_to_local',
-    'import_accounting_documents_to_local',
     'pull_sync_to_local',
 })
 
 CATALOG_ONLY_ALLOWED_CONFLICT_ENTITY_TYPES = frozenset({
     QuickBooksImportConflict.ENTITY_CUSTOMER,
     QuickBooksImportConflict.ENTITY_ITEM,
-    QuickBooksImportConflict.ENTITY_INVOICE,
-    QuickBooksImportConflict.ENTITY_CREDIT_MEMO,
 })
 
 
 def _quickbooks_catalog_only_enabled():
     return getattr(settings, 'QUICKBOOKS_CATALOG_ONLY_MODE', True)
+
+
+def _quickbooks_accounting_import_enabled():
+    return quickbooks_accounting_import_enabled()
 
 
 def _is_catalog_only_allowed_view(view_name):
@@ -142,6 +150,23 @@ def _guard_quickbooks_catalog_only(request, *, operation='quickbooks'):
     if not _quickbooks_catalog_only_enabled():
         return None
     return _response_or_redirect(request, operation=operation, error=CATALOG_ONLY_BLOCKED_MESSAGE, status_code=403)
+
+
+def _guard_quickbooks_accounting_import(request, *, operation='quickbooks'):
+    if _quickbooks_accounting_import_enabled():
+        return None
+    return _response_or_redirect(request, operation=operation, error=ACCOUNTING_IMPORT_DISABLED_MESSAGE, status_code=403)
+
+
+def quickbooks_requires_accounting_import(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        blocked = _guard_quickbooks_accounting_import(request, operation=view_func.__name__)
+        if blocked is not None:
+            return blocked
+        return view_func(request, *args, **kwargs)
+
+    return wrapper
 
 
 def quickbooks_requires_full_mode(view_func):
@@ -377,13 +402,14 @@ def _build_dashboard_feedback(*, operation, ok, result=None, error=None):
                 'conflicts': items.get('conflict_count', 0),
             }
         )
-        feedback['details'].append(
-            _('Accounting docs -> created %(created)s, updated %(updated)s, conflicts queued %(conflicts)s.') % {
-                'created': accounting.get('created_count', 0),
-                'updated': accounting.get('updated_count', 0),
-                'conflicts': accounting.get('conflict_count', 0),
-            }
-        )
+        if not accounting.get('disabled'):
+            feedback['details'].append(
+                _('Accounting docs -> created %(created)s, updated %(updated)s, conflicts queued %(conflicts)s.') % {
+                    'created': accounting.get('created_count', 0),
+                    'updated': accounting.get('updated_count', 0),
+                    'conflicts': accounting.get('conflict_count', 0),
+                }
+            )
         feedback['details'].append(
             _('Incremental sync used saved cursors.') if result.get('incremental') else _('Full sync ignored saved cursors.')
         )
@@ -701,6 +727,17 @@ def _parse_quickbooks_import_limit(raw_value, *, default=None):
 
 def _build_quickbooks_preview_context(*, request):
     preview_type = str(request.GET.get('preview') or '').strip().lower()
+    accounting_preview_types = {'invoices', 'credit_memos'}
+    if preview_type in accounting_preview_types and not _quickbooks_accounting_import_enabled():
+        return {
+            'quickbooks_preview_type': preview_type,
+            'quickbooks_preview_title': _('Preview disabled'),
+            'quickbooks_preview_help': '',
+            'quickbooks_preview_columns': [],
+            'quickbooks_preview_rows': [],
+            'quickbooks_preview_limit': _quickbooks_center_preview_limit(request),
+            'quickbooks_preview_error': ACCOUNTING_IMPORT_DISABLED_MESSAGE,
+        }
     if preview_type and _quickbooks_catalog_only_enabled() and preview_type not in CATALOG_ONLY_ALLOWED_PREVIEW_TYPES:
         return {
             'quickbooks_preview_type': preview_type,
@@ -810,17 +847,22 @@ def _build_quickbooks_center_context(*, request):
     connection = get_connection()
     raw_cursors = connection.sync_state.get('cursors', {}) if isinstance(connection.sync_state, dict) else {}
     sync_cursors = []
-    for key, label in (
+    cursor_labels = (
         ('customer', _('Customers')),
         ('item', _('Catalog')),
-        ('invoice', _('Invoices')),
-        ('credit_memo', _('Credit memos')),
-    ):
+    )
+    if _quickbooks_accounting_import_enabled():
+        cursor_labels += (
+            ('invoice', _('Invoices')),
+            ('credit_memo', _('Credit memos')),
+        )
+    for key, label in cursor_labels:
         if raw_cursors.get(key):
             sync_cursors.append({'label': label, 'value': raw_cursors[key]})
 
     return {
         'quickbooks_catalog_only_mode': _quickbooks_catalog_only_enabled(),
+        'quickbooks_import_accounting_enabled': _quickbooks_accounting_import_enabled(),
         'quickbooks_status': get_connection_status(),
         'quickbooks_recent_conflicts': conflicts[:5],
         'quickbooks_active_conflicts_count': conflicts.filter(status=QuickBooksImportConflict.STATUS_CONFLICT).count(),
@@ -1119,6 +1161,7 @@ def quickbooks_pull_items_sync_to_local(request):
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 @quickbooks_requires_full_mode
+@quickbooks_requires_accounting_import
 def quickbooks_import_invoices(request):
     try:
         result = fetch_quickbooks_invoices(max_results=request.GET.get('limit', 25))
@@ -1131,6 +1174,7 @@ def quickbooks_import_invoices(request):
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 @quickbooks_requires_full_mode
+@quickbooks_requires_accounting_import
 def quickbooks_import_credit_memos(request):
     try:
         result = fetch_quickbooks_credit_memos(max_results=request.GET.get('limit', 25))
@@ -1142,7 +1186,7 @@ def quickbooks_import_credit_memos(request):
 
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
-@quickbooks_requires_full_mode
+@quickbooks_requires_accounting_import
 def quickbooks_import_accounting_documents_to_local(request):
     force_full = str(request.POST.get('mode') or '').strip().lower() == 'full'
     try:
@@ -1160,6 +1204,10 @@ def quickbooks_import_accounting_documents_to_local(request):
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def quickbooks_start_task(request):
     operation = str(request.POST.get('operation') or '').strip()
+    if operation == 'import_accounting_documents_to_local':
+        blocked = _guard_quickbooks_accounting_import(request, operation='task_start')
+        if blocked is not None:
+            return blocked
     if _quickbooks_catalog_only_enabled() and operation not in CATALOG_ONLY_ALLOWED_TASK_OPERATIONS:
         blocked = _guard_quickbooks_catalog_only(request, operation='task_start')
         if blocked is not None:
@@ -1352,6 +1400,12 @@ def quickbooks_import_conflicts(request):
 def quickbooks_import_conflict_retry(request, conflict_id):
     try:
         conflict = QuickBooksImportConflict.objects.get(pk=conflict_id)
+        if (
+            not _quickbooks_accounting_import_enabled()
+            and conflict.entity_type in ACCOUNTING_IMPORT_ENTITY_TYPES
+        ):
+            messages.error(request, ACCOUNTING_IMPORT_DISABLED_MESSAGE)
+            return redirect(_conflicts_redirect_target(request))
         if _quickbooks_catalog_only_enabled() and conflict.entity_type not in CATALOG_ONLY_ALLOWED_CONFLICT_ENTITY_TYPES:
             messages.error(request, CATALOG_ONLY_BLOCKED_MESSAGE)
             return redirect(_conflicts_redirect_target(request))

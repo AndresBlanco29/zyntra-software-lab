@@ -513,7 +513,7 @@
   {% if quickbooks_catalog_only_mode %}
   <div class="alert alert-info border-0 shadow-sm mb-4" role="status">
     <strong>{% trans "Catalog-only mode" %}</strong> —
-    {% trans "Customer, catalog, accounting import, pull sync, review queue, and outbound send are enabled. Vendor and bill sync stay disabled until you turn off QUICKBOOKS_CATALOG_ONLY_MODE." %}
+    {% trans "Customer and catalog import, pull sync, review queue, and outbound send are enabled. Vendor and bill sync stay disabled until you turn off QUICKBOOKS_CATALOG_ONLY_MODE." %}
   </div>
   {% endif %}
   {% with total_pending=quickbooks_pending_customer_count|add:quickbooks_pending_presentation_count|add:quickbooks_pending_invoice_count|add:quickbooks_pending_note_count %}
@@ -785,6 +785,7 @@
                 <p class="qb-action-note">{% trans "Use this to review products and presentations before importing them." %}</p>
               </div>
             </div>
+            {% if quickbooks_import_accounting_enabled %}
             <div class="col-md-6">
               <div class="qb-action-item h-100">
                 <form method="get" action="{% url 'quickbooks_center' %}">
@@ -805,6 +806,7 @@
                 <p class="qb-action-note">{% trans "Review credit memos before importing or deciding how to match them." %}</p>
               </div>
             </div>
+            {% endif %}
           </div>
         </div>
       </div>
@@ -853,6 +855,7 @@
               </form>
               <p class="qb-action-note">{% trans "Fast refresh for products already linked to QuickBooks: cost, prices, stock, packaging, and names. Does not scan the full QuickBooks catalog." %}</p>
             </div>
+            {% if quickbooks_import_accounting_enabled %}
             <div class="qb-action-item" id="qb-pull-accounting">
               <form method="post" action="{% url 'quickbooks_import_accounting_documents_to_local' %}" data-qb-operation="import_accounting_documents_to_local">
                 {% csrf_token %}
@@ -862,6 +865,7 @@
               </form>
               <p class="qb-action-note">{% trans "Imports QuickBooks invoices into Invoices and credit memos into Credit / Debit Notes. Unmatched documents go to the review queue when the local customer cannot be identified." %}</p>
             </div>
+            {% endif %}
             <div class="qb-action-item" id="qb-refresh-invoice-status">
               <form method="post" action="{% url 'quickbooks_refresh_linked_invoice_status_to_local' %}" data-qb-operation="refresh_linked_invoice_status_to_local">
                 {% csrf_token %}
@@ -935,8 +939,10 @@
       <div class="qb-chip-list">
         <a href="{% url 'quickbooks_center' %}?preview=customers&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'customers' %}is-active{% endif %}">{% trans "Customers" %}</a>
         <a href="{% url 'quickbooks_center' %}?preview=items&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'items' %}is-active{% endif %}">{% trans "Catalog" %}</a>
+        {% if quickbooks_import_accounting_enabled %}
         <a href="{% url 'quickbooks_center' %}?preview=invoices&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'invoices' %}is-active{% endif %}">{% trans "Invoices" %}</a>
         <a href="{% url 'quickbooks_center' %}?preview=credit_memos&preview_limit={{ quickbooks_preview_limit }}#quickbooks-live-preview" class="qb-preview-tab {% if quickbooks_preview_type == 'credit_memos' %}is-active{% endif %}">{% trans "Credit memos" %}</a>
+        {% endif %}
       </div>
     </div>
 

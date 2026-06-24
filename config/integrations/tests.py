@@ -1179,6 +1179,7 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertTrue(Producto.objects.filter(nombre='Tortilla 12').exists())
         self.assertTrue(default_storage.exists(media_path))
 
+    @override_settings(QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS=True)
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_pull_accounting_documents_matches_local_invoice_and_credit_note(self, mock_request):
         self._activate_connection()
@@ -1199,6 +1200,7 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertEqual(self.adjustment_note.total, Decimal('10.00'))
         self.assertEqual(QuickBooksImportConflict.objects.count(), 0)
 
+    @override_settings(QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS=True)
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_pull_accounting_documents_queues_unmatched_conflict(self, mock_request):
         self._activate_connection()
@@ -1218,6 +1220,7 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertContains(view_response, 'QB-EXT-1001')
         self.assertContains(view_response, 'External QB Customer')
 
+    @override_settings(QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS=True)
     @patch('config.integrations.quickbooks.client.requests.request')
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_pull_accounting_documents_creates_invoice_and_credit_notes_when_customer_exists(self, mock_request):
@@ -1248,8 +1251,14 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertFalse(QuickBooksImportConflict.objects.filter(quickbooks_id__in=['QB-INV-AUTO-1', 'QB-CM-AUTO-1']).exists())
 
     @override_settings(QUICKBOOKS_CATALOG_ONLY_MODE=True)
+    def test_accounting_import_disabled_by_default(self):
+        self._activate_connection()
+        response = self.client.post(reverse('quickbooks_import_accounting_documents_to_local'), {'limit': '10'})
+        self.assertEqual(response.status_code, 403)
+
+    @override_settings(QUICKBOOKS_CATALOG_ONLY_MODE=True, QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS=True)
     @patch('config.integrations.quickbooks.client.requests.request')
-    def test_catalog_only_mode_allows_accounting_import(self, mock_request):
+    def test_accounting_import_enabled_when_setting_true(self, mock_request):
         self._activate_connection()
         self.cliente.quickbooks_id = 'QB-CUSTOMER-1'
         self.cliente.save(update_fields=['quickbooks_id'])
@@ -1262,6 +1271,7 @@ class QuickBooksIntegrationTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    @override_settings(QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS=True)
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_pull_accounting_documents_imports_missing_customer_from_quickbooks(self, mock_request):
         self._activate_connection()
@@ -1294,6 +1304,7 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertEqual(customer.nombre_empresa, 'Customer 1061 LLC')
         self.assertFalse(QuickBooksImportConflict.objects.filter(quickbooks_id='QB-INV-MISSING-CUST').exists())
 
+    @override_settings(QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS=True)
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_pull_accounting_documents_skips_invoice_with_deleted_customer(self, mock_request):
         self._activate_connection()
@@ -1696,14 +1707,13 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         mock_request.side_effect = [
             self._json_response({'QueryResponse': {'Customer': []}}),
             self._json_response({'QueryResponse': {'Item': []}}),
-            self._json_response({'QueryResponse': {'Invoice': []}}),
-            self._json_response({'QueryResponse': {'CreditMemo': []}}),
         ]
 
         response = self.client.post(reverse('quickbooks_pull_sync_to_local'), {'limit': '10'})
 
         self.assertEqual(response.status_code, 200)
 
+    @override_settings(QUICKBOOKS_CATALOG_ONLY_MODE=True)
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_pull_sync_uses_saved_cursors_for_incremental_queries(self, mock_request):
         connection = self._activate_connection()
@@ -1720,15 +1730,13 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         mock_request.side_effect = [
             self._json_response({'QueryResponse': {'Customer': []}}),
             self._json_response({'QueryResponse': {'Item': []}}),
-            self._json_response({'QueryResponse': {'Invoice': []}}),
-            self._json_response({'QueryResponse': {'CreditMemo': []}}),
-            self._json_response({'QueryResponse': {'Bill': []}}),
         ]
 
         response = self.client.post(reverse('quickbooks_pull_sync_to_local'), {'limit': '10'})
 
         self.assertEqual(response.status_code, 200)
         queries = [call.kwargs['params']['query'] for call in mock_request.call_args_list]
+        self.assertEqual(len(queries), 2)
         self.assertTrue(all('MetaData.LastUpdatedTime >' in query for query in queries))
 
     @patch('config.integrations.quickbooks.client.requests.request')

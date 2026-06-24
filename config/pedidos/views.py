@@ -5,7 +5,6 @@ from xml.sax.saxutils import escape
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -30,7 +29,6 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from config.cotizaciones.models import Cotizacion
 from config.facturacion.models import NotaAjuste
 from config.facturacion.services import DEFAULT_SUGGESTED_PROFIT_PERCENTAGE, resolve_presentacion_suggested_unit_price, summarize_pending_customer_notes
 from config.integrations.quickbooks.services import get_connection_status
@@ -40,6 +38,7 @@ from config.productos.models import Presentacion
 from config.inventario.models import StockPresentacion
 
 from .models import Pedido, PedidoItem
+from .dispatch_orders import build_dispatch_order_page, get_dispatch_order_counts
 from .services import (
 	actualizar_cantidad_linea_pedido_sin_aplicar_inventario,
 	anular_pedido_desde_backoffice,
@@ -184,15 +183,17 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 @login_required
 @internal_permission_required('backoffice.dashboard.view')
 def backoffice_dashboard(request):
+	dispatch_counts = get_dispatch_order_counts()
 	context = {
-		'cotizaciones_pendientes': Cotizacion.objects.filter(estado='ENVIADA').count(),
-		'ordenes_recibidas': Pedido.objects.count(),
+		'ordenes_pendientes': dispatch_counts['pending_count'],
+		'solicitudes_pendientes': dispatch_counts['pending_requests_count'],
+		'ordenes_recibidas': dispatch_counts['pending_dispatch_count'],
 		'ordenes_en_gestion': Pedido.objects.filter(estado='EN_GESTION').count(),
 		'ordenes_listas_picking': Pedido.objects.filter(estado='LISTO_PARA_PICKING').count(),
 		'inventario_agotado': StockPresentacion.objects.filter(stock_disponible__lte=0).count(),
 		'pending_adjustment_notes_count': NotaAjuste.objects.filter(estado='BORRADOR').count(),
 		'unread_adjustment_notifications_count': Notificacion.objects.filter(tipo='NOTA_AJUSTE', leida=False).count(),
-		'notificaciones': Notificacion.objects.all()[:8],
+		'notificaciones': Notificacion.objects.filter(tipo__in=('PEDIDO', 'COTIZACION')).order_by('-creada_en')[:8],
 		'quickbooks_status': get_connection_status(),
 	}
 	context.update(get_dashboard_sync_context(request=request))
@@ -202,36 +203,17 @@ def backoffice_dashboard(request):
 @login_required
 @internal_permission_required('backoffice.orders.view')
 def backoffice_pedidos(request):
-	base_queryset = Pedido.objects.select_related('cliente__usuario', 'vendedor', 'seleccionador', 'invoice', 'invoice__driver').prefetch_related('items').order_by('-creada_en')
-	pending_statuses = {'RECIBIDO', 'LISTO_PARA_PICKING'}
-	in_progress_statuses = {'EN_GESTION', 'PARA_VERIFICAR', 'VERIFICADO_AJUSTADO', 'INVOICE_GENERADA'}
-	completed_statuses = {'DESPACHADO'}
-	cancelled_statuses = {'CANCELADO'}
-	view_mode = request.GET.get('view')
-
-	if view_mode == 'in-progress':
-		pedidos = base_queryset.filter(estado__in=in_progress_statuses)
-	elif view_mode == 'completed':
-		pedidos = base_queryset.filter(estado__in=completed_statuses)
-	elif view_mode == 'cancelled':
-		pedidos = base_queryset.filter(estado__in=cancelled_statuses)
-	else:
-		view_mode = 'pending'
-		pedidos = base_queryset.filter(estado__in=pending_statuses)
-
-	page_obj = Paginator(pedidos, BACKOFFICE_PEDIDOS_PAGE_SIZE).get_page(request.GET.get('page'))
-	for pedido in page_obj:
-		pedido.estado_label = _pedido_state_label(pedido.estado)
-		pedido.origen_label = _pedido_origin_label(pedido.origen)
-		pedido.workflow_badge = build_order_workflow_badge(pedido)
+	view_mode, page_obj = build_dispatch_order_page(
+		view_mode=request.GET.get('view'),
+		page_number=request.GET.get('page'),
+		page_size=BACKOFFICE_PEDIDOS_PAGE_SIZE,
+	)
+	counts = get_dispatch_order_counts()
 	return render(request, 'backoffice/pedidos_lista.html', {
-		'pedidos': page_obj,
+		'dispatch_orders': page_obj,
 		'page_obj': page_obj,
 		'view_mode': view_mode,
-		'pending_count': base_queryset.filter(estado__in=pending_statuses).count(),
-		'in_progress_count': base_queryset.filter(estado__in=in_progress_statuses).count(),
-		'completed_count': base_queryset.filter(estado__in=completed_statuses).count(),
-		'cancelled_count': base_queryset.filter(estado__in=cancelled_statuses).count(),
+		**counts,
 	})
 
 

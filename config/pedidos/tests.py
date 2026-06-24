@@ -722,10 +722,10 @@ class PickingVerificationFlowTests(TestCase):
 
 		self.client.force_login(self.backoffice)
 		response = self.client.get(reverse('backoffice_pedidos'))
-		visible_ids = [pedido.id for pedido in response.context['pedidos']]
+		visible_ids = [row.source_id for row in response.context['dispatch_orders'] if row.record_type == 'order']
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'Pending Orders')
+		self.assertContains(response, 'Pending orders')
 		self.assertEqual(visible_ids, [self.pedido.id])
 		self.assertNotIn(in_progress_order.id, visible_ids)
 		self.assertNotIn(completed_order.id, visible_ids)
@@ -755,15 +755,24 @@ class PickingVerificationFlowTests(TestCase):
 
 		in_progress_response = self.client.get(reverse('backoffice_pedidos'), {'view': 'in-progress'})
 		self.assertContains(in_progress_response, 'Orders in progress')
-		self.assertEqual([pedido.id for pedido in in_progress_response.context['pedidos']], [in_progress_order.id])
+		self.assertEqual(
+			[row.source_id for row in in_progress_response.context['dispatch_orders'] if row.record_type == 'order'],
+			[in_progress_order.id],
+		)
 
 		completed_response = self.client.get(reverse('backoffice_pedidos'), {'view': 'completed'})
-		self.assertContains(completed_response, 'Completed Orders')
-		self.assertEqual([pedido.id for pedido in completed_response.context['pedidos']], [completed_order.id])
+		self.assertContains(completed_response, 'Completed orders')
+		self.assertEqual(
+			[row.source_id for row in completed_response.context['dispatch_orders'] if row.record_type == 'order'],
+			[completed_order.id],
+		)
 
 		cancelled_response = self.client.get(reverse('backoffice_pedidos'), {'view': 'cancelled'})
-		self.assertContains(cancelled_response, 'Cancelled Orders')
-		self.assertEqual([pedido.id for pedido in cancelled_response.context['pedidos']], [cancelled_order.id])
+		self.assertContains(cancelled_response, 'Cancelled orders')
+		self.assertEqual(
+			[row.source_id for row in cancelled_response.context['dispatch_orders'] if row.record_type == 'order'],
+			[cancelled_order.id],
+		)
 
 	@patch('config.pedidos.views.BACKOFFICE_PEDIDOS_PAGE_SIZE', 2)
 	def test_backoffice_order_list_paginates_filtered_orders(self, _page_size):
@@ -779,10 +788,10 @@ class PickingVerificationFlowTests(TestCase):
 		first_page = self.client.get(reverse('backoffice_pedidos'), {'view': 'in-progress'})
 		second_page = self.client.get(reverse('backoffice_pedidos'), {'view': 'in-progress', 'page': 2})
 
-		self.assertEqual(len(list(first_page.context['pedidos'])), 2)
+		self.assertEqual(len(list(first_page.context['dispatch_orders'])), 2)
 		self.assertContains(first_page, 'Page 1 of')
 		self.assertContains(first_page, 'Showing 1-2 of 3 orders')
-		self.assertEqual(len(list(second_page.context['pedidos'])), 1)
+		self.assertEqual(len(list(second_page.context['dispatch_orders'])), 1)
 		self.assertContains(second_page, 'Page 2 of 2')
 
 

@@ -306,18 +306,14 @@ La Tortilla Grocery
     </a>
     {% endif %}
 
-    {% if request.user|has_internal_permission:'backoffice.quotes.view' %}
-    <a href="{% url 'backoffice_cotizaciones' %}"
-      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' %}active{% endif %}">
-      {% trans "Quotes" %}
+    {% if request.user|has_internal_permission:'backoffice.orders.view' or request.user|has_internal_permission:'backoffice.quotes.view' %}
+    <a href="{% url 'backoffice_pedidos' %}"
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' %}active{% endif %}">
+      {% trans "Orders" %}
     </a>
     {% endif %}
 
     {% if request.user|has_internal_permission:'backoffice.orders.view' %}
-    <a href="{% url 'backoffice_pedidos' %}"
-      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' %}active{% endif %}">
-      {% trans "Sales Orders" %}
-    </a>
     <a href="{% url 'backoffice_live_drivers' %}"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' %}active{% endif %}">
       {% trans "Live Drivers" %}

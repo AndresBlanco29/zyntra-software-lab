@@ -364,22 +364,26 @@ class BackofficeQuotePricingTests(TestCase):
 	def test_backoffice_quote_list_respects_selected_language(self):
 		self.client.force_login(self.backoffice)
 
-		english_response = self.client.get(reverse('backoffice_cotizaciones'))
+		english_response = self.client.get(reverse('backoffice_pedidos'))
 
 		self.assertEqual(english_response.status_code, 200)
-		self.assertContains(english_response, '<title>Quotes BackOffice</title>', html=False)
+		self.assertContains(english_response, '<title>Orders for dispatch</title>', html=False)
 		self.assertContains(english_response, 'Log out')
 		self.assertContains(english_response, 'Are you sure you want to log out?')
 		self.assertContains(english_response, 'Sent by client')
 
 		self.client.cookies[settings.LANGUAGE_COOKIE_NAME] = 'es'
-		spanish_response = self.client.get(reverse('backoffice_cotizaciones'), HTTP_ACCEPT_LANGUAGE='es')
+		spanish_response = self.client.get(reverse('backoffice_pedidos'), HTTP_ACCEPT_LANGUAGE='es')
 
 		self.assertEqual(spanish_response.status_code, 200)
-		self.assertContains(spanish_response, '<title>Cotizaciones BackOffice</title>', html=False)
 		self.assertContains(spanish_response, 'Cerrar sesión')
 		self.assertContains(spanish_response, '¿Estás seguro de salir?')
 		self.assertContains(spanish_response, 'Enviada por el cliente')
+
+	def test_legacy_quotes_list_redirects_to_unified_orders_list(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_cotizaciones'))
+		self.assertRedirects(response, reverse('backoffice_pedidos'))
 
 	def test_backoffice_quote_list_defaults_to_pending_filters(self):
 		ready_quote = Cotizacion.objects.create(cliente=self.cliente, estado='LISTA_PARA_CONFIRMACION', total=Decimal('25.00'))
@@ -416,11 +420,11 @@ class BackofficeQuotePricingTests(TestCase):
 		)
 
 		self.client.force_login(self.backoffice)
-		response = self.client.get(reverse('backoffice_cotizaciones'))
-		visible_ids = [cotizacion.id for cotizacion in response.context['cotizaciones']]
+		response = self.client.get(reverse('backoffice_pedidos'))
+		visible_ids = [row.source_id for row in response.context['dispatch_orders'] if row.record_type == 'quote']
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'Pending Quotes')
+		self.assertContains(response, 'Pending orders')
 		self.assertEqual(visible_ids, [ready_quote.id, self.cotizacion.id])
 
 	def test_backoffice_quote_list_can_filter_confirmed_cancelled_and_processed(self):
@@ -451,19 +455,19 @@ class BackofficeQuotePricingTests(TestCase):
 
 		self.client.force_login(self.backoffice)
 
-		confirmed_response = self.client.get(reverse('backoffice_cotizaciones'), {'view': 'confirmed'})
-		confirmed_ids = [cotizacion.id for cotizacion in confirmed_response.context['cotizaciones']]
-		self.assertContains(confirmed_response, 'Confirmed Quotes')
+		confirmed_response = self.client.get(reverse('backoffice_cotizaciones'), {'view': 'confirmed'}, follow=True)
+		confirmed_ids = [row.source_id for row in confirmed_response.context['dispatch_orders'] if row.record_type == 'quote']
+		self.assertContains(confirmed_response, 'Pending orders')
 		self.assertEqual(confirmed_ids, [confirmed_quote.id])
 
-		cancelled_response = self.client.get(reverse('backoffice_cotizaciones'), {'view': 'cancelled'})
-		cancelled_ids = [cotizacion.id for cotizacion in cancelled_response.context['cotizaciones']]
-		self.assertContains(cancelled_response, 'Cancelled Quotes')
+		cancelled_response = self.client.get(reverse('backoffice_cotizaciones'), {'view': 'cancelled'}, follow=True)
+		cancelled_ids = [row.source_id for row in cancelled_response.context['dispatch_orders'] if row.record_type == 'quote']
+		self.assertContains(cancelled_response, 'Cancelled orders')
 		self.assertEqual(cancelled_ids, [cancelled_quote.id])
 
-		processed_response = self.client.get(reverse('backoffice_cotizaciones'), {'view': 'processed'})
-		processed_ids = [cotizacion.id for cotizacion in processed_response.context['cotizaciones']]
-		self.assertContains(processed_response, 'Processed Quotes')
+		processed_response = self.client.get(reverse('backoffice_cotizaciones'), {'view': 'processed'}, follow=True)
+		processed_ids = [row.source_id for row in processed_response.context['dispatch_orders'] if row.record_type == 'quote']
+		self.assertContains(processed_response, 'Completed orders')
 		self.assertEqual(processed_ids, [processed_quote.id])
 
 	def test_backoffice_cannot_save_quote_below_cost(self):
@@ -527,7 +531,7 @@ class BackofficeQuotePricingTests(TestCase):
 		self.client.force_login(self.backoffice)
 		response = self.client.post(reverse('backoffice_cotizacion_void', args=[self.cotizacion.id]))
 
-		self.assertRedirects(response, reverse('backoffice_cotizaciones'))
+		self.assertRedirects(response, reverse('backoffice_pedidos'))
 		self.cotizacion.refresh_from_db()
 		self.assertEqual(self.cotizacion.estado, 'CANCELADA_CLIENTE')
 
@@ -536,7 +540,7 @@ class BackofficeQuotePricingTests(TestCase):
 		self.client.force_login(self.backoffice)
 		response = self.client.post(reverse('backoffice_cotizacion_delete', args=[cotizacion_id]))
 
-		self.assertRedirects(response, reverse('backoffice_cotizaciones'))
+		self.assertRedirects(response, reverse('backoffice_pedidos'))
 		self.assertFalse(Cotizacion.objects.filter(id=cotizacion_id).exists())
 
 	def test_backoffice_cannot_delete_quote_with_generated_order(self):

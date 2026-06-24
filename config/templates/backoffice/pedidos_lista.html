@@ -1,14 +1,15 @@
 {% extends "bases/base_vendedor.html" %}
 {% load i18n pagination_tags %}
 
-{% block title %}{% trans "Sales Orders" %}{% endblock %}
+{% block title %}{% trans "Orders for dispatch" %}{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">{% trans "Received Sales Orders" %}</h2>
+<h2 class="mb-4">{% trans "Orders for dispatch" %}</h2>
+<p class="text-muted">{% trans "Customer requests and sales orders ready to manage, pick, and ship." %}</p>
 
 <div class="btn-group mb-3" role="group" aria-label="{% trans 'Order views' %}">
   <a href="{% url 'backoffice_pedidos' %}" class="btn {% if view_mode == 'pending' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-    {% trans "Pending Orders" %}
+    {% trans "Pending orders" %}
     <span class="badge {% if view_mode == 'pending' %}bg-light text-primary{% else %}bg-primary{% endif %} ms-1">{{ pending_count }}</span>
   </a>
   <a href="{% url 'backoffice_pedidos' %}?view=in-progress" class="btn {% if view_mode == 'in-progress' %}btn-warning{% else %}btn-outline-warning{% endif %}">
@@ -16,11 +17,11 @@
     <span class="badge {% if view_mode == 'in-progress' %}bg-light text-dark{% else %}bg-warning text-dark{% endif %} ms-1">{{ in_progress_count }}</span>
   </a>
   <a href="{% url 'backoffice_pedidos' %}?view=completed" class="btn {% if view_mode == 'completed' %}btn-success{% else %}btn-outline-success{% endif %}">
-    {% trans "Completed Orders" %}
+    {% trans "Completed orders" %}
     <span class="badge {% if view_mode == 'completed' %}bg-light text-success{% else %}bg-success{% endif %} ms-1">{{ completed_count }}</span>
   </a>
   <a href="{% url 'backoffice_pedidos' %}?view=cancelled" class="btn {% if view_mode == 'cancelled' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-    {% trans "Cancelled Orders" %}
+    {% trans "Cancelled orders" %}
     <span class="badge {% if view_mode == 'cancelled' %}bg-light text-secondary{% else %}bg-secondary{% endif %} ms-1">{{ cancelled_count }}</span>
   </a>
 </div>
@@ -38,7 +39,8 @@
     <table class="table table-striped align-middle mb-0 mobile-stack-table mobile-stack-table--list">
       <thead>
         <tr>
-          <th>ID</th>
+          <th>{% trans "Ref." %}</th>
+          <th>{% trans "Type" %}</th>
           <th>{% trans "Customer" %}</th>
           <th>{% trans "Selector" %}</th>
           <th>{% trans "Origin" %}</th>
@@ -49,37 +51,44 @@
         </tr>
       </thead>
       <tbody>
-        {% for pedido in pedidos %}
+        {% for row in dispatch_orders %}
         <tr>
-          <td data-label="ID">#{{ pedido.id }}</td>
-          <td data-label="{% trans 'Customer' %}">{{ pedido.cliente.nombre_empresa }}</td>
-          <td data-label="{% trans 'Selector' %}">{% if pedido.seleccionador %}{% firstof pedido.seleccionador.get_full_name pedido.seleccionador.username %}{% else %}<span class="text-muted">-</span>{% endif %}</td>
-          <td data-label="{% trans 'Origin' %}">{{ pedido.origen_label }}</td>
+          <td data-label="{% trans 'Ref.' %}">#{{ row.source_id }}</td>
+          <td data-label="{% trans 'Type' %}">
+            {% if row.record_type == 'quote' %}
+              <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle">{% trans "Request" %}</span>
+            {% else %}
+              <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">{% trans "Dispatch" %}</span>
+            {% endif %}
+          </td>
+          <td data-label="{% trans 'Customer' %}">{{ row.customer_name }}</td>
+          <td data-label="{% trans 'Selector' %}">{% if row.selector_name %}{{ row.selector_name }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+          <td data-label="{% trans 'Origin' %}">{{ row.origin_label }}</td>
           <td data-label="{% trans 'Status' %}">
             <div class="workflow-status-stack">
-              <span class="badge {% if pedido.estado == 'DESPACHADO' %}bg-success{% elif pedido.estado == 'CANCELADO' %}bg-secondary{% elif pedido.estado == 'EN_GESTION' or pedido.estado == 'PARA_VERIFICAR' or pedido.estado == 'VERIFICADO_AJUSTADO' or pedido.estado == 'INVOICE_GENERADA' %}bg-warning text-dark{% else %}bg-info text-dark{% endif %}">{{ pedido.estado_label }}</span>
-              {% if pedido.workflow_badge %}
-              <span class="workflow-role-badge {% if pedido.workflow_badge.kind == 'split' %}workflow-role-badge--split{% endif %}" style="--workflow-start: {{ pedido.workflow_badge.color_start }}; --workflow-end: {{ pedido.workflow_badge.color_end }}; --workflow-text: {{ pedido.workflow_badge.text_color }};">
-                {{ pedido.workflow_badge.label }}
+              <span class="badge {{ row.status_badge_class }}">{{ row.status_label }}</span>
+              {% if row.workflow_badge %}
+              <span class="workflow-role-badge {% if row.workflow_badge.kind == 'split' %}workflow-role-badge--split{% endif %}" style="--workflow-start: {{ row.workflow_badge.color_start }}; --workflow-end: {{ row.workflow_badge.color_end }}; --workflow-text: {{ row.workflow_badge.text_color }};">
+                {{ row.workflow_badge.label }}
               </span>
               {% endif %}
             </div>
           </td>
-          <td data-label="{% trans 'Total' %}">${{ pedido.total }}</td>
-          <td data-label="{% trans 'Date' %}">{{ pedido.creada_en|date:"d/m/Y H:i" }}</td>
+          <td data-label="{% trans 'Total' %}">${{ row.total }}</td>
+          <td data-label="{% trans 'Date' %}">{{ row.date|date:"d/m/Y H:i" }}</td>
           <td data-label="{% trans 'Action' %}" class="mobile-stack-table__action">
-            <a href="{% url 'backoffice_pedido_detalle' pedido.id %}" class="btn btn-sm btn-warning">{% trans "Manage" %}</a>
+            <a href="{{ row.detail_url }}" class="btn btn-sm btn-warning">{% trans "Manage" %}</a>
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="8" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No sales orders have been registered yet." %}</td>
+          <td colspan="9" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No orders have been registered yet." %}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 
-  {% pagination_controls page_obj aria_label=_('Sales order pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0 px-3 pb-3" view=view_mode %}
+  {% pagination_controls page_obj aria_label=_('Order pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0 px-3 pb-3" view=view_mode %}
 </div>
 {% endblock %}

@@ -465,10 +465,10 @@ def guardar_cotizacion(request):
     items = cotizacion.items.all()
 
     crear_notificacion_backoffice(
-        titulo=f'New order request #{cotizacion.id}',
-        mensaje=f'{cliente.nombre_empresa} requested a new order.',
-        tipo='COTIZACION',
-        url=f'/cotizaciones/backoffice/{cotizacion.id}/',
+        titulo=_('New order request #%(id)s') % {'id': cotizacion.id},
+        mensaje=_('%(client)s submitted a new order request.') % {'client': cliente.nombre_empresa},
+        tipo='PEDIDO',
+        url=reverse('backoffice_cotizacion_detalle', args=[cotizacion.id]),
     )
 
     html_content = render_to_string(
@@ -506,29 +506,23 @@ def guardar_cotizacion(request):
 @login_required
 @internal_permission_required('backoffice.quotes.view')
 def backoffice_cotizaciones(request):
-    base_queryset = Cotizacion.objects.select_related('cliente__usuario').prefetch_related('items').order_by('-fecha')
-    pending_statuses = ['ENVIADA', 'LISTA_PARA_CONFIRMACION']
-    processed_statuses = ['APROBADA', 'RECHAZADA', 'BORRADOR']
-    view_mode = request.GET.get('view')
-
-    if view_mode == 'confirmed':
-        cotizaciones = base_queryset.filter(estado='CONFIRMADA_CLIENTE')
-    elif view_mode == 'cancelled':
-        cotizaciones = base_queryset.filter(estado='CANCELADA_CLIENTE')
-    elif view_mode == 'processed':
-        cotizaciones = base_queryset.filter(estado__in=processed_statuses)
-    else:
-        view_mode = 'pending'
-        cotizaciones = base_queryset.filter(estado__in=pending_statuses)
-
-    return render(request, 'backoffice/cotizaciones_lista.html', {
-        'cotizaciones': cotizaciones,
-        'view_mode': view_mode,
-        'pending_count': base_queryset.filter(estado__in=pending_statuses).count(),
-        'confirmed_count': base_queryset.filter(estado='CONFIRMADA_CLIENTE').count(),
-        'cancelled_count': base_queryset.filter(estado='CANCELADA_CLIENTE').count(),
-        'processed_count': base_queryset.filter(estado__in=processed_statuses).count(),
-    })
+    view_mapping = {
+        'confirmed': 'pending',
+        'processed': 'completed',
+        'cancelled': 'cancelled',
+        'pending': 'pending',
+    }
+    target_view = view_mapping.get(request.GET.get('view'), 'pending')
+    params = []
+    if target_view != 'pending':
+        params.append(f'view={target_view}')
+    page = request.GET.get('page')
+    if page:
+        params.append(f'page={page}')
+    target_url = reverse('backoffice_pedidos')
+    if params:
+        target_url = f'{target_url}?{"&".join(params)}'
+    return redirect(target_url)
 
 
 @login_required
@@ -619,7 +613,7 @@ def backoffice_cotizacion_void(request, cotizacion_id):
         return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
     messages.success(request, _('Quote voided successfully. Inventory was not changed.'))
-    return redirect('backoffice_cotizaciones')
+    return redirect('backoffice_pedidos')
 
 
 @login_required
@@ -634,7 +628,7 @@ def backoffice_cotizacion_delete(request, cotizacion_id):
         return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
     messages.success(request, _('Quote deleted permanently. Inventory was not changed.'))
-    return redirect('backoffice_cotizaciones')
+    return redirect('backoffice_pedidos')
 
 
 @login_required
@@ -925,10 +919,10 @@ def cliente_cotizacion_recibida_detalle(request, token):
                 cotizacion.estado = 'CANCELADA_CLIENTE'
                 cotizacion.save(update_fields=['estado', 'total', 'nota_confirmacion_cliente'])
                 crear_notificacion_backoffice(
-                    titulo=f'Quote cancelled #{cotizacion.id}',
-                    mensaje=f'{cotizacion.cliente.nombre_empresa} cancelled the quote.',
-                    tipo='COTIZACION',
-                    url=f'/cotizaciones/backoffice/{cotizacion.id}/',
+                    titulo=_('Order request cancelled #%(id)s') % {'id': cotizacion.id},
+                    mensaje=_('%(client)s cancelled the order request.') % {'client': cotizacion.cliente.nombre_empresa},
+                    tipo='PEDIDO',
+                    url=reverse('backoffice_cotizacion_detalle', args=[cotizacion.id]),
                 )
                 messages.warning(request, _('The quote was cancelled successfully.'))
                 return redirect('cliente_cotizacion_recibida_detalle', token=cotizacion.token_cliente)

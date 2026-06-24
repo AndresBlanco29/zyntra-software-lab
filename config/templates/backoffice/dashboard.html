@@ -8,7 +8,7 @@
 {% block content %}
 
 <h2 class="mb-4">{% trans "BackOffice Dashboard" %}</h2>
-<p class="text-muted">{% trans "Dedicated module for managing quotes and sales orders." %}</p>
+<p class="text-muted">{% trans "Dedicated module for managing orders for dispatch." %}</p>
 
 <div class="row g-3 mb-4">
   <div class="col-12">
@@ -63,17 +63,9 @@
   <div class="col-md-6 col-xl-3">
     <div class="card shadow-sm h-100">
       <div class="card-body text-center">
-        <h3 class="mb-1">{{ cotizaciones_pendientes }}</h3>
-        <p class="mb-0">{% trans "Pending quotes" %}</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-md-6 col-xl-3">
-    <div class="card shadow-sm h-100">
-      <div class="card-body text-center">
-        <h3 class="mb-1">{{ ordenes_recibidas }}</h3>
-        <p class="mb-0">{% trans "Received orders" %}</p>
+        <h3 class="mb-1">{{ ordenes_pendientes }}</h3>
+        <p class="mb-0">{% trans "Pending orders" %}</p>
+        <p class="small text-muted mb-0">{% blocktrans with requests=solicitudes_pendientes dispatch=ordenes_recibidas %}{{ requests }} requests · {{ dispatch }} ready to dispatch{% endblocktrans %}</p>
       </div>
     </div>
   </div>
@@ -120,8 +112,7 @@
   <div class="card-body">
     <h5 class="mb-3">{% trans "Quick actions" %}</h5>
     <div class="d-flex flex-wrap gap-2">
-      <a href="{% url 'backoffice_cotizaciones' %}" class="btn btn-primary">{% trans "Manage quotes" %}</a>
-      <a href="{% url 'backoffice_pedidos' %}" class="btn btn-warning">{% trans "Manage sales orders" %}</a>
+      <a href="{% url 'backoffice_pedidos' %}" class="btn btn-primary">{% trans "Manage orders" %}</a>
       <a href="{% url 'backoffice_inventory_list' %}" class="btn btn-outline-dark">{% trans "Manage inventory" %}</a>
     </div>
   </div>

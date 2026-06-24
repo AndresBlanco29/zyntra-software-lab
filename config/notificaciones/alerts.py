@@ -27,56 +27,100 @@ def _append_alert(items, *, label, detail, url, count, priority='medium', kind='
 def get_urgent_workspace_alerts(user):
     if not _is_internal_panel_user(user):
         return None
-    if not user.has_internal_permission('backoffice.quotes.view'):
+    if not (
+        user.has_internal_permission('backoffice.orders.view')
+        or user.has_internal_permission('backoffice.quotes.view')
+    ):
         return None
 
     from config.cotizaciones.models import Cotizacion
+    from config.pedidos.dispatch_orders import (
+        PEDIDO_IN_PROGRESS_STATUSES,
+        PEDIDO_PENDING_STATUSES,
+        QUOTE_PENDING_STATUSES,
+    )
+    from config.pedidos.models import Pedido
 
-    base_queryset = Cotizacion.objects.select_related('cliente').order_by('-fecha')
-    quotes_url = reverse('backoffice_cotizaciones')
+    orders_url = reverse('backoffice_pedidos')
     summary_items = []
+    open_quotes = Cotizacion.objects.select_related('cliente').filter(
+        pedido_generado__isnull=True,
+    ).order_by('-fecha')
+    pedidos = Pedido.objects.select_related('cliente').order_by('-creada_en')
 
-    pending_review = base_queryset.filter(estado='ENVIADA').count()
+    pending_requests = open_quotes.filter(estado__in=QUOTE_PENDING_STATUSES).count()
     _append_alert(
         summary_items,
         label=_('Pending review'),
-        detail=_('New quotes sent by customers waiting for BackOffice'),
-        url=quotes_url,
-        count=pending_review,
+        detail=_('New customer order requests waiting for BackOffice'),
+        url=orders_url,
+        count=pending_requests,
         priority='high',
-        kind='quotes-pending',
+        kind='orders-pending-review',
     )
 
-    awaiting_customer = base_queryset.filter(estado='LISTA_PARA_CONFIRMACION').count()
+    awaiting_customer = open_quotes.filter(estado='LISTA_PARA_CONFIRMACION').count()
     _append_alert(
         summary_items,
         label=_('Waiting for customer'),
-        detail=_('Quotes sent to the customer that are still open'),
-        url=quotes_url,
+        detail=_('Orders sent to the customer that are still open'),
+        url=orders_url,
         count=awaiting_customer,
         priority='medium',
-        kind='quotes-awaiting-customer',
+        kind='orders-awaiting-customer',
     )
 
-    confirmed_pending = base_queryset.filter(estado='CONFIRMADA_CLIENTE').count()
+    ready_for_dispatch = pedidos.filter(estado__in=PEDIDO_PENDING_STATUSES).count()
     _append_alert(
         summary_items,
-        label=_('Confirmed, not finished'),
-        detail=_('Customer confirmed the quote and BackOffice still needs to complete it'),
-        url=f'{quotes_url}?view=confirmed',
-        count=confirmed_pending,
+        label=_('Ready to dispatch'),
+        detail=_('Confirmed orders waiting for picking or dispatch'),
+        url=orders_url,
+        count=ready_for_dispatch,
         priority='high',
-        kind='quotes-confirmed',
+        kind='orders-ready-dispatch',
     )
 
-    active_statuses = ['ENVIADA', 'LISTA_PARA_CONFIRMACION', 'CONFIRMADA_CLIENTE']
-    recent_quotes = list(base_queryset.filter(estado__in=active_statuses)[:8])
+    in_progress = pedidos.filter(estado__in=PEDIDO_IN_PROGRESS_STATUSES).count()
+    _append_alert(
+        summary_items,
+        label=_('In progress'),
+        detail=_('Orders currently being managed, verified, or invoiced'),
+        url=f'{orders_url}?view=in-progress',
+        count=in_progress,
+        priority='medium',
+        kind='orders-in-progress',
+    )
 
-    total_count = pending_review + awaiting_customer + confirmed_pending
+    recent_items = []
+    for cotizacion in open_quotes.filter(estado__in=QUOTE_PENDING_STATUSES)[:4]:
+        recent_items.append({
+            'title': _('Order request #%(id)s · %(customer)s') % {
+                'id': cotizacion.id,
+                'customer': cotizacion.cliente.nombre_empresa,
+            },
+            'message': str(cotizacion.get_estado_display()),
+            'url': reverse('backoffice_cotizacion_detalle', args=[cotizacion.id]),
+            'sort_date': cotizacion.fecha,
+        })
+    for pedido in pedidos.filter(estado__in=PEDIDO_PENDING_STATUSES | PEDIDO_IN_PROGRESS_STATUSES)[:4]:
+        recent_items.append({
+            'title': _('Order #%(id)s · %(customer)s') % {
+                'id': pedido.id,
+                'customer': pedido.cliente.nombre_empresa,
+            },
+            'message': pedido.get_estado_display(),
+            'url': reverse('backoffice_pedido_detalle', args=[pedido.id]),
+            'sort_date': pedido.creada_en,
+        })
+    recent_items.sort(key=lambda item: item['sort_date'], reverse=True)
+    recent_items = recent_items[:8]
+
+    total_count = pending_requests + awaiting_customer + ready_for_dispatch + in_progress
 
     return {
         'total_count': total_count,
         'summary_items': summary_items,
-        'recent_quotes': recent_quotes,
-        'quotes_url': quotes_url,
+        'recent_items': recent_items,
+        'orders_url': orders_url,
     }

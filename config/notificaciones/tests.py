@@ -36,24 +36,27 @@ class WorkspaceUrgentAlertsTests(TestCase):
 	def test_customer_user_does_not_receive_workspace_alerts(self):
 		self.assertIsNone(get_urgent_workspace_alerts(self.customer_user))
 
-	def test_backoffice_user_receives_customer_quote_alerts_only(self):
+	def test_backoffice_user_receives_unified_order_alerts(self):
 		Cotizacion.objects.create(cliente=self.cliente, estado='ENVIADA')
 		Cotizacion.objects.create(cliente=self.cliente, estado='LISTA_PARA_CONFIRMACION')
-		Cotizacion.objects.create(cliente=self.cliente, estado='CONFIRMADA_CLIENTE')
 		Pedido.objects.create(cliente=self.cliente, origen='CLIENTE', estado='RECIBIDO')
+		Pedido.objects.create(cliente=self.cliente, origen='VENDEDOR', estado='EN_GESTION')
 
 		alerts = get_urgent_workspace_alerts(self.backoffice)
 
 		self.assertIsNotNone(alerts)
-		self.assertEqual(alerts['total_count'], 3)
-		self.assertEqual(len(alerts['summary_items']), 3)
-		self.assertEqual(len(alerts['recent_quotes']), 3)
+		self.assertEqual(alerts['total_count'], 4)
+		self.assertEqual(len(alerts['summary_items']), 4)
+		self.assertEqual(len(alerts['recent_items']), 4)
 		self.assertEqual(alerts['summary_items'][0]['label'], 'Pending review')
 		self.assertEqual(alerts['summary_items'][0]['count'], 1)
 		self.assertEqual(alerts['summary_items'][1]['label'], 'Waiting for customer')
 		self.assertEqual(alerts['summary_items'][1]['count'], 1)
-		self.assertEqual(alerts['summary_items'][2]['label'], 'Confirmed, not finished')
+		self.assertEqual(alerts['summary_items'][2]['label'], 'Ready to dispatch')
 		self.assertEqual(alerts['summary_items'][2]['count'], 1)
+		self.assertEqual(alerts['summary_items'][3]['label'], 'In progress')
+		self.assertEqual(alerts['summary_items'][3]['count'], 1)
+		self.assertEqual(alerts['orders_url'], reverse('backoffice_pedidos'))
 
 	def test_context_processor_injects_alerts_for_internal_users(self):
 		request = RequestFactory().get('/')
@@ -64,10 +67,10 @@ class WorkspaceUrgentAlertsTests(TestCase):
 		self.assertIn('workspace_urgent_alerts', context)
 		self.assertIsNotNone(context['workspace_urgent_alerts'])
 
-	def test_backoffice_dashboard_includes_navbar_quotes_button(self):
+	def test_backoffice_dashboard_includes_navbar_orders_button(self):
 		self.client.force_login(self.backoffice)
 		response = self.client.get(reverse('backoffice_dashboard'))
 
 		self.assertContains(response, 'navbar-urgent-alerts')
-		self.assertContains(response, 'Quotes')
-		self.assertContains(response, 'Customer quotes')
+		self.assertContains(response, 'Orders')
+		self.assertContains(response, 'Orders for dispatch')

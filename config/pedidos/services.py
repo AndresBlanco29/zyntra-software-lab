@@ -469,9 +469,20 @@ def guardar_verificacion_picking(
 
 
 def notificar_backoffice_pedido(pedido):
+    if pedido.origen == 'VENDEDOR':
+        vendor_name = ''
+        if pedido.vendedor_id:
+            vendor_name = (pedido.vendedor.get_full_name() or '').strip() or pedido.vendedor.username
+        mensaje = _('%(vendor)s created a new order for %(client)s.') % {
+            'vendor': vendor_name or _('A vendor'),
+            'client': pedido.cliente.nombre_empresa,
+        }
+    else:
+        mensaje = _('%(client)s submitted a new order.') % {'client': pedido.cliente.nombre_empresa}
+
     crear_notificacion_backoffice(
-        titulo=_('New sales order #%(id)s') % {'id': pedido.id},
-        mensaje=_('%(client)s submitted a new sales order.') % {'client': pedido.cliente.nombre_empresa},
+        titulo=_('New order #%(id)s') % {'id': pedido.id},
+        mensaje=mensaje,
         tipo='PEDIDO',
         url=reverse('backoffice_pedido_detalle', args=[pedido.id]),
     )
@@ -494,12 +505,12 @@ def notificar_backoffice_pedido(pedido):
             'items': pedido.items.select_related('presentacion__producto').all(),
         },
     )
-    text_content = _('A new sales order #%(id)s was created for %(client)s.') % {
+    text_content = _('A new order #%(id)s was created for %(client)s.') % {
         'id': pedido.id,
         'client': pedido.cliente.nombre_empresa,
     }
     email = EmailMultiAlternatives(
-        subject=_('New sales order #%(id)s') % {'id': pedido.id},
+        subject=_('New order #%(id)s') % {'id': pedido.id},
         body=text_content,
         from_email=settings.DEFAULT_FROM_EMAIL or settings.SERVER_EMAIL,
         to=backoffice_emails,

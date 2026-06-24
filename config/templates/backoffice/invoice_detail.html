@@ -25,7 +25,7 @@
 <div class="alert alert-danger mb-3">
   <strong>{% trans "This invoice was voided." %}</strong>
   <div class="small mb-0">
-    {% if invoice.anulada_en %}{% trans "Voided on" %} {{ invoice.anulada_en|date:"d/m/Y H:i" }}{% endif %}
+    {% if invoice.anulada_en %}{% trans "Voided on" %} {{ invoice.anulada_en|date:"m/d/Y H:i" }}{% endif %}
     {% if invoice.anulada_por %} · {% trans "By" %} {% firstof invoice.anulada_por.get_full_name invoice.anulada_por.username %}{% endif %}
     {% if invoice.motivo_anulacion %} · {{ invoice.motivo_anulacion }}{% endif %}
   </div>
@@ -103,7 +103,7 @@
           {% if invoice.delivery %}
           <div class="col-md-4">
             <div class="text-muted small">{% trans "Estimated delivery" %}</div>
-            <div class="fw-semibold">{% if invoice.delivery.estimated_delivery_at %}{{ invoice.delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
+            <div class="fw-semibold">{% if invoice.delivery.estimated_delivery_at %}{{ invoice.delivery.estimated_delivery_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</div>
           </div>
           {% endif %}
           {% if invoice.cliente.terminos_pago %}
@@ -113,7 +113,7 @@
           </div>
           <div class="col-md-4">
             <div class="text-muted small">{% trans "Due date" %}</div>
-            <div class="fw-semibold">{% if invoice_payment_due_date %}{{ invoice_payment_due_date|date:"d/m/Y" }}{% else %}-{% endif %}</div>
+            <div class="fw-semibold">{% if invoice_payment_due_date %}{{ invoice_payment_due_date|date:"m/d/Y" }}{% else %}-{% endif %}</div>
           </div>
           {% endif %}
         </div>
@@ -209,19 +209,19 @@
       </div>
       <div class="col-md-3">
         <div class="text-muted small">{% trans "Delivered at" %}</div>
-        <div>{% if invoice.delivery.delivered_at %}{{ invoice.delivery.delivered_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
+        <div>{% if invoice.delivery.delivered_at %}{{ invoice.delivery.delivered_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</div>
       </div>
       <div class="col-md-3">
         <div class="text-muted small">{% trans "Estimated delivery" %}</div>
-        <div>{% if invoice.delivery.estimated_delivery_at %}{{ invoice.delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
+        <div>{% if invoice.delivery.estimated_delivery_at %}{{ invoice.delivery.estimated_delivery_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</div>
       </div>
       <div class="col-md-3">
         <div class="text-muted small">{% trans "Signature received" %}</div>
-        <div>{% if invoice.delivery.firma_recibida_en %}{{ invoice.delivery.firma_recibida_en|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div>
+        <div>{% if invoice.delivery.firma_recibida_en %}{{ invoice.delivery.firma_recibida_en|date:"m/d/Y H:i" }}{% else %}-{% endif %}</div>
       </div>
       <div class="col-md-3">
         <div class="text-muted small">{% trans "Last live signal" %}</div>
-        <div>{% if invoice.delivery.location_updated_at %}{{ invoice.delivery.location_updated_at|date:"d/m/Y H:i:s" }}{% else %}-{% endif %}</div>
+        <div>{% if invoice.delivery.location_updated_at %}{{ invoice.delivery.location_updated_at|date:"m/d/Y H:i:s" }}{% else %}-{% endif %}</div>
       </div>
       <div class="col-md-3">
         <div class="text-muted small">{% trans "Current coordinates" %}</div>
@@ -359,7 +359,7 @@
               <tr>
                 <td>
                   <strong>{{ nota.numero }}</strong>
-                  <div class="small text-muted">{{ nota.creada_en|date:"d/m/Y H:i" }}</div>
+                  <div class="small text-muted">{{ nota.creada_en|date:"m/d/Y H:i" }}</div>
                   {% if nota.creada_por and nota.creada_por.role == 'driver' %}
                     <div class="mt-1"><span class="badge bg-warning text-dark">{% trans "Created by driver" %}</span></div>
                   {% endif %}
@@ -460,10 +460,10 @@
                       {% endif %}
                       <div class="small"><span class="text-muted">{% trans "Balance impact" %}:</span> ${{ nota.impacto_saldo }}</div>
                       {% if nota.aprobada_en %}
-                        <div class="small"><span class="text-muted">{% trans "Approved on" %}:</span> {{ nota.aprobada_en|date:"d/m/Y H:i" }}</div>
+                        <div class="small"><span class="text-muted">{% trans "Approved on" %}:</span> {{ nota.aprobada_en|date:"m/d/Y H:i" }}</div>
                       {% endif %}
                       {% if nota.anulada_en %}
-                        <div class="small"><span class="text-muted">{% trans "Voided on" %}:</span> {{ nota.anulada_en|date:"d/m/Y H:i" }}</div>
+                        <div class="small"><span class="text-muted">{% trans "Voided on" %}:</span> {{ nota.anulada_en|date:"m/d/Y H:i" }}</div>
                       {% endif %}
                     </div>
                     <div class="col-lg-4">

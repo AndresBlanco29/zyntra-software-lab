@@ -185,7 +185,7 @@
           <tr>
             <td data-label="{% trans 'Invoice' %}">
               <strong>{{ invoice.numero }}</strong>
-              <div class="small text-muted">{{ invoice.creada_en|date:"d/m/Y H:i" }}</div>
+              <div class="small text-muted">{{ invoice.creada_en|date:"m/d/Y H:i" }}</div>
             </td>
             <td data-label="{% trans 'Order' %}">#{{ invoice.pedido_id }}</td>
             <td data-label="{% trans 'Customer' %}">{{ invoice.cliente.nombre_empresa }}</td>

@@ -21,6 +21,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from config.clientes.models import Cliente
+from config.core.datetime_formats import format_local_date, format_local_datetime
 from config.core.product_ordering import order_invoice_items_for_display
 from config.core.workflow_badges import build_delivery_workflow_badge
 from config.productos.models import Presentacion
@@ -85,7 +86,7 @@ def _resolve_invoice_pdf_due_date_label(invoice):
 	due_date = resolve_invoice_payment_due_date(invoice)
 	if due_date is None:
 		return '-'
-	return due_date.strftime('%m/%d/%Y')
+	return format_local_date(due_date)
 
 
 def _validate_invoice_is_not_quickbooks_locked(invoice):
@@ -622,7 +623,7 @@ def _invoice_pdf_response(invoice):
 	]))
 	item_rows = _build_invoice_pdf_item_data(invoice)
 	item_chunks = _chunk_invoice_pdf_item_rows(item_rows)
-	generated_label = timezone.localtime(invoice.creada_en).strftime('%m/%d/%Y %H:%M')
+	generated_label = format_local_datetime(invoice.creada_en)
 
 	content = []
 	meta_table = Table([
@@ -844,9 +845,9 @@ def _delivery_tracking_payload(delivery):
 		'speed_mps': float(delivery.current_speed_mps) if delivery.current_speed_mps is not None else None,
 		'heading': float(delivery.current_heading) if delivery.current_heading is not None else None,
 		'location_updated_at': location_updated.isoformat() if location_updated else None,
-		'location_updated_label': timezone.localtime(location_updated).strftime('%d/%m/%Y %H:%M:%S') if location_updated else '-',
+		'location_updated_label': format_local_datetime(location_updated, seconds=True) if location_updated else '-',
 		'location_age_seconds': location_age_seconds,
-		'route_started_label': timezone.localtime(delivery.route_started_at).strftime('%d/%m/%Y %H:%M') if delivery.route_started_at else '-',
+		'route_started_label': format_local_datetime(delivery.route_started_at) if delivery.route_started_at else '-',
 		'maps_url': delivery.live_google_maps_url,
 		'destination_maps_url': delivery.google_maps_url,
 		'destination_address': delivery.route_address,

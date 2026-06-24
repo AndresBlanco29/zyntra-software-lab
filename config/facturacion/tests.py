@@ -2649,7 +2649,7 @@ class InvoiceFlowTests(TestCase):
 		)
 
 		self.assertEqual(_resolve_invoice_pdf_due_date_label(invoice), '07/02/2026')
-		self.assertEqual(resolve_invoice_payment_due_date(invoice).strftime('%d/%m/%Y'), '02/07/2026')
+		self.assertEqual(resolve_invoice_payment_due_date(invoice).strftime('%m/%d/%Y'), '07/02/2026')
 
 	def test_invoice_pdf_due_date_shows_dash_when_terms_not_configured(self):
 		invoice = generar_invoice_desde_picking(
@@ -3274,7 +3274,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(payload['tracking']['accuracy_meters'], 8.5)
 		self.assertEqual(payload['tracking']['speed_mps'], 12.3)
 		self.assertEqual(payload['tracking']['heading'], 182.4)
-		self.assertEqual(payload['tracking']['location_updated_label'], timezone.localtime(invoice.delivery.location_updated_at).strftime('%d/%m/%Y %H:%M:%S'))
+		self.assertEqual(payload['tracking']['location_updated_label'], timezone.localtime(invoice.delivery.location_updated_at).strftime('%m/%d/%Y %H:%M:%S'))
 		self.assertIsNotNone(payload['tracking']['location_updated_at'])
 		self.assertGreaterEqual(payload['tracking']['location_age_seconds'], 0)
 		self.assertLessEqual(payload['tracking']['location_age_seconds'], 5)

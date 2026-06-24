@@ -159,7 +159,7 @@
           <tr>
             <td data-label="{% trans 'Note' %}">
               <div class="fw-semibold">{{ note.numero }}</div>
-              <div class="small text-muted">{{ note.creada_en|date:"d/m/Y H:i" }}</div>
+              <div class="small text-muted">{{ note.creada_en|date:"m/d/Y H:i" }}</div>
               <div class="small mt-1">{{ note.get_tipo_documento_display }} · {{ note.get_motivo_display }}</div>
               {% if note.tipo_credito %}
               <div class="small text-muted">{{ note.get_tipo_credito_display }}</div>

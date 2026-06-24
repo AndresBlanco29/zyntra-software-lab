@@ -333,6 +333,14 @@ TIME_ZONE = 'America/New_York'
 
 USE_I18N = True
 USE_TZ = True
+USE_L10N = True
+
+FORMAT_MODULE_PATH = 'config.core.formats'
+
+DATE_FORMAT = 'm/d/Y'
+TIME_FORMAT = 'H:i'
+DATETIME_FORMAT = 'm/d/Y H:i'
+SHORT_DATE_FORMAT = 'm/d/Y'
 
 LANGUAGES = [
     ("en", "English"),

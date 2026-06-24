@@ -28,7 +28,7 @@
           {% endif %}
         </div>
         {% if pedido.picking_asignado_en %}
-          <small class="text-muted d-block mt-1">{% trans "Assigned on" %}: {{ pedido.picking_asignado_en|date:"d/m/Y H:i" }}</small>
+          <small class="text-muted d-block mt-1">{% trans "Assigned on" %}: {{ pedido.picking_asignado_en|date:"m/d/Y H:i" }}</small>
         {% endif %}
       </div>
       <div class="col-lg-7">
@@ -460,7 +460,7 @@
       {% if pedido.picking_verificado_en %}
       <div class="col-md-4">
         <label class="form-label fw-semibold">{% trans "Verified on" %}</label>
-        <div>{{ pedido.picking_verificado_en|date:"d/m/Y H:i" }}</div>
+        <div>{{ pedido.picking_verificado_en|date:"m/d/Y H:i" }}</div>
       </div>
       {% endif %}
       <div class="col-md-4">
@@ -477,7 +477,7 @@
         <label class="form-label fw-semibold">{% trans "Authorization recorded on" %}</label>
         <div>
           {% if pedido.acepta_terminos_en %}
-            {{ pedido.acepta_terminos_en|date:"d/m/Y H:i" }}
+            {{ pedido.acepta_terminos_en|date:"m/d/Y H:i" }}
           {% else %}
             <span class="text-muted">{% trans "No record" %}</span>
           {% endif %}

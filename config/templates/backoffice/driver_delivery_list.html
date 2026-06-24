@@ -283,7 +283,7 @@
                 <strong>{{ delivery.invoice.numero }}</strong>
                 <div class="driver-delivery-meta">
                   <span class="small text-muted">PO #{{ delivery.invoice.pedido_id }}</span>
-                  <span class="driver-inline-hint">{% trans "Estimated delivery" %}: {% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</span>
+                  <span class="driver-inline-hint">{% trans "Estimated delivery" %}: {% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</span>
                 </div>
               </div>
             </td>
@@ -353,7 +353,7 @@
                 <strong>{{ delivery.invoice.numero }}</strong>
                 <div class="driver-delivery-meta">
                   <span class="small text-muted">PO #{{ delivery.invoice.pedido_id }}</span>
-                  <span class="driver-inline-hint">{% trans "Estimated delivery" %}: {% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</span>
+                  <span class="driver-inline-hint">{% trans "Estimated delivery" %}: {% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</span>
                 </div>
               </div>
             </td>

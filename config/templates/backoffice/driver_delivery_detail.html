@@ -241,9 +241,9 @@
         <div class="text-muted small">{% trans "Google Maps query" %}</div>
         <div class="mb-3">{{ delivery.route_query_address }}</div>
         <div class="row g-3">
-          <div class="col-md-4"><div class="text-muted small">{% trans "Estimated delivery" %}</div><div>{% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
-          <div class="col-md-4"><div class="text-muted small">{% trans "Started" %}</div><div>{% if delivery.route_started_at %}{{ delivery.route_started_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
-          <div class="col-md-4"><div class="text-muted small">{% trans "Delivered" %}</div><div>{% if delivery.delivered_at %}{{ delivery.delivered_at|date:"d/m/Y H:i" }}{% else %}-{% endif %}</div></div>
+          <div class="col-md-4"><div class="text-muted small">{% trans "Estimated delivery" %}</div><div>{% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</div></div>
+          <div class="col-md-4"><div class="text-muted small">{% trans "Started" %}</div><div>{% if delivery.route_started_at %}{{ delivery.route_started_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</div></div>
+          <div class="col-md-4"><div class="text-muted small">{% trans "Delivered" %}</div><div>{% if delivery.delivered_at %}{{ delivery.delivered_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</div></div>
         </div>
       </div>
       <div class="col-lg-4">

@@ -38,7 +38,7 @@
           <div class="col-12"><div class="text-muted small">{% trans "Driver" %}</div><div id="trackingDriverName">{% firstof delivery.driver.get_full_name delivery.driver.username %}</div></div>
           <div class="col-md-6"><div class="text-muted small">{% trans "Delivery status" %}</div><div id="trackingStatus">{{ delivery.get_estado_display }}</div></div>
           <div class="col-md-6"><div class="text-muted small">{% trans "Payment status" %}</div><div id="trackingPaymentStatus">{{ delivery.get_estado_pago_display }}</div></div>
-          <div class="col-md-6"><div class="text-muted small">{% trans "Last signal" %}</div><div id="trackingUpdatedAt">{% if delivery.location_updated_at %}{{ delivery.location_updated_at|date:"d/m/Y H:i:s" }}{% else %}-{% endif %}</div></div>
+          <div class="col-md-6"><div class="text-muted small">{% trans "Last signal" %}</div><div id="trackingUpdatedAt">{% if delivery.location_updated_at %}{{ delivery.location_updated_at|date:"m/d/Y H:i:s" }}{% else %}-{% endif %}</div></div>
           <div class="col-md-6"><div class="text-muted small">{% trans "Signal age" %}</div><div id="trackingAge">-</div></div>
           <div class="col-md-6"><div class="text-muted small">{% trans "Accuracy" %}</div><div id="trackingAccuracy">-</div></div>
           <div class="col-md-6"><div class="text-muted small">{% trans "Speed" %}</div><div id="trackingSpeed">-</div></div>

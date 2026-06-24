@@ -1,4 +1,4 @@
-ï»¿{% extends "bases/base_vendedor.html" %}
+{% extends "bases/base_vendedor.html" %}
 {% load i18n %}
 
 {% block title %}{% trans "QuickBooks Center" %}{% endblock %}
@@ -512,7 +512,7 @@
 <div class="qb-shell">
   {% if quickbooks_catalog_only_mode %}
   <div class="alert alert-info border-0 shadow-sm mb-4" role="status">
-    <strong>{% trans "Catalog-only mode" %}</strong> â€”
+    <strong>{% trans "Catalog-only mode" %}</strong> —
     {% trans "Customer and catalog import, pull sync, review queue, and outbound send are enabled. Vendor and bill sync stay disabled until you turn off QUICKBOOKS_CATALOG_ONLY_MODE." %}
   </div>
   {% endif %}
@@ -694,7 +694,7 @@
         <h2 class="mb-1">{% trans "Step by step" %}</h2>
         <p class="qb-soft-copy mb-0">{% trans "Follow these blocks in order. This avoids confusion between checking data, importing data, and syncing your own local records." %}</p>
       </div>
-      <span class="badge text-bg-light border px-3 py-2">{% trans "Recommended order" %}: 1 â†’ 2 â†’ 3 â†’ 4</span>
+      <span class="badge text-bg-light border px-3 py-2">{% trans "Recommended order" %}: 1 ? 2 ? 3 ? 4</span>
     </div>
 
     <div class="row g-4">
@@ -1018,7 +1018,7 @@
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
                 <select name="ids" class="form-select" multiple size="6" {% if not quickbooks_pending_customers %}disabled{% endif %}>
                   {% for cliente in quickbooks_pending_customers %}
-                  <option value="{{ cliente.id }}">#{{ cliente.id }} Â· {{ cliente.nombre_empresa }}</option>
+                  <option value="{{ cliente.id }}">#{{ cliente.id }} · {{ cliente.nombre_empresa }}</option>
                   {% empty %}
                   <option value="" disabled>{% trans "No pending customers" %}</option>
                   {% endfor %}
@@ -1039,7 +1039,7 @@
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
                 <select name="ids" class="form-select" multiple size="6" {% if not quickbooks_pending_presentations %}disabled{% endif %}>
                   {% for presentacion in quickbooks_pending_presentations %}
-                  <option value="{{ presentacion.id }}">#{{ presentacion.id }} Â· {{ presentacion.producto.nombre }} / {{ presentacion.nombre }}</option>
+                  <option value="{{ presentacion.id }}">#{{ presentacion.id }} · {{ presentacion.producto.nombre }} / {{ presentacion.nombre }}</option>
                   {% empty %}
                   <option value="" disabled>{% trans "No pending items" %}</option>
                   {% endfor %}
@@ -1063,7 +1063,7 @@
                     <input type="hidden" name="redirect_to" value="{{ request.path }}">
                     <select name="ids" class="form-select" multiple size="6" {% if not quickbooks_linked_presentations %}disabled{% endif %}>
                       {% for presentacion in quickbooks_linked_presentations %}
-                      <option value="{{ presentacion.id }}">#{{ presentacion.id }} Â· {{ presentacion.producto.nombre }} / {{ presentacion.nombre }}</option>
+                      <option value="{{ presentacion.id }}">#{{ presentacion.id }} · {{ presentacion.producto.nombre }} / {{ presentacion.nombre }}</option>
                       {% empty %}
                       <option value="" disabled>{% trans "No linked items yet" %}</option>
                       {% endfor %}
@@ -1094,7 +1094,7 @@
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
                 <select name="ids" class="form-select" multiple size="6" {% if not quickbooks_pending_invoices %}disabled{% endif %}>
                   {% for invoice in quickbooks_pending_invoices %}
-                  <option value="{{ invoice.id }}">#{{ invoice.id }} Â· {{ invoice.numero }} Â· {{ invoice.cliente.nombre_empresa }}</option>
+                  <option value="{{ invoice.id }}">#{{ invoice.id }} · {{ invoice.numero }} · {{ invoice.cliente.nombre_empresa }}</option>
                   {% empty %}
                   <option value="" disabled>{% trans "No pending invoices" %}</option>
                   {% endfor %}
@@ -1115,7 +1115,7 @@
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
                 <select name="ids" class="form-select" multiple size="6" {% if not quickbooks_pending_notes %}disabled{% endif %}>
                   {% for nota in quickbooks_pending_notes %}
-                  <option value="{{ nota.id }}">#{{ nota.id }} Â· {{ nota.numero }} Â· {{ nota.cliente.nombre_empresa }}</option>
+                  <option value="{{ nota.id }}">#{{ nota.id }} · {{ nota.numero }} · {{ nota.cliente.nombre_empresa }}</option>
                   {% empty %}
                   <option value="" disabled>{% trans "No pending approved notes" %}</option>
                   {% endfor %}
@@ -1215,7 +1215,7 @@
         {% if quickbooks_has_saved_cursors %}
         <div class="qb-chip-list">
           {% for cursor in quickbooks_sync_cursors %}
-          <span class="qb-chip">{{ cursor.label }} Â· {{ cursor.value }}</span>
+          <span class="qb-chip">{{ cursor.label }} · {{ cursor.value }}</span>
           {% endfor %}
         </div>
         {% else %}
@@ -1243,7 +1243,7 @@
               </div>
               <div class="small text-muted mb-1">{{ conflict.doc_number|default:conflict.display_name|default:conflict.quickbooks_id }}</div>
               <div class="small">{% if conflict.reason %}{{ conflict.reason }}{% else %}{% trans "No reason recorded." %}{% endif %}</div>
-              <div class="small text-muted mt-2">{{ conflict.last_seen_at|date:"d/m/Y H:i" }}</div>
+              <div class="small text-muted mt-2">{{ conflict.last_seen_at|date:"m/d/Y H:i" }}</div>
             </div>
           </div>
           {% empty %}
@@ -1322,7 +1322,7 @@
           if (data.status === 'running'){
             const displayTarget = Math.max(lastKnown, 85);
             animateTo(displayTarget);
-            message.textContent = 'Importando â€” por favor espera.';
+            message.textContent = 'Importando — por favor espera.';
             setTimeout(poll, 900);
             return;
           }
@@ -1338,7 +1338,7 @@
                 if (typeof res.updated_count !== 'undefined') parts.push('Actualizados: ' + (res.updated_count||0));
                 if (typeof res.conflict_count !== 'undefined') parts.push('Conflictos: ' + (res.conflict_count||0));
                 if (typeof res.failed_count !== 'undefined') parts.push('Fallidos: ' + (res.failed_count||0));
-                details = parts.join(' Â· ');
+                details = parts.join(' · ');
               }
             }catch(e){ details = ''; }
             message.textContent = 'Completado correctamente.';
@@ -1352,11 +1352,11 @@
                 list.style.marginTop = '8px';
                 failed.forEach(function(item){
                   const label = item.label || item.DisplayName || item.Name || item.DocNumber || item.quickbooks_id || 'Item';
-                  const err = item.error || (item.action==='conflict' ? 'Conflicto' : 'FallÃ³');
+                  const err = item.error || (item.action==='conflict' ? 'Conflicto' : 'Falló');
                   const el = document.createElement('div');
                   el.style.fontSize='0.95rem';
                   el.style.color='#5a6c86';
-                  el.textContent = `${label} Â· ${err}`;
+                  el.textContent = `${label} · ${err}`;
                   list.appendChild(el);
                 });
                 const detailsEl = document.getElementById('qb-task-result-details');
@@ -1384,11 +1384,11 @@
                 detailsEl.innerHTML = '';
                 failed.forEach(function(item){
                   const label = item.label || item.DisplayName || item.Name || item.DocNumber || item.quickbooks_id || 'Item';
-                  const err = item.error || (item.action==='conflict' ? 'Conflicto' : 'FallÃ³');
+                  const err = item.error || (item.action==='conflict' ? 'Conflicto' : 'Falló');
                   const el = document.createElement('div');
                   el.style.fontSize='0.95rem';
                   el.style.color='#e14b5a';
-                  el.textContent = `${label} Â· ${err}`;
+                  el.textContent = `${label} · ${err}`;
                   detailsEl.appendChild(el);
                 });
                 detailsEl.style.display='block';
@@ -1397,7 +1397,7 @@
             return;
           }
         }).catch(function(){
-          // network hiccup â€” try again
+          // network hiccup — try again
           setTimeout(poll, 1200);
         });
       }

@@ -355,7 +355,7 @@ data-summary="{{ p.descripcion_empaque_cliente }}"
 {% for invoice_item in p.recent_customer_sales %}
 
 <div class="border rounded-3 bg-white px-2 py-2 small flex-fill order-history-entry">
-<div class="fw-semibold">{{ invoice_item.invoice.creada_en|date:"n/j/Y" }}</div>
+<div class="fw-semibold">{{ invoice_item.invoice.creada_en|date:"m/d/Y" }}</div>
 <div>{% blocktrans with quantity=invoice_item.cantidad_facturada price=invoice_item.precio_unitario|floatformat:2 %}{{ quantity }} @ ${{ price }}{% endblocktrans %}</div>
 </div>
 

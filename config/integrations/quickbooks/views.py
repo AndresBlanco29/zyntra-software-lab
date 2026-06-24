@@ -11,7 +11,7 @@ from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.dateformat import format as date_format
+from config.core.datetime_formats import format_local_datetime
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_GET, require_POST
 
@@ -246,7 +246,7 @@ def _build_backup_history(limit=8):
         history.append({
             'name': backup['name'],
             'size_label': _format_backup_size(backup['size_bytes']),
-            'modified_label': date_format(timezone.localtime(backup['modified_at']), 'Y-m-d H:i'),
+            'modified_label': format_local_datetime(timezone.localtime(backup['modified_at'])),
             'download_url_name': 'quickbooks_database_backup_download',
         })
     return history
@@ -258,7 +258,7 @@ def _build_system_backup_history(limit=8):
         history.append({
             'name': backup['name'],
             'size_label': _format_backup_size(backup['size_bytes']),
-            'modified_label': date_format(timezone.localtime(backup['modified_at']), 'Y-m-d H:i'),
+            'modified_label': format_local_datetime(timezone.localtime(backup['modified_at'])),
             'download_url_name': 'system_backup_download',
         })
     return history

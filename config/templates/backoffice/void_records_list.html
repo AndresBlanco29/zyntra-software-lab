@@ -28,7 +28,7 @@
       <tbody>
         {% for registro in registros %}
         <tr>
-          <td>{{ registro.anulado_en|date:"d/m/Y H:i" }}</td>
+          <td>{{ registro.anulado_en|date:"m/d/Y H:i" }}</td>
           <td>{{ registro.get_tipo_documento_display }}</td>
           <td>{{ registro.numero_documento }}</td>
           <td>{{ registro.cliente.nombre_empresa }}</td>

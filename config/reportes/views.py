@@ -14,6 +14,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.utils.translation import gettext as _
+from config.core.datetime_formats import APP_DATE_STRFTIME, format_local_date, format_local_datetime
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape, letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -528,7 +529,7 @@ def _build_trend_rows(period, orders, invoices, deliveries):
 	})
 	current = period['start_date']
 	while current <= period['end_date']:
-		buckets[current]['label'] = current.strftime('%d %b')
+		buckets[current]['label'] = current.strftime(APP_DATE_STRFTIME)
 		current += timedelta(days=1)
 
 	for order in orders:
@@ -781,15 +782,15 @@ def _build_focus_alerts(close_snapshot, top_products, low_products, driver_rows)
 def _build_email_subject(*, period, section_label):
 	return _('%(section)s report | %(start)s - %(end)s') % {
 		'section': section_label,
-		'start': period['start_date'].strftime('%d/%m/%Y'),
-		'end': period['end_date'].strftime('%d/%m/%Y'),
+		'start': format_local_date(period['start_date']),
+		'end': format_local_date(period['end_date']),
 	}
 
 
 def _build_email_body(*, period, report_data, section_items):
 	lines = [
 		str(_('Reports Center')),
-		f"{period['label']}: {period['start_date'].strftime('%d/%m/%Y')} - {period['end_date'].strftime('%d/%m/%Y')}",
+		f"{period['label']}: {format_local_date(period['start_date'])} - {format_local_date(period['end_date'])}",
 		'',
 	]
 	for card in report_data['summary_cards'][:4]:
@@ -855,7 +856,7 @@ def _build_pdf_response(*, period, report_data, section='all'):
 	body_style = styles['BodyText']
 	story = [
 		Paragraph(str(_('Reports Center')), title_style),
-		Paragraph(f"{period['label']} | {period['start_date'].strftime('%d/%m/%Y')} - {period['end_date'].strftime('%d/%m/%Y')}", subtitle_style),
+		Paragraph(f"{period['label']} | {format_local_date(period['start_date'])} - {format_local_date(period['end_date'])}", subtitle_style),
 		Spacer(1, 0.2 * inch),
 	]
 
@@ -889,7 +890,7 @@ def _build_excel_response(*, period, report_data, section='all'):
 	parts = [
 		'<html><head><meta charset="utf-8"></head><body>',
 		f'<h1>{escape(str(_("Reports Center")))}</h1>',
-		f'<p>{escape(period["label"])} | {escape(period["start_date"].strftime("%d/%m/%Y"))} - {escape(period["end_date"].strftime("%d/%m/%Y"))}</p>',
+		f'<p>{escape(period["label"])} | {escape(format_local_date(period["start_date"]))} - {escape(format_local_date(period["end_date"]))}</p>',
 	]
 	for section_item in _filter_export_sections(_build_export_sections(report_data, section=section)):
 		parts.append(f'<h2>{escape(str(section_item["title"]))}</h2>')

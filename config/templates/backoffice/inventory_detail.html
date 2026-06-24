@@ -139,7 +139,7 @@
           <tbody>
             {% for movement in consolidation_movements %}
             <tr>
-              <td>{{ movement.creado_en|date:"d/m/Y H:i" }}</td>
+              <td>{{ movement.creado_en|date:"m/d/Y H:i" }}</td>
               <td>{{ movement.get_tipo_display }}</td>
               <td>{{ movement.cantidad }}</td>
               <td>{{ movement.referencia }}</td>
@@ -178,7 +178,7 @@
           <tbody>
             {% for movement in movements %}
             <tr>
-              <td>{{ movement.creado_en|date:"d/m/Y H:i" }}</td>
+              <td>{{ movement.creado_en|date:"m/d/Y H:i" }}</td>
               <td>{{ movement.get_tipo_display }}</td>
               <td>{{ movement.cantidad }}</td>
               <td>{{ movement.delta_fisico }}</td>

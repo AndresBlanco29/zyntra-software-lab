@@ -3,10 +3,25 @@ from types import SimpleNamespace
 from django.conf import settings
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
+from datetime import datetime
 
+from config.core.datetime_formats import format_local_date, format_local_datetime
 from config.core.workflow_badges import build_delivery_workflow_badge, build_order_workflow_badge
 from config.core.pagination import get_quick_jump_pages
 from config.usuarios.models import Usuario
+
+
+class AppDateFormatTests(TestCase):
+	def test_format_local_date_uses_month_day_year(self):
+		value = timezone.make_aware(datetime(2026, 6, 25, 17, 16))
+		self.assertEqual(format_local_date(value), '06/25/2026')
+		self.assertEqual(format_local_date(value.date()), '06/25/2026')
+
+	def test_format_local_datetime_uses_month_day_year_with_time(self):
+		value = timezone.make_aware(datetime(2026, 6, 25, 17, 16, 45))
+		self.assertEqual(format_local_datetime(value), '06/25/2026 17:16')
+		self.assertEqual(format_local_datetime(value, seconds=True), '06/25/2026 17:16:45')
 
 
 class QuickJumpPaginationTests(TestCase):

@@ -75,7 +75,7 @@
               <span class="badge bg-success">{% trans "Unlocked" %}</span>
             {% endif %}
           </td>
-          <td data-label="{% trans 'Assigned on' %}">{% if pedido.picking_asignado_en %}{{ pedido.picking_asignado_en|date:"d/m/Y H:i" }}{% else %}-{% endif %}</td>
+          <td data-label="{% trans 'Assigned on' %}">{% if pedido.picking_asignado_en %}{{ pedido.picking_asignado_en|date:"m/d/Y H:i" }}{% else %}-{% endif %}</td>
           <td data-label="{% trans 'Action' %}" class="mobile-stack-table__action">
             <a href="{% url 'selector_picking_detail' pedido.id %}" class="btn btn-sm {% if view_mode == 'completed' %}btn-success{% else %}btn-primary{% endif %}">
               {% if view_mode == 'completed' %}

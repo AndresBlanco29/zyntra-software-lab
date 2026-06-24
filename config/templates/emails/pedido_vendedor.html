@@ -18,7 +18,7 @@
 			<td style="padding:5px 0;"><strong>{% trans "Order type:" %}</strong></td>
 			<td>{% if tipo_orden == "telefono" %}{% trans "Phone order" %}{% elif tipo_orden == "personal" %}{% trans "In-person order" %}{% else %}-{% endif %}</td>
 		</tr>
-		<tr><td style="padding:5px 0;"><strong>{% trans "Date:" %}</strong></td><td>{{ fecha|date:"F d, Y - h:i A" }}</td></tr>
+		<tr><td style="padding:5px 0;"><strong>{% trans "Date:" %}</strong></td><td>{{ fecha|date:"m/d/Y H:i" }}</td></tr>
 	</table>
 </div>
 

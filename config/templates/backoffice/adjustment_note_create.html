@@ -37,7 +37,7 @@
             <select name="invoice_id" class="form-select" {% if not selected_client and not selected_invoice %}disabled{% endif %}>
               <option value="">{% trans "No invoice / general customer balance" %}</option>
               {% for invoice in available_invoices %}
-              <option value="{{ invoice.id }}" {% if selected_invoice and invoice.id == selected_invoice.id %}selected{% endif %}>{{ invoice.numero }} | {{ invoice.creada_en|date:"d/m/Y" }} | ${{ invoice.saldo_cliente }}</option>
+              <option value="{{ invoice.id }}" {% if selected_invoice and invoice.id == selected_invoice.id %}selected{% endif %}>{{ invoice.numero }} | {{ invoice.creada_en|date:"m/d/Y" }} | ${{ invoice.saldo_cliente }}</option>
               {% endfor %}
             </select>
           </div>
@@ -71,7 +71,7 @@
               </div>
               <div class="text-end">
                 <div class="fw-semibold">${{ nota.total }}</div>
-                <div class="small text-muted">{{ nota.creada_en|date:"d/m/Y H:i" }}</div>
+                <div class="small text-muted">{{ nota.creada_en|date:"m/d/Y H:i" }}</div>
               </div>
             </div>
             <div class="small mb-2">{{ nota.descripcion|default:'-' }}</div>

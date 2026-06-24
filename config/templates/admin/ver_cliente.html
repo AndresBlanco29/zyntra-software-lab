@@ -105,7 +105,7 @@
 <div class="col-md-6 mb-3">
 <strong>{% trans "Tax declaration accepted on:" %}</strong><br>
 {% if cliente.declaracion_fiscal_aceptada_en %}
-	{{ cliente.declaracion_fiscal_aceptada_en|date:"d/m/Y H:i" }}
+	{{ cliente.declaracion_fiscal_aceptada_en|date:"m/d/Y H:i" }}
 {% else %}
 	<span class="text-muted">{% trans "No record" %}</span>
 {% endif %}
@@ -139,7 +139,7 @@
 	{% endif %}
 	{% if cliente.rechazado_en %}
 	<div class="small text-muted mt-2">
-		{% trans "Rejected on" %}: {{ cliente.rechazado_en|date:"d/m/Y H:i" }}
+		{% trans "Rejected on" %}: {{ cliente.rechazado_en|date:"m/d/Y H:i" }}
 	</div>
 	{% endif %}
 </div>

@@ -61,11 +61,11 @@
       </div>
       <div class="form-text mt-2">
         {% if period == 'today' %}
-        {% blocktrans with start=period_start|date:"d/m/Y" %}
+        {% blocktrans with start=period_start|date:"m/d/Y" %}
         Open orders from previous days stay visible. Completed deliveries only appear for {{ start }}.
         {% endblocktrans %}
         {% else %}
-        {% blocktrans with start=period_start|date:"d/m/Y" end=period_end|date:"d/m/Y" %}
+        {% blocktrans with start=period_start|date:"m/d/Y" end=period_end|date:"m/d/Y" %}
         Open orders from previous days stay visible. Completed deliveries only appear for {{ start }} – {{ end }}.
         {% endblocktrans %}
         {% endif %}
@@ -105,7 +105,7 @@
           <div class="crm-pipeline-card__customer">{{ card.customer_name }}</div>
           <div class="crm-pipeline-card__manager">{{ card.manager_name }}</div>
           <div class="crm-pipeline-card__meta">
-            <span>{{ card.created_at|date:"d/m/Y H:i" }}</span>
+            <span>{{ card.created_at|date:"m/d/Y H:i" }}</span>
             {% if card.is_blocked %}
             <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle">{% trans "Blocked" %}</span>
             {% elif card.is_pickup %}

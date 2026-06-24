@@ -75,7 +75,7 @@
             </div>
           </td>
           <td data-label="{% trans 'Total' %}">${{ row.total }}</td>
-          <td data-label="{% trans 'Date' %}">{{ row.date|date:"d/m/Y H:i" }}</td>
+          <td data-label="{% trans 'Date' %}">{{ row.date|date:"m/d/Y H:i" }}</td>
           <td data-label="{% trans 'Action' %}" class="mobile-stack-table__action">
             <a href="{{ row.detail_url }}" class="btn btn-sm btn-warning">{% trans "Manage" %}</a>
           </td>

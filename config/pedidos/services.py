@@ -511,6 +511,33 @@ def guardar_verificacion_picking(
     return pedido
 
 
+@transaction.atomic
+def resolver_bloqueo_picking_desde_backoffice(*, pedido, usuario):
+    if hasattr(pedido, 'invoice'):
+        raise ValidationError(_('Orders with a generated invoice cannot be unlocked.'))
+    if not pedido.picking_bloqueado:
+        raise ValidationError(_('This order is not blocked.'))
+    if pedido.estado != 'VERIFICADO_AJUSTADO':
+        raise ValidationError(_('Picking must be verified before unlocking the order.'))
+
+    pedido.nota_seleccionador_resuelta = True
+    pedido.save(update_fields=['nota_seleccionador_resuelta', 'picking_bloqueado', 'actualizada_en'])
+
+    pending_item_ids = [
+        item.id
+        for item in pedido.items.all()
+        if int(item.cantidad or 0) > int(item.cantidad_inventario_aplicada or 0)
+    ]
+    if pending_item_ids:
+        aplicar_verificacion_picking_inventario(
+            pedido=pedido,
+            pedido_item_ids=pending_item_ids,
+            creado_por=usuario,
+        )
+
+    return pedido
+
+
 def notificar_backoffice_pedido(pedido):
     if pedido.origen == 'VENDEDOR':
         vendor_name = ''

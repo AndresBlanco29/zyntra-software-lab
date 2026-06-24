@@ -66,7 +66,7 @@
           <div class="alert alert-danger mt-3 mb-0">
             <div class="fw-semibold">{% trans "Picker reported physical stock shortage" %}</div>
             <div class="small mb-2">{% trans "This order stays blocked until BackOffice reviews the shortage reported during picking." %}</div>
-            <ul class="mb-0 ps-3">
+            <ul class="mb-3 ps-3">
               {% for row in picker_stock_shortage_rows %}
               <li>
                 {{ row.product_name }} - {{ row.presentation_name }}:
@@ -74,6 +74,21 @@
               </li>
               {% endfor %}
             </ul>
+            {% if can_unlock_pedido and can_manage_pedido %}
+            <form method="post" action="{% url 'backoffice_resolver_bloqueo_picking' pedido.id %}" class="d-flex flex-wrap gap-2 align-items-center" onsubmit="return confirm('{% trans "Confirm you reviewed the picker note and adjusted quantities if needed. Unlock this order?" %}');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-success">{% trans "Unlock order" %}</button>
+              <span class="small text-muted">{% trans "Use this after reviewing quantities and confirming the order is ready to invoice." %}</span>
+            </form>
+            {% endif %}
+          </div>
+          {% elif can_unlock_pedido and can_manage_pedido %}
+          <div class="alert alert-warning mt-3 mb-0 d-flex flex-wrap gap-2 align-items-center justify-content-between">
+            <span>{% trans "This order is blocked by a picker note pending BackOffice review." %}</span>
+            <form method="post" action="{% url 'backoffice_resolver_bloqueo_picking' pedido.id %}" onsubmit="return confirm('{% trans "Confirm you reviewed the picker note. Unlock this order?" %}');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-success btn-sm">{% trans "Unlock order" %}</button>
+            </form>
           </div>
           {% endif %}
         </div>
@@ -351,7 +366,9 @@
           <div class="alert alert-warning mb-0">
             {% trans "The order must be verified and unlocked before generating the invoice." %}
             {% if picker_stock_shortage_blocked %}
-            <div class="small mt-2">{% trans "BackOffice action required: the picker reported insufficient physical stock for one or more items." %}</div>
+            <div class="small mt-2">{% trans "BackOffice action required: review the shortage, adjust quantities if needed, then use Unlock order above." %}</div>
+            {% elif can_unlock_pedido %}
+            <div class="small mt-2">{% trans "BackOffice action required: review the picker note and use Unlock order to continue." %}</div>
             {% endif %}
           </div>
         {% endif %}

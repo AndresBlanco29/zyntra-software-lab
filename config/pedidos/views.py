@@ -237,8 +237,8 @@ def backoffice_pedido_detalle(request, pedido_id):
 		{
 			'product_name': item.presentacion.producto.nombre,
 			'presentation_name': item.presentacion.nombre,
-			'quantity_to_pick': item.cantidad,
-			'available_physical_stock': picker_stock_evaluation[item.id]['stock_fisico'],
+			'quantity_to_pick': picker_stock_evaluation[item.id]['cantidad_pendiente_aplicar'],
+			'available_physical_stock': picker_stock_evaluation[item.id]['available_packages'],
 			'shortage_amount': picker_stock_evaluation[item.id]['shortage_amount'],
 		}
 		for item in pedido_items
@@ -528,12 +528,17 @@ def backoffice_resolver_bloqueo_picking(request, pedido_id):
 
 	try:
 		ensure_pedido_edit_lock_owner(pedido=pedido, user=request.user)
-		resolver_bloqueo_picking_desde_backoffice(pedido=pedido, usuario=request.user)
+		_pedido, inventory_warning = resolver_bloqueo_picking_desde_backoffice(pedido=pedido, usuario=request.user)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:
 		release_pedido_edit_lock(pedido=pedido, user=request.user)
 		messages.success(request, _('Order unlocked successfully. You can now generate the invoice.'))
+		if inventory_warning:
+			messages.warning(
+				request,
+				_('The order was unlocked, but inventory could not be applied yet: %(reason)s') % {'reason': inventory_warning},
+			)
 
 	return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 

@@ -19,6 +19,7 @@ from config.pedidos.services import (
 	PEDIDO_EDIT_LOCK_TIMEOUT,
 	acquire_pedido_edit_lock,
 	asignar_picking_a_seleccionador,
+	evaluar_stock_fisico_verificacion_picking,
 	guardar_verificacion_picking,
 	resolver_bloqueo_picking_desde_backoffice,
 )
@@ -486,6 +487,45 @@ class PickingVerificationFlowTests(TestCase):
 
 		with self.assertRaises(ValidationError):
 			resolver_bloqueo_picking_desde_backoffice(pedido=self.pedido, usuario=self.backoffice)
+
+	def test_evaluar_stock_no_shortage_when_enough_boxes_are_available(self):
+		self.presentacion.unidades = 8
+		self.presentacion.save(update_fields=['unidades'])
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(
+			stock_fisico=256,
+			stock_reservado=0,
+			stock_disponible=256,
+		)
+		self.item.cantidad = 20
+		self.item.save(update_fields=['cantidad'])
+
+		evaluation = evaluar_stock_fisico_verificacion_picking(
+			pedido_items=[self.item],
+			cantidades_reales={self.item.id: 20},
+		)
+
+		self.assertFalse(evaluation[self.item.id]['has_shortage'])
+		self.assertEqual(evaluation[self.item.id]['available_packages'], 32)
+		self.assertEqual(evaluation[self.item.id]['shortage_amount'], 0)
+
+	def test_evaluar_stock_counts_reserved_units_for_same_order(self):
+		self.presentacion.unidades = 8
+		self.presentacion.save(update_fields=['unidades'])
+		self.item.cantidad = 20
+		self.item.cantidad_reservada_inventario = 20
+		self.item.save(update_fields=['cantidad', 'cantidad_reservada_inventario'])
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(
+			stock_fisico=256,
+			stock_reservado=160,
+			stock_disponible=96,
+		)
+
+		evaluation = evaluar_stock_fisico_verificacion_picking(
+			pedido_items=[self.item],
+			cantidades_reales={self.item.id: 20},
+		)
+
+		self.assertFalse(evaluation[self.item.id]['has_shortage'])
 
 	def test_selector_post_with_stock_error_preserves_typed_quantities_and_note(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)

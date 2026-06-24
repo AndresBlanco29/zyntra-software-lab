@@ -350,20 +350,36 @@ def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales
     evaluation = {}
     for item in pedido_items:
         stock = stock_map.get(item.presentacion_id)
-        stock_fisico = int(getattr(stock, 'stock_fisico', 0) or 0)
+        units_per_package = max(int(getattr(item.presentacion, 'unidades', 0) or 0), 1)
+        stock_disponible = int(getattr(stock, 'stock_disponible', 0) or 0)
         cantidad_real = max(int(cantidades_reales.get(item.id, item.cantidad) or 0), 0)
         cantidad_aplicada_previa = max(int(item.cantidad_inventario_aplicada or 0), 0)
         cantidad_pendiente_aplicar = max(cantidad_real - cantidad_aplicada_previa, 0)
+        reserved_units_for_item = inventory_units_for_packages(
+            item.presentacion,
+            int(item.cantidad_reservada_inventario or 0),
+        )
+        available_units = stock_disponible + reserved_units_for_item
         units_needed = inventory_units_for_packages(item.presentacion, cantidad_pendiente_aplicar)
-        faltante = max(units_needed - stock_fisico, 0)
+        shortage_units = max(units_needed - available_units, 0)
+        shortage_packages = (
+            (shortage_units + units_per_package - 1) // units_per_package
+            if shortage_units
+            else 0
+        )
 
         evaluation[item.id] = {
-            'stock_fisico': stock_fisico,
+            'units_per_package': units_per_package,
+            'stock_fisico': int(getattr(stock, 'stock_fisico', 0) or 0),
+            'stock_disponible': stock_disponible,
+            'available_units': available_units,
+            'available_packages': available_units // units_per_package,
             'cantidad_real': cantidad_real,
             'cantidad_aplicada_previa': cantidad_aplicada_previa,
             'cantidad_pendiente_aplicar': cantidad_pendiente_aplicar,
-            'has_shortage': faltante > 0,
-            'shortage_amount': faltante,
+            'has_shortage': shortage_units > 0,
+            'shortage_amount': shortage_packages,
+            'shortage_units': shortage_units,
         }
     return evaluation
 
@@ -528,14 +544,19 @@ def resolver_bloqueo_picking_desde_backoffice(*, pedido, usuario):
         for item in pedido.items.all()
         if int(item.cantidad or 0) > int(item.cantidad_inventario_aplicada or 0)
     ]
+    inventory_warning = None
     if pending_item_ids:
-        aplicar_verificacion_picking_inventario(
-            pedido=pedido,
-            pedido_item_ids=pending_item_ids,
-            creado_por=usuario,
-        )
+        try:
+            with transaction.atomic():
+                aplicar_verificacion_picking_inventario(
+                    pedido=pedido,
+                    pedido_item_ids=pending_item_ids,
+                    creado_por=usuario,
+                )
+        except ValidationError as exc:
+            inventory_warning = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
 
-    return pedido
+    return pedido, inventory_warning
 
 
 def notificar_backoffice_pedido(pedido):

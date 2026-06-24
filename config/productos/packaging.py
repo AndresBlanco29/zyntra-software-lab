@@ -91,6 +91,8 @@ def parse_case_packaging_from_product_name(name):
     if not text:
         return None
 
+    text = re.sub(r'/+', '/', text)
+
     slash_match = _last_pattern_match(CASE_PACK_PATTERN, text)
     if slash_match is not None:
         return _parse_slash_packaging_match(slash_match)
@@ -239,3 +241,35 @@ def apply_case_packaging_defaults_to_presentacion(presentacion, product_name, *,
         presentacion.tipo_contenido = parsed['content_type']
         changed = True
     return changed
+
+
+def finalize_quickbooks_import_packaging(*, product_name, presentation_name, tipo_contenido, unidades):
+    """
+    QuickBooks catalog imports should default to case/box packaging when the item
+    does not expose an explicit sellable package (Unit, Each, etc.).
+    """
+    parsed = parse_case_packaging_from_product_name(product_name)
+    presentation_token = _normalize_content_token(presentation_name)
+    content_token = _normalize_content_token(tipo_contenido)
+    generic_presentation_tokens = GENERIC_PRESENTATION_NAMES | {'ea', 'each'}
+    generic_content_tokens = GENERIC_PRESENTATION_CONTENT | {'ea', 'each'}
+
+    if parsed:
+        if presentation_token in generic_presentation_tokens:
+            presentation_name = parsed['presentation_name']
+        if content_token in generic_content_tokens or int(unidades or 0) <= 1:
+            tipo_contenido = parsed['content_type']
+        if int(unidades or 0) <= 1:
+            unidades = parsed['units_per_case']
+    elif presentation_token in generic_presentation_tokens or content_token in generic_content_tokens:
+        presentation_name = 'Caja'
+        if content_token in generic_content_tokens:
+            tipo_contenido = 'caja'
+        if int(unidades or 0) <= 1:
+            unidades = 1
+
+    return {
+        'presentation_name': (presentation_name or 'Caja').strip() or 'Caja',
+        'tipo_contenido': (tipo_contenido or 'caja').strip() or 'caja',
+        'unidades': max(int(unidades or 1), 1),
+    }

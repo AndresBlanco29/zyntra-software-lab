@@ -55,6 +55,11 @@ class CasePackagingParserTests(TestCase):
         self.assertEqual(parsed['units_per_case'], 24)
         self.assertEqual(parsed['unit_size_label'], '100 CT')
 
+    def test_parses_double_slash_pattern(self):
+        parsed = parse_case_packaging_from_product_name('BOING TRIANGULO ASSORTED 3/6//6.76OZ')
+        self.assertEqual(parsed['units_per_case'], 6)
+        self.assertEqual(parsed['unit_size_label'], '6.76 OZ')
+
     def test_returns_none_when_pattern_missing(self):
         self.assertIsNone(parse_case_packaging_from_product_name('Jarritos Mango'))
 

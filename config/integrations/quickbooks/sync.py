@@ -1440,6 +1440,17 @@ def _parse_quickbooks_presentation(payload):
         if not tipo_contenido or tipo_contenido in {'unidades', 'unidad', 'units', 'unit'}:
             tipo_contenido = case_packaging['content_type']
 
+    from config.productos.packaging import finalize_quickbooks_import_packaging
+    finalized = finalize_quickbooks_import_packaging(
+        product_name=product_name,
+        presentation_name=presentation_name,
+        tipo_contenido=tipo_contenido,
+        unidades=unidades,
+    )
+    presentation_name = finalized['presentation_name']
+    tipo_contenido = finalized['tipo_contenido']
+    unidades = finalized['unidades']
+
     return (
         _truncate(product_name, limit=255),
         _truncate(presentation_name, limit=100),
@@ -1604,7 +1615,7 @@ def _sync_stock_from_quickbooks_item(presentacion, payload):
     return True
 
 
-def _update_presentacion_from_quickbooks(presentacion, *, quickbooks_id, item_cost):
+def _update_presentacion_from_quickbooks(presentacion, *, quickbooks_id, item_cost, presentation_name=None, tipo_contenido=None, unidades=None):
     presentacion.quickbooks_id = quickbooks_id
     presentacion.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
     presentacion.last_synced_at = timezone.now()
@@ -1612,6 +1623,15 @@ def _update_presentacion_from_quickbooks(presentacion, *, quickbooks_id, item_co
     if item_cost is not None:
         presentacion.costo = item_cost
         update_fields.append('costo')
+    if presentation_name is not None:
+        presentacion.nombre = presentation_name
+        update_fields.append('nombre')
+    if tipo_contenido is not None:
+        presentacion.tipo_contenido = tipo_contenido
+        update_fields.append('tipo_contenido')
+    if unidades is not None:
+        presentacion.unidades = unidades
+        update_fields.append('unidades')
     presentacion.save(update_fields=update_fields)
 
 
@@ -1627,7 +1647,7 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
     if not quickbooks_id:
         raise QuickBooksSyncError('QuickBooks item payload is missing an Id.')
     client = client or QuickBooksAPIClient()
-    product_name, _, _, _ = _parse_quickbooks_presentation(payload)
+    product_name, presentation_name, tipo_contenido, unidades = _parse_quickbooks_presentation(payload)
     description = _truncate(payload.get('Description') or payload.get('FullyQualifiedName') or '', limit=4000)
     sku = _truncate(payload.get('Sku') or '', limit=100)
     item_cost = _extract_quickbooks_item_cost(payload)
@@ -1669,6 +1689,9 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
         presentacion,
         quickbooks_id=quickbooks_id,
         item_cost=item_cost,
+        presentation_name=presentation_name,
+        tipo_contenido=tipo_contenido,
+        unidades=unidades,
     )
     try:
         _sync_stock_from_quickbooks_item(presentacion, payload)

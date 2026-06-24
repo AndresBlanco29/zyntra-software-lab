@@ -108,6 +108,28 @@ class QuickBooksPresentationParsingTests(TestCase):
         self.assertEqual(units, 4)
         self.assertEqual(tipo, '4.65 LT')
 
+    def test_generic_unit_defaults_to_case_for_quickbooks_import(self):
+        product, presentation, tipo, units = _parse_quickbooks_presentation({
+            'Id': '6',
+            'Name': 'BOUNCE CHECK',
+        })
+
+        self.assertEqual(product, 'BOUNCE CHECK')
+        self.assertEqual(presentation, 'Caja')
+        self.assertEqual(tipo, 'caja')
+        self.assertEqual(units, 1)
+
+    def test_double_slash_packaging_pattern_defaults_to_case(self):
+        product, presentation, tipo, units = _parse_quickbooks_presentation({
+            'Id': '7',
+            'Name': 'BOING TRIANGULO ASSORTED 3/6//6.76OZ',
+        })
+
+        self.assertEqual(product, 'BOING TRIANGULO ASSORTED 3/6//6.76OZ')
+        self.assertEqual(presentation, 'Caja')
+        self.assertEqual(units, 6)
+        self.assertEqual(tipo, '6.76 OZ')
+
 
 class QuickBooksItemPayloadTests(TestCase):
     def setUp(self):

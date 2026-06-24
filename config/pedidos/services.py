@@ -9,6 +9,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext as _
+from datetime import timedelta
 
 from config.inventario.services import (
     aplicar_verificacion_picking_inventario,
@@ -22,7 +23,10 @@ from config.inventario.models import StockPresentacion
 from config.notificaciones.models import crear_notificacion_backoffice, crear_notificacion_usuario
 from config.productos.models import Presentacion
 
-from .models import Pedido, PedidoItem
+from .models import Pedido, PedidoEditLock, PedidoItem
+
+
+PEDIDO_EDIT_LOCK_TIMEOUT = timedelta(minutes=5)
 
 
 def _to_decimal(value, default='0'):
@@ -140,6 +144,118 @@ def crear_pedido_desde_items(
 def validar_estado_backoffice_con_bloqueo(pedido, nuevo_estado):
     if pedido.picking_bloqueado and nuevo_estado != pedido.estado:
         raise ValidationError(_('This sales order is blocked by an unresolved picking note.'))
+
+
+def _pedido_edit_lock_display_name(user):
+    if not user:
+        return ''
+    return (user.get_full_name() or '').strip() or user.username
+
+
+def _pedido_edit_lock_is_stale(lock):
+    return timezone.now() - lock.last_seen_at > PEDIDO_EDIT_LOCK_TIMEOUT
+
+
+def get_active_pedido_edit_lock(pedido):
+    try:
+        lock = PedidoEditLock.objects.select_related('locked_by').get(pedido=pedido)
+    except PedidoEditLock.DoesNotExist:
+        return None
+    if _pedido_edit_lock_is_stale(lock):
+        lock.delete()
+        return None
+    return lock
+
+
+@transaction.atomic
+def acquire_pedido_edit_lock(*, pedido, user):
+    now = timezone.now()
+    lock = (
+        PedidoEditLock.objects.select_for_update()
+        .select_related('locked_by')
+        .filter(pedido=pedido)
+        .first()
+    )
+    if lock is None:
+        return PedidoEditLock.objects.create(pedido=pedido, locked_by=user, last_seen_at=now)
+
+    if lock.locked_by_id == user.id:
+        lock.last_seen_at = now
+        lock.save(update_fields=['last_seen_at'])
+        return lock
+
+    if _pedido_edit_lock_is_stale(lock):
+        lock.locked_by = user
+        lock.locked_at = now
+        lock.last_seen_at = now
+        lock.save(update_fields=['locked_by', 'locked_at', 'last_seen_at'])
+        return lock
+
+    return lock
+
+
+def refresh_pedido_edit_lock(*, pedido, user):
+    lock = get_active_pedido_edit_lock(pedido)
+    if not lock or lock.locked_by_id != user.id:
+        editor_name = _pedido_edit_lock_display_name(getattr(lock, 'locked_by', None))
+        raise ValidationError(
+            _('This sales order is currently being edited by %(user)s.') % {'user': editor_name or _('another user')}
+        )
+    lock.last_seen_at = timezone.now()
+    lock.save(update_fields=['last_seen_at'])
+    return lock
+
+
+def release_pedido_edit_lock(*, pedido, user):
+    PedidoEditLock.objects.filter(pedido=pedido, locked_by=user).delete()
+
+
+def user_holds_pedido_edit_lock(*, pedido, user):
+    lock = get_active_pedido_edit_lock(pedido)
+    return bool(lock and lock.locked_by_id == user.id)
+
+
+def ensure_pedido_edit_lock_owner(*, pedido, user):
+    lock = get_active_pedido_edit_lock(pedido)
+    if lock and lock.locked_by_id != user.id:
+        raise ValidationError(
+            _('This sales order is currently being edited by %(user)s.') % {
+                'user': _pedido_edit_lock_display_name(lock.locked_by),
+            }
+        )
+    if not lock:
+        acquire_pedido_edit_lock(pedido=pedido, user=user)
+
+
+def build_pedido_edit_lock_context(*, pedido, user):
+    blocked = False
+    blocked_by = ''
+    holds_lock = False
+
+    if not user or not user.is_authenticated:
+        return {
+            'pedido_edit_blocked': blocked,
+            'pedido_edit_blocked_by': blocked_by,
+            'pedido_edit_holds_lock': holds_lock,
+        }
+
+    if user.has_internal_permission('backoffice.orders.manage'):
+        lock = acquire_pedido_edit_lock(pedido=pedido, user=user)
+        holds_lock = lock.locked_by_id == user.id
+        if not holds_lock:
+            blocked = True
+            blocked_by = _pedido_edit_lock_display_name(lock.locked_by)
+    else:
+        lock = get_active_pedido_edit_lock(pedido)
+        if lock:
+            blocked = True
+            blocked_by = _pedido_edit_lock_display_name(lock.locked_by)
+
+    return {
+        'pedido_edit_blocked': blocked,
+        'pedido_edit_blocked_by': blocked_by,
+        'pedido_edit_holds_lock': holds_lock,
+    }
 
 
 def puede_anular_pedido_desde_backoffice(pedido):

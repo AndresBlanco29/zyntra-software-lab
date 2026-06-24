@@ -44,14 +44,18 @@ from .services import (
 	actualizar_cantidad_linea_pedido_sin_aplicar_inventario,
 	anular_pedido_desde_backoffice,
 	asignar_picking_a_seleccionador,
+	build_pedido_edit_lock_context,
 	eliminar_linea_pedido_desde_backoffice,
 	eliminar_pedido_desde_backoffice,
+	ensure_pedido_edit_lock_owner,
 	evaluar_stock_fisico_verificacion_picking,
 	guardar_verificacion_picking,
 	puede_anular_pedido_desde_backoffice,
 	puede_eliminar_pedido_desde_backoffice,
 	recalcular_pedido,
+	refresh_pedido_edit_lock,
 	reemplazar_presentacion_linea_pedido_sin_aplicar_inventario,
+	release_pedido_edit_lock,
 	validar_estado_backoffice_con_bloqueo,
 )
 
@@ -262,6 +266,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 		if not request.user.has_internal_permission('backoffice.orders.manage'):
 			return redirect('backoffice_pedidos')
 		try:
+			ensure_pedido_edit_lock_owner(pedido=pedido, user=request.user)
 			with transaction.atomic():
 				if hasattr(pedido, 'invoice'):
 					raise ValidationError(_('Orders with a generated invoice are locked on this screen.'))
@@ -319,8 +324,21 @@ def backoffice_pedido_detalle(request, pedido_id):
 			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 			return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
+		release_pedido_edit_lock(pedido=pedido, user=request.user)
 		messages.success(request, _('Sales order updated successfully.'))
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+	edit_lock_context = build_pedido_edit_lock_context(pedido=pedido, user=request.user)
+	pedido_form_disabled = (
+		edit_lock_context['pedido_edit_blocked']
+		or bool(pedido.seleccionador_id and pedido.estado == 'PARA_VERIFICAR')
+		or hasattr(pedido, 'invoice')
+	)
+	can_manage_pedido = (
+		request.user.has_internal_permission('backoffice.orders.manage')
+		and not edit_lock_context['pedido_edit_blocked']
+		and not pedido_form_disabled
+	)
 
 	context = {
 		'pending_customer_notes_summary': summarize_pending_customer_notes(cliente=pedido.cliente),
@@ -336,8 +354,10 @@ def backoffice_pedido_detalle(request, pedido_id):
 		'drivers': Usuario.objects.filter(role='driver', is_active=True).order_by('first_name', 'last_name', 'username'),
 		'selectores': Usuario.objects.filter(role='seleccionador', is_active=True).order_by('first_name', 'last_name', 'username'),
 		'lineas_bloqueadas_para_picking': bool(pedido.seleccionador_id and pedido.estado == 'PARA_VERIFICAR') or hasattr(pedido, 'invoice'),
-		'can_void_pedido': puede_anular_pedido_desde_backoffice(pedido),
-		'can_delete_pedido': puede_eliminar_pedido_desde_backoffice(pedido),
+		'pedido_form_disabled': pedido_form_disabled,
+		'can_manage_pedido': can_manage_pedido,
+		'can_void_pedido': puede_anular_pedido_desde_backoffice(pedido) and can_manage_pedido,
+		'can_delete_pedido': puede_eliminar_pedido_desde_backoffice(pedido) and can_manage_pedido,
 		'invoice_suggested_price_rows': [
 			{
 				'item_id': item.id,
@@ -353,6 +373,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 			for item in pedido.items.select_related('presentacion__producto')
 			if item.cantidad > 0
 		],
+		**edit_lock_context,
 	}
 	return render(request, 'backoffice/pedido_detalle.html', context)
 
@@ -439,10 +460,12 @@ def backoffice_pedido_void(request, pedido_id):
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
 	try:
+		ensure_pedido_edit_lock_owner(pedido=pedido, user=request.user)
 		anular_pedido_desde_backoffice(pedido=pedido)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:
+		release_pedido_edit_lock(pedido=pedido, user=request.user)
 		messages.success(request, _('Sales order voided successfully. Inventory was not changed.'))
 	return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
@@ -455,11 +478,13 @@ def backoffice_pedido_delete(request, pedido_id):
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
 	try:
+		ensure_pedido_edit_lock_owner(pedido=pedido, user=request.user)
 		eliminar_pedido_desde_backoffice(pedido=pedido)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
+	release_pedido_edit_lock(pedido=pedido, user=request.user)
 	messages.success(request, _('Sales order deleted permanently. Inventory was not changed.'))
 	return redirect('backoffice_pedidos')
 
@@ -475,13 +500,42 @@ def backoffice_asignar_picking(request, pedido_id):
 	seleccionador = get_object_or_404(Usuario, id=selector_id, role='seleccionador', is_active=True)
 
 	try:
+		ensure_pedido_edit_lock_owner(pedido=pedido, user=request.user)
 		asignar_picking_a_seleccionador(pedido=pedido, seleccionador=seleccionador)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:
+		release_pedido_edit_lock(pedido=pedido, user=request.user)
 		messages.success(request, _('Picking ticket sent to selector successfully.'))
 
 	return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_pedido_edit_lock_ping(request, pedido_id):
+	pedido = get_object_or_404(Pedido, id=pedido_id)
+	if request.method != 'POST':
+		return JsonResponse({'ok': False}, status=405)
+
+	try:
+		refresh_pedido_edit_lock(pedido=pedido, user=request.user)
+	except ValidationError as exc:
+		message = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
+		return JsonResponse({'ok': False, 'error': message}, status=409)
+
+	return JsonResponse({'ok': True})
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_pedido_edit_lock_release(request, pedido_id):
+	pedido = get_object_or_404(Pedido, id=pedido_id)
+	if request.method != 'POST':
+		return JsonResponse({'ok': False}, status=405)
+
+	release_pedido_edit_lock(pedido=pedido, user=request.user)
+	return JsonResponse({'ok': True})
 
 
 @login_required

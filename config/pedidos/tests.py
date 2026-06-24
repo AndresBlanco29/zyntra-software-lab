@@ -1,18 +1,25 @@
 from decimal import Decimal
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from config.clientes.models import Cliente
 from config.inventario.models import StockPresentacion
 from config.inventario.services import registrar_entrada_manual
 from config.notificaciones.models import Notificacion
-from config.pedidos.models import Pedido, PedidoItem
-from config.pedidos.services import asignar_picking_a_seleccionador, guardar_verificacion_picking
+from config.pedidos.models import Pedido, PedidoEditLock, PedidoItem
+from config.pedidos.services import (
+	PEDIDO_EDIT_LOCK_TIMEOUT,
+	acquire_pedido_edit_lock,
+	asignar_picking_a_seleccionador,
+	guardar_verificacion_picking,
+)
 from config.productos.models import Categoria, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
 
@@ -777,3 +784,161 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(first_page, 'Showing 1-2 of 3 orders')
 		self.assertEqual(len(list(second_page.context['pedidos'])), 1)
 		self.assertContains(second_page, 'Page 2 of 2')
+
+
+class PedidoEditLockTests(TestCase):
+	def setUp(self):
+		self.backoffice_one = Usuario.objects.create_user(
+			username='backoffice-one',
+			password='secret123',
+			role='backoffice',
+			first_name='Alice',
+		)
+		self.backoffice_two = Usuario.objects.create_user(
+			username='backoffice-two',
+			password='secret123',
+			role='backoffice',
+			first_name='Bob',
+		)
+		customer_user = Usuario.objects.create_user(
+			username='customer-lock',
+			password='secret123',
+			role='cliente',
+			email='customer-lock@example.com',
+		)
+		self.cliente = Cliente.objects.create(
+			usuario=customer_user,
+			nombre_empresa='Cliente Lock',
+			telefono='5551234567',
+			direccion='123 Main St',
+			ciudad='Marietta',
+			estado='GA',
+			codigo_postal='30062',
+			pais='USA',
+			sales_tax_number='TAX-LOCK',
+			certificado_tax=SimpleUploadedFile('certificado.txt', b'certificado'),
+			aprobado=True,
+		)
+		categoria = Categoria.objects.create(nombre='Categoria lock')
+		marca = Marca.objects.create(nombre='Marca lock')
+		producto = Producto.objects.create(nombre='Producto lock', categoria=categoria, marca=marca, activo=True)
+		self.presentacion = Presentacion.objects.create(
+			producto=producto,
+			nombre='Caja',
+			unidades=1,
+			tipo_contenido='caja',
+			costo=Decimal('10.00'),
+			precio_1=Decimal('12.00'),
+		)
+		self.pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='RECIBIDO',
+			total=Decimal('24.00'),
+		)
+		self.item = PedidoItem.objects.create(
+			pedido=self.pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=2,
+			cantidad=2,
+			precio=Decimal('12.00'),
+			subtotal=Decimal('24.00'),
+		)
+
+	def test_second_backoffice_user_sees_read_only_when_first_is_editing(self):
+		client_one = Client()
+		client_one.force_login(self.backoffice_one)
+		first_response = client_one.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(first_response.status_code, 200)
+		self.assertTrue(first_response.context['pedido_edit_holds_lock'])
+		self.assertFalse(first_response.context['pedido_form_disabled'])
+
+		client_two = Client()
+		client_two.force_login(self.backoffice_two)
+		blocked_response = client_two.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(blocked_response.status_code, 200)
+		self.assertTrue(blocked_response.context['pedido_edit_blocked'])
+		self.assertEqual(blocked_response.context['pedido_edit_blocked_by'], 'Alice')
+		self.assertTrue(blocked_response.context['pedido_form_disabled'])
+		self.assertContains(blocked_response, 'currently being edited by Alice')
+
+	def test_lock_released_after_save_allows_second_user(self):
+		client_one = Client()
+		client_one.force_login(self.backoffice_one)
+		client_one.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		save_response = client_one.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), {
+			'estado': 'RECIBIDO',
+			'nota_backoffice': 'Guardado por Alice',
+			f'cantidad_{self.item.id}': '2',
+			f'precio_{self.item.id}': '12.00',
+		})
+		self.assertEqual(save_response.status_code, 302)
+		self.assertFalse(PedidoEditLock.objects.filter(pedido=self.pedido).exists())
+
+		client_two = Client()
+		client_two.force_login(self.backoffice_two)
+		second_response = client_two.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(second_response.status_code, 200)
+		self.assertTrue(second_response.context['pedido_edit_holds_lock'])
+		self.assertFalse(second_response.context['pedido_edit_blocked'])
+
+	def test_stale_lock_can_be_taken_by_another_user(self):
+		acquire_pedido_edit_lock(pedido=self.pedido, user=self.backoffice_one)
+		lock = PedidoEditLock.objects.get(pedido=self.pedido)
+		lock.last_seen_at = timezone.now() - PEDIDO_EDIT_LOCK_TIMEOUT - timedelta(seconds=1)
+		lock.save(update_fields=['last_seen_at'])
+
+		client_two = Client()
+		client_two.force_login(self.backoffice_two)
+		response = client_two.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertTrue(response.context['pedido_edit_holds_lock'])
+		lock.refresh_from_db()
+		self.assertEqual(lock.locked_by_id, self.backoffice_two.id)
+
+	def test_second_user_cannot_post_while_order_is_locked(self):
+		client_one = Client()
+		client_one.force_login(self.backoffice_one)
+		client_one.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		client_two = Client()
+		client_two.force_login(self.backoffice_two)
+		response = client_two.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), {
+			'estado': 'EN_GESTION',
+			'nota_backoffice': 'Intento bloqueado',
+			f'cantidad_{self.item.id}': '2',
+			f'precio_{self.item.id}': '12.00',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.pedido.refresh_from_db()
+		self.assertEqual(self.pedido.estado, 'RECIBIDO')
+		self.assertNotEqual(self.pedido.nota_backoffice, 'Intento bloqueado')
+
+	def test_edit_lock_ping_refreshes_active_lock(self):
+		client_one = Client()
+		client_one.force_login(self.backoffice_one)
+		client_one.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+		lock = PedidoEditLock.objects.get(pedido=self.pedido)
+		original_seen_at = lock.last_seen_at
+
+		ping_response = client_one.post(reverse('backoffice_pedido_edit_lock_ping', args=[self.pedido.id]))
+		lock.refresh_from_db()
+
+		self.assertEqual(ping_response.status_code, 200)
+		self.assertGreater(lock.last_seen_at, original_seen_at)
+
+	def test_edit_lock_release_removes_lock(self):
+		client_one = Client()
+		client_one.force_login(self.backoffice_one)
+		client_one.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		release_response = client_one.post(reverse('backoffice_pedido_edit_lock_release', args=[self.pedido.id]))
+
+		self.assertEqual(release_response.status_code, 200)
+		self.assertFalse(PedidoEditLock.objects.filter(pedido=self.pedido).exists())

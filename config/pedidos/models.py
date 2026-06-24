@@ -157,3 +157,22 @@ class PedidoItem(models.Model):
 	@property
 	def selector_has_changes(self):
 		return bool(self.selector_added_by_picker or self.selector_changed_presentation or self.selector_changed_quantity)
+
+
+class PedidoEditLock(models.Model):
+	pedido = models.OneToOneField(Pedido, on_delete=models.CASCADE, related_name='edit_lock')
+	locked_by = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.CASCADE,
+		related_name='pedido_edit_locks',
+	)
+	locked_at = models.DateTimeField(auto_now_add=True)
+	last_seen_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		db_table = 'pedidos_pedidoeditlock'
+		verbose_name = _('Sales order edit lock')
+		verbose_name_plural = _('Sales order edit locks')
+
+	def __str__(self):
+		return f'Pedido #{self.pedido_id} locked by {self.locked_by_id}'

@@ -32,6 +32,7 @@
         {% endif %}
       </div>
       <div class="col-lg-7">
+        <fieldset {% if not can_manage_pedido %}disabled{% endif %}>
         <form method="post" action="{% url 'backoffice_asignar_picking' pedido.id %}" class="row g-2">
           {% csrf_token %}
           <div class="col-md-8">
@@ -47,6 +48,7 @@
             <button type="submit" class="btn btn-outline-primary w-100">{% trans "Send picking" %}</button>
           </div>
         </form>
+        </fieldset>
       </div>
       <div class="col-12">
         <div class="border rounded-3 p-3 bg-light-subtle">
@@ -364,6 +366,16 @@
   {% endfor %}
 {% endif %}
 
+{% if pedido_edit_blocked %}
+<div class="alert alert-warning">
+  {% blocktrans with editor=pedido_edit_blocked_by %}This sales order is currently being edited by {{ editor }}. You can view it in read-only mode until they save their changes.{% endblocktrans %}
+</div>
+{% elif pedido_edit_holds_lock %}
+<div class="alert alert-info mb-3">
+  {% trans "You are editing this sales order. Other backoffice users will have read-only access until you save your changes." %}
+</div>
+{% endif %}
+
 {% if can_void_pedido or can_delete_pedido %}
 <div class="card shadow-sm mb-3">
   <div class="card-body">
@@ -386,8 +398,17 @@
 </div>
 {% endif %}
 
-<form method="post" class="card shadow-sm mb-3" id="backofficeOrderForm">
+<form
+  method="post"
+  class="card shadow-sm mb-3"
+  id="backofficeOrderForm"
+  {% if pedido_edit_holds_lock %}
+  data-pedido-edit-lock-active="true"
+  data-pedido-lock-ping-url="{% url 'backoffice_pedido_edit_lock_ping' pedido.id %}"
+  data-pedido-lock-release-url="{% url 'backoffice_pedido_edit_lock_release' pedido.id %}"
+  {% endif %}>
   {% csrf_token %}
+  <fieldset {% if pedido_form_disabled %}disabled{% endif %}>
   <div class="card-body">
     <div class="row g-3 mb-3">
       <div class="col-md-4">
@@ -529,6 +550,7 @@
       <button type="submit" class="btn btn-primary">{% trans "Save changes" %}</button>
     </div>
   </div>
+  </fieldset>
 </form>
 
 <div class="d-flex gap-2">
@@ -737,4 +759,5 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 <script defer src="{% static 'js/pedido_detalle_product_search.js' %}"></script>
+<script defer src="{% static 'js/pedido_edit_lock.js' %}"></script>
 {% endblock %}

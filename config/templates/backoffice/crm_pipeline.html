@@ -60,9 +60,15 @@
         </div>
       </div>
       <div class="form-text mt-2">
-        {% blocktrans with start=period_start|date:"d/m/Y" end=period_end|date:"d/m/Y" %}
-        Open orders from previous days stay visible. Completed deliveries only appear for {{ start }}{% if period != 'today' %} – {{ end }}{% endif %}.
+        {% if period == 'today' %}
+        {% blocktrans with start=period_start|date:"d/m/Y" %}
+        Open orders from previous days stay visible. Completed deliveries only appear for {{ start }}.
         {% endblocktrans %}
+        {% else %}
+        {% blocktrans with start=period_start|date:"d/m/Y" end=period_end|date:"d/m/Y" %}
+        Open orders from previous days stay visible. Completed deliveries only appear for {{ start }} – {{ end }}.
+        {% endblocktrans %}
+        {% endif %}
       </div>
     </div>
   </form>

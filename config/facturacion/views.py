@@ -21,6 +21,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from config.clientes.models import Cliente
+from config.core.product_ordering import order_invoice_items_for_display
 from config.core.workflow_badges import build_delivery_workflow_badge
 from config.productos.models import Presentacion
 from config.core.pdf_branding import (
@@ -392,7 +393,7 @@ def _calculate_invoice_line_discount_total(invoice):
 
 def _build_invoice_pdf_item_data(invoice):
 	items = []
-	for item in invoice.items.select_related('presentacion__producto', 'pedido_item').all():
+	for item in order_invoice_items_for_display(invoice):
 		barcode = _resolve_invoice_barcode(item)
 		requested_quantity = item.cantidad_facturada
 		if item.pedido_item_id:
@@ -1169,6 +1170,7 @@ def backoffice_invoice_detail(request, invoice_id):
 	driver_created_notes_count = invoice.notas_ajuste.filter(creada_por__role='driver').count()
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
+		'invoice_items': order_invoice_items_for_display(invoice),
 		'driver_created_notes_count': driver_created_notes_count,
 		'advanced_adjustment_note_url': f"{reverse('backoffice_adjustment_note_create')}?cliente_id={invoice.cliente_id}&invoice_id={invoice.id}",
 		'invoice_quickbooks_locked': is_sync_locked(invoice),

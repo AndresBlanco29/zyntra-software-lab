@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.db import transaction
 from django.utils.translation import gettext as _
 
+from config.core.product_ordering import order_pedido_items_for_display
 from config.core.pdf_branding import (
 	BRAND_BORDER,
 	BRAND_MUTED_TEXT,
@@ -241,6 +242,7 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 			'stock_physical': int(getattr(getattr(item.presentacion, 'stock_operativo', None), 'stock_fisico', 0) or 0),
 			'applied_quantity': int(item.cantidad_inventario_aplicada or 0),
 		})
+	rows.sort(key=lambda row: (row['product'].casefold(), row['id']))
 	return rows
 
 
@@ -734,6 +736,7 @@ def backoffice_picking_ticket(request, pedido_id):
 	pedido = get_object_or_404(Pedido.objects.select_related('cliente__usuario', 'seleccionador').prefetch_related('items__presentacion__producto'), id=pedido_id)
 	return render(request, 'backoffice/picking_ticket.html', {
 		'pedido': pedido,
+		'picking_items': order_pedido_items_for_display(pedido),
 		'pedido_estado_label': _pedido_state_label(pedido.estado),
 	})
 
@@ -784,7 +787,7 @@ def backoffice_picking_pdf(request, pedido_id):
 		textColor=BRAND_TEXT,
 		wordWrap='CJK',
 	)
-	for item in pedido.items.all():
+	for item in order_pedido_items_for_display(pedido):
 		rows.append([
 			Paragraph(escape(item.presentacion.producto.nombre), item_cell_style),
 			Paragraph(escape(item.presentacion.nombre), item_cell_style),

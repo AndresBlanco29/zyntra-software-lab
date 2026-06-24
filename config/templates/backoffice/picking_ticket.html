@@ -78,7 +78,7 @@
             </tr>
           </thead>
           <tbody>
-            {% for item in pedido.items.all %}
+            {% for item in picking_items %}
             <tr>
               <td class="col-product" data-label="{% trans 'Product' %}">{{ item.presentacion.producto.nombre }}</td>
               <td class="col-presentation" data-label="{% trans 'Presentation' %}">{{ item.presentacion.nombre }}</td>

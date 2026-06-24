@@ -629,6 +629,54 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertFalse(self.pedido.picking_bloqueado)
 		self.assertEqual(self.pedido.total, Decimal('0.00'))
 
+	def test_picking_ticket_items_are_sorted_alphabetically(self):
+		categoria = Categoria.objects.get(nombre='Categoria test')
+		marca = Marca.objects.get(nombre='Marca test')
+		producto_z = Producto.objects.create(nombre='Zulu Product', categoria=categoria, marca=marca, activo=True)
+		producto_a = Producto.objects.create(nombre='Alpha Product', categoria=categoria, marca=marca, activo=True)
+		presentacion_z = Presentacion.objects.create(
+			producto=producto_z,
+			nombre='Caja',
+			unidades=1,
+			tipo_contenido='caja',
+			costo=Decimal('10.00'),
+			precio_1=Decimal('12.00'),
+		)
+		presentacion_a = Presentacion.objects.create(
+			producto=producto_a,
+			nombre='Caja',
+			unidades=1,
+			tipo_contenido='caja',
+			costo=Decimal('10.00'),
+			precio_1=Decimal('12.00'),
+		)
+		registrar_entrada_manual(presentacion=presentacion_z, cantidad=5, observacion='Z stock')
+		registrar_entrada_manual(presentacion=presentacion_a, cantidad=5, observacion='A stock')
+		PedidoItem.objects.create(
+			pedido=self.pedido,
+			presentacion=presentacion_z,
+			cantidad_solicitada=1,
+			cantidad=1,
+			precio=Decimal('12.00'),
+			subtotal=Decimal('12.00'),
+		)
+		PedidoItem.objects.create(
+			pedido=self.pedido,
+			presentacion=presentacion_a,
+			cantidad_solicitada=1,
+			cantidad=1,
+			precio=Decimal('12.00'),
+			subtotal=Decimal('12.00'),
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_picking_ticket', args=[self.pedido.id]))
+		content = response.content.decode()
+
+		self.assertEqual(response.status_code, 200)
+		self.assertLess(content.index('Alpha Product'), content.index('Producto test'))
+		self.assertLess(content.index('Producto test'), content.index('Zulu Product'))
+
 	def test_backoffice_cannot_move_blocked_order_forward(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=0)

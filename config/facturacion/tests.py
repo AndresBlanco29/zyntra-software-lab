@@ -2491,6 +2491,58 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(items[0]['suggested_unit_price'], '$1.79')
 		self.assertEqual(items[0]['profit_percentage'], '30.00%')
 
+	def test_invoice_pdf_item_data_is_sorted_alphabetically(self):
+		categoria = Categoria.objects.get(nombre='Tortillas')
+		marca = Marca.objects.get(nombre='Marca Test')
+		producto_z = Producto.objects.create(nombre='Zulu Soda', categoria=categoria, marca=marca, codigo_barras='7500000000001')
+		producto_a = Producto.objects.create(nombre='Alpha Soda', categoria=categoria, marca=marca, codigo_barras='7500000000002')
+		presentacion_z = Presentacion.objects.create(
+			producto=producto_z,
+			nombre='Caja',
+			unidades=1,
+			tipo_contenido='caja',
+			precio_1=Decimal('10.00'),
+		)
+		presentacion_a = Presentacion.objects.create(
+			producto=producto_a,
+			nombre='Caja',
+			unidades=1,
+			tipo_contenido='caja',
+			precio_1=Decimal('8.00'),
+		)
+		registrar_entrada_manual(presentacion=presentacion_z, cantidad=5, observacion='Z stock')
+		registrar_entrada_manual(presentacion=presentacion_a, cantidad=5, observacion='A stock')
+		PedidoItem.objects.create(
+			pedido=self.pedido,
+			presentacion=presentacion_z,
+			cantidad_solicitada=1,
+			cantidad=1,
+			precio=Decimal('10.00'),
+			subtotal=Decimal('10.00'),
+		)
+		PedidoItem.objects.create(
+			pedido=self.pedido,
+			presentacion=presentacion_a,
+			cantidad_solicitada=1,
+			cantidad=1,
+			precio=Decimal('8.00'),
+			subtotal=Decimal('8.00'),
+		)
+
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+		rows = _build_invoice_pdf_item_data(invoice)
+
+		self.assertEqual(
+			[row['product_name'] for row in rows],
+			['Alpha Soda', 'Tortilla 12', 'Zulu Soda'],
+		)
+
 	def test_invoice_pdf_item_rows_are_chunked_in_groups_of_ten(self):
 		rows = [{'index': number} for number in range(23)]
 

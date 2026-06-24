@@ -71,10 +71,13 @@ def _format_pdf_money(value):
 
 
 def _build_invoice_pdf_terms_paragraph(invoice, body_style):
-	return Paragraph(
-		f'<b>{_("Terms")}</b><br/><b>{_("DUE BALANCE")}</b>: {_format_pdf_money(invoice.cliente.balance)}',
-		body_style,
-	)
+	cliente = invoice.cliente
+	lines = [f'<b>{_("Terms")}</b>']
+	payment_terms_label = cliente.get_terminos_pago_label()
+	if payment_terms_label:
+		lines.append(f'<b>{payment_terms_label}</b>')
+	lines.append(f'<b>{_("DUE BALANCE")}</b>: {_format_pdf_money(cliente.balance)}')
+	return Paragraph('<br/>'.join(lines), body_style)
 
 
 def _validate_invoice_is_not_quickbooks_locked(invoice):

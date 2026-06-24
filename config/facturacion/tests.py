@@ -2605,6 +2605,23 @@ class InvoiceFlowTests(TestCase):
 		self.assertNotIn('Customer credit applied', terms_paragraph.text)
 		self.assertNotIn('Delivery method', terms_paragraph.text)
 
+	def test_invoice_pdf_terms_shows_configured_payment_term(self):
+		self.cliente.terminos_pago = Cliente.PAYMENT_TERMS_NET7
+		self.cliente.balance = Decimal('20408.57')
+		self.cliente.save(update_fields=['terminos_pago', 'balance'])
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		styles = getSampleStyleSheet()
+		terms_paragraph = _build_invoice_pdf_terms_paragraph(invoice, styles['BodyText'])
+
+		self.assertIn('NET7', terms_paragraph.text)
+		self.assertIn('DUE BALANCE', terms_paragraph.text)
+		self.assertIn('$20,408.57', terms_paragraph.text)
+
 	def test_invoice_pdf_totals_rows_include_customer_credit_applied(self):
 		self.cliente.balance = Decimal('30.00')
 		self.cliente.save(update_fields=['balance'])

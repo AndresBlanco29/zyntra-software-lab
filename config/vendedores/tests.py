@@ -538,3 +538,48 @@ class VendedorEditarClienteTests(TestCase):
 			'success': False,
 			'message': 'Debes seleccionar una ciudad valida para el estado elegido.',
 		})
+
+	def test_customer_list_shows_terms_button(self):
+		self.client.force_login(self.vendor)
+
+		response = self.client.get(reverse('vendedores_clientes'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Terms')
+		self.assertContains(response, 'abrirModalTerminosCliente')
+
+	def test_vendor_can_configure_customer_payment_terms(self):
+		self.client.force_login(self.vendor)
+
+		response = self.client.post(
+			reverse('configurar_terminos_cliente'),
+			data=json.dumps({
+				'cliente_id': self.customer.id,
+				'terminos_pago': 'NET14',
+			}),
+			content_type='application/json',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(payload['success'])
+		self.assertEqual(payload['terminos_pago'], 'NET14')
+		self.assertEqual(payload['terminos_pago_label'], 'NET14')
+		self.customer.refresh_from_db()
+		self.assertEqual(self.customer.terminos_pago, Cliente.PAYMENT_TERMS_NET14)
+
+	def test_configure_payment_terms_rejects_invalid_value(self):
+		self.client.force_login(self.vendor)
+
+		response = self.client.post(
+			reverse('configurar_terminos_cliente'),
+			data=json.dumps({
+				'cliente_id': self.customer.id,
+				'terminos_pago': 'NET30',
+			}),
+			content_type='application/json',
+		)
+
+		self.assertEqual(response.status_code, 400)
+		payload = response.json()
+		self.assertFalse(payload['success'])

@@ -319,6 +319,60 @@ transform:translateY(-1px);
     font-weight: 700;
 }
 
+.vendor-terms-btn,
+.vendor-terms-save-btn {
+    background: linear-gradient(to right, #334155, #475569);
+    border: none;
+    color: #fff;
+    font-weight: 700;
+}
+
+.vendor-terms-btn:hover,
+.vendor-terms-btn:focus,
+.vendor-terms-save-btn:hover,
+.vendor-terms-save-btn:focus {
+    background: linear-gradient(to right, #1e293b, #334155);
+    color: #fff;
+}
+
+.payment-terms-options {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.payment-terms-option {
+    display: grid;
+    grid-template-columns: auto 72px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 12px;
+    cursor: pointer;
+    margin: 0;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.payment-terms-option:hover {
+    border-color: rgba(11, 61, 145, 0.35);
+    background: rgba(11, 61, 145, 0.04);
+}
+
+.payment-terms-option input {
+    margin: 0;
+}
+
+.payment-terms-option-label {
+    font-weight: 700;
+    color: #0b3d91;
+}
+
+.payment-terms-option-copy {
+    color: #64748b;
+    font-size: 13px;
+}
+
 .vendor-access-save-btn:hover,
 .vendor-access-save-btn:focus {
     background: linear-gradient(to right, #92400e, #d97706);

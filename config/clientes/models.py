@@ -30,6 +30,20 @@ class Cliente(models.Model):
         (5, 'Precio 5'),
     )
 
+    PAYMENT_TERMS_PREPAY = 'PREPAY'
+    PAYMENT_TERMS_COD = 'COD'
+    PAYMENT_TERMS_NET7 = 'NET7'
+    PAYMENT_TERMS_NET14 = 'NET14'
+    PAYMENT_TERMS_NET21 = 'NET21'
+
+    PAYMENT_TERMS_CHOICES = (
+        (PAYMENT_TERMS_PREPAY, 'prepay'),
+        (PAYMENT_TERMS_COD, 'COD'),
+        (PAYMENT_TERMS_NET7, 'NET7'),
+        (PAYMENT_TERMS_NET14, 'NET14'),
+        (PAYMENT_TERMS_NET21, 'NET21'),
+    )
+
     usuario = models.OneToOneField(
         Usuario,
         on_delete=models.CASCADE,
@@ -176,6 +190,13 @@ class Cliente(models.Model):
         default=Decimal('0.00')
     )
 
+    terminos_pago = models.CharField(
+        max_length=10,
+        choices=PAYMENT_TERMS_CHOICES,
+        blank=True,
+        default='',
+    )
+
     quickbooks_id = models.CharField(
         max_length=100,
         blank=True,
@@ -226,6 +247,11 @@ class Cliente(models.Model):
 
     def has_assigned_price_tier(self):
         return self.get_nivel_precio_normalizado() is not None
+
+    def get_terminos_pago_label(self):
+        if not self.terminos_pago:
+            return ''
+        return dict(self.PAYMENT_TERMS_CHOICES).get(self.terminos_pago, self.terminos_pago)
 
     @property
     def available_credit(self):

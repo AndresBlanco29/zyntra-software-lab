@@ -881,6 +881,44 @@ def _validate_customer_access_password(password):
 
 
 @login_required
+@require_POST
+def configurar_terminos_cliente(request):
+    """Save payment terms for a customer."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': _('Invalid request.')}, status=400)
+
+    cliente_id = data.get('cliente_id')
+    terminos_pago = str(data.get('terminos_pago') or '').strip().upper()
+
+    if not cliente_id:
+        return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
+
+    valid_terms = {choice[0] for choice in Cliente.PAYMENT_TERMS_CHOICES}
+    if terminos_pago not in valid_terms:
+        return JsonResponse({'success': False, 'message': _('Please select a valid payment term.')}, status=400)
+
+    try:
+        cliente = filter_clientes_for_vendedor(
+            Cliente.objects.all(),
+            request.user,
+        ).get(id=cliente_id)
+    except Cliente.DoesNotExist:
+        return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
+
+    cliente.terminos_pago = terminos_pago
+    cliente.save(update_fields=['terminos_pago'])
+
+    return JsonResponse({
+        'success': True,
+        'message': _('Payment terms updated successfully.'),
+        'terminos_pago': cliente.terminos_pago,
+        'terminos_pago_label': cliente.get_terminos_pago_label(),
+    })
+
+
+@login_required
 @internal_permission_required('vendor.customers.manage')
 @require_POST
 def configurar_acceso_cliente(request):

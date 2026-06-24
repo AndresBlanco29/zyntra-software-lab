@@ -37,6 +37,10 @@
   data-msg-access-success-title="{% trans 'Access configured' %}"
   data-msg-access-success-body="{% trans 'The customer can now sign in with the username and password you set.' %}"
   data-msg-access-password-rules="{% trans 'The password must meet all requirements listed below.' %}"
+  data-msg-terms-error-prefix="{% trans 'Error saving payment terms:' %}"
+  data-msg-terms-success-title="{% trans 'Payment terms updated' %}"
+  data-msg-terms-success-body="{% trans 'The customer payment terms were saved successfully.' %}"
+  data-msg-terms-select-required="{% trans 'Please select a payment term.' %}"
 >
 
 <section class="vendor-hero vendor-hero--customers mb-4">
@@ -171,6 +175,13 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
   data-cliente-pais="{{ cliente.pais|default:'USA' }}"
   onclick="abrirEditarCliente(this)">
 {% trans "Editar" %}
+</button>
+
+<button
+  type="button"
+  class="btn btn-sm vendor-terms-btn"
+  onclick="abrirModalTerminosCliente({{ cliente.id }}, '{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa|escapejs }}', '{{ cliente.terminos_pago|escapejs }}')">
+{% trans "Terms" %}
 </button>
 
 {% if request.user|has_internal_permission:'vendor.customers.manage' %}
@@ -312,6 +323,81 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
       <div class="modal-body text-center p-4">
         <h5 class="fw-bold mb-2" style="color: #0b3d91;">{% trans "Customer Updated!" %}</h5>
         <p class="text-muted">{% trans "The customer data was updated successfully." %}</p>
+      </div>
+      <div class="modal-footer border-0 justify-content-center pb-3">
+        <button type="button" class="btn" style="background: linear-gradient(to right, #0b3d91, #1565c0); color: white; font-weight: 700; padding: 10px 25px;" data-bs-dismiss="modal">{% trans "Cerrar" %}</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFIGURAR TERMINOS DE PAGO -->
+<div class="modal fade" id="configurarTerminosClienteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);">
+      <div class="modal-header border-0" style="background: linear-gradient(135deg, #0b3d91, #1565c0); border-radius: 12px 12px 0 0;">
+        <div>
+          <h5 class="modal-title text-white fw-bold mb-1">{% trans "Payment terms" %}</h5>
+          <p class="text-white-50 small mb-0" id="terminosClienteNombre"></p>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <p class="text-muted small mb-3">{% trans "Select how this customer should pay. The selected term will appear on every invoice." %}</p>
+        <form id="formConfigurarTerminosCliente" onsubmit="return false;">
+          {% csrf_token %}
+          <input type="hidden" id="terminosClienteId" name="cliente_id">
+
+          <div class="payment-terms-options">
+            <label class="payment-terms-option">
+              <input type="radio" name="terminos_pago" value="PREPAY">
+              <span class="payment-terms-option-label">prepay</span>
+              <span class="payment-terms-option-copy">{% trans "Pay in advance" %}</span>
+            </label>
+            <label class="payment-terms-option">
+              <input type="radio" name="terminos_pago" value="COD">
+              <span class="payment-terms-option-label">COD</span>
+              <span class="payment-terms-option-copy">{% trans "Cash on delivery" %}</span>
+            </label>
+            <label class="payment-terms-option">
+              <input type="radio" name="terminos_pago" value="NET7">
+              <span class="payment-terms-option-label">NET7</span>
+              <span class="payment-terms-option-copy">{% trans "Pay within 7 calendar days of invoice date" %}</span>
+            </label>
+            <label class="payment-terms-option">
+              <input type="radio" name="terminos_pago" value="NET14">
+              <span class="payment-terms-option-label">NET14</span>
+              <span class="payment-terms-option-copy">{% trans "Pay within 14 calendar days of invoice date" %}</span>
+            </label>
+            <label class="payment-terms-option">
+              <input type="radio" name="terminos_pago" value="NET21">
+              <span class="payment-terms-option-label">NET21</span>
+              <span class="payment-terms-option-copy">{% trans "Pay within 21 calendar days of invoice date" %}</span>
+            </label>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Cancelar" %}</button>
+        <button type="button" class="btn vendor-terms-save-btn" onclick="guardarTerminosCliente()">{% trans "Guardar" %}</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ÉXITO CONFIGURAR TERMINOS -->
+<div class="modal fade" id="exitoTerminosClienteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);">
+      <div class="modal-header border-0" style="background: linear-gradient(135deg, #0b3d91, #1565c0); border-radius: 12px 12px 0 0;">
+        <div class="w-100 text-center text-white" style="padding: 20px 0;">
+          <i class="bi bi-check-circle" style="font-size: 3rem; display: block; margin-bottom: 10px;"></i>
+        </div>
+        <button type="button" class="btn-close btn-close-white position-absolute" style="top: 10px; right: 15px;" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center p-4">
+        <h5 class="fw-bold mb-2" style="color: #0b3d91;" id="tituloExitoTerminosCliente"></h5>
+        <p class="text-muted" id="textoExitoTerminosCliente"></p>
       </div>
       <div class="modal-footer border-0 justify-content-center pb-3">
         <button type="button" class="btn" style="background: linear-gradient(to right, #0b3d91, #1565c0); color: white; font-weight: 700; padding: 10px 25px;" data-bs-dismiss="modal">{% trans "Cerrar" %}</button>

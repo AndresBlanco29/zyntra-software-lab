@@ -51,7 +51,11 @@ function getCustomerPageMessages() {
         accessErrorPrefix: dataset.msgAccessErrorPrefix || 'Error configuring access:',
         accessSuccessTitle: dataset.msgAccessSuccessTitle || 'Access configured',
         accessSuccessBody: dataset.msgAccessSuccessBody || 'The customer can now sign in with the username and password you set.',
-        accessPasswordRules: dataset.msgAccessPasswordRules || 'The password must meet all requirements listed below.'
+        accessPasswordRules: dataset.msgAccessPasswordRules || 'The password must meet all requirements listed below.',
+        termsErrorPrefix: dataset.msgTermsErrorPrefix || 'Error saving payment terms:',
+        termsSuccessTitle: dataset.msgTermsSuccessTitle || 'Payment terms updated',
+        termsSuccessBody: dataset.msgTermsSuccessBody || 'The customer payment terms were saved successfully.',
+        termsSelectRequired: dataset.msgTermsSelectRequired || 'Please select a payment term.'
     };
 }
 
@@ -306,6 +310,74 @@ function confirmarCambioEstadoCliente() {
 window.abrirModalEstadoCliente = abrirModalEstadoCliente;
 window.confirmarCambioEstadoCliente = confirmarCambioEstadoCliente;
 window.abrirEditarCliente = abrirEditarCliente;
+
+function abrirModalTerminosCliente(clienteId, nombreCliente, terminosActuales) {
+    document.getElementById('terminosClienteId').value = clienteId;
+    document.getElementById('terminosClienteNombre').textContent = nombreCliente || customerMessages.customerFallbackName;
+
+    const form = document.getElementById('formConfigurarTerminosCliente');
+    if (!form) {
+        return;
+    }
+
+    form.querySelectorAll('input[name="terminos_pago"]').forEach(function (input) {
+        input.checked = input.value === terminosActuales;
+    });
+
+    const modal = new bootstrap.Modal(document.getElementById('configurarTerminosClienteModal'));
+    modal.show();
+}
+
+function guardarTerminosCliente() {
+    const clienteId = document.getElementById('terminosClienteId').value;
+    const selectedInput = document.querySelector('#formConfigurarTerminosCliente input[name="terminos_pago"]:checked');
+
+    if (!clienteId || !selectedInput) {
+        alert(customerMessages.termsSelectRequired);
+        return;
+    }
+
+    fetch('/vendedores/configurar-terminos-cliente/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            cliente_id: clienteId,
+            terminos_pago: selectedInput.value
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            alert(`${customerMessages.termsErrorPrefix} ${data.message || customerMessages.unknownError}`);
+            return;
+        }
+
+        const modalTerminos = bootstrap.Modal.getInstance(document.getElementById('configurarTerminosClienteModal'));
+        if (modalTerminos) {
+            modalTerminos.hide();
+        }
+
+        document.getElementById('tituloExitoTerminosCliente').textContent = customerMessages.termsSuccessTitle;
+        document.getElementById('textoExitoTerminosCliente').textContent = customerMessages.termsSuccessBody;
+
+        const modalExito = new bootstrap.Modal(document.getElementById('exitoTerminosClienteModal'));
+        modalExito.show();
+
+        setTimeout(function () {
+            location.reload();
+        }, 1600);
+    })
+    .catch(function (error) {
+        console.error('Error:', error);
+        alert(customerMessages.requestError);
+    });
+}
+
+window.abrirModalTerminosCliente = abrirModalTerminosCliente;
+window.guardarTerminosCliente = guardarTerminosCliente;
 
 function abrirModalAccesoCliente(clienteId, nombreCliente) {
     document.getElementById('accesoClienteId').value = clienteId;

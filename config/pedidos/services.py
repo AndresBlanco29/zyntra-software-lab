@@ -206,8 +206,11 @@ def refresh_pedido_edit_lock(*, pedido, user):
     return lock
 
 
-def release_pedido_edit_lock(*, pedido, user):
-    PedidoEditLock.objects.filter(pedido=pedido, locked_by=user).delete()
+def release_pedido_edit_lock(*, pedido=None, pedido_id=None, user):
+    resolved_pedido_id = pedido_id if pedido_id is not None else getattr(pedido, 'pk', None)
+    if not resolved_pedido_id:
+        return
+    PedidoEditLock.objects.filter(pedido_id=resolved_pedido_id, locked_by=user).delete()
 
 
 def user_holds_pedido_edit_lock(*, pedido, user):

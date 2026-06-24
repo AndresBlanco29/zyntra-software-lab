@@ -942,3 +942,28 @@ class PedidoEditLockTests(TestCase):
 
 		self.assertEqual(release_response.status_code, 200)
 		self.assertFalse(PedidoEditLock.objects.filter(pedido=self.pedido).exists())
+
+	def test_edit_lock_release_succeeds_after_pedido_is_deleted(self):
+		client_one = Client()
+		client_one.force_login(self.backoffice_one)
+		client_one.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+		pedido_id = self.pedido.id
+		self.pedido.delete()
+
+		release_response = client_one.post(reverse('backoffice_pedido_edit_lock_release', args=[pedido_id]))
+
+		self.assertEqual(release_response.status_code, 200)
+		self.assertEqual(release_response.json(), {'ok': True})
+
+	def test_delete_pedido_succeeds_while_user_holds_edit_lock(self):
+		client_one = Client()
+		client_one.force_login(self.backoffice_one)
+		client_one.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+		pedido_id = self.pedido.id
+
+		delete_response = client_one.post(reverse('backoffice_pedido_delete', args=[pedido_id]))
+
+		self.assertEqual(delete_response.status_code, 302)
+		self.assertEqual(delete_response.url, reverse('backoffice_pedidos'))
+		self.assertFalse(Pedido.objects.filter(id=pedido_id).exists())
+		self.assertFalse(PedidoEditLock.objects.filter(pedido_id=pedido_id).exists())

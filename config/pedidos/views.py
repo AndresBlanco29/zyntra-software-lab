@@ -484,7 +484,6 @@ def backoffice_pedido_delete(request, pedido_id):
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
-	release_pedido_edit_lock(pedido=pedido, user=request.user)
 	messages.success(request, _('Sales order deleted permanently. Inventory was not changed.'))
 	return redirect('backoffice_pedidos')
 
@@ -514,9 +513,12 @@ def backoffice_asignar_picking(request, pedido_id):
 @login_required
 @internal_permission_required('backoffice.orders.manage')
 def backoffice_pedido_edit_lock_ping(request, pedido_id):
-	pedido = get_object_or_404(Pedido, id=pedido_id)
 	if request.method != 'POST':
 		return JsonResponse({'ok': False}, status=405)
+
+	pedido = Pedido.objects.filter(id=pedido_id).first()
+	if pedido is None:
+		return JsonResponse({'ok': True})
 
 	try:
 		refresh_pedido_edit_lock(pedido=pedido, user=request.user)
@@ -530,11 +532,10 @@ def backoffice_pedido_edit_lock_ping(request, pedido_id):
 @login_required
 @internal_permission_required('backoffice.orders.manage')
 def backoffice_pedido_edit_lock_release(request, pedido_id):
-	pedido = get_object_or_404(Pedido, id=pedido_id)
 	if request.method != 'POST':
 		return JsonResponse({'ok': False}, status=405)
 
-	release_pedido_edit_lock(pedido=pedido, user=request.user)
+	release_pedido_edit_lock(pedido_id=pedido_id, user=request.user)
 	return JsonResponse({'ok': True})
 
 

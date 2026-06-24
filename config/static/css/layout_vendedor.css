@@ -452,6 +452,24 @@ width:100%;
     color: #0b3d91;
 }
 
+.navbar-urgent-alerts-item--unread {
+    background: #fff7ed;
+}
+
+.navbar-urgent-alerts-item--unread .navbar-urgent-alerts-item-count {
+    background: #dc2626;
+    color: #fff;
+}
+
+.navbar-urgent-alerts-recent-item--unread {
+    background: #fff7ed;
+    border-left: 3px solid #f59e0b;
+}
+
+.navbar-urgent-alerts-recent-item--unread .navbar-urgent-alerts-recent-title {
+    color: #0b3d91;
+}
+
 .navbar-urgent-alerts-recent-title {
     font-weight: 700;
     font-size: 0.9rem;

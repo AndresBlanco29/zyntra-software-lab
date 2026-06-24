@@ -1,6 +1,10 @@
-{% load i18n %}
+{% load static i18n %}
 {% if workspace_urgent_alerts %}
-<div class="navbar-urgent-alerts dropdown">
+<div
+  class="navbar-urgent-alerts dropdown"
+  id="navbarUrgentAlerts"
+  data-mark-seen-url="{{ workspace_urgent_alerts.mark_seen_url }}"
+  data-csrf="{{ csrf_token }}">
   <button
     type="button"
     class="navbar-urgent-alerts-toggle dropdown-toggle"
@@ -8,7 +12,7 @@
     data-bs-toggle="dropdown"
     data-bs-auto-close="outside"
     aria-expanded="false"
-    aria-label="{% trans 'Orders pending or in progress' %}">
+    aria-label="{% trans 'Orders pending dispatch' %}">
     <span class="navbar-urgent-alerts-icon" aria-hidden="true">
       <svg viewBox="0 0 24 24" focusable="false">
         <path d="M12 2.25a5.25 5.25 0 0 0-5.25 5.25v2.086c0 .414-.164.811-.456 1.104l-1.189 1.189a1.125 1.125 0 0 0-.33.797v.324c0 .621.504 1.125 1.125 1.125h11.7c.621 0 1.125-.504 1.125-1.125v-.324a1.125 1.125 0 0 0-.33-.797l-1.189-1.189a1.562 1.562 0 0 1-.456-1.104V7.5A5.25 5.25 0 0 0 12 2.25Zm0 18a2.625 2.625 0 0 0 2.583-2.125H9.417A2.625 2.625 0 0 0 12 20.25Z"></path>
@@ -16,25 +20,25 @@
     </span>
     <span class="navbar-urgent-alerts-label">{% trans "Orders" %}</span>
     {% if workspace_urgent_alerts.total_count %}
-      <span class="navbar-urgent-alerts-badge">{{ workspace_urgent_alerts.total_count }}</span>
+      <span class="navbar-urgent-alerts-badge" id="navbarUrgentAlertsBadge">{{ workspace_urgent_alerts.total_count }}</span>
     {% endif %}
   </button>
 
   <div class="dropdown-menu dropdown-menu-end navbar-urgent-alerts-menu" aria-labelledby="navbarUrgentAlertsToggle">
     <div class="navbar-urgent-alerts-menu-header">
       <strong>{% trans "Orders for dispatch" %}</strong>
-      <span class="text-muted small">{% trans "Pending and in progress" %}</span>
+      <span class="text-muted small">{% trans "Pending dispatch only" %}</span>
     </div>
 
     {% if workspace_urgent_alerts.summary_items %}
       <div class="navbar-urgent-alerts-summary">
         {% for item in workspace_urgent_alerts.summary_items %}
-          <a href="{{ item.url }}" class="navbar-urgent-alerts-item navbar-urgent-alerts-item--{{ item.priority }}">
+          <a href="{{ item.url }}" class="navbar-urgent-alerts-item navbar-urgent-alerts-item--{{ item.priority }}{% if item.unread_count %} navbar-urgent-alerts-item--unread{% endif %}">
             <span class="navbar-urgent-alerts-item-copy">
               <span class="navbar-urgent-alerts-item-label">{{ item.label }}</span>
               <span class="navbar-urgent-alerts-item-detail">{{ item.detail }}</span>
             </span>
-            <span class="navbar-urgent-alerts-item-count">{{ item.count }}</span>
+            <span class="navbar-urgent-alerts-item-count">{% if item.unread_count %}{{ item.unread_count }}{% else %}{{ item.count }}{% endif %}</span>
           </a>
         {% endfor %}
       </div>
@@ -46,7 +50,7 @@
       <div class="navbar-urgent-alerts-recent-header">{% trans "Latest open orders" %}</div>
       <div class="navbar-urgent-alerts-recent">
         {% for item in workspace_urgent_alerts.recent_items %}
-          <a href="{{ item.url }}" class="navbar-urgent-alerts-recent-item">
+          <a href="{{ item.url }}" class="navbar-urgent-alerts-recent-item{% if item.is_unread %} navbar-urgent-alerts-recent-item--unread{% endif %}">
             <span class="navbar-urgent-alerts-recent-title">{{ item.title }}</span>
             <span class="navbar-urgent-alerts-recent-message">{{ item.message }}</span>
           </a>
@@ -61,4 +65,5 @@
     </div>
   </div>
 </div>
+<script src="{% static 'js/navbar_urgent_alerts.js' %}"></script>
 {% endif %}

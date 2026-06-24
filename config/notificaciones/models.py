@@ -37,6 +37,22 @@ class Notificacion(models.Model):
 		return 'BACKOFFICE'
 
 
+class WorkspaceDispatchAlertReadState(models.Model):
+	user = models.OneToOneField(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.CASCADE,
+		related_name='dispatch_alert_read_state',
+	)
+	last_opened_at = models.DateTimeField(blank=True, null=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		db_table = 'notificaciones_dispatch_alert_read_state'
+
+	def __str__(self):
+		return f'Dispatch alerts read state for {self.user_id}'
+
+
 def _get_fallback_notification_user():
 	User = get_user_model()
 	return User.objects.filter(is_active=True).filter(

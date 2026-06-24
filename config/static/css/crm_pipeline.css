@@ -158,6 +158,13 @@
     background: rgba(255, 255, 255, 0.65);
 }
 
+.crm-pipeline-column__period-total {
+    margin-top: 6px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+}
+
 @media (max-width: 1400px) {
     .crm-pipeline-board {
         grid-template-columns: repeat(5, minmax(260px, 280px));

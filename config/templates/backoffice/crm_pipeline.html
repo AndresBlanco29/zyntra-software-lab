@@ -81,16 +81,19 @@
           <h3 class="crm-pipeline-column__title">{{ column.title }}</h3>
           <span class="crm-pipeline-column__count">{{ column.card_count }}</span>
         </div>
-        <div class="crm-pipeline-column__total">${{ column.period_total }}</div>
-        <div class="crm-pipeline-column__total-label">
+        <div class="crm-pipeline-column__total">${{ column.column_total }}</div>
+        <div class="crm-pipeline-column__total-label">{% trans "Total value in this stage" %}</div>
+        {% if column.period_total > 0 %}
+        <div class="crm-pipeline-column__period-total">
           {% if period == 'today' %}
-            {% trans "Orders taken today" %}
+            {% trans "Orders taken today:" %} ${{ column.period_total }}
           {% elif period == 'week' %}
-            {% trans "Orders taken this week" %}
+            {% trans "Orders taken this week:" %} ${{ column.period_total }}
           {% else %}
-            {% trans "Orders taken this month" %}
+            {% trans "Orders taken this month:" %} ${{ column.period_total }}
           {% endif %}
         </div>
+        {% endif %}
       </header>
       <div class="crm-pipeline-column__body">
         {% for card in column.cards %}

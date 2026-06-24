@@ -125,13 +125,14 @@ class CrmPipelineTests(TestCase):
 		self.assertEqual(cards[0].pedido_id, pedido.id)
 		self.assertIn(f'/facturacion/backoffice/invoices/{invoice.pk}/', cards[0].detail_url)
 
-	def test_column_period_total_sums_only_orders_created_in_period(self):
+	def test_column_totals_sum_visible_orders_and_period_orders_separately(self):
 		self._create_pedido(total=Decimal('100.00'))
 		self._create_pedido(total=Decimal('200.00'), created_days_ago=4)
 
 		pipeline = build_crm_pipeline(period='today')
 		confirmed_column = next(column for column in pipeline['columns'] if column.key == 'confirmed')
 
+		self.assertEqual(confirmed_column.column_total, Decimal('300.00'))
 		self.assertEqual(confirmed_column.period_total, Decimal('100.00'))
 		self.assertEqual(confirmed_column.card_count, 2)
 

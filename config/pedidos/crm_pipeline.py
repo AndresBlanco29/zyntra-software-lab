@@ -70,6 +70,7 @@ class CrmPipelineColumn:
 	title: str
 	accent: str
 	cards: list
+	column_total: Decimal
 	period_total: Decimal
 	card_count: int
 
@@ -251,6 +252,7 @@ def build_crm_pipeline(*, period='today', search_term='', vendedor_id=None, clie
 	for key in CRM_COLUMN_KEYS:
 		config = CRM_COLUMN_CONFIG[key]
 		column_cards = cards_by_column[key]
+		column_total = sum((card.total for card in column_cards), start=Decimal('0.00'))
 		period_total = Decimal('0.00')
 		for card in column_cards:
 			pedido = pedido_map.get(card.pedido_id)
@@ -263,6 +265,7 @@ def build_crm_pipeline(*, period='today', search_term='', vendedor_id=None, clie
 				title=str(config['title']),
 				accent=config['accent'],
 				cards=column_cards,
+				column_total=column_total,
 				period_total=period_total,
 				card_count=len(column_cards),
 			)

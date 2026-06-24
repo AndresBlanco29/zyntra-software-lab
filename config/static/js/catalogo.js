@@ -69,18 +69,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /* BOTONES + - */
     document.querySelectorAll(".producto-card").forEach(card => {
-        let cantidadSpan = card.querySelector(".cantidad");
-
-        card.querySelector(".sumar").addEventListener("click", () => {
-            cantidadSpan.textContent = parseInt(cantidadSpan.textContent) + 1;
-        });
-
-        card.querySelector(".restar").addEventListener("click", () => {
-            let actual = parseInt(cantidadSpan.textContent);
-            if (actual > 1) {
-                cantidadSpan.textContent = actual - 1;
-            }
-        });
+        window.CatalogQuantity.bindLocalQuantityStepper(card);
     });
 
     /* AGREGAR AL CARRITO */
@@ -102,7 +91,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             let producto_id = card.dataset.productoId;
             let presentacion_id = card.querySelector(".presentacion-select").value;
-            let cantidad = card.querySelector(".cantidad").textContent;
+            let cantidad = window.CatalogQuantity.getQuantityValue(card.querySelector(".cantidad"));
 
             fetch(agregarUrl, {
                 method: "POST",

@@ -432,11 +432,11 @@ data-summary="{{ p.descripcion_empaque_cliente }}"
 
 <div class="d-flex justify-content-center align-items-center gap-2 mt-1">
 
-<button class="qty-btn restar">-</button>
+<button type="button" class="qty-btn restar">-</button>
 
-<span class="cantidad">1</span>
+<input type="number" min="1" step="1" class="cantidad-input cantidad" value="1" inputmode="numeric" aria-label="{% trans 'Cantidad:' %}">
 
-<button class="qty-btn sumar">+</button>
+<button type="button" class="qty-btn sumar">+</button>
 
 </div>
 
@@ -566,6 +566,7 @@ $<span id="pedidoTotal">{{ total }}</span>
   }
 </style>
 
+<script src="{% static 'js/catalog_quantity.js' %}"></script>
 <script src="{% static 'js/tomar_pedido_catalogo.js' %}"></script>
 
 <script>

@@ -254,7 +254,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     /* BOTONES + - */
     document.querySelectorAll(".producto-card").forEach(card => {
-        let cantidadSpan = card.querySelector(".cantidad");
+        window.CatalogQuantity.bindLocalQuantityStepper(card);
         const precioSelect = card.querySelector('.precio-select');
         const precioHoldTrigger = card.querySelector('.precio-hold-trigger');
 
@@ -300,17 +300,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 event.preventDefault();
             });
         }
-
-        card.querySelector(".sumar").addEventListener("click", () => {
-            cantidadSpan.textContent = parseInt(cantidadSpan.textContent) + 1;
-        });
-
-        card.querySelector(".restar").addEventListener("click", () => {
-            let actual = parseInt(cantidadSpan.textContent);
-            if (actual > 1) {
-                cantidadSpan.textContent = actual - 1;
-            }
-        });
     });
 
     /* AGREGAR AL CARRITO */
@@ -321,7 +310,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             let producto_id = card.dataset.productoId;
             let presentacion_id = card.querySelector(".presentacion-select").value;
-            let cantidad = card.querySelector(".cantidad").textContent;
+            let cantidad = window.CatalogQuantity.getQuantityValue(card.querySelector(".cantidad"));
             let precioSelect = card.querySelector(".precio-select");
             let precio = precioSelect.value;
             const selectedPriceOption = precioSelect.selectedOptions[0];

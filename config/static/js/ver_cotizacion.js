@@ -26,32 +26,53 @@ document.getElementById("buscador").addEventListener("keyup", function() {
 
 });
 
-// SUMAR / RESTAR
-document.querySelectorAll(".sumar, .restar").forEach(btn => {
-
-    btn.addEventListener("click", function(){
-
-        let fila = this.closest("tr");
-        let producto_id = fila.dataset.id;
-        let accion = this.classList.contains("sumar") ? "sumar" : "restar";
-
-        fetch(actualizarURL, {
-            method: "POST",
-            headers: {
-                "X-CSRFToken": csrf,
-                "Content-Type": "application/x-www-form-urlencoded"
-            },
-            body: `producto_id=${producto_id}&accion=${accion}`
-        })
-        .then(res => res.json())
-        .then(data => {
-
-            fila.querySelector(".cantidad").textContent = data.cantidad;
-
-        });
-
+// SUMAR / RESTAR / INGRESO MANUAL
+function actualizarCantidad(productoId, accion, cantidad) {
+    const body = new URLSearchParams({
+        producto_id: productoId,
+        accion: accion,
     });
 
+    if (accion === "set") {
+        body.set("cantidad", cantidad);
+    }
+
+    return fetch(actualizarURL, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": csrf,
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: body.toString()
+    })
+    .then(res => res.json())
+    .then(data => {
+        const input = document.querySelector(`.cantidad-input[data-id="${productoId}"]`);
+        if (input) {
+            input.value = data.cantidad;
+        }
+        return data;
+    });
+}
+
+document.querySelectorAll(".sumar, .restar").forEach(btn => {
+    btn.addEventListener("click", function () {
+        const productoId = this.dataset.id;
+        const accion = this.classList.contains("sumar") ? "sumar" : "restar";
+        actualizarCantidad(productoId, accion);
+    });
+});
+
+document.querySelectorAll(".cantidad-input").forEach(input => {
+    input.addEventListener("blur", function () {
+        window.CatalogQuantity.normalizeQuantityInput(this);
+    });
+
+    input.addEventListener("change", function () {
+        const productoId = this.dataset.id;
+        const cantidad = window.CatalogQuantity.normalizeQuantityInput(this);
+        actualizarCantidad(productoId, "set", cantidad);
+    });
 });
 
 

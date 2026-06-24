@@ -387,6 +387,20 @@ z-index:9999;
     font-weight: bold;
 }
 
+.cantidad-input {
+    width: 72px;
+    text-align: center;
+    border: 1px solid #d6d9de;
+    border-radius: 10px;
+    padding: 6px 8px;
+}
+
+.cantidad-input:focus {
+    outline: none;
+    border-color: #1f4fa3;
+    box-shadow: 0 0 0 2px rgba(31, 79, 163, 0.15);
+}
+
         /* BOTON AMARILLO */
 /* BOTON AMARILLO */
 .btn-yellow {

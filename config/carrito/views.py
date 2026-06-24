@@ -77,6 +77,12 @@ def actualizar_cantidad(request):
             if carrito[producto_id]["cantidad"] > 1:
                 carrito[producto_id]["cantidad"] -= 1
 
+        elif accion == "set":
+            cantidad = int(request.POST.get("cantidad", 1))
+            if cantidad < 1:
+                cantidad = 1
+            carrito[producto_id]["cantidad"] = cantidad
+
         presentacion_id = carrito[producto_id].get("presentacion_id")
 
         if presentacion_id:

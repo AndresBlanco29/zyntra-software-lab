@@ -187,11 +187,20 @@ data-tipo="{{ p.tipo_contenido_traducido|lower }}"
 
 <div class="d-flex align-items-center gap-2">
 
-<button class="qty-btn restar">-</button>
+<button type="button" class="qty-btn restar" data-id="{{ item.id }}">-</button>
 
-<span class="cantidad">{{ item.cantidad }}</span>
+<input
+type="number"
+min="1"
+step="1"
+class="cantidad-input cantidad"
+data-id="{{ item.id }}"
+value="{{ item.cantidad }}"
+inputmode="numeric"
+aria-label="{% trans 'Quantity' %}"
+>
 
-<button class="qty-btn sumar">+</button>
+<button type="button" class="qty-btn sumar" data-id="{{ item.id }}">+</button>
 
 </div>
 
@@ -355,6 +364,7 @@ placeholder="{% trans "Search products..." %}">
   </div>
 </div>
 
+<script src="{% static 'js/catalog_quantity.js' %}"></script>
 <script src="{% static 'js/ver_cotizacion.js' %}"></script>
 
 <script>

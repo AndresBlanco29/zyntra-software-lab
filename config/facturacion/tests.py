@@ -2491,6 +2491,23 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(items[0]['suggested_unit_price'], '$1.79')
 		self.assertEqual(items[0]['profit_percentage'], '30.00%')
 
+	def test_invoice_pdf_item_data_uses_sold_price_when_list_price_missing(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		item = invoice.items.get()
+		item.precio_unitario_lista = None
+		item.precio_unitario = Decimal('14.99')
+		item.save(update_fields=['precio_unitario_lista', 'precio_unitario'])
+
+		rows = _build_invoice_pdf_item_data(invoice)
+
+		self.assertEqual(rows[0]['list_price'], '$14.99')
+		self.assertEqual(rows[0]['customer_price'], '$14.99')
+
 	def test_invoice_pdf_item_data_is_sorted_alphabetically(self):
 		categoria = Categoria.objects.get(nombre='Tortillas')
 		marca = Marca.objects.get(nombre='Marca Test')
@@ -2543,12 +2560,12 @@ class InvoiceFlowTests(TestCase):
 			['Alpha Soda', 'Tortilla 12', 'Zulu Soda'],
 		)
 
-	def test_invoice_pdf_item_rows_are_chunked_in_groups_of_sixteen(self):
+	def test_invoice_pdf_item_rows_are_chunked_in_groups_of_twenty(self):
 		rows = [{'index': number} for number in range(23)]
 
 		chunks = _chunk_invoice_pdf_item_rows(rows)
 
-		self.assertEqual([len(chunk) for chunk in chunks], [16, 7])
+		self.assertEqual([len(chunk) for chunk in chunks], [20, 3])
 		self.assertEqual(chunks[0][0]['index'], 0)
 		self.assertEqual(chunks[-1][-1]['index'], 22)
 

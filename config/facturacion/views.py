@@ -420,7 +420,10 @@ def _build_invoice_pdf_item_data(invoice):
 				profit_percentage = Decimal('0.00')
 		discount_percentage = Decimal(str(item.descuento_porcentaje or 0)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 		discount_amount_unit = Decimal(str(item.descuento_monto_unitario or 0)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-		list_price_value = Decimal(str(item.precio_unitario_lista)) if item.precio_unitario_lista else None
+		if item.precio_unitario_lista is not None:
+			list_price_value = Decimal(str(item.precio_unitario_lista))
+		else:
+			list_price_value = Decimal(str(item.precio_unitario or 0))
 		line_discount_amount = Decimal('0.00')
 		if discount_amount_unit > 0:
 			line_discount_amount = (discount_amount_unit * Decimal(str(item.cantidad_facturada or 0))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
@@ -432,7 +435,7 @@ def _build_invoice_pdf_item_data(invoice):
 			'pack_size': INVOICE_PDF_UNIT_OF_MEASURE,
 			'requested_quantity': str(requested_quantity),
 			'dispatched_quantity': str(item.cantidad_facturada),
-			'list_price': _format_pdf_money(list_price_value) if list_price_value is not None else '—',
+			'list_price': _format_pdf_money(list_price_value),
 			'discount_amount_unit': _format_pdf_money(discount_amount_unit) if discount_amount_unit > 0 else '—',
 			'discount_percentage': f'{discount_percentage:.2f}%' if discount_percentage > 0 else '—',
 			'line_discount_amount': _format_pdf_money(line_discount_amount) if line_discount_amount > 0 else '—',
@@ -444,7 +447,7 @@ def _build_invoice_pdf_item_data(invoice):
 	return items
 
 
-INVOICE_PDF_ITEMS_PER_PAGE = 16
+INVOICE_PDF_ITEMS_PER_PAGE = 20
 INVOICE_PDF_UNIT_OF_MEASURE = 'CS'
 INVOICE_PDF_SHOW_SUGGESTED_RETAIL = False
 INVOICE_PDF_ITEM_COLUMN_WEIGHTS_BASE = (70, 138, 38, 28, 28, 48, 34, 48, 48)
@@ -470,7 +473,7 @@ def _build_invoice_pdf_item_table_header(header_style):
 		Paragraph(_('QtyOrd'), header_style),
 		Paragraph(_('Qtyshp'), header_style),
 		Paragraph(_('price'), header_style),
-		Paragraph(_('Disc/promo'), header_style),
+		Paragraph(_('Disc/prom'), header_style),
 		Paragraph(_('net price'), header_style),
 		Paragraph(_('total'), header_style),
 	]
@@ -612,24 +615,31 @@ def _invoice_pdf_response(invoice):
 
 	content = []
 	meta_table = Table([
-		[Paragraph(_('Customer no.'), meta_label_style), Paragraph(str(invoice.cliente_id), meta_value_style), Paragraph(_('Date'), meta_label_style), Paragraph(timezone.localtime(invoice.creada_en).strftime('%m/%d/%Y'), meta_value_style)],
-		[Paragraph(_('Order no.'), meta_label_style), Paragraph(str(invoice.pedido_id), meta_value_style), Paragraph(_('Generated on'), meta_label_style), Paragraph(timezone.localtime(invoice.creada_en).strftime('%m/%d/%Y %H:%M'), meta_value_style)],
-		[Paragraph(_('Sales rep'), meta_label_style), Paragraph(sales_rep, meta_value_style), Paragraph(_('Driver'), meta_label_style), Paragraph(driver_name, meta_value_style)],
-	], colWidths=[58, 92, 64, 92])
+		[
+			Paragraph(_('Customer no.'), meta_label_style), Paragraph(str(invoice.cliente_id), meta_value_style),
+			Paragraph(_('Order no.'), meta_label_style), Paragraph(str(invoice.pedido_id), meta_value_style),
+			Paragraph(_('Date'), meta_label_style), Paragraph(timezone.localtime(invoice.creada_en).strftime('%m/%d/%Y'), meta_value_style),
+		],
+		[
+			Paragraph(_('Sales rep'), meta_label_style), Paragraph(sales_rep, meta_value_style),
+			Paragraph(_('Driver'), meta_label_style), Paragraph(driver_name, meta_value_style),
+			Paragraph('', meta_label_style), Paragraph('', meta_value_style),
+		],
+	], colWidths=[54, 78, 50, 72, 42, 78])
 	meta_table.setStyle(TableStyle([
 		('BOX', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
 		('INNERGRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
 		('BACKGROUND', (0, 0), (-1, -1), BRAND_SURFACE),
-		('LEFTPADDING', (0, 0), (-1, -1), 6),
-		('RIGHTPADDING', (0, 0), (-1, -1), 6),
-		('TOPPADDING', (0, 0), (-1, -1), 5),
-		('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+		('LEFTPADDING', (0, 0), (-1, -1), 4),
+		('RIGHTPADDING', (0, 0), (-1, -1), 4),
+		('TOPPADDING', (0, 0), (-1, -1), 3),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 3),
 	]))
 	content.extend([
 		_build_invoice_pdf_compact_header(styles=styles, invoice_number=invoice.numero, generated_on=generated_label, total_width=content_width),
-		Spacer(1, 8),
+		Spacer(1, 6),
 		meta_table,
-		Spacer(1, 8),
+		Spacer(1, 6),
 	])
 
 	party_table = Table([
@@ -652,19 +662,19 @@ def _invoice_pdf_response(invoice):
 		('VALIGN', (0, 0), (-1, -1), 'TOP'),
 		('LEFTPADDING', (0, 0), (-1, -1), 6),
 		('RIGHTPADDING', (0, 0), (-1, -1), 6),
-		('TOPPADDING', (0, 0), (-1, -1), 5),
-		('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+		('TOPPADDING', (0, 0), (-1, -1), 4),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 4),
 	]))
-	content.extend([party_table, Spacer(1, 6)])
+	content.extend([party_table, Spacer(1, 4)])
 
 	for index, chunk in enumerate(item_chunks):
 		if index > 0:
 			content.extend([
 				PageBreak(),
 				_build_invoice_pdf_compact_header(styles=styles, invoice_number=invoice.numero, generated_on=generated_label, total_width=content_width),
-				Spacer(1, 8),
-				Paragraph(_('Continued line items.'), note_style),
 				Spacer(1, 6),
+				Paragraph(_('Continued line items.'), note_style),
+				Spacer(1, 4),
 			])
 
 		rows = [_build_invoice_pdf_item_table_header(table_header_style)]
@@ -699,13 +709,13 @@ def _invoice_pdf_response(invoice):
 			('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
 			('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, BRAND_SURFACE]),
 			('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-			('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-			('TOPPADDING', (0, 0), (-1, -1), 3),
-			('TOPPADDING', (0, 0), (-1, 0), 5),
-			('BOTTOMPADDING', (0, 0), (-1, 0), 5),
+			('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+			('TOPPADDING', (0, 0), (-1, -1), 2),
+			('TOPPADDING', (0, 0), (-1, 0), 4),
+			('BOTTOMPADDING', (0, 0), (-1, 0), 4),
 			('VALIGN', (0, 1), (0, -1), 'TOP'),
 			('TOPPADDING', (0, 1), (0, -1), 1),
-			('BOTTOMPADDING', (0, 1), (0, -1), 5),
+			('BOTTOMPADDING', (0, 1), (0, -1), 4),
 			('LEFTPADDING', (0, 0), (-1, -1), 4),
 			('RIGHTPADDING', (0, 0), (-1, -1), 4),
 		]))

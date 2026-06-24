@@ -492,9 +492,9 @@ class PickingVerificationFlowTests(TestCase):
 		self.presentacion.unidades = 8
 		self.presentacion.save(update_fields=['unidades'])
 		StockPresentacion.objects.filter(presentacion=self.presentacion).update(
-			stock_fisico=256,
+			stock_fisico=32,
 			stock_reservado=0,
-			stock_disponible=256,
+			stock_disponible=32,
 		)
 		self.item.cantidad = 20
 		self.item.save(update_fields=['cantidad'])
@@ -515,9 +515,9 @@ class PickingVerificationFlowTests(TestCase):
 		self.item.cantidad_reservada_inventario = 20
 		self.item.save(update_fields=['cantidad', 'cantidad_reservada_inventario'])
 		StockPresentacion.objects.filter(presentacion=self.presentacion).update(
-			stock_fisico=256,
-			stock_reservado=160,
-			stock_disponible=96,
+			stock_fisico=32,
+			stock_reservado=20,
+			stock_disponible=12,
 		)
 
 		evaluation = evaluar_stock_fisico_verificacion_picking(

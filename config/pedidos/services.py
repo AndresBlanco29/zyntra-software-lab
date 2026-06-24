@@ -14,7 +14,6 @@ from datetime import timedelta
 from config.inventario.services import (
     aplicar_verificacion_picking_inventario,
     eliminar_item_pedido_con_inventario,
-    inventory_units_for_packages,
     reemplazar_presentacion_item_pedido,
     reservar_stock_para_pedido_items,
     validar_disponibilidad_para_items,
@@ -350,36 +349,24 @@ def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales
     evaluation = {}
     for item in pedido_items:
         stock = stock_map.get(item.presentacion_id)
-        units_per_package = max(int(getattr(item.presentacion, 'unidades', 0) or 0), 1)
         stock_disponible = int(getattr(stock, 'stock_disponible', 0) or 0)
         cantidad_real = max(int(cantidades_reales.get(item.id, item.cantidad) or 0), 0)
         cantidad_aplicada_previa = max(int(item.cantidad_inventario_aplicada or 0), 0)
         cantidad_pendiente_aplicar = max(cantidad_real - cantidad_aplicada_previa, 0)
-        reserved_units_for_item = inventory_units_for_packages(
-            item.presentacion,
-            int(item.cantidad_reservada_inventario or 0),
-        )
-        available_units = stock_disponible + reserved_units_for_item
-        units_needed = inventory_units_for_packages(item.presentacion, cantidad_pendiente_aplicar)
-        shortage_units = max(units_needed - available_units, 0)
-        shortage_packages = (
-            (shortage_units + units_per_package - 1) // units_per_package
-            if shortage_units
-            else 0
-        )
+        reserved_packages_for_item = max(int(item.cantidad_reservada_inventario or 0), 0)
+        available_packages = stock_disponible + reserved_packages_for_item
+        shortage_packages = max(cantidad_pendiente_aplicar - available_packages, 0)
 
         evaluation[item.id] = {
-            'units_per_package': units_per_package,
+            'units_per_package': max(int(getattr(item.presentacion, 'unidades', 0) or 0), 1),
             'stock_fisico': int(getattr(stock, 'stock_fisico', 0) or 0),
             'stock_disponible': stock_disponible,
-            'available_units': available_units,
-            'available_packages': available_units // units_per_package,
+            'available_packages': available_packages,
             'cantidad_real': cantidad_real,
             'cantidad_aplicada_previa': cantidad_aplicada_previa,
             'cantidad_pendiente_aplicar': cantidad_pendiente_aplicar,
-            'has_shortage': shortage_units > 0,
+            'has_shortage': shortage_packages > 0,
             'shortage_amount': shortage_packages,
-            'shortage_units': shortage_units,
         }
     return evaluation
 

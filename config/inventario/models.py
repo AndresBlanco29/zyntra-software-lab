@@ -12,9 +12,9 @@ from config.productos.models import Presentacion, Producto
 
 class StockPresentacion(models.Model):
 	presentacion = models.OneToOneField(Presentacion, on_delete=models.CASCADE, related_name='stock_operativo')
-	stock_fisico = models.PositiveIntegerField(default=0)
-	stock_reservado = models.PositiveIntegerField(default=0)
-	stock_disponible = models.PositiveIntegerField(default=0)
+	stock_fisico = models.PositiveIntegerField(default=0, help_text=_('Physical stock counted in presentation packages (boxes).'))
+	stock_reservado = models.PositiveIntegerField(default=0, help_text=_('Reserved stock counted in presentation packages (boxes).'))
+	stock_disponible = models.PositiveIntegerField(default=0, help_text=_('Available stock counted in presentation packages (boxes).'))
 	actualizado_en = models.DateTimeField(auto_now=True)
 
 	class Meta:

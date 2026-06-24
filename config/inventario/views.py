@@ -119,12 +119,10 @@ def backoffice_inventory_list(request):
 			'stock_fisico': stock_fisico,
 			'stock_reservado': stock_reservado,
 			'stock_disponible': stock_disponible,
+			'units_per_package': max(int(getattr(presentacion, 'unidades', 0) or 0), 1),
 			'fractional_stock': fractional_match['stock_fisico'] if fractional_match else 0,
 			'fractional_content_label': fractional_match['contenido'] if fractional_match else '',
-			'physical_summary': (
-				f"{stock_fisico} {presentacion.nombre_traducido} + {fractional_match['stock_fisico']} {fractional_match['contenido']}".strip()
-				if fractional_match and fractional_match['stock_fisico'] > 0 else f"{stock_fisico} {presentacion.nombre_traducido}"
-			),
+			'physical_summary': presentacion.nombre_traducido,
 		})
 		total_fisico += stock_fisico
 		total_reservado += stock_reservado

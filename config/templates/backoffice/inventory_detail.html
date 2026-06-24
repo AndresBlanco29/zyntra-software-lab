@@ -8,7 +8,7 @@
   <div>
     <a href="{% url 'backoffice_inventory_list' %}" class="btn btn-sm btn-outline-secondary mb-3">{% trans "Back to inventory" %}</a>
     <h2 class="mb-1">{{ presentacion.producto.nombre_traducido }} / {{ presentacion.nombre_traducido }}</h2>
-    <p class="text-muted mb-0">{% trans "Register manual movements and review the latest inventory traceability." %}</p>
+    <p class="text-muted mb-0">{% trans "Register manual movements and review the latest inventory traceability. Quantities here are counted in packages (boxes)." %}</p>
   </div>
 </div>
 
@@ -18,6 +18,10 @@
       <div class="card-body text-center">
         <div class="text-muted small text-uppercase">{% trans "Physical stock" %}</div>
         <div class="display-6 fw-semibold">{{ stock.stock_fisico }}</div>
+        <div class="small text-muted">{{ presentacion.nombre_traducido }}</div>
+        {% if presentacion.unidades > 1 %}
+        <div class="small text-muted">{% blocktrans with units=presentacion.unidades content=presentacion.tipo_contenido_traducido %}{{ units }} {{ content }} per package{% endblocktrans %}</div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -26,6 +30,7 @@
       <div class="card-body text-center">
         <div class="text-muted small text-uppercase">{% trans "Reserved stock" %}</div>
         <div class="display-6 fw-semibold">{{ stock.stock_reservado }}</div>
+        <div class="small text-muted">{{ presentacion.nombre_traducido }}</div>
       </div>
     </div>
   </div>
@@ -34,6 +39,7 @@
       <div class="card-body text-center">
         <div class="text-muted small text-uppercase">{% trans "Available stock" %}</div>
         <div class="display-6 fw-semibold">{{ stock.stock_disponible }}</div>
+        <div class="small text-muted">{{ presentacion.nombre_traducido }}</div>
       </div>
     </div>
   </div>
@@ -95,7 +101,7 @@
             </div>
           </div>
           <div>
-            <label class="form-label">{% trans "Quantity" %}</label>
+            <label class="form-label">{% trans "Quantity" %} ({{ presentacion.nombre_traducido }})</label>
             <input type="number" name="cantidad" min="1" value="1" class="form-control" id="inventoryQuantityInput">
             <div class="form-text">{% trans "Use this field for entries and exits." %}</div>
           </div>

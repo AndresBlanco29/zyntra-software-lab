@@ -12,10 +12,17 @@ from config.productos.models import Presentacion
 from .models import CompraProveedor, InventarioMovimiento, StockPresentacion, StockProductoFraccionado
 
 
+def units_per_package(presentacion):
+    return max(int(getattr(presentacion, 'unidades', 0) or 0), 1)
+
+
 def inventory_units_for_packages(presentacion, package_quantity):
     packages = max(int(package_quantity or 0), 0)
-    multiplier = max(int(getattr(presentacion, 'unidades', 0) or 0), 1)
-    return packages * multiplier
+    return packages * units_per_package(presentacion)
+
+
+def inventory_packages_for_quantity(presentacion, package_quantity):
+    return max(int(package_quantity or 0), 0)
 
 
 def _normalize_content_term(value):
@@ -329,15 +336,15 @@ def validar_disponibilidad_para_items(items_payload, bypass_stock_check=False):
     stock_map = _lock_stock_records(item['presentacion'].id for item in items_payload)
     for item in items_payload:
         cantidad = max(int(item['cantidad']), 1)
-        reserved_units = inventory_units_for_packages(item['presentacion'], cantidad)
+        reserved_packages = inventory_packages_for_quantity(item['presentacion'], cantidad)
         stock = stock_map[item['presentacion'].id]
-        if stock.stock_disponible < reserved_units:
+        if stock.stock_disponible < reserved_packages:
             raise ValidationError(
                 _('Insufficient available stock for %(product)s - %(presentation)s. Requested %(requested)s, available %(available)s.') % {
                     'product': stock.presentacion.producto.nombre,
                     'presentation': stock.presentacion.nombre,
                     'requested': cantidad,
-                    'available': stock.stock_disponible // max(int(getattr(stock.presentacion, 'unidades', 0) or 0), 1),
+                    'available': stock.stock_disponible,
                 }
             )
 
@@ -347,7 +354,7 @@ def reservar_stock_para_pedido_items(*, pedido, pedido_items, creado_por=None):
     stock_map = _lock_stock_records(item.presentacion_id for item in pedido_items)
     for item in pedido_items:
         cantidad = max(int(item.cantidad_solicitada or item.cantidad or 0), 1)
-        reserved_units = inventory_units_for_packages(item.presentacion, cantidad)
+        reserved_packages = inventory_packages_for_quantity(item.presentacion, cantidad)
         stock = stock_map[item.presentacion_id]
         _apply_inventory_change(
             stock=stock,
@@ -355,7 +362,7 @@ def reservar_stock_para_pedido_items(*, pedido, pedido_items, creado_por=None):
             tipo='RESERVA_PEDIDO',
             cantidad=cantidad,
             delta_fisico=0,
-            delta_reservado=reserved_units,
+            delta_reservado=reserved_packages,
             referencia=f'PO-{pedido.id}',
             idempotency_key=f'PO-RESERVA-{item.id}',
             pedido=pedido,
@@ -389,7 +396,7 @@ def ajustar_reserva_item_pedido(*, item, nueva_cantidad, creado_por=None):
             tipo='RESERVA_PEDIDO',
             cantidad=delta,
             delta_fisico=0,
-            delta_reservado=inventory_units_for_packages(locked_item.presentacion, delta),
+            delta_reservado=inventory_packages_for_quantity(locked_item.presentacion, delta),
             referencia=f'PO-{locked_item.pedido_id}',
             idempotency_key=f'PO-AJUSTE-MAS-{locked_item.id}-{objetivo}',
             pedido=locked_item.pedido,
@@ -403,7 +410,7 @@ def ajustar_reserva_item_pedido(*, item, nueva_cantidad, creado_por=None):
             tipo='LIBERACION_PEDIDO',
             cantidad=abs(delta),
             delta_fisico=0,
-            delta_reservado=-inventory_units_for_packages(locked_item.presentacion, abs(delta)),
+            delta_reservado=-inventory_packages_for_quantity(locked_item.presentacion, abs(delta)),
             referencia=f'PO-{locked_item.pedido_id}',
             idempotency_key=f'PO-AJUSTE-MENOS-{locked_item.id}-{objetivo}',
             pedido=locked_item.pedido,
@@ -430,7 +437,7 @@ def ajustar_cantidad_item_pedido_despues_picking(*, item, nueva_cantidad, creado
         return locked_item
 
     stock = _lock_stock_records([locked_item.presentacion_id])[locked_item.presentacion_id]
-    inventory_delta = inventory_units_for_packages(locked_item.presentacion, abs(delta)) * (1 if delta > 0 else -1)
+    inventory_delta = inventory_packages_for_quantity(locked_item.presentacion, abs(delta)) * (1 if delta > 0 else -1)
     _apply_inventory_change(
         stock=stock,
         categoria='SALIDA' if delta > 0 else 'AJUSTE',
@@ -473,7 +480,7 @@ def reemplazar_presentacion_item_pedido(*, item, nueva_presentacion, creado_por=
             tipo='LIBERACION_PEDIDO',
             cantidad=reserva_actual,
             delta_fisico=0,
-            delta_reservado=-inventory_units_for_packages(locked_item.presentacion, reserva_actual),
+            delta_reservado=-inventory_packages_for_quantity(locked_item.presentacion, reserva_actual),
             referencia=f'PO-{locked_item.pedido_id}',
             idempotency_key=f'PO-SWAP-OUT-{locked_item.id}-{locked_item.presentacion_id}-{nueva_presentacion.id}',
             pedido=locked_item.pedido,
@@ -486,7 +493,7 @@ def reemplazar_presentacion_item_pedido(*, item, nueva_presentacion, creado_por=
             tipo='RESERVA_PEDIDO',
             cantidad=reserva_actual,
             delta_fisico=0,
-            delta_reservado=inventory_units_for_packages(nueva_presentacion, reserva_actual),
+            delta_reservado=inventory_packages_for_quantity(nueva_presentacion, reserva_actual),
             referencia=f'PO-{locked_item.pedido_id}',
             idempotency_key=f'PO-SWAP-IN-{locked_item.id}-{locked_item.presentacion_id}-{nueva_presentacion.id}',
             pedido=locked_item.pedido,
@@ -520,7 +527,7 @@ def reemplazar_presentacion_item_pedido_despues_picking(*, item, nueva_presentac
             tipo='LIBERACION_PEDIDO',
             cantidad=reservado_actual,
             delta_fisico=0,
-            delta_reservado=-inventory_units_for_packages(locked_item.presentacion, reservado_actual),
+            delta_reservado=-inventory_packages_for_quantity(locked_item.presentacion, reservado_actual),
             referencia=f'PO-{locked_item.pedido_id}',
             idempotency_key=f'PO-BO-SWAP-RES-OUT-{locked_item.id}-{locked_item.presentacion_id}-{nueva_presentacion.id}',
             pedido=locked_item.pedido,
@@ -533,7 +540,7 @@ def reemplazar_presentacion_item_pedido_despues_picking(*, item, nueva_presentac
             tipo='RESERVA_PEDIDO',
             cantidad=reservado_actual,
             delta_fisico=0,
-            delta_reservado=inventory_units_for_packages(nueva_presentacion, reservado_actual),
+            delta_reservado=inventory_packages_for_quantity(nueva_presentacion, reservado_actual),
             referencia=f'PO-{locked_item.pedido_id}',
             idempotency_key=f'PO-BO-SWAP-RES-IN-{locked_item.id}-{locked_item.presentacion_id}-{nueva_presentacion.id}',
             pedido=locked_item.pedido,
@@ -542,14 +549,12 @@ def reemplazar_presentacion_item_pedido_despues_picking(*, item, nueva_presentac
         )
 
     if aplicado_actual:
-        applied_units_old = inventory_units_for_packages(locked_item.presentacion, aplicado_actual)
-        applied_units_new = inventory_units_for_packages(nueva_presentacion, aplicado_actual)
         _apply_inventory_change(
             stock=stock_actual,
             categoria='AJUSTE',
             tipo='AJUSTE_PICKING',
             cantidad=aplicado_actual,
-            delta_fisico=applied_units_old,
+            delta_fisico=aplicado_actual,
             delta_reservado=0,
             referencia=f'PO-{locked_item.pedido_id}',
             idempotency_key=f'PO-BO-SWAP-APPLIED-OUT-{locked_item.id}-{locked_item.presentacion_id}-{nueva_presentacion.id}',
@@ -562,7 +567,7 @@ def reemplazar_presentacion_item_pedido_despues_picking(*, item, nueva_presentac
             categoria='SALIDA',
             tipo='SALIDA_PICKING',
             cantidad=aplicado_actual,
-            delta_fisico=-applied_units_new,
+            delta_fisico=-aplicado_actual,
             delta_reservado=0,
             referencia=f'PO-{locked_item.pedido_id}',
             idempotency_key=f'PO-BO-SWAP-APPLIED-IN-{locked_item.id}-{locked_item.presentacion_id}-{nueva_presentacion.id}',
@@ -581,14 +586,14 @@ def eliminar_item_pedido_con_inventario(*, item, creado_por=None):
     locked_item = PedidoItem.objects.select_for_update().select_related('pedido').get(pk=item.pk)
     stock = _lock_stock_records([locked_item.presentacion_id])[locked_item.presentacion_id]
     if locked_item.cantidad_reservada_inventario:
-        reserved_units = inventory_units_for_packages(locked_item.presentacion, locked_item.cantidad_reservada_inventario)
+        reserved_packages = inventory_packages_for_quantity(locked_item.presentacion, locked_item.cantidad_reservada_inventario)
         _apply_inventory_change(
             stock=stock,
             categoria='RESERVA',
             tipo='LIBERACION_PEDIDO',
             cantidad=locked_item.cantidad_reservada_inventario,
             delta_fisico=0,
-            delta_reservado=-reserved_units,
+            delta_reservado=-reserved_packages,
             referencia=f'PO-{locked_item.pedido_id}',
             idempotency_key=f'PO-DELETE-RESERVA-{locked_item.id}',
             pedido=locked_item.pedido,
@@ -596,13 +601,13 @@ def eliminar_item_pedido_con_inventario(*, item, creado_por=None):
             creado_por=creado_por,
         )
     if locked_item.cantidad_inventario_aplicada:
-        applied_units = inventory_units_for_packages(locked_item.presentacion, locked_item.cantidad_inventario_aplicada)
+        applied_packages = inventory_packages_for_quantity(locked_item.presentacion, locked_item.cantidad_inventario_aplicada)
         _apply_inventory_change(
             stock=stock,
             categoria='AJUSTE',
             tipo='ANULACION_PEDIDO',
             cantidad=locked_item.cantidad_inventario_aplicada,
-            delta_fisico=applied_units,
+            delta_fisico=applied_packages,
             delta_reservado=0,
             referencia=f'PO-{locked_item.pedido_id}',
             idempotency_key=f'PO-DELETE-FISICO-{locked_item.id}',
@@ -628,8 +633,8 @@ def aplicar_verificacion_picking_inventario(*, pedido, pedido_item_ids, creado_p
         aplicado_previo = int(item.cantidad_inventario_aplicada or 0)
         nuevo_real = int(item.cantidad or 0)
         delta_real = nuevo_real - aplicado_previo
-        reserved_units_pending = inventory_units_for_packages(item.presentacion, reservado_pendiente)
-        reserva_a_liberar = min(reserved_units_pending, int(stock.stock_reservado or 0))
+        reserved_packages_pending = inventory_packages_for_quantity(item.presentacion, reservado_pendiente)
+        reserva_a_liberar = min(reserved_packages_pending, int(stock.stock_reservado or 0))
 
         if reserva_a_liberar:
             _apply_inventory_change(
@@ -647,7 +652,7 @@ def aplicar_verificacion_picking_inventario(*, pedido, pedido_item_ids, creado_p
             )
 
         if delta_real:
-            inventory_delta = inventory_units_for_packages(item.presentacion, abs(delta_real)) * (-1 if delta_real > 0 else 1)
+            inventory_delta = inventory_packages_for_quantity(item.presentacion, abs(delta_real)) * (-1 if delta_real > 0 else 1)
             _apply_inventory_change(
                 stock=stock,
                 categoria='SALIDA' if delta_real > 0 else 'AJUSTE',
@@ -679,14 +684,14 @@ def cancelar_pedido_con_inventario(*, pedido, creado_por=None):
     for item in items:
         stock = stock_map[item.presentacion_id]
         if item.cantidad_reservada_inventario:
-            reserved_units = inventory_units_for_packages(item.presentacion, item.cantidad_reservada_inventario)
+            reserved_packages = inventory_packages_for_quantity(item.presentacion, item.cantidad_reservada_inventario)
             _apply_inventory_change(
                 stock=stock,
                 categoria='RESERVA',
                 tipo='LIBERACION_PEDIDO',
                 cantidad=item.cantidad_reservada_inventario,
                 delta_fisico=0,
-                delta_reservado=-reserved_units,
+                delta_reservado=-reserved_packages,
                 referencia=f'PO-{pedido.id}',
                 idempotency_key=f'PO-CANCEL-RESERVA-{item.id}',
                 pedido=pedido,
@@ -694,13 +699,13 @@ def cancelar_pedido_con_inventario(*, pedido, creado_por=None):
                 creado_por=creado_por,
             )
         if item.cantidad_inventario_aplicada:
-            applied_units = inventory_units_for_packages(item.presentacion, item.cantidad_inventario_aplicada)
+            applied_packages = inventory_packages_for_quantity(item.presentacion, item.cantidad_inventario_aplicada)
             _apply_inventory_change(
                 stock=stock,
                 categoria='AJUSTE',
                 tipo='ANULACION_PEDIDO',
                 cantidad=item.cantidad_inventario_aplicada,
-                delta_fisico=applied_units,
+                delta_fisico=applied_packages,
                 delta_reservado=0,
                 referencia=f'PO-{pedido.id}',
                 idempotency_key=f'PO-CANCEL-FISICO-{item.id}',
@@ -724,13 +729,13 @@ def restaurar_inventario_por_anulacion_factura(*, pedido, invoice, creado_por=No
     for item in items:
         stock = stock_map[item.presentacion_id]
         if item.cantidad_inventario_aplicada:
-            applied_units = inventory_units_for_packages(item.presentacion, item.cantidad_inventario_aplicada)
+            applied_packages = inventory_packages_for_quantity(item.presentacion, item.cantidad_inventario_aplicada)
             _apply_inventory_change(
                 stock=stock,
                 categoria='AJUSTE',
                 tipo='ANULACION_PEDIDO',
                 cantidad=item.cantidad_inventario_aplicada,
-                delta_fisico=applied_units,
+                delta_fisico=applied_packages,
                 delta_reservado=0,
                 referencia=f'INV-{invoice.numero}',
                 idempotency_key=f'INV-VOID-FISICO-{invoice.id}-{item.id}',

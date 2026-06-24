@@ -3635,7 +3635,7 @@ class InvoiceVoidDeleteTests(TestCase):
 		stock_after = StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico
 		self.assertEqual(self.invoice.estado, 'ANULADA')
 		self.assertEqual(self.pedido_item.cantidad_inventario_aplicada, 0)
-		self.assertEqual(stock_after, stock_before + 36)
+		self.assertEqual(stock_after, stock_before + 3)
 		self.assertTrue(FacturacionRegistroAnulacion.objects.filter(invoice=self.invoice, tipo_documento='INVOICE').exists())
 		self.assertEqual(self.pedido.estado, 'VERIFICADO_AJUSTADO')
 
@@ -3649,7 +3649,7 @@ class InvoiceVoidDeleteTests(TestCase):
 		self.assertFalse(FacturacionRegistroAnulacion.objects.filter(documento_id=invoice_id).exists())
 		self.pedido_item.refresh_from_db()
 		self.assertEqual(self.pedido_item.cantidad_inventario_aplicada, 0)
-		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, stock_before + 36)
+		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, stock_before + 3)
 
 	def test_delete_delivered_invoice_allowed_when_not_synced_to_quickbooks(self):
 		driver = Usuario.objects.create_user(username='void-driver', password='secret123', role='driver')
@@ -3734,7 +3734,7 @@ class InvoiceVoidDeleteTests(TestCase):
 		eliminar_nota_ajuste(nota=nota)
 
 		self.assertFalse(NotaAjuste.objects.filter(id=note_id).exists())
-		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, stock_after_credit - 12)
+		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, stock_after_credit - 1)
 
 	def test_delete_synced_general_note_allowed_from_backoffice(self):
 		nota = crear_nota_ajuste(

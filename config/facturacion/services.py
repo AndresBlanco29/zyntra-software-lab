@@ -8,7 +8,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from config.inventario.services import _apply_fractional_inventory_change, _apply_inventory_change, _lock_fractional_stock_records, _lock_stock_records, aplicar_verificacion_picking_inventario, inventory_units_for_packages, restaurar_inventario_por_anulacion_factura
+from config.inventario.services import _apply_fractional_inventory_change, _apply_inventory_change, _lock_fractional_stock_records, _lock_stock_records, aplicar_verificacion_picking_inventario, restaurar_inventario_por_anulacion_factura
 from config.notificaciones.models import crear_notificacion_backoffice
 from config.pedidos.services import crear_pedido_desde_items
 from config.productos.models import Presentacion
@@ -918,13 +918,12 @@ def _apply_credit_note_inventory(*, nota, movement_type, delta_fisico, created_b
 			)
 			continue
 		stock = stock_map[note_item.presentacion_id]
-		inventory_units = inventory_units_for_packages(note_item.presentacion, note_item.cantidad)
 		_apply_inventory_change(
 			stock=stock,
 			categoria='ENTRADA' if delta_fisico > 0 else 'SALIDA',
 			tipo=movement_type,
 			cantidad=note_item.cantidad,
-			delta_fisico=delta_fisico * inventory_units,
+			delta_fisico=delta_fisico * note_item.cantidad,
 			delta_reservado=0,
 			referencia=nota.numero,
 			idempotency_key=f'{movement_type}-{nota.id}-{note_item.id}',

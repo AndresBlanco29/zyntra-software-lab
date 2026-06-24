@@ -658,6 +658,8 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'buscadorProductoPedido')
 		self.assertContains(response, 'pedido_detalle_product_search.js')
 		self.assertContains(response, 'id="precioNuevoPedido"', html=False)
+		self.assertContains(response, 'id="precioNuevoPedidoPreset"', html=False)
+		self.assertContains(response, 'name="precio_nuevo"', html=False)
 		self.assertContains(response, 'name="presentacion_nueva"', html=False)
 
 	def test_backoffice_search_presentaciones_returns_matching_products(self):
@@ -681,6 +683,25 @@ class PickingVerificationFlowTests(TestCase):
 		js_path = Path(settings.BASE_DIR) / 'static' / 'js' / 'searchable-selects.js'
 		content = js_path.read_text(encoding='utf-8')
 		self.assertIn('dropdown_input', content)
+
+	def test_backoffice_can_add_product_with_manual_price(self):
+		self.pedido.estado = 'RECIBIDO'
+		self.pedido.save(update_fields=['estado', 'actualizada_en'])
+
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), {
+			'estado': 'RECIBIDO',
+			'presentacion_nueva': str(self.presentacion_extra.id),
+			'cantidad_nueva': '2',
+			'precio_nuevo': '7.25',
+			f'cantidad_{self.item.id}': '2',
+			f'precio_{self.item.id}': '12.00',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		nuevo_item = PedidoItem.objects.get(pedido=self.pedido, presentacion=self.presentacion_extra)
+		self.assertEqual(nuevo_item.precio, Decimal('7.25'))
+		self.assertEqual(nuevo_item.cantidad, 2)
 
 	def test_backoffice_can_add_product_without_available_stock(self):
 		self.pedido.estado = 'RECIBIDO'

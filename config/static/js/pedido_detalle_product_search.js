@@ -9,6 +9,15 @@
       .replace(/"/g, '&quot;');
   }
 
+  function parseDecimal(value) {
+    var normalized = String(value || '').trim().replace(',', '.');
+    if (!normalized) {
+      return null;
+    }
+    var parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     var root = document.getElementById('newProductSearchRoot');
     if (!root) {
@@ -19,13 +28,15 @@
     var hiddenInput = document.getElementById('presentacionNuevaId');
     var resultsBox = document.getElementById('newProductSearchResults');
     var selectedLabel = document.getElementById('newProductSelectedLabel');
-    var priceSelect = document.getElementById('precioNuevoPedido');
+    var pricePresetSelect = document.getElementById('precioNuevoPedidoPreset');
+    var priceInput = document.getElementById('precioNuevoPedido');
     var searchUrl = root.dataset.searchUrl;
     var pedidoId = root.dataset.pedidoId;
     var emptyMessage = root.dataset.emptyMessage || 'No products found.';
     var minCharsMessage = root.dataset.minCharsMessage || 'Type at least 2 characters to search.';
-    var pricePlaceholder = root.dataset.pricePlaceholder || 'Select price...';
-    var priceLocked = priceSelect && priceSelect.dataset.locked === 'true';
+    var manualPriceLabel = root.dataset.manualPriceLabel || 'Manual price';
+    var priceLocked = (pricePresetSelect && pricePresetSelect.dataset.locked === 'true')
+      || (priceInput && priceInput.dataset.locked === 'true');
 
     var debounceTimer = null;
     var activeIndex = -1;
@@ -38,47 +49,76 @@
       lastResults = [];
     }
 
-    function resetPriceSelect() {
-      if (!priceSelect) {
+    function resetPriceFields() {
+      if (!pricePresetSelect || !priceInput) {
         return;
       }
 
-      priceSelect.innerHTML = '';
-      var placeholder = document.createElement('option');
-      placeholder.value = '';
-      placeholder.textContent = pricePlaceholder;
-      priceSelect.appendChild(placeholder);
-      priceSelect.value = '';
-      priceSelect.disabled = true;
+      pricePresetSelect.innerHTML = '';
+      var manualOption = document.createElement('option');
+      manualOption.value = '';
+      manualOption.textContent = manualPriceLabel;
+      pricePresetSelect.appendChild(manualOption);
+      pricePresetSelect.value = '';
+      pricePresetSelect.disabled = true;
+
+      priceInput.value = '';
+      priceInput.disabled = true;
     }
 
-    function populatePriceSelect(item) {
-      if (!priceSelect || priceLocked) {
+    function syncPresetFromInput() {
+      if (!pricePresetSelect || !priceInput) {
         return;
       }
 
-      priceSelect.innerHTML = '';
-      var placeholder = document.createElement('option');
-      placeholder.value = '';
-      placeholder.textContent = pricePlaceholder;
-      priceSelect.appendChild(placeholder);
+      var inputValue = parseDecimal(priceInput.value);
+      var matchedValue = '';
+
+      Array.prototype.forEach.call(pricePresetSelect.options, function (option) {
+        if (!option.value) {
+          return;
+        }
+        var optionValue = parseDecimal(option.value);
+        if (inputValue !== null && optionValue !== null && optionValue === inputValue) {
+          matchedValue = option.value;
+        }
+      });
+
+      pricePresetSelect.value = matchedValue;
+    }
+
+    function populatePriceFields(item) {
+      if (!pricePresetSelect || !priceInput || priceLocked) {
+        return;
+      }
+
+      pricePresetSelect.innerHTML = '';
+      var manualOption = document.createElement('option');
+      manualOption.value = '';
+      manualOption.textContent = manualPriceLabel;
+      pricePresetSelect.appendChild(manualOption);
 
       (item.prices || []).forEach(function (priceOption) {
         var option = document.createElement('option');
         option.value = priceOption.value;
         option.textContent = priceOption.label;
         option.dataset.priceKey = priceOption.key;
-        if (priceOption.key === item.default_price_key) {
-          option.selected = true;
-        }
-        priceSelect.appendChild(option);
+        pricePresetSelect.appendChild(option);
       });
 
-      if (!priceSelect.value && item.price) {
-        priceSelect.value = item.price;
+      var defaultPrice = item.price || '';
+      priceInput.value = defaultPrice;
+      syncPresetFromInput();
+
+      if (!pricePresetSelect.value && defaultPrice) {
+        var defaultOption = pricePresetSelect.querySelector('option[data-price-key="' + item.default_price_key + '"]');
+        if (defaultOption) {
+          pricePresetSelect.value = defaultOption.value;
+        }
       }
 
-      priceSelect.disabled = false;
+      pricePresetSelect.disabled = false;
+      priceInput.disabled = false;
     }
 
     function highlightActive() {
@@ -115,7 +155,7 @@
       searchInput.value = item.label;
       selectedLabel.textContent = item.label;
       selectedLabel.hidden = false;
-      populatePriceSelect(item);
+      populatePriceFields(item);
       hideResults();
     }
 
@@ -144,13 +184,23 @@
         });
     }
 
-    resetPriceSelect();
+    resetPriceFields();
+
+    if (pricePresetSelect && priceInput) {
+      pricePresetSelect.addEventListener('change', function () {
+        if (pricePresetSelect.value) {
+          priceInput.value = pricePresetSelect.value;
+        }
+      });
+
+      priceInput.addEventListener('input', syncPresetFromInput);
+    }
 
     searchInput.addEventListener('input', function () {
       hiddenInput.value = '';
       selectedLabel.hidden = true;
       selectedLabel.textContent = '';
-      resetPriceSelect();
+      resetPriceFields();
 
       var query = searchInput.value.trim();
       if (query.length < 2) {

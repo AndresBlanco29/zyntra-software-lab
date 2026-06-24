@@ -125,6 +125,38 @@ class CrmPipelineTests(TestCase):
 		self.assertEqual(cards[0].pedido_id, pedido.id)
 		self.assertIn(f'/facturacion/backoffice/invoices/{invoice.pk}/', cards[0].detail_url)
 
+	def test_pickup_column_contains_customer_pick_up_invoices(self):
+		pedido = self._create_pedido(estado='INVOICE_GENERADA', total=Decimal('88.50'))
+		invoice = Invoice.objects.create(
+			pedido=pedido,
+			cliente=self.cliente,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			subtotal=pedido.total,
+			total_neto=pedido.total,
+			saldo_cliente=pedido.total,
+			creada_por=self.backoffice,
+		)
+
+		pipeline = build_crm_pipeline(period='today')
+		driver_cards = self._column_cards(pipeline, 'driver')
+		pickup_cards = self._column_cards(pipeline, 'pickup')
+
+		self.assertEqual(len(driver_cards), 0)
+		self.assertEqual(len(pickup_cards), 1)
+		self.assertEqual(pickup_cards[0].pedido_id, pedido.id)
+		self.assertTrue(pickup_cards[0].is_pickup)
+		self.assertIn(f'/facturacion/backoffice/invoices/{invoice.pk}/', pickup_cards[0].detail_url)
+
+	def test_quickbooks_imported_orders_are_excluded_from_pipeline(self):
+		pedido = self._create_pedido(estado='VERIFICADO_AJUSTADO', total=Decimal('999.00'))
+		pedido.canal_toma = 'QUICKBOOKS_IMPORT'
+		pedido.save(update_fields=['canal_toma'])
+
+		pipeline = build_crm_pipeline(period='today')
+		backoffice_cards = self._column_cards(pipeline, 'backoffice_review')
+
+		self.assertEqual(len(backoffice_cards), 0)
+
 	def test_column_totals_sum_visible_orders_and_period_orders_separately(self):
 		self._create_pedido(total=Decimal('100.00'))
 		self._create_pedido(total=Decimal('200.00'), created_days_ago=4)

@@ -16,6 +16,7 @@ CRM_COLUMN_KEYS = (
 	'picking_pending',
 	'backoffice_review',
 	'driver',
+	'pickup',
 	'delivered',
 )
 
@@ -38,6 +39,11 @@ CRM_COLUMN_CONFIG = {
 	'driver': {
 		'title': _('Driver'),
 		'accent': '#f59e0b',
+		'statuses': {'INVOICE_GENERADA'},
+	},
+	'pickup': {
+		'title': _('Customer pickup'),
+		'accent': '#8b5cf6',
 		'statuses': {'INVOICE_GENERADA'},
 	},
 	'delivered': {
@@ -153,6 +159,8 @@ def _resolve_column_key(pedido):
 	if estado == 'INVOICE_GENERADA':
 		if invoice and invoice.metodo_entrega == 'RUTA_DRIVER':
 			return 'driver'
+		if invoice and invoice.metodo_entrega == 'CUSTOMER_PICK_UP':
+			return 'pickup'
 		return 'backoffice_review'
 	if estado == 'DESPACHADO':
 		return 'delivered'
@@ -177,6 +185,7 @@ def _base_queryset():
 			'invoice__driver',
 		)
 		.exclude(estado='CANCELADO')
+		.exclude(canal_toma='QUICKBOOKS_IMPORT')
 		.order_by('-creada_en')
 	)
 

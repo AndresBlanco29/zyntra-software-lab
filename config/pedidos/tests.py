@@ -661,6 +661,11 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'id="precioNuevoPedidoPreset"', html=False)
 		self.assertContains(response, 'name="precio_nuevo"', html=False)
 		self.assertContains(response, 'name="presentacion_nueva"', html=False)
+		self.assertContains(response, 'bulkPriceTierSelect')
+		self.assertContains(response, 'applyBulkPriceTierButton')
+		self.assertContains(response, 'Apply to all products')
+		self.assertContains(response, 'pedido-item-price-preset')
+		self.assertContains(response, 'pedido-presentation-price-map')
 
 	def test_backoffice_search_presentaciones_returns_matching_products(self):
 		self.client.force_login(self.backoffice)

@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load static i18n %}
+{% load static i18n l10n %}
 
 {% block title %}{% trans "Order" %} #{{ pedido.id }}{% endblock %}
 
@@ -435,6 +435,7 @@
   method="post"
   class="card shadow-sm mb-3"
   id="backofficeOrderForm"
+  data-default-price-key="{{ default_price_key }}"
   {% if pedido_edit_holds_lock %}
   data-pedido-edit-lock-active="true"
   data-pedido-lock-ping-url="{% url 'backoffice_pedido_edit_lock_ping' pedido.id %}"
@@ -485,6 +486,23 @@
     </div>
 
     <h5 class="mb-3">{% trans "Editable product details" %}</h5>
+    {% if not lineas_bloqueadas_para_picking %}
+    <div class="row g-2 align-items-end mb-3">
+      <div class="col-md-8 col-lg-7">
+        <label for="bulkPriceTierSelect" class="form-label fw-semibold mb-1">{% trans "Assign one price tier to all products" %}</label>
+        <select id="bulkPriceTierSelect" class="form-select form-select-sm">
+          <option value="">{% trans "Select one of the 5 prices" %}</option>
+          {% for option in bulk_price_options %}
+          <option value="{{ option.key }}">{{ option.label }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text">{% trans "This applies the selected price tier to every product so you do not have to change them one by one." %}</div>
+      </div>
+      <div class="col-md-4 col-lg-5 d-grid d-md-flex justify-content-md-end">
+        <button type="button" class="btn btn-outline-primary btn-sm" id="applyBulkPriceTierButton">{% trans "Apply to all products" %}</button>
+      </div>
+    </div>
+    {% endif %}
     <div class="table-responsive">
       <table class="table align-middle">
         <thead>
@@ -493,7 +511,7 @@
             <th>{% trans "Presentation" %}</th>
             <th>{% trans "Requested qty." %}</th>
             <th>{% trans "Quantity" %}</th>
-            <th>{% trans "Price" %}</th>
+            <th style="width: 180px;">{% trans "Price" %}</th>
             <th>{% trans "Discount" %}</th>
             <th>{% trans "You pay" %}</th>
             <th>{% trans "Subtotal" %}</th>
@@ -502,7 +520,7 @@
         </thead>
         <tbody>
           {% for item in pedido_items %}
-          <tr class="{% if item.selector_has_changes %}table-danger{% endif %}">
+          <tr class="{% if item.selector_has_changes %}table-danger{% endif %}" data-pedido-item-row="{{ item.id }}">
             <td>
               {{ item.presentacion.producto.nombre }}
               {% if item.selector_added_by_picker %}
@@ -524,7 +542,15 @@
             <td>
               <input type="number" min="0" class="form-control form-control-sm {% if item.selector_changed_quantity %}border-danger text-danger fw-semibold{% endif %}" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
             </td>
-            <td><input type="number" min="0" step="0.01" class="form-control form-control-sm pedido-item-list-price" name="precio_{{ item.id }}" value="{{ item.precio }}" data-item-id="{{ item.id }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}></td>
+            <td>
+              <select class="form-select form-select-sm mb-1 preset-price-select pedido-item-price-preset" data-target-input="precio_{{ item.id }}" data-item-id="{{ item.id }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+                <option value="">{% trans "Manual price" %}</option>
+                {% for option in item.price_options %}
+                <option value="{{ option.value|unlocalize }}" data-price-key="{{ option.key }}" {% if item.selected_price_key == option.key %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+              </select>
+              <input type="number" min="0" step="0.01" class="form-control form-control-sm pedido-item-list-price" id="precio_{{ item.id }}" name="precio_{{ item.id }}" value="{{ item.precio|unlocalize }}" data-item-id="{{ item.id }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+            </td>
             <td class="pedido-item-discount-cell" data-item-id="{{ item.id }}">
               <div class="form-check mb-2">
                 <input
@@ -623,6 +649,8 @@
   <a class="btn btn-outline-dark" href="{% url 'backoffice_picking_ticket' pedido.id %}">{% trans "Generate Picking Ticket" %}</a>
   <a class="btn btn-success" href="{% url 'backoffice_picking_pdf' pedido.id %}">{% trans "Export PDF" %}</a>
 </div>
+
+{{ presentation_price_map|json_script:"pedido-presentation-price-map" }}
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -730,6 +758,122 @@ document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('.pedido-item-discount-toggle').forEach((toggle) => {
     refreshPedidoItemDiscountRow(toggle.dataset.itemId);
   });
+
+  const presentationPriceMapNode = document.getElementById('pedido-presentation-price-map');
+  const presentationPriceMap = presentationPriceMapNode ? JSON.parse(presentationPriceMapNode.textContent) : {};
+  const defaultPriceKey = orderForm?.dataset.defaultPriceKey || 'precio_1';
+  const bulkPriceTierSelect = document.getElementById('bulkPriceTierSelect');
+  const applyBulkPriceTierButton = document.getElementById('applyBulkPriceTierButton');
+  const manualPriceLabel = '{% trans "Manual price"|escapejs %}';
+
+  function parseDecimalValue(value) {
+    const normalized = String(value || '').trim().replace(',', '.');
+    if (!normalized) {
+      return null;
+    }
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function syncPedidoPresetFromInput(presetSelect, priceInput) {
+    if (!presetSelect || !priceInput) {
+      return;
+    }
+    const inputValue = parseDecimalValue(priceInput.value);
+    let matchedValue = '';
+    Array.from(presetSelect.options).forEach((option) => {
+      if (!option.value) {
+        return;
+      }
+      const optionValue = parseDecimalValue(option.value);
+      if (inputValue !== null && optionValue !== null && optionValue === inputValue) {
+        matchedValue = option.value;
+      }
+    });
+    presetSelect.value = matchedValue;
+  }
+
+  function rebuildPedidoRowPriceOptions(row, presentationId, itemId) {
+    const priceOptions = presentationPriceMap[presentationId] || [];
+    const presetSelect = row.querySelector('.pedido-item-price-preset');
+    const priceInput = row.querySelector('.pedido-item-list-price');
+    if (!presetSelect || !priceInput) {
+      return;
+    }
+
+    presetSelect.innerHTML = '';
+    const manualOption = document.createElement('option');
+    manualOption.value = '';
+    manualOption.textContent = manualPriceLabel;
+    presetSelect.appendChild(manualOption);
+
+    priceOptions.forEach((priceOption) => {
+      const option = document.createElement('option');
+      option.value = priceOption.value;
+      option.dataset.priceKey = priceOption.key;
+      option.textContent = priceOption.label;
+      presetSelect.appendChild(option);
+    });
+
+    const tierKey = bulkPriceTierSelect?.value || defaultPriceKey;
+    const matchingOption = priceOptions.find((priceOption) => priceOption.key === tierKey)
+      || priceOptions.find((priceOption) => priceOption.key === defaultPriceKey)
+      || priceOptions[0];
+    if (matchingOption) {
+      priceInput.value = matchingOption.value;
+      presetSelect.value = matchingOption.value;
+    }
+    refreshPedidoItemDiscountRow(itemId);
+  }
+
+  document.querySelectorAll('.pedido-item-price-preset').forEach((presetSelect) => {
+    const priceInput = document.getElementById(presetSelect.dataset.targetInput);
+    if (!priceInput) {
+      return;
+    }
+
+    presetSelect.addEventListener('change', function () {
+      if (presetSelect.value) {
+        priceInput.value = presetSelect.value;
+      }
+      refreshPedidoItemDiscountRow(presetSelect.dataset.itemId);
+    });
+
+    priceInput.addEventListener('input', function () {
+      syncPedidoPresetFromInput(presetSelect, priceInput);
+    });
+
+    syncPedidoPresetFromInput(presetSelect, priceInput);
+  });
+
+  document.querySelectorAll('select[name^="presentacion_"]').forEach((select) => {
+    select.addEventListener('change', function () {
+      const row = select.closest('[data-pedido-item-row]');
+      const itemId = row?.dataset.pedidoItemRow;
+      if (!row || !itemId) {
+        return;
+      }
+      rebuildPedidoRowPriceOptions(row, select.value, itemId);
+    });
+  });
+
+  if (applyBulkPriceTierButton && bulkPriceTierSelect) {
+    applyBulkPriceTierButton.addEventListener('click', function () {
+      const selectedPriceKey = bulkPriceTierSelect.value;
+      if (!selectedPriceKey) {
+        return;
+      }
+
+      document.querySelectorAll('.pedido-item-price-preset').forEach((presetSelect) => {
+        const matchingOption = presetSelect.querySelector(`option[data-price-key="${selectedPriceKey}"]`);
+        if (!matchingOption) {
+          return;
+        }
+        presetSelect.value = matchingOption.value;
+        presetSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    });
+  }
 
   const marginInputs = Array.from(document.querySelectorAll('.suggested-margin-input'));
   const valueInputs = Array.from(document.querySelectorAll('.suggested-value-input'));

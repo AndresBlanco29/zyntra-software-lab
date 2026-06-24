@@ -34,7 +34,7 @@ from config.facturacion.services import DEFAULT_SUGGESTED_PROFIT_PERCENTAGE, res
 from config.integrations.quickbooks.services import get_connection_status
 from config.integrations.quickbooks.views import get_dashboard_sync_context
 from config.notificaciones.models import Notificacion
-from config.productos.models import Presentacion
+from config.productos.models import Presentacion, ConfiguracionPrecios
 from config.inventario.models import StockPresentacion
 
 from .models import Pedido, PedidoItem
@@ -332,6 +332,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 	]
 	for item in pedido_items:
 		item.presentation_options = list(item.presentacion.producto.presentaciones.order_by('nombre'))
+	_enrich_pedido_items_with_price_options(pedido=pedido, pedido_items=pedido_items)
 
 	if request.method == 'POST':
 		if not request.user.has_internal_permission('backoffice.orders.manage'):
@@ -458,6 +459,9 @@ def backoffice_pedido_detalle(request, pedido_id):
 			for item in pedido.items.select_related('presentacion__producto')
 			if item.cantidad > 0
 		],
+		'bulk_price_options': _build_bulk_pedido_price_options(),
+		'presentation_price_map': _build_pedido_presentation_price_map(pedido=pedido, pedido_items=pedido_items),
+		'default_price_key': _default_presentacion_price_key_for_pedido(pedido=pedido),
 		**edit_lock_context,
 	}
 	return render(request, 'backoffice/pedido_detalle.html', context)
@@ -494,6 +498,47 @@ def _build_presentacion_price_options(*, presentacion, pedido=None):
 	default_key = _default_presentacion_price_key_for_pedido(pedido=pedido) if pedido else 'precio_1'
 	default_price = _default_presentacion_price_for_pedido(presentacion=presentacion, pedido=pedido) if pedido else _quantize_money(presentacion.precio_1 or 0)
 	return prices, default_key, format(default_price, '.2f')
+
+
+def _match_presentacion_price_key(price_options, current_price):
+	current = format(_quantize_money(current_price or 0), '.2f')
+	for option in price_options:
+		if option['value'] == current:
+			return option['key']
+	return ''
+
+
+def _build_bulk_pedido_price_options():
+	return [
+		{
+			'key': f'precio_{index}',
+			'label': _('Price %(number)s (%(percentage)s%%)') % {
+				'number': index,
+				'percentage': margin,
+			},
+		}
+		for index, margin in enumerate(ConfiguracionPrecios.obtener().porcentajes_lista(), start=1)
+	]
+
+
+def _build_pedido_presentation_price_map(*, pedido, pedido_items):
+	presentation_ids = set()
+	for item in pedido_items:
+		for presentation in item.presentation_options:
+			presentation_ids.add(presentation.id)
+
+	price_map = {}
+	for presentation in Presentacion.objects.filter(id__in=presentation_ids):
+		options, _, _ = _build_presentacion_price_options(presentacion=presentation, pedido=pedido)
+		price_map[str(presentation.id)] = options
+	return price_map
+
+
+def _enrich_pedido_items_with_price_options(*, pedido, pedido_items):
+	for item in pedido_items:
+		price_options, _, _ = _build_presentacion_price_options(presentacion=item.presentacion, pedido=pedido)
+		item.price_options = price_options
+		item.selected_price_key = _match_presentacion_price_key(price_options, item.precio)
 
 
 @login_required

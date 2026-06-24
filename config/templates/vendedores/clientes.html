@@ -126,7 +126,7 @@
 
 <th>{% trans "Phone" %}</th>
 
-<th>{% trans "Balance" %}</th>
+<th>{% trans "Due balance" %}</th>
 
 <th>{% trans "Acción" %}</th>
 
@@ -156,7 +156,7 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 
 <td data-label="{% trans 'Phone' %}" class="vendor-muted-cell">{{ cliente.telefono }}</td>
 
-<td data-label="Balance" class="vendor-muted-cell">${{ cliente.balance|floatformat:2 }}</td>
+<td data-label="{% trans 'Due balance' %}" class="vendor-muted-cell">${{ cliente.due_balance|floatformat:2 }}</td>
 
 <td data-label="{% trans 'Acción' %}" class="mobile-stack-table__action clientes-acciones-cell">
 

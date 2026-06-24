@@ -51,8 +51,7 @@
         <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Selected customer" %}</div>
         <div class="fw-semibold">{{ selected_client.nombre_empresa }}</div>
         <div class="small text-muted">{{ selected_client.direccion }}, {{ selected_client.ciudad }}</div>
-        <div class="small mt-2"><span class="text-muted">{% trans "Current balance" %}:</span> ${{ selected_client.balance }}</div>
-        <div class="small"><span class="text-muted">{% trans "Available credit" %}:</span> ${{ selected_client.available_credit }}</div>
+        <div class="small mt-2"><span class="text-muted">{% trans "Current due balance" %}:</span> ${{ selected_client.due_balance }}</div>
 
         {% if customer_general_notes %}
         <hr>
@@ -60,7 +59,7 @@
           <div class="small text-muted text-uppercase fw-semibold mb-0">{% trans "General customer notes" %}</div>
           <span class="badge text-bg-light">{{ customer_general_notes|length }}</span>
         </div>
-        <div class="small text-muted mb-2">{% trans "Approve general notes here to update the customer balance and available credit." %}</div>
+        <div class="small text-muted mb-2">{% trans "Approve general notes here to update the customer due balance." %}</div>
         <div class="d-grid gap-2">
           {% for nota in customer_general_notes %}
           <div class="border rounded p-2">

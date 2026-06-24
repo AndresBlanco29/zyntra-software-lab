@@ -172,7 +172,7 @@
               <div class="small text-muted">{% trans "Outstanding balance" %}: ${{ note.invoice.saldo_cliente }}</div>
               {% else %}
               <div class="small text-muted">{% trans "General customer balance note" %}</div>
-              <div class="small text-muted">{% trans "Customer balance" %}: ${{ note.cliente.balance }}</div>
+              <div class="small text-muted">{% trans "Customer due balance" %}: ${{ note.cliente.due_balance }}</div>
               {% endif %}
             </td>
             <td data-label="{% trans 'Origin' %}">

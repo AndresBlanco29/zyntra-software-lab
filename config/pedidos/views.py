@@ -33,6 +33,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from config.clientes.models import Cliente
+from config.facturacion.models import NotaAjuste
 from config.facturacion.services import DEFAULT_SUGGESTED_PROFIT_PERCENTAGE, resolve_presentacion_suggested_unit_price, summarize_pending_customer_notes
 from config.integrations.quickbooks.services import get_connection_status
 from config.integrations.quickbooks.views import get_dashboard_sync_context

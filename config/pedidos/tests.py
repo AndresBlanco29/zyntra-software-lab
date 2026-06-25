@@ -975,6 +975,13 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(get_response, f'name="presentacion_{self.item.id}"', html=False)
 		self.assertContains(get_response, 'This line was modified during picking. Do you want to delete it anyway?', html=False)
 
+	def test_backoffice_dashboard_loads_successfully(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_dashboard'))
+
+		self.assertEqual(response.status_code, 200)
+
 	def test_backoffice_order_list_defaults_to_pending_orders(self):
 		in_progress_order = Pedido.objects.create(
 			cliente=self.cliente,

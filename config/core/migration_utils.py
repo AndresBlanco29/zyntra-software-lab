@@ -1,3 +1,5 @@
+import importlib
+
 from django.db import migrations
 
 
@@ -14,6 +16,26 @@ def table_exists(schema_editor, table_name):
         return table_name in schema_editor.connection.introspection.table_names(cursor)
 
 
+def bind_field_remote_model(field, apps):
+    remote_field = getattr(field, 'remote_field', None)
+    if remote_field is None:
+        return field
+    remote_model = remote_field.model
+    if isinstance(remote_model, str) and '.' in remote_model:
+        related_app_label, related_model_name = remote_model.split('.', 1)
+        remote_field.model = apps.get_model(related_app_label, related_model_name)
+    return field
+
+
+def rebuild_field(name, field, apps):
+    path, args, kwargs = field.deconstruct()
+    module_path, class_name = path.rsplit('.', 1)
+    field_class = getattr(importlib.import_module(module_path), class_name)
+    rebuilt = field_class(*args, **kwargs)
+    rebuilt.set_attributes_from_name(name)
+    return bind_field_remote_model(rebuilt, apps)
+
+
 def add_model_fields_if_missing(apps, schema_editor, app_label, model_name, fields):
     model = apps.get_model(app_label, model_name)
     table_name = model._meta.db_table
@@ -24,9 +46,8 @@ def add_model_fields_if_missing(apps, schema_editor, app_label, model_name, fiel
         schema_editor.add_field(model, field)
 
 
-def build_field(name, field):
-    field.set_attributes_from_name(name)
-    return field
+def build_field(name, field, apps):
+    return rebuild_field(name, field, apps)
 
 
 def separate_add_fields(app_label, model_name, field_specs):
@@ -36,7 +57,7 @@ def separate_add_fields(app_label, model_name, field_specs):
             schema_editor,
             app_label,
             model_name,
-            [build_field(name, field) for name, field in field_specs],
+            [build_field(name, field, apps) for name, field in field_specs],
         )
 
     return migrations.SeparateDatabaseAndState(

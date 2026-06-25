@@ -28,9 +28,14 @@ def _append_alert(items, *, label, detail, url, count, unread_count=0, priority=
 
 
 def _get_dispatch_alert_last_seen_at(user):
+    from django.db.utils import ProgrammingError
+
     from config.notificaciones.models import WorkspaceDispatchAlertReadState
 
-    state = WorkspaceDispatchAlertReadState.objects.filter(user=user).only('last_opened_at').first()
+    try:
+        state = WorkspaceDispatchAlertReadState.objects.filter(user=user).only('last_opened_at').first()
+    except ProgrammingError:
+        return None
     return state.last_opened_at if state else None
 
 
@@ -57,13 +62,18 @@ def _count_unread_queryset(queryset, *, activity_getter, last_seen_at):
 
 
 def mark_dispatch_alerts_seen(user):
+    from django.db.utils import ProgrammingError
+
     from config.notificaciones.models import Notificacion, WorkspaceDispatchAlertReadState
 
     now = timezone.now()
-    WorkspaceDispatchAlertReadState.objects.update_or_create(
-        user=user,
-        defaults={'last_opened_at': now},
-    )
+    try:
+        WorkspaceDispatchAlertReadState.objects.update_or_create(
+            user=user,
+            defaults={'last_opened_at': now},
+        )
+    except ProgrammingError:
+        pass
     Notificacion.objects.filter(
         tipo__in=('PEDIDO', 'COTIZACION'),
         leida=False,

@@ -32,6 +32,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+        ('clientes', '0010_cliente_credit_limit'),
         ('facturacion', '0020_invoiceitem_line_discount'),
     ]
 

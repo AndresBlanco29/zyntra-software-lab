@@ -77,6 +77,7 @@ class VendedorPedidoTests(TestCase):
 			estado='GENERADA',
 			subtotal=Decimal(str(price)) * Decimal(str(quantity)),
 			total_neto=Decimal(str(price)) * Decimal(str(quantity)),
+			fecha_documento=timezone.localtime(created_at).date(),
 		)
 		Invoice.objects.filter(id=invoice.id).update(creada_en=created_at, actualizada_en=created_at)
 		invoice.refresh_from_db()
@@ -262,7 +263,7 @@ class VendedorPedidoTests(TestCase):
 		self.assertContains(response, 'Historial')
 		self.assertContains(response, '5 @ $37.00')
 		self.assertContains(response, '2 @ $36.50')
-		self.assertContains(response, '4 @ $35.75')
+		self.assertNotContains(response, '4 @ $35.75')
 		self.assertNotContains(response, '7 @ $34.10')
 
 	def test_catalogo_vendedor_ignores_unbilled_sales_orders(self):

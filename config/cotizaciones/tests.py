@@ -116,6 +116,7 @@ class BackofficeQuotePricingTests(TestCase):
 			estado='GENERADA',
 			subtotal=Decimal(str(price)) * Decimal(str(quantity)),
 			total_neto=Decimal(str(price)) * Decimal(str(quantity)),
+			fecha_documento=timezone.localtime(created_at).date(),
 		)
 		Invoice.objects.filter(id=invoice.id).update(creada_en=created_at, actualizada_en=created_at)
 		invoice.refresh_from_db()
@@ -144,7 +145,7 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, '60 @ $14.99')
 		self.assertContains(response, '12 @ $13.50')
-		self.assertContains(response, '8 @ $12.75')
+		self.assertNotContains(response, '8 @ $12.75')
 		self.assertNotContains(response, '4 @ $11.00')
 
 	def test_backoffice_quote_detail_ignores_unbilled_sales_orders(self):

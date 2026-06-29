@@ -585,9 +585,9 @@
     {% if not lineas_bloqueadas_para_picking %}
     <div class="row g-2 align-items-end mb-3">
       <div class="col-md-8 col-lg-7">
-        <label for="bulkPriceTierSelect" class="form-label fw-semibold mb-1">{% trans "Assign one price tier to all products" %}</label>
+        <label for="bulkPriceTierSelect" class="form-label fw-semibold mb-1">{% trans "Assign one recent sale price to all products" %}</label>
         <select id="bulkPriceTierSelect" class="form-select form-select-sm">
-          <option value="">{% trans "Select one of the 5 prices" %}</option>
+          <option value="">{% trans "Select a recent sale price" %}</option>
           {% for option in bulk_price_options %}
           <option value="{{ option.key }}">{{ option.label }}</option>
           {% endfor %}
@@ -636,6 +636,16 @@
               {{ item.presentacion.producto.nombre }}
               {% if item.selector_added_by_picker %}
               <div><span class="badge text-bg-danger">{% trans "Added by picker" %}</span></div>
+              {% endif %}
+              {% if item.recent_customer_sales %}
+              <div class="pedido-order-history mt-1">
+                {% for invoice_item in item.recent_customer_sales %}
+                <div class="pedido-order-history-entry border rounded bg-light-subtle px-2 py-1 small text-muted mb-1">
+                  <div>{{ invoice_item.sale_reference_date|date:"m/d/Y" }}</div>
+                  <div class="fw-semibold text-body-secondary">{% blocktrans with quantity=invoice_item.cantidad_facturada price=invoice_item.precio_unitario|floatformat:2 %}{{ quantity }} @ ${{ price }}{% endblocktrans %}</div>
+                </div>
+                {% endfor %}
+              </div>
               {% endif %}
             </td>
             <td>

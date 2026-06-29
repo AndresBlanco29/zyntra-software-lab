@@ -36,11 +36,17 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 from config.clientes.models import Cliente
 from config.facturacion.models import NotaAjuste
 from config.facturacion.views import _build_invoice_pdf_shipment_summary_table
-from config.facturacion.services import DEFAULT_SUGGESTED_PROFIT_PERCENTAGE, resolve_presentacion_suggested_unit_price, summarize_pending_customer_notes
+from config.facturacion.services import (
+	DEFAULT_SUGGESTED_PROFIT_PERCENTAGE,
+	build_customer_invoice_sale_price_options,
+	get_recent_customer_invoice_items_by_presentation,
+	resolve_presentacion_suggested_unit_price,
+	summarize_pending_customer_notes,
+)
 from config.integrations.quickbooks.services import get_connection_status
 from config.integrations.quickbooks.views import get_dashboard_sync_context
 from config.notificaciones.models import Notificacion
-from config.productos.models import Presentacion, ConfiguracionPrecios, ConfiguracionDescuentos
+from config.productos.models import Presentacion, ConfiguracionDescuentos
 from config.inventario.models import StockPresentacion
 
 from .models import Pedido, PedidoItem
@@ -541,14 +547,18 @@ def _default_presentacion_price_for_pedido(*, presentacion, pedido):
 
 
 def _default_presentacion_price_key_for_pedido(*, pedido):
-	cliente = getattr(pedido, 'cliente', None)
-	tier = cliente.get_nivel_precio_normalizado() if cliente and hasattr(cliente, 'get_nivel_precio_normalizado') else None
-	if tier is None:
-		return 'precio_1'
-	return f'precio_{tier}'
+	return 'invoice_sale_1'
 
 
 def _build_presentacion_price_options(*, presentacion, pedido=None):
+	cliente = getattr(pedido, 'cliente', None) if pedido is not None else None
+	if cliente is not None:
+		prices = build_customer_invoice_sale_price_options(cliente=cliente, presentacion=presentacion, limit=2)
+		if prices:
+			return prices, prices[0]['key'], prices[0]['value']
+		default_price = _default_presentacion_price_for_pedido(presentacion=presentacion, pedido=pedido)
+		return [], '', format(default_price, '.2f')
+
 	prices = []
 	for index in range(1, 6):
 		key = f'precio_{index}'
@@ -575,13 +585,13 @@ def _match_presentacion_price_key(price_options, current_price):
 def _build_bulk_pedido_price_options():
 	return [
 		{
-			'key': f'precio_{index}',
-			'label': _('Price %(number)s (%(percentage)s%%)') % {
-				'number': index,
-				'percentage': margin,
-			},
-		}
-		for index, margin in enumerate(ConfiguracionPrecios.obtener().porcentajes_lista(), start=1)
+			'key': 'invoice_sale_1',
+			'label': _('Most recent sale price'),
+		},
+		{
+			'key': 'invoice_sale_2',
+			'label': _('Second most recent sale price'),
+		},
 	]
 
 
@@ -612,9 +622,18 @@ def _build_pedido_presentation_price_map(*, pedido, pedido_items):
 
 def _enrich_pedido_items_with_price_options(*, pedido, pedido_items):
 	discount_options = _build_pedido_discount_preset_options()
+	history_by_presentation = {}
+	if pedido.cliente_id:
+		history_by_presentation = get_recent_customer_invoice_items_by_presentation(
+			cliente=pedido.cliente,
+			presentation_ids=[item.presentacion_id for item in pedido_items],
+			limit=2,
+		)
+
 	for item in pedido_items:
 		price_options, _, _ = _build_presentacion_price_options(presentacion=item.presentacion, pedido=pedido)
 		item.price_options = price_options
+		item.recent_customer_sales = history_by_presentation.get(item.presentacion_id, [])
 		item.selected_price_key = _match_presentacion_price_key(price_options, item.precio)
 		item.discount_preset_options = discount_options
 		item.selected_discount_preset_key = (

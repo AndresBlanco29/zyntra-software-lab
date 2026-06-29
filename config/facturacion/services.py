@@ -434,6 +434,7 @@ def generar_invoice_desde_picking(
 		despachador_notificado=True,
 		notificado_en=timezone.now(),
 		creada_por=usuario,
+		fecha_documento=timezone.localdate(),
 	)
 
 	total = Decimal('0.00')
@@ -1738,20 +1739,20 @@ def mark_delivery_unpaid_from_backoffice(*, delivery, backoffice_user, motivo_no
 	return delivery
 
 
-def get_recent_customer_invoice_items_by_presentation(*, cliente, presentation_ids, limit=3):
+def get_recent_customer_invoice_items_by_presentation(*, cliente, presentation_ids, limit=2):
 	presentation_ids = [presentation_id for presentation_id in presentation_ids if presentation_id]
 	if not cliente or not presentation_ids:
 		return {}
 
 	recent_items = (
 		InvoiceItem.objects
-		.select_related('invoice')
+		.select_related('invoice', 'invoice__pedido')
 		.filter(
 			invoice__cliente=cliente,
 			invoice__estado='GENERADA',
 			presentacion_id__in=presentation_ids,
 		)
-		.order_by('presentacion_id', '-invoice__creada_en', '-invoice_id', '-id')
+		.order_by('presentacion_id', '-invoice__fecha_documento', '-invoice__creada_en', '-invoice_id', '-id')
 	)
 
 	history = {presentation_id: [] for presentation_id in presentation_ids}
@@ -1762,7 +1763,41 @@ def get_recent_customer_invoice_items_by_presentation(*, cliente, presentation_i
 			continue
 		if history_counts[presentacion_id] >= limit:
 			continue
+		invoice_item.sale_reference_date = resolve_invoice_sale_reference_date(invoice_item.invoice)
 		history[presentacion_id].append(invoice_item)
 		history_counts[presentacion_id] += 1
 
 	return history
+
+
+def resolve_invoice_sale_reference_date(invoice):
+	if getattr(invoice, 'fecha_documento', None):
+		return invoice.fecha_documento
+	if getattr(invoice, 'creada_en', None):
+		return timezone.localtime(invoice.creada_en).date()
+	return timezone.localdate()
+
+
+def build_customer_invoice_sale_price_options(*, cliente, presentacion, limit=2):
+	history = get_recent_customer_invoice_items_by_presentation(
+		cliente=cliente,
+		presentation_ids=[presentacion.id],
+		limit=limit,
+	).get(presentacion.id, [])
+
+	options = []
+	for index, invoice_item in enumerate(history, start=1):
+		price_value = _quantize_money(invoice_item.precio_unitario)
+		sale_date = getattr(invoice_item, 'sale_reference_date', None) or resolve_invoice_sale_reference_date(invoice_item.invoice)
+		date_label = sale_date.strftime('%m/%d/%Y')
+		options.append({
+			'key': f'invoice_sale_{index}',
+			'value': format(price_value, '.2f'),
+			'label': _('%(date)s - $%(price)s') % {
+				'date': date_label,
+				'price': format(price_value, '.2f'),
+			},
+			'sale_date': sale_date,
+			'invoice_item_id': invoice_item.id,
+		})
+	return options

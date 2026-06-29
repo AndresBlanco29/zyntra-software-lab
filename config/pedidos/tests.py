@@ -10,7 +10,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from config.clientes.models import Cliente
-from config.facturacion.services import generar_invoice_desde_picking
+from config.facturacion.models import Invoice, InvoiceItem
+from config.facturacion.services import generar_invoice_desde_picking, resolve_invoice_sale_reference_date
 from config.inventario.models import StockPresentacion
 from config.inventario.services import registrar_entrada_manual
 from config.notificaciones.models import Notificacion
@@ -768,6 +769,68 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'configurar-descuentos')
 		self.assertContains(response, 'pedido-presentation-price-map')
 
+	def _create_pedido_customer_invoice(self, *, created_at, quantity, price):
+		sale_date = timezone.localtime(created_at).date()
+		pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			vendedor=self.backoffice,
+			origen='VENDEDOR',
+			estado='INVOICE_GENERADA',
+			total=Decimal(str(price)) * Decimal(str(quantity)),
+		)
+		Pedido.objects.filter(id=pedido.id).update(creada_en=created_at, actualizada_en=created_at)
+		pedido_item = PedidoItem.objects.create(
+			pedido=pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=quantity,
+			cantidad=quantity,
+			precio=Decimal(str(price)),
+			subtotal=Decimal(str(price)) * Decimal(str(quantity)),
+		)
+		invoice = Invoice.objects.create(
+			pedido=pedido,
+			cliente=self.cliente,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			estado='GENERADA',
+			subtotal=Decimal(str(price)) * Decimal(str(quantity)),
+			total_neto=Decimal(str(price)) * Decimal(str(quantity)),
+			fecha_documento=sale_date,
+		)
+		Invoice.objects.filter(id=invoice.id).update(creada_en=created_at, actualizada_en=created_at)
+		InvoiceItem.objects.create(
+			invoice=invoice,
+			pedido_item=pedido_item,
+			presentacion=self.presentacion,
+			producto_nombre=self.presentacion.producto.nombre,
+			presentacion_nombre=self.presentacion.nombre,
+			cantidad_facturada=quantity,
+			precio_unitario=Decimal(str(price)),
+			subtotal=Decimal(str(price)) * Decimal(str(quantity)),
+		)
+		return invoice
+
+	def test_backoffice_detail_shows_only_last_two_invoice_sale_prices(self):
+		now = timezone.now()
+		self._create_pedido_customer_invoice(created_at=now - timedelta(days=1), quantity=5, price='37.00')
+		self._create_pedido_customer_invoice(created_at=now - timedelta(days=8), quantity=2, price='36.50')
+		self._create_pedido_customer_invoice(created_at=now - timedelta(days=15), quantity=4, price='35.75')
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '37.00')
+		self.assertContains(response, '36.50')
+		self.assertNotContains(response, '35.75')
+		self.assertContains(response, 'data-price-key="invoice_sale_1"', html=False)
+		self.assertContains(response, 'data-price-key="invoice_sale_2"', html=False)
+		self.assertContains(response, 'Most recent sale price')
+
+	def test_resolve_invoice_sale_reference_date_uses_fecha_documento(self):
+		sale_date = timezone.localdate() - timedelta(days=3)
+		invoice = Invoice(fecha_documento=sale_date, creada_en=timezone.now())
+		self.assertEqual(resolve_invoice_sale_reference_date(invoice), sale_date)
+
 	def test_backoffice_search_presentaciones_returns_matching_products(self):
 		self.client.force_login(self.backoffice)
 		response = self.client.get(reverse('backoffice_buscar_presentaciones'), {
@@ -780,7 +843,7 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertTrue(any(result['id'] == self.presentacion.id for result in payload['results']))
 		self.assertTrue(any('Producto test' in result['label'] for result in payload['results']))
 		matched = next(result for result in payload['results'] if result['id'] == self.presentacion.id)
-		self.assertEqual(len(matched['prices']), 5)
+		self.assertLessEqual(len(matched['prices']), 2)
 		self.assertIn('default_price_key', matched)
 
 	def test_searchable_selects_script_uses_dropdown_input_plugin(self):

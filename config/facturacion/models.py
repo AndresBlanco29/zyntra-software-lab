@@ -72,6 +72,7 @@ class Invoice(models.Model):
 	qb_payment_status = models.CharField(max_length=20, choices=QB_PAYMENT_STATUS_CHOICES, blank=True, default='', db_index=True)
 	qb_due_date = models.DateField(blank=True, null=True, db_index=True)
 	qb_email_status = models.CharField(max_length=20, choices=QB_EMAIL_STATUS_CHOICES, blank=True, default='')
+	fecha_documento = models.DateField(blank=True, null=True, db_index=True)
 	creada_en = models.DateTimeField(auto_now_add=True)
 	actualizada_en = models.DateTimeField(auto_now=True)
 	anulada_en = models.DateTimeField(blank=True, null=True)

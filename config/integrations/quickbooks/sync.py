@@ -2820,6 +2820,7 @@ def _create_invoice_from_quickbooks_invoice(payload, *, client=None, customer_ca
         quickbooks_id=quickbooks_id,
         sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
         last_synced_at=timezone.now(),
+        fecha_documento=_parse_quickbooks_date(payload.get('TxnDate')) or timezone.localdate(),
     )
     status_fields = _apply_quickbooks_invoice_status_to_local_record(invoice, payload, client=client)
     if status_fields:

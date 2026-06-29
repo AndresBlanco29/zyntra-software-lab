@@ -1164,6 +1164,19 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(amount_owed, Decimal('10.00') + invoice.saldo_cliente)
 		self.assertEqual(self.cliente.total_amount_owed, amount_owed)
 
+	def test_resolve_customer_amount_owed_deduplicates_repeated_balance_applications(self):
+		self.cliente.balance = Decimal('582.28')
+		self.cliente.save(update_fields=['balance'])
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		amount_owed = resolve_customer_amount_owed(cliente=self.cliente, invoice=invoice)
+		self.assertLess(amount_owed, Decimal('100.00'))
+		self.assertGreaterEqual(amount_owed, invoice.saldo_cliente)
+
 	def test_backoffice_can_mark_completed_paid_delivery_as_unpaid(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
@@ -1204,8 +1217,10 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(delivery.motivo_no_pago, 'Customer did not pay')
 		self.assertTrue(delivery.invoice.cliente.credit_hold)
 		self.assertGreater(invoice.saldo_cliente, Decimal('0.00'))
-		delivery.invoice.cliente.refresh_from_db()
-		self.assertGreaterEqual(delivery.invoice.cliente.due_balance, invoice.saldo_cliente)
+		self.assertGreaterEqual(
+			resolve_customer_amount_owed(cliente=delivery.invoice.cliente, invoice=invoice),
+			invoice.saldo_cliente,
+		)
 
 	def test_driver_cannot_mark_delivery_unpaid_from_backoffice_endpoint(self):
 		invoice = generar_invoice_desde_picking(
@@ -1258,8 +1273,10 @@ class InvoiceFlowTests(TestCase):
 			evidence_files=[self.photo_file],
 		)
 		invoice.refresh_from_db()
-		delivery.invoice.cliente.refresh_from_db()
-		self.assertGreaterEqual(delivery.invoice.cliente.due_balance, invoice.saldo_cliente)
+		self.assertGreaterEqual(
+			resolve_customer_amount_owed(cliente=delivery.invoice.cliente, invoice=invoice),
+			invoice.saldo_cliente,
+		)
 
 	def test_driver_non_payment_blocks_customer_and_requires_photo(self):
 		invoice = generar_invoice_desde_picking(

@@ -188,13 +188,87 @@ def _apply_customer_balance_delta(*, cliente, delta):
 	return cliente.balance
 
 
-def _apply_invoice_outstanding_to_customer_balance(*, invoice):
-	invoice.refresh_from_db(fields=['saldo_cliente', 'cliente_id'])
-	outstanding = _quantize_money(invoice.saldo_cliente)
-	if outstanding <= 0:
-		return outstanding
-	_apply_customer_balance_delta(cliente=invoice.cliente, delta=outstanding)
-	return outstanding
+def _local_open_invoice_outstanding_queryset(*, cliente):
+	from django.db.models import Q
+
+	return Invoice.objects.filter(
+		cliente=cliente,
+		estado='GENERADA',
+		saldo_cliente__gt=0,
+	).filter(Q(quickbooks_id__isnull=True) | Q(quickbooks_id=''))
+
+
+def _sum_local_open_invoice_outstanding(*, cliente):
+	from django.db.models import Sum
+
+	total = (
+		_local_open_invoice_outstanding_queryset(cliente=cliente).aggregate(total=Sum('saldo_cliente'))['total']
+		or Decimal('0.00')
+	)
+	return _quantize_money(total)
+
+
+def _invoice_counts_toward_local_open_outstanding(invoice):
+	if invoice.estado != 'GENERADA':
+		return False
+	if _quantize_money(invoice.saldo_cliente) <= 0:
+		return False
+	return not (invoice.quickbooks_id or '').strip()
+
+
+def _effective_stored_due_before_local_invoices(*, stored_due, local_open):
+	"""Undo repeated local-invoice balance applications without mutating stored data."""
+	stored_due = _quantize_money(stored_due)
+	local_open = _quantize_money(local_open)
+	if local_open <= 0:
+		return stored_due
+	adjusted = stored_due
+	while adjusted > local_open:
+		adjusted = _quantize_money(adjusted - local_open)
+	return adjusted
+
+
+def annotate_clientes_open_invoice_balance(queryset):
+	from django.db.models import DecimalField, OuterRef, Q, Subquery, Sum
+	from django.db.models.functions import Coalesce
+
+	open_invoice_subquery = (
+		Invoice.objects.filter(
+			cliente_id=OuterRef('pk'),
+			estado='GENERADA',
+			saldo_cliente__gt=0,
+		)
+		.filter(Q(quickbooks_id__isnull=True) | Q(quickbooks_id=''))
+		.values('cliente_id')
+		.annotate(total=Sum('saldo_cliente'))
+		.values('total')
+	)
+	return queryset.annotate(
+		open_invoice_balance=Coalesce(
+			Subquery(open_invoice_subquery, output_field=DecimalField(max_digits=12, decimal_places=2)),
+			Decimal('0.00'),
+		),
+	)
+
+
+def resolve_customer_amount_owed(*, cliente, invoice=None):
+	stored_due = _quantize_money(cliente.due_balance)
+	if invoice is not None:
+		if not _invoice_counts_toward_local_open_outstanding(invoice):
+			return stored_due
+		local_open = _quantize_money(invoice.saldo_cliente)
+	else:
+		local_open = getattr(cliente, 'open_invoice_balance', None)
+		if local_open is None:
+			local_open = _sum_local_open_invoice_outstanding(cliente=cliente)
+		else:
+			local_open = _quantize_money(local_open)
+
+	effective_stored = _effective_stored_due_before_local_invoices(
+		stored_due=stored_due,
+		local_open=local_open,
+	)
+	return _quantize_money(effective_stored + local_open)
 
 
 def _remaining_invoice_balance_before_payment(*, invoice):
@@ -481,66 +555,6 @@ def generar_invoice_desde_picking(
 		},
 	)
 	return invoice
-
-
-def _combine_stored_due_with_open_outstanding(*, stored_due, open_outstanding):
-	stored_due = _quantize_money(stored_due)
-	open_outstanding = _quantize_money(open_outstanding)
-	if open_outstanding <= 0:
-		return stored_due
-	if stored_due <= 0:
-		return open_outstanding
-	if open_outstanding <= stored_due:
-		return stored_due
-	return _quantize_money(stored_due + open_outstanding)
-
-
-def annotate_clientes_open_invoice_balance(queryset):
-	from django.db.models import DecimalField, OuterRef, Subquery, Sum
-	from django.db.models.functions import Coalesce
-
-	open_invoice_subquery = (
-		Invoice.objects.filter(
-			cliente_id=OuterRef('pk'),
-			estado='GENERADA',
-			saldo_cliente__gt=0,
-		)
-		.values('cliente_id')
-		.annotate(total=Sum('saldo_cliente'))
-		.values('total')
-	)
-	return queryset.annotate(
-		open_invoice_balance=Coalesce(
-			Subquery(open_invoice_subquery, output_field=DecimalField(max_digits=12, decimal_places=2)),
-			Decimal('0.00'),
-		),
-	)
-
-
-def resolve_customer_amount_owed(*, cliente, invoice=None):
-	stored_due = _quantize_money(cliente.due_balance)
-	if invoice is not None:
-		return _combine_stored_due_with_open_outstanding(
-			stored_due=stored_due,
-			open_outstanding=invoice.saldo_cliente,
-		)
-
-	open_invoice_balance = getattr(cliente, 'open_invoice_balance', None)
-	if open_invoice_balance is None:
-		from django.db.models import Sum
-
-		open_invoice_balance = (
-			Invoice.objects.filter(
-				cliente=cliente,
-				estado='GENERADA',
-				saldo_cliente__gt=0,
-			).aggregate(total=Sum('saldo_cliente'))['total']
-			or Decimal('0.00')
-		)
-	return _combine_stored_due_with_open_outstanding(
-		stored_due=stored_due,
-		open_outstanding=open_invoice_balance,
-	)
 
 
 @transaction.atomic
@@ -979,7 +993,6 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 			payment_entry['cheque_imagen'] = _rewind_uploaded_file(payment_entry.get('cheque_imagen'))
 			DeliveryPayment.objects.create(delivery=delivery, **payment_entry)
 	_recalculate_invoice_balances(delivery.invoice)
-	_apply_invoice_outstanding_to_customer_balance(invoice=delivery.invoice)
 	for normalized_file in evidence_files:
 		DeliveryEvidencePhoto.objects.create(delivery=delivery, image=normalized_file)
 
@@ -1574,7 +1587,6 @@ def anular_invoice(*, invoice, usuario, motivo=''):
 	_void_linked_invoice_notes(invoice=invoice, usuario=usuario, motivo=motivo)
 	_reverse_invoice_customer_note_applications(invoice=invoice)
 	_reverse_invoice_customer_credit(invoice=invoice)
-	outstanding_before_void = _quantize_money(invoice.saldo_cliente)
 	restaurar_inventario_por_anulacion_factura(pedido=invoice.pedido, invoice=invoice, creado_por=usuario)
 
 	pedido = invoice.pedido
@@ -1607,8 +1619,6 @@ def anular_invoice(*, invoice, usuario, motivo=''):
 		usuario=usuario,
 		snapshot=_build_invoice_void_snapshot(invoice),
 	)
-	if outstanding_before_void > 0:
-		_apply_customer_balance_delta(cliente=invoice.cliente, delta=-outstanding_before_void)
 	from config.auditoria.business_events import log_business_event
 	from config.auditoria.models import AuditLog
 	log_business_event(
@@ -1721,7 +1731,6 @@ def mark_delivery_unpaid_from_backoffice(*, delivery, backoffice_user, motivo_no
 	cliente.credit_hold = True
 	cliente.save(update_fields=['credit_hold'])
 	_recalculate_invoice_balances(delivery.invoice)
-	_apply_invoice_outstanding_to_customer_balance(invoice=delivery.invoice)
 	from config.auditoria.business_events import log_business_event
 	log_business_event(
 		backoffice_user,

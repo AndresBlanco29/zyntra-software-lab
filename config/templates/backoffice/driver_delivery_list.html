@@ -8,6 +8,18 @@
   .driver-list-shell {
     display: grid;
     gap: 1rem;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .driver-list-page-head {
+    min-width: 0;
+  }
+
+  .driver-list-page-head h2,
+  .driver-list-page-head p {
+    overflow-wrap: anywhere;
   }
 
   .driver-list-hero {
@@ -16,6 +28,15 @@
     background: linear-gradient(135deg, #0d47a1 0%, #1976d2 48%, #64b5f6 100%);
     color: #fff;
     box-shadow: 0 18px 40px rgba(13, 71, 161, 0.18);
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .driver-list-hero h3,
+  .driver-list-hero p {
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .driver-list-hero p {
@@ -45,6 +66,33 @@
     display: block;
     font-size: 0.92rem;
     line-height: 1.35;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .driver-view-switcher {
+    width: 100%;
+  }
+
+  .driver-view-switcher .btn-group {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    gap: 0.5rem;
+  }
+
+  .driver-view-switcher .btn-group > .btn {
+    width: 100%;
+    margin: 0 !important;
+    border-radius: 0.75rem !important;
+  }
+
+  .driver-route-toolbar {
+    width: 100%;
+  }
+
+  .driver-route-toolbar .btn {
+    width: 100%;
   }
 
   .driver-list-toolbar {
@@ -59,7 +107,9 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.75rem;
-    flex: 1 1 420px;
+    flex: 1 1 100%;
+    min-width: 0;
+    width: 100%;
   }
 
   .driver-list-metric {
@@ -120,6 +170,12 @@
     justify-content: flex-end;
   }
 
+  .driver-delivery-address,
+  .driver-delivery-address > div {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
   .driver-inline-hint {
     display: inline-flex;
     align-items: center;
@@ -129,6 +185,13 @@
     padding: 0.25rem 0.6rem;
     color: #6c757d;
     font-size: 0.82rem;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .driver-list-stack-table {
+    overflow: visible;
   }
 
   .driver-action-help {
@@ -144,8 +207,40 @@
       grid-template-columns: 1fr;
     }
 
+    .driver-list-toolbar,
+    .driver-list-section-head,
+    .driver-view-toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .driver-list-hero {
+      padding: 1rem;
+    }
+
+    .driver-list-card .card-body {
+      padding: 1rem;
+    }
+
     .driver-delivery-actions {
       justify-content: flex-start;
+      flex-direction: column;
+      width: 100%;
+    }
+
+    .driver-delivery-actions .btn {
+      width: 100%;
+    }
+
+    .driver-delivery-meta {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .driver-inline-hint {
+      display: flex;
+      width: 100%;
+      border-radius: 0.75rem;
     }
 
     .driver-action-help {
@@ -154,7 +249,7 @@
   }
 </style>
 <div class="driver-list-shell">
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="driver-list-page-head d-flex justify-content-between align-items-center mb-3">
   <div>
     <h2 class="mb-1">
       {% if view_mode == 'completed' %}
@@ -208,8 +303,9 @@
   </div>
 </div>
 
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-  <div class="btn-group" role="group" aria-label="{% trans 'Delivery views' %}">
+<div class="driver-view-toolbar d-flex flex-wrap justify-content-between align-items-stretch gap-2 mb-3">
+  <div class="driver-view-switcher">
+    <div class="btn-group" role="group" aria-label="{% trans 'Delivery views' %}">
     <a href="{% url 'driver_delivery_list' %}" class="btn {% if view_mode == 'active' %}btn-primary{% else %}btn-outline-primary{% endif %}">
       {% trans "Driver Deliveries" %}
       <span class="badge {% if view_mode == 'active' %}bg-light text-primary{% else %}bg-primary{% endif %} ms-1">{{ active_count }}</span>
@@ -218,10 +314,13 @@
       {% trans "Delivered Invoices" %}
       <span class="badge {% if view_mode == 'completed' %}bg-light text-success{% else %}bg-success{% endif %} ms-1">{{ completed_count }}</span>
     </a>
+    </div>
   </div>
 
   {% if view_mode == 'active' %}
+  <div class="driver-route-toolbar">
   <button type="submit" class="btn btn-outline-primary" id="generateRouteButton" form="driverSelectionTableForm" disabled>{% trans "Generate route" %}</button>
+  </div>
   {% endif %}
 </div>
 
@@ -253,7 +352,7 @@
         </div>
         <div class="driver-inline-hint">{% trans "Generate route" %}: {% trans "Select one or more deliveries first." %}</div>
       </div>
-      <div class="table-responsive mobile-stack-responsive">
+      <div class="driver-list-stack-table mobile-stack-responsive">
         <table class="table align-middle mb-0 mobile-stack-table mobile-stack-table--driver">
         <thead>
           <tr>
@@ -333,7 +432,7 @@
         <p class="text-muted mb-0">{% trans "Review finished deliveries with quick access to the PDF and the saved delivery summary." %}</p>
       </div>
     </div>
-    <div class="table-responsive mobile-stack-responsive">
+    <div class="driver-list-stack-table mobile-stack-responsive">
       <table class="table align-middle mb-0 mobile-stack-table mobile-stack-table--driver">
         <thead>
           <tr>

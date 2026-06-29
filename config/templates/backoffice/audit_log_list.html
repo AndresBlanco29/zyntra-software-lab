@@ -1,0 +1,188 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Audit trail" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+  <div>
+    <h2 class="mb-1">{% trans "Audit trail" %}</h2>
+    <p class="text-muted mb-0">{% trans "Track who performed each action, how it was executed, when it happened, and what changed across the system." %}</p>
+  </div>
+  <div class="badge text-bg-light border px-3 py-2">
+    {% blocktrans with count=total_count %}Showing {{ count }} matching records{% endblocktrans %}
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-12 col-lg-4">
+        <label class="form-label" for="auditSearch">{% trans "Search" %}</label>
+        <input
+          id="auditSearch"
+          type="search"
+          name="q"
+          value="{{ filters.q }}"
+          class="form-control"
+          placeholder="{% trans 'User, action, path, entity, IP...' %}">
+      </div>
+      <div class="col-12 col-md-6 col-lg-2">
+        <label class="form-label" for="auditUser">{% trans "User" %}</label>
+        <select id="auditUser" name="user_id" class="form-select">
+          <option value="">{% trans "All users" %}</option>
+          {% for user in users %}
+          <option value="{{ user.id }}" {% if filters.user_id == user.id %}selected{% endif %}>
+            {% firstof user.get_full_name user.username %} ({{ user.role }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-6 col-lg-2">
+        <label class="form-label" for="auditCategory">{% trans "Action type" %}</label>
+        <select id="auditCategory" name="action_category" class="form-select">
+          <option value="">{% trans "All types" %}</option>
+          {% for value, label in category_choices %}
+          <option value="{{ value }}" {% if filters.action_category == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-6 col-lg-2">
+        <label class="form-label" for="auditMethod">{% trans "Method" %}</label>
+        <select id="auditMethod" name="http_method" class="form-select">
+          <option value="">{% trans "All methods" %}</option>
+          {% for value, label in method_choices %}
+          <option value="{{ value }}" {% if filters.http_method == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-6 col-lg-2">
+        <label class="form-label" for="auditEntityType">{% trans "Entity" %}</label>
+        <select id="auditEntityType" name="entity_type" class="form-select">
+          <option value="">{% trans "All entities" %}</option>
+          {% for entity_type in entity_types %}
+          <option value="{{ entity_type }}" {% if filters.entity_type == entity_type %}selected{% endif %}>{{ entity_type }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-6 col-lg-2">
+        <label class="form-label" for="auditStart">{% trans "From" %}</label>
+        <input id="auditStart" type="date" name="start_date" value="{{ filters.start_date|date:'Y-m-d' }}" class="form-control">
+      </div>
+      <div class="col-12 col-md-6 col-lg-2">
+        <label class="form-label" for="auditEnd">{% trans "To" %}</label>
+        <input id="auditEnd" type="date" name="end_date" value="{{ filters.end_date|date:'Y-m-d' }}" class="form-control">
+      </div>
+      <div class="col-12 col-lg-4 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">{% trans "Apply filters" %}</button>
+        <a href="{% url 'audit_log_list' %}" class="btn btn-outline-secondary">{% trans "Clear" %}</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0 align-middle audit-log-table">
+      <thead class="table-light">
+        <tr>
+          <th>{% trans "When" %}</th>
+          <th>{% trans "Who" %}</th>
+          <th>{% trans "How" %}</th>
+          <th>{% trans "Action" %}</th>
+          <th>{% trans "Entity" %}</th>
+          <th>{% trans "IP" %}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in page_obj %}
+        <tr>
+          <td class="text-nowrap">{{ log.created_at|date:"m/d/Y H:i:s" }}</td>
+          <td>
+            <div class="fw-semibold">{{ log.actor_display }}</div>
+            <div class="small text-muted">{{ log.actor_role|default:"-" }}</div>
+          </td>
+          <td>
+            <span class="badge text-bg-secondary">{{ log.http_method }}</span>
+            <div class="small text-muted mt-1">{{ log.get_action_category_display }}</div>
+          </td>
+          <td>
+            <div class="fw-semibold">{{ log.action_label }}</div>
+            <div class="small text-muted text-break">{{ log.path }}</div>
+          </td>
+          <td>
+            {% if log.entity_label %}
+              <div>{{ log.entity_label }}</div>
+              <div class="small text-muted">{{ log.entity_type }}{% if log.entity_id %} #{{ log.entity_id }}{% endif %}</div>
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td class="small text-muted">{{ log.ip_address|default:"-" }}</td>
+          <td class="text-end">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-primary"
+              data-bs-toggle="collapse"
+              data-bs-target="#audit-detail-{{ log.id }}"
+              aria-expanded="false">
+              {% trans "Details" %}
+            </button>
+          </td>
+        </tr>
+        <tr class="collapse" id="audit-detail-{{ log.id }}">
+          <td colspan="7" class="bg-light">
+            <div class="p-3 small">
+              <div class="row g-3">
+                <div class="col-md-4"><strong>{% trans "Route" %}:</strong> {{ log.route_name|default:"-" }}</div>
+                <div class="col-md-4"><strong>{% trans "Status" %}:</strong> {{ log.status_code }}</div>
+                <div class="col-md-4"><strong>{% trans "User agent" %}:</strong> {{ log.user_agent|default:"-" }}</div>
+              </div>
+              {% if log.metadata %}
+              <pre class="mt-3 mb-0 p-2 bg-white border rounded small">{{ log.metadata }}</pre>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-5">{% trans "No audit records match the selected filters." %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="mt-4" aria-label="{% trans 'Audit pagination' %}">
+  <ul class="pagination justify-content-center flex-wrap">
+    {% if page_obj.has_previous %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ filters.q }}&user_id={{ filters.user_id|default:'' }}&action_category={{ filters.action_category }}&http_method={{ filters.http_method }}&entity_type={{ filters.entity_type }}&start_date={% if filters.start_date %}{{ filters.start_date|date:'Y-m-d' }}{% endif %}&end_date={% if filters.end_date %}{{ filters.end_date|date:'Y-m-d' }}{% endif %}">{% trans "Previous" %}</a>
+    </li>
+    {% endif %}
+    <li class="page-item disabled">
+      <span class="page-link">{% blocktrans with page=page_obj.number total=page_obj.paginator.num_pages %}Page {{ page }} of {{ total }}{% endblocktrans %}</span>
+    </li>
+    {% if page_obj.has_next %}
+    <li class="page-item">
+      <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ filters.q }}&user_id={{ filters.user_id|default:'' }}&action_category={{ filters.action_category }}&http_method={{ filters.http_method }}&entity_type={{ filters.entity_type }}&start_date={% if filters.start_date %}{{ filters.start_date|date:'Y-m-d' }}{% endif %}&end_date={% if filters.end_date %}{{ filters.end_date|date:'Y-m-d' }}{% endif %}">{% trans "Next" %}</a>
+    </li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+
+<style>
+  .audit-log-table td,
+  .audit-log-table th {
+    vertical-align: top;
+  }
+  .audit-log-table pre {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+</style>
+{% endblock %}

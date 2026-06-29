@@ -161,6 +161,7 @@ INSTALLED_APPS = [
     'config.notificaciones',
     'config.pedidos',
     'config.reportes',
+    'config.auditoria',
 ]
 
 # ========================
@@ -180,6 +181,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'config.auditoria.middleware.AuditMiddleware',
     'config.config.middleware.ProtectedAreaLoginMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',

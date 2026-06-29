@@ -150,6 +150,9 @@ La Tortilla Grocery
   <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-pull-sync" data-label="{% trans 'Run pull sync now' %}" data-section="QuickBooks action" data-keywords="quickbooks sync pull sync run sync sincronizar quickbooks incremental sync"></a>
   <a class="quick-search-shortcut" href="{% url 'quickbooks_center' %}#qb-full-resync" data-label="{% trans 'Run full resync' %}" data-section="QuickBooks action" data-keywords="quickbooks full resync full sync reimport resync sincronizacion completa"></a>
 {% endif %}
+{% if request.user.is_superuser or request.user.role == 'admin' %}
+  <a class="quick-search-shortcut" href="{% url 'audit_log_list' %}" data-label="{% trans 'Audit trail' %}" data-section="{% trans 'Administration' %}" data-keywords="audit trail auditoria registro actividad logs movimientos historial"></a>
+{% endif %}
 </div>
 
 <!-- Modal de confirmacion de logout -->
@@ -213,8 +216,8 @@ La Tortilla Grocery
 <div class="list-group list-group-flush">
 {% get_current_language as CURRENT_LANGUAGE %}
 
-{% if request.user|has_internal_permission:'admin.dashboard.view' or request.user|has_internal_permission:'admin.users.view' or request.user|has_internal_permission:'admin.products.view' or request.user|has_internal_permission:'admin.content.view' or request.user|has_internal_permission:'backoffice.reports.view' %}
-<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'panel_admin' or request.resolver_match.url_name == 'reportes_dashboard' or request.resolver_match.url_name == 'lista_usuarios_internos' or request.resolver_match.url_name == 'crear_usuario_interno' or request.resolver_match.url_name == 'editar_usuario_interno' or request.resolver_match.url_name == 'crear_vendedor' or request.resolver_match.url_name == 'editar_vendedor' or request.resolver_match.url_name == 'crear_backoffice' or request.resolver_match.url_name == 'editar_backoffice' or request.resolver_match.url_name == 'lista_productos' or request.resolver_match.url_name == 'crear_producto' or request.resolver_match.url_name == 'crear_categoria' or request.resolver_match.url_name == 'crear_marca' or request.resolver_match.url_name == 'lista_marcas' or request.resolver_match.url_name == 'editar_marca' or request.resolver_match.url_name == 'editar_producto' or request.resolver_match.url_name == 'contenido_home' or request.resolver_match.url_name == 'editar_home_contenido' or request.resolver_match.url_name == 'lista_testimonios' or request.resolver_match.url_name == 'crear_testimonio' or request.resolver_match.url_name == 'editar_testimonio' %}open{% endif %}>
+{% if request.user|has_internal_permission:'admin.dashboard.view' or request.user|has_internal_permission:'admin.users.view' or request.user|has_internal_permission:'admin.products.view' or request.user|has_internal_permission:'admin.content.view' or request.user|has_internal_permission:'backoffice.reports.view' or request.user.is_superuser or request.user.role == 'admin' %}
+<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'panel_admin' or request.resolver_match.url_name == 'reportes_dashboard' or request.resolver_match.url_name == 'audit_log_list' or request.resolver_match.url_name == 'lista_usuarios_internos' or request.resolver_match.url_name == 'crear_usuario_interno' or request.resolver_match.url_name == 'editar_usuario_interno' or request.resolver_match.url_name == 'crear_vendedor' or request.resolver_match.url_name == 'editar_vendedor' or request.resolver_match.url_name == 'crear_backoffice' or request.resolver_match.url_name == 'editar_backoffice' or request.resolver_match.url_name == 'lista_productos' or request.resolver_match.url_name == 'crear_producto' or request.resolver_match.url_name == 'crear_categoria' or request.resolver_match.url_name == 'crear_marca' or request.resolver_match.url_name == 'lista_marcas' or request.resolver_match.url_name == 'editar_marca' or request.resolver_match.url_name == 'editar_producto' or request.resolver_match.url_name == 'contenido_home' or request.resolver_match.url_name == 'editar_home_contenido' or request.resolver_match.url_name == 'lista_testimonios' or request.resolver_match.url_name == 'crear_testimonio' or request.resolver_match.url_name == 'editar_testimonio' %}open{% endif %}>
   <summary class="sidebar-collapsible-summary">{% trans "Administration" %}</summary>
   <div class="sidebar-collapsible-links">
     {% if request.user|has_internal_permission:'admin.dashboard.view' %}
@@ -228,6 +231,13 @@ La Tortilla Grocery
     <a href="{% url 'reportes_dashboard' %}"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'reportes_dashboard' %}active{% endif %}">
       {% trans "Reports Center" %}
+    </a>
+    {% endif %}
+
+    {% if request.user.is_superuser or request.user.role == 'admin' %}
+    <a href="{% url 'audit_log_list' %}"
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'audit_log_list' %}active{% endif %}">
+      {% trans "Audit trail" %}
     </a>
     {% endif %}
 

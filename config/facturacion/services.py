@@ -188,44 +188,44 @@ def _apply_customer_balance_delta(*, cliente, delta):
 	return cliente.balance
 
 
-def _local_open_invoice_outstanding_queryset(*, cliente):
+def _operational_open_invoice_outstanding_queryset(*, cliente):
 	from django.db.models import Q
 
 	return Invoice.objects.filter(
 		cliente=cliente,
 		estado='GENERADA',
 		saldo_cliente__gt=0,
-	).filter(Q(quickbooks_id__isnull=True) | Q(quickbooks_id=''))
+	).filter(
+		Q(metodo_entrega='CUSTOMER_PICK_UP') | Q(delivery__estado_pago='NO_PAGADO')
+	)
 
 
-def _sum_local_open_invoice_outstanding(*, cliente):
+def _sum_operational_open_invoice_outstanding(*, cliente):
 	from django.db.models import Sum
 
 	total = (
-		_local_open_invoice_outstanding_queryset(cliente=cliente).aggregate(total=Sum('saldo_cliente'))['total']
+		_operational_open_invoice_outstanding_queryset(cliente=cliente).aggregate(total=Sum('saldo_cliente'))['total']
 		or Decimal('0.00')
 	)
 	return _quantize_money(total)
 
 
-def _invoice_counts_toward_local_open_outstanding(invoice):
+def _invoice_operational_outstanding(invoice):
 	if invoice.estado != 'GENERADA':
-		return False
-	if _quantize_money(invoice.saldo_cliente) <= 0:
-		return False
-	return not (invoice.quickbooks_id or '').strip()
+		return Decimal('0.00')
+	outstanding = _quantize_money(invoice.saldo_cliente)
+	if outstanding <= 0:
+		return Decimal('0.00')
+	if invoice.metodo_entrega == 'CUSTOMER_PICK_UP':
+		return outstanding
+	delivery = getattr(invoice, 'delivery', None)
+	if delivery is not None and delivery.estado_pago == 'NO_PAGADO':
+		return outstanding
+	return Decimal('0.00')
 
 
-def _effective_stored_due_before_local_invoices(*, stored_due, local_open):
-	"""Undo repeated local-invoice balance applications without mutating stored data."""
-	stored_due = _quantize_money(stored_due)
-	local_open = _quantize_money(local_open)
-	if local_open <= 0:
-		return stored_due
-	adjusted = stored_due
-	while adjusted > local_open:
-		adjusted = _quantize_money(adjusted - local_open)
-	return adjusted
+def _customer_has_open_invoice_saldo(*, cliente):
+	return Invoice.objects.filter(cliente=cliente, estado='GENERADA', saldo_cliente__gt=0).exists()
 
 
 def annotate_clientes_open_invoice_balance(queryset):
@@ -238,7 +238,7 @@ def annotate_clientes_open_invoice_balance(queryset):
 			estado='GENERADA',
 			saldo_cliente__gt=0,
 		)
-		.filter(Q(quickbooks_id__isnull=True) | Q(quickbooks_id=''))
+		.filter(Q(metodo_entrega='CUSTOMER_PICK_UP') | Q(delivery__estado_pago='NO_PAGADO'))
 		.values('cliente_id')
 		.annotate(total=Sum('saldo_cliente'))
 		.values('total')
@@ -254,21 +254,24 @@ def annotate_clientes_open_invoice_balance(queryset):
 def resolve_customer_amount_owed(*, cliente, invoice=None):
 	stored_due = _quantize_money(cliente.due_balance)
 	if invoice is not None:
-		if not _invoice_counts_toward_local_open_outstanding(invoice):
-			return stored_due
-		local_open = _quantize_money(invoice.saldo_cliente)
-	else:
-		local_open = getattr(cliente, 'open_invoice_balance', None)
-		if local_open is None:
-			local_open = _sum_local_open_invoice_outstanding(cliente=cliente)
-		else:
-			local_open = _quantize_money(local_open)
+		invoice_operational = _invoice_operational_outstanding(invoice)
+		if invoice_operational > 0:
+			return _quantize_money(stored_due + invoice_operational)
+		return stored_due
 
-	effective_stored = _effective_stored_due_before_local_invoices(
-		stored_due=stored_due,
-		local_open=local_open,
-	)
-	return _quantize_money(effective_stored + local_open)
+	operational_open = getattr(cliente, 'open_invoice_balance', None)
+	if operational_open is None:
+		operational_open = _sum_operational_open_invoice_outstanding(cliente=cliente)
+	else:
+		operational_open = _quantize_money(operational_open)
+
+	if operational_open > 0:
+		return _quantize_money(stored_due + operational_open)
+
+	if not _customer_has_open_invoice_saldo(cliente=cliente) and stored_due > Decimal('1000.00'):
+		return Decimal('0.00')
+
+	return stored_due
 
 
 def _remaining_invoice_balance_before_payment(*, invoice):

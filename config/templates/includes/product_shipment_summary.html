@@ -1,0 +1,47 @@
+<div class="card shadow-sm mb-3 product-shipment-summary invoice-shipment-summary">
+  <div class="card-body">
+    <div class="row g-3 align-items-center">
+      <div class="col-md-4">
+        <div class="invoice-summary-box">
+          <span class="invoice-summary-box__label">No. of Cases:</span>
+          <span class="invoice-summary-box__value">{{ shipment_summary.total_cases }}</span>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="invoice-summary-box">
+          <span class="invoice-summary-box__label">Total WGT:</span>
+          <span class="invoice-summary-box__value">{{ shipment_summary.total_weight|floatformat:1 }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .product-shipment-summary .invoice-summary-box {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .product-shipment-summary .invoice-summary-box__label {
+    display: inline-block;
+    min-width: 7.5rem;
+    padding: 0.45rem 0.65rem;
+    border: 1px solid #1f2937;
+    font-weight: 700;
+    font-size: 0.95rem;
+    background: #fff;
+  }
+  .product-shipment-summary .invoice-summary-box__value {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+  @media print {
+    .product-shipment-summary {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      box-shadow: none !important;
+      border: 0 !important;
+    }
+  }
+</style>

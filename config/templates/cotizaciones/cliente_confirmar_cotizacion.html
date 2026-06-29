@@ -1,4 +1,4 @@
-{% load static i18n %}
+{% load static i18n shipment_summary_tags %}
 <!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
 <head>
@@ -165,6 +165,8 @@
               </tbody>
             </table>
           </div>
+
+          {% product_shipment_summary source='quote_rows' value=quote_rows %}
 
               {% if puede_editar %}
               <div class="mb-3">

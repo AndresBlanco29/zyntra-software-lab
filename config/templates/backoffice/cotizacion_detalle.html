@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n l10n %}
+{% load i18n l10n shipment_summary_tags %}
 
 {% block title %}{% trans "Quote" %} #{{ cotizacion.id }}{% endblock %}
 
@@ -91,6 +91,8 @@
             </tbody>
           </table>
         </div>
+
+        {% product_shipment_summary source='cotizacion_items' value=cotizacion_item_rows %}
 
         <div class="mb-3">
           <label class="form-label fw-semibold">{% trans "Customer note" %}</label>

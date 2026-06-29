@@ -1,5 +1,5 @@
 {% load static %}
-{% load i18n permissions_tags %}
+{% load i18n permissions_tags shipment_summary_tags %}
 
 <!DOCTYPE html>
 
@@ -314,6 +314,8 @@ ${{ item.subtotal|floatformat:2 }}
 </table>
 
 </div>
+
+{% product_shipment_summary source='vendor_products' value=productos %}
 
 <div class="row">
 

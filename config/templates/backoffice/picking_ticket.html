@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n %}
+{% load i18n shipment_summary_tags %}
 
 {% block title %}{% trans "Picking Ticket" %} #{{ pedido.id }}{% endblock %}
 
@@ -91,5 +91,7 @@
       </div>
     </div>
   </div>
+
+  {% product_shipment_summary source='pedido_items' value=picking_items quantity='cantidad' %}
 </div>
 {% endblock %}

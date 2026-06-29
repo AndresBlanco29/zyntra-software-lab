@@ -41,27 +41,18 @@ def resolve_invoice_payment_due_date(invoice):
 
 
 def resolve_invoice_item_case_weight(item):
-	if item.peso_por_caja is not None:
-		return _to_decimal(item.peso_por_caja, '0')
-	presentacion = getattr(item, 'presentacion', None)
-	if presentacion is not None and presentacion.peso_por_caja is not None:
-		return _to_decimal(presentacion.peso_por_caja, '0')
-	return Decimal('0')
+	from config.core.shipment_summary import resolve_line_case_weight
+
+	return resolve_line_case_weight(
+		case_weight=item.peso_por_caja,
+		presentacion=getattr(item, 'presentacion', None),
+	)
 
 
 def build_invoice_shipment_summary(invoice):
-	total_cases = 0
-	total_weight = Decimal('0')
-	for item in invoice.items.all():
-		quantity = int(item.cantidad_facturada or 0)
-		total_cases += quantity
-		case_weight = resolve_invoice_item_case_weight(item)
-		if case_weight > 0 and quantity > 0:
-			total_weight += case_weight * Decimal(str(quantity))
-	return {
-		'total_cases': total_cases,
-		'total_weight': total_weight.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP),
-	}
+	from config.core.shipment_summary import build_shipment_summary_from_invoice
+
+	return build_shipment_summary_from_invoice(invoice)
 
 
 def _to_decimal(value, default='0'):

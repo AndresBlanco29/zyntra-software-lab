@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n %}
+{% load i18n shipment_summary_tags %}
 
 {% block title %}{% trans "Create Adjustment Note" %}{% endblock %}
 
@@ -318,6 +318,9 @@
                 {% endif %}
               </tbody>
             </table>
+            {% if selected_invoice %}
+            {% product_shipment_summary source='invoice' value=selected_invoice %}
+            {% endif %}
             <div class="form-text">{% trans "Partial returns are prorated from the package amount. If a child presentation exists, inventory returns there automatically. Otherwise the remainder is stored as internal product stock." %}</div>
           </div>
 

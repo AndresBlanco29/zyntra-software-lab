@@ -1,4 +1,11 @@
+from decimal import Decimal
 from types import SimpleNamespace
+
+from config.core.shipment_summary import (
+	build_shipment_summary_from_cart_entries,
+	build_shipment_summary_from_lines,
+	build_shipment_summary_from_vendor_cart_products,
+)
 
 from django.conf import settings
 from django.test import TestCase
@@ -107,3 +114,34 @@ class WorkflowBadgeTests(TestCase):
 		self.assertEqual(badge['kind'], 'split')
 		self.assertEqual(badge['sender_role'], 'backoffice')
 		self.assertEqual(badge['receiver_role'], 'driver')
+
+
+class ShipmentSummaryTests(TestCase):
+	def test_build_shipment_summary_from_lines_sums_cases_and_weight(self):
+		presentacion = SimpleNamespace(peso_por_caja=Decimal('10.5'))
+		summary = build_shipment_summary_from_lines([
+			{'quantity': 2, 'presentacion': presentacion},
+			{'quantity': 1, 'case_weight': Decimal('5.0')},
+		])
+		self.assertEqual(summary['total_cases'], 3)
+		self.assertEqual(summary['total_weight'], Decimal('26.0'))
+
+	def test_build_shipment_summary_from_cart_entries(self):
+		presentacion = SimpleNamespace(peso_por_caja=Decimal('12.0'))
+		summary = build_shipment_summary_from_cart_entries([
+			{'cantidad': 4, 'presentacion': presentacion},
+		])
+		self.assertEqual(summary['total_cases'], 4)
+		self.assertEqual(summary['total_weight'], Decimal('48.0'))
+
+	def test_build_shipment_summary_from_vendor_cart_products(self):
+		presentacion = SimpleNamespace(id=7, peso_por_caja=Decimal('8.0'))
+		summary = build_shipment_summary_from_vendor_cart_products([
+			{
+				'presentacion_id': 7,
+				'cantidad': 3,
+				'presentaciones': [presentacion],
+			},
+		])
+		self.assertEqual(summary['total_cases'], 3)
+		self.assertEqual(summary['total_weight'], Decimal('24.0'))

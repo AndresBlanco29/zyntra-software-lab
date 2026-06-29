@@ -1,4 +1,4 @@
-{% load static i18n %}
+{% load static i18n shipment_summary_tags %}
 <!DOCTYPE html>
 <html lang="{{ LANGUAGE_CODE }}">
 <head>
@@ -223,6 +223,8 @@ aria-label="{% trans 'Quantity' %}"
 </table>
 
 </div>
+
+{% product_shipment_summary source='cart' value=carrito %}
 
 </div>
 

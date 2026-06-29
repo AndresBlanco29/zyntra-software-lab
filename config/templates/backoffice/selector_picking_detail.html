@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n %}
+{% load i18n shipment_summary_tags %}
 
 {% block title %}{% trans "Picking Verification" %} #{{ pedido.id }}{% endblock %}
 
@@ -121,6 +121,9 @@
         </tbody>
       </table>
     </div>
+
+    {% product_shipment_summary source='pedido' value=pedido quantity='cantidad_solicitada' %}
+
     <div class="form-text mt-2">{% trans "Check each line in the Reviewed column to confirm you verified every product before saving." %}</div>
     <div class="form-text">{% trans "Products added here will be marked in red for BackOffice review." %}</div>
 

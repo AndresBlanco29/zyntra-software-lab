@@ -12,6 +12,7 @@ from django.db import transaction
 from django.utils.translation import gettext as _
 
 from config.core.product_ordering import order_pedido_items_for_display
+from config.core.shipment_summary import build_shipment_summary_from_pedido_items
 from config.core.pdf_branding import (
 	BRAND_BORDER,
 	BRAND_MUTED_TEXT,
@@ -34,6 +35,7 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 from config.clientes.models import Cliente
 from config.facturacion.models import NotaAjuste
+from config.facturacion.views import _build_invoice_pdf_shipment_summary_table
 from config.facturacion.services import DEFAULT_SUGGESTED_PROFIT_PERCENTAGE, resolve_presentacion_suggested_unit_price, summarize_pending_customer_notes
 from config.integrations.quickbooks.services import get_connection_status
 from config.integrations.quickbooks.views import get_dashboard_sync_context
@@ -879,6 +881,28 @@ def backoffice_picking_pdf(request, pedido_id):
 		('TOPPADDING', (0, 0), (-1, -1), 8),
 	]))
 	content.append(table)
+	content.append(Spacer(1, 12))
+	picking_items = order_pedido_items_for_display(pedido)
+	shipment_summary = build_shipment_summary_from_pedido_items(picking_items, quantity_attr='cantidad')
+	summary_box_style = ParagraphStyle(
+		'PickingShipmentSummaryLabel',
+		parent=styles['BodyText'],
+		fontName='Helvetica-Bold',
+		fontSize=8,
+	)
+	summary_value_style = ParagraphStyle(
+		'PickingShipmentSummaryValue',
+		parent=styles['BodyText'],
+		fontSize=8,
+	)
+	content.append(
+		_build_invoice_pdf_shipment_summary_table(
+			shipment_summary,
+			box_style=summary_box_style,
+			value_style=summary_value_style,
+			total_width=504,
+		)
+	)
 
 	document.build(content)
 	pdf = buffer.getvalue()

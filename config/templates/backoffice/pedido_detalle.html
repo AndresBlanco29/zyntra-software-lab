@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load static i18n l10n permissions_tags %}
+{% load static i18n l10n permissions_tags shipment_summary_tags %}
 
 {% block title %}{% trans "Order" %} #{{ pedido.id }}{% endblock %}
 
@@ -711,6 +711,8 @@
         </tbody>
       </table>
     </div>
+
+    {% product_shipment_summary source='pedido_items' value=pedido_items quantity='cantidad' %}
 
     {% if lineas_bloqueadas_para_picking %}
     <div class="alert alert-warning mt-3 mb-0">

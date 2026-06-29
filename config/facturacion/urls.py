@@ -21,6 +21,7 @@ urlpatterns = [
 	path('backoffice/notes/<int:note_id>/cancel/', views.backoffice_invoice_cancel_note, name='backoffice_invoice_cancel_note'),
 	path('backoffice/notes/<int:note_id>/delete/', views.backoffice_invoice_delete_note, name='backoffice_invoice_delete_note'),
 	path('backoffice/deliveries/<int:delivery_id>/unlock-client/', views.backoffice_unlock_delivery_client, name='backoffice_unlock_delivery_client'),
+	path('backoffice/deliveries/<int:delivery_id>/mark-unpaid/', views.backoffice_mark_delivery_unpaid, name='backoffice_mark_delivery_unpaid'),
 	path('backoffice/pedidos/<int:pedido_id>/generate-invoice/', views.backoffice_generate_invoice, name='backoffice_generate_invoice'),
 	path('driver/deliveries/', views.driver_delivery_list, name='driver_delivery_list'),
 	path('driver/deliveries/route/', views.driver_delivery_route, name='driver_delivery_route'),

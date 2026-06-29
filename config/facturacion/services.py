@@ -1517,6 +1517,70 @@ def unlock_client_from_delivery(*, delivery, backoffice_user):
 	return delivery
 
 
+@transaction.atomic
+def mark_delivery_unpaid_from_backoffice(*, delivery, backoffice_user, motivo_no_pago):
+	_ = backoffice_user
+	if not delivery.is_completed:
+		raise ValidationError(_('Only completed deliveries can be corrected from BackOffice.'))
+	if delivery.estado_pago != 'PAGADO':
+		raise ValidationError(_('Only paid deliveries can be marked as unpaid from BackOffice.'))
+
+	reason = (motivo_no_pago or '').strip()
+	if not reason:
+		raise ValidationError(_('A reason is required when marking the delivery as unpaid.'))
+
+	delivery.estado_pago = 'NO_PAGADO'
+	delivery.estado = 'ENTREGADA_SIN_PAGO'
+	delivery.metodo_pago = ''
+	delivery.monto_pagado = Decimal('0.00')
+	delivery.monto_pagado_cash = Decimal('0.00')
+	delivery.monto_pagado_cheque = Decimal('0.00')
+	delivery.motivo_no_pago = reason
+	delivery.transferencia_referencia = ''
+	delivery.tarjeta_ultimos_4 = ''
+	delivery.tarjeta_autorizacion = ''
+	delivery.zelle_referencia = ''
+	delivery.zelle_remitente = ''
+	delivery.ach_referencia = ''
+	delivery.ach_cuenta_ultimos_4 = ''
+	delivery.cheque_numero = ''
+	delivery.cheque_banco = ''
+	delivery.cheque_imagen = None
+	delivery.client_blocked_on_delivery = True
+	delivery.client_unlocked_by = None
+	delivery.client_unlocked_at = None
+	delivery.payments.all().delete()
+	delivery.save(update_fields=[
+		'estado',
+		'estado_pago',
+		'metodo_pago',
+		'monto_pagado',
+		'monto_pagado_cash',
+		'monto_pagado_cheque',
+		'motivo_no_pago',
+		'transferencia_referencia',
+		'tarjeta_ultimos_4',
+		'tarjeta_autorizacion',
+		'zelle_referencia',
+		'zelle_remitente',
+		'ach_referencia',
+		'ach_cuenta_ultimos_4',
+		'cheque_numero',
+		'cheque_banco',
+		'cheque_imagen',
+		'client_blocked_on_delivery',
+		'client_unlocked_by',
+		'client_unlocked_at',
+		'updated_at',
+	])
+
+	cliente = delivery.invoice.cliente
+	cliente.credit_hold = True
+	cliente.save(update_fields=['credit_hold'])
+	_recalculate_invoice_balances(delivery.invoice)
+	return delivery
+
+
 def get_recent_customer_invoice_items_by_presentation(*, cliente, presentation_ids, limit=3):
 	presentation_ids = [presentation_id for presentation_id in presentation_ids if presentation_id]
 	if not cliente or not presentation_ids:

@@ -73,6 +73,7 @@ from .services import (
 	summarize_pending_customer_notes,
 	start_delivery_route,
 	unlock_client_from_delivery,
+	mark_delivery_unpaid_from_backoffice,
 )
 
 
@@ -1653,6 +1654,25 @@ def backoffice_unlock_delivery_client(request, delivery_id):
 		return redirect('backoffice_invoice_detail', invoice_id=delivery.invoice_id)
 	unlock_client_from_delivery(delivery=delivery, backoffice_user=request.user)
 	messages.success(request, _('Customer unlocked successfully.'))
+	return redirect('backoffice_invoice_detail', invoice_id=delivery.invoice_id)
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_mark_delivery_unpaid(request, delivery_id):
+	delivery = get_object_or_404(Delivery.objects.select_related('invoice__cliente'), id=delivery_id)
+	if request.method != 'POST':
+		return redirect('backoffice_invoice_detail', invoice_id=delivery.invoice_id)
+	try:
+		mark_delivery_unpaid_from_backoffice(
+			delivery=delivery,
+			backoffice_user=request.user,
+			motivo_no_pago=request.POST.get('motivo_no_pago'),
+		)
+	except ValidationError as exc:
+		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+	else:
+		messages.success(request, _('Delivery payment status updated to unpaid.'))
 	return redirect('backoffice_invoice_detail', invoice_id=delivery.invoice_id)
 
 

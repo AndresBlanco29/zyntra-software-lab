@@ -292,6 +292,20 @@
         </form>
       </div>
       {% endif %}
+      {% if invoice.delivery.is_completed and invoice.delivery.estado_pago == 'PAGADO' %}
+      <div class="col-12">
+        <div class="border rounded-3 p-3 bg-light">
+          <h6 class="mb-2">{% trans "Correct payment status" %}</h6>
+          <p class="text-muted small mb-3">{% trans "If the driver marked this delivery as paid by mistake, BackOffice can change it to unpaid. Drivers cannot make this correction." %}</p>
+          <form method="post" action="{% url 'backoffice_mark_delivery_unpaid' invoice.delivery.id %}">
+            {% csrf_token %}
+            <label class="form-label fw-semibold">{% trans "Reason for non-payment" %}</label>
+            <textarea name="motivo_no_pago" class="form-control mb-3" rows="3" required placeholder="{% trans 'Explain why this delivery should be marked as unpaid.' %}"></textarea>
+            <button type="submit" class="btn btn-warning">{% trans "Mark delivery as unpaid" %}</button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>

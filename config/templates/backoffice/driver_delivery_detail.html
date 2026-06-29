@@ -115,8 +115,106 @@
 
   .driver-finish-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-    gap: 1rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+  }
+
+  .driver-adjustment-callout {
+    position: relative;
+    overflow: hidden;
+    border: 2px solid #0b3d91;
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #eef4ff 0%, #fffdf5 58%, #ffffff 100%);
+    box-shadow: 0 14px 32px rgba(11, 61, 145, 0.14);
+    padding: 1.2rem 1.25rem 1.25rem 1.45rem;
+  }
+
+  .driver-adjustment-callout::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 6px;
+    background: linear-gradient(180deg, #0b3d91 0%, #ffd400 100%);
+  }
+
+  .driver-adjustment-callout-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+    margin-bottom: 1rem;
+  }
+
+  .driver-adjustment-callout-icon {
+    width: 2.85rem;
+    height: 2.85rem;
+    border-radius: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #0b3d91;
+    color: #fff;
+    font-size: 1.35rem;
+    flex: 0 0 auto;
+    box-shadow: 0 8px 18px rgba(11, 61, 145, 0.28);
+  }
+
+  .driver-adjustment-callout-title {
+    color: #0b3d91;
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+
+  .driver-adjustment-callout-pill {
+    background: #ffd400;
+    color: #1e293b;
+    font-weight: 700;
+    border: 1px solid rgba(11, 61, 145, 0.12);
+  }
+
+  .driver-adjustment-callout-lead {
+    color: #334155;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    margin-top: 0.35rem;
+  }
+
+  .driver-adjustment-callout-body {
+    border: 1px solid rgba(11, 61, 145, 0.12);
+    border-radius: 0.9rem;
+    background: rgba(255, 255, 255, 0.92);
+    padding: 1rem;
+  }
+
+  .driver-adjustment-type-highlight {
+    border: 1px dashed rgba(11, 61, 145, 0.35);
+    border-radius: 0.85rem;
+    background: #f8fbff;
+    padding: 0.85rem 0.95rem;
+  }
+
+  .driver-adjustment-type-highlight .form-label {
+    color: #0b3d91;
+    font-size: 0.95rem;
+  }
+
+  .driver-adjustment-type-select {
+    border-color: #0b3d91;
+    font-weight: 600;
+  }
+
+  .driver-adjustment-callout .alert-info-tone {
+    border: 1px solid rgba(11, 61, 145, 0.18);
+    background: #f1f6ff;
+    color: #1e3a5f;
+  }
+
+  .driver-payment-panel {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 1rem;
+    background: #f8fafc;
+    padding: 1rem 1.1rem;
+    height: 100%;
   }
 
   .driver-signature-card {
@@ -212,7 +310,7 @@
       </div>
       <div class="driver-guide-item">
         <strong>{% trans "Close delivery" %}</strong>
-        <span>{% trans "Finish with payment details, signature and any adjustment note if needed." %}</span>
+        <span>{% trans "Create a credit note here if the customer returns products or reports damage." %}</span>
       </div>
     </div>
     <div class="driver-summary-grid">
@@ -340,7 +438,7 @@
       <span class="driver-step-index">3</span>
       <div>
         <h5 class="mb-0">{% trans "Complete delivery" %}</h5>
-        <p class="driver-step-copy">{% trans "Finish the stop in this order: notes if needed, payment details, then customer signature." %}</p>
+        <p class="driver-step-copy">{% trans "Finish the stop in this order: credit note if needed, payment details, then customer signature." %}</p>
       </div>
     </div>
     <div class="row g-3">
@@ -350,23 +448,30 @@
       </div>
     </div>
     <div class="driver-finish-grid mt-3">
-      <div data-driver-section="adjustment-note">
-        <div class="border rounded-3 p-3 bg-light-subtle h-100">
-          <div class="mb-3">
-            <div class="d-flex align-items-center gap-2 mb-1">
-              <span class="badge text-bg-light border">1</span>
-              <h6 class="mb-0">{% trans "Adjustment note during delivery" %}</h6>
-              <span class="badge text-bg-secondary">{% trans "Optional" %}</span>
-            </div>
-            <p class="text-muted small mb-0">{% trans "Optional. Save a draft credit note for BackOffice review while closing the delivery." %}</p>
+      <div class="driver-adjustment-callout" data-driver-section="adjustment-note">
+        <div class="driver-adjustment-callout-head">
+          <div class="driver-adjustment-callout-icon" aria-hidden="true">
+            <i class="bi bi-receipt-cutoff"></i>
           </div>
+          <div class="flex-grow-1">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+              <h5 class="driver-adjustment-callout-title mb-0">{% trans "Adjustment note during delivery" %}</h5>
+              <span class="badge driver-adjustment-callout-pill">{% trans "Credit notes" %}</span>
+            </div>
+            <p class="driver-adjustment-callout-lead mb-0">{% trans "Use this section when the customer returns products, reports damage, or needs a credit note before closing the delivery." %}</p>
+          </div>
+        </div>
+        <div class="driver-adjustment-callout-body">
           <div class="row g-3">
             <div class="col-md-4">
-              <label class="form-label fw-semibold">{% trans "Type" %}</label>
-              <select name="driver_note_tipo_documento" id="driverNoteType" class="form-select">
-                <option value="">{% trans "No adjustment note" %}</option>
-                <option value="CREDITO">{% trans "Credit note" %}</option>
-              </select>
+              <div class="driver-adjustment-type-highlight h-100">
+                <label class="form-label fw-semibold mb-2">{% trans "Start here: note type" %}</label>
+                <select name="driver_note_tipo_documento" id="driverNoteType" class="form-select form-select-lg driver-adjustment-type-select">
+                  <option value="">{% trans "No adjustment note" %}</option>
+                  <option value="CREDITO">{% trans "Credit note" %}</option>
+                </select>
+                <div class="form-text mt-2 mb-0">{% trans "Select Credit note to register returned or damaged products." %}</div>
+              </div>
             </div>
             <div class="col-md-4">
               <label class="form-label fw-semibold">{% trans "Adjustment mode" %}</label>
@@ -410,7 +515,7 @@
               <div class="form-text">{% trans "Optional photos that support the credit note created during delivery." %}</div>
             </div>
             <div class="col-12">
-              <div class="alert alert-secondary small mb-0">
+              <div class="alert alert-info-tone small mb-0">
                 {% trans "Driver credit notes use returned invoice lines and are always recorded as Credit Dump, so damaged products do not return to inventory." %}
               </div>
             </div>
@@ -463,7 +568,7 @@
         </div>
       </div>
       <div data-driver-section="payment-details">
-        <div class="border rounded-3 p-3 bg-light-subtle h-100">
+        <div class="driver-payment-panel h-100">
           <div class="mb-3">
             <div class="d-flex align-items-center gap-2 mb-1">
               <span class="badge text-bg-light border">2</span>
@@ -584,15 +689,23 @@
         </div>
     </div>
     <div class="driver-submit-bar">
-      <p class="driver-submit-copy">{% trans "Review payment details and signature before saving the delivery." %}</p>
+      <p class="driver-submit-copy">{% trans "Review the credit note section, payment details and signature before saving the delivery." %}</p>
       <button type="submit" class="btn btn-primary">{% trans "Save delivery" %}</button>
     </div>
   </div>
 </form>
 {% else %}
-<div class="card shadow-sm mb-3">
+<div class="card shadow-sm mb-3 driver-adjustment-callout">
   <div class="card-body">
-    <h5 class="mb-3">{% trans "Create adjustment note" %}</h5>
+    <div class="driver-adjustment-callout-head mb-3">
+      <div class="driver-adjustment-callout-icon" aria-hidden="true">
+        <i class="bi bi-receipt-cutoff"></i>
+      </div>
+      <div class="flex-grow-1">
+        <h5 class="driver-adjustment-callout-title mb-1">{% trans "Create adjustment note" %}</h5>
+        <p class="driver-adjustment-callout-lead mb-0">{% trans "Use this form to register a credit note after the delivery has been closed." %}</p>
+      </div>
+    </div>
     <form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_create_note' delivery.id %}">
       {% csrf_token %}
       <div class="row g-3">

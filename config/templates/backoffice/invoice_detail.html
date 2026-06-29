@@ -130,10 +130,10 @@
         <div class="d-flex justify-content-between mb-2"><span>{% trans "Total paid" %}</span><strong>${% if invoice.delivery %}{{ invoice.delivery.monto_pagado }}{% else %}0.00{% endif %}</strong></div>
         <hr>
         <div class="d-flex justify-content-between mb-2"><span>{% trans "Outstanding invoice balance" %}</span><strong>${{ invoice.saldo_cliente }}</strong></div>
-        {% if invoice.cliente.balance > 0 %}
+        {% if invoice.saldo_cliente > 0 or invoice.delivery and invoice.delivery.estado_pago == 'NO_PAGADO' %}
         <div class="d-flex justify-content-between mb-2 text-danger">
           <span class="fw-semibold">{% trans "Current due balance" %}</span>
-          <strong>${{ invoice.cliente.due_balance }}</strong>
+          <strong>${{ customer_amount_owed }}</strong>
         </div>
         {% elif invoice.cliente.balance < 0 %}
         <div class="d-flex justify-content-between mb-2 text-success">
@@ -169,6 +169,12 @@
         <div class="text-muted small">{% trans "Payment status" %}</div>
         <div><span class="badge {% if invoice.delivery.estado_pago == 'NO_PAGADO' %}bg-danger{% elif invoice.delivery.estado_pago == 'PAGADO' %}bg-success{% else %}bg-secondary{% endif %}">{{ invoice.delivery.get_estado_pago_display }}</span></div>
       </div>
+      {% if invoice.delivery.estado_pago == 'NO_PAGADO' %}
+      <div class="col-md-3">
+        <div class="text-muted small">{% trans "Amount owed to La Tortilla" %}</div>
+        <div class="fw-semibold text-danger fs-5">${{ customer_amount_owed }}</div>
+      </div>
+      {% endif %}
       <div class="col-md-3">
         <div class="text-muted small">{% trans "Customer hold" %}</div>
         <div>

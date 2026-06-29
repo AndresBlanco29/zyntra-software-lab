@@ -188,6 +188,15 @@ def _apply_customer_balance_delta(*, cliente, delta):
 	return cliente.balance
 
 
+def _apply_invoice_outstanding_to_customer_balance(*, invoice):
+	invoice.refresh_from_db(fields=['saldo_cliente', 'cliente_id'])
+	outstanding = _quantize_money(invoice.saldo_cliente)
+	if outstanding <= 0:
+		return outstanding
+	_apply_customer_balance_delta(cliente=invoice.cliente, delta=outstanding)
+	return outstanding
+
+
 def _remaining_invoice_balance_before_payment(*, invoice):
 	return _clamp_non_negative_money(
 		Decimal(str(invoice.subtotal or '0.00'))
@@ -472,6 +481,20 @@ def generar_invoice_desde_picking(
 		},
 	)
 	return invoice
+
+
+def resolve_customer_amount_owed(*, cliente, invoice=None):
+	stored_due = _quantize_money(cliente.due_balance)
+	if invoice is None:
+		return stored_due
+	invoice_outstanding = _quantize_money(invoice.saldo_cliente)
+	if invoice_outstanding <= 0:
+		return stored_due
+	if stored_due <= 0:
+		return invoice_outstanding
+	if invoice_outstanding <= stored_due:
+		return stored_due
+	return _quantize_money(stored_due + invoice_outstanding)
 
 
 @transaction.atomic
@@ -910,6 +933,7 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 			payment_entry['cheque_imagen'] = _rewind_uploaded_file(payment_entry.get('cheque_imagen'))
 			DeliveryPayment.objects.create(delivery=delivery, **payment_entry)
 	_recalculate_invoice_balances(delivery.invoice)
+	_apply_invoice_outstanding_to_customer_balance(invoice=delivery.invoice)
 	for normalized_file in evidence_files:
 		DeliveryEvidencePhoto.objects.create(delivery=delivery, image=normalized_file)
 
@@ -1504,6 +1528,7 @@ def anular_invoice(*, invoice, usuario, motivo=''):
 	_void_linked_invoice_notes(invoice=invoice, usuario=usuario, motivo=motivo)
 	_reverse_invoice_customer_note_applications(invoice=invoice)
 	_reverse_invoice_customer_credit(invoice=invoice)
+	outstanding_before_void = _quantize_money(invoice.saldo_cliente)
 	restaurar_inventario_por_anulacion_factura(pedido=invoice.pedido, invoice=invoice, creado_por=usuario)
 
 	pedido = invoice.pedido
@@ -1536,6 +1561,8 @@ def anular_invoice(*, invoice, usuario, motivo=''):
 		usuario=usuario,
 		snapshot=_build_invoice_void_snapshot(invoice),
 	)
+	if outstanding_before_void > 0:
+		_apply_customer_balance_delta(cliente=invoice.cliente, delta=-outstanding_before_void)
 	from config.auditoria.business_events import log_business_event
 	from config.auditoria.models import AuditLog
 	log_business_event(
@@ -1648,6 +1675,7 @@ def mark_delivery_unpaid_from_backoffice(*, delivery, backoffice_user, motivo_no
 	cliente.credit_hold = True
 	cliente.save(update_fields=['credit_hold'])
 	_recalculate_invoice_balances(delivery.invoice)
+	_apply_invoice_outstanding_to_customer_balance(invoice=delivery.invoice)
 	from config.auditoria.business_events import log_business_event
 	log_business_event(
 		backoffice_user,

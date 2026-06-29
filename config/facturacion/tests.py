@@ -16,7 +16,7 @@ from reportlab.platypus import SimpleDocTemplate
 
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, DeliveryNotificationLog, FacturacionRegistroAnulacion, Invoice, NotaAjuste, NotaAjusteAplicacion
-from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, build_invoice_shipment_summary, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, mark_delivery_unpaid_from_backoffice, resolve_invoice_payment_base_date, resolve_invoice_payment_due_date, start_delivery_route, unlock_client_from_delivery
+from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, build_invoice_shipment_summary, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, mark_delivery_unpaid_from_backoffice, resolve_customer_amount_owed, resolve_invoice_payment_base_date, resolve_invoice_payment_due_date, start_delivery_route, unlock_client_from_delivery
 from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_footer_layout, _build_invoice_pdf_item_data, _build_invoice_pdf_shipment_summary_table, _build_invoice_pdf_terms_paragraph, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_pdf_due_date_label, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_SYNCED
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
@@ -1151,6 +1151,18 @@ class InvoiceFlowTests(TestCase):
 		self.assertFalse(delivery.invoice.cliente.credit_hold)
 		self.assertTrue(DeliveryNotificationLog.objects.filter(delivery=delivery).count(), 3)
 
+	def test_resolve_customer_amount_owed_combines_stored_balance_and_invoice_outstanding(self):
+		self.cliente.balance = Decimal('10.00')
+		self.cliente.save(update_fields=['balance'])
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		amount_owed = resolve_customer_amount_owed(cliente=self.cliente, invoice=invoice)
+		self.assertEqual(amount_owed, Decimal('10.00') + invoice.saldo_cliente)
+
 	def test_backoffice_can_mark_completed_paid_delivery_as_unpaid(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
@@ -1191,6 +1203,8 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(delivery.motivo_no_pago, 'Customer did not pay')
 		self.assertTrue(delivery.invoice.cliente.credit_hold)
 		self.assertGreater(invoice.saldo_cliente, Decimal('0.00'))
+		delivery.invoice.cliente.refresh_from_db()
+		self.assertGreaterEqual(delivery.invoice.cliente.due_balance, invoice.saldo_cliente)
 
 	def test_driver_cannot_mark_delivery_unpaid_from_backoffice_endpoint(self):
 		invoice = generar_invoice_desde_picking(
@@ -1222,6 +1236,29 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(response.status_code, 302)
 		delivery.refresh_from_db()
 		self.assertEqual(delivery.estado_pago, 'PAGADO')
+
+	def test_driver_non_payment_updates_customer_due_balance(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		delivery = invoice.delivery
+		complete_driver_delivery(
+			delivery=delivery,
+			driver_user=self.driver,
+			payload={
+				'estado_pago': 'NO_PAGADO',
+				'recibido_por': 'Maria',
+				'motivo_no_pago': 'Caja cerrada',
+				'firma_cliente_data': self.signature_data,
+			},
+			evidence_files=[self.photo_file],
+		)
+		invoice.refresh_from_db()
+		delivery.invoice.cliente.refresh_from_db()
+		self.assertGreaterEqual(delivery.invoice.cliente.due_balance, invoice.saldo_cliente)
 
 	def test_driver_non_payment_blocks_customer_and_requires_photo(self):
 		invoice = generar_invoice_desde_picking(

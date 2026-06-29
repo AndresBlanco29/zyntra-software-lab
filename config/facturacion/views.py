@@ -74,6 +74,7 @@ from .services import (
 	start_delivery_route,
 	unlock_client_from_delivery,
 	mark_delivery_unpaid_from_backoffice,
+	resolve_customer_amount_owed,
 )
 
 
@@ -1423,6 +1424,7 @@ def backoffice_invoice_detail(request, invoice_id):
 		'invoice_items': order_invoice_items_for_display(invoice),
 		'invoice_shipment_summary': build_invoice_shipment_summary(invoice),
 		'invoice_payment_due_date': resolve_invoice_payment_due_date(invoice),
+		'customer_amount_owed': resolve_customer_amount_owed(cliente=invoice.cliente, invoice=invoice),
 		'driver_created_notes_count': driver_created_notes_count,
 		'advanced_adjustment_note_url': f"{reverse('backoffice_adjustment_note_create')}?cliente_id={invoice.cliente_id}&invoice_id={invoice.id}",
 		'invoice_quickbooks_locked': is_sync_locked(invoice),

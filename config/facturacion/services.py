@@ -483,18 +483,64 @@ def generar_invoice_desde_picking(
 	return invoice
 
 
-def resolve_customer_amount_owed(*, cliente, invoice=None):
-	stored_due = _quantize_money(cliente.due_balance)
-	if invoice is None:
-		return stored_due
-	invoice_outstanding = _quantize_money(invoice.saldo_cliente)
-	if invoice_outstanding <= 0:
+def _combine_stored_due_with_open_outstanding(*, stored_due, open_outstanding):
+	stored_due = _quantize_money(stored_due)
+	open_outstanding = _quantize_money(open_outstanding)
+	if open_outstanding <= 0:
 		return stored_due
 	if stored_due <= 0:
-		return invoice_outstanding
-	if invoice_outstanding <= stored_due:
+		return open_outstanding
+	if open_outstanding <= stored_due:
 		return stored_due
-	return _quantize_money(stored_due + invoice_outstanding)
+	return _quantize_money(stored_due + open_outstanding)
+
+
+def annotate_clientes_open_invoice_balance(queryset):
+	from django.db.models import DecimalField, OuterRef, Subquery, Sum
+	from django.db.models.functions import Coalesce
+
+	open_invoice_subquery = (
+		Invoice.objects.filter(
+			cliente_id=OuterRef('pk'),
+			estado='GENERADA',
+			saldo_cliente__gt=0,
+		)
+		.values('cliente_id')
+		.annotate(total=Sum('saldo_cliente'))
+		.values('total')
+	)
+	return queryset.annotate(
+		open_invoice_balance=Coalesce(
+			Subquery(open_invoice_subquery, output_field=DecimalField(max_digits=12, decimal_places=2)),
+			Decimal('0.00'),
+		),
+	)
+
+
+def resolve_customer_amount_owed(*, cliente, invoice=None):
+	stored_due = _quantize_money(cliente.due_balance)
+	if invoice is not None:
+		return _combine_stored_due_with_open_outstanding(
+			stored_due=stored_due,
+			open_outstanding=invoice.saldo_cliente,
+		)
+
+	open_invoice_balance = getattr(cliente, 'open_invoice_balance', None)
+	if open_invoice_balance is None:
+		from django.db.models import Sum
+
+		open_invoice_balance = (
+			Invoice.objects.filter(
+				cliente=cliente,
+				estado='GENERADA',
+				saldo_cliente__gt=0,
+			).aggregate(total=Sum('saldo_cliente'))['total']
+			or Decimal('0.00')
+		)
+	return _combine_stored_due_with_open_outstanding(
+		stored_due=stored_due,
+		open_outstanding=open_invoice_balance,
+	)
 
 
 @transaction.atomic

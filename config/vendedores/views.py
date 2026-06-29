@@ -25,7 +25,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-from config.facturacion.services import get_recent_customer_invoice_items_by_presentation
+from config.facturacion.services import annotate_clientes_open_invoice_balance, get_recent_customer_invoice_items_by_presentation
 from config.pedidos.services import (
     calcular_precio_unitario_neto_item,
     calcular_subtotal_item_pedido,
@@ -251,7 +251,9 @@ def _clientes_filter_params(request):
 
 
 def _clientes_queryset(request):
-    queryset = Cliente.objects.select_related('usuario').order_by('nombre_empresa', 'id')
+    queryset = annotate_clientes_open_invoice_balance(
+        Cliente.objects.select_related('usuario').order_by('nombre_empresa', 'id')
+    )
 
     filters = _clientes_filter_params(request)
     query = filters.get('q')
@@ -961,7 +963,7 @@ def configurar_limite_credito_cliente(request):
         'message': _('Credit limit updated successfully.'),
         'credit_limit': str(cliente.credit_limit) if cliente.credit_limit is not None else '',
         'remaining_limit': str(remaining_limit) if remaining_limit is not None else '',
-        'due_balance': str(cliente.due_balance),
+        'due_balance': str(cliente.total_amount_owed),
     })
 
 

@@ -1162,6 +1162,7 @@ class InvoiceFlowTests(TestCase):
 		)
 		amount_owed = resolve_customer_amount_owed(cliente=self.cliente, invoice=invoice)
 		self.assertEqual(amount_owed, Decimal('10.00') + invoice.saldo_cliente)
+		self.assertEqual(self.cliente.total_amount_owed, amount_owed)
 
 	def test_backoffice_can_mark_completed_paid_delivery_as_unpaid(self):
 		invoice = generar_invoice_desde_picking(

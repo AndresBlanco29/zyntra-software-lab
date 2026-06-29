@@ -291,6 +291,12 @@ class Cliente(models.Model):
         return self.balance if self.balance > 0 else Decimal('0.00')
 
     @property
+    def total_amount_owed(self):
+        from config.facturacion.services import resolve_customer_amount_owed
+
+        return resolve_customer_amount_owed(cliente=self)
+
+    @property
     def customer_credit_balance(self):
         """Credit in favor of the customer (QuickBooks negative balance, shown as a positive amount)."""
         return abs(self.balance) if self.balance < 0 else Decimal('0.00')

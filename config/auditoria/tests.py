@@ -2,6 +2,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from config.auditoria.models import AuditLog
+from config.auditoria.business_events import log_business_event
 from config.auditoria.services import record_audit_event
 from config.usuarios.models import Usuario
 
@@ -51,5 +52,26 @@ class AuditTrailTests(TestCase):
     def test_middleware_logs_authenticated_post(self):
         self.client.force_login(self.admin)
         before = AuditLog.objects.count()
-        self.client.post(reverse('audit_log_list'), {'q': 'demo'})
+        self.client.post(reverse('audit_log_list'), {'q': 'demo', 'business_only': '0'})
         self.assertGreater(AuditLog.objects.count(), before)
+
+    def test_business_only_filter_hides_page_views(self):
+        record_audit_event(
+            self.client.get('/auditoria/').wsgi_request,
+            action_label='Page view',
+            action_category=AuditLog.CATEGORY_VIEW,
+        )
+        log_business_event(
+            self.admin,
+            action_label='Import from QuickBooks: import items',
+            action_category=AuditLog.CATEGORY_SYNC,
+            entity_type='QuickBooks',
+            entity_label='Items sync',
+        )
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('audit_log_list'))
+        self.assertNotContains(response, 'Page view')
+        self.assertContains(response, 'Import from QuickBooks')
+
+        response = self.client.get(reverse('audit_log_list'), {'business_only': '0'})
+        self.assertContains(response, 'Page view')

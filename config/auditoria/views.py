@@ -29,12 +29,19 @@ def _parse_filters(request):
     except (TypeError, ValueError):
         user_id = None
 
+    raw_business_only = (data.get('business_only') or '1').strip().lower()
+    if raw_business_only in {'0', 'false', 'no', 'off'}:
+        business_only = False
+    else:
+        business_only = raw_business_only in {'1', 'true', 'yes', 'on', ''}
+
     return {
         'q': (data.get('q') or '').strip(),
         'user_id': user_id,
         'action_category': (data.get('action_category') or '').strip(),
         'http_method': (data.get('http_method') or '').strip().upper(),
         'entity_type': (data.get('entity_type') or '').strip(),
+        'business_only': business_only,
         'start_dt': start_dt,
         'end_dt': end_dt,
         'start_date': start_date,
@@ -61,6 +68,8 @@ def _apply_filters(queryset, filters):
         queryset = queryset.filter(http_method=filters['http_method'])
     if filters['entity_type']:
         queryset = queryset.filter(entity_type__icontains=filters['entity_type'])
+    if filters.get('business_only'):
+        queryset = queryset.exclude(entity_type='')
     if filters['start_dt']:
         queryset = queryset.filter(created_at__gte=filters['start_dt'])
     if filters['end_dt']:

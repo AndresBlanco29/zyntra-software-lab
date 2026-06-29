@@ -560,6 +560,9 @@ def _build_dashboard_feedback(*, operation, ok, result=None, error=None):
 
 
 def _response_or_redirect(request, *, operation, result=None, error=None, status_code=200):
+    from config.auditoria.business_events import log_quickbooks_operation
+
+    log_quickbooks_operation(request, operation=operation, result=result, error=error)
     redirect_to = _resolve_dashboard_redirect(request)
     if redirect_to:
         feedback = _build_dashboard_feedback(operation=operation, ok=error is None, result=result, error=error)
@@ -1279,6 +1282,21 @@ def quickbooks_task_status(request, task_id):
     data = cache.get(cache_key)
     if not data:
         return _response_or_redirect(request, operation='task_status', error='Task not found', status_code=404)
+
+    status = data.get('status')
+    operation = data.get('operation')
+    if status in {'completed', 'failed'} and operation and not data.get('audit_logged'):
+        from config.auditoria.business_events import log_quickbooks_operation
+
+        log_quickbooks_operation(
+            request,
+            operation=operation,
+            result=data.get('result') if status == 'completed' else None,
+            error=data.get('error') if status == 'failed' else None,
+        )
+        data['audit_logged'] = True
+        cache.set(cache_key, data, timeout=60 * 60)
+
     return JsonResponse({'status': data.get('status'), 'progress': int(data.get('progress') or 0), 'operation': data.get('operation'), 'result': data.get('result', None), 'error': data.get('error', None)})
 
 

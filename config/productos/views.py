@@ -612,6 +612,17 @@ def configurar_precios(request):
             })
 
         _recalcular_presentaciones_con_costo()
+        from config.auditoria.business_events import log_business_event
+        from config.auditoria.models import AuditLog
+        log_business_event(
+            request.user,
+            action_label=_('Updated global price margin percentages'),
+            action_category=AuditLog.CATEGORY_UPDATE,
+            entity_type='Pricing',
+            entity_label=_('Price margins P1-P5'),
+            metadata={'margins': price_margins},
+            request=request,
+        )
         messages.success(request, _("Price percentages updated successfully"))
         return redirect("configurar_precios")
 
@@ -655,6 +666,17 @@ def configurar_descuentos(request):
             })
 
         messages.success(request, _("Preset discounts updated successfully."))
+        from config.auditoria.business_events import log_business_event
+        from config.auditoria.models import AuditLog
+        log_business_event(
+            request.user,
+            action_label=_('Updated preset discount amounts'),
+            action_category=AuditLog.CATEGORY_UPDATE,
+            entity_type='Pricing',
+            entity_label=_('Preset discounts'),
+            metadata={'discount_presets': discount_presets},
+            request=request,
+        )
         return redirect("configurar_descuentos")
 
     return render(request, "admin/configurar_descuentos.html", {

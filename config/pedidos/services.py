@@ -119,6 +119,7 @@ def crear_pedido_desde_items(
     canal_toma='',
     bypass_stock_check=False,
     reservar_inventario=True,
+    request=None,
 ):
     if not items_payload:
         raise ValidationError(_('You must add at least one item to create the sales order.'))
@@ -179,6 +180,38 @@ def crear_pedido_desde_items(
 
     if reservar_inventario and created_items:
         reservar_stock_para_pedido_items(pedido=pedido, pedido_items=created_items, creado_por=vendedor)
+
+    from config.auditoria.business_events import log_business_event
+    from config.auditoria.models import AuditLog
+
+    log_business_event(
+        vendedor,
+        action_label=_('Created sales order #%(id)s for %(client)s') % {
+            'id': pedido.id,
+            'client': cliente.nombre_empresa,
+        },
+        action_category=AuditLog.CATEGORY_CREATE,
+        entity_type='Pedido',
+        entity_id=str(pedido.id),
+        entity_label=_('Order #%(id)s - %(client)s') % {'id': pedido.id, 'client': cliente.nombre_empresa},
+        metadata={
+            'origen': origen,
+            'canal_toma': canal_toma,
+            'total': str(pedido.total),
+            'items_count': len(created_items),
+            'line_items': [
+                {
+                    'presentacion_id': item.presentacion_id,
+                    'cantidad': item.cantidad,
+                    'precio': str(item.precio),
+                    'descuento_aplicado': bool(item.descuento_aplicado),
+                    'descuento_monto': str(item.descuento_monto),
+                }
+                for item in created_items
+            ],
+        },
+        request=request,
+    )
 
     return pedido
 
@@ -316,11 +349,22 @@ def puede_eliminar_pedido_desde_backoffice(pedido):
 
 
 @transaction.atomic
-def anular_pedido_desde_backoffice(*, pedido):
+def anular_pedido_desde_backoffice(*, pedido, usuario=None):
     if not puede_anular_pedido_desde_backoffice(pedido):
         raise ValidationError(_('This sales order cannot be voided.'))
     pedido.estado = 'CANCELADO'
     pedido.save(update_fields=['estado', 'actualizada_en'])
+    if usuario is not None:
+        from config.auditoria.business_events import log_business_event
+        from config.auditoria.models import AuditLog
+        log_business_event(
+            usuario,
+            action_label=_('Voided sales order #%(id)s') % {'id': pedido.id},
+            action_category=AuditLog.CATEGORY_DELETE,
+            entity_type='Pedido',
+            entity_id=str(pedido.id),
+            entity_label=_('Order #%(id)s') % {'id': pedido.id},
+        )
     return pedido
 
 
@@ -374,7 +418,7 @@ def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales
 
 
 @transaction.atomic
-def asignar_picking_a_seleccionador(*, pedido, seleccionador):
+def asignar_picking_a_seleccionador(*, pedido, seleccionador, asignado_por=None):
     if getattr(seleccionador, 'role', '') != 'seleccionador':
         raise ValidationError(_('Only selector users can be assigned to a picking ticket.'))
     if pedido.estado not in {'RECIBIDO', 'EN_GESTION', 'LISTO_PARA_PICKING', 'PARA_VERIFICAR'}:
@@ -391,6 +435,22 @@ def asignar_picking_a_seleccionador(*, pedido, seleccionador):
         mensaje=_('You have a new picking ticket assigned for %(client)s.') % {'client': pedido.cliente.nombre_empresa},
         tipo='PEDIDO',
         url=reverse('selector_picking_detail', args=[pedido.id]),
+    )
+
+    from config.auditoria.business_events import log_business_event
+    from config.auditoria.models import AuditLog
+
+    log_business_event(
+        asignado_por or seleccionador,
+        action_label=_('Assigned picking for order #%(id)s to %(selector)s') % {
+            'id': pedido.id,
+            'selector': seleccionador.get_full_name() or seleccionador.username,
+        },
+        action_category=AuditLog.CATEGORY_ACTION,
+        entity_type='Pedido',
+        entity_id=str(pedido.id),
+        entity_label=_('Order #%(id)s') % {'id': pedido.id},
+        metadata={'selector_id': seleccionador.id, 'estado': pedido.estado},
     )
 
     return pedido
@@ -513,6 +573,23 @@ def guardar_verificacion_picking(
             url=reverse('backoffice_pedido_detalle', args=[pedido.id]),
         )
 
+    from config.auditoria.business_events import log_business_event
+    from config.auditoria.models import AuditLog
+
+    log_business_event(
+        seleccionador,
+        action_label=_('Completed picking verification for order #%(id)s') % {'id': pedido.id},
+        action_category=AuditLog.CATEGORY_UPDATE,
+        entity_type='Pedido',
+        entity_id=str(pedido.id),
+        entity_label=_('Order #%(id)s - %(client)s') % {'id': pedido.id, 'client': pedido.cliente.nombre_empresa},
+        metadata={
+            'estado': pedido.estado,
+            'has_stock_shortage': has_stock_shortage,
+            'nota_resuelta': pedido.nota_seleccionador_resuelta,
+        },
+    )
+
     return pedido
 
 
@@ -544,6 +621,19 @@ def resolver_bloqueo_picking_desde_backoffice(*, pedido, usuario):
                 )
         except ValidationError as exc:
             inventory_warning = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
+
+    from config.auditoria.business_events import log_business_event
+    from config.auditoria.models import AuditLog
+
+    log_business_event(
+        usuario,
+        action_label=_('Unlocked picking block for order #%(id)s') % {'id': pedido.id},
+        action_category=AuditLog.CATEGORY_UPDATE,
+        entity_type='Pedido',
+        entity_id=str(pedido.id),
+        entity_label=_('Order #%(id)s') % {'id': pedido.id},
+        metadata={'inventory_warning': inventory_warning},
+    )
 
     return pedido, inventory_warning
 

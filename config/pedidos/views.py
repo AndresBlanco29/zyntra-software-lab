@@ -357,6 +357,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 	if request.method == 'POST':
 		if not request.user.has_internal_permission('backoffice.orders.manage'):
 			return redirect('backoffice_pedidos')
+		estado_anterior = pedido.estado
 		try:
 			ensure_pedido_edit_lock_owner(pedido=pedido, user=request.user)
 			with transaction.atomic():
@@ -437,6 +438,38 @@ def backoffice_pedido_detalle(request, pedido_id):
 			return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
 		release_pedido_edit_lock(pedido=pedido, user=request.user)
+		from config.auditoria.business_events import log_business_event
+		from config.auditoria.models import AuditLog
+		pedido.refresh_from_db()
+		line_items = [
+			{
+				'item_id': item.id,
+				'producto': item.presentacion.producto.nombre,
+				'presentacion': item.presentacion.nombre,
+				'cantidad': item.cantidad,
+				'precio': str(item.precio),
+				'descuento_aplicado': bool(item.descuento_aplicado),
+				'descuento_monto': str(item.descuento_monto),
+				'subtotal': str(item.subtotal),
+			}
+			for item in pedido.items.select_related('presentacion__producto')
+		]
+		log_business_event(
+			request.user,
+			action_label=_('Updated sales order #%(id)s') % {'id': pedido.id},
+			action_category=AuditLog.CATEGORY_UPDATE,
+			entity_type='Pedido',
+			entity_id=str(pedido.id),
+			entity_label=_('Order #%(id)s - %(client)s') % {'id': pedido.id, 'client': pedido.cliente.nombre_empresa},
+			metadata={
+				'estado_anterior': estado_anterior,
+				'estado_nuevo': pedido.estado,
+				'nota_backoffice': pedido.nota_backoffice,
+				'total': str(pedido.total),
+				'line_items': line_items,
+			},
+			request=request,
+		)
 		messages.success(request, _('Sales order updated successfully.'))
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
@@ -639,7 +672,7 @@ def backoffice_pedido_void(request, pedido_id):
 
 	try:
 		ensure_pedido_edit_lock_owner(pedido=pedido, user=request.user)
-		anular_pedido_desde_backoffice(pedido=pedido)
+		anular_pedido_desde_backoffice(pedido=pedido, usuario=request.user)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:
@@ -678,7 +711,7 @@ def backoffice_asignar_picking(request, pedido_id):
 
 	try:
 		ensure_pedido_edit_lock_owner(pedido=pedido, user=request.user)
-		asignar_picking_a_seleccionador(pedido=pedido, seleccionador=seleccionador)
+		asignar_picking_a_seleccionador(pedido=pedido, seleccionador=seleccionador, asignado_por=request.user)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:

@@ -73,6 +73,20 @@
         <label class="form-label" for="auditEnd">{% trans "To" %}</label>
         <input id="auditEnd" type="date" name="end_date" value="{{ filters.end_date|date:'Y-m-d' }}" class="form-control">
       </div>
+      <div class="col-12 col-md-6 col-lg-3">
+        <div class="form-check mt-4">
+          <input type="hidden" name="business_only" value="0">
+          <input
+            id="auditBusinessOnly"
+            type="checkbox"
+            name="business_only"
+            value="1"
+            class="form-check-input"
+            {% if filters.business_only %}checked{% endif %}>
+          <label class="form-check-label" for="auditBusinessOnly">{% trans "Business actions only" %}</label>
+        </div>
+        <div class="small text-muted">{% trans "Orders, invoices, deliveries, QuickBooks sync, pricing changes." %}</div>
+      </div>
       <div class="col-12 col-lg-4 d-flex gap-2">
         <button type="submit" class="btn btn-primary">{% trans "Apply filters" %}</button>
         <a href="{% url 'audit_log_list' %}" class="btn btn-outline-secondary">{% trans "Clear" %}</a>
@@ -109,7 +123,9 @@
           </td>
           <td>
             <div class="fw-semibold">{{ log.action_label }}</div>
+            {% if not log.entity_type %}
             <div class="small text-muted text-break">{{ log.path }}</div>
+            {% endif %}
           </td>
           <td>
             {% if log.entity_label %}
@@ -160,7 +176,7 @@
   <ul class="pagination justify-content-center flex-wrap">
     {% if page_obj.has_previous %}
     <li class="page-item">
-      <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ filters.q }}&user_id={{ filters.user_id|default:'' }}&action_category={{ filters.action_category }}&http_method={{ filters.http_method }}&entity_type={{ filters.entity_type }}&start_date={% if filters.start_date %}{{ filters.start_date|date:'Y-m-d' }}{% endif %}&end_date={% if filters.end_date %}{{ filters.end_date|date:'Y-m-d' }}{% endif %}">{% trans "Previous" %}</a>
+      <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ filters.q }}&user_id={{ filters.user_id|default:'' }}&action_category={{ filters.action_category }}&http_method={{ filters.http_method }}&entity_type={{ filters.entity_type }}&business_only={% if filters.business_only %}1{% else %}0{% endif %}&start_date={% if filters.start_date %}{{ filters.start_date|date:'Y-m-d' }}{% endif %}&end_date={% if filters.end_date %}{{ filters.end_date|date:'Y-m-d' }}{% endif %}">{% trans "Previous" %}</a>
     </li>
     {% endif %}
     <li class="page-item disabled">
@@ -168,7 +184,7 @@
     </li>
     {% if page_obj.has_next %}
     <li class="page-item">
-      <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ filters.q }}&user_id={{ filters.user_id|default:'' }}&action_category={{ filters.action_category }}&http_method={{ filters.http_method }}&entity_type={{ filters.entity_type }}&start_date={% if filters.start_date %}{{ filters.start_date|date:'Y-m-d' }}{% endif %}&end_date={% if filters.end_date %}{{ filters.end_date|date:'Y-m-d' }}{% endif %}">{% trans "Next" %}</a>
+      <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ filters.q }}&user_id={{ filters.user_id|default:'' }}&action_category={{ filters.action_category }}&http_method={{ filters.http_method }}&entity_type={{ filters.entity_type }}&business_only={% if filters.business_only %}1{% else %}0{% endif %}&start_date={% if filters.start_date %}{{ filters.start_date|date:'Y-m-d' }}{% endif %}&end_date={% if filters.end_date %}{{ filters.end_date|date:'Y-m-d' }}{% endif %}">{% trans "Next" %}</a>
     </li>
     {% endif %}
   </ul>

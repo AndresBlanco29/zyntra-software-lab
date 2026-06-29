@@ -733,6 +733,7 @@ def enviar_pedido(request):
             canal_toma=tipo_orden,
             bypass_stock_check=True,
             reservar_inventario=False,
+            request=request,
         )
     except ValidationError as exc:
         error_message = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)

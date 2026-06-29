@@ -8,6 +8,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
+from config.auditoria.models import AuditLog
 from config.inventario.services import _apply_fractional_inventory_change, _apply_inventory_change, _lock_fractional_stock_records, _lock_stock_records, aplicar_verificacion_picking_inventario, restaurar_inventario_por_anulacion_factura
 from config.notificaciones.models import crear_notificacion_backoffice
 from config.pedidos.services import crear_pedido_desde_items
@@ -438,6 +439,38 @@ def generar_invoice_desde_picking(
 			delivery.save(update_fields=['estimated_delivery_at', 'updated_at'])
 
 	_create_invoice_notification(invoice)
+	from config.auditoria.business_events import log_business_event
+	log_business_event(
+		usuario,
+		action_label=_('Generated invoice %(invoice)s from sales order #%(pedido)s') % {
+			'invoice': invoice.numero,
+			'pedido': pedido.id,
+		},
+		action_category=AuditLog.CATEGORY_CREATE,
+		entity_type='Invoice',
+		entity_id=str(invoice.id),
+		entity_label=invoice.numero,
+		metadata={
+			'pedido_id': pedido.id,
+			'cliente': pedido.cliente.nombre_empresa,
+			'metodo_entrega': metodo_entrega,
+			'driver_id': getattr(driver, 'id', None),
+			'driver_name': (driver.get_full_name() or driver.username) if driver else '',
+			'total_neto': str(invoice.total_neto),
+			'line_items': [
+				{
+					'presentacion_id': item.presentacion_id,
+					'producto': item.producto_nombre,
+					'presentacion': item.presentacion_nombre,
+					'cantidad': item.cantidad_facturada,
+					'precio_unitario': str(item.precio_unitario),
+					'descuento_porcentaje': str(item.descuento_porcentaje),
+					'subtotal': str(item.subtotal),
+				}
+				for item in invoice.items.all()
+			],
+		},
+	)
 	return invoice
 
 
@@ -542,6 +575,16 @@ def start_delivery_route(*, delivery, driver_user):
 		delivery.estado = 'EN_RUTA'
 		delivery.route_started_at = timezone.now()
 		delivery.save(update_fields=['estado', 'route_started_at', 'updated_at'])
+	from config.auditoria.business_events import log_business_event
+	log_business_event(
+		driver_user,
+		action_label=_('Started delivery route for invoice %(invoice)s') % {'invoice': delivery.invoice.numero},
+		action_category=AuditLog.CATEGORY_ACTION,
+		entity_type='Delivery',
+		entity_id=str(delivery.id),
+		entity_label=delivery.invoice.numero,
+		metadata={'invoice_id': delivery.invoice_id, 'estado': delivery.estado},
+	)
 	return delivery
 
 
@@ -873,6 +916,23 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 	pedido = delivery.invoice.pedido
 	pedido.estado = 'DESPACHADO'
 	pedido.save(update_fields=['estado', 'actualizada_en'])
+	from config.auditoria.business_events import log_business_event
+	log_business_event(
+		driver_user,
+		action_label=_('Completed delivery for invoice %(invoice)s') % {'invoice': delivery.invoice.numero},
+		action_category=AuditLog.CATEGORY_ACTION,
+		entity_type='Delivery',
+		entity_id=str(delivery.id),
+		entity_label=delivery.invoice.numero,
+		metadata={
+			'invoice_id': delivery.invoice_id,
+			'pedido_id': pedido.id if pedido else None,
+			'estado': delivery.estado,
+			'estado_pago': delivery.estado_pago,
+			'recibido_por': recibido_por,
+			'monto_pagado': str(delivery.monto_pagado),
+		},
+	)
 	return delivery
 
 
@@ -1476,6 +1536,17 @@ def anular_invoice(*, invoice, usuario, motivo=''):
 		usuario=usuario,
 		snapshot=_build_invoice_void_snapshot(invoice),
 	)
+	from config.auditoria.business_events import log_business_event
+	from config.auditoria.models import AuditLog
+	log_business_event(
+		usuario,
+		action_label=_('Voided invoice'),
+		action_category=AuditLog.CATEGORY_DELETE,
+		entity_type='Invoice',
+		entity_id=invoice.id,
+		entity_label=invoice.numero,
+		metadata={'motivo': motivo, 'pedido_id': pedido.id},
+	)
 	return invoice
 
 
@@ -1578,6 +1649,16 @@ def mark_delivery_unpaid_from_backoffice(*, delivery, backoffice_user, motivo_no
 	cliente.credit_hold = True
 	cliente.save(update_fields=['credit_hold'])
 	_recalculate_invoice_balances(delivery.invoice)
+	from config.auditoria.business_events import log_business_event
+	log_business_event(
+		backoffice_user,
+		action_label=_('Marked delivery as unpaid for invoice %(invoice)s') % {'invoice': delivery.invoice.numero},
+		action_category=AuditLog.CATEGORY_UPDATE,
+		entity_type='Delivery',
+		entity_id=str(delivery.id),
+		entity_label=delivery.invoice.numero,
+		metadata={'motivo_no_pago': reason},
+	)
 	return delivery
 
 

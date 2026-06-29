@@ -203,6 +203,8 @@ def record_audit_event_from_request(request, response):
     is_login = route_name in {'login', 'login_modal'} or method == 'POST' and '/login' in (request.path or '')
 
     if user and getattr(user, 'is_authenticated', False):
+        if method == 'GET' and getattr(user, 'role', '') != 'cliente':
+            return None
         if method == 'GET' and getattr(user, 'role', '') == 'cliente':
             if not re.search(r'/clientes/|/cotizaciones/|/carrito/|/pedidos/', request.path or '', re.I):
                 return None

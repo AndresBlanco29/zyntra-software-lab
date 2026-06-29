@@ -227,6 +227,15 @@ class Presentacion(models.Model):
 
     costo = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
+    peso_por_caja = models.DecimalField(
+        max_digits=10,
+        decimal_places=3,
+        blank=True,
+        null=True,
+        verbose_name=_('Weight per case (LB)'),
+        help_text=_('Case weight in pounds used on invoices for Total WGT.'),
+    )
+
     quickbooks_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
 
     sync_status = models.CharField(

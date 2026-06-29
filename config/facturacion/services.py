@@ -39,6 +39,30 @@ def resolve_invoice_payment_due_date(invoice):
 	return invoice.cliente.get_payment_due_date(resolve_invoice_payment_base_date(invoice))
 
 
+def resolve_invoice_item_case_weight(item):
+	if item.peso_por_caja is not None:
+		return _to_decimal(item.peso_por_caja, '0')
+	presentacion = getattr(item, 'presentacion', None)
+	if presentacion is not None and presentacion.peso_por_caja is not None:
+		return _to_decimal(presentacion.peso_por_caja, '0')
+	return Decimal('0')
+
+
+def build_invoice_shipment_summary(invoice):
+	total_cases = 0
+	total_weight = Decimal('0')
+	for item in invoice.items.all():
+		quantity = int(item.cantidad_facturada or 0)
+		total_cases += quantity
+		case_weight = resolve_invoice_item_case_weight(item)
+		if case_weight > 0 and quantity > 0:
+			total_weight += case_weight * Decimal(str(quantity))
+	return {
+		'total_cases': total_cases,
+		'total_weight': total_weight.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP),
+	}
+
+
 def _to_decimal(value, default='0'):
 	try:
 		return Decimal(str(value if value is not None else default))
@@ -367,6 +391,7 @@ def generar_invoice_desde_picking(
 			producto_nombre=item.presentacion.producto.nombre,
 			presentacion_nombre=item.presentacion.nombre,
 			cantidad_facturada=quantity,
+			peso_por_caja=item.presentacion.peso_por_caja,
 			precio_unitario_lista=list_unit_price if discount_percentage > 0 or discount_amount_unit > 0 else None,
 			descuento_porcentaje=discount_percentage,
 			descuento_monto_unitario=discount_amount_unit,

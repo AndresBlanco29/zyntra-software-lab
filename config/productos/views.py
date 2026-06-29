@@ -80,6 +80,7 @@ def _parse_new_presentacion_rows_from_post(request):
     unidades_list = _post_list(request, "presentacion_nueva_unidades")
     costos = _post_list(request, "presentacion_nueva_costo")
     stocks = _post_list(request, "presentacion_nueva_stock")
+    pesos = _post_list(request, "presentacion_nueva_peso_por_caja")
 
     rows = []
     for index, raw_nombre in enumerate(nombres):
@@ -88,8 +89,9 @@ def _parse_new_presentacion_rows_from_post(request):
         unidades_raw = (unidades_list[index] if index < len(unidades_list) else "").strip()
         costo_raw = (costos[index] if index < len(costos) else "").strip()
         stock_raw = (stocks[index] if index < len(stocks) else "").strip()
+        peso_raw = (pesos[index] if index < len(pesos) else "").strip()
 
-        if not any([nombre, unidades_raw, costo_raw, stock_raw]):
+        if not any([nombre, unidades_raw, costo_raw, stock_raw, peso_raw]):
             continue
 
         rows.append({
@@ -97,6 +99,7 @@ def _parse_new_presentacion_rows_from_post(request):
             "tipo_contenido": tipo_contenido,
             "unidades": _parse_positive_int(unidades_raw, default=1),
             "costo": _parse_optional_decimal(costo_raw),
+            "peso_por_caja": _parse_optional_decimal(peso_raw),
             "stock_inicial": _parse_non_negative_int(stock_raw, default=0),
         })
     return rows
@@ -910,6 +913,9 @@ def editar_producto(request, producto_id):
 
             if f"costo_{presentacion.id}" in request.POST:
                 presentacion.costo = _parse_optional_decimal(request.POST.get(f"costo_{presentacion.id}"))
+
+            if f"peso_por_caja_{presentacion.id}" in request.POST:
+                presentacion.peso_por_caja = _parse_optional_decimal(request.POST.get(f"peso_por_caja_{presentacion.id}"))
 
             presentacion.save()
 

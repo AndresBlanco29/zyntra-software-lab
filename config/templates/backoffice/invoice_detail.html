@@ -344,6 +344,106 @@
   </div>
 </div>
 
+<div class="card shadow-sm mb-3 invoice-shipment-summary">
+  <div class="card-body">
+    <div class="row g-3 align-items-center">
+      <div class="col-md-4">
+        <div class="invoice-summary-box">
+          <span class="invoice-summary-box__label">No. of Cases:</span>
+          <span class="invoice-summary-box__value">{{ invoice_shipment_summary.total_cases }}</span>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="invoice-summary-box">
+          <span class="invoice-summary-box__label">Total WGT:</span>
+          <span class="invoice-summary-box__value">{{ invoice_shipment_summary.total_weight|floatformat:1 }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3 invoice-signature-print">
+  <div class="card-body">
+    <div class="invoice-signature-print__label">Customer's Signature:</div>
+    {% if invoice.delivery and invoice.delivery.firma_cliente %}
+    <div class="invoice-signature-print__image-wrap">
+      <img src="{{ invoice.delivery.firma_cliente.url }}" alt="Customer signature" class="invoice-signature-print__image">
+    </div>
+    {% else %}
+    <div class="invoice-signature-print__line" aria-hidden="true"></div>
+    {% endif %}
+    <p class="invoice-signature-print__legal mb-0">
+      In case of default of payment, Customer agrees to pay all cost of collection and legal fees.
+    </p>
+    <p class="invoice-signature-print__legal mb-0">
+      The perishable agricultural commodities listed on this invoice are sold subject to the statutory trust authorized by section 5(c) of the Perishable Agricultural Commodities Act, 1930 (7 U.S.C. 499e(c)). The seller of these commodities retains a trust claim over these commodities, all inventories of food or other products derived from these commodities, and any receivables or proceeds from the sale of these commodities until full payment is received.
+    </p>
+  </div>
+</div>
+
+<style>
+  .invoice-summary-box {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .invoice-summary-box__label {
+    display: inline-block;
+    min-width: 7.5rem;
+    padding: 0.45rem 0.65rem;
+    border: 1px solid #1f2937;
+    font-weight: 700;
+    font-size: 0.95rem;
+    background: #fff;
+  }
+  .invoice-summary-box__value {
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+  .invoice-signature-print__label {
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 0.75rem;
+  }
+  .invoice-signature-print__line {
+    min-height: 3.25rem;
+    border-bottom: 1px solid #111827;
+    margin-bottom: 0.85rem;
+    max-width: 34rem;
+  }
+  .invoice-signature-print__image-wrap {
+    min-height: 3.25rem;
+    margin-bottom: 0.85rem;
+    max-width: 34rem;
+  }
+  .invoice-signature-print__image {
+    display: block;
+    max-width: 100%;
+    max-height: 4.5rem;
+    object-fit: contain;
+    object-position: left center;
+  }
+  .invoice-signature-print__legal {
+    font-size: 0.78rem;
+    color: #4b5563;
+    line-height: 1.35;
+    max-width: 52rem;
+  }
+  @media print {
+    .invoice-signature-print,
+    .invoice-shipment-summary {
+      break-inside: avoid;
+      page-break-inside: avoid;
+      box-shadow: none !important;
+      border: 0 !important;
+    }
+    .invoice-signature-print__image {
+      max-height: 3.5rem;
+    }
+  }
+</style>
+
 <div class="row g-3">
   <div class="col-lg-7">
     <div class="card shadow-sm h-100">

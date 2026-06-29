@@ -14,7 +14,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, DeliveryNotificationLog, FacturacionRegistroAnulacion, Invoice, NotaAjuste, NotaAjusteAplicacion
-from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, resolve_invoice_payment_base_date, resolve_invoice_payment_due_date, start_delivery_route, unlock_client_from_delivery
+from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, build_invoice_shipment_summary, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, resolve_invoice_payment_base_date, resolve_invoice_payment_due_date, start_delivery_route, unlock_client_from_delivery
 from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_item_data, _build_invoice_pdf_terms_paragraph, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_pdf_due_date_label, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_SYNCED
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
@@ -58,6 +58,7 @@ class InvoiceFlowTests(TestCase):
 			nombre='Caja',
 			unidades=12,
 			tipo_contenido='unidades',
+			peso_por_caja=Decimal('33.827'),
 			precio_1=Decimal('15.00'),
 			precio_2=Decimal('16.00'),
 			precio_3=Decimal('17.00'),
@@ -3019,6 +3020,55 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response['Content-Type'], 'application/pdf')
 		self.assertGreater(len(response.content), len(unsigned_response.content))
+
+	def test_build_invoice_shipment_summary_sums_cases_and_weight(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		summary = build_invoice_shipment_summary(invoice)
+		self.assertEqual(summary['total_cases'], 3)
+		self.assertEqual(summary['total_weight'], Decimal('101.5'))
+
+	def test_invoice_generation_snapshots_case_weight_on_items(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		item = invoice.items.get()
+		self.assertEqual(item.peso_por_caja, Decimal('33.827'))
+
+	def test_invoice_pdf_includes_cases_and_weight_summary(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_invoice_pdf', args=[invoice.id]))
+		self.assertEqual(response.status_code, 200)
+		pdf_text = response.content.decode('latin-1', errors='ignore')
+		self.assertIn('No. of Cases:', pdf_text)
+		self.assertIn('Total WGT:', pdf_text)
+		self.assertIn("Customer's Signature:", pdf_text)
+
+	def test_backoffice_invoice_detail_shows_cases_and_weight_summary(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertContains(response, 'No. of Cases:')
+		self.assertContains(response, 'Total WGT:')
+		self.assertContains(response, "Customer's Signature:")
 
 	def test_backoffice_and_driver_delivery_details_show_estimated_delivery(self):
 		estimated_delivery_at = timezone.make_aware(datetime(2026, 4, 18, 9, 30), timezone.get_current_timezone())

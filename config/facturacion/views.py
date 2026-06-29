@@ -58,6 +58,7 @@ from .services import (
 	anular_invoice,
 	anular_nota_ajuste,
 	build_google_maps_route_url,
+	build_invoice_shipment_summary,
 	calculate_delivery_collectible_balance,
 	complete_driver_delivery,
 	crear_nota_ajuste,
@@ -593,6 +594,96 @@ def _build_invoice_pdf_totals_rows(invoice, *, meta_label_style, meta_value_styl
 	return rows
 
 
+def _format_pdf_weight(value):
+	amount = Decimal(str(value or '0')).quantize(Decimal('0.1'), rounding=ROUND_HALF_UP)
+	return f'{amount:,.1f}'
+
+
+def _build_invoice_pdf_summary_box(label, *, box_style):
+	return Table([[Paragraph(f'<b>{label}</b>', box_style)]], colWidths=[88])
+
+
+def _build_invoice_pdf_shipment_summary_table(summary, *, box_style, value_style):
+	cases_box = _build_invoice_pdf_summary_box('No. of Cases:', box_style=box_style)
+	weight_box = _build_invoice_pdf_summary_box('Total WGT:', box_style=box_style)
+	summary_table = Table(
+		[[
+			cases_box,
+			Paragraph(str(summary['total_cases']), value_style),
+			weight_box,
+			Paragraph(_format_pdf_weight(summary['total_weight']), value_style),
+		]],
+		colWidths=[92, 58, 78, 78],
+		hAlign='LEFT',
+	)
+	box_style_commands = [
+		('BOX', (0, 0), (0, 0), 0.75, BRAND_BORDER),
+		('BOX', (2, 0), (2, 0), 0.75, BRAND_BORDER),
+		('BACKGROUND', (0, 0), (0, 0), colors.white),
+		('BACKGROUND', (2, 0), (2, 0), colors.white),
+		('LEFTPADDING', (0, 0), (-1, -1), 4),
+		('RIGHTPADDING', (0, 0), (-1, -1), 4),
+		('TOPPADDING', (0, 0), (-1, -1), 4),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+		('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+	]
+	cases_box.setStyle(TableStyle(box_style_commands))
+	weight_box.setStyle(TableStyle(box_style_commands))
+	summary_table.setStyle(TableStyle([
+		('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+		('LEFTPADDING', (0, 0), (-1, -1), 0),
+		('RIGHTPADDING', (0, 0), (-1, -1), 8),
+		('TOPPADDING', (0, 0), (-1, -1), 0),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+	]))
+	return summary_table
+
+
+def _build_invoice_pdf_signature_section(invoice, *, section_title_style, body_style, note_style):
+	elements = [
+		Spacer(1, 16),
+		Paragraph("Customer's Signature:", section_title_style),
+	]
+	signature_bytes = None
+	if hasattr(invoice, 'delivery') and invoice.delivery.firma_cliente:
+		try:
+			with invoice.delivery.firma_cliente.open('rb') as signature_file:
+				signature_bytes = signature_file.read()
+		except Exception:
+			signature_bytes = None
+	if signature_bytes:
+		signature_image = Image(BytesIO(signature_bytes), width=240, height=56)
+		signature_image.hAlign = 'LEFT'
+		elements.extend([
+			Spacer(1, 4),
+			signature_image,
+		])
+	else:
+		signature_line = Table([['']], colWidths=[420], rowHeights=[28])
+		signature_line.setStyle(TableStyle([
+			('LINEBELOW', (0, 0), (-1, -1), 0.75, BRAND_TEXT),
+			('TOPPADDING', (0, 0), (-1, -1), 18),
+			('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+		]))
+		elements.extend([
+			Spacer(1, 2),
+			signature_line,
+		])
+	elements.extend([
+		Spacer(1, 6),
+		Paragraph(
+			'In case of default of payment, Customer agrees to pay all cost of collection and legal fees.',
+			note_style,
+		),
+		Spacer(1, 2),
+		Paragraph(
+			'The perishable agricultural commodities listed on this invoice are sold subject to the statutory trust authorized by section 5(c) of the Perishable Agricultural Commodities Act, 1930 (7 U.S.C. 499e(c)). The seller of these commodities retains a trust claim over these commodities, all inventories of food or other products derived from these commodities, and any receivables or proceeds from the sale of these commodities until full payment is received.',
+			note_style,
+		),
+	])
+	return elements
+
+
 def _invoice_pdf_response(invoice):
 	buffer = BytesIO()
 	document = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=24, rightMargin=24, topMargin=20, bottomMargin=20)
@@ -771,22 +862,29 @@ def _invoice_pdf_response(invoice):
 		totals_table,
 	])
 
-	if hasattr(invoice, 'delivery') and invoice.delivery.firma_cliente:
-		try:
-			with invoice.delivery.firma_cliente.open('rb') as signature_file:
-				signature_bytes = signature_file.read()
-		except Exception:
-			signature_bytes = None
-		if signature_bytes:
-			signature_image = Image(BytesIO(signature_bytes), width=180, height=70)
-			signature_image.hAlign = 'LEFT'
-			content.extend([
-				Spacer(1, 12),
-				Paragraph(_('Customer signature'), section_title_style),
-				Paragraph(_('Signed electronically by the customer during delivery confirmation.'), note_style),
-				Spacer(1, 6),
-				signature_image,
-			])
+	shipment_summary = build_invoice_shipment_summary(invoice)
+	summary_box_style = ParagraphStyle(
+		'InvoiceSummaryBox',
+		parent=body_style,
+		fontName='Helvetica-Bold',
+		fontSize=8,
+		leading=10,
+		textColor=BRAND_TEXT,
+	)
+	content.extend([
+		Spacer(1, 10),
+		_build_invoice_pdf_shipment_summary_table(
+			shipment_summary,
+			box_style=summary_box_style,
+			value_style=body_style,
+		),
+	])
+	content.extend(_build_invoice_pdf_signature_section(
+		invoice,
+		section_title_style=section_title_style,
+		body_style=body_style,
+		note_style=note_style,
+	))
 
 	document.build(
 		content,
@@ -1241,6 +1339,7 @@ def backoffice_invoice_detail(request, invoice_id):
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
 		'invoice_items': order_invoice_items_for_display(invoice),
+		'invoice_shipment_summary': build_invoice_shipment_summary(invoice),
 		'invoice_payment_due_date': resolve_invoice_payment_due_date(invoice),
 		'driver_created_notes_count': driver_created_notes_count,
 		'advanced_adjustment_note_url': f"{reverse('backoffice_adjustment_note_create')}?cliente_id={invoice.cliente_id}&invoice_id={invoice.id}",

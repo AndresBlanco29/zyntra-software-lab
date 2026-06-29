@@ -599,42 +599,27 @@ def _format_pdf_weight(value):
 	return f'{amount:,.1f}'
 
 
-def _build_invoice_pdf_summary_box(label, *, box_style):
-	return Table([[Paragraph(f'<b>{label}</b>', box_style)]], colWidths=[88])
-
-
 def _build_invoice_pdf_shipment_summary_table(summary, *, box_style, value_style):
-	cases_box = _build_invoice_pdf_summary_box('No. of Cases:', box_style=box_style)
-	weight_box = _build_invoice_pdf_summary_box('Total WGT:', box_style=box_style)
 	summary_table = Table(
 		[[
-			cases_box,
+			Paragraph('<b>No. of Cases:</b>', box_style),
 			Paragraph(str(summary['total_cases']), value_style),
-			weight_box,
+			Paragraph('<b>Total WGT:</b>', box_style),
 			Paragraph(_format_pdf_weight(summary['total_weight']), value_style),
 		]],
 		colWidths=[92, 58, 78, 78],
 		hAlign='LEFT',
 	)
-	box_style_commands = [
+	summary_table.setStyle(TableStyle([
 		('BOX', (0, 0), (0, 0), 0.75, BRAND_BORDER),
 		('BOX', (2, 0), (2, 0), 0.75, BRAND_BORDER),
 		('BACKGROUND', (0, 0), (0, 0), colors.white),
 		('BACKGROUND', (2, 0), (2, 0), colors.white),
+		('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
 		('LEFTPADDING', (0, 0), (-1, -1), 4),
 		('RIGHTPADDING', (0, 0), (-1, -1), 4),
 		('TOPPADDING', (0, 0), (-1, -1), 4),
 		('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-		('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-	]
-	cases_box.setStyle(TableStyle(box_style_commands))
-	weight_box.setStyle(TableStyle(box_style_commands))
-	summary_table.setStyle(TableStyle([
-		('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-		('LEFTPADDING', (0, 0), (-1, -1), 0),
-		('RIGHTPADDING', (0, 0), (-1, -1), 8),
-		('TOPPADDING', (0, 0), (-1, -1), 0),
-		('BOTTOMPADDING', (0, 0), (-1, -1), 0),
 	]))
 	return summary_table
 

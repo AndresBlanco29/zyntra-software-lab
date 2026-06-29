@@ -1590,7 +1590,6 @@ def unlock_client_from_delivery(*, delivery, backoffice_user):
 
 @transaction.atomic
 def mark_delivery_unpaid_from_backoffice(*, delivery, backoffice_user, motivo_no_pago):
-	_ = backoffice_user
 	if not delivery.is_completed:
 		raise ValidationError(_('Only completed deliveries can be corrected from BackOffice.'))
 	if delivery.estado_pago != 'PAGADO':

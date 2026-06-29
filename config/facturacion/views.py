@@ -563,8 +563,8 @@ def _build_invoice_pdf_compact_header(*, styles, invoice_number, total_width):
 		'InvoiceCompactHeaderNumber',
 		parent=styles['BodyText'],
 		fontName='Helvetica-Bold',
-		fontSize=18,
-		leading=20,
+		fontSize=9,
+		leading=10,
 		textColor=colors.white,
 		alignment=TA_RIGHT,
 	)
@@ -859,7 +859,7 @@ def _invoice_pdf_response(invoice):
 			Paragraph(_('Driver'), meta_label_style), Paragraph(driver_name, meta_value_style),
 			Paragraph(_('Due date'), meta_label_style), Paragraph(_resolve_invoice_pdf_due_date_label(invoice), meta_value_style),
 		],
-	], colWidths=[54, 78, 50, 72, 42, 78])
+	], colWidths=[52, 76, 48, 70, 58, 80])
 	meta_table.setStyle(TableStyle([
 		('BOX', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
 		('INNERGRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),

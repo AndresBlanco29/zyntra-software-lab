@@ -70,8 +70,14 @@ class AuditTrailTests(TestCase):
         )
         self.client.force_login(self.admin)
         response = self.client.get(reverse('audit_log_list'))
+        self.assertContains(response, 'Page view')
+        self.assertContains(response, 'Import from QuickBooks')
+
+        response = self.client.get(reverse('audit_log_list'), {'business_only': '1'})
         self.assertNotContains(response, 'Page view')
         self.assertContains(response, 'Import from QuickBooks')
 
-        response = self.client.get(reverse('audit_log_list'), {'business_only': '0'})
-        self.assertContains(response, 'Page view')
+    def test_user_filter_lists_all_internal_users_including_backoffice(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse('audit_log_list'))
+        self.assertContains(response, 'backoffice_audit')

@@ -8,6 +8,13 @@
   <div>
     <h2 class="mb-1">{% trans "Audit trail" %}</h2>
     <p class="text-muted mb-0">{% trans "Track who performed each action, how it was executed, when it happened, and what changed across the system." %}</p>
+    {% if archive_earliest %}
+    <p class="small text-muted mb-0 mt-1">
+      {% blocktrans with start=archive_earliest|date:"m/d/Y H:i" end=archive_latest|date:"m/d/Y H:i" %}
+      Records available from {{ start }} through {{ end }}. Leave date filters empty to show the full history.
+      {% endblocktrans %}
+    </p>
+    {% endif %}
   </div>
   <div class="badge text-bg-light border px-3 py-2">
     {% blocktrans with count=total_count %}Showing {{ count }} matching records{% endblocktrans %}
@@ -31,10 +38,15 @@
         <label class="form-label" for="auditUser">{% trans "User" %}</label>
         <select id="auditUser" name="user_id" class="form-select">
           <option value="">{% trans "All users" %}</option>
-          {% for user in users %}
-          <option value="{{ user.id }}" {% if filters.user_id == user.id %}selected{% endif %}>
-            {% firstof user.get_full_name user.username %} ({{ user.role }})
-          </option>
+          {% regroup users by role as users_by_role %}
+          {% for role_group in users_by_role %}
+          <optgroup label="{{ role_group.grouper|capfirst }}">
+            {% for user in role_group.list %}
+            <option value="{{ user.id }}" {% if filters.user_id == user.id %}selected{% endif %}>
+              {% firstof user.get_full_name user.username %}{% if not user.is_active %} ({% trans "inactive" %}){% endif %}
+            </option>
+            {% endfor %}
+          </optgroup>
           {% endfor %}
         </select>
       </div>
@@ -85,7 +97,7 @@
             {% if filters.business_only %}checked{% endif %}>
           <label class="form-check-label" for="auditBusinessOnly">{% trans "Business actions only" %}</label>
         </div>
-        <div class="small text-muted">{% trans "Orders, invoices, deliveries, QuickBooks sync, pricing changes." %}</div>
+        <div class="small text-muted">{% trans "Optional. Check to hide navigation and show only orders, invoices, deliveries, QuickBooks, and pricing." %}</div>
       </div>
       <div class="col-12 col-lg-4 d-flex gap-2">
         <button type="submit" class="btn btn-primary">{% trans "Apply filters" %}</button>

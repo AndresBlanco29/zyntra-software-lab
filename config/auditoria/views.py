@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Max, Min, Q
 from django.shortcuts import render
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -10,6 +10,8 @@ from django.utils.translation import gettext_lazy as _
 from config.auditoria.decorators import admin_only_required
 from config.auditoria.models import AuditLog
 from config.usuarios.models import Usuario
+
+INTERNAL_AUDIT_ROLES = ('admin', 'vendedor', 'backoffice', 'seleccionador', 'driver')
 
 
 def _parse_filters(request):
@@ -29,11 +31,11 @@ def _parse_filters(request):
     except (TypeError, ValueError):
         user_id = None
 
-    raw_business_only = (data.get('business_only') or '1').strip().lower()
-    if raw_business_only in {'0', 'false', 'no', 'off'}:
-        business_only = False
+    raw_business_only = (data.get('business_only') or '0').strip().lower()
+    if raw_business_only in {'1', 'true', 'yes', 'on'}:
+        business_only = True
     else:
-        business_only = raw_business_only in {'1', 'true', 'yes', 'on', ''}
+        business_only = False
 
     return {
         'q': (data.get('q') or '').strip(),
@@ -61,7 +63,13 @@ def _apply_filters(queryset, filters):
             | Q(ip_address__icontains=term)
         )
     if filters['user_id']:
-        queryset = queryset.filter(actor_id=filters['user_id'])
+        selected_user = Usuario.objects.filter(id=filters['user_id']).only('id', 'username').first()
+        if selected_user:
+            queryset = queryset.filter(
+                Q(actor_id=selected_user.id) | Q(actor_username=selected_user.username)
+            )
+        else:
+            queryset = queryset.filter(actor_id=filters['user_id'])
     if filters['action_category']:
         queryset = queryset.filter(action_category=filters['action_category'])
     if filters['http_method']:
@@ -86,12 +94,15 @@ def audit_log_list(request):
     paginator = Paginator(queryset, 50)
     page_obj = paginator.get_page(request.GET.get('page'))
 
-    actor_ids = (
-        AuditLog.objects.exclude(actor_id__isnull=True)
-        .values_list('actor_id', flat=True)
-        .distinct()[:200]
+    users = (
+        Usuario.objects.filter(role__in=INTERNAL_AUDIT_ROLES)
+        .order_by('role', 'first_name', 'last_name', 'username')
     )
-    users = Usuario.objects.filter(id__in=actor_ids).order_by('username')
+
+    archive_bounds = AuditLog.objects.aggregate(
+        earliest=Min('created_at'),
+        latest=Max('created_at'),
+    )
 
     entity_types = (
         AuditLog.objects.exclude(entity_type='')
@@ -114,5 +125,7 @@ def audit_log_list(request):
             ('DELETE', 'DELETE'),
         ),
         'total_count': paginator.count,
+        'archive_earliest': archive_bounds['earliest'],
+        'archive_latest': archive_bounds['latest'],
     }
     return render(request, 'backoffice/audit_log_list.html', context)

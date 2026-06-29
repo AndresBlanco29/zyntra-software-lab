@@ -15,7 +15,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 from reportlab.graphics.barcode import code128
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER
+from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
@@ -515,7 +515,30 @@ def _chunk_invoice_pdf_item_rows(item_rows, size=INVOICE_PDF_ITEMS_PER_PAGE):
 	return [rows[index:index + size] for index in range(0, len(rows), size)]
 
 
-def _build_invoice_pdf_compact_header(*, styles, invoice_number, generated_on, total_width):
+def _get_invoice_pdf_company_contact_lines():
+	from config.core.models import HomeContenido
+
+	contenido = HomeContenido.objects.filter(activo=True).order_by('-actualizado').first()
+	if contenido:
+		lines = [
+			contenido.footer_contacto_direccion_linea_1,
+			contenido.footer_contacto_direccion_linea_2,
+			contenido.footer_contacto_email,
+			contenido.footer_contacto_telefono,
+		]
+	else:
+		lines = [
+			'1666 Roswell Rd Bldg 100',
+			'Marietta, GA 30062-3639',
+			'latortilla@gmail.com',
+			'+1 (470) 967 2782',
+		]
+	return [line.strip() for line in lines if line and str(line).strip()]
+
+
+def _build_invoice_pdf_compact_header(*, styles, invoice_number, total_width):
+	from html import escape
+
 	logo_cell = build_pdf_logo_image(max_width=36, max_height=36)
 	if logo_cell:
 		logo_cell.hAlign = 'LEFT'
@@ -528,21 +551,34 @@ def _build_invoice_pdf_compact_header(*, styles, invoice_number, generated_on, t
 			leading=11,
 			textColor=colors.white,
 		))
-	text_html = (
-		f'<b>La Tortilla Grocery</b><br/>'
-		f'Invoice {invoice_number}<br/>'
-		f'Generated {generated_on}'
+	header_text_style = ParagraphStyle(
+		'InvoiceCompactHeaderText',
+		parent=styles['BodyText'],
+		fontName='Helvetica',
+		fontSize=7,
+		leading=8,
+		textColor=colors.white,
 	)
+	invoice_number_style = ParagraphStyle(
+		'InvoiceCompactHeaderNumber',
+		parent=styles['BodyText'],
+		fontName='Helvetica-Bold',
+		fontSize=18,
+		leading=20,
+		textColor=colors.white,
+		alignment=TA_RIGHT,
+	)
+	contact_html = '<br/>'.join(escape(line) for line in _get_invoice_pdf_company_contact_lines())
+	company_html = f'<b>La Tortilla Grocery</b><br/>{contact_html}'
+	invoice_number_width = 150
+	center_width = max(total_width - 62 - invoice_number_width, 200)
 	header = Table(
-		[[logo_cell, Paragraph(text_html, ParagraphStyle(
-			'InvoiceCompactHeaderText',
-			parent=styles['BodyText'],
-			fontName='Helvetica',
-			fontSize=8,
-			leading=9,
-			textColor=colors.white,
-		))]],
-		colWidths=[62, max(total_width - 62, 200)],
+		[[
+			logo_cell,
+			Paragraph(company_html, header_text_style),
+			Paragraph(escape(invoice_number), invoice_number_style),
+		]],
+		colWidths=[62, center_width, invoice_number_width],
 	)
 	header.setStyle(TableStyle([
 		('BACKGROUND', (0, 0), (-1, -1), BRAND_PRIMARY),
@@ -816,12 +852,12 @@ def _invoice_pdf_response(invoice):
 		[
 			Paragraph(_('Customer no.'), meta_label_style), Paragraph(str(invoice.cliente_id), meta_value_style),
 			Paragraph(_('Order no.'), meta_label_style), Paragraph(str(invoice.pedido_id), meta_value_style),
-			Paragraph(_('Due date'), meta_label_style), Paragraph(_resolve_invoice_pdf_due_date_label(invoice), meta_value_style),
+			Paragraph(_('Generated'), meta_label_style), Paragraph(generated_label, meta_value_style),
 		],
 		[
 			Paragraph(_('Sales rep'), meta_label_style), Paragraph(sales_rep, meta_value_style),
 			Paragraph(_('Driver'), meta_label_style), Paragraph(driver_name, meta_value_style),
-			Paragraph('', meta_label_style), Paragraph('', meta_value_style),
+			Paragraph(_('Due date'), meta_label_style), Paragraph(_resolve_invoice_pdf_due_date_label(invoice), meta_value_style),
 		],
 	], colWidths=[54, 78, 50, 72, 42, 78])
 	meta_table.setStyle(TableStyle([
@@ -834,7 +870,7 @@ def _invoice_pdf_response(invoice):
 		('BOTTOMPADDING', (0, 0), (-1, -1), 3),
 	]))
 	content.extend([
-		_build_invoice_pdf_compact_header(styles=styles, invoice_number=invoice.numero, generated_on=generated_label, total_width=content_width),
+		_build_invoice_pdf_compact_header(styles=styles, invoice_number=invoice.numero, total_width=content_width),
 		Spacer(1, 6),
 		meta_table,
 		Spacer(1, 6),
@@ -869,7 +905,7 @@ def _invoice_pdf_response(invoice):
 		if index > 0:
 			content.extend([
 				PageBreak(),
-				_build_invoice_pdf_compact_header(styles=styles, invoice_number=invoice.numero, generated_on=generated_label, total_width=content_width),
+				_build_invoice_pdf_compact_header(styles=styles, invoice_number=invoice.numero, total_width=content_width),
 				Spacer(1, 6),
 				Paragraph(_('Continued line items.'), note_style),
 				Spacer(1, 4),

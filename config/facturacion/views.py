@@ -599,7 +599,16 @@ def _format_pdf_weight(value):
 	return f'{amount:,.1f}'
 
 
-def _build_invoice_pdf_shipment_summary_table(summary, *, box_style, value_style):
+def _build_invoice_pdf_shipment_summary_table(summary, *, box_style, value_style, total_width=None):
+	if total_width is None:
+		col_widths = [92, 58, 78, 78]
+	else:
+		col_widths = [
+			total_width * 0.38,
+			total_width * 0.12,
+			total_width * 0.32,
+			total_width * 0.18,
+		]
 	summary_table = Table(
 		[[
 			Paragraph('<b>No. of Cases:</b>', box_style),
@@ -607,7 +616,7 @@ def _build_invoice_pdf_shipment_summary_table(summary, *, box_style, value_style
 			Paragraph('<b>Total WGT:</b>', box_style),
 			Paragraph(_format_pdf_weight(summary['total_weight']), value_style),
 		]],
-		colWidths=[92, 58, 78, 78],
+		colWidths=col_widths,
 		hAlign='LEFT',
 	)
 	summary_table.setStyle(TableStyle([
@@ -624,37 +633,38 @@ def _build_invoice_pdf_shipment_summary_table(summary, *, box_style, value_style
 	return summary_table
 
 
-def _build_invoice_pdf_signature_section(invoice, *, section_title_style, body_style, note_style):
-	elements = [
-		Spacer(1, 16),
+def _build_invoice_pdf_signature_flowables(invoice, *, section_title_style, body_style, note_style, signature_width):
+	flowables = [
 		Paragraph("Customer's Signature:", section_title_style),
 	]
 	signature_bytes = None
-	if hasattr(invoice, 'delivery') and invoice.delivery.firma_cliente:
+	delivery = getattr(invoice, 'delivery', None)
+	if delivery and getattr(delivery, 'firma_cliente', None):
 		try:
 			with invoice.delivery.firma_cliente.open('rb') as signature_file:
 				signature_bytes = signature_file.read()
 		except Exception:
 			signature_bytes = None
 	if signature_bytes:
-		signature_image = Image(BytesIO(signature_bytes), width=240, height=56)
+		image_width = min(signature_width, 240)
+		signature_image = Image(BytesIO(signature_bytes), width=image_width, height=52)
 		signature_image.hAlign = 'LEFT'
-		elements.extend([
+		flowables.extend([
 			Spacer(1, 4),
 			signature_image,
 		])
 	else:
-		signature_line = Table([['']], colWidths=[420], rowHeights=[28])
+		signature_line = Table([['']], colWidths=[signature_width], rowHeights=[26])
 		signature_line.setStyle(TableStyle([
 			('LINEBELOW', (0, 0), (-1, -1), 0.75, BRAND_TEXT),
-			('TOPPADDING', (0, 0), (-1, -1), 18),
+			('TOPPADDING', (0, 0), (-1, -1), 16),
 			('BOTTOMPADDING', (0, 0), (-1, -1), 0),
 		]))
-		elements.extend([
+		flowables.extend([
 			Spacer(1, 2),
 			signature_line,
 		])
-	elements.extend([
+	flowables.extend([
 		Spacer(1, 6),
 		Paragraph(
 			'In case of default of payment, Customer agrees to pay all cost of collection and legal fees.',
@@ -666,7 +676,94 @@ def _build_invoice_pdf_signature_section(invoice, *, section_title_style, body_s
 			note_style,
 		),
 	])
-	return elements
+	return flowables
+
+
+def _build_invoice_pdf_footer_layout(
+	invoice,
+	*,
+	content_width,
+	left_width,
+	meta_label_style,
+	meta_value_style,
+	section_title_style,
+	body_style,
+	note_style,
+):
+	summary_box_style = ParagraphStyle(
+		'InvoiceSummaryBox',
+		parent=body_style,
+		fontName='Helvetica-Bold',
+		fontSize=8,
+		leading=10,
+		textColor=BRAND_TEXT,
+	)
+	shipment_summary = build_invoice_shipment_summary(invoice)
+	left_rows = [[
+		_build_invoice_pdf_shipment_summary_table(
+			shipment_summary,
+			box_style=summary_box_style,
+			value_style=body_style,
+			total_width=left_width,
+		),
+	]]
+	for flowable in _build_invoice_pdf_signature_flowables(
+		invoice,
+		section_title_style=section_title_style,
+		body_style=body_style,
+		note_style=note_style,
+		signature_width=max(left_width - 8, 180),
+	):
+		left_rows.append([flowable])
+	left_column = Table(left_rows, colWidths=[left_width])
+	left_column.setStyle(TableStyle([
+		('VALIGN', (0, 0), (-1, -1), 'TOP'),
+		('LEFTPADDING', (0, 0), (-1, -1), 0),
+		('RIGHTPADDING', (0, 0), (-1, -1), 0),
+		('TOPPADDING', (0, 0), (-1, -1), 0),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+		('TOPPADDING', (0, 1), (0, 1), 8),
+	]))
+
+	totals_col_widths = [92, 110]
+	totals_table = Table(
+		_build_invoice_pdf_totals_rows(
+			invoice,
+			meta_label_style=meta_label_style,
+			meta_value_style=meta_value_style,
+			section_title_style=section_title_style,
+			body_style=body_style,
+		),
+		colWidths=totals_col_widths,
+		hAlign='RIGHT',
+	)
+	totals_table.setStyle(TableStyle([
+		('BOX', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('INNERGRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('BACKGROUND', (0, 0), (-1, -2), BRAND_SURFACE),
+		('BACKGROUND', (0, -1), (-1, -1), BRAND_SOFT_BLUE),
+		('LEFTPADDING', (0, 0), (-1, -1), 6),
+		('RIGHTPADDING', (0, 0), (-1, -1), 6),
+		('TOPPADDING', (0, 0), (-1, -1), 5),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+	]))
+
+	right_width = max(content_width - left_width, sum(totals_col_widths))
+	footer_table = Table(
+		[[left_column, totals_table]],
+		colWidths=[left_width, right_width],
+		hAlign='LEFT',
+	)
+	footer_table.setStyle(TableStyle([
+		('VALIGN', (0, 0), (-1, -1), 'TOP'),
+		('ALIGN', (0, 0), (0, 0), 'LEFT'),
+		('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+		('LEFTPADDING', (0, 0), (-1, -1), 0),
+		('RIGHTPADDING', (0, 0), (-1, -1), 0),
+		('TOPPADDING', (0, 0), (-1, -1), 0),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+	]))
+	return footer_table
 
 
 def _invoice_pdf_response(invoice):
@@ -710,6 +807,8 @@ def _invoice_pdf_response(invoice):
 	]))
 	item_rows = _build_invoice_pdf_item_data(invoice)
 	item_chunks = _chunk_invoice_pdf_item_rows(item_rows)
+	item_column_widths = _invoice_pdf_item_table_column_widths(content_width)
+	left_footer_width = item_column_widths[0] + item_column_widths[1]
 	generated_label = format_local_datetime(invoice.creada_en)
 
 	content = []
@@ -777,7 +876,6 @@ def _invoice_pdf_response(invoice):
 			])
 
 		rows = [_build_invoice_pdf_item_table_header(table_header_style)]
-		item_column_widths = _invoice_pdf_item_table_column_widths(content_width)
 		barcode_column_width = item_column_widths[0] - 8
 		for item in chunk:
 			barcode_cell = Paragraph('-', body_style)
@@ -820,52 +918,14 @@ def _invoice_pdf_response(invoice):
 		]))
 		content.append(table)
 		if index == len(item_chunks) - 1:
-			content.append(Spacer(1, 12))
+			content.append(Spacer(1, 8))
 
-	totals_table = Table(
-		_build_invoice_pdf_totals_rows(
-			invoice,
-			meta_label_style=meta_label_style,
-			meta_value_style=meta_value_style,
-			section_title_style=section_title_style,
-			body_style=styles['BodyText'],
-		),
-		colWidths=[92, 110],
-	)
-	totals_table.setStyle(TableStyle([
-		('BOX', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
-		('INNERGRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
-		('BACKGROUND', (0, 0), (-1, -2), BRAND_SURFACE),
-		('BACKGROUND', (0, -1), (-1, -1), BRAND_SOFT_BLUE),
-		('LEFTPADDING', (0, 0), (-1, -1), 6),
-		('RIGHTPADDING', (0, 0), (-1, -1), 6),
-		('TOPPADDING', (0, 0), (-1, -1), 5),
-		('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-	]))
-	content.extend([
-		Spacer(1, 6),
-		totals_table,
-	])
-
-	shipment_summary = build_invoice_shipment_summary(invoice)
-	summary_box_style = ParagraphStyle(
-		'InvoiceSummaryBox',
-		parent=body_style,
-		fontName='Helvetica-Bold',
-		fontSize=8,
-		leading=10,
-		textColor=BRAND_TEXT,
-	)
-	content.extend([
-		Spacer(1, 10),
-		_build_invoice_pdf_shipment_summary_table(
-			shipment_summary,
-			box_style=summary_box_style,
-			value_style=body_style,
-		),
-	])
-	content.extend(_build_invoice_pdf_signature_section(
+	content.append(_build_invoice_pdf_footer_layout(
 		invoice,
+		content_width=content_width,
+		left_width=left_footer_width,
+		meta_label_style=meta_label_style,
+		meta_value_style=meta_value_style,
 		section_title_style=section_title_style,
 		body_style=body_style,
 		note_style=note_style,

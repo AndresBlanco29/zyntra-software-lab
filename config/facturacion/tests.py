@@ -17,7 +17,7 @@ from reportlab.platypus import SimpleDocTemplate
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, DeliveryNotificationLog, FacturacionRegistroAnulacion, Invoice, NotaAjuste, NotaAjusteAplicacion
 from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, build_invoice_shipment_summary, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, resolve_invoice_payment_base_date, resolve_invoice_payment_due_date, start_delivery_route, unlock_client_from_delivery
-from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_item_data, _build_invoice_pdf_shipment_summary_table, _build_invoice_pdf_terms_paragraph, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_pdf_due_date_label, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
+from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_footer_layout, _build_invoice_pdf_item_data, _build_invoice_pdf_shipment_summary_table, _build_invoice_pdf_terms_paragraph, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_pdf_due_date_label, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_SYNCED
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
 from config.inventario.services import registrar_entrada_manual, reservar_stock_para_pedido_items
@@ -3069,11 +3069,44 @@ class InvoiceFlowTests(TestCase):
 			{'total_cases': 180, 'total_weight': Decimal('6088.2')},
 			box_style=box_style,
 			value_style=value_style,
+			total_width=244,
 		)
 		buffer = BytesIO()
 		document = SimpleDocTemplate(buffer, pagesize=letter)
 		document.build([summary_table])
 		self.assertGreater(len(buffer.getvalue()), 100)
+
+	def test_invoice_pdf_footer_layout_builds_without_reportlab_error(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		styles = getSampleStyleSheet()
+		page_width, _page_height = letter
+		content_width = page_width - 48
+		item_column_widths = _invoice_pdf_item_table_column_widths(content_width)
+		left_width = item_column_widths[0] + item_column_widths[1]
+		meta_label_style = ParagraphStyle('MetaLabel', parent=styles['BodyText'], fontName='Helvetica-Bold', fontSize=7)
+		meta_value_style = ParagraphStyle('MetaValue', parent=styles['BodyText'], fontSize=8)
+		section_title_style = ParagraphStyle('SectionTitle', parent=styles['BodyText'], fontName='Helvetica-Bold', fontSize=8)
+		body_style = ParagraphStyle('Body', parent=styles['BodyText'], fontSize=7.5)
+		note_style = ParagraphStyle('Note', parent=styles['BodyText'], fontSize=6.5)
+		footer = _build_invoice_pdf_footer_layout(
+			invoice,
+			content_width=content_width,
+			left_width=left_width,
+			meta_label_style=meta_label_style,
+			meta_value_style=meta_value_style,
+			section_title_style=section_title_style,
+			body_style=body_style,
+			note_style=note_style,
+		)
+		buffer = BytesIO()
+		document = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=24, rightMargin=24)
+		document.build([footer])
+		self.assertGreater(len(buffer.getvalue()), 500)
 
 	def test_backoffice_invoice_detail_shows_cases_and_weight_summary(self):
 		invoice = generar_invoice_desde_picking(

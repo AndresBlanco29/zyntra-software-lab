@@ -394,6 +394,21 @@
       display: none;
     }
 
+    .driver-stack-table .driver-data-table td.driver-stack-field,
+    .driver-stack-table .driver-data-table td.driver-stack-field .driver-stack-field-help {
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      white-space: normal;
+    }
+
+    .driver-stack-table .driver-data-table td.driver-stack-field .driver-stack-field-help {
+      display: block;
+      line-height: 1.35;
+      margin-top: 0.35rem;
+    }
+
     .driver-stack-table .driver-data-table tr.driver-table-empty-row td {
       text-align: center !important;
       padding: 0.75rem 0;
@@ -722,7 +737,7 @@
                       </td>
                       <td class="driver-stack-field" data-label="{% trans 'Calculated amount' %}">
                         <input type="number" min="0" step="0.01" name="driver_note_amount_{{ item.id }}" id="driver_note_amount_{{ item.id }}" class="form-control form-control-sm js-driver-adjustment-amount" placeholder="0.00" inputmode="decimal">
-                        <div class="small text-muted">{% trans "Calculated automatically from the quantities you enter." %}</div>
+                        <div class="small text-muted driver-stack-field-help">{% trans "Calculated automatically from the quantities you enter." %}</div>
                       </td>
                     </tr>
                     {% endfor %}
@@ -973,7 +988,7 @@
                   </td>
                   <td class="driver-stack-field" data-label="{% trans 'Calculated amount' %}">
                     <input type="number" min="0" step="0.01" name="driver_note_amount_{{ item.id }}" id="driver_note_amount_post_{{ item.id }}" class="form-control form-control-sm js-driver-adjustment-amount" placeholder="0.00" inputmode="decimal">
-                    <div class="small text-muted">{% trans "Calculated automatically from the quantities you enter." %}</div>
+                    <div class="small text-muted driver-stack-field-help">{% trans "Calculated automatically from the quantities you enter." %}</div>
                   </td>
                 </tr>
                 {% endfor %}

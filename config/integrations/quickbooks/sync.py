@@ -754,9 +754,24 @@ def sync_customer(*, cliente, client=None):
 
 
 def _build_item_name(presentacion):
-    product_name = _normalize_text(presentacion.producto.nombre, fallback=f'Producto {presentacion.producto_id}')
-    presentation_name = _normalize_text(presentacion.nombre, fallback=f'Presentacion {presentacion.pk}')
-    return _truncate(f'LTG Item {presentacion.pk} - {product_name} - {presentation_name}')
+	return _truncate(
+		_normalize_text(presentacion.producto.nombre, fallback=f'Producto {presentacion.producto_id}')
+	)
+
+
+def _resolve_item_payload_name(presentacion, *, remote_payload=None):
+	if remote_payload:
+		remote_name = _normalize_text(remote_payload.get('Name'))
+		if remote_name:
+			return _truncate(remote_name)
+	return _build_item_name(presentacion)
+
+
+def _build_item_ref(presentacion, *, remote_payload=None):
+	return {
+		'value': str(getattr(presentacion, 'quickbooks_id', '') or '').strip(),
+		'name': _resolve_item_payload_name(presentacion, remote_payload=remote_payload),
+	}
 
 
 def _build_item_description(presentacion):
@@ -878,7 +893,7 @@ def _build_item_payload(presentacion, *, client, income_account_ref=None, remote
         use_inventory = _quickbooks_item_is_inventory(remote_payload)
 
     payload = {
-        'Name': _build_item_name(presentacion),
+        'Name': _resolve_item_payload_name(presentacion, remote_payload=remote_payload),
         'Active': bool(presentacion.producto.activo),
         'Description': _build_item_description(presentacion),
         'UnitPrice': _as_float(presentacion.precio_3),
@@ -914,7 +929,6 @@ def _build_item_payload(presentacion, *, client, income_account_ref=None, remote
 
 def _item_payload_needs_update(remote_payload, expected_payload):
     compare_fields = (
-        'Name',
         'Type',
         'Active',
         'Description',
@@ -3786,7 +3800,7 @@ def sync_invoice(*, invoice, client=None):
         inventory_presentaciones = []
         for item in invoice.items.select_related('presentacion__producto').all():
             if item.presentacion_id:
-                sync_product(presentacion=item.presentacion, client=client)
+                product_result = sync_product(presentacion=item.presentacion, client=client)
                 _prepare_inventory_item_for_txn_date(
                     client=client,
                     presentacion=item.presentacion,
@@ -3794,7 +3808,10 @@ def sync_invoice(*, invoice, client=None):
                 )
                 item.presentacion.refresh_from_db(fields=['quickbooks_id'])
                 inventory_presentaciones.append(item.presentacion)
-                item_ref = {'value': item.presentacion.quickbooks_id, 'name': _build_item_name(item.presentacion)}
+                item_ref = _build_item_ref(
+                    item.presentacion,
+                    remote_payload=product_result.get('payload'),
+                )
             else:
                 adjustment_item_ref = adjustment_item_ref or _build_adjustment_item_ref(client)
                 item_ref = adjustment_item_ref
@@ -3843,7 +3860,7 @@ def _build_adjustment_lines(note, client, *, txn_date=None):
     for item in note.items.select_related('presentacion__producto').all():
         amount = _quantize_money(item.total or Decimal(str(item.monto_unitario or '0')) * Decimal(str(item.cantidad or 1)))
         if item.presentacion_id:
-            sync_product(presentacion=item.presentacion, client=client)
+            product_result = sync_product(presentacion=item.presentacion, client=client)
             if txn_date is not None:
                 _prepare_inventory_item_for_txn_date(
                     client=client,
@@ -3852,7 +3869,10 @@ def _build_adjustment_lines(note, client, *, txn_date=None):
                 )
                 item.presentacion.refresh_from_db(fields=['quickbooks_id'])
             presentaciones.append(item.presentacion)
-            item_ref = {'value': item.presentacion.quickbooks_id, 'name': _build_item_name(item.presentacion)}
+            item_ref = _build_item_ref(
+                item.presentacion,
+                remote_payload=product_result.get('payload'),
+            )
         else:
             adjustment_item_ref = adjustment_item_ref or _build_adjustment_item_ref(client)
             item_ref = adjustment_item_ref
@@ -3962,7 +3982,7 @@ def _resolve_vendor_ref_for_purchase(*, compra, client):
 
 
 def _build_purchase_bill_line(*, linea, client):
-    sync_product(presentacion=linea.presentacion, client=client)
+    product_result = sync_product(presentacion=linea.presentacion, client=client)
     return {
         'DetailType': 'ItemBasedExpenseLineDetail',
         'Amount': _as_float(linea.subtotal),
@@ -3971,7 +3991,10 @@ def _build_purchase_bill_line(*, linea, client):
             limit=4000,
         ),
         'ItemBasedExpenseLineDetail': {
-            'ItemRef': {'value': str(linea.presentacion.quickbooks_id), 'name': _build_item_name(linea.presentacion)},
+            'ItemRef': _build_item_ref(
+                linea.presentacion,
+                remote_payload=product_result.get('payload'),
+            ),
             'Qty': int(linea.cantidad),
             'UnitPrice': _as_float(linea.costo_unitario),
         },

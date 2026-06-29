@@ -28,6 +28,7 @@ from config.integrations.quickbooks.client import QuickBooksAPIError
 from config.integrations.quickbooks.services import get_connection
 from config.integrations.models import QuickBooksConnection, QuickBooksImportConflict
 from config.integrations.quickbooks.sync import (
+    _build_item_name,
     _build_item_payload,
     _convert_linked_item_to_inventory,
     _derive_quickbooks_invoice_status,
@@ -37,6 +38,7 @@ from config.integrations.quickbooks.sync import (
     _normalize_inventory_start_date_if_needed,
     _parse_quickbooks_presentation,
     _prepare_inventory_item_for_txn_date,
+    _resolve_item_payload_name,
     import_quickbooks_credit_memo_record,
     import_quickbooks_customer_record,
     import_quickbooks_invoice_record,
@@ -145,6 +147,28 @@ class QuickBooksItemPayloadTests(TestCase):
             precio_3=Decimal('12.00'),
         )
         StockPresentacion.objects.create(presentacion=self.presentacion, stock_fisico=18, stock_disponible=18)
+
+    def test_build_item_name_uses_product_name_without_ltg_prefix(self):
+        self.assertEqual(_build_item_name(self.presentacion), 'QB payload product')
+
+    def test_build_item_payload_preserves_remote_quickbooks_name(self):
+        payload = _build_item_payload(
+            self.presentacion,
+            client=Mock(),
+            remote_payload={
+                'Id': '1062',
+                'Type': 'Inventory',
+                'Name': 'MILAGRO CORN TORTILLA 16/36CT',
+            },
+        )
+
+        self.assertEqual(payload['Name'], 'MILAGRO CORN TORTILLA 16/36CT')
+
+    def test_resolve_item_payload_name_falls_back_to_local_product_name(self):
+        self.assertEqual(
+            _resolve_item_payload_name(self.presentacion),
+            'QB payload product',
+        )
 
     @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
     @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
@@ -277,10 +301,11 @@ class QuickBooksItemPayloadTests(TestCase):
             'Id': '1062',
             'SyncToken': '3',
             'Type': 'NonInventory',
-            'Name': 'LTG Item 1062 - Demo - Caja',
+            'Name': 'MILAGRO CORN TORTILLA 16/36CT',
             'IncomeAccountRef': {'value': '79', 'name': 'Sales'},
         }
         desired_payload = _build_item_payload(self.presentacion, client=Mock(), remote_payload=existing)
+        self.assertEqual(desired_payload['Name'], 'MILAGRO CORN TORTILLA 16/36CT')
         client = Mock()
         client.update_item.side_effect = QuickBooksAPIError('QuickBooks API request failed: conversion rejected')
         client.create_item.return_value = {'Id': '2001', 'SyncToken': '0', 'Type': 'Inventory', 'QtyOnHand': 18}
@@ -1947,7 +1972,7 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         mock_request.side_effect = [
             self._json_response({'QueryResponse': {}}),
             self._json_response({'QueryResponse': {'Account': [{'Id': '79', 'Name': 'Sales of Product Income'}]}}),
-            self._json_response({'Item': {'Id': '801', 'Name': 'LTG Item 1 - Tortilla 12 - Caja'}}),
+            self._json_response({'Item': {'Id': '801', 'Name': 'Tortilla 12'}}),
         ]
 
         response = self.client.get(reverse('quickbooks_sync_product', args=[self.presentacion.pk]))
@@ -1966,9 +1991,9 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
             self._json_response({'Customer': {'Id': '701', 'DisplayName': 'LTG Customer 1 - Cliente QuickBooks'}}),
             self._json_response({'QueryResponse': {}}),
             self._json_response({'QueryResponse': {'Account': [{'Id': '79', 'Name': 'Sales of Product Income'}]}}),
-            self._json_response({'Item': {'Id': '801', 'Name': 'LTG Item 1 - Tortilla 12 - Caja'}}),
+            self._json_response({'Item': {'Id': '801', 'Name': 'Tortilla 12'}}),
             self._json_response({'QueryResponse': {}}),
-            self._json_response({'Item': {'Id': '801', 'Name': 'LTG Item 1 - Tortilla 12 - Caja'}}),
+            self._json_response({'Item': {'Id': '801', 'Name': 'Tortilla 12'}}),
             self._json_response({'Invoice': {'Id': '901', 'DocNumber': self.invoice.numero}}),
         ]
 

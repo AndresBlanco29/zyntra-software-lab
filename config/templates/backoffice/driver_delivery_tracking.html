@@ -4,15 +4,21 @@
 {% block title %}{% trans "Live Tracking" %} - {{ invoice.numero }}{% endblock %}
 
 {% block content %}
+<div class="has-panel-mobile-back">
+{% url 'driver_delivery_detail' delivery.id as driver_delivery_detail_url %}
+{% trans "Back to delivery" as back_to_delivery_label %}
+{% include "includes/panel_mobile_back_button.html" with back_url=driver_delivery_detail_url back_text=back_to_delivery_label back_label=back_to_delivery_label %}
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
   <div>
     <h2 class="mb-1">{% trans "Live route tracking" %}</h2>
     <p class="text-muted mb-0">{{ invoice.numero }} | {{ delivery.invoice.cliente.nombre_empresa }}</p>
   </div>
-  <div class="d-flex gap-2">
-    <a href="{% url 'driver_delivery_detail' delivery.id %}" class="btn btn-outline-secondary">{% trans "Back to delivery" %}</a>
+  <div class="d-flex gap-2 d-none d-md-flex">
     <a href="{{ delivery.google_maps_url }}" target="_blank" rel="noopener" class="btn btn-primary">{% trans "Open Google Maps" %}</a>
   </div>
+</div>
+<div class="d-flex gap-2 mb-3 d-md-none">
+  <a href="{{ delivery.google_maps_url }}" target="_blank" rel="noopener" class="btn btn-primary w-100">{% trans "Open Google Maps" %}</a>
 </div>
 
 <div class="alert alert-info">
@@ -57,6 +63,8 @@
       </div>
     </div>
   </div>
+</div>
+
 </div>
 
 <script>

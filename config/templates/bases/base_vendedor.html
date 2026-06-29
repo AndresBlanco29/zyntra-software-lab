@@ -21,6 +21,34 @@
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
 <script src="{% static 'js/preserve-search-focus.js' %}"></script>
 <script defer src="{% static 'js/language-session.js' %}"></script>
+<script>
+(function () {
+  const navbar = document.querySelector('.navbar-custom');
+  if (!navbar) {
+    return;
+  }
+
+  const root = document.documentElement;
+
+  function syncPanelNavbarOffset() {
+    const height = Math.max(Math.ceil(navbar.getBoundingClientRect().height), 56);
+    root.style.setProperty('--panel-navbar-offset', height + 'px');
+  }
+
+  syncPanelNavbarOffset();
+  window.addEventListener('load', syncPanelNavbarOffset);
+
+  let resizeTimer;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(syncPanelNavbarOffset, 100);
+  });
+
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(syncPanelNavbarOffset).observe(navbar);
+  }
+})();
+</script>
 
 </head>
 

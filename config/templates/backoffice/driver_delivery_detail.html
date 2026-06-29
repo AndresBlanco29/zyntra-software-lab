@@ -14,20 +14,6 @@
     overflow-x: hidden;
   }
 
-  .driver-page-topbar {
-    margin-bottom: 0.75rem;
-  }
-
-  .driver-page-topbar .btn {
-    width: 100%;
-  }
-
-  @media (min-width: 768px) {
-    .driver-page-topbar .btn {
-      width: auto;
-    }
-  }
-
   .driver-page-header-copy {
     min-width: 0;
   }
@@ -455,10 +441,10 @@
     }
   }
 </style>
-<div class="driver-shell">
-<div class="driver-page-topbar">
-  <a href="{% url 'driver_delivery_list' %}" class="btn btn-outline-secondary">← {% trans "Back to deliveries" %}</a>
-</div>
+<div class="driver-shell has-panel-mobile-back">
+{% url 'driver_delivery_list' as driver_delivery_list_url %}
+{% trans "Back to deliveries" as back_to_deliveries_label %}
+{% include "includes/panel_mobile_back_button.html" with back_url=driver_delivery_list_url back_text=back_to_deliveries_label back_label=back_to_deliveries_label %}
 <div class="driver-page-header d-flex justify-content-between align-items-center mb-3">
   <div class="driver-page-header-copy">
     <h2 class="mb-1">{{ delivery.invoice.numero }}</h2>

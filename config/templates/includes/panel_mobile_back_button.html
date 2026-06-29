@@ -1,0 +1,10 @@
+{% load i18n %}
+<a
+  href="{{ back_url }}"
+  class="panel-mobile-back-btn"
+  aria-label="{% if back_label %}{{ back_label }}{% else %}{% trans 'Back' %}{% endif %}">
+  <span class="panel-mobile-back-btn__icon" aria-hidden="true">&larr;</span>
+  <span class="panel-mobile-back-btn__text">
+    {% if back_text %}{{ back_text }}{% else %}{% trans "Back" %}{% endif %}
+  </span>
+</a>

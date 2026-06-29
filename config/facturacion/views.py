@@ -618,7 +618,7 @@ def _build_invoice_pdf_totals_rows(invoice, *, meta_label_style, meta_value_styl
 	line_discount_total = _calculate_invoice_line_discount_total(invoice)
 	if line_discount_total > 0:
 		rows.append([
-			Paragraph(_('Line discounts applied'), meta_label_style),
+			Paragraph(_('Discounts applied'), meta_label_style),
 			Paragraph(f'-{_format_pdf_money(line_discount_total)}', meta_value_style),
 		])
 	rows.extend([
@@ -859,7 +859,7 @@ def _invoice_pdf_response(invoice):
 			Paragraph(_('Driver'), meta_label_style), Paragraph(driver_name, meta_value_style),
 			Paragraph(_('Due date'), meta_label_style), Paragraph(_resolve_invoice_pdf_due_date_label(invoice), meta_value_style),
 		],
-	], colWidths=[52, 76, 48, 70, 58, 80])
+	], colWidths=[58, 70, 48, 70, 58, 80])
 	meta_table.setStyle(TableStyle([
 		('BOX', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
 		('INNERGRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),

@@ -2830,7 +2830,7 @@ class InvoiceFlowTests(TestCase):
 			section_title_style=ParagraphStyle('InvoiceSectionTitleDiscountTest', parent=styles['BodyText']),
 			body_style=styles['BodyText'],
 		)
-		self.assertEqual(total_rows[1][0].text, 'Line discounts applied')
+		self.assertEqual(total_rows[1][0].text, 'Discounts applied')
 		self.assertEqual(total_rows[1][1].text, '-$4.50')
 
 	def test_backoffice_generate_invoice_view_applies_line_discount(self):

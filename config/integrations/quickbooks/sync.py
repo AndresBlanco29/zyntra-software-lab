@@ -543,55 +543,55 @@ def _batch_sync_result(*, record_ids, sync_callable):
 
 
 def _strip_ltg_customer_export_prefix(value):
-	text = _normalize_text(value)
-	if not text:
-		return text
-	marker = ' - '
-	if marker in text:
-		prefix, remainder = text.split(marker, 1)
-		if prefix.startswith('LTG Customer '):
-			return remainder.strip()
-	return text
+    text = _normalize_text(value)
+    if not text:
+        return text
+    marker = ' - '
+    if marker in text:
+        prefix, remainder = text.split(marker, 1)
+        if prefix.startswith('LTG Customer '):
+            return remainder.strip()
+    return text
 
 
 def resolve_customer_company_name(cliente):
-	return _truncate(
-		_strip_ltg_customer_export_prefix(
-			_normalize_text(cliente.nombre_empresa, fallback=f'Cliente {cliente.pk}')
-		),
-		limit=255,
-	)
+    return _truncate(
+        _strip_ltg_customer_export_prefix(
+            _normalize_text(cliente.nombre_empresa, fallback=f'Cliente {cliente.pk}')
+        ),
+        limit=255,
+    )
 
 
 def _build_customer_display_name(cliente):
-	return resolve_customer_company_name(cliente)
+    return resolve_customer_company_name(cliente)
 
 
 def _resolve_customer_payload_display_name(cliente, *, remote_payload=None):
-	if remote_payload:
-		for key in ('DisplayName', 'CompanyName', 'PrintOnCheckName'):
-			remote_name = _normalize_text(remote_payload.get(key))
-			if remote_name:
-				return _truncate(remote_name)
-	return _build_customer_display_name(cliente)
+    if remote_payload:
+        for key in ('DisplayName', 'CompanyName', 'PrintOnCheckName'):
+            remote_name = _normalize_text(remote_payload.get(key))
+            if remote_name:
+                return _truncate(remote_name)
+    return _build_customer_display_name(cliente)
 
 
 def _resolve_customer_payload_company_name(cliente, *, remote_payload=None):
-	if remote_payload:
-		for key in ('CompanyName', 'DisplayName', 'PrintOnCheckName'):
-			remote_name = _normalize_text(remote_payload.get(key))
-			if remote_name:
-				return _truncate(_strip_ltg_customer_export_prefix(remote_name), limit=100)
-	return _truncate(_build_customer_display_name(cliente), limit=100)
+    if remote_payload:
+        for key in ('CompanyName', 'DisplayName', 'PrintOnCheckName'):
+            remote_name = _normalize_text(remote_payload.get(key))
+            if remote_name:
+                return _truncate(_strip_ltg_customer_export_prefix(remote_name), limit=100)
+    return _truncate(_build_customer_display_name(cliente), limit=100)
 
 
 def _build_customer_payload(cliente, *, remote_payload=None):
-	company_name = _resolve_customer_payload_company_name(cliente, remote_payload=remote_payload)
-	display_name = _resolve_customer_payload_display_name(cliente, remote_payload=remote_payload)
-	payload = {
-		'DisplayName': display_name,
-		'CompanyName': company_name or display_name,
-		'PrintOnCheckName': company_name or display_name,
+    company_name = _resolve_customer_payload_company_name(cliente, remote_payload=remote_payload)
+    display_name = _resolve_customer_payload_display_name(cliente, remote_payload=remote_payload)
+    payload = {
+        'DisplayName': display_name,
+        'CompanyName': company_name or display_name,
+        'PrintOnCheckName': company_name or display_name,
         'Active': bool(cliente.aprobado),
         'Notes': _truncate(f'Sales tax: {cliente.sales_tax_number}', limit=4000),
     }
@@ -791,24 +791,24 @@ def sync_customer(*, cliente, client=None):
 
 
 def _build_item_name(presentacion):
-	return _truncate(
-		_normalize_text(presentacion.producto.nombre, fallback=f'Producto {presentacion.producto_id}')
-	)
+    return _truncate(
+        _normalize_text(presentacion.producto.nombre, fallback=f'Producto {presentacion.producto_id}')
+    )
 
 
 def _resolve_item_payload_name(presentacion, *, remote_payload=None):
-	if remote_payload:
-		remote_name = _normalize_text(remote_payload.get('Name'))
-		if remote_name:
-			return _truncate(remote_name)
-	return _build_item_name(presentacion)
+    if remote_payload:
+        remote_name = _normalize_text(remote_payload.get('Name'))
+        if remote_name:
+            return _truncate(remote_name)
+    return _build_item_name(presentacion)
 
 
 def _build_item_ref(presentacion, *, remote_payload=None):
-	return {
-		'value': str(getattr(presentacion, 'quickbooks_id', '') or '').strip(),
-		'name': _resolve_item_payload_name(presentacion, remote_payload=remote_payload),
-	}
+    return {
+        'value': str(getattr(presentacion, 'quickbooks_id', '') or '').strip(),
+        'name': _resolve_item_payload_name(presentacion, remote_payload=remote_payload),
+    }
 
 
 def _build_item_description(presentacion):
@@ -2206,7 +2206,7 @@ def _extract_bill_vendor_name(payload):
 
 
 def _extract_purchase_order_vendor_name(payload):
-	return _truncate((payload.get('VendorRef') or {}).get('name') or f"QuickBooks Vendor {payload.get('Id', '')}", limit=255)
+    return _truncate((payload.get('VendorRef') or {}).get('name') or f"QuickBooks Vendor {payload.get('Id', '')}", limit=255)
 
 
 def _match_local_bill_from_quickbooks(payload):

@@ -542,16 +542,56 @@ def _batch_sync_result(*, record_ids, sync_callable):
     }
 
 
+def _strip_ltg_customer_export_prefix(value):
+	text = _normalize_text(value)
+	if not text:
+		return text
+	marker = ' - '
+	if marker in text:
+		prefix, remainder = text.split(marker, 1)
+		if prefix.startswith('LTG Customer '):
+			return remainder.strip()
+	return text
+
+
+def resolve_customer_company_name(cliente):
+	return _truncate(
+		_strip_ltg_customer_export_prefix(
+			_normalize_text(cliente.nombre_empresa, fallback=f'Cliente {cliente.pk}')
+		),
+		limit=255,
+	)
+
+
 def _build_customer_display_name(cliente):
-    company_name = _normalize_text(cliente.nombre_empresa, fallback=f'Cliente {cliente.pk}')
-    return _truncate(f'LTG Customer {cliente.pk} - {company_name}')
+	return resolve_customer_company_name(cliente)
 
 
-def _build_customer_payload(cliente):
-    payload = {
-        'DisplayName': _build_customer_display_name(cliente),
-        'CompanyName': _truncate(cliente.nombre_empresa, limit=100) or _build_customer_display_name(cliente),
-        'PrintOnCheckName': _truncate(cliente.nombre_empresa, limit=100) or _build_customer_display_name(cliente),
+def _resolve_customer_payload_display_name(cliente, *, remote_payload=None):
+	if remote_payload:
+		for key in ('DisplayName', 'CompanyName', 'PrintOnCheckName'):
+			remote_name = _normalize_text(remote_payload.get(key))
+			if remote_name:
+				return _truncate(remote_name)
+	return _build_customer_display_name(cliente)
+
+
+def _resolve_customer_payload_company_name(cliente, *, remote_payload=None):
+	if remote_payload:
+		for key in ('CompanyName', 'DisplayName', 'PrintOnCheckName'):
+			remote_name = _normalize_text(remote_payload.get(key))
+			if remote_name:
+				return _truncate(_strip_ltg_customer_export_prefix(remote_name), limit=100)
+	return _truncate(_build_customer_display_name(cliente), limit=100)
+
+
+def _build_customer_payload(cliente, *, remote_payload=None):
+	company_name = _resolve_customer_payload_company_name(cliente, remote_payload=remote_payload)
+	display_name = _resolve_customer_payload_display_name(cliente, remote_payload=remote_payload)
+	payload = {
+		'DisplayName': display_name,
+		'CompanyName': company_name or display_name,
+		'PrintOnCheckName': company_name or display_name,
         'Active': bool(cliente.aprobado),
         'Notes': _truncate(f'Sales tax: {cliente.sales_tax_number}', limit=4000),
     }
@@ -704,9 +744,6 @@ def _customer_payload_needs_update(remote_payload, expected_payload):
         remote_payload,
         expected_payload,
         (
-            'DisplayName',
-            'CompanyName',
-            'PrintOnCheckName',
             'Active',
             'Notes',
             'PrimaryPhone.FreeFormNumber',
@@ -731,7 +768,7 @@ def sync_customer(*, cliente, client=None):
         if cliente.quickbooks_id:
             existing = client.find_by_id('Customer', cliente.quickbooks_id)
             if existing:
-                desired_payload = _build_customer_payload(cliente)
+                desired_payload = _build_customer_payload(cliente, remote_payload=existing)
                 if _customer_payload_needs_update(existing, desired_payload):
                     updated = client.update_customer(_build_sparse_update_payload(existing, desired_payload))
                     _mark_synced(cliente, updated.get('Id'))
@@ -1075,21 +1112,25 @@ def _pick_quickbooks_customer_address(payload):
 
 def _extract_quickbooks_customer_display_name(payload):
     return _truncate(
-        payload.get('DisplayName')
-        or payload.get('FullyQualifiedName')
-        or payload.get('CompanyName')
-        or payload.get('PrintOnCheckName')
-        or f"QuickBooks Customer {payload.get('Id', '')}",
+        _strip_ltg_customer_export_prefix(
+            payload.get('DisplayName')
+            or payload.get('FullyQualifiedName')
+            or payload.get('CompanyName')
+            or payload.get('PrintOnCheckName')
+            or f"QuickBooks Customer {payload.get('Id', '')}"
+        ),
         limit=150,
     )
 
 
 def _extract_quickbooks_customer_company_name(payload):
     return _truncate(
-        payload.get('CompanyName')
-        or payload.get('DisplayName')
-        or payload.get('PrintOnCheckName')
-        or f"QuickBooks Customer {payload.get('Id', '')}",
+        _strip_ltg_customer_export_prefix(
+            payload.get('CompanyName')
+            or payload.get('DisplayName')
+            or payload.get('PrintOnCheckName')
+            or f"QuickBooks Customer {payload.get('Id', '')}"
+        ),
         limit=255,
     )
 

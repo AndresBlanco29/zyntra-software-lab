@@ -28,17 +28,21 @@ from config.integrations.quickbooks.client import QuickBooksAPIError
 from config.integrations.quickbooks.services import get_connection
 from config.integrations.models import QuickBooksConnection, QuickBooksImportConflict
 from config.integrations.quickbooks.sync import (
+    _build_customer_display_name,
+    _build_customer_payload,
     _build_item_name,
     _build_item_payload,
     _convert_linked_item_to_inventory,
     _derive_quickbooks_invoice_status,
     _enrich_quickbooks_item_payload,
     _extract_quickbooks_item_cost,
+    _extract_quickbooks_customer_company_name,
     _get_inventory_start_date,
     _normalize_inventory_start_date_if_needed,
     _parse_quickbooks_presentation,
     _prepare_inventory_item_for_txn_date,
     _resolve_item_payload_name,
+    _strip_ltg_customer_export_prefix,
     import_quickbooks_credit_memo_record,
     import_quickbooks_customer_record,
     import_quickbooks_invoice_record,
@@ -131,6 +135,37 @@ class QuickBooksPresentationParsingTests(TestCase):
         self.assertEqual(presentation, 'Caja')
         self.assertEqual(units, 6)
         self.assertEqual(tipo, '6.76 OZ')
+
+
+class QuickBooksCustomerNamingTests(TestCase):
+    def test_strip_ltg_customer_export_prefix(self):
+        self.assertEqual(
+            _strip_ltg_customer_export_prefix('LTG Customer 238 - (BHM) MI TIERRA'),
+            '(BHM) MI TIERRA',
+        )
+
+    def test_build_customer_display_name_uses_company_name_without_prefix(self):
+        cliente = Cliente(nombre_empresa='(BHM) MI TIERRA')
+        self.assertEqual(_build_customer_display_name(cliente), '(BHM) MI TIERRA')
+
+    def test_build_customer_payload_preserves_remote_quickbooks_name(self):
+        cliente = Cliente(nombre_empresa='(BHM) MI TIERRA')
+        payload = _build_customer_payload(
+            cliente,
+            remote_payload={
+                'Id': '701',
+                'DisplayName': '(BHM) MI TIERRA',
+                'CompanyName': '(BHM) MI TIERRA',
+            },
+        )
+        self.assertEqual(payload['DisplayName'], '(BHM) MI TIERRA')
+        self.assertEqual(payload['CompanyName'], '(BHM) MI TIERRA')
+
+    def test_import_strips_ltg_prefix_from_customer_name(self):
+        company_name = _extract_quickbooks_customer_company_name({
+            'DisplayName': 'LTG Customer 238 - (BHM) MI TIERRA',
+        })
+        self.assertEqual(company_name, '(BHM) MI TIERRA')
 
 
 class QuickBooksItemPayloadTests(TestCase):
@@ -1829,7 +1864,7 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         self.cliente.save(update_fields=['quickbooks_id', 'sync_status'])
         mock_request.side_effect = [
             self._json_response({'QueryResponse': {'Customer': [{'Id': '701', 'SyncToken': '3', 'DisplayName': 'Old Name', 'CompanyName': 'Old Name', 'PrintOnCheckName': 'Old Name', 'Active': True}]}}),
-            self._json_response({'Customer': {'Id': '701', 'SyncToken': '4', 'DisplayName': 'LTG Customer 1 - Cliente QuickBooks'}}),
+            self._json_response({'Customer': {'Id': '701', 'SyncToken': '4', 'DisplayName': 'Old Name'}}),
         ]
 
         response = self.client.get(reverse('quickbooks_sync_customer', args=[self.cliente.pk]))
@@ -1837,6 +1872,9 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['result']['action'], 'updated')
         self.assertEqual(mock_request.call_args_list[1].kwargs['params']['operation'], 'update')
+        update_payload = mock_request.call_args_list[1].kwargs.get('json') or {}
+        display_name = update_payload.get('DisplayName', '')
+        self.assertFalse(display_name.startswith('LTG Customer '))
 
     def test_conflict_link_endpoint_resolves_customer_conflict(self):
         conflict = QuickBooksImportConflict.objects.create(
@@ -1955,7 +1993,7 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         self._activate_connection()
         mock_request.side_effect = [
             self._json_response({'QueryResponse': {}}),
-            self._json_response({'Customer': {'Id': '701', 'DisplayName': 'LTG Customer 1 - Cliente QuickBooks'}}),
+            self._json_response({'Customer': {'Id': '701', 'DisplayName': 'Cliente QuickBooks'}}),
         ]
 
         response = self.client.get(reverse('quickbooks_sync_customer', args=[self.cliente.pk]))
@@ -1988,7 +2026,7 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         self._activate_connection()
         mock_request.side_effect = [
             self._json_response({'QueryResponse': {}}),
-            self._json_response({'Customer': {'Id': '701', 'DisplayName': 'LTG Customer 1 - Cliente QuickBooks'}}),
+            self._json_response({'Customer': {'Id': '701', 'DisplayName': 'Cliente QuickBooks'}}),
             self._json_response({'QueryResponse': {}}),
             self._json_response({'QueryResponse': {'Account': [{'Id': '79', 'Name': 'Sales of Product Income'}]}}),
             self._json_response({'Item': {'Id': '801', 'Name': 'Tortilla 12'}}),
@@ -2010,7 +2048,7 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         self._activate_connection()
         mock_request.side_effect = [
             self._json_response({'QueryResponse': {}}),
-            self._json_response({'Customer': {'Id': '701', 'DisplayName': 'LTG Customer 1 - Cliente QuickBooks'}}),
+            self._json_response({'Customer': {'Id': '701', 'DisplayName': 'Cliente QuickBooks'}}),
             self._json_response({'QueryResponse': {}}),
             self._json_response({'QueryResponse': {'Account': [{'Id': '79', 'Name': 'Sales of Product Income'}]}}),
             self._json_response({'Item': {'Id': '850', 'Name': 'LTG Adjustment Item'}}),
@@ -2044,7 +2082,7 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         )
         mock_request.side_effect = [
             self._json_response({'QueryResponse': {}}),
-            self._json_response({'Customer': {'Id': '701', 'DisplayName': 'LTG Customer 1 - Cliente QuickBooks'}}),
+            self._json_response({'Customer': {'Id': '701', 'DisplayName': 'Cliente QuickBooks'}}),
             self._json_response({'QueryResponse': {}}),
             self._json_response({'Fault': {'Error': [{'Message': 'QuickBooks rejected customer'}]}}, ok=False, status_code=400),
         ]
@@ -2075,7 +2113,7 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         self._activate_connection()
         mock_request.side_effect = [
             self._json_response({'QueryResponse': {}}),
-            self._json_response({'Customer': {'Id': '701', 'DisplayName': 'LTG Customer 1 - Cliente QuickBooks'}}),
+            self._json_response({'Customer': {'Id': '701', 'DisplayName': 'Cliente QuickBooks'}}),
         ]
 
         response = self.client.post(

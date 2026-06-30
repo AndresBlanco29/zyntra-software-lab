@@ -43,7 +43,7 @@ from config.core.pdf_branding import (
 	NumberedPdfCanvas,
 	build_pdf_logo_image,
 )
-from config.integrations.quickbooks.sync import is_sync_locked
+from config.integrations.quickbooks.sync import is_sync_locked, resolve_customer_company_name
 from config.notificaciones.models import Notificacion
 from config.pedidos.models import Pedido
 from config.usuarios.models import Usuario
@@ -843,6 +843,7 @@ def _invoice_pdf_response(invoice):
 		invoice.cliente.codigo_postal,
 		invoice.cliente.pais,
 	]))
+	customer_company_name = resolve_customer_company_name(invoice.cliente)
 	item_rows = _build_invoice_pdf_item_data(invoice)
 	item_chunks = _chunk_invoice_pdf_item_rows(item_rows)
 	item_column_widths = _invoice_pdf_item_table_column_widths(content_width)
@@ -881,11 +882,11 @@ def _invoice_pdf_response(invoice):
 	party_table = Table([
 		[
 			Paragraph(
-				f'<b>{_("Sold to")}</b><br/>{invoice.cliente.nombre_empresa}<br/>{invoice.cliente.direccion}<br/>{invoice.cliente.ciudad}, {invoice.cliente.estado} {invoice.cliente.codigo_postal or ""}<br/>{invoice.cliente.pais}',
+				f'<b>{_("Sold to")}</b><br/>{customer_company_name}<br/>{invoice.cliente.direccion}<br/>{invoice.cliente.ciudad}, {invoice.cliente.estado} {invoice.cliente.codigo_postal or ""}<br/>{invoice.cliente.pais}',
 				body_style,
 			),
 			Paragraph(
-				f'<b>{_("Ship to")}</b><br/>{invoice.cliente.nombre_empresa}<br/>{ship_to}',
+				f'<b>{_("Ship to")}</b><br/>{customer_company_name}<br/>{ship_to}',
 				body_style,
 			),
 			_build_invoice_pdf_terms_paragraph(invoice, body_style),
@@ -1026,7 +1027,7 @@ def _delivery_tracking_payload(delivery):
 		'delivery_id': delivery.id,
 		'invoice_id': delivery.invoice_id,
 		'invoice_number': delivery.invoice.numero,
-		'customer_name': delivery.invoice.cliente.nombre_empresa,
+		'customer_name': resolve_customer_company_name(delivery.invoice.cliente),
 		'driver_name': delivery.driver.get_full_name() or delivery.driver.username,
 		'status': delivery.get_estado_display(),
 		'payment_status': delivery.get_estado_pago_display(),
@@ -1421,6 +1422,7 @@ def backoffice_invoice_detail(request, invoice_id):
 	driver_created_notes_count = invoice.notas_ajuste.filter(creada_por__role='driver').count()
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
+		'customer_company_name': resolve_customer_company_name(invoice.cliente),
 		'invoice_items': order_invoice_items_for_display(invoice),
 		'invoice_shipment_summary': build_invoice_shipment_summary(invoice),
 		'invoice_payment_due_date': resolve_invoice_payment_due_date(invoice),

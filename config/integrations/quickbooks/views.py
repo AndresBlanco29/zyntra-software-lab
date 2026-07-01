@@ -46,6 +46,7 @@ from .sync import (
     import_quickbooks_items,
     link_quickbooks_import_conflict,
     pull_quickbooks_accounting_documents_to_local,
+    pull_quickbooks_item_images_to_local,
     pull_quickbooks_items_to_local,
     pull_quickbooks_to_local,
     push_linked_quickbooks_items,
@@ -94,6 +95,7 @@ CATALOG_ONLY_ALLOWED_VIEW_NAMES = frozenset({
     'quickbooks_import_items_to_local',
     'quickbooks_refresh_linked_items_to_local',
     'quickbooks_refresh_linked_invoice_status_to_local',
+    'quickbooks_sync_item_images_to_local',
     'quickbooks_pull_items_sync_to_local',
     'quickbooks_pull_sync_to_local',
     'quickbooks_start_task',
@@ -127,6 +129,7 @@ CATALOG_ONLY_ALLOWED_TASK_OPERATIONS = frozenset({
     'refresh_linked_invoice_status_to_local',
     'pull_items_sync_to_local',
     'pull_sync_to_local',
+    'sync_item_images_to_local',
 })
 
 CATALOG_ONLY_ALLOWED_CONFLICT_ENTITY_TYPES = frozenset({
@@ -473,6 +476,18 @@ def _build_dashboard_feedback(*, operation, ok, result=None, error=None):
                     'record_id': sample.get('id'),
                     'error': sample.get('error'),
                 })
+        return feedback
+
+    if operation == 'sync_item_images_to_local':
+        feedback['title'] = _('QuickBooks product images sync')
+        feedback['details'].append(
+            _('Checked: %(checked)s. Downloaded: %(synced)s. Missing in QuickBooks: %(missing)s. Failed: %(failed)s.') % {
+                'checked': result.get('checked', 0),
+                'synced': result.get('synced', 0),
+                'missing': result.get('missing_in_qb', 0),
+                'failed': result.get('failed', 0),
+            }
+        )
         return feedback
 
     if operation == 'refresh_linked_invoice_status_to_local':
@@ -1127,6 +1142,10 @@ def quickbooks_import_customers_to_local(request):
     return _response_or_redirect(request, operation='import_customers_to_local', result=result)
 
 
+def _quickbooks_import_include_images(request):
+    return str(request.POST.get('include_images') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def quickbooks_import_items_to_local(request):
@@ -1134,6 +1153,7 @@ def quickbooks_import_items_to_local(request):
         pull_result = pull_quickbooks_items_to_local(
             max_results=_parse_quickbooks_import_limit(request.POST.get('limit'), default=None),
             force_full=request.POST.get('mode') == 'full',
+            skip_images=not _quickbooks_import_include_images(request),
         )
         result = pull_result.get('items', {})
         result['incremental'] = pull_result.get('incremental')
@@ -1166,6 +1186,19 @@ def quickbooks_refresh_linked_invoice_status_to_local(request):
         logger.warning('QuickBooks linked invoice status refresh failed: %s', exc)
         return _response_or_redirect(request, operation='refresh_linked_invoice_status_to_local', error=str(exc), status_code=502)
     return _response_or_redirect(request, operation='refresh_linked_invoice_status_to_local', result=result)
+
+
+@require_POST
+@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+def quickbooks_sync_item_images_to_local(request):
+    try:
+        result = pull_quickbooks_item_images_to_local(
+            limit=_parse_quickbooks_import_limit(request.POST.get('limit'), default=None),
+        )
+    except (ValueError, QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
+        logger.warning('QuickBooks product image sync failed: %s', exc)
+        return _response_or_redirect(request, operation='sync_item_images_to_local', error=str(exc), status_code=502)
+    return _response_or_redirect(request, operation='sync_item_images_to_local', result=result)
 
 
 @require_POST
@@ -1244,6 +1277,7 @@ def quickbooks_start_task(request):
     except Exception:
         limit = None
     force_full = str(request.POST.get('mode') or '').strip().lower() == 'full'
+    skip_images = not _quickbooks_import_include_images(request)
 
     # map allowed operations to internal functions
     op_map = {
@@ -1252,6 +1286,7 @@ def quickbooks_start_task(request):
             max_results=kwargs.get('max_results'),
             force_full=kwargs.get('force_full', False),
             task_cache_key=kwargs.get('task_cache_key'),
+            skip_images=kwargs.get('skip_images'),
         ).get('items', {}),
         'refresh_linked_items_to_local': refresh_linked_quickbooks_items,
         'refresh_linked_invoice_status_to_local': refresh_linked_quickbooks_invoice_status,
@@ -1259,6 +1294,7 @@ def quickbooks_start_task(request):
             max_results=kwargs.get('max_results'),
             force_full=kwargs.get('force_full', False),
             task_cache_key=kwargs.get('task_cache_key'),
+            skip_images=kwargs.get('skip_images'),
         ).get('items', {}),
         'import_accounting_documents_to_local': pull_quickbooks_accounting_documents_to_local,
         'pull_sync_to_local': lambda **kwargs: pull_quickbooks_to_local(
@@ -1266,6 +1302,7 @@ def quickbooks_start_task(request):
             force_full=kwargs.get('force_full', False),
             task_cache_key=kwargs.get('task_cache_key'),
         ),
+        'sync_item_images_to_local': pull_quickbooks_item_images_to_local,
     }
 
     func = op_map.get(operation)
@@ -1276,23 +1313,36 @@ def quickbooks_start_task(request):
     cache_key = f'quickbooks_task_{task_id}'
     cache.set(cache_key, {'status': 'running', 'progress': 0, 'operation': operation}, timeout=60 * 60)
 
-    def _runner(task_key, fn, limit_value, force_full_value):
+    def _runner(task_key, fn, limit_value, force_full_value, skip_images_value):
         try:
             cache.set(task_key, {'status': 'running', 'progress': 5, 'operation': operation}, timeout=60 * 60)
             try:
-                result = fn(max_results=limit_value, force_full=force_full_value, task_cache_key=task_key)
+                result = fn(
+                    max_results=limit_value,
+                    force_full=force_full_value,
+                    task_cache_key=task_key,
+                    skip_images=skip_images_value,
+                )
             except TypeError:
                 try:
-                    result = fn(max_results=limit_value, force_full=force_full_value)
+                    result = fn(
+                        max_results=limit_value,
+                        force_full=force_full_value,
+                        task_cache_key=task_key,
+                    )
                 except TypeError:
-                    result = fn(max_results=limit_value, task_cache_key=task_key)
-                except TypeError:
-                    result = fn(max_results=limit_value)
+                    try:
+                        result = fn(limit=limit_value, task_cache_key=task_key)
+                    except TypeError:
+                        try:
+                            result = fn(max_results=limit_value, force_full=force_full_value)
+                        except TypeError:
+                            result = fn(max_results=limit_value)
             cache.set(task_key, {'status': 'completed', 'progress': 100, 'operation': operation, 'result': result}, timeout=60 * 60)
         except Exception as exc:
             cache.set(task_key, {'status': 'failed', 'progress': 100, 'operation': operation, 'error': str(exc)}, timeout=60 * 60)
 
-    thread = threading.Thread(target=_runner, args=(cache_key, func, limit, force_full), daemon=True)
+    thread = threading.Thread(target=_runner, args=(cache_key, func, limit, force_full, skip_images), daemon=True)
     thread.start()
 
     return JsonResponse({'task_id': task_id})

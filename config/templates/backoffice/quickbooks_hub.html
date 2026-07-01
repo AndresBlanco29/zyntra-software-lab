@@ -843,8 +843,21 @@
                 <input type="hidden" name="limit" value="0">
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
                 <button type="submit" class="btn btn-outline-success w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Import catalog to the app" %}</button>
+                <label class="form-check mt-2 mb-0">
+                  <input type="checkbox" class="form-check-input" name="include_images" value="1">
+                  <span class="form-check-label small">{% trans "Include product images (slower)" %}</span>
+                </label>
               </form>
-              <p class="qb-action-note">{% trans "Brings new QuickBooks items and updates changed ones using incremental sync cursors." %}</p>
+              <p class="qb-action-note">{% trans "Brings new QuickBooks items and updates changed ones using incremental sync cursors. Images are skipped by default; use the image sync action below after import." %}</p>
+            </div>
+            <div class="qb-action-item" id="qb-sync-product-images">
+              <form method="post" action="{% url 'quickbooks_sync_item_images_to_local' %}" data-qb-operation="sync_item_images_to_local">
+                {% csrf_token %}
+                <input type="hidden" name="limit" value="0">
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <button type="submit" class="btn btn-outline-info w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Sync product images from QuickBooks" %}</button>
+              </form>
+              <p class="qb-action-note">{% trans "Downloads missing product images from QuickBooks attachments for products already imported without images." %}</p>
             </div>
             <div class="qb-action-item" id="qb-refresh-linked-catalog">
               <form method="post" action="{% url 'quickbooks_refresh_linked_items_to_local' %}" data-qb-operation="refresh_linked_items_to_local">
@@ -1322,7 +1335,9 @@
           if (data.status === 'running'){
             const displayTarget = Math.max(lastKnown, 85);
             animateTo(displayTarget);
-            message.textContent = 'Importando — por favor espera.';
+            message.textContent = data.operation === 'sync_item_images_to_local'
+              ? 'Descargando imágenes — por favor espera.'
+              : 'Importando — por favor espera.';
             setTimeout(poll, 900);
             return;
           }
@@ -1339,6 +1354,8 @@
                 if (typeof res.conflict_count !== 'undefined') parts.push('Conflictos: ' + (res.conflict_count||0));
                 if (typeof res.failed_count !== 'undefined') parts.push('Fallidos: ' + (res.failed_count||0));
                 details = parts.join(' · ');
+              } else if (typeof res.synced !== 'undefined' || typeof res.checked !== 'undefined') {
+                details = 'Imágenes descargadas: ' + (res.synced||0) + ' / ' + (res.checked||0);
               }
             }catch(e){ details = ''; }
             message.textContent = 'Completado correctamente.';
@@ -1421,6 +1438,10 @@
         const payload = new URLSearchParams({operation: op, limit: limit});
         if (mode) {
           payload.set('mode', mode);
+        }
+        const includeImages = form.querySelector('input[name=include_images]');
+        if (includeImages && includeImages.checked) {
+          payload.set('include_images', '1');
         }
         fetch('/quickbooks/task/start', {
           method: 'POST',

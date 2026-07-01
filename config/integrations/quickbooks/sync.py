@@ -2133,16 +2133,12 @@ def import_quickbooks_items(*, max_results=25, client=None, updated_after=None, 
     return result
 
 
-def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=None):
+def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=None, task_cache_key=None):
     client = client or QuickBooksAPIClient()
-    queryset = (
-        Producto.objects.filter(quickbooks_id__isnull=False)
-        .exclude(quickbooks_id='')
-        .filter(Q(imagen__isnull=True) | Q(imagen=''))
-        .order_by('nombre', 'id')
-    )
+    queryset = _products_missing_quickbooks_images_queryset()
     if limit is not None:
         queryset = queryset[:max(int(limit), 0)]
+    total = queryset.count()
 
     summary = {
         'checked': 0,
@@ -2151,9 +2147,12 @@ def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=Non
         'failed': 0,
         'synced_labels': [],
     }
-    for producto in queryset.iterator():
+    for index, producto in enumerate(queryset.iterator(), start=1):
         summary['checked'] += 1
-        item_id = str(producto.quickbooks_id).strip()
+        item_id = _resolve_product_quickbooks_item_id(producto)
+        if not item_id:
+            summary['missing_in_qb'] += 1
+            continue
         try:
             payload = client.find_by_id('Item', item_id) or {'Id': item_id, 'Name': producto.nombre}
         except QuickBooksAPIError:
@@ -2176,8 +2175,22 @@ def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=Non
         else:
             summary['missing_in_qb'] += 1
 
+        if task_cache_key and total:
+            task_state = cache.get(task_cache_key) or {}
+            task_state['status'] = 'running'
+            task_state['progress'] = int(index * 100 / total)
+            cache.set(task_cache_key, task_state, timeout=60 * 60)
+
     cache.delete('catalogo:productos_activos_v2')
     return summary
+
+
+def pull_quickbooks_item_images_to_local(*, limit=None, client=None, task_cache_key=None):
+    return sync_missing_quickbooks_item_images(
+        limit=limit,
+        client=client,
+        task_cache_key=task_cache_key,
+    )
 
 
 def fetch_quickbooks_credit_memos(*, max_results=25, client=None, updated_after=None, page_size=100):
@@ -3241,7 +3254,39 @@ def _sync_cursor_key(entity_name):
     return f'quickbooks:{entity_name.lower()}'
 
 
-def pull_quickbooks_items_to_local(*, max_results=25, client=None, force_full=False, task_cache_key=None):
+def _products_missing_quickbooks_images_queryset():
+    linked_product_ids = (
+        Presentacion.objects.filter(quickbooks_id__isnull=False)
+        .exclude(quickbooks_id='')
+        .values_list('producto_id', flat=True)
+        .distinct()
+    )
+    return (
+        Producto.objects.filter(
+            Q(quickbooks_id__isnull=False) & ~Q(quickbooks_id='')
+            | Q(pk__in=linked_product_ids)
+        )
+        .filter(Q(imagen__isnull=True) | Q(imagen=''))
+        .distinct()
+        .order_by('nombre', 'id')
+    )
+
+
+def _resolve_product_quickbooks_item_id(producto):
+    qb_id = str(producto.quickbooks_id or '').strip()
+    if qb_id:
+        return qb_id
+    return str(
+        Presentacion.objects.filter(producto=producto)
+        .exclude(quickbooks_id__isnull=True)
+        .exclude(quickbooks_id='')
+        .order_by('id')
+        .values_list('quickbooks_id', flat=True)
+        .first() or ''
+    ).strip()
+
+
+def pull_quickbooks_items_to_local(*, max_results=25, client=None, force_full=False, task_cache_key=None, skip_images=None):
     client = client or QuickBooksAPIClient()
     connection = client.connection
     run_started_at = timezone.now()
@@ -3252,6 +3297,7 @@ def pull_quickbooks_items_to_local(*, max_results=25, client=None, force_full=Fa
         client=client,
         updated_after=item_cursor,
         task_cache_key=task_cache_key,
+        skip_images=skip_images,
     )
 
     connection.set_sync_cursor(_sync_cursor_key('item'), items.get('latest_updated_at') or _serialize_cursor(run_started_at))

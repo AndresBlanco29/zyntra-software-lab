@@ -34,7 +34,7 @@
   </div>
   <div class="col-md-6">
     <label class="form-label">{% trans "Username" %}</label>
-    <input type="text" class="form-control" value="{{ usuario_interno.username }}" disabled>
+    <input type="text" name="username" class="form-control" value="{{ usuario_interno.username }}" required>
   </div>
   <div class="col-md-6">
     <label class="form-label">{% trans "Role" %}</label>

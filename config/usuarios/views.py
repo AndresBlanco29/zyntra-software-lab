@@ -1236,23 +1236,33 @@ def editar_usuario_interno(request, usuario_id, preset_role=None):
     if request.method == 'POST':
 
         role = _resolve_internal_role(request.POST.get('role'), fallback=preset_role or usuario.role)
+        username = (request.POST.get('username') or '').strip()
         email = (request.POST.get('email') or '').strip()
         telefono = (request.POST.get('telefono') or '').strip()
         nombre = (request.POST.get('nombre') or '').strip()
         apellido = (request.POST.get('apellido') or '').strip()
         permission_overrides = build_permission_overrides_for_role(role, request.POST.getlist('permissions'))
 
+        if not username:
+            messages.error(request, _('Username is required.'))
+            return redirect(request.path)
+
+        if Usuario.objects.filter(username=username).exclude(pk=usuario.pk).exists():
+            messages.error(request, _('This username is already in use.'))
+            return redirect(request.path)
+
         if Usuario.objects.filter(email__iexact=email).exclude(pk=usuario.pk).exists():
             messages.error(request, _('Another user already uses that email address.'))
             return redirect(request.path)
 
+        usuario.username = username
         usuario.first_name = nombre
         usuario.last_name = apellido
         usuario.email = email
         usuario.telefono = telefono
         usuario.role = role
         usuario.permission_overrides = permission_overrides
-        usuario.save(update_fields=['first_name', 'last_name', 'email', 'telefono', 'role', 'permission_overrides'])
+        usuario.save(update_fields=['username', 'first_name', 'last_name', 'email', 'telefono', 'role', 'permission_overrides'])
 
         messages.success(request, _('%(role)s updated successfully.') % {'role': _get_internal_role_label(role)})
 

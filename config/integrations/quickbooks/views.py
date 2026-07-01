@@ -1323,13 +1323,10 @@ def quickbooks_database_backup(request):
         saved_path, backup_name = create_database_backup_file(label=backup_schedule)
     except Exception as exc:
         logger.exception('Database backup generation failed: %s', exc)
-        return _response_or_redirect(request, operation='database_backup', error='Database backup could not be created.', status_code=500)
+        messages.error(request, _('Database backup could not be created.'))
+        return redirect('database_backups_center')
 
-    backup_file = _get_backup_storage().open(saved_path, 'rb')
-    response = FileResponse(backup_file, as_attachment=True, filename=backup_name, content_type='application/gzip')
-    response['X-Backup-Path'] = str(Path(settings.MEDIA_ROOT) / saved_path)
-    response['X-Backup-Schedule'] = backup_schedule
-    return response
+    return redirect(reverse('quickbooks_database_backup_download', args=[backup_name]))
 
 
 @require_POST
@@ -1340,13 +1337,13 @@ def system_backup(request):
         saved_path, backup_name = create_system_backup_file(label=backup_schedule)
     except Exception as exc:
         logger.exception('System backup generation failed: %s', exc)
-        return _response_or_redirect(request, operation='system_backup', error='System backup could not be created.', status_code=500)
+        messages.error(
+            request,
+            _('System backup could not be created. Try Database only, or use Create on server and download from the list below.'),
+        )
+        return redirect('database_backups_center')
 
-    backup_file = _get_backup_storage().open(saved_path, 'rb')
-    response = FileResponse(backup_file, as_attachment=True, filename=backup_name, content_type='application/gzip')
-    response['X-Backup-Path'] = str(Path(settings.MEDIA_ROOT) / saved_path)
-    response['X-Backup-Schedule'] = backup_schedule
-    return response
+    return redirect(reverse('system_backup_download', args=[backup_name]))
 
 
 @require_GET

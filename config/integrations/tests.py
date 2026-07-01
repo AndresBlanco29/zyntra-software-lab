@@ -1026,6 +1026,8 @@ class QuickBooksIntegrationTests(TestCase):
         )
 
         response = self.client.post(reverse('quickbooks_database_backup'))
+        self.assertEqual(response.status_code, 302)
+        response = self.client.get(response.url)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/gzip')
@@ -1042,6 +1044,8 @@ class QuickBooksIntegrationTests(TestCase):
 
     def test_database_backups_center_lists_existing_backups_with_redownload_link(self):
         backup_response = self.client.post(reverse('quickbooks_database_backup'))
+        self.assertEqual(backup_response.status_code, 302)
+        backup_response = self.client.get(backup_response.url)
         backup_name = backup_response['Content-Disposition'].split('filename="', 1)[1].rstrip('"')
 
         response = self.client.get(reverse('database_backups_center'))
@@ -1066,10 +1070,12 @@ class QuickBooksIntegrationTests(TestCase):
         connection.save(update_fields=['sync_state', 'updated_at'])
 
         response = self.client.post(reverse('system_backup'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('ltg-system-backup-monthly-', response.url)
+        response = self.client.get(response.url)
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('ltg-system-backup-monthly-', response['Content-Disposition'])
-        self.assertEqual(response['X-Backup-Schedule'], 'monthly')
 
     def test_backup_database_command_creates_labeled_backup_file(self):
         stdout = StringIO()
@@ -1192,6 +1198,8 @@ class QuickBooksIntegrationTests(TestCase):
     def test_restore_backup_upload_restores_database_from_downloaded_file(self):
         self.client.force_login(self.user)
         backup_response = self.client.post(reverse('quickbooks_database_backup'))
+        self.assertEqual(backup_response.status_code, 302)
+        backup_response = self.client.get(backup_response.url)
         backup_name = backup_response['Content-Disposition'].split('filename="', 1)[1].rstrip('"')
         backup_bytes = b''.join(backup_response.streaming_content)
 

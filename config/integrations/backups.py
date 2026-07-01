@@ -1,5 +1,6 @@
 import json
 import logging
+import shutil
 import tarfile
 import threading
 import uuid
@@ -14,6 +15,7 @@ from tempfile import NamedTemporaryFile
 from django.apps import apps
 from django.conf import settings
 from django.core.files.base import ContentFile
+from django.core.files import File
 from django.core.files.storage import FileSystemStorage, default_storage
 from django.core.management import call_command
 from django.db import models
@@ -85,6 +87,29 @@ def _build_database_dump_bytes():
     return json_buffer.getvalue().encode('utf-8')
 
 
+def _write_database_dump_file(target_path):
+    with Path(target_path).open('w', encoding='utf-8') as dump_file:
+        call_command('dumpdata', format='json', indent=2, stdout=dump_file)
+
+
+def _add_storage_file_to_archive(archive, storage, file_name, archive_name):
+    media_temp_path = None
+    try:
+        with NamedTemporaryFile(delete=False) as media_temp:
+            media_temp_path = Path(media_temp.name)
+        with storage.open(file_name, 'rb') as stored_file:
+            with media_temp_path.open('wb') as media_temp_file:
+                shutil.copyfileobj(stored_file, media_temp_file, length=1024 * 1024)
+        archive.add(media_temp_path, arcname=archive_name)
+        return True
+    except Exception:
+        logger.warning('Skipped media file during system backup: %s', file_name, exc_info=True)
+        return False
+    finally:
+        if media_temp_path is not None:
+            media_temp_path.unlink(missing_ok=True)
+
+
 def _iter_local_media_files():
     media_root = Path(settings.MEDIA_ROOT)
     if not media_root.exists():
@@ -144,15 +169,20 @@ def create_database_backup_file(*, label=''):
 
 def create_system_backup_file(*, label=''):
     backup_name = _build_system_backup_name(label=label)
-    dump_bytes = _build_database_dump_bytes()
-    seen_archive_names = {DATABASE_ARCHIVE_NAME}
-    with NamedTemporaryFile(suffix='.tar.gz', delete=False) as temp_file:
-        temp_path = Path(temp_file.name)
+    database_path = None
+    temp_path = None
     try:
+        with NamedTemporaryFile(suffix='.json', delete=False) as database_temp:
+            database_path = Path(database_temp.name)
+        _write_database_dump_file(database_path)
+
+        with NamedTemporaryFile(suffix='.tar.gz', delete=False) as temp_file:
+            temp_path = Path(temp_file.name)
+
+        seen_archive_names = set()
         with tarfile.open(temp_path, mode='w:gz') as archive:
-            database_info = tarfile.TarInfo(name=DATABASE_ARCHIVE_NAME)
-            database_info.size = len(dump_bytes)
-            archive.addfile(database_info, BytesIO(dump_bytes))
+            archive.add(database_path, arcname=DATABASE_ARCHIVE_NAME)
+            seen_archive_names.add(DATABASE_ARCHIVE_NAME)
 
             media_root = Path(settings.MEDIA_ROOT)
             for file_path in _iter_local_media_files() or []:
@@ -166,20 +196,18 @@ def create_system_backup_file(*, label=''):
                 archive_name = f'{MEDIA_ARCHIVE_PREFIX}{file_name}'
                 if archive_name in seen_archive_names:
                     continue
-                try:
-                    with storage.open(file_name, 'rb') as stored_file:
-                        file_bytes = stored_file.read()
-                except Exception:
-                    continue
-                seen_archive_names.add(archive_name)
-                media_info = tarfile.TarInfo(name=archive_name)
-                media_info.size = len(file_bytes)
-                archive.addfile(media_info, BytesIO(file_bytes))
+                if _add_storage_file_to_archive(archive, storage, file_name, archive_name):
+                    seen_archive_names.add(archive_name)
 
         backup_storage = _get_backup_storage()
-        saved_path = backup_storage.save(_system_backup_storage_path(backup_name), ContentFile(temp_path.read_bytes()))
+        with temp_path.open('rb') as backup_file:
+            saved_path = backup_storage.save(_system_backup_storage_path(backup_name), File(backup_file))
+        logger.info('System backup created: %s (%s bytes)', backup_name, temp_path.stat().st_size)
     finally:
-        temp_path.unlink(missing_ok=True)
+        if database_path is not None:
+            database_path.unlink(missing_ok=True)
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
     return saved_path, backup_name
 
 

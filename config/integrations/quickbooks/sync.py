@@ -3241,13 +3241,18 @@ def _sync_cursor_key(entity_name):
     return f'quickbooks:{entity_name.lower()}'
 
 
-def pull_quickbooks_items_to_local(*, max_results=25, client=None, force_full=False):
+def pull_quickbooks_items_to_local(*, max_results=25, client=None, force_full=False, task_cache_key=None):
     client = client or QuickBooksAPIClient()
     connection = client.connection
     run_started_at = timezone.now()
 
     item_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('item')))
-    items = import_quickbooks_items(max_results=max_results, client=client, updated_after=item_cursor)
+    items = import_quickbooks_items(
+        max_results=max_results,
+        client=client,
+        updated_after=item_cursor,
+        task_cache_key=task_cache_key,
+    )
 
     connection.set_sync_cursor(_sync_cursor_key('item'), items.get('latest_updated_at') or _serialize_cursor(run_started_at))
     connection.save(update_fields=['sync_state', 'updated_at'])
@@ -3317,7 +3322,7 @@ def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None
     return result
 
 
-def pull_quickbooks_to_local(*, max_results=25, client=None, force_full=False):
+def pull_quickbooks_to_local(*, max_results=25, client=None, force_full=False, task_cache_key=None):
     client = client or QuickBooksAPIClient()
     connection = client.connection
     run_started_at = timezone.now()
@@ -3327,8 +3332,18 @@ def pull_quickbooks_to_local(*, max_results=25, client=None, force_full=False):
     invoice_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('invoice')))
     credit_memo_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('credit_memo')))
 
-    customers = import_quickbooks_customers(max_results=max_results, client=client, updated_after=customer_cursor)
-    items = import_quickbooks_items(max_results=max_results, client=client, updated_after=item_cursor)
+    customers = import_quickbooks_customers(
+        max_results=max_results,
+        client=client,
+        updated_after=customer_cursor,
+        task_cache_key=task_cache_key,
+    )
+    items = import_quickbooks_items(
+        max_results=max_results,
+        client=client,
+        updated_after=item_cursor,
+        task_cache_key=task_cache_key,
+    )
     if quickbooks_accounting_import_enabled():
         accounting_documents = import_quickbooks_accounting_documents(
             max_results=max_results,

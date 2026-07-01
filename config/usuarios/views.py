@@ -1241,6 +1241,8 @@ def editar_usuario_interno(request, usuario_id, preset_role=None):
         telefono = (request.POST.get('telefono') or '').strip()
         nombre = (request.POST.get('nombre') or '').strip()
         apellido = (request.POST.get('apellido') or '').strip()
+        password = request.POST.get('password') or ''
+        confirm_password = request.POST.get('confirm_password') or ''
         permission_overrides = build_permission_overrides_for_role(role, request.POST.getlist('permissions'))
 
         if not username:
@@ -1255,6 +1257,20 @@ def editar_usuario_interno(request, usuario_id, preset_role=None):
             messages.error(request, _('Another user already uses that email address.'))
             return redirect(request.path)
 
+        if password or confirm_password:
+            if not password or not confirm_password:
+                messages.error(request, _('Enter and confirm the new password, or leave both fields blank.'))
+                return redirect(request.path)
+            if password != confirm_password:
+                messages.error(request, _('The new passwords do not match.'))
+                return redirect(request.path)
+            try:
+                validate_password(password, usuario)
+            except ValidationError as exc:
+                for error in exc.messages:
+                    messages.error(request, error)
+                return redirect(request.path)
+
         usuario.username = username
         usuario.first_name = nombre
         usuario.last_name = apellido
@@ -1262,9 +1278,16 @@ def editar_usuario_interno(request, usuario_id, preset_role=None):
         usuario.telefono = telefono
         usuario.role = role
         usuario.permission_overrides = permission_overrides
-        usuario.save(update_fields=['username', 'first_name', 'last_name', 'email', 'telefono', 'role', 'permission_overrides'])
+        update_fields = ['username', 'first_name', 'last_name', 'email', 'telefono', 'role', 'permission_overrides']
+        if password:
+            usuario.set_password(password)
+            update_fields.append('password')
+        usuario.save(update_fields=update_fields)
 
-        messages.success(request, _('%(role)s updated successfully.') % {'role': _get_internal_role_label(role)})
+        success_message = _('%(role)s updated successfully.') % {'role': _get_internal_role_label(role)}
+        if password:
+            success_message = _('%(role)s updated successfully. Password changed.') % {'role': _get_internal_role_label(role)}
+        messages.success(request, success_message)
 
         return redirect('lista_usuarios_internos')
 

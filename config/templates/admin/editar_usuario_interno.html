@@ -47,6 +47,31 @@
     <input type="hidden" name="role" value="{{ selected_role }}">
     {% endif %}
   </div>
+  <div class="col-md-6">
+    <label class="form-label">{% trans "New password" %}</label>
+    <div class="input-group">
+      <input type="password" name="password" id="editInternalUserPassword" class="form-control" autocomplete="new-password">
+      <button
+        type="button"
+        class="btn btn-outline-secondary"
+        id="toggleEditInternalUserPassword"
+        aria-label="{% trans 'Show password' %}"
+        title="{% trans 'Show password' %}"
+        aria-pressed="false"
+      >
+        <span class="visually-hidden" id="toggleEditInternalUserPasswordText">{% trans "Show password" %}</span>
+        <svg id="toggleEditInternalUserPasswordIcon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.12 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/>
+          <path d="M8 5.5A2.5 2.5 0 1 0 8 10.5A2.5 2.5 0 0 0 8 5.5m0 1A1.5 1.5 0 1 1 8 9.5A1.5 1.5 0 0 1 8 6.5"/>
+        </svg>
+      </button>
+    </div>
+    <div class="form-text">{% trans "Leave blank to keep the current password." %}</div>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label">{% trans "Confirm new password" %}</label>
+    <input type="password" name="confirm_password" class="form-control" autocomplete="new-password">
+  </div>
 </div>
 
 <div class="mt-4">
@@ -98,5 +123,35 @@
 
 </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const passwordInput = document.getElementById('editInternalUserPassword');
+  const togglePasswordButton = document.getElementById('toggleEditInternalUserPassword');
+  const togglePasswordText = document.getElementById('toggleEditInternalUserPasswordText');
+  const toggleIcon = document.getElementById('toggleEditInternalUserPasswordIcon');
+  if (!passwordInput || !togglePasswordButton || !togglePasswordText) {
+    return;
+  }
+
+  const eyeIconMarkup = toggleIcon ? toggleIcon.innerHTML : '';
+  const eyeSlashIconMarkup = '<path d="M13.359 11.238l1.387 1.387l-.708.707l-1.53-1.53A8.8 8.8 0 0 1 8 13.5C3 13.5 0 8 0 8a15.7 15.7 0 0 1 3.155-3.826L1.146 2.165l.708-.707l12.213 12.213zM11.297 9.176l-1.574-1.574a2 2 0 0 1-2.12 2.12l-1.574-1.574a3 3 0 0 0 4.268 4.268M6.286 4.165l-.823-.823A8.5 8.5 0 0 1 8 2.5c5 0 8 5.5 8 5.5a15.8 15.8 0 0 1-2.391 3.102l-.758-.758A14.8 14.8 0 0 0 14.828 8c-.058-.087-.122-.183-.195-.288-.335-.48-.83-1.12-1.465-1.755C11.879 4.668 10.12 3.5 8 3.5c-.62 0-1.193.1-1.714.665"/><path d="M5.525 6.232l2.243 2.243a1.5 1.5 0 0 1-2.243-2.243"/>';
+  const showPasswordText = '{% trans "Show password" %}';
+  const hidePasswordText = '{% trans "Hide password" %}';
+
+  togglePasswordButton.addEventListener('click', function () {
+    const isHidden = passwordInput.type === 'password';
+    passwordInput.type = isHidden ? 'text' : 'password';
+    const nextLabel = isHidden ? hidePasswordText : showPasswordText;
+    togglePasswordButton.setAttribute('aria-label', nextLabel);
+    togglePasswordButton.setAttribute('title', nextLabel);
+    togglePasswordButton.setAttribute('aria-pressed', isHidden ? 'true' : 'false');
+    togglePasswordText.textContent = nextLabel;
+    if (toggleIcon) {
+      toggleIcon.innerHTML = isHidden ? eyeSlashIconMarkup : eyeIconMarkup;
+    }
+  });
+});
+</script>
 
 {% endblock %}

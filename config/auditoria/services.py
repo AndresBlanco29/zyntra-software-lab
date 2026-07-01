@@ -19,6 +19,7 @@ SKIP_ROUTE_NAMES = {
     'driver_delivery_update_location',
     'quickbooks_task_status',
     'backup_restore_status',
+    'backup_job_status',
 }
 
 ROUTE_LABELS = {

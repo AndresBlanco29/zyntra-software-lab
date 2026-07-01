@@ -207,7 +207,7 @@
 
 <div id="restore-job-overlay" style="display:none;position:fixed;inset:0;background:rgba(4,12,30,0.6);backdrop-filter:blur(4px);z-index:1050;align-items:center;justify-content:center;">
   <div style="max-width:520px;width:92%;background:linear-gradient(180deg,#ffffff,#f1fbff);border-radius:18px;padding:28px 26px;box-shadow:0 30px 60px rgba(2,16,52,0.5);text-align:center;color:#102a63;">
-    <h3 class="h5 mb-2">{% trans "Restoring backup" %}</h3>
+    <h3 id="job-overlay-title" class="h5 mb-2">{% trans "Working on backup" %}</h3>
     <p id="restore-job-message" class="text-muted small mb-3">{% trans "Please wait. Do not close this tab." %}</p>
     <div style="position:relative;height:18px;background:linear-gradient(90deg,#e6f7ff,#dff3ff);border-radius:999px;overflow:hidden;margin:14px 0;">
       <div id="restore-job-progress" style="height:100%;width:35%;background:linear-gradient(90deg,#1f6fd1,#73d7ff);transition:width 400ms ease;"></div>
@@ -219,20 +219,40 @@
 <script>
 (function () {
   const params = new URLSearchParams(window.location.search);
-  const jobId = params.get('restore_job');
+  const restoreJobId = params.get('restore_job');
+  const backupJobId = params.get('backup_job');
+  const downloadOnComplete = params.get('download') === '1';
+  const jobId = restoreJobId || backupJobId;
   if (!jobId) {
     return;
   }
 
   const overlay = document.getElementById('restore-job-overlay');
+  const titleEl = document.getElementById('job-overlay-title');
   const messageEl = document.getElementById('restore-job-message');
   const progressEl = document.getElementById('restore-job-progress');
   const errorEl = document.getElementById('restore-job-error');
-  const statusUrl = '{% url "backup_restore_status" job_id="__JOB__" %}'.replace('__JOB__', encodeURIComponent(jobId));
+  const statusUrl = restoreJobId
+    ? '{% url "backup_restore_status" job_id="__JOB__" %}'.replace('__JOB__', encodeURIComponent(jobId))
+    : '{% url "backup_job_status" job_id="__JOB__" %}'.replace('__JOB__', encodeURIComponent(jobId));
+  const systemDownloadUrlTemplate = '{% url "system_backup_download" backup_name="__NAME__" %}';
+
+  if (restoreJobId) {
+    titleEl.textContent = '{% trans "Restoring backup" %}';
+  } else {
+    titleEl.textContent = '{% trans "Creating system backup" %}';
+  }
 
   overlay.style.display = 'flex';
 
-  function showCompletion(backupName) {
+  function clearJobQuery() {
+    if (window.history.replaceState) {
+      const cleanUrl = window.location.pathname + window.location.hash;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+  }
+
+  function showRestoreCompletion(backupName) {
     progressEl.style.width = '100%';
     messageEl.textContent = '{% trans "Restore completed." %}';
     const card = document.createElement('div');
@@ -240,10 +260,26 @@
     card.innerHTML = '<p class="small mb-2">{% trans "Restored from:" %} <code></code></p><p class="small mb-3">{% trans "If your session was replaced, sign in again before continuing." %}</p><a class="btn btn-primary btn-sm" href="/login/">{% trans "Go to sign in" %}</a>';
     card.querySelector('code').textContent = backupName || jobId;
     overlay.querySelector('div').appendChild(card);
-    if (window.history.replaceState) {
-      const cleanUrl = window.location.pathname + window.location.hash;
-      window.history.replaceState({}, document.title, cleanUrl);
+    clearJobQuery();
+  }
+
+  function showBackupCompletion(backupName) {
+    progressEl.style.width = '100%';
+    messageEl.textContent = '{% trans "System backup completed." %}';
+    if (downloadOnComplete && backupName) {
+      clearJobQuery();
+      window.location.href = systemDownloadUrlTemplate.replace('__NAME__', encodeURIComponent(backupName));
+      return;
     }
+    const card = document.createElement('div');
+    card.className = 'mt-3';
+    card.innerHTML = '<p class="small mb-2">{% trans "Backup saved as:" %} <code></code></p><a class="btn btn-primary btn-sm" href="">{% trans "Download backup" %}</a>';
+    card.querySelector('code').textContent = backupName || jobId;
+    if (backupName) {
+      card.querySelector('a').href = systemDownloadUrlTemplate.replace('__NAME__', encodeURIComponent(backupName));
+    }
+    overlay.querySelector('div').appendChild(card);
+    clearJobQuery();
   }
 
   function poll() {
@@ -253,22 +289,26 @@
         const data = payload.data || {};
         if (!payload.ok || data.status === 'not_found') {
           errorEl.style.display = 'block';
-          errorEl.textContent = data.error || '{% trans "Restore job not found." %}';
+          errorEl.textContent = data.error || (restoreJobId ? '{% trans "Restore job not found." %}' : '{% trans "Backup job not found." %}');
           return;
         }
         if (data.status === 'running') {
-          progressEl.style.width = data.phase === 'restore' ? '65%' : '35%';
+          progressEl.style.width = data.phase === 'database' ? '55%' : (data.phase === 'restore' ? '65%' : '35%');
           window.setTimeout(poll, 2500);
           return;
         }
         if (data.status === 'completed') {
-          showCompletion(data.backup_name);
+          if (restoreJobId) {
+            showRestoreCompletion(data.backup_name);
+          } else {
+            showBackupCompletion(data.backup_name);
+          }
           return;
         }
         if (data.status === 'failed') {
           errorEl.style.display = 'block';
-          errorEl.textContent = data.error || '{% trans "Restore failed." %}';
-          messageEl.textContent = '{% trans "Restore failed." %}';
+          errorEl.textContent = data.error || (restoreJobId ? '{% trans "Restore failed." %}' : '{% trans "System backup failed." %}');
+          messageEl.textContent = restoreJobId ? '{% trans "Restore failed." %}' : '{% trans "System backup failed." %}';
           return;
         }
         window.setTimeout(poll, 2500);

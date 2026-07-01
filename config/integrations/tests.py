@@ -1070,12 +1070,11 @@ class QuickBooksIntegrationTests(TestCase):
         connection.save(update_fields=['sync_state', 'updated_at'])
 
         response = self.client.post(reverse('system_backup'))
-        self.assertEqual(response.status_code, 302)
-        self.assertIn('ltg-system-backup-monthly-', response.url)
-        response = self.client.get(response.url)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('ltg-system-backup-monthly-', response['Content-Disposition'])
+        backup_result = self._wait_for_backup_job(response)
+        self.assertIn('ltg-system-backup-monthly-', backup_result.get('backup_name', ''))
+        download_response = self.client.get(reverse('system_backup_download', args=[backup_result['backup_name']]))
+        self.assertEqual(download_response.status_code, 200)
+        self.assertIn('ltg-system-backup-monthly-', download_response['Content-Disposition'])
 
     def test_backup_database_command_creates_labeled_backup_file(self):
         stdout = StringIO()
@@ -1194,6 +1193,21 @@ class QuickBooksIntegrationTests(TestCase):
                 self.fail(data.get('error') or 'Restore job failed.')
             time.sleep(0.05)
         self.fail('Restore job did not complete in time.')
+
+    def _wait_for_backup_job(self, response):
+        self.assertEqual(response.status_code, 302)
+        job_id = parse_qs(urlparse(response.url).query).get('backup_job', [None])[0]
+        self.assertTrue(job_id)
+        for _ in range(400):
+            status_response = self.client.get(reverse('backup_job_status', args=[job_id]))
+            self.assertEqual(status_response.status_code, 200)
+            data = status_response.json()
+            if data.get('status') == 'completed':
+                return data
+            if data.get('status') == 'failed':
+                self.fail(data.get('error') or 'Backup job failed.')
+            time.sleep(0.05)
+        self.fail('Backup job did not complete in time.')
 
     def test_restore_backup_upload_restores_database_from_downloaded_file(self):
         self.client.force_login(self.user)

@@ -3,6 +3,7 @@ import logging
 import shutil
 import tarfile
 import threading
+import urllib.request
 import uuid
 from datetime import datetime
 from gzip import open as gzip_open
@@ -26,6 +27,7 @@ DATABASE_BACKUP_DIRECTORY = Path('backups') / 'database'
 SYSTEM_BACKUP_DIRECTORY = Path('backups') / 'system'
 UPLOAD_RESTORE_DIRECTORY = Path('backups') / 'uploads'
 RESTORE_JOB_DIRECTORY = Path('backups') / 'restore-jobs'
+BACKUP_JOB_DIRECTORY = Path('backups') / 'backup-jobs'
 logger = logging.getLogger(__name__)
 MEDIA_ARCHIVE_PREFIX = 'media/'
 DATABASE_ARCHIVE_NAME = 'database.json'
@@ -92,18 +94,176 @@ def _write_database_dump_file(target_path):
         call_command('dumpdata', format='json', indent=2, stdout=dump_file)
 
 
+def _cloudinary_media_enabled():
+    return bool(getattr(settings, 'USE_CLOUDINARY_MEDIA', False))
+
+
+def _download_url_to_path(url, target_path, *, timeout=60):
+    with urllib.request.urlopen(url, timeout=timeout) as response:
+        with Path(target_path).open('wb') as target_file:
+            shutil.copyfileobj(response, target_file, length=1024 * 1024)
+
+
+def _cloudinary_archive_name(resource):
+    public_id = str(resource.get('public_id') or '').strip().lstrip('/')
+    if not public_id:
+        return ''
+    archive_name = public_id if public_id.startswith('media/') else f'media/{public_id}'
+    resource_format = str(resource.get('format') or '').strip().lower()
+    if resource_format and not Path(archive_name).suffix:
+        archive_name = f'{archive_name}.{resource_format}'
+    return archive_name
+
+
+def _iter_cloudinary_media_resources():
+    if not _cloudinary_media_enabled():
+        return
+
+    try:
+        from cloudinary import api
+    except ImportError:
+        logger.warning('Cloudinary SDK is not available for system backup media export.')
+        return
+
+    for resource_type in ('image', 'raw', 'video'):
+        next_cursor = None
+        while True:
+            params = {
+                'resource_type': resource_type,
+                'type': 'upload',
+                'max_results': 500,
+            }
+            if next_cursor:
+                params['next_cursor'] = next_cursor
+            try:
+                response = api.resources(**params)
+            except Exception:
+                logger.warning('Cloudinary listing failed for resource_type=%s', resource_type, exc_info=True)
+                break
+
+            for resource in response.get('resources', []):
+                archive_name = _cloudinary_archive_name(resource)
+                secure_url = resource.get('secure_url') or resource.get('url')
+                if archive_name and secure_url:
+                    yield secure_url, archive_name
+
+            next_cursor = response.get('next_cursor')
+            if not next_cursor:
+                break
+
+
+def _resolve_cloudinary_download_url(file_name):
+    try:
+        from cloudinary import api
+        from cloudinary.models import CLOUDINARY_FIELD_DB_RE
+        from cloudinary.utils import private_download_url
+    except ImportError:
+        return None
+
+    normalized_name = str(file_name or '').strip().lstrip('/')
+    if not normalized_name:
+        return None
+
+    public_id_candidates = [normalized_name]
+    if normalized_name.startswith('media/'):
+        public_id_candidates.append(normalized_name[6:])
+    match = CLOUDINARY_FIELD_DB_RE.match(normalized_name)
+    if match:
+        public_id_candidates.append(match.group('public_id'))
+
+    seen = set()
+    for public_id in public_id_candidates:
+        public_id = public_id.strip().lstrip('/')
+        if not public_id or public_id in seen:
+            continue
+        seen.add(public_id)
+
+        for resource_type in ('image', 'raw', 'video'):
+            for delivery_type in ('upload', 'authenticated', 'private'):
+                try:
+                    resource = api.resource(
+                        public_id,
+                        resource_type=resource_type,
+                        type=delivery_type,
+                    )
+                except Exception:
+                    continue
+
+                resource_public_id = resource.get('public_id') or public_id
+                resource_format = resource.get('format')
+                if delivery_type in {'authenticated', 'private'}:
+                    try:
+                        return private_download_url(
+                            resource_public_id,
+                            resource_format,
+                            resource_type=resource_type,
+                            type=delivery_type,
+                            secure=True,
+                        )
+                    except Exception:
+                        continue
+                secure_url = resource.get('secure_url') or resource.get('url')
+                if secure_url:
+                    return secure_url
+    return None
+
+
+def _fetch_storage_file_to_path(storage, file_name, target_path):
+    try:
+        with storage.open(file_name, 'rb') as stored_file:
+            with Path(target_path).open('wb') as target_file:
+                shutil.copyfileobj(stored_file, target_file, length=1024 * 1024)
+        return True
+    except Exception:
+        pass
+
+    try:
+        url = storage.url(file_name)
+        if url:
+            _download_url_to_path(url, target_path)
+            return True
+    except Exception:
+        pass
+
+    if _cloudinary_media_enabled():
+        download_url = _resolve_cloudinary_download_url(file_name)
+        if download_url:
+            try:
+                _download_url_to_path(download_url, target_path)
+                return True
+            except Exception:
+                logger.debug('Cloudinary download failed for %s', file_name, exc_info=True)
+    return False
+
+
 def _add_storage_file_to_archive(archive, storage, file_name, archive_name):
     media_temp_path = None
     try:
         with NamedTemporaryFile(delete=False) as media_temp:
             media_temp_path = Path(media_temp.name)
-        with storage.open(file_name, 'rb') as stored_file:
-            with media_temp_path.open('wb') as media_temp_file:
-                shutil.copyfileobj(stored_file, media_temp_file, length=1024 * 1024)
+        if not _fetch_storage_file_to_path(storage, file_name, media_temp_path):
+            logger.info('Skipped media file during system backup: %s', file_name)
+            return False
         archive.add(media_temp_path, arcname=archive_name)
         return True
     except Exception:
         logger.warning('Skipped media file during system backup: %s', file_name, exc_info=True)
+        return False
+    finally:
+        if media_temp_path is not None:
+            media_temp_path.unlink(missing_ok=True)
+
+
+def _add_url_file_to_archive(archive, download_url, archive_name):
+    media_temp_path = None
+    try:
+        with NamedTemporaryFile(delete=False) as media_temp:
+            media_temp_path = Path(media_temp.name)
+        _download_url_to_path(download_url, media_temp_path)
+        archive.add(media_temp_path, arcname=archive_name)
+        return True
+    except Exception:
+        logger.info('Skipped Cloudinary media during system backup: %s', archive_name)
         return False
     finally:
         if media_temp_path is not None:
@@ -192,12 +352,19 @@ def create_system_backup_file(*, label=''):
                 seen_archive_names.add(archive_name)
                 archive.add(file_path, arcname=archive_name)
 
-            for storage, file_name in _iter_referenced_media_files():
-                archive_name = f'{MEDIA_ARCHIVE_PREFIX}{file_name}'
-                if archive_name in seen_archive_names:
-                    continue
-                if _add_storage_file_to_archive(archive, storage, file_name, archive_name):
-                    seen_archive_names.add(archive_name)
+            if _cloudinary_media_enabled():
+                for secure_url, archive_name in _iter_cloudinary_media_resources():
+                    if archive_name in seen_archive_names:
+                        continue
+                    if _add_url_file_to_archive(archive, secure_url, archive_name):
+                        seen_archive_names.add(archive_name)
+            else:
+                for storage, file_name in _iter_referenced_media_files():
+                    archive_name = f'{MEDIA_ARCHIVE_PREFIX}{file_name}'
+                    if archive_name in seen_archive_names:
+                        continue
+                    if _add_storage_file_to_archive(archive, storage, file_name, archive_name):
+                        seen_archive_names.add(archive_name)
 
         backup_storage = _get_backup_storage()
         with temp_path.open('rb') as backup_file:
@@ -360,6 +527,64 @@ def restore_database_backup_upload(*, uploaded_file, flush=False):
         return restore_database_backup_file(source=str(temp_path), flush=flush)
     finally:
         temp_path.unlink(missing_ok=True)
+
+
+def _backup_job_status_path(job_id):
+    normalized_job_id = Path(str(job_id or '').strip()).name
+    if not normalized_job_id or normalized_job_id != str(job_id or '').strip():
+        raise DatabaseBackupError('Invalid backup job id.')
+    job_root = Path(settings.MEDIA_ROOT) / BACKUP_JOB_DIRECTORY
+    job_root.mkdir(parents=True, exist_ok=True)
+    return job_root / f'{normalized_job_id}.json'
+
+
+def _write_backup_job_status(job_id, payload):
+    status_path = _backup_job_status_path(job_id)
+    status_path.write_text(json.dumps(payload), encoding='utf-8')
+
+
+def get_system_backup_job(job_id):
+    try:
+        status_path = _backup_job_status_path(job_id)
+    except DatabaseBackupError:
+        return None
+    if not status_path.exists():
+        return None
+    try:
+        return json.loads(status_path.read_text(encoding='utf-8'))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def start_system_backup_job(*, label=''):
+    job_id = uuid.uuid4().hex
+
+    def _runner():
+        from django.db import close_old_connections
+
+        close_old_connections()
+        try:
+            _write_backup_job_status(job_id, {'status': 'running', 'phase': 'database'})
+            saved_path, backup_name = create_system_backup_file(label=label)
+            _write_backup_job_status(
+                job_id,
+                {
+                    'status': 'completed',
+                    'phase': 'done',
+                    'backup_name': backup_name,
+                    'saved_path': saved_path,
+                },
+            )
+        except Exception as exc:
+            logger.exception('Background system backup failed: %s', exc)
+            _write_backup_job_status(job_id, {'status': 'failed', 'error': str(exc)})
+        finally:
+            close_old_connections()
+
+    _write_backup_job_status(job_id, {'status': 'running', 'phase': 'queued'})
+    thread = threading.Thread(target=_runner, daemon=True)
+    thread.start()
+    return job_id
 
 
 def _restore_job_status_path(job_id):

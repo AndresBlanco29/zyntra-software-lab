@@ -25,14 +25,15 @@ from config.integrations.backups import (
     DatabaseBackupError,
     _get_backup_storage,
     create_database_backup_file,
-    create_system_backup_file,
     list_database_backups,
     list_system_backups,
     open_database_backup,
     open_system_backup,
+    get_database_restore_job,
+    get_system_backup_job,
     persist_uploaded_backup_for_restore,
     start_database_restore_job,
-    get_database_restore_job,
+    start_system_backup_job,
 )
 
 from .auth import QuickBooksConfigurationError, quickbooks_credentials_configured, quickbooks_credentials_setup_message
@@ -921,16 +922,12 @@ def create_database_backup_stored(request):
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def create_system_backup_stored(request):
     try:
-        saved_path, backup_name = create_system_backup_file(label='manual')
+        job_id = start_system_backup_job(label='manual')
     except Exception as exc:
         logger.exception('Manual system backup failed: %s', exc)
         messages.error(request, _('System backup could not be created.'))
         return redirect('database_backups_center')
-    messages.success(
-        request,
-        _('System backup created and saved on the server: %(name)s') % {'name': backup_name},
-    )
-    return redirect('database_backups_center')
+    return _redirect_to_backup_job(request, job_id)
 
 
 def _redirect_to_restore_job(request, job_id):
@@ -939,6 +936,17 @@ def _redirect_to_restore_job(request, job_id):
         _('Restore started. This may take several minutes; keep this page open until it finishes.'),
     )
     return redirect(f'{reverse("database_backups_center")}?restore_job={job_id}')
+
+
+def _redirect_to_backup_job(request, job_id, *, download=False):
+    messages.info(
+        request,
+        _('System backup started. This may take several minutes; keep this page open until it finishes.'),
+    )
+    query = f'backup_job={job_id}'
+    if download:
+        query += '&download=1'
+    return redirect(f'{reverse("database_backups_center")}?{query}')
 
 
 @require_POST
@@ -964,6 +972,21 @@ def restore_backup_upload(request):
         return redirect('database_backups_center')
 
     return _redirect_to_restore_job(request, job_id)
+
+
+@require_GET
+@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+def backup_job_status(request, job_id):
+    data = get_system_backup_job(job_id)
+    if not data:
+        return JsonResponse({'status': 'not_found', 'error': 'Backup job not found.'}, status=404)
+    payload = {
+        'status': data.get('status'),
+        'phase': data.get('phase'),
+        'backup_name': data.get('backup_name'),
+        'error': data.get('error'),
+    }
+    return JsonResponse(payload)
 
 
 @require_GET
@@ -1334,16 +1357,16 @@ def quickbooks_database_backup(request):
 def system_backup(request):
     backup_schedule = _normalize_backup_schedule(request.POST.get('backup_schedule') or _get_backup_schedule_preference())
     try:
-        saved_path, backup_name = create_system_backup_file(label=backup_schedule)
+        job_id = start_system_backup_job(label=backup_schedule)
     except Exception as exc:
         logger.exception('System backup generation failed: %s', exc)
         messages.error(
             request,
-            _('System backup could not be created. Try Database only, or use Create on server and download from the list below.'),
+            _('System backup could not be started. Try Database only, or use Create on server and download from the list below.'),
         )
         return redirect('database_backups_center')
 
-    return redirect(reverse('system_backup_download', args=[backup_name]))
+    return _redirect_to_backup_job(request, job_id, download=True)
 
 
 @require_GET

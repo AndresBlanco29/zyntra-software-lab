@@ -24,8 +24,21 @@
         <h5 class="mb-3">{% trans "Choose destination" %}</h5>
         <form method="get" class="row g-3">
           <div class="col-12">
-            <label class="form-label fw-semibold">{% trans "Customer" %}</label>
-            <select name="cliente_id" class="form-select">
+            <label class="form-label fw-semibold" for="buscadorClienteNotaAjuste">{% trans "Search customer" %}</label>
+            <input
+              type="search"
+              name="q"
+              id="buscadorClienteNotaAjuste"
+              class="form-control"
+              value="{{ customer_search_query }}"
+              placeholder="{% trans 'Search by full company name...' %}"
+              autocomplete="off"
+            >
+            <div class="form-text">{% trans "Type any part of the customer name, not only the first word." %}</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold" for="adjustmentNoteCustomerSelect">{% trans "Customer" %}</label>
+            <select name="cliente_id" id="adjustmentNoteCustomerSelect" class="form-select search-select-enhanced">
               <option value="">{% trans "Select customer..." %}</option>
               {% for customer in customers %}
               <option value="{{ customer.id }}" {% if selected_client and customer.id == selected_client.id %}selected{% endif %}>{{ customer.nombre_empresa }}</option>
@@ -331,6 +344,75 @@
     </div>
   </div>
 </div>
+
+{{ customer_search_options|json_script:"adjustment-note-customer-options" }}
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const searchInput = document.getElementById('buscadorClienteNotaAjuste');
+  const customerSelect = document.getElementById('adjustmentNoteCustomerSelect');
+  const optionsNode = document.getElementById('adjustment-note-customer-options');
+  if (!searchInput || !customerSelect || !optionsNode) {
+    return;
+  }
+
+  let allOptions = [];
+  try {
+    allOptions = JSON.parse(optionsNode.textContent).map(function (customer) {
+      return {
+        value: String(customer.id),
+        text: customer.nombre_empresa,
+      };
+    });
+  } catch (error) {
+    allOptions = Array.from(customerSelect.options)
+      .filter(function (option) { return option.value; })
+      .map(function (option) {
+        return {
+          value: option.value,
+          text: option.textContent,
+        };
+      });
+  }
+
+  function filterCustomerOptions(query) {
+    const normalized = String(query || '').trim().toLowerCase();
+    const selectedValue = customerSelect.value;
+    customerSelect.innerHTML = '';
+
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = "{% trans 'Select customer...'|escapejs %}";
+    customerSelect.appendChild(placeholder);
+
+    allOptions.forEach(function (optionData) {
+      const matches = !normalized || optionData.text.toLowerCase().includes(normalized);
+      if (!matches && optionData.value !== selectedValue) {
+        return;
+      }
+      const option = document.createElement('option');
+      option.value = optionData.value;
+      option.textContent = optionData.text;
+      if (optionData.value === selectedValue) {
+        option.selected = true;
+        placeholder.selected = false;
+      }
+      customerSelect.appendChild(option);
+    });
+
+    if (window.LTGSearchableSelect) {
+      window.LTGSearchableSelect.destroy(customerSelect);
+      window.LTGSearchableSelect.init(customerSelect);
+    }
+  }
+
+  searchInput.addEventListener('input', function () {
+    filterCustomerOptions(searchInput.value);
+  });
+
+  filterCustomerOptions(searchInput.value);
+});
+</script>
 
 <script>
   (function () {

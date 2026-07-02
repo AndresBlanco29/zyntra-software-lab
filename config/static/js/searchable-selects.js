@@ -47,6 +47,9 @@
     if (typeof TomSelect !== 'undefined' && TomSelect.getInstance(select)) {
       return false;
     }
+    if (select.classList.contains('search-select-enhanced')) {
+      return true;
+    }
     if (meaningfulOptionCount(select) <= 2) {
       return false;
     }
@@ -61,6 +64,38 @@
     return plugins;
   }
 
+  function buildSubstringScoreFunction() {
+    return function (search) {
+      var query = String(search || '').trim().toLowerCase();
+      return function (item) {
+        if (!query) {
+          return 1;
+        }
+        var text = String(item.text || '').toLowerCase();
+        if (!text) {
+          return 0;
+        }
+        if (text === query) {
+          return 1;
+        }
+        if (text.indexOf(query) === 0) {
+          return 0.9;
+        }
+        if (text.indexOf(query) > 0) {
+          return 0.75;
+        }
+        var tokens = query.split(/\s+/).filter(Boolean);
+        if (!tokens.length) {
+          return 1;
+        }
+        var matchesAll = tokens.every(function (token) {
+          return text.indexOf(token) >= 0;
+        });
+        return matchesAll ? 0.6 : 0;
+      };
+    };
+  }
+
   function buildTomSelectOptions(select) {
     return {
       create: false,
@@ -71,6 +106,7 @@
       sortField: { field: 'text', direction: 'asc' },
       placeholder: i18n.placeholder,
       plugins: buildPlugins(select),
+      score: buildSubstringScoreFunction(),
       render: {
         no_results: function () {
           return '<div class="no-results px-3 py-2 text-muted">' + i18n.noResults + '</div>';

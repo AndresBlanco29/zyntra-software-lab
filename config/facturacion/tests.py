@@ -2194,11 +2194,35 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(response, 'id="advancedReasonSelect"', html=False)
 		self.assertContains(response, 'id="advancedDescriptionLabel"', html=False)
 		self.assertContains(response, 'id="advancedDescriptionHelp"', html=False)
+		self.assertContains(response, 'id="buscadorClienteNotaAjuste"', html=False)
+		self.assertContains(response, 'id="adjustmentNoteCustomerSelect"', html=False)
 		self.assertContains(response, 'Amount to charge')
 		self.assertContains(response, 'Product to charge')
 		self.assertContains(response, 'Charge description')
 		self.assertContains(response, 'Use this field to clearly explain what will be charged to the customer.')
 		self.assertContains(response, f'data-package-price="{invoice.items.first().precio_unitario}"', html=False)
+
+	def test_backoffice_adjustment_note_create_view_filters_customers_by_full_name_query(self):
+		other_user = Usuario.objects.create_user(username='cliente-botanas', password='secret123', role='cliente')
+		other_client = Cliente.objects.create(
+			usuario=other_user,
+			nombre_empresa='DON BOTANAS',
+			telefono='5552223333',
+			direccion='456 Main St',
+			ciudad='Dallas',
+			estado='TX',
+			codigo_postal='75002',
+			pais='USA',
+			sales_tax_number='TX-456',
+			certificado_tax='certificados/test.pdf',
+		)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_adjustment_note_create'), {'q': 'BOTANAS'})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, other_client.nombre_empresa)
+		self.assertNotContains(response, f'value="{self.cliente.id}"')
 
 	def test_backoffice_adjustment_note_create_view_translates_debit_labels_in_spanish(self):
 		invoice = generar_invoice_desde_picking(

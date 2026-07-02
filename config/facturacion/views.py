@@ -361,8 +361,12 @@ def _build_note_product_presentations(selected_client):
 	return presentations
 
 
-def _build_adjustment_note_creation_context(*, selected_client_id=None, selected_invoice_id=None):
+def _build_adjustment_note_creation_context(*, selected_client_id=None, selected_invoice_id=None, customer_query=''):
 	customers = Cliente.objects.order_by('nombre_empresa')
+	query = str(customer_query or '').strip()
+	filtered_customers = customers
+	if query:
+		filtered_customers = customers.filter(nombre_empresa__icontains=query)
 	invoice_queryset = Invoice.objects.select_related('cliente', 'pedido', 'driver').prefetch_related('items__presentacion__producto').filter(estado='GENERADA').order_by('-creada_en')
 
 	selected_invoice = None
@@ -377,6 +381,11 @@ def _build_adjustment_note_creation_context(*, selected_client_id=None, selected
 	elif selected_client_id:
 		selected_client = get_object_or_404(customers, id=selected_client_id)
 		available_invoices = invoice_queryset.filter(cliente=selected_client)
+		if query and not filtered_customers.filter(pk=selected_client.pk).exists():
+			filtered_customers = (
+				Cliente.objects.filter(pk=selected_client.pk)
+				| filtered_customers
+			).distinct().order_by('nombre_empresa')
 
 	if selected_client is not None:
 		customer_general_notes = (
@@ -388,7 +397,9 @@ def _build_adjustment_note_creation_context(*, selected_client_id=None, selected
 		)
 
 	return {
-		'customers': customers,
+		'customers': filtered_customers,
+		'customer_search_query': query,
+		'customer_search_options': list(customers.values('id', 'nombre_empresa')),
 		'available_invoices': available_invoices,
 		'customer_general_notes': customer_general_notes,
 		'product_presentations': _build_note_product_presentations(selected_client),
@@ -1304,6 +1315,7 @@ def backoffice_adjustment_note_create(request):
 	context = _build_adjustment_note_creation_context(
 		selected_client_id=selected_client_id or None,
 		selected_invoice_id=selected_invoice_id or None,
+		customer_query=request.GET.get('q'),
 	)
 
 	if request.method == 'POST':

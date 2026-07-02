@@ -917,6 +917,7 @@ class PickingVerificationFlowTests(TestCase):
 		js_path = Path(settings.BASE_DIR) / 'static' / 'js' / 'searchable-selects.js'
 		content = js_path.read_text(encoding='utf-8')
 		self.assertIn('dropdown_input', content)
+		self.assertIn('buildSubstringScoreFunction', content)
 
 	def test_backoffice_can_add_product_with_manual_price(self):
 		self.pedido.estado = 'RECIBIDO'

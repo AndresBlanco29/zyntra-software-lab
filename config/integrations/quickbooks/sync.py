@@ -1022,9 +1022,8 @@ def _item_payload_needs_update(remote_payload, expected_payload):
 
 
 CATALOG_PRODUCT_ITEM_TYPES = frozenset({'inventory', 'noninventory', 'assembly'})
-CATALOG_PRODUCT_ITEM_WHERE = (
-    "Active = true AND (Type = 'Inventory' OR Type = 'NonInventory' OR Type = 'Assembly')"
-)
+# QuickBooks query language does not support parentheses in WHERE clauses.
+CATALOG_ACTIVE_ITEMS_WHERE = 'Active = true'
 
 
 def _is_quickbooks_catalog_product_item(payload):
@@ -1051,13 +1050,14 @@ def fetch_quickbooks_items(*, max_results=25, client=None, updated_after=None, p
     if updated_after:
         records = client.find_updated_since('Item', updated_after, max_results=max_results, page_size=resolved_page_size)
         return _filter_catalog_import_items(records)
-    return client.find_all(
+    records = client.find_all(
         'Item',
         max_results=max_results,
-        where_clause=CATALOG_PRODUCT_ITEM_WHERE,
+        where_clause=CATALOG_ACTIVE_ITEMS_WHERE,
         order_by='MetaData.LastUpdatedTime',
         page_size=resolved_page_size,
     )
+    return _filter_catalog_import_items(records)
 
 
 def _quickbooks_catalog_page_size():

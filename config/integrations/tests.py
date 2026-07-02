@@ -54,7 +54,7 @@ from config.integrations.quickbooks.sync import (
     refresh_linked_quickbooks_items,
     _filter_catalog_import_items,
     _is_quickbooks_catalog_product_item,
-    CATALOG_PRODUCT_ITEM_WHERE,
+    CATALOG_ACTIVE_ITEMS_WHERE,
     _resolve_quickbooks_item_active,
     _resolve_item_import_force_full,
     refresh_linked_quickbooks_invoice_status,
@@ -597,16 +597,20 @@ class QuickBooksCatalogItemFilterTests(TestCase):
         self.assertEqual([item['Id'] for item in filtered], ['1'])
 
     @patch('config.integrations.quickbooks.sync.QuickBooksAPIClient')
-    def test_fetch_quickbooks_items_uses_product_type_filter_for_full_import(self, mock_client_cls):
+    def test_fetch_quickbooks_items_uses_active_filter_and_excludes_services_in_python(self, mock_client_cls):
         mock_client = mock_client_cls.return_value
-        mock_client.find_all.return_value = []
+        mock_client.find_all.return_value = [
+            {'Id': '1', 'Type': 'Inventory', 'Name': 'Tortilla', 'Active': True},
+            {'Id': '2', 'Type': 'Service', 'Name': 'Hours', 'Active': True},
+        ]
 
         from config.integrations.quickbooks.sync import fetch_quickbooks_items
 
-        fetch_quickbooks_items(max_results=None)
+        records = fetch_quickbooks_items(max_results=None)
 
         mock_client.find_all.assert_called_once()
-        self.assertEqual(mock_client.find_all.call_args.kwargs['where_clause'], CATALOG_PRODUCT_ITEM_WHERE)
+        self.assertEqual(mock_client.find_all.call_args.kwargs['where_clause'], CATALOG_ACTIVE_ITEMS_WHERE)
+        self.assertEqual([item['Id'] for item in records], ['1'])
 
 
 class QuickBooksClientAuthRetryTests(TestCase):

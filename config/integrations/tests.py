@@ -455,9 +455,10 @@ class QuickBooksItemCostSyncTests(TestCase):
         self.assertEqual(_extract_quickbooks_item_cost(imported_payload), Decimal('35.99'))
         mock_incremental.assert_called_once()
 
+    @patch('config.integrations.quickbooks.sync._fetch_quickbooks_item_payload', return_value=None)
     @patch('config.integrations.quickbooks.sync.import_quickbooks_items')
     @patch('config.integrations.quickbooks.sync._fetch_quickbooks_items_map')
-    def test_refresh_linked_items_deactivates_missing_quickbooks_item(self, mock_fetch_map, mock_incremental):
+    def test_refresh_linked_items_deactivates_missing_quickbooks_item(self, mock_fetch_map, mock_incremental, _mock_fetch_item):
         mock_incremental.return_value = {'count': 0, 'created_count': 0, 'updated_count': 0, 'latest_updated_at': None}
         producto = Producto.objects.create(nombre='Missing Product', activo=True, quickbooks_id='QB-MISSING')
         Presentacion.objects.create(producto=producto, nombre='Unit', quickbooks_id='QB-MISSING')
@@ -468,6 +469,46 @@ class QuickBooksItemCostSyncTests(TestCase):
         producto.refresh_from_db()
         self.assertFalse(producto.activo)
         self.assertEqual(result['deactivated_count'], 1)
+
+    @patch('config.integrations.quickbooks.sync._save_quickbooks_item_image', return_value=False)
+    @patch('config.integrations.quickbooks.sync._fetch_quickbooks_item_payload')
+    @patch('config.integrations.quickbooks.sync.import_quickbooks_items')
+    @patch('config.integrations.quickbooks.sync._fetch_quickbooks_items_map')
+    def test_refresh_linked_items_deactivates_inactive_item_from_authoritative_fetch(
+        self,
+        mock_fetch_map,
+        mock_incremental,
+        mock_fetch_item,
+        _mock_image,
+    ):
+        mock_incremental.return_value = {'count': 0, 'created_count': 0, 'updated_count': 0, 'latest_updated_at': None}
+        producto = Producto.objects.create(
+            nombre='PRUEBA 3 PRODUCTO',
+            activo=True,
+            quickbooks_id='QB-PRUEBA-3',
+        )
+        Presentacion.objects.create(producto=producto, nombre='Unit', quickbooks_id='QB-PRUEBA-3')
+        mock_fetch_map.return_value = {
+            'QB-PRUEBA-3': {
+                'Id': 'QB-PRUEBA-3',
+                'Name': 'PRUEBA 3 PRODUCTO',
+                'Type': 'Inventory',
+                'Active': True,
+            }
+        }
+        mock_fetch_item.return_value = {
+            'Id': 'QB-PRUEBA-3',
+            'Name': 'PRUEBA 3 PRODUCTO',
+            'Type': 'Inventory',
+            'Active': False,
+        }
+
+        result = refresh_linked_quickbooks_items()
+
+        producto.refresh_from_db()
+        self.assertFalse(producto.activo)
+        self.assertEqual(result['updated_count'], 1)
+        mock_fetch_item.assert_called()
 
 
 class QuickBooksLinkedItemUpdateTests(TestCase):

@@ -85,15 +85,20 @@ def _quickbooks_payload_active(payload):
     return bool(value)
 
 
-def _resolve_quickbooks_item_active(payload, *, client=None, fetch_when_missing=False):
+def _resolve_quickbooks_item_active(payload, *, client=None, fetch_when_missing=False, force_refresh=False):
     if not payload:
         return False
+    item_id = str(payload.get('Id') or '').strip()
+    if force_refresh and item_id:
+        client = client or QuickBooksAPIClient()
+        full_payload = _fetch_quickbooks_item_payload(item_id=item_id, client=client)
+        if full_payload and 'Active' in full_payload:
+            return _quickbooks_payload_active(full_payload)
     if 'Active' in payload:
         return _quickbooks_payload_active(payload)
     if not fetch_when_missing:
         # Bulk catalog queries already scope to Active items; avoid per-item API calls.
         return True
-    item_id = str(payload.get('Id') or '').strip()
     if not item_id:
         return False
     client = client or QuickBooksAPIClient()
@@ -101,6 +106,49 @@ def _resolve_quickbooks_item_active(payload, *, client=None, fetch_when_missing=
     if full_payload and 'Active' in full_payload:
         return _quickbooks_payload_active(full_payload)
     return False
+
+
+def _find_local_presentacion_for_quickbooks_item(quickbooks_id, *, prefetched_presentacion=None):
+    qb_id = str(quickbooks_id or '').strip()
+    if not qb_id:
+        return None
+    presentacion = prefetched_presentacion
+    if presentacion is not None:
+        linked_ids = {
+            str(getattr(presentacion, 'quickbooks_id', '') or '').strip(),
+            str(getattr(getattr(presentacion, 'producto', None), 'quickbooks_id', '') or '').strip(),
+        }
+        if qb_id in linked_ids:
+            return presentacion
+        presentacion = None
+    if presentacion is None:
+        presentacion = (
+            Presentacion.objects.select_related('producto')
+            .filter(Q(quickbooks_id=qb_id) | Q(producto__quickbooks_id=qb_id))
+            .first()
+        )
+    return presentacion
+
+
+def _linked_catalog_presentacion_queryset():
+    return (
+        Presentacion.objects.select_related('producto')
+        .filter(
+            Q(quickbooks_id__isnull=False) & ~Q(quickbooks_id='')
+            | Q(producto__quickbooks_id__isnull=False) & ~Q(producto__quickbooks_id='')
+        )
+        .order_by('producto__nombre', 'id')
+    )
+
+
+def _linked_catalog_quickbooks_ids(presentaciones):
+    qb_ids = set()
+    for presentacion in presentaciones:
+        for raw_id in (presentacion.quickbooks_id, getattr(presentacion.producto, 'quickbooks_id', None)):
+            qb_id = str(raw_id or '').strip()
+            if qb_id:
+                qb_ids.add(qb_id)
+    return sorted(qb_ids)
 
 
 def _quickbooks_record_is_active(payload):
@@ -1079,7 +1127,7 @@ def _fetch_quickbooks_items_by_ids(*, client, item_ids, updated_after=None, chun
     for offset in range(0, len(ids), chunk_size):
         chunk = ids[offset:offset + chunk_size]
         in_list = ', '.join(f"'{client._escape_query_value(item_id)}'" for item_id in chunk)
-        where_parts = [f"Id IN ({in_list})", 'Active IN (true, false)']
+        where_parts = [f"Id IN ({in_list})"]
         if updated_after:
             where_parts.append(f"MetaData.LastUpdatedTime > '{client._escape_query_value(updated_after)}'")
         where_clause = ' AND '.join(where_parts)
@@ -1832,7 +1880,15 @@ def _product_conflict_exists(*, quickbooks_id, product_name, presentation_name):
     ).exclude(quickbooks_id=quickbooks_id).first()
 
 
-def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None, skip_images=False, lookup_cache=None):
+def _apply_quickbooks_item_to_local_record(
+    presentacion,
+    payload,
+    *,
+    client=None,
+    skip_images=False,
+    lookup_cache=None,
+    force_active_refresh=False,
+):
     quickbooks_id = str(payload.get('Id') or '').strip()
     if not quickbooks_id:
         raise QuickBooksSyncError('QuickBooks item payload is missing an Id.')
@@ -1852,7 +1908,12 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
         brand=brand,
         preserve_local=True,
     )
-    producto.activo = _resolve_quickbooks_item_active(payload, client=client, fetch_when_missing=True)
+    producto.activo = _resolve_quickbooks_item_active(
+        payload,
+        client=client,
+        fetch_when_missing=True,
+        force_refresh=force_active_refresh,
+    )
     if sku:
         if producto.codigo_barras == sku:
             pass
@@ -1895,7 +1956,16 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
 
 
 @transaction.atomic
-def import_quickbooks_item_record(payload, *, client=None, skip_enrich=False, skip_images=None, prefetched_presentacion=None, lookup_cache=None):
+def import_quickbooks_item_record(
+    payload,
+    *,
+    client=None,
+    skip_enrich=False,
+    skip_images=None,
+    prefetched_presentacion=None,
+    lookup_cache=None,
+    force_active_refresh=False,
+):
     quickbooks_id = str((payload or {}).get('Id') or '').strip()
     if not quickbooks_id:
         raise QuickBooksSyncError('QuickBooks item payload is missing an Id.')
@@ -1928,15 +1998,15 @@ def import_quickbooks_item_record(payload, *, client=None, skip_enrich=False, sk
     unit_price = _quantize_money(payload.get('UnitPrice') or 0)
     item_cost = _extract_quickbooks_item_cost(payload)
     category, brand = _resolve_quickbooks_item_category_and_brand(payload, lookup_cache=lookup_cache)
-    existing = prefetched_presentacion
-    if existing is None:
-        existing = Presentacion.objects.select_related('producto').filter(quickbooks_id=quickbooks_id).first()
-    elif getattr(existing, 'quickbooks_id', None) and str(existing.quickbooks_id) != quickbooks_id:
-        existing = Presentacion.objects.select_related('producto').filter(quickbooks_id=quickbooks_id).first()
+    existing = _find_local_presentacion_for_quickbooks_item(
+        quickbooks_id,
+        prefetched_presentacion=prefetched_presentacion,
+    )
     item_active = _resolve_quickbooks_item_active(
         payload,
         client=client,
         fetch_when_missing=existing is not None,
+        force_refresh=force_active_refresh,
     )
     if not item_active and existing is None:
         return _skip_import_result(
@@ -2064,6 +2134,7 @@ def import_quickbooks_item_record(payload, *, client=None, skip_enrich=False, sk
             client=client,
             skip_images=skip_images,
             lookup_cache=lookup_cache,
+            force_active_refresh=force_active_refresh,
         )
         producto = presentacion.producto
         action = 'updated'
@@ -2088,9 +2159,10 @@ def _deactivate_local_product_for_quickbooks_item(*, quickbooks_id, prefetched_p
     qb_id = str(quickbooks_id or '').strip()
     if not qb_id:
         return None
-    presentacion = prefetched_presentacion
-    if presentacion is None:
-        presentacion = Presentacion.objects.select_related('producto').filter(quickbooks_id=qb_id).first()
+    presentacion = _find_local_presentacion_for_quickbooks_item(
+        qb_id,
+        prefetched_presentacion=prefetched_presentacion,
+    )
     if presentacion is None:
         return None
     producto = presentacion.producto
@@ -2098,6 +2170,7 @@ def _deactivate_local_product_for_quickbooks_item(*, quickbooks_id, prefetched_p
         return presentacion
     producto.activo = False
     producto.save(update_fields=['activo'])
+    cache.delete('catalogo:productos_activos_v2')
     return presentacion
 
 
@@ -3578,24 +3651,25 @@ def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None
         skip_images=skip_images,
     )
 
-    queryset = (
-        Presentacion.objects.filter(quickbooks_id__isnull=False)
-        .exclude(quickbooks_id='')
-        .order_by('producto__nombre', 'id')
-    )
+    queryset = _linked_catalog_presentacion_queryset()
     if limit is not None:
         queryset = queryset[:max(int(limit), 0)]
 
-    qb_ids = [str(qb_id).strip() for qb_id in queryset.values_list('quickbooks_id', flat=True) if str(qb_id or '').strip()]
+    linked_presentaciones = list(queryset)
+    qb_ids = _linked_catalog_quickbooks_ids(linked_presentaciones)
     items_map = _fetch_quickbooks_items_map(client=client, wanted_ids=qb_ids)
-    prefetched_presentaciones = {
-        str(presentacion.quickbooks_id): presentacion
-        for presentacion in Presentacion.objects.select_related('producto').filter(quickbooks_id__in=qb_ids)
-    }
+    prefetched_presentaciones = {}
+    for presentacion in linked_presentaciones:
+        for raw_id in (presentacion.quickbooks_id, getattr(presentacion.producto, 'quickbooks_id', None)):
+            qb_id = str(raw_id or '').strip()
+            if qb_id:
+                prefetched_presentaciones.setdefault(qb_id, presentacion)
     lookup_cache = _build_catalog_lookup_cache()
     payloads = []
     for qb_id in qb_ids:
         payload = items_map.get(qb_id)
+        if not payload:
+            payload = _fetch_quickbooks_item_payload(item_id=qb_id, client=client)
         if not payload:
             payloads.append({'Id': qb_id, '_missing_in_qb': True})
             continue
@@ -3604,6 +3678,17 @@ def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None
     def _import_payload(payload):
         qb_id = str(payload.get('Id') or '').strip()
         if payload.get('_missing_in_qb'):
+            fetched_payload = _fetch_quickbooks_item_payload(item_id=qb_id, client=client)
+            if fetched_payload:
+                return import_quickbooks_item_record(
+                    fetched_payload,
+                    client=client,
+                    skip_enrich=True,
+                    skip_images=skip_images,
+                    prefetched_presentacion=prefetched_presentaciones.get(qb_id),
+                    lookup_cache=lookup_cache,
+                    force_active_refresh=True,
+                )
             presentacion = _deactivate_local_product_for_quickbooks_item(
                 quickbooks_id=qb_id,
                 prefetched_presentacion=prefetched_presentaciones.get(qb_id),
@@ -3624,7 +3709,7 @@ def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None
                 'entity': 'Item',
                 'quickbooks_id': qb_id,
                 'label': qb_id,
-                'error': payload.get('_error') or 'Item not found in QuickBooks.',
+                'error': 'Item not found in QuickBooks.',
             }
         return import_quickbooks_item_record(
             payload,
@@ -3633,6 +3718,7 @@ def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None
             skip_images=skip_images,
             prefetched_presentacion=prefetched_presentaciones.get(qb_id),
             lookup_cache=lookup_cache,
+            force_active_refresh=True,
         )
 
     linked_result = _import_batch_result(

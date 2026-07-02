@@ -24,7 +24,7 @@ from config.clientes.models import Cliente
 from config.facturacion.models import Invoice, NotaAjuste
 from config.facturacion.services import generar_invoice_desde_picking
 from config.integrations.backups import _backup_modified_time
-from config.integrations.quickbooks.client import QuickBooksAPIError
+from config.integrations.quickbooks.client import QuickBooksAPIClient, QuickBooksAPIError
 from config.integrations.quickbooks.services import get_connection
 from config.integrations.models import QuickBooksConnection, QuickBooksImportConflict
 from config.integrations.quickbooks.sync import (
@@ -52,6 +52,9 @@ from config.integrations.quickbooks.sync import (
     import_quickbooks_items,
     pull_quickbooks_items_to_local,
     refresh_linked_quickbooks_items,
+    _filter_catalog_import_items,
+    _is_quickbooks_catalog_product_item,
+    CATALOG_PRODUCT_ITEM_WHERE,
     _resolve_quickbooks_item_active,
     _resolve_item_import_force_full,
     refresh_linked_quickbooks_invoice_status,
@@ -573,6 +576,69 @@ class QuickBooksCategoryBrandImportTests(TestCase):
         self.assertIsNone(producto.marca)
 
 
+class QuickBooksCatalogItemFilterTests(TestCase):
+    def test_service_and_group_items_are_not_catalog_products(self):
+        self.assertFalse(_is_quickbooks_catalog_product_item({'Type': 'Service', 'Name': 'Hours'}))
+        self.assertFalse(_is_quickbooks_catalog_product_item({'Type': 'Group', 'Name': 'Bundle'}))
+        self.assertFalse(_is_quickbooks_catalog_product_item({'Type': 'Category', 'Name': 'Salsas'}))
+
+    def test_inventory_and_noninventory_items_are_catalog_products(self):
+        self.assertTrue(_is_quickbooks_catalog_product_item({'Type': 'Inventory', 'Name': 'Tortilla'}))
+        self.assertTrue(_is_quickbooks_catalog_product_item({'Type': 'NonInventory', 'Name': 'Bag'}))
+        self.assertTrue(_is_quickbooks_catalog_product_item({'Type': 'Assembly', 'Name': 'Kit'}))
+
+    def test_filter_catalog_import_items_excludes_services(self):
+        records = [
+            {'Id': '1', 'Type': 'Inventory', 'Name': 'Tortilla'},
+            {'Id': '2', 'Type': 'Service', 'Name': 'Hours'},
+            {'Id': '3', 'Type': 'Category', 'Name': 'Salsas'},
+        ]
+        filtered = _filter_catalog_import_items(records)
+        self.assertEqual([item['Id'] for item in filtered], ['1'])
+
+    @patch('config.integrations.quickbooks.sync.QuickBooksAPIClient')
+    def test_fetch_quickbooks_items_uses_product_type_filter_for_full_import(self, mock_client_cls):
+        mock_client = mock_client_cls.return_value
+        mock_client.find_all.return_value = []
+
+        from config.integrations.quickbooks.sync import fetch_quickbooks_items
+
+        fetch_quickbooks_items(max_results=None)
+
+        mock_client.find_all.assert_called_once()
+        self.assertEqual(mock_client.find_all.call_args.kwargs['where_clause'], CATALOG_PRODUCT_ITEM_WHERE)
+
+
+class QuickBooksClientAuthRetryTests(TestCase):
+    @patch('config.integrations.quickbooks.client.ensure_valid_access_token')
+    @patch('config.integrations.quickbooks.client.requests.request')
+    def test_request_retries_once_after_401(self, mock_request, mock_refresh):
+        connection = Mock()
+        connection.access_token = 'old-token'
+        connection.realm_id = '123'
+        connection.environment = 'production'
+
+        def refresh_side_effect(**kwargs):
+            conn = kwargs.get('connection')
+            conn.access_token = 'new-token'
+            return conn
+
+        mock_refresh.side_effect = refresh_side_effect
+
+        unauthorized = Mock(ok=False, status_code=401)
+        unauthorized.json.return_value = {'Fault': {'Error': [{'Message': 'AuthenticationFailed'}]}}
+        success = Mock(ok=True, status_code=200)
+        success.json.return_value = {'QueryResponse': {'Item': []}}
+        mock_request.side_effect = [unauthorized, success]
+
+        client = QuickBooksAPIClient(connection=connection)
+        client.request('GET', client.realm_path('query'), params={'query': 'select * from Item'})
+
+        self.assertEqual(mock_request.call_count, 2)
+        self.assertEqual(mock_refresh.call_count, 2)
+        self.assertEqual(mock_request.call_args_list[1].kwargs['headers']['Authorization'], 'Bearer new-token')
+
+
 class QuickBooksDeletedRecordImportTests(TestCase):
     def test_active_defaults_to_true_when_missing_or_none(self):
         self.assertTrue(_quickbooks_payload_active({'Id': '1', 'Name': 'X'}))
@@ -580,8 +646,18 @@ class QuickBooksDeletedRecordImportTests(TestCase):
         self.assertFalse(_quickbooks_payload_active({'Id': '1', 'Name': 'X', 'Active': False}))
 
     @patch('config.integrations.quickbooks.sync._fetch_quickbooks_item_payload', return_value=None)
-    def test_resolve_item_active_defaults_to_false_when_status_unknown(self, _mock_fetch):
-        self.assertFalse(_resolve_quickbooks_item_active({'Id': 'QB-UNKNOWN', 'Name': 'Unknown Status'}))
+    def test_resolve_item_active_defaults_to_true_during_bulk_import(self, _mock_fetch):
+        self.assertTrue(_resolve_quickbooks_item_active({'Id': 'QB-UNKNOWN', 'Name': 'Unknown Status'}))
+        _mock_fetch.assert_not_called()
+
+    @patch('config.integrations.quickbooks.sync._fetch_quickbooks_item_payload', return_value=None)
+    def test_resolve_item_active_defaults_to_false_when_status_unknown_and_fetch_requested(self, _mock_fetch):
+        self.assertFalse(
+            _resolve_quickbooks_item_active(
+                {'Id': 'QB-UNKNOWN', 'Name': 'Unknown Status'},
+                fetch_when_missing=True,
+            )
+        )
 
     @patch('config.integrations.quickbooks.sync.fetch_quickbooks_items')
     @patch('config.integrations.quickbooks.sync.import_quickbooks_item_record')

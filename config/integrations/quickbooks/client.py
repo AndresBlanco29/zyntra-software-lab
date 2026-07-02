@@ -5,7 +5,7 @@ import requests
 from django.conf import settings
 
 from .constants import QUICKBOOKS_API_BASE_URLS
-from .services import ensure_valid_access_token, get_connection
+from .services import QuickBooksServiceError, ensure_valid_access_token, get_connection
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ class QuickBooksAPIClient:
     def realm_path(self, suffix):
         return f'/v3/company/{self.realm_id}/{suffix.lstrip("/")}'
 
-    def request(self, method, path, *, params=None, json=None):
+    def request(self, method, path, *, params=None, json=None, _retry_auth=True):
         url = f'{self.base_url}{path}'
         response = requests.request(
             method,
@@ -47,6 +47,12 @@ class QuickBooksAPIClient:
             },
             timeout=30,
         )
+        if response.status_code == 401 and _retry_auth:
+            try:
+                self.connection = ensure_valid_access_token(connection=self.connection, force_refresh=True)
+            except QuickBooksServiceError as exc:
+                raise QuickBooksAPIError(f'QuickBooks API authentication failed: {exc}') from exc
+            return self.request(method, path, params=params, json=json, _retry_auth=False)
         if not response.ok:
             logger.warning('QuickBooks API request failed: %s %s -> %s', method, url, response.status_code)
             try:
@@ -212,7 +218,7 @@ class QuickBooksAPIClient:
     def _image_download_timeout(self):
         return max(int(getattr(settings, 'QUICKBOOKS_IMAGE_DOWNLOAD_TIMEOUT', 8) or 8), 3)
 
-    def download_authenticated_file(self, download_url, *, timeout=None):
+    def download_authenticated_file(self, download_url, *, timeout=None, _retry_auth=True):
         response = requests.request(
             'GET',
             download_url,
@@ -222,6 +228,12 @@ class QuickBooksAPIClient:
             },
             timeout=timeout or self._image_download_timeout(),
         )
+        if response.status_code == 401 and _retry_auth:
+            try:
+                self.connection = ensure_valid_access_token(connection=self.connection, force_refresh=True)
+            except QuickBooksServiceError as exc:
+                raise QuickBooksAPIError(f'QuickBooks API authentication failed: {exc}') from exc
+            return self.download_authenticated_file(download_url, timeout=timeout, _retry_auth=False)
         if not response.ok:
             logger.warning('QuickBooks authenticated download failed: %s -> %s', download_url, response.status_code)
             raise QuickBooksAPIError(f'QuickBooks authenticated download failed with status {response.status_code}.')

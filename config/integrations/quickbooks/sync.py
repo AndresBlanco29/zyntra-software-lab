@@ -26,6 +26,7 @@ from config.usuarios.models import Usuario
 
 from .client import QuickBooksAPIClient, QuickBooksAPIError
 from .constants import QUICKBOOKS_SYNC_STATUS_FAILED, QUICKBOOKS_SYNC_STATUS_PENDING, QUICKBOOKS_SYNC_STATUS_SYNCED
+from .services import QuickBooksServiceError, ensure_valid_access_token
 
 
 class QuickBooksSyncError(Exception):
@@ -84,11 +85,14 @@ def _quickbooks_payload_active(payload):
     return bool(value)
 
 
-def _resolve_quickbooks_item_active(payload, *, client=None):
+def _resolve_quickbooks_item_active(payload, *, client=None, fetch_when_missing=False):
     if not payload:
         return False
     if 'Active' in payload:
         return _quickbooks_payload_active(payload)
+    if not fetch_when_missing:
+        # Bulk catalog queries already scope to Active items; avoid per-item API calls.
+        return True
     item_id = str(payload.get('Id') or '').strip()
     if not item_id:
         return False
@@ -1017,15 +1021,40 @@ def _item_payload_needs_update(remote_payload, expected_payload):
     )
 
 
+CATALOG_PRODUCT_ITEM_TYPES = frozenset({'inventory', 'noninventory', 'assembly'})
+CATALOG_PRODUCT_ITEM_WHERE = (
+    "Active = true AND (Type = 'Inventory' OR Type = 'NonInventory' OR Type = 'Assembly')"
+)
+
+
+def _is_quickbooks_catalog_product_item(payload):
+    item_type = str((payload or {}).get('Type') or '').strip().lower()
+    if item_type in {'category', 'service', 'group'}:
+        return False
+    if not item_type:
+        return True
+    return item_type in CATALOG_PRODUCT_ITEM_TYPES
+
+
+def _filter_catalog_import_items(records):
+    filtered = []
+    for record in records or []:
+        if not _is_quickbooks_catalog_product_item(record):
+            continue
+        filtered.append(record)
+    return filtered
+
+
 def fetch_quickbooks_items(*, max_results=25, client=None, updated_after=None, page_size=None):
     client = client or QuickBooksAPIClient()
     resolved_page_size = page_size or getattr(settings, 'QUICKBOOKS_CATALOG_SYNC_PAGE_SIZE', 1000)
     if updated_after:
-        return client.find_updated_since('Item', updated_after, max_results=max_results, page_size=resolved_page_size)
+        records = client.find_updated_since('Item', updated_after, max_results=max_results, page_size=resolved_page_size)
+        return _filter_catalog_import_items(records)
     return client.find_all(
         'Item',
         max_results=max_results,
-        where_clause='Active = true',
+        where_clause=CATALOG_PRODUCT_ITEM_WHERE,
         order_by='MetaData.LastUpdatedTime',
         page_size=resolved_page_size,
     )
@@ -2006,14 +2035,20 @@ def import_quickbooks_item_record(payload, *, client=None, skip_enrich=False, sk
     }
 
 
-def _import_batch_result(*, entity_name, records, import_callable, task_cache_key=None):
+def _import_batch_result(*, entity_name, records, import_callable, task_cache_key=None, client=None):
     results = []
     total = len(records or [])
     processed = 0
+    batch_client = client
     # initialize progress if we have a task key
     if task_cache_key:
         cache.set(task_cache_key, {'status': 'running', 'progress': 0, 'operation': entity_name}, timeout=60 * 60)
     for record in records:
+        if batch_client and processed and processed % 100 == 0:
+            try:
+                batch_client.connection = ensure_valid_access_token(connection=batch_client.connection, force_refresh=True)
+            except QuickBooksServiceError:
+                pass
         try:
             with transaction.atomic():
                 result = import_callable(record)
@@ -2168,7 +2203,7 @@ def import_quickbooks_items(*, max_results=25, client=None, updated_after=None, 
     # as inactive locally after the import run.
     if records:
         all_ids = {str(r.get('Id') or '') for r in records}
-        filtered = [r for r in records if (r.get('Type') or '').lower() != 'category']
+        filtered = _filter_catalog_import_items(records)
     else:
         all_ids = set()
         filtered = []
@@ -2191,6 +2226,7 @@ def import_quickbooks_items(*, max_results=25, client=None, updated_after=None, 
             lookup_cache=lookup_cache,
         ),
         task_cache_key=task_cache_key,
+        client=client,
     )
 
     # If QuickBooks no longer returns some linked items, mark their local

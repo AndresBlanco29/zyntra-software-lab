@@ -852,7 +852,7 @@
                   <span class="form-check-label small">{% trans "Skip product images (faster import)" %}</span>
                 </label>
               </form>
-              <p class="qb-action-note">{% trans "Brings QuickBooks items into your catalog. After clearing the catalog, the first import automatically pulls all items. Later runs only fetch new or changed items unless you check full import above." %}</p>
+              <p class="qb-action-note">{% trans "Brings QuickBooks product items (inventory, non-inventory, and assembly) into your catalog. Services, labor/hours, categories, and bundles are skipped. After clearing the catalog, the first import automatically pulls all items. Later runs only fetch new or changed items unless you check full import above." %}</p>
             </div>
             <div class="qb-action-item" id="qb-sync-product-images">
               <form method="post" action="{% url 'quickbooks_sync_item_images_to_local' %}" data-qb-operation="sync_item_images_to_local">

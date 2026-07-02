@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 
 from config.productos.models import Presentacion
+from config.productos.packaging import get_effective_packaging_for_display
 from config.usuarios.permissions import internal_permission_required
 
 from .models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
@@ -114,15 +115,19 @@ def backoffice_inventory_list(request):
 		if stock_disponible <= 0:
 			zero_stock_count += 1
 		fractional_match = fractional_by_presentacion_id.get(presentacion.id)
+		packaging = get_effective_packaging_for_display(presentacion)
+		presentation_label = packaging['presentation_name']
 		rows.append({
 			'presentacion': presentacion,
 			'stock_fisico': stock_fisico,
 			'stock_reservado': stock_reservado,
 			'stock_disponible': stock_disponible,
-			'units_per_package': max(int(getattr(presentacion, 'unidades', 0) or 0), 1),
+			'units_per_package': packaging['units'],
+			'content_type_label': packaging['content_type'],
 			'fractional_stock': fractional_match['stock_fisico'] if fractional_match else 0,
 			'fractional_content_label': fractional_match['contenido'] if fractional_match else '',
-			'physical_summary': presentacion.nombre_traducido,
+			'physical_summary': presentation_label,
+			'presentation_label': presentation_label,
 		})
 		total_fisico += stock_fisico
 		total_reservado += stock_reservado
@@ -197,9 +202,11 @@ def backoffice_inventory_detail(request, presentacion_id):
 		if stock.stock_fisico > 0
 	]
 	stock.refresh_from_db()
+	packaging = get_effective_packaging_for_display(presentacion)
 	context = {
 		'presentacion': presentacion,
 		'stock': stock,
+		'packaging': packaging,
 		'movements': movements,
 		'consolidation_movements': consolidation_movements,
 		'fractional_stocks': fractional_stocks,

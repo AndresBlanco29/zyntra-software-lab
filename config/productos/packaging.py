@@ -157,7 +157,12 @@ def get_effective_packaging_for_display(presentacion, *, language=None):
     product = getattr(presentacion, 'producto', None)
     product_name = getattr(product, 'nombre', '') if product is not None else ''
     parsed = None
-    if presentation_looks_unconfigured(presentacion) and product_name:
+    nombre = (getattr(presentacion, 'nombre', '') or '').strip()
+    should_infer_from_product_name = (
+        presentation_looks_unconfigured(presentacion)
+        or presentation_name_looks_like_unit_size(nombre)
+    )
+    if should_infer_from_product_name and product_name:
         parsed = parse_case_packaging_from_product_name(product_name)
 
     if parsed:
@@ -220,13 +225,24 @@ def build_packaging_customer_description(*, units, content_type, presentation_na
     return presentation_name
 
 
+def presentation_name_looks_like_unit_size(value):
+    return content_type_looks_like_unit_size(value)
+
+
 def apply_case_packaging_defaults_to_presentacion(presentacion, product_name, *, overwrite=False):
     parsed = parse_case_packaging_from_product_name(product_name)
     if parsed is None:
         return False
 
     changed = False
-    if overwrite or not (presentacion.nombre or '').strip() or (presentacion.nombre or '').strip().lower() in {'unit', 'unidad', 'units', 'unidades'}:
+    nombre = (presentacion.nombre or '').strip()
+    should_overwrite_presentation = (
+        overwrite
+        or not nombre
+        or nombre.lower() in GENERIC_PRESENTATION_NAMES
+        or presentation_name_looks_like_unit_size(nombre)
+    )
+    if should_overwrite_presentation:
         presentacion.nombre = parsed['presentation_name']
         changed = True
     if overwrite or int(getattr(presentacion, 'unidades', 0) or 0) <= 1:
@@ -255,16 +271,20 @@ def finalize_quickbooks_import_packaging(*, product_name, presentation_name, tip
     generic_content_tokens = GENERIC_PRESENTATION_CONTENT | {'ea', 'each'}
 
     if parsed:
-        if presentation_token in generic_presentation_tokens:
-            presentation_name = parsed['presentation_name']
-        if content_token in generic_content_tokens or int(unidades or 0) <= 1:
-            tipo_contenido = parsed['content_type']
-        if int(unidades or 0) <= 1:
-            unidades = parsed['units_per_case']
+        presentation_name = parsed['presentation_name']
+        tipo_contenido = parsed['content_type']
+        unidades = parsed['units_per_case']
     elif presentation_token in generic_presentation_tokens or content_token in generic_content_tokens:
         presentation_name = 'Caja'
         if content_token in generic_content_tokens:
             tipo_contenido = 'caja'
+        if int(unidades or 0) <= 1:
+            unidades = 1
+    elif presentation_name_looks_like_unit_size(presentation_name):
+        inferred_content = (presentation_name or '').strip()
+        presentation_name = 'Caja'
+        if content_type_looks_like_unit_size(tipo_contenido) or content_token in generic_content_tokens or not tipo_contenido:
+            tipo_contenido = inferred_content
         if int(unidades or 0) <= 1:
             unidades = 1
 

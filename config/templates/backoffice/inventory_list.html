@@ -81,11 +81,11 @@
             <div class="text-muted small">{{ row.presentacion.producto.categoria.nombre_traducido }}</div>
             {% endif %}
           </td>
-          <td data-label="{% trans 'Presentation' %}">{{ row.presentacion.nombre_traducido }}</td>
+          <td data-label="{% trans 'Presentation' %}">{{ row.presentation_label|capfirst }}</td>
           <td data-label="{% trans 'Physical' %}">
             <div class="fw-semibold">{{ row.stock_fisico }} {{ row.physical_summary }}</div>
             {% if row.units_per_package > 1 %}
-            <div class="small text-muted">{% blocktrans with units=row.units_per_package content=row.presentacion.tipo_contenido_traducido %}{{ units }} {{ content }} per package{% endblocktrans %}</div>
+            <div class="small text-muted">{% blocktrans with units=row.units_per_package content=row.content_type_label %}{{ units }} {{ content }} per package{% endblocktrans %}</div>
             {% endif %}
             {% if row.fractional_stock > 0 %}
             <div class="small text-muted">+ {{ row.fractional_stock }} {{ row.fractional_content_label }} {% trans "partial" %}</div>

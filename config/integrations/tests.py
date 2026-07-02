@@ -146,6 +146,19 @@ class QuickBooksPresentationParsingTests(TestCase):
         self.assertEqual(units, 6)
         self.assertEqual(tipo, '6.76 OZ')
 
+    def test_product_name_slash_pattern_overrides_unit_size_description(self):
+        product, presentation, tipo, units = _parse_quickbooks_presentation({
+            'Id': '8',
+            'Name': 'PRUEBA 2 PRODUCTO 8/250ML',
+            'Description': 'Catalog item | 250 ML | unit',
+            'UnitOfMeasureRef': {'name': '250 ML'},
+        })
+
+        self.assertEqual(product, 'PRUEBA 2 PRODUCTO 8/250ML')
+        self.assertEqual(presentation, 'Caja')
+        self.assertEqual(tipo, '250 ML')
+        self.assertEqual(units, 8)
+
 
 class QuickBooksCustomerNamingTests(TestCase):
     def test_strip_ltg_customer_export_prefix(self):

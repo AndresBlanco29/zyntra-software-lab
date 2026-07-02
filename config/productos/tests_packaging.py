@@ -3,9 +3,11 @@ from django.test import TestCase
 from config.productos.packaging import (
     build_packaging_customer_description,
     content_type_looks_like_unit_size,
+    finalize_quickbooks_import_packaging,
     get_effective_packaging_for_display,
     parse_case_packaging_from_product_name,
     presentation_looks_unconfigured,
+    presentation_name_looks_like_unit_size,
 )
 
 
@@ -133,3 +135,53 @@ class EffectivePackagingDisplayTests(TestCase):
         self.assertTrue(presentation_looks_unconfigured(presentacion))
         self.assertEqual(packaging['description'], '6 piezas por caja')
         self.assertEqual(packaging['presentation_name'], 'caja')
+
+
+class QuickBooksImportPackagingTests(TestCase):
+    def test_finalize_uses_case_packaging_from_product_name_even_with_unit_description(self):
+        finalized = finalize_quickbooks_import_packaging(
+            product_name='PRUEBA 2 PRODUCTO 8/250ML',
+            presentation_name='250 ML',
+            tipo_contenido='unidades',
+            unidades=1,
+        )
+
+        self.assertEqual(finalized['presentation_name'], 'Caja')
+        self.assertEqual(finalized['tipo_contenido'], '250 ML')
+        self.assertEqual(finalized['unidades'], 8)
+
+    def test_finalize_repairs_unit_size_presentation_without_slash_pattern(self):
+        finalized = finalize_quickbooks_import_packaging(
+            product_name='GENERIC PRODUCT',
+            presentation_name='250 ML',
+            tipo_contenido='unidades',
+            unidades=1,
+        )
+
+        self.assertEqual(finalized['presentation_name'], 'Caja')
+        self.assertEqual(finalized['tipo_contenido'], '250 ML')
+        self.assertEqual(finalized['unidades'], 1)
+
+    def test_presentation_name_unit_size_detector(self):
+        self.assertTrue(presentation_name_looks_like_unit_size('250 ML'))
+        self.assertFalse(presentation_name_looks_like_unit_size('box'))
+
+
+class MisconfiguredPresentationDisplayTests(TestCase):
+    def test_effective_packaging_repairs_unit_size_presentation_name(self):
+        producto = type('ProductoStub', (), {'nombre': 'PRUEBA 2 PRODUCTO 8/250ML'})()
+        presentacion = type('PresentacionStub', (), {
+            'unidades': 8,
+            'nombre': '250 ML',
+            'tipo_contenido': '250 ML',
+            'producto': producto,
+            'producto_id': 1,
+            'tipo_contenido_traducido': '250 ML',
+            'nombre_traducido': '250 ML',
+        })()
+
+        packaging = get_effective_packaging_for_display(presentacion, language='en')
+
+        self.assertEqual(packaging['presentation_name'], 'box')
+        self.assertEqual(packaging['content_type'], '250 ML')
+        self.assertEqual(packaging['units'], 8)

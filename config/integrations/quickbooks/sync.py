@@ -1955,6 +1955,9 @@ def _apply_quickbooks_item_to_local_record(
         tipo_contenido=tipo_contenido,
         unidades=unidades,
     )
+    from config.productos.packaging import apply_case_packaging_defaults_to_presentacion
+    if apply_case_packaging_defaults_to_presentacion(presentacion, product_name):
+        presentacion.save(update_fields=['nombre', 'tipo_contenido', 'unidades'])
     try:
         _sync_stock_from_quickbooks_item(presentacion, payload)
     except Exception:

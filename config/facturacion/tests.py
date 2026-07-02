@@ -1526,6 +1526,80 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, reverse('backoffice_invoice_complete_pickup', args=[invoice.id]))
 		self.assertContains(response, 'Complete customer pick up')
+		self.assertContains(response, 'pickupSaveAdjustmentNoteButton')
+		self.assertContains(response, 'Save draft note')
+
+	def test_invoice_displays_box_um_when_presentation_name_is_unit_size(self):
+		categoria = Categoria.objects.create(nombre='Bebidas')
+		marca = Marca.objects.create(nombre='Marca UM')
+		producto = Producto.objects.create(
+			nombre='PRUEBA 2 PRODUCTO 8/250ML',
+			categoria=categoria,
+			marca=marca,
+			activo=True,
+		)
+		presentacion = Presentacion.objects.create(
+			producto=producto,
+			nombre='250 ML',
+			unidades=8,
+			tipo_contenido='250 ML',
+			precio_1=Decimal('20.00'),
+		)
+		registrar_entrada_manual(presentacion=presentacion, cantidad=10, observacion='Seed misconfigured packaging')
+		pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='VERIFICADO_AJUSTADO',
+			total=Decimal('20.00'),
+		)
+		PedidoItem.objects.create(
+			pedido=pedido,
+			presentacion=presentacion,
+			cantidad_solicitada=1,
+			cantidad=1,
+			precio=Decimal('20.00'),
+			subtotal=Decimal('20.00'),
+		)
+		invoice = generar_invoice_desde_picking(
+			pedido=pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		item = invoice.items.get()
+
+		self.assertEqual(item.presentacion_nombre, 'Box')
+		self.assertEqual(item.presentacion_nombre_display, 'Box')
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'data-label="U/M">Box</td>', html=False)
+
+	def test_pickup_flow_can_save_adjustment_note_before_completion(self):
+		invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', driver=None, total='30.00')
+		item = invoice.items.first()
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(
+			reverse('backoffice_invoice_create_note', args=[invoice.id]),
+			{
+				'adjustment_field_prefix': 'driver_note_',
+				'driver_note_tipo_documento': 'CREDITO',
+				'driver_note_tipo_ajuste': 'PRODUCTO',
+				'driver_note_motivo': 'DAMAGE',
+				'driver_note_descripcion': 'Producto dañado en mostrador',
+				f'driver_note_qty_{item.id}': '1',
+				f'driver_note_amount_{item.id}': '15.00',
+			},
+		)
+
+		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		invoice.refresh_from_db()
+		nota = invoice.notas_ajuste.get()
+		self.assertEqual(nota.estado, 'BORRADOR')
+		self.assertEqual(nota.tipo_documento, 'CREDITO')
+		self.assertEqual(nota.total, Decimal('15.00'))
+		self.assertFalse(invoice.delivery.is_completed)
 
 	def test_backoffice_can_complete_customer_pickup_with_payment_and_signature(self):
 		invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', driver=None, total='30.00')

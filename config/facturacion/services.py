@@ -624,7 +624,7 @@ def generar_invoice_desde_picking(
 			pedido_item=item,
 			presentacion=item.presentacion,
 			producto_nombre=item.presentacion.producto.nombre,
-			presentacion_nombre=item.presentacion.nombre,
+			presentacion_nombre=(item.presentacion.nombre_empaque_cliente or item.presentacion.nombre)[:120],
 			cantidad_facturada=quantity,
 			peso_por_caja=item.presentacion.peso_por_caja,
 			precio_unitario_lista=list_unit_price if discount_percentage > 0 or discount_amount_unit > 0 else None,

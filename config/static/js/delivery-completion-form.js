@@ -11,6 +11,7 @@
   const paymentEntryMethods = Array.from(root.querySelectorAll('.js-payment-entry-method'));
   const paymentEntryAmounts = Array.from(root.querySelectorAll('.js-payment-entry-amount'));
   const driverNoteType = root.querySelector('#driverNoteType');
+  const pickupSaveAdjustmentNoteButton = root.querySelector('#pickupSaveAdjustmentNoteButton');
   const driverAdjustmentType = root.querySelector('#driverAdjustmentType');
   const driverAdjustmentTypeOptions = driverAdjustmentType && driverAdjustmentType.options ? Array.from(driverAdjustmentType.options) : [];
   const paidFields = root.querySelectorAll('.paid-only');
@@ -278,6 +279,12 @@
     creditTypeFields.forEach((element) => element.classList.toggle('d-none', !isCredit));
     if (driverCreditType && isCredit && !driverCreditType.value) driverCreditType.value = 'CREDIT_DUMP';
     toggleDriverAdjustmentMode();
+    syncPickupSaveNoteButton();
+  }
+
+  function syncPickupSaveNoteButton() {
+    if (!pickupSaveAdjustmentNoteButton || !driverNoteType) return;
+    pickupSaveAdjustmentNoteButton.disabled = !driverNoteType.value;
   }
 
   if (paymentStatus) paymentStatus.addEventListener('change', togglePaymentSections);
@@ -298,6 +305,7 @@
   togglePaymentSections();
   toggleDriverNoteFields();
   toggleDriverAdjustmentMode();
+  syncPickupSaveNoteButton();
 
   if (!canvas || !signatureInput || !clearSignature) return;
   const context = canvas.getContext('2d');

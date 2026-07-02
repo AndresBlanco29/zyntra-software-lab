@@ -544,6 +544,15 @@ class InvoiceItem(models.Model):
 	def __str__(self):
 		return f'{self.producto_nombre} x {self.cantidad_facturada}'
 
+	@property
+	def presentacion_nombre_display(self):
+		presentacion = self.presentacion
+		if presentacion is not None:
+			effective_name = presentacion.nombre_empaque_cliente
+			if effective_name:
+				return effective_name
+		return self.presentacion_nombre
+
 
 class NotaAjuste(models.Model):
 	DOCUMENT_TYPE_CHOICES = (

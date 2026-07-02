@@ -130,8 +130,8 @@ def _resolve_invoice_barcode(item):
 def _resolve_invoice_pack_size(item):
 	presentacion = item.presentacion
 	if not presentacion:
-		return item.presentacion_nombre
-	return f'{item.presentacion_nombre} x {presentacion.unidades}'
+		return item.presentacion_nombre_display
+	return f'{item.presentacion_nombre_display} x {presentacion.unidades}'
 
 
 def _resolve_invoice_suggested_case_price(item):
@@ -1532,7 +1532,11 @@ def backoffice_invoice_create_note(request, invoice_id):
 
 	try:
 		_validate_invoice_is_not_quickbooks_locked(invoice)
-		note_request = _extract_adjustment_note_request(invoice, request.POST, field_prefix='note_')
+		field_prefix = (request.POST.get('adjustment_field_prefix') or 'note_').strip()
+		if field_prefix not in {'note_', 'driver_note_'}:
+			field_prefix = 'note_'
+		evidence_field = 'driver_note_evidence_photos' if field_prefix == 'driver_note_' else 'note_evidence_photos'
+		note_request = _extract_adjustment_note_request(invoice, request.POST, field_prefix=field_prefix)
 		if note_request is None:
 			raise ValidationError(_('Add note details before saving the adjustment.'))
 		nota = crear_nota_ajuste_desde_invoice(
@@ -1546,7 +1550,7 @@ def backoffice_invoice_create_note(request, invoice_id):
 			items_payload=note_request['items_payload'],
 			monto=note_request['monto'],
 		)
-		_save_adjustment_note_evidence_files(nota, request.FILES.getlist('note_evidence_photos'))
+		_save_adjustment_note_evidence_files(nota, request.FILES.getlist(evidence_field))
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:

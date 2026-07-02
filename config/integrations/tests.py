@@ -38,6 +38,7 @@ from config.integrations.quickbooks.sync import (
     _extract_quickbooks_item_cost,
     _extract_quickbooks_customer_company_name,
     _get_inventory_start_date,
+    _item_payload_needs_update,
     _normalize_inventory_start_date_if_needed,
     _parse_quickbooks_presentation,
     _prepare_inventory_item_for_txn_date,
@@ -272,6 +273,61 @@ class QuickBooksItemPayloadTests(TestCase):
         self.assertEqual(payload['IncomeAccountRef']['value'], '79')
         self.assertEqual(payload['AssetAccountRef']['value'], '81')
         self.assertEqual(payload['ExpenseAccountRef']['value'], '80')
+
+    @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
+    @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
+    @patch('config.integrations.quickbooks.sync._get_default_expense_account_ref', return_value={'value': '80', 'name': 'COGS'})
+    @patch('config.integrations.quickbooks.sync._get_inventory_income_account_ref', return_value={'value': '79', 'name': 'Sales of Product Income'})
+    def test_build_item_payload_omits_qty_on_hand_when_transaction_sync(self, *_mocks):
+        payload = _build_item_payload(
+            self.presentacion,
+            client=Mock(),
+            remote_payload={
+                'Id': '1062',
+                'Type': 'Inventory',
+                'QtyOnHand': 20,
+            },
+            sync_qty_on_hand=False,
+        )
+
+        self.assertEqual(payload['Type'], 'Inventory')
+        self.assertNotIn('QtyOnHand', payload)
+
+    @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
+    @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
+    @patch('config.integrations.quickbooks.sync._get_default_expense_account_ref', return_value={'value': '80', 'name': 'COGS'})
+    @patch('config.integrations.quickbooks.sync._get_inventory_income_account_ref', return_value={'value': '79', 'name': 'Sales of Product Income'})
+    def test_item_payload_needs_update_ignores_qty_on_hand_during_transaction_sync(self, *_mocks):
+        expected_payload = _build_item_payload(
+            self.presentacion,
+            client=Mock(),
+            remote_payload={
+                'Id': '1062',
+                'Type': 'Inventory',
+            },
+            sync_qty_on_hand=False,
+        )
+        remote_payload = {
+            'Id': '1062',
+            'Type': 'Inventory',
+            'Active': expected_payload['Active'],
+            'Description': expected_payload['Description'],
+            'UnitPrice': expected_payload['UnitPrice'],
+            'IncomeAccountRef': expected_payload['IncomeAccountRef'],
+            'Sku': expected_payload['Sku'],
+            'QtyOnHand': 20,
+            'PurchaseCost': expected_payload['PurchaseCost'],
+            'ExpenseAccountRef': expected_payload['ExpenseAccountRef'],
+            'AssetAccountRef': expected_payload['AssetAccountRef'],
+        }
+
+        self.assertFalse(
+            _item_payload_needs_update(
+                remote_payload,
+                expected_payload,
+                sync_qty_on_hand=False,
+            )
+        )
 
     def test_get_inventory_start_date_defaults_to_early_date(self):
         self.assertEqual(_get_inventory_start_date(), date(2015, 1, 1))
@@ -2387,6 +2443,29 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         self.assertEqual(self.presentacion.quickbooks_id, '801')
         self.assertEqual(self.presentacion.sync_status, 'SYNCED')
         self.assertEqual(response.json()['result']['action'], 'created')
+
+    @patch('config.integrations.quickbooks.sync._find_transaction_by_doc_number', return_value=None)
+    @patch('config.integrations.quickbooks.sync.sync_customer', return_value={'quickbooks_id': '701'})
+    @patch('config.integrations.quickbooks.sync.sync_product')
+    def test_sync_invoice_disables_qty_on_hand_push_for_linked_items(
+        self,
+        mock_sync_product,
+        mock_sync_customer,
+        mock_find_transaction,
+    ):
+        from config.integrations.quickbooks.sync import sync_invoice
+
+        mock_sync_product.return_value = {
+            'quickbooks_id': '801',
+            'payload': {'Id': '801', 'InvStartDate': '2015-01-01', 'Type': 'Inventory'},
+        }
+        mock_client = Mock()
+        mock_client.create_invoice.return_value = {'Id': '901', 'DocNumber': self.invoice.numero}
+
+        sync_invoice(invoice=self.invoice, client=mock_client)
+
+        mock_sync_product.assert_called_once()
+        self.assertIs(mock_sync_product.call_args.kwargs.get('sync_qty_on_hand'), False)
 
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_sync_invoice_endpoint_creates_invoice_in_quickbooks(self, mock_request):

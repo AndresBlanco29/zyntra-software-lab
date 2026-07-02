@@ -240,16 +240,15 @@
                       {% endif %}
                       {% if invoice.can_delete_from_backoffice %}
                       <li>
-                        <form
-                          method="post"
-                          action="{% url 'backoffice_invoice_delete' invoice.id %}"
-                          class="m-0"
-                          onsubmit="return confirm('{% trans "Delete this invoice permanently? No record will remain." %}');"
+                        <button
+                          type="button"
+                          class="dropdown-item text-danger invoice-delete-trigger"
+                          data-delete-url="{% url 'backoffice_invoice_delete' invoice.id %}"
+                          data-invoice-numero="{{ invoice.numero }}"
+                          data-requires-confirmation="{% if invoice.requires_delete_confirmation_phrase %}true{% else %}false{% endif %}"
                         >
-                          {% csrf_token %}
-                          <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                          <button type="submit" class="dropdown-item text-danger">{% trans "Delete" %}</button>
-                        </form>
+                          {% trans "Delete" %}
+                        </button>
                       </li>
                       {% endif %}
                     </ul>
@@ -307,6 +306,78 @@
     </div>
   </div>
 </div>
+<div class="modal fade" id="invoiceDeleteModal" tabindex="-1" aria-labelledby="invoiceDeleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="invoiceDeleteForm" action="">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <div class="modal-header">
+          <h5 class="modal-title" id="invoiceDeleteModalLabel">{% trans "Delete invoice" %}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-3" id="invoiceDeleteModalDescription"></p>
+          <div class="alert alert-warning d-none" id="invoiceDeleteQuickBooksWarning">
+            {% trans "This invoice is already synced with QuickBooks. Deleting it here will not remove it from QuickBooks." %}
+          </div>
+          <div class="d-none" id="invoiceDeleteConfirmationBlock">
+            <label class="form-label" for="invoiceDeleteConfirmationPhrase">{% trans "Type CONFIRM or DELETE to continue" %}</label>
+            <input type="text" class="form-control" id="invoiceDeleteConfirmationPhrase" name="confirmation_phrase" autocomplete="off" spellcheck="false" placeholder="{% trans "CONFIRM or DELETE" %}">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+          <button type="submit" class="btn btn-danger" id="invoiceDeleteSubmitButton">{% trans "Delete permanently" %}</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const modalElement = document.getElementById('invoiceDeleteModal');
+  if (!modalElement) {
+    return;
+  }
+  const modal = new bootstrap.Modal(modalElement);
+  const form = document.getElementById('invoiceDeleteForm');
+  const description = document.getElementById('invoiceDeleteModalDescription');
+  const quickbooksWarning = document.getElementById('invoiceDeleteQuickBooksWarning');
+  const confirmationBlock = document.getElementById('invoiceDeleteConfirmationBlock');
+  const confirmationInput = document.getElementById('invoiceDeleteConfirmationPhrase');
+  const submitButton = document.getElementById('invoiceDeleteSubmitButton');
+  const acceptedPhrases = ['confirm', 'delete'];
+
+  function updateDeleteSubmitState(requiresConfirmation) {
+    if (!requiresConfirmation) {
+      submitButton.disabled = false;
+      return;
+    }
+    const normalized = (confirmationInput.value || '').trim().toLowerCase();
+    submitButton.disabled = !acceptedPhrases.includes(normalized);
+  }
+
+  document.querySelectorAll('.invoice-delete-trigger').forEach(function (button) {
+    button.addEventListener('click', function () {
+      const invoiceNumero = button.dataset.invoiceNumero;
+      const requiresConfirmation = button.dataset.requiresConfirmation === 'true';
+      form.action = button.dataset.deleteUrl;
+      description.textContent = "{% trans 'Delete invoice' %} " + invoiceNumero + "? {% trans 'No record will remain in the app.' %}";
+      quickbooksWarning.classList.toggle('d-none', !requiresConfirmation);
+      confirmationBlock.classList.toggle('d-none', !requiresConfirmation);
+      confirmationInput.value = '';
+      confirmationInput.required = requiresConfirmation;
+      updateDeleteSubmitState(requiresConfirmation);
+      modal.show();
+    });
+  });
+
+  confirmationInput.addEventListener('input', function () {
+    updateDeleteSubmitState(!confirmationBlock.classList.contains('d-none'));
+  });
+});
+</script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const modalElement = document.getElementById('invoiceVoidModal');

@@ -1553,6 +1553,27 @@ def _create_void_registro(*, tipo_documento, numero_documento, documento_id, cli
 	)
 
 
+INVOICE_DELETE_CONFIRMATION_PHRASES = frozenset({'confirm', 'delete'})
+
+
+def invoice_delete_requires_confirmation_phrase(invoice):
+	from config.integrations.quickbooks.sync import is_sync_locked
+
+	return invoice.estado != 'ANULADA' and is_sync_locked(invoice)
+
+
+def validate_invoice_delete_confirmation_phrase(*, invoice, confirmation_phrase):
+	if not invoice_delete_requires_confirmation_phrase(invoice):
+		return
+	normalized = str(confirmation_phrase or '').strip().lower()
+	if normalized not in INVOICE_DELETE_CONFIRMATION_PHRASES:
+		raise ValidationError(
+			_('Type CONFIRM or DELETE to permanently remove invoice %(invoice)s that is already synced with QuickBooks.') % {
+				'invoice': invoice.numero,
+			}
+		)
+
+
 def _validate_invoice_void_delete_allowed(invoice):
 	if invoice.estado == 'ANULADA':
 		raise ValidationError(_('This invoice is already voided.'))

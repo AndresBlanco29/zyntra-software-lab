@@ -64,6 +64,9 @@ from .services import (
 	crear_nota_ajuste,
 	crear_nota_ajuste_desde_invoice,
 	eliminar_invoice,
+	invoice_delete_requires_confirmation_phrase,
+	validate_invoice_delete_confirmation_phrase,
+	_invoice_allows_quickbooks_bypass_on_delete,
 	eliminar_nota_ajuste,
 	ensure_delivery_for_invoice,
 	generar_invoice_desde_picking,
@@ -1435,6 +1438,7 @@ def backoffice_invoice_detail(request, invoice_id):
 		'invoice_quickbooks_locked': is_sync_locked(invoice),
 		'can_void_invoice': invoice.can_void_from_backoffice(),
 		'can_delete_invoice': invoice.can_delete_from_backoffice(),
+		'invoice_requires_delete_confirmation': invoice.requires_delete_confirmation_phrase(),
 		'void_registro': invoice.registros_anulacion.order_by('-anulado_en', '-id').first(),
 		'focus_adjustment_note': focus_adjustment_note,
 		'show_prominent_adjustment_note': show_prominent_adjustment_note,
@@ -1617,6 +1621,16 @@ def backoffice_invoice_void(request, invoice_id):
 	return redirect(next_url)
 
 
+def _resolve_invoice_delete_force_quickbooks(request, invoice):
+	validate_invoice_delete_confirmation_phrase(
+		invoice=invoice,
+		confirmation_phrase=request.POST.get('confirmation_phrase'),
+	)
+	if invoice_delete_requires_confirmation_phrase(invoice):
+		return True
+	return _invoice_allows_quickbooks_bypass_on_delete(invoice)
+
+
 @login_required
 @internal_permission_required('backoffice.orders.manage')
 def backoffice_invoice_delete(request, invoice_id):
@@ -1627,8 +1641,10 @@ def backoffice_invoice_delete(request, invoice_id):
 	next_url = str(request.POST.get('next') or '').strip() or reverse('backoffice_invoices_list')
 
 	try:
-		_validate_invoice_is_not_quickbooks_locked(invoice)
-		eliminar_invoice(invoice=invoice)
+		force_quickbooks = _resolve_invoice_delete_force_quickbooks(request, invoice)
+		if not force_quickbooks:
+			_validate_invoice_is_not_quickbooks_locked(invoice)
+		eliminar_invoice(invoice=invoice, force_quickbooks=force_quickbooks)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 		return redirect(next_url)

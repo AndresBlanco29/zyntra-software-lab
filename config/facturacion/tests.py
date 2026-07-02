@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from django.conf import settings
+from django.contrib.messages import get_messages
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
@@ -16,7 +17,7 @@ from reportlab.platypus import SimpleDocTemplate
 
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, DeliveryNotificationLog, FacturacionRegistroAnulacion, Invoice, NotaAjuste, NotaAjusteAplicacion
-from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, build_invoice_shipment_summary, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, mark_delivery_unpaid_from_backoffice, resolve_customer_amount_owed, resolve_invoice_payment_base_date, resolve_invoice_payment_due_date, start_delivery_route, unlock_client_from_delivery
+from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, build_invoice_shipment_summary, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, invoice_delete_requires_confirmation_phrase, mark_delivery_unpaid_from_backoffice, resolve_customer_amount_owed, resolve_invoice_payment_base_date, resolve_invoice_payment_due_date, start_delivery_route, unlock_client_from_delivery, validate_invoice_delete_confirmation_phrase
 from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_footer_layout, _build_invoice_pdf_item_data, _build_invoice_pdf_shipment_summary_table, _build_invoice_pdf_terms_paragraph, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_pdf_due_date_label, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_SYNCED
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
@@ -4296,3 +4297,46 @@ class InvoiceVoidDeleteTests(TestCase):
 		eliminar_nota_ajuste(nota=nota)
 
 		self.assertFalse(NotaAjuste.objects.filter(id=note_id).exists())
+
+	def test_synced_invoice_can_delete_from_backoffice_before_delivery(self):
+		self.invoice.quickbooks_id = 'QB-INVOICE-1'
+		self.invoice.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+		self.invoice.save(update_fields=['quickbooks_id', 'sync_status', 'actualizada_en'])
+		self.invoice.refresh_from_db()
+
+		self.assertFalse(self.invoice.can_void_from_backoffice())
+		self.assertTrue(self.invoice.can_delete_from_backoffice())
+		self.assertTrue(self.invoice.requires_delete_confirmation_phrase())
+		self.assertTrue(invoice_delete_requires_confirmation_phrase(self.invoice))
+
+	def test_validate_delete_confirmation_phrase_blocks_invalid_values(self):
+		self.invoice.quickbooks_id = 'QB-INVOICE-2'
+		self.invoice.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+		self.invoice.save(update_fields=['quickbooks_id', 'sync_status', 'actualizada_en'])
+
+		with self.assertRaises(ValidationError):
+			validate_invoice_delete_confirmation_phrase(invoice=self.invoice, confirmation_phrase='yes')
+
+		validate_invoice_delete_confirmation_phrase(invoice=self.invoice, confirmation_phrase='confirm')
+		validate_invoice_delete_confirmation_phrase(invoice=self.invoice, confirmation_phrase='DELETE')
+
+	def test_backoffice_delete_synced_invoice_requires_confirmation_phrase(self):
+		self.invoice.quickbooks_id = 'QB-INVOICE-3'
+		self.invoice.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+		self.invoice.save(update_fields=['quickbooks_id', 'sync_status', 'actualizada_en'])
+		invoice_id = self.invoice.id
+		delete_url = reverse('backoffice_invoice_delete', args=[invoice_id])
+
+		self.client.force_login(self.backoffice)
+		response = self.client.post(delete_url, {'next': reverse('backoffice_invoices_list')})
+		self.assertEqual(response.status_code, 302)
+		self.assertTrue(Invoice.objects.filter(id=invoice_id).exists())
+		messages = [str(message) for message in get_messages(response.wsgi_request)]
+		self.assertTrue(any('CONFIRM' in message or 'DELETE' in message for message in messages))
+
+		response = self.client.post(
+			delete_url,
+			{'next': reverse('backoffice_invoices_list'), 'confirmation_phrase': 'confirm'},
+		)
+		self.assertEqual(response.status_code, 302)
+		self.assertFalse(Invoice.objects.filter(id=invoice_id).exists())

@@ -1,11 +1,12 @@
 /* Refuerzo definitivo: menú y botones de idioma idénticos a home, máxima especificidad */
 :root {
     --panel-navbar-offset: 72px;
+    --panel-content-top-gap: 0px;
     --panel-mobile-back-size: 44px;
 }
 
 html {
-    scroll-padding-top: var(--panel-navbar-offset);
+    scroll-padding-top: calc(var(--panel-navbar-offset) + var(--panel-content-top-gap));
 }
 
 .workflow-status-stack {
@@ -129,10 +130,10 @@ z-index:1000;
 
 .content{
 margin-left:240px;
-margin-top:var(--panel-navbar-offset);
+margin-top:calc(var(--panel-navbar-offset) + var(--panel-content-top-gap));
 padding:40px;
 
-height:calc(100vh - var(--panel-navbar-offset));
+height:calc(100vh - var(--panel-navbar-offset) - var(--panel-content-top-gap));
 overflow-y:auto;
 
 width:100%;
@@ -1164,7 +1165,8 @@ width:100%;
 
 @media (max-width: 576px) {
     :root {
-        --panel-navbar-offset: 164px;
+        --panel-navbar-offset: 196px;
+        --panel-content-top-gap: 14px;
     }
 
     .navbar-custom {
@@ -1447,7 +1449,7 @@ width:100%;
 
 @media (max-width: 992px) {
   :root {
-    --panel-navbar-offset: 96px;
+    --panel-content-top-gap: 10px;
   }
 
   .layout {
@@ -1463,7 +1465,7 @@ width:100%;
     padding: 16px;
     padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
     height: auto;
-    min-height: calc(100vh - var(--panel-navbar-offset));
+    min-height: calc(100vh - var(--panel-navbar-offset) - var(--panel-content-top-gap));
   }
 
 }

@@ -1612,13 +1612,14 @@ def _is_image_attachable(payload):
     return file_name.endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif'))
 
 
-def _fetch_quickbooks_item_image(client, payload):
+def _fetch_quickbooks_item_image(client, payload, *, max_attachments=3):
     item_id = str(payload.get('Id') or '').strip()
     if not item_id:
         return None
 
     client = client or QuickBooksAPIClient()
-    for attachment in client.find_attachments_for_entity('Item', item_id, max_results=10):
+    max_attachments = max(int(max_attachments or 3), 1)
+    for attachment in client.find_attachments_for_entity('Item', item_id, max_results=max_attachments):
         if not _is_image_attachable(attachment):
             continue
         try:
@@ -1643,7 +1644,7 @@ def _fetch_quickbooks_item_image(client, payload):
     return None
 
 
-def _save_quickbooks_item_image(*, producto, payload, client=None, force=False, skip=False):
+def _save_quickbooks_item_image(*, producto, payload, client=None, force=False, skip=False, invalidate_catalog_cache=True):
     if skip:
         return False
     if not force and producto.imagen:
@@ -1652,7 +1653,8 @@ def _save_quickbooks_item_image(*, producto, payload, client=None, force=False, 
     if image_file is None:
         return False
     producto.imagen.save(image_file.name, image_file, save=True)
-    cache.delete('catalogo:productos_activos_v2')
+    if invalidate_catalog_cache:
+        cache.delete('catalogo:productos_activos_v2')
     return True
 
 
@@ -2043,11 +2045,21 @@ def _import_batch_result(*, entity_name, records, import_callable, task_cache_ke
 
         # update progress in cache after each record (throttled for large batches)
         processed += 1
-        if task_cache_key and total > 0 and (processed == total or processed % 25 == 0):
+        progress_interval = 1 if total <= 100 else 5 if total <= 500 else 10
+        if task_cache_key and total > 0 and (processed == total or processed % progress_interval == 0):
             # keep some headroom for finalization; map processed/total to 5..95
             pct = int((processed / total) * 90) + 5
             pct = min(max(pct, 0), 95)
-            cache.set(task_cache_key, {'status': 'running', 'progress': pct, 'operation': entity_name, 'result': {'processed': processed, 'total': total}}, timeout=60 * 60)
+            cache.set(
+                task_cache_key,
+                {
+                    'status': 'running',
+                    'progress': pct,
+                    'operation': entity_name,
+                    'result': {'processed': processed, 'total': total},
+                },
+                timeout=60 * 60,
+            )
 
     return {
         'entity': entity_name,
@@ -2173,6 +2185,7 @@ def import_quickbooks_items(*, max_results=25, client=None, updated_after=None, 
         import_callable=lambda record: import_quickbooks_item_record(
             record,
             client=client,
+            skip_enrich=True,
             skip_images=skip_images,
             prefetched_presentacion=prefetched_presentaciones.get(str(record.get('Id') or '').strip()),
             lookup_cache=lookup_cache,
@@ -2188,14 +2201,21 @@ def import_quickbooks_items(*, max_results=25, client=None, updated_after=None, 
     deactivate_missing_items = updated_after is None and max_results is None
     try:
         if deactivate_missing_items and all_ids:
-            missing_qb_pres = Presentacion.objects.select_related('producto').filter(quickbooks_id__isnull=False).exclude(quickbooks_id__in=all_ids)
+            missing_qb_pres = (
+                Presentacion.objects.select_related('producto')
+                .filter(quickbooks_id__isnull=False)
+                .exclude(quickbooks_id__in=all_ids)
+            )
             disabled = []
+            products_to_disable = []
             for pres in missing_qb_pres:
                 prod = pres.producto
                 if prod and prod.activo:
                     prod.activo = False
-                    prod.save(update_fields=['activo'])
+                    products_to_disable.append(prod)
                     disabled.append({'quickbooks_id': pres.quickbooks_id, 'local_id': prod.id, 'label': prod.nombre})
+            if products_to_disable:
+                Producto.objects.bulk_update(products_to_disable, ['activo'])
             if disabled:
                 result['disabled_count'] = len(disabled)
                 result['disabled'] = disabled
@@ -2243,7 +2263,12 @@ def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=Non
                 summary['missing_in_qb'] += 1
             continue
 
-        if _save_quickbooks_item_image(producto=producto, payload=payload, client=client):
+        if _save_quickbooks_item_image(
+            producto=producto,
+            payload=payload,
+            client=client,
+            invalidate_catalog_cache=False,
+        ):
             summary['synced'] += 1
             summary['synced_labels'].append(producto.nombre)
         else:

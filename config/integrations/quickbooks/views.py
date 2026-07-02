@@ -1143,9 +1143,9 @@ def quickbooks_import_customers_to_local(request):
 
 
 def _quickbooks_import_skip_images(request):
-    if str(request.POST.get('skip_images') or '').strip().lower() in {'1', 'true', 'yes', 'on'}:
-        return True
-    return bool(getattr(settings, 'QUICKBOOKS_CATALOG_SYNC_SKIP_IMAGES', False))
+    if 'skip_images' in request.POST:
+        return str(request.POST.get('skip_images') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+    return bool(getattr(settings, 'QUICKBOOKS_CATALOG_SYNC_SKIP_IMAGES', True))
 
 
 @require_POST

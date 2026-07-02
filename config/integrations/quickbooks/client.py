@@ -209,7 +209,10 @@ class QuickBooksAPIClient:
             )
         raise QuickBooksAPIError('QuickBooks attachment does not include a downloadable URI.')
 
-    def download_authenticated_file(self, download_url):
+    def _image_download_timeout(self):
+        return max(int(getattr(settings, 'QUICKBOOKS_IMAGE_DOWNLOAD_TIMEOUT', 8) or 8), 3)
+
+    def download_authenticated_file(self, download_url, *, timeout=None):
         response = requests.request(
             'GET',
             download_url,
@@ -217,19 +220,19 @@ class QuickBooksAPIClient:
                 'Authorization': f'Bearer {self.connection.access_token}',
                 'Accept': '*/*',
             },
-            timeout=30,
+            timeout=timeout or self._image_download_timeout(),
         )
         if not response.ok:
             logger.warning('QuickBooks authenticated download failed: %s -> %s', download_url, response.status_code)
             raise QuickBooksAPIError(f'QuickBooks authenticated download failed with status {response.status_code}.')
         return response.content, response.headers.get('Content-Type', '')
 
-    def download_public_file(self, download_url):
+    def download_public_file(self, download_url, *, timeout=None):
         response = requests.request(
             'GET',
             download_url,
             headers={'Accept': '*/*'},
-            timeout=30,
+            timeout=timeout or self._image_download_timeout(),
         )
         if not response.ok:
             logger.warning('QuickBooks file download failed: %s -> %s', download_url, response.status_code)

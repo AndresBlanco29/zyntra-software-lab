@@ -1873,7 +1873,10 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
 
         mock_request.side_effect = request_side_effect
 
-        response = self.client.post(reverse('quickbooks_import_items_to_local'), {'limit': '10'})
+        response = self.client.post(
+            reverse('quickbooks_import_items_to_local'),
+            {'limit': '10', 'skip_images': '0'},
+        )
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()['result']
@@ -1930,7 +1933,10 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
 
         mock_request.side_effect = request_side_effect
 
-        response = self.client.post(reverse('quickbooks_import_items_to_local'), {'limit': '10'})
+        response = self.client.post(
+            reverse('quickbooks_import_items_to_local'),
+            {'limit': '10', 'skip_images': '0'},
+        )
 
         self.assertEqual(response.status_code, 200)
         presentacion = Presentacion.objects.get(quickbooks_id='QB-ITEM-2')

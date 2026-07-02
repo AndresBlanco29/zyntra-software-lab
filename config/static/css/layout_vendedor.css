@@ -1165,8 +1165,8 @@ width:100%;
 
 @media (max-width: 576px) {
     :root {
-        --panel-navbar-offset: 196px;
-        --panel-content-top-gap: 14px;
+        --panel-navbar-offset: 210px;
+        --panel-content-top-gap: 18px;
     }
 
     .navbar-custom {

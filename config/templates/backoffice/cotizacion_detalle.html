@@ -4,8 +4,58 @@
 {% block title %}{% trans "Quote" %} #{{ cotizacion.id }}{% endblock %}
 
 {% block content %}
+<div class="quote-detail-page">
+<style>
+  .quote-detail-page {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  @media (max-width: 767.98px) {
+    .quote-detail-page .quote-page-intro {
+      margin-bottom: 1rem;
+    }
+
+    .quote-detail-page .quote-bulk-price-row .col-md-8,
+    .quote-detail-page .quote-bulk-price-row .col-md-4 {
+      width: 100%;
+    }
+
+    .quote-detail-page .quote-bulk-price-row .d-grid.d-md-flex {
+      display: grid !important;
+    }
+
+    .quote-detail-page .quote-bulk-price-row .btn {
+      width: 100%;
+    }
+
+    .quote-detail-page .quote-save-row {
+      flex-direction: column;
+      align-items: stretch !important;
+      gap: 0.85rem;
+    }
+
+    .quote-detail-page .quote-save-row .btn {
+      width: 100%;
+    }
+
+    .quote-detail-page .mobile-stack-table--quote td {
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+
+    .quote-detail-page .mobile-stack-table--quote .mobile-stack-table__input-cell .form-control,
+    .quote-detail-page .mobile-stack-table--quote .mobile-stack-table__input-cell .form-select {
+      width: 100%;
+      max-width: 100%;
+    }
+  }
+</style>
 <h2 class="mb-3">{% trans "Quote" %} #{{ cotizacion.id }}</h2>
-<p class="text-muted mb-4">{% trans "Customer" %}: {{ cotizacion.cliente.nombre_empresa }} | {% trans "Status" %}: {{ cotizacion.get_estado_display }}</p>
+<p class="text-muted mb-4 quote-page-intro">{% trans "Customer" %}: {{ cotizacion.cliente.nombre_empresa }} | {% trans "Status" %}: {{ cotizacion.get_estado_display }}</p>
 
 {% if messages %}
   {% for message in messages %}
@@ -19,7 +69,7 @@
       {% csrf_token %}
       <div class="card-body">
         <h5 class="mb-3">{% trans "Quoted Products" %}</h5>
-        <div class="row g-2 align-items-end mb-3">
+        <div class="row g-2 align-items-end mb-3 quote-bulk-price-row">
           <div class="col-md-8 col-lg-7">
             <label for="bulkPriceTierSelect" class="form-label fw-semibold mb-1">{% trans "Assign one customer price tier to all requested products" %}</label>
             <select id="bulkPriceTierSelect" class="form-select form-select-sm">
@@ -34,8 +84,8 @@
             <button type="button" class="btn btn-outline-primary btn-sm" id="applyBulkPriceTierButton">{% trans "Apply to all products" %}</button>
           </div>
         </div>
-        <div class="table-responsive">
-          <table class="table align-middle">
+        <div class="table-responsive mobile-stack-responsive">
+          <table class="table align-middle mobile-stack-table mobile-stack-table--quote">
             <thead>
               <tr>
                 <th>{% trans "Product" %}</th>
@@ -49,7 +99,7 @@
               {% for row in cotizacion_item_rows %}
               {% with item=row.item %}
               <tr>
-                <td>
+                <td data-label="{% trans 'Product' %}">
                   <div>{{ item.presentacion.producto.nombre }}</div>
                   {% if row.recent_customer_sales %}
                   <div class="quote-order-history mt-1">
@@ -62,11 +112,11 @@
                   </div>
                   {% endif %}
                 </td>
-                <td>{{ item.presentacion.nombre }}</td>
-                <td>
+                <td data-label="{% trans 'Presentation' %}">{{ item.presentacion.nombre }}</td>
+                <td data-label="{% trans 'Quantity' %}" class="mobile-stack-table__input-cell">
                   <input type="number" min="1" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" class="form-control form-control-sm quote-quantity-input" data-item-id="{{ item.id }}">
                 </td>
-                <td>
+                <td data-label="{% trans 'Customer price' %}" class="mobile-stack-table__input-cell">
                   <select class="form-select form-select-sm mb-2 preset-price-select" data-target-input="precio_{{ item.id }}">
                     <option value="">{% trans "Manual price" %}</option>
                     {% for option in row.price_options %}
@@ -84,7 +134,7 @@
                     {% endif %}
                   </div>
                 </td>
-                <td><span class="quote-subtotal" data-item-id="{{ item.id }}">${{ row.display_subtotal }}</span></td>
+                <td data-label="{% trans 'Subtotal' %}"><span class="quote-subtotal" data-item-id="{{ item.id }}">${{ row.display_subtotal }}</span></td>
               </tr>
               {% endwith %}
               {% endfor %}
@@ -104,7 +154,7 @@
           <textarea name="nota_backoffice" class="form-control" rows="3">{{ cotizacion.nota_backoffice }}</textarea>
         </div>
 
-        <div class="d-flex justify-content-between align-items-center">
+        <div class="d-flex justify-content-between align-items-center quote-save-row">
           <strong>{% trans "Updated total" %}: <span id="quoteTotalValue">${{ display_total }}</span></strong>
           <button type="submit" class="btn btn-primary">{% trans "Save changes" %}</button>
         </div>
@@ -454,4 +504,5 @@ document.addEventListener('DOMContentLoaded', function () {
   updateQuoteTotal();
 });
 </script>
+</div>
 {% endblock %}

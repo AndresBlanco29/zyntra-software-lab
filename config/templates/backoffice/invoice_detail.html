@@ -164,6 +164,9 @@
 {% if show_prominent_adjustment_note %}
 {% include 'backoffice/includes/invoice_adjustment_note_form.html' with prominent=True invoice=invoice invoice_items=invoice_items %}
 {% endif %}
+{% if show_customer_pickup_completion %}
+{% include 'backoffice/includes/invoice_customer_pickup_form.html' with invoice=invoice pickup_delivery=pickup_delivery pickup_collectible_balance=pickup_collectible_balance %}
+{% endif %}
 
 <div class="row g-3 mb-3">
   <div class="col-lg-8">

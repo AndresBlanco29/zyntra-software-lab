@@ -339,6 +339,127 @@ def ensure_delivery_for_invoice(invoice):
 	)
 
 
+@transaction.atomic
+def ensure_customer_pickup_delivery_for_invoice(invoice):
+	if invoice.metodo_entrega != 'CUSTOMER_PICK_UP':
+		return None
+	if hasattr(invoice, 'delivery'):
+		delivery = invoice.delivery
+		if not delivery.is_customer_pickup:
+			delivery.is_customer_pickup = True
+			delivery.driver = None
+			delivery.save(update_fields=['is_customer_pickup', 'driver', 'updated_at'])
+		return delivery
+	cliente = invoice.cliente
+	return Delivery.objects.create(
+		invoice=invoice,
+		driver=None,
+		is_customer_pickup=True,
+		delivery_address=cliente.direccion or _('Customer pick up'),
+		delivery_city=cliente.ciudad or '',
+		delivery_state=cliente.estado or '',
+		delivery_postal_code=cliente.codigo_postal or '',
+		delivery_country=cliente.pais or 'USA',
+	)
+
+
+def _finalize_delivery_completion(
+	*,
+	delivery,
+	acting_user,
+	payload,
+	evidence_files,
+	estado_pago,
+	recibido_por,
+	motivo_no_pago,
+	signature_file,
+	payment_details,
+	completed_by=None,
+):
+	delivery.estado_pago = estado_pago
+	delivery.metodo_pago = payment_details['metodo_pago'] if payment_details else ''
+	delivery.monto_pagado = payment_details['monto_pagado'] if payment_details else Decimal('0.00')
+	delivery.monto_pagado_cash = payment_details['monto_pagado_cash'] if payment_details else Decimal('0.00')
+	delivery.monto_pagado_cheque = payment_details['monto_pagado_cheque'] if payment_details else Decimal('0.00')
+	delivery.recibido_por = recibido_por
+	delivery.motivo_no_pago = motivo_no_pago if estado_pago == 'NO_PAGADO' else ''
+	delivery.notas_driver = (payload.get('notas_driver') or payload.get('notas_pickup') or '').strip()
+	delivery.firma_cliente = signature_file
+	delivery.firma_recibida_en = timezone.now()
+	delivery.delivered_at = timezone.now()
+	delivery.notifications_sent_at = timezone.now()
+	delivery.transferencia_referencia = payment_details['transferencia_referencia'] if payment_details else ''
+	delivery.tarjeta_ultimos_4 = payment_details['tarjeta_ultimos_4'] if payment_details else ''
+	delivery.tarjeta_autorizacion = payment_details['tarjeta_autorizacion'] if payment_details else ''
+	delivery.zelle_referencia = payment_details['zelle_referencia'] if payment_details else ''
+	delivery.zelle_remitente = payment_details['zelle_remitente'] if payment_details else ''
+	delivery.ach_referencia = payment_details['ach_referencia'] if payment_details else ''
+	delivery.ach_cuenta_ultimos_4 = payment_details['ach_cuenta_ultimos_4'] if payment_details else ''
+	delivery.cheque_numero = payment_details['cheque_numero'] if payment_details else ''
+	delivery.cheque_banco = payment_details['cheque_banco'] if payment_details else ''
+	if payment_details and payment_details['cheque_imagen'] is not None:
+		delivery.cheque_imagen = payment_details['cheque_imagen']
+	elif not payment_details:
+		delivery.cheque_imagen = None
+	if completed_by is not None:
+		delivery.completed_by = completed_by
+	if estado_pago == 'PAGADO':
+		delivery.estado = 'ENTREGADA_PAGADA'
+		delivery.client_blocked_on_delivery = False
+		delivery.invoice.cliente.credit_hold = False
+		delivery.invoice.cliente.save(update_fields=['credit_hold'])
+		_create_delivery_notification_logs(delivery, 'SENT')
+	else:
+		delivery.estado = 'ENTREGADA_SIN_PAGO'
+		delivery.client_blocked_on_delivery = True
+		delivery.monto_pagado_cash = Decimal('0.00')
+		delivery.monto_pagado_cheque = Decimal('0.00')
+		delivery.transferencia_referencia = ''
+		delivery.tarjeta_ultimos_4 = ''
+		delivery.tarjeta_autorizacion = ''
+		delivery.zelle_referencia = ''
+		delivery.zelle_remitente = ''
+		delivery.ach_referencia = ''
+		delivery.ach_cuenta_ultimos_4 = ''
+		delivery.invoice.cliente.credit_hold = True
+		delivery.invoice.cliente.save(update_fields=['credit_hold'])
+		_create_delivery_notification_logs(delivery, 'FAILED')
+
+	delivery.save()
+	delivery.payments.all().delete()
+	if payment_details:
+		for entry in payment_details['entries']:
+			payment_entry = entry.copy()
+			payment_entry['cheque_imagen'] = _rewind_uploaded_file(payment_entry.get('cheque_imagen'))
+			DeliveryPayment.objects.create(delivery=delivery, **payment_entry)
+	_recalculate_invoice_balances(delivery.invoice)
+	for normalized_file in evidence_files:
+		DeliveryEvidencePhoto.objects.create(delivery=delivery, image=normalized_file)
+
+	pedido = delivery.invoice.pedido
+	pedido.estado = 'DESPACHADO'
+	pedido.save(update_fields=['estado', 'actualizada_en'])
+	from config.auditoria.business_events import log_business_event
+	log_business_event(
+		acting_user,
+		action_label=_('Completed delivery for invoice %(invoice)s') % {'invoice': delivery.invoice.numero},
+		action_category=AuditLog.CATEGORY_ACTION,
+		entity_type='Delivery',
+		entity_id=str(delivery.id),
+		entity_label=delivery.invoice.numero,
+		metadata={
+			'invoice_id': delivery.invoice_id,
+			'pedido_id': pedido.id if pedido else None,
+			'estado': delivery.estado,
+			'estado_pago': delivery.estado_pago,
+			'recibido_por': recibido_por,
+			'monto_pagado': str(delivery.monto_pagado),
+			'is_customer_pickup': delivery.is_customer_pickup,
+		},
+	)
+	return delivery
+
+
 def build_google_maps_route_url(deliveries):
 	delivery_list = list(deliveries)
 	if not delivery_list:
@@ -967,86 +1088,66 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 	if delivery.estado != 'EN_RUTA':
 		start_delivery_route(delivery=delivery, driver_user=driver_user)
 
-	delivery.estado_pago = estado_pago
-	delivery.metodo_pago = payment_details['metodo_pago'] if payment_details else ''
-	delivery.monto_pagado = payment_details['monto_pagado'] if payment_details else Decimal('0.00')
-	delivery.monto_pagado_cash = payment_details['monto_pagado_cash'] if payment_details else Decimal('0.00')
-	delivery.monto_pagado_cheque = payment_details['monto_pagado_cheque'] if payment_details else Decimal('0.00')
-	delivery.recibido_por = recibido_por
-	delivery.motivo_no_pago = motivo_no_pago if estado_pago == 'NO_PAGADO' else ''
-	delivery.notas_driver = (payload.get('notas_driver') or '').strip()
-	delivery.firma_cliente = signature_file
-	delivery.firma_recibida_en = timezone.now()
-	delivery.delivered_at = timezone.now()
-	delivery.notifications_sent_at = timezone.now()
-	delivery.transferencia_referencia = payment_details['transferencia_referencia'] if payment_details else ''
-	delivery.tarjeta_ultimos_4 = payment_details['tarjeta_ultimos_4'] if payment_details else ''
-	delivery.tarjeta_autorizacion = payment_details['tarjeta_autorizacion'] if payment_details else ''
-	delivery.zelle_referencia = payment_details['zelle_referencia'] if payment_details else ''
-	delivery.zelle_remitente = payment_details['zelle_remitente'] if payment_details else ''
-	delivery.ach_referencia = payment_details['ach_referencia'] if payment_details else ''
-	delivery.ach_cuenta_ultimos_4 = payment_details['ach_cuenta_ultimos_4'] if payment_details else ''
-	delivery.cheque_numero = payment_details['cheque_numero'] if payment_details else ''
-	delivery.cheque_banco = payment_details['cheque_banco'] if payment_details else ''
-	if payment_details and payment_details['cheque_imagen'] is not None:
-		delivery.cheque_imagen = payment_details['cheque_imagen']
-	elif not payment_details:
-		delivery.cheque_imagen = None
-	if estado_pago == 'PAGADO':
-		delivery.estado = 'ENTREGADA_PAGADA'
-		delivery.client_blocked_on_delivery = False
-		delivery.invoice.cliente.credit_hold = False
-		delivery.invoice.cliente.save(update_fields=['credit_hold'])
-		_create_delivery_notification_logs(delivery, 'SENT')
-	else:
-		delivery.estado = 'ENTREGADA_SIN_PAGO'
-		delivery.client_blocked_on_delivery = True
-		delivery.monto_pagado_cash = Decimal('0.00')
-		delivery.monto_pagado_cheque = Decimal('0.00')
-		delivery.transferencia_referencia = ''
-		delivery.tarjeta_ultimos_4 = ''
-		delivery.tarjeta_autorizacion = ''
-		delivery.zelle_referencia = ''
-		delivery.zelle_remitente = ''
-		delivery.ach_referencia = ''
-		delivery.ach_cuenta_ultimos_4 = ''
-		delivery.invoice.cliente.credit_hold = True
-		delivery.invoice.cliente.save(update_fields=['credit_hold'])
-		_create_deliveryNotificationLogs = _create_delivery_notification_logs
-		_create_deliveryNotificationLogs(delivery, 'FAILED')
-
-	delivery.save()
-	delivery.payments.all().delete()
-	if payment_details:
-		for entry in payment_details['entries']:
-			payment_entry = entry.copy()
-			payment_entry['cheque_imagen'] = _rewind_uploaded_file(payment_entry.get('cheque_imagen'))
-			DeliveryPayment.objects.create(delivery=delivery, **payment_entry)
-	_recalculate_invoice_balances(delivery.invoice)
-	for normalized_file in evidence_files:
-		DeliveryEvidencePhoto.objects.create(delivery=delivery, image=normalized_file)
-
-	pedido = delivery.invoice.pedido
-	pedido.estado = 'DESPACHADO'
-	pedido.save(update_fields=['estado', 'actualizada_en'])
-	from config.auditoria.business_events import log_business_event
-	log_business_event(
-		driver_user,
-		action_label=_('Completed delivery for invoice %(invoice)s') % {'invoice': delivery.invoice.numero},
-		action_category=AuditLog.CATEGORY_ACTION,
-		entity_type='Delivery',
-		entity_id=str(delivery.id),
-		entity_label=delivery.invoice.numero,
-		metadata={
-			'invoice_id': delivery.invoice_id,
-			'pedido_id': pedido.id if pedido else None,
-			'estado': delivery.estado,
-			'estado_pago': delivery.estado_pago,
-			'recibido_por': recibido_por,
-			'monto_pagado': str(delivery.monto_pagado),
-		},
+	return _finalize_delivery_completion(
+		delivery=delivery,
+		acting_user=driver_user,
+		payload=payload,
+		evidence_files=evidence_files,
+		estado_pago=estado_pago,
+		recibido_por=recibido_por,
+		motivo_no_pago=motivo_no_pago,
+		signature_file=signature_file,
+		payment_details=payment_details,
 	)
-	return delivery
+
+
+@transaction.atomic
+def complete_customer_pickup_from_backoffice(*, invoice, backoffice_user, payload, evidence_files, adjustment_note=None, cheque_image_file=None, payment_files=None):
+	delivery = ensure_customer_pickup_delivery_for_invoice(invoice)
+	if delivery is None:
+		raise ValidationError(_('This invoice is not configured for customer pick up.'))
+	if delivery.is_completed:
+		raise ValidationError(_('This customer pick up was already completed.'))
+	evidence_files = _normalize_uploaded_files(evidence_files)
+
+	estado_pago = (payload.get('estado_pago') or '').strip()
+	recibido_por = (payload.get('recibido_por') or '').strip()
+	motivo_no_pago = (payload.get('motivo_no_pago') or '').strip()
+	signature_file = _build_signature_content_file(payload.get('firma_cliente_data'), delivery.id)
+	payment_delta = calculate_delivery_payment_delta(delivery=delivery, adjustment_note=adjustment_note)
+	collectible_balance = calculate_delivery_collectible_balance(delivery=delivery, adjustment_note=adjustment_note)
+	payment_details = None
+
+	if estado_pago not in {'PAGADO', 'NO_PAGADO'}:
+		raise ValidationError(_('Select a valid payment status.'))
+	if not recibido_por:
+		raise ValidationError(_('Recipient name is required for delivered orders.'))
+	if estado_pago == 'PAGADO':
+		payment_details = _resolve_driver_delivery_payment(
+			payload=payload,
+			collectible_balance=collectible_balance,
+			payment_delta=payment_delta,
+			payment_files=payment_files,
+			cheque_image_file=cheque_image_file,
+		)
+	else:
+		if not motivo_no_pago:
+			raise ValidationError(_('A reason is required when the customer does not pay.'))
+		if not evidence_files:
+			raise ValidationError(_('Upload at least one evidence photo when the customer does not pay.'))
+
+	return _finalize_delivery_completion(
+		delivery=delivery,
+		acting_user=backoffice_user,
+		payload=payload,
+		evidence_files=evidence_files,
+		estado_pago=estado_pago,
+		recibido_por=recibido_por,
+		motivo_no_pago=motivo_no_pago,
+		signature_file=signature_file,
+		payment_details=payment_details,
+		completed_by=backoffice_user,
+	)
 
 
 def _extract_note_presentacion(invoice_item):

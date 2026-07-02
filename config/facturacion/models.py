@@ -211,6 +211,16 @@ class Delivery(models.Model):
 		on_delete=models.PROTECT,
 		related_name='deliveries',
 		limit_choices_to={'role': 'driver'},
+		null=True,
+		blank=True,
+	)
+	is_customer_pickup = models.BooleanField(default=False)
+	completed_by = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='pickup_deliveries_completed',
 	)
 	estado = models.CharField(max_length=30, choices=STATUS_CHOICES, default='ASIGNADA')
 	estado_pago = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='PENDIENTE')
@@ -327,11 +337,20 @@ class Delivery(models.Model):
 
 	def clean(self):
 		if self.invoice_id:
-			if self.invoice.metodo_entrega != 'RUTA_DRIVER':
-				raise ValidationError({'invoice': _('Only route invoices can create a delivery assignment.')})
-			if self.invoice.driver_id and self.driver_id != self.invoice.driver_id:
-				raise ValidationError({'driver': _('Delivery driver must match the invoice driver.')})
-		if getattr(self.driver, 'role', '') != 'driver':
+			is_pickup = self.is_customer_pickup or self.invoice.metodo_entrega == 'CUSTOMER_PICK_UP'
+			if is_pickup:
+				if self.invoice.metodo_entrega != 'CUSTOMER_PICK_UP':
+					raise ValidationError({'invoice': _('Only customer pick up invoices can use this delivery record.')})
+				if self.driver_id is not None:
+					raise ValidationError({'driver': _('Customer pick up deliveries cannot assign a driver.')})
+			else:
+				if self.invoice.metodo_entrega != 'RUTA_DRIVER':
+					raise ValidationError({'invoice': _('Only route invoices can create a delivery assignment.')})
+				if self.invoice.driver_id and self.driver_id != self.invoice.driver_id:
+					raise ValidationError({'driver': _('Delivery driver must match the invoice driver.')})
+				if not self.driver_id:
+					raise ValidationError({'driver': _('A driver is required for route deliveries.')})
+		if self.driver_id is not None and getattr(self.driver, 'role', '') != 'driver':
 			raise ValidationError({'driver': _('Only users with driver role can manage deliveries.')})
 		if self.estado_pago == 'PAGADO':
 			if not self.metodo_pago:

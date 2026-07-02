@@ -1517,6 +1517,43 @@ class InvoiceFlowTests(TestCase):
 		self.assertIn('approve or reject', notificacion.mensaje)
 		self.assertEqual(notificacion.url, f'/facturacion/backoffice/invoices/{invoice.id}/')
 
+	def test_backoffice_invoice_detail_shows_customer_pickup_completion_panel(self):
+		invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', driver=None, total='20.00')
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, reverse('backoffice_invoice_complete_pickup', args=[invoice.id]))
+		self.assertContains(response, 'Complete customer pick up')
+
+	def test_backoffice_can_complete_customer_pickup_with_payment_and_signature(self):
+		invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', driver=None, total='30.00')
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(
+			reverse('backoffice_invoice_complete_pickup', args=[invoice.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'payment_method_1': 'CASH',
+				'payment_amount_1': '30.00',
+				'monto_pagado': '30.00',
+				'recibido_por': 'Cliente Mostrador',
+				'firma_cliente_data': self.signature_data,
+			},
+		)
+
+		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		invoice.refresh_from_db()
+		invoice.pedido.refresh_from_db()
+		self.assertTrue(hasattr(invoice, 'delivery'))
+		self.assertTrue(invoice.delivery.is_customer_pickup)
+		self.assertEqual(invoice.delivery.estado, 'ENTREGADA_PAGADA')
+		self.assertEqual(invoice.delivery.estado_pago, 'PAGADO')
+		self.assertEqual(invoice.delivery.monto_pagado, Decimal('30.00'))
+		self.assertEqual(invoice.delivery.completed_by, self.backoffice)
+		self.assertEqual(invoice.pedido.estado, 'DESPACHADO')
+
 	def test_driver_complete_view_can_create_credit_note_with_evidence_without_disabled_credit_type_field(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,

@@ -16,6 +16,7 @@ urlpatterns = [
 	path('backoffice/invoices/<int:invoice_id>/delete/', views.backoffice_invoice_delete, name='backoffice_invoice_delete'),
 	path('backoffice/void-records/', views.backoffice_void_records_list, name='backoffice_void_records_list'),
 	path('backoffice/invoices/<int:invoice_id>/pdf/', views.backoffice_invoice_pdf, name='backoffice_invoice_pdf'),
+	path('backoffice/invoices/<int:invoice_id>/complete-pickup/', views.backoffice_invoice_complete_pickup, name='backoffice_invoice_complete_pickup'),
 	path('backoffice/invoices/<int:invoice_id>/notes/create/', views.backoffice_invoice_create_note, name='backoffice_invoice_create_note'),
 	path('backoffice/notes/<int:note_id>/approve/', views.backoffice_invoice_approve_note, name='backoffice_invoice_approve_note'),
 	path('backoffice/notes/<int:note_id>/cancel/', views.backoffice_invoice_cancel_note, name='backoffice_invoice_cancel_note'),

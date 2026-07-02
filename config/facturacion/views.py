@@ -60,6 +60,7 @@ from .services import (
 	build_google_maps_route_url,
 	build_invoice_shipment_summary,
 	calculate_delivery_collectible_balance,
+	complete_customer_pickup_from_backoffice,
 	complete_driver_delivery,
 	crear_nota_ajuste,
 	crear_nota_ajuste_desde_invoice,
@@ -69,6 +70,7 @@ from .services import (
 	_invoice_allows_quickbooks_bypass_on_delete,
 	eliminar_nota_ajuste,
 	ensure_delivery_for_invoice,
+	ensure_customer_pickup_delivery_for_invoice,
 	generar_invoice_desde_picking,
 	list_pending_customer_notes,
 	resolve_invoice_payment_due_date,
@@ -1042,7 +1044,7 @@ def _delivery_tracking_payload(delivery):
 		'invoice_id': delivery.invoice_id,
 		'invoice_number': delivery.invoice.numero,
 		'customer_name': resolve_customer_company_name(delivery.invoice.cliente),
-		'driver_name': delivery.driver.get_full_name() or delivery.driver.username,
+		'driver_name': (delivery.driver.get_full_name() or delivery.driver.username) if delivery.driver else _('Customer pick up'),
 		'status': delivery.get_estado_display(),
 		'payment_status': delivery.get_estado_pago_display(),
 		'has_location': delivery.has_live_location,
@@ -1429,6 +1431,17 @@ def backoffice_invoice_detail(request, invoice_id):
 	if invoice.metodo_entrega == 'RUTA_DRIVER' and invoice.driver_id:
 		ensure_delivery_for_invoice(invoice)
 		invoice.refresh_from_db()
+	pickup_delivery = None
+	show_customer_pickup_completion = False
+	pickup_collectible_balance = None
+	can_complete_pickup = False
+	if invoice.metodo_entrega == 'CUSTOMER_PICK_UP' and invoice.estado == 'GENERADA' and not is_sync_locked(invoice):
+		pickup_delivery = ensure_customer_pickup_delivery_for_invoice(invoice)
+		invoice.refresh_from_db()
+		if pickup_delivery and not pickup_delivery.is_completed:
+			can_complete_pickup = request.user.has_internal_permission('backoffice.orders.manage')
+			show_customer_pickup_completion = can_complete_pickup
+			pickup_collectible_balance = calculate_delivery_collectible_balance(delivery=pickup_delivery)
 	Notificacion.objects.filter(
 		tipo='NOTA_AJUSTE',
 		url=f'/facturacion/backoffice/invoices/{invoice.id}/',
@@ -1437,7 +1450,7 @@ def backoffice_invoice_detail(request, invoice_id):
 	driver_created_notes_count = invoice.notas_ajuste.filter(creada_por__role='driver').count()
 	focus_adjustment_note = str(request.GET.get('focus_adjustment_note') or '').strip() == '1'
 	can_create_adjustment_note = not is_sync_locked(invoice) and invoice.estado != 'ANULADA'
-	show_prominent_adjustment_note = can_create_adjustment_note
+	show_prominent_adjustment_note = can_create_adjustment_note and not show_customer_pickup_completion
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
 		'customer_company_name': resolve_customer_company_name(invoice.cliente),
@@ -1454,6 +1467,10 @@ def backoffice_invoice_detail(request, invoice_id):
 		'void_registro': invoice.registros_anulacion.order_by('-anulado_en', '-id').first(),
 		'focus_adjustment_note': focus_adjustment_note,
 		'show_prominent_adjustment_note': show_prominent_adjustment_note,
+		'show_customer_pickup_completion': show_customer_pickup_completion,
+		'pickup_delivery': pickup_delivery,
+		'pickup_collectible_balance': pickup_collectible_balance,
+		'can_complete_pickup': can_complete_pickup,
 	})
 
 
@@ -1535,6 +1552,61 @@ def backoffice_invoice_create_note(request, invoice_id):
 	else:
 		messages.success(request, _('Adjustment note %(note)s saved as draft.') % {'note': nota.numero})
 
+	return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+@transaction.atomic
+def backoffice_invoice_complete_pickup(request, invoice_id):
+	invoice = get_object_or_404(
+		Invoice.objects.select_related('cliente', 'pedido').prefetch_related('items__presentacion__producto', 'notas_ajuste__items'),
+		id=invoice_id,
+	)
+	if invoice.metodo_entrega != 'CUSTOMER_PICK_UP':
+		messages.error(request, _('This invoice is not configured for customer pick up.'))
+		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
+	if request.method != 'POST':
+		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
+	if is_sync_locked(invoice):
+		messages.error(request, _('This invoice is locked after QuickBooks sync.'))
+		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
+	try:
+		nota = None
+		note_request = _extract_adjustment_note_request(invoice, request.POST, field_prefix='driver_note_')
+		note_evidence_files = _normalize_uploaded_files(request.FILES.getlist('driver_note_evidence_photos'))
+		if note_request is None and note_evidence_files:
+			raise ValidationError(_('Select a note type before uploading adjustment evidence.'))
+		if note_request is not None:
+			nota = crear_nota_ajuste_desde_invoice(
+				invoice=invoice,
+				tipo_ajuste=note_request['tipo_ajuste'],
+				tipo_documento=note_request['tipo_documento'],
+				motivo=note_request['motivo'],
+				tipo_credito=note_request['tipo_credito'],
+				descripcion=note_request['descripcion'],
+				usuario=request.user,
+				items_payload=note_request['items_payload'],
+				monto=note_request['monto'],
+			)
+		complete_customer_pickup_from_backoffice(
+			invoice=invoice,
+			backoffice_user=request.user,
+			payload=request.POST,
+			evidence_files=_normalize_uploaded_files(request.FILES.getlist('evidence_photos')),
+			payment_files=request.FILES,
+			cheque_image_file=request.FILES.get('cheque_imagen'),
+			adjustment_note=nota,
+		)
+		if nota is not None:
+			_save_adjustment_note_evidence_files(nota, note_evidence_files)
+	except ValidationError as exc:
+		transaction.set_rollback(True)
+		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+	else:
+		messages.success(request, _('Customer pick up completed successfully.'))
+		if nota is not None:
+			messages.success(request, _('Adjustment note %(note)s saved as draft.') % {'note': nota.numero})
 	return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
 
 

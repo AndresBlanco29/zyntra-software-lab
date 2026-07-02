@@ -52,6 +52,7 @@ from config.integrations.quickbooks.sync import (
     import_quickbooks_items,
     pull_quickbooks_items_to_local,
     refresh_linked_quickbooks_items,
+    _resolve_quickbooks_item_active,
     _resolve_item_import_force_full,
     refresh_linked_quickbooks_invoice_status,
 )
@@ -578,6 +579,10 @@ class QuickBooksDeletedRecordImportTests(TestCase):
         self.assertTrue(_quickbooks_payload_active({'Id': '1', 'Name': 'X', 'Active': None}))
         self.assertFalse(_quickbooks_payload_active({'Id': '1', 'Name': 'X', 'Active': False}))
 
+    @patch('config.integrations.quickbooks.sync._fetch_quickbooks_item_payload', return_value=None)
+    def test_resolve_item_active_defaults_to_false_when_status_unknown(self, _mock_fetch):
+        self.assertFalse(_resolve_quickbooks_item_active({'Id': 'QB-UNKNOWN', 'Name': 'Unknown Status'}))
+
     @patch('config.integrations.quickbooks.sync.fetch_quickbooks_items')
     @patch('config.integrations.quickbooks.sync.import_quickbooks_item_record')
     def test_incremental_import_does_not_deactivate_products_outside_batch(self, mock_import, mock_fetch):
@@ -594,16 +599,40 @@ class QuickBooksDeletedRecordImportTests(TestCase):
 
     @patch('config.integrations.quickbooks.sync._save_quickbooks_item_image', return_value=False)
     @patch('config.integrations.quickbooks.sync._enrich_quickbooks_item_payload', side_effect=lambda payload, **kwargs: payload)
-    def test_inactive_item_is_imported_as_inactive(self, _mock_enrich, _mock_image):
+    def test_inactive_item_is_skipped_on_new_import(self, _mock_enrich, _mock_image):
         result = import_quickbooks_item_record({
             'Id': 'QB-INACTIVE-ITEM',
             'Name': 'Inactive Product',
             'Type': 'Inventory',
             'Active': False,
         })
-        self.assertEqual(result['action'], 'created')
-        presentacion = Presentacion.objects.get(quickbooks_id='QB-INACTIVE-ITEM')
-        self.assertFalse(presentacion.producto.activo)
+        self.assertEqual(result['action'], 'skipped')
+        self.assertFalse(Presentacion.objects.filter(quickbooks_id='QB-INACTIVE-ITEM').exists())
+
+    @patch('config.integrations.quickbooks.sync._save_quickbooks_item_image', return_value=False)
+    @patch('config.integrations.quickbooks.sync._enrich_quickbooks_item_payload', side_effect=lambda payload, **kwargs: payload)
+    def test_inactive_item_deactivates_existing_linked_product(self, _mock_enrich, _mock_image):
+        producto = Producto.objects.create(
+            nombre='Was Active',
+            activo=True,
+            quickbooks_id='QB-INACTIVE-LINKED',
+        )
+        Presentacion.objects.create(
+            producto=producto,
+            nombre='Unit',
+            quickbooks_id='QB-INACTIVE-LINKED',
+        )
+
+        result = import_quickbooks_item_record({
+            'Id': 'QB-INACTIVE-LINKED',
+            'Name': 'Was Active',
+            'Type': 'Inventory',
+            'Active': False,
+        })
+
+        producto.refresh_from_db()
+        self.assertEqual(result['action'], 'updated')
+        self.assertFalse(producto.activo)
 
     def test_inactive_customer_is_skipped(self):
         result = import_quickbooks_customer_record({

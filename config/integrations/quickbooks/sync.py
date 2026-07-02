@@ -84,6 +84,21 @@ def _quickbooks_payload_active(payload):
     return bool(value)
 
 
+def _resolve_quickbooks_item_active(payload, *, client=None):
+    if not payload:
+        return False
+    if 'Active' in payload:
+        return _quickbooks_payload_active(payload)
+    item_id = str(payload.get('Id') or '').strip()
+    if not item_id:
+        return False
+    client = client or QuickBooksAPIClient()
+    full_payload = _fetch_quickbooks_item_payload(item_id=item_id, client=client)
+    if full_payload and 'Active' in full_payload:
+        return _quickbooks_payload_active(full_payload)
+    return False
+
+
 def _quickbooks_record_is_active(payload):
     return _quickbooks_payload_active(payload)
 
@@ -1007,7 +1022,13 @@ def fetch_quickbooks_items(*, max_results=25, client=None, updated_after=None, p
     resolved_page_size = page_size or getattr(settings, 'QUICKBOOKS_CATALOG_SYNC_PAGE_SIZE', 1000)
     if updated_after:
         return client.find_updated_since('Item', updated_after, max_results=max_results, page_size=resolved_page_size)
-    return client.find_all('Item', max_results=max_results, order_by='MetaData.LastUpdatedTime', page_size=resolved_page_size)
+    return client.find_all(
+        'Item',
+        max_results=max_results,
+        where_clause='Active = true',
+        order_by='MetaData.LastUpdatedTime',
+        page_size=resolved_page_size,
+    )
 
 
 def _quickbooks_catalog_page_size():
@@ -1029,7 +1050,7 @@ def _fetch_quickbooks_items_by_ids(*, client, item_ids, updated_after=None, chun
     for offset in range(0, len(ids), chunk_size):
         chunk = ids[offset:offset + chunk_size]
         in_list = ', '.join(f"'{client._escape_query_value(item_id)}'" for item_id in chunk)
-        where_parts = [f"Id IN ({in_list})"]
+        where_parts = [f"Id IN ({in_list})", 'Active IN (true, false)']
         if updated_after:
             where_parts.append(f"MetaData.LastUpdatedTime > '{client._escape_query_value(updated_after)}'")
         where_clause = ' AND '.join(where_parts)
@@ -1660,12 +1681,13 @@ def _enrich_quickbooks_item_payload(payload, *, client=None):
         return normalized
 
     item_type = str(normalized.get('Type') or '').strip().lower()
+    missing_active = 'Active' not in normalized
     missing_cost = _extract_quickbooks_item_cost(normalized) is None
     missing_qty = (
         item_type in {'inventory', 'assembly'}
         and _extract_quickbooks_item_qty_on_hand(normalized) is None
     )
-    if not missing_cost and not missing_qty:
+    if not missing_active and not missing_cost and not missing_qty:
         return normalized
 
     full_payload = _fetch_quickbooks_item_payload(item_id=item_id, client=client)
@@ -1674,6 +1696,7 @@ def _enrich_quickbooks_item_payload(payload, *, client=None):
 
     merged = dict(normalized)
     authoritative_keys = {
+        'Active',
         'PurchaseCost',
         'PurchaseCostValue',
         'UnitPrice',
@@ -1753,7 +1776,7 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
         brand=brand,
         preserve_local=True,
     )
-    producto.activo = _quickbooks_payload_active(payload)
+    producto.activo = _resolve_quickbooks_item_active(payload, client=client)
     if sku:
         if producto.codigo_barras == sku:
             pass
@@ -1829,11 +1852,19 @@ def import_quickbooks_item_record(payload, *, client=None, skip_enrich=False, sk
     unit_price = _quantize_money(payload.get('UnitPrice') or 0)
     item_cost = _extract_quickbooks_item_cost(payload)
     category, brand = _resolve_quickbooks_item_category_and_brand(payload, lookup_cache=lookup_cache)
+    item_active = _resolve_quickbooks_item_active(payload, client=client)
     existing = prefetched_presentacion
     if existing is None:
         existing = Presentacion.objects.select_related('producto').filter(quickbooks_id=quickbooks_id).first()
     elif getattr(existing, 'quickbooks_id', None) and str(existing.quickbooks_id) != quickbooks_id:
         existing = Presentacion.objects.select_related('producto').filter(quickbooks_id=quickbooks_id).first()
+    if not item_active and existing is None:
+        return _skip_import_result(
+            entity='Item',
+            quickbooks_id=quickbooks_id,
+            label=payload.get('Name') or quickbooks_id,
+            reason='QuickBooks item is inactive.',
+        )
     if existing is None:
         conflict = _product_conflict_exists(
             quickbooks_id=quickbooks_id,
@@ -1880,7 +1911,7 @@ def import_quickbooks_item_record(payload, *, client=None, skip_enrich=False, sk
                 categoria=category,
                 marca=brand,
                 codigo_barras=sku or None,
-                activo=_quickbooks_payload_active(payload),
+                activo=item_active,
                 quickbooks_id=quickbooks_id,
                 sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
                 last_synced_at=timezone.now(),
@@ -1913,7 +1944,7 @@ def import_quickbooks_item_record(payload, *, client=None, skip_enrich=False, sk
                     categoria=category,
                     marca=brand,
                     codigo_barras=None,
-                    activo=_quickbooks_payload_active(payload),
+                    activo=item_active,
                     quickbooks_id=quickbooks_id,
                     sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
                     last_synced_at=timezone.now(),

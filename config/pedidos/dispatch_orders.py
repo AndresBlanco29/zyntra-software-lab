@@ -20,6 +20,7 @@ PEDIDO_PENDING_STATUSES = {'RECIBIDO', 'LISTO_PARA_PICKING'}
 PEDIDO_IN_PROGRESS_STATUSES = {'EN_GESTION', 'PARA_VERIFICAR', 'VERIFICADO_AJUSTADO', 'INVOICE_GENERADA'}
 PEDIDO_COMPLETED_STATUSES = {'DESPACHADO'}
 PEDIDO_CANCELLED_STATUSES = {'CANCELADO'}
+DELIVERED_DELIVERY_STATUSES = {'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'}
 
 
 @dataclass
@@ -95,6 +96,80 @@ def _selector_display_name(user):
 	return (user.get_full_name() or '').strip() or user.username
 
 
+def _load_reversed_invoice_pedido_ids(pedido_ids):
+	if not pedido_ids:
+		return set()
+	from config.inventario.models import InventarioMovimiento
+
+	return set(
+		InventarioMovimiento.objects.filter(
+			pedido_id__in=pedido_ids,
+			tipo='ANULACION_PEDIDO',
+			referencia__startswith='INV-',
+		).values_list('pedido_id', flat=True)
+	)
+
+
+def _pedido_is_completed(pedido):
+	if pedido.estado == 'DESPACHADO':
+		return True
+	invoice = getattr(pedido, 'invoice', None)
+	if invoice and invoice.estado == 'GENERADA':
+		delivery = getattr(invoice, 'delivery', None)
+		if delivery and delivery.estado in DELIVERED_DELIVERY_STATUSES:
+			return True
+	return False
+
+
+def _pedido_is_cancelled(pedido, *, reversed_invoice_pedido_ids=None):
+	if pedido.estado == 'CANCELADO':
+		return True
+	invoice = getattr(pedido, 'invoice', None)
+	if invoice and invoice.estado == 'ANULADA':
+		return True
+	if reversed_invoice_pedido_ids is not None:
+		return pedido.id in reversed_invoice_pedido_ids
+	return pedido.id in _load_reversed_invoice_pedido_ids([pedido.id])
+
+
+def _pedido_dispatch_bucket(pedido, *, reversed_invoice_pedido_ids=None):
+	if _pedido_is_cancelled(pedido, reversed_invoice_pedido_ids=reversed_invoice_pedido_ids):
+		return 'cancelled'
+	if _pedido_is_completed(pedido):
+		return 'completed'
+	if pedido.estado in PEDIDO_PENDING_STATUSES:
+		return 'pending'
+	if pedido.estado in PEDIDO_IN_PROGRESS_STATUSES:
+		return 'in-progress'
+	return None
+
+
+def _classify_pedidos(pedido_queryset):
+	pedidos = list(pedido_queryset)
+	reversed_invoice_pedido_ids = _load_reversed_invoice_pedido_ids([pedido.id for pedido in pedidos])
+	buckets = {
+		'pending': [],
+		'in-progress': [],
+		'completed': [],
+		'cancelled': [],
+	}
+	for pedido in pedidos:
+		bucket = _pedido_dispatch_bucket(pedido, reversed_invoice_pedido_ids=reversed_invoice_pedido_ids)
+		if bucket:
+			buckets[bucket].append(pedido)
+	for bucket_name in buckets:
+		buckets[bucket_name].sort(key=lambda pedido: pedido.creada_en, reverse=True)
+	return buckets
+
+
+def _pedido_status_display(pedido, *, bucket):
+	if bucket == 'cancelled':
+		return str(_pedido_state_label('CANCELADO')), _pedido_status_badge_class('CANCELADO')
+	if bucket == 'completed':
+		return str(_pedido_state_label('DESPACHADO')), _pedido_status_badge_class('DESPACHADO')
+	return str(_pedido_state_label(pedido.estado)), _pedido_status_badge_class(pedido.estado)
+
+
 def _quote_rows_for_statuses(*, statuses):
 	rows = []
 	queryset = (
@@ -121,9 +196,10 @@ def _quote_rows_for_statuses(*, statuses):
 	return rows
 
 
-def _pedido_rows_for_statuses(*, statuses, pedido_queryset):
+def _pedido_rows_from_pedidos(*, pedidos, bucket):
 	rows = []
-	for pedido in pedido_queryset.filter(estado__in=statuses).order_by('-creada_en'):
+	for pedido in pedidos:
+		status_label, status_badge_class = _pedido_status_display(pedido, bucket=bucket)
 		rows.append(
 			DispatchOrderRow(
 				row_key=f'order-{pedido.id}',
@@ -132,8 +208,8 @@ def _pedido_rows_for_statuses(*, statuses, pedido_queryset):
 				customer_name=pedido.cliente.nombre_empresa,
 				selector_name=_selector_display_name(getattr(pedido, 'seleccionador', None)),
 				origin_label=str(_pedido_origin_label(pedido.origen)),
-				status_label=str(_pedido_state_label(pedido.estado)),
-				status_badge_class=_pedido_status_badge_class(pedido.estado),
+				status_label=status_label,
+				status_badge_class=status_badge_class,
 				total=pedido.total,
 				date=pedido.creada_en,
 				detail_url=reverse('backoffice_pedido_detalle', args=[pedido.id]),
@@ -154,46 +230,63 @@ def _pedido_base_queryset():
 		'seleccionador',
 		'invoice',
 		'invoice__driver',
+		'invoice__delivery',
 	).prefetch_related('items')
+
+
+def _count_pedido_buckets():
+	pedidos = list(Pedido.objects.all())
+	reversed_invoice_pedido_ids = _load_reversed_invoice_pedido_ids([pedido.id for pedido in pedidos])
+	buckets = {
+		'pending': 0,
+		'in-progress': 0,
+		'completed': 0,
+		'cancelled': 0,
+	}
+	for pedido in pedidos:
+		bucket = _pedido_dispatch_bucket(pedido, reversed_invoice_pedido_ids=reversed_invoice_pedido_ids)
+		if bucket:
+			buckets[bucket] += 1
+	return buckets
 
 
 def get_dispatch_order_counts():
 	open_quotes = _open_quote_queryset()
-	pedidos = Pedido.objects.all()
+	pedido_buckets = _count_pedido_buckets()
 	return {
 		'pending_count': (
 			open_quotes.filter(estado__in=QUOTE_PENDING_STATUSES).count()
-			+ pedidos.filter(estado__in=PEDIDO_PENDING_STATUSES).count()
+			+ pedido_buckets['pending']
 		),
-		'in_progress_count': pedidos.filter(estado__in=PEDIDO_IN_PROGRESS_STATUSES).count(),
+		'in_progress_count': pedido_buckets['in-progress'],
 		'completed_count': (
-			pedidos.filter(estado__in=PEDIDO_COMPLETED_STATUSES).count()
+			pedido_buckets['completed']
 			+ open_quotes.filter(estado__in=QUOTE_COMPLETED_STATUSES).count()
 		),
 		'cancelled_count': (
-			pedidos.filter(estado__in=PEDIDO_CANCELLED_STATUSES).count()
+			pedido_buckets['cancelled']
 			+ open_quotes.filter(estado__in=QUOTE_CANCELLED_STATUSES).count()
 		),
 		'pending_requests_count': open_quotes.filter(estado__in=QUOTE_PENDING_STATUSES).count(),
-		'pending_dispatch_count': pedidos.filter(estado__in=PEDIDO_PENDING_STATUSES).count(),
+		'pending_dispatch_count': pedido_buckets['pending'],
 	}
 
 
 def build_dispatch_order_page(*, view_mode, page_number, page_size):
-	pedido_queryset = _pedido_base_queryset()
+	pedido_buckets = _classify_pedidos(_pedido_base_queryset())
 
 	if view_mode == 'in-progress':
-		rows = _pedido_rows_for_statuses(statuses=PEDIDO_IN_PROGRESS_STATUSES, pedido_queryset=pedido_queryset)
+		rows = _pedido_rows_from_pedidos(pedidos=pedido_buckets['in-progress'], bucket='in-progress')
 	elif view_mode == 'completed':
-		rows = _pedido_rows_for_statuses(statuses=PEDIDO_COMPLETED_STATUSES, pedido_queryset=pedido_queryset)
+		rows = _pedido_rows_from_pedidos(pedidos=pedido_buckets['completed'], bucket='completed')
 		rows.extend(_quote_rows_for_statuses(statuses=QUOTE_COMPLETED_STATUSES))
 	elif view_mode == 'cancelled':
-		rows = _pedido_rows_for_statuses(statuses=PEDIDO_CANCELLED_STATUSES, pedido_queryset=pedido_queryset)
+		rows = _pedido_rows_from_pedidos(pedidos=pedido_buckets['cancelled'], bucket='cancelled')
 		rows.extend(_quote_rows_for_statuses(statuses=QUOTE_CANCELLED_STATUSES))
 	else:
 		view_mode = 'pending'
 		rows = _quote_rows_for_statuses(statuses=QUOTE_PENDING_STATUSES)
-		rows.extend(_pedido_rows_for_statuses(statuses=PEDIDO_PENDING_STATUSES, pedido_queryset=pedido_queryset))
+		rows.extend(_pedido_rows_from_pedidos(pedidos=pedido_buckets['pending'], bucket='pending'))
 
 	rows.sort(key=lambda row: row.date, reverse=True)
 	page_obj = Paginator(rows, page_size).get_page(page_number)

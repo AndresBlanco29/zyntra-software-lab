@@ -4216,6 +4216,8 @@ class InvoiceVoidDeleteTests(TestCase):
 		self.pedido_item.refresh_from_db()
 		self.assertEqual(self.pedido_item.cantidad_inventario_aplicada, 0)
 		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, stock_before + 3)
+		self.pedido.refresh_from_db()
+		self.assertEqual(self.pedido.estado, 'CANCELADO')
 
 	def test_delete_delivered_invoice_allowed_when_not_synced_to_quickbooks(self):
 		driver = Usuario.objects.create_user(username='void-driver', password='secret123', role='driver')

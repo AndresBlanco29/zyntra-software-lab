@@ -1705,7 +1705,7 @@ def eliminar_invoice(*, invoice, force_quickbooks=False):
 	FacturacionRegistroAnulacion.objects.filter(invoice=invoice).delete()
 	invoice.delete()
 	pedido.refresh_from_db()
-	pedido.estado = 'VERIFICADO_AJUSTADO'
+	pedido.estado = 'CANCELADO'
 	pedido.save(update_fields=['estado', 'actualizada_en'])
 	return pedido_id
 

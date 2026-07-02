@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n l10n shipment_summary_tags %}
+{% load i18n l10n static shipment_summary_tags %}
 
 {% block title %}{% trans "Quote" %} #{{ cotizacion.id }}{% endblock %}
 
@@ -69,6 +69,7 @@
       {% csrf_token %}
       <div class="card-body">
         <h5 class="mb-3">{% trans "Quoted Products" %}</h5>
+        {% if can_manage_quote_lines %}
         <div class="row g-2 align-items-end mb-3 quote-bulk-price-row">
           <div class="col-md-8 col-lg-7">
             <label for="bulkPriceTierSelect" class="form-label fw-semibold mb-1">{% trans "Assign one customer price tier to all requested products" %}</label>
@@ -84,6 +85,24 @@
             <button type="button" class="btn btn-outline-primary btn-sm" id="applyBulkPriceTierButton">{% trans "Apply to all products" %}</button>
           </div>
         </div>
+        {% endif %}
+        {% if can_manage_quote_lines %}
+        <div class="row g-2 align-items-end mb-3 quote-bulk-discount-row">
+          <div class="col-md-8 col-lg-7">
+            <label for="bulkDiscountPresetSelect" class="form-label fw-semibold mb-1">{% trans "Assign one preset discount to all products" %}</label>
+            <select id="bulkDiscountPresetSelect" class="form-select form-select-sm">
+              <option value="">{% trans "Select one of the preset discounts" %}</option>
+              {% for option in discount_preset_options %}
+              <option value="{{ option.value|unlocalize }}" data-discount-key="{{ option.key }}">{{ option.label }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">{% trans "This enables the discount on every line and applies the selected dollar amount." %} <a href="{% url 'configurar_descuentos' %}">{% trans "Configure preset discounts" %}</a></div>
+          </div>
+          <div class="col-md-4 col-lg-5 d-grid d-md-flex justify-content-md-end">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="applyBulkDiscountButton">{% trans "Apply discount to all products" %}</button>
+          </div>
+        </div>
+        {% endif %}
         <div class="table-responsive mobile-stack-responsive">
           <table class="table align-middle mobile-stack-table mobile-stack-table--quote">
             <thead>
@@ -92,13 +111,16 @@
                 <th>{% trans "Presentation" %}</th>
                 <th style="width: 130px;">{% trans "Quantity" %}</th>
                 <th style="width: 180px;">{% trans "Customer price" %}</th>
+                <th style="width: 180px;">{% trans "Discount" %}</th>
+                <th>{% trans "You pay" %}</th>
                 <th>{% trans "Subtotal" %}</th>
+                {% if can_manage_quote_lines %}<th>{% trans "Remove" %}</th>{% endif %}
               </tr>
             </thead>
             <tbody>
               {% for row in cotizacion_item_rows %}
               {% with item=row.item %}
-              <tr>
+              <tr data-quote-item-row="{{ item.id }}">
                 <td data-label="{% trans 'Product' %}">
                   <div>{{ item.presentacion.producto.nombre }}</div>
                   {% if row.recent_customer_sales %}
@@ -114,10 +136,10 @@
                 </td>
                 <td data-label="{% trans 'Presentation' %}">{{ item.presentacion.nombre }}</td>
                 <td data-label="{% trans 'Quantity' %}" class="mobile-stack-table__input-cell">
-                  <input type="number" min="1" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" class="form-control form-control-sm quote-quantity-input" data-item-id="{{ item.id }}">
+                  <input type="number" min="1" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" class="form-control form-control-sm quote-quantity-input" data-item-id="{{ item.id }}" {% if not can_manage_quote_lines %}disabled{% endif %}>
                 </td>
                 <td data-label="{% trans 'Customer price' %}" class="mobile-stack-table__input-cell">
-                  <select class="form-select form-select-sm mb-2 preset-price-select" data-target-input="precio_{{ item.id }}">
+                  <select class="form-select form-select-sm mb-2 preset-price-select" data-target-input="precio_{{ item.id }}" data-item-id="{{ item.id }}" {% if not can_manage_quote_lines %}disabled{% endif %}>
                     <option value="">{% trans "Manual price" %}</option>
                     {% for option in row.price_options %}
                     <option value="{{ option.value|unlocalize }}" data-price-key="{{ option.key }}" {% if row.selected_option == option.key %}selected{% endif %}>
@@ -125,7 +147,7 @@
                     </option>
                     {% endfor %}
                   </select>
-                  <input type="number" min="1.01" step="0.01" id="precio_{{ item.id }}" name="precio_{{ item.id }}" value="{{ row.current_price|unlocalize }}" class="form-control form-control-sm customer-price-input" data-item-id="{{ item.id }}" data-product-name="{{ item.presentacion.producto.nombre|escape }}" data-presentation-name="{{ item.presentacion.nombre|escape }}" data-cost="{% if row.cost is not None %}{{ row.cost|unlocalize }}{% endif %}" data-min-price="{{ row.minimum_price|unlocalize }}" data-margin-target="margin_{{ item.id }}">
+                  <input type="number" min="1.01" step="0.01" id="precio_{{ item.id }}" name="precio_{{ item.id }}" value="{{ row.current_price|unlocalize }}" class="form-control form-control-sm customer-price-input quote-item-list-price" data-item-id="{{ item.id }}" data-product-name="{{ item.presentacion.producto.nombre|escape }}" data-presentation-name="{{ item.presentacion.nombre|escape }}" data-cost="{% if row.cost is not None %}{{ row.cost|unlocalize }}{% endif %}" data-min-price="{{ row.minimum_price|unlocalize }}" data-margin-target="margin_{{ item.id }}" {% if not can_manage_quote_lines %}disabled{% endif %}>
                   <div id="margin_{{ item.id }}" class="small text-muted mt-1 utility-indicator">
                     {% if row.current_utility_percentage is not None %}
                       {% blocktrans with percentage=row.current_utility_percentage %}Utility: {{ percentage }}%{% endblocktrans %}
@@ -134,7 +156,52 @@
                     {% endif %}
                   </div>
                 </td>
+                <td data-label="{% trans 'Discount' %}" class="quote-item-discount-cell mobile-stack-table__input-cell" data-item-id="{{ item.id }}">
+                  <div class="form-check mb-2">
+                    <input
+                      type="checkbox"
+                      class="form-check-input quote-item-discount-toggle"
+                      id="descuentoAplicado{{ item.id }}"
+                      name="descuento_aplicado_{{ item.id }}"
+                      data-item-id="{{ item.id }}"
+                      {% if item.descuento_aplicado %}checked{% endif %}
+                      {% if not can_manage_quote_lines %}disabled{% endif %}>
+                    <label class="form-check-label small" for="descuentoAplicado{{ item.id }}">{% trans "Apply discount" %}</label>
+                  </div>
+                  <div class="quote-item-discount-fields {% if not item.descuento_aplicado %}d-none{% endif %}">
+                    <select class="form-select form-select-sm mb-1 quote-item-discount-preset" data-target-input="descuento_monto_{{ item.id }}" data-item-id="{{ item.id }}" {% if not can_manage_quote_lines %}disabled{% endif %}>
+                      <option value="">{% trans "Manual discount" %}</option>
+                      {% for option in discount_preset_options %}
+                      <option value="{{ option.value|unlocalize }}" data-discount-key="{{ option.key }}" {% if row.selected_discount_preset_key == option.key %}selected{% endif %}>{{ option.label }}</option>
+                      {% endfor %}
+                    </select>
+                    <div class="input-group input-group-sm mb-1">
+                      <span class="input-group-text">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        class="form-control quote-item-discount-amount"
+                        id="descuento_monto_{{ item.id }}"
+                        name="descuento_monto_{{ item.id }}"
+                        value="{{ item.descuento_monto|unlocalize }}"
+                        data-item-id="{{ item.id }}"
+                        placeholder="0.00"
+                        {% if not can_manage_quote_lines %}disabled{% endif %}>
+                    </div>
+                  </div>
+                  <div class="small text-muted quote-item-discount-summary" data-item-id="{{ item.id }}"></div>
+                </td>
+                <td data-label="{% trans 'You pay' %}">
+                  <div class="fw-semibold quote-item-net-price" data-item-id="{{ item.id }}">${{ row.precio_unitario_neto }}</div>
+                  <div class="small text-success quote-item-savings {% if not item.descuento_aplicado %}d-none{% endif %}" data-item-id="{{ item.id }}">
+                    {% blocktrans with amount=row.descuento_linea_total %}You save ${{ amount }}{% endblocktrans %}
+                  </div>
+                </td>
                 <td data-label="{% trans 'Subtotal' %}"><span class="quote-subtotal" data-item-id="{{ item.id }}">${{ row.display_subtotal }}</span></td>
+                {% if can_manage_quote_lines %}
+                <td data-label="{% trans 'Remove' %}"><input type="checkbox" class="form-check-input" name="eliminar_{{ item.id }}"></td>
+                {% endif %}
               </tr>
               {% endwith %}
               {% endfor %}
@@ -143,6 +210,46 @@
         </div>
 
         {% product_shipment_summary source='cotizacion_items' value=cotizacion_item_rows %}
+
+        {% if can_manage_quote_lines %}
+        <hr>
+        <h6 class="mb-3">{% trans "Add a new product to this quote" %}</h6>
+        <div class="row g-2 mb-3 align-items-end">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" for="buscadorProductoPedido">{% trans "Search product" %}</label>
+            <div
+              class="product-search-field position-relative"
+              id="newProductSearchRoot"
+              data-search-url="{% url 'backoffice_buscar_presentaciones' %}"
+              data-cotizacion-id="{{ cotizacion.id }}"
+              data-empty-message="{% trans 'No products found.'|escapejs %}"
+              data-min-chars-message="{% trans 'Type at least 2 characters to search.'|escapejs %}"
+              data-price-placeholder="{% trans 'Select price...'|escapejs %}"
+              data-manual-price-label="{% trans 'Manual price'|escapejs %}">
+              <input
+                type="search"
+                id="buscadorProductoPedido"
+                class="form-control"
+                placeholder="{% trans 'Search products by full name...' %}"
+                autocomplete="off">
+              <input type="hidden" name="presentacion_nueva" id="presentacionNuevaId" value="">
+              <div id="newProductSearchResults" class="product-search-results list-group shadow-sm" hidden></div>
+              <div id="newProductSelectedLabel" class="small text-success fw-semibold mt-1" hidden></div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-semibold" for="cantidadNuevaPedido">{% trans "Qty." %}</label>
+            <input type="number" min="1" id="cantidadNuevaPedido" name="cantidad_nueva" class="form-control" placeholder="{% trans 'Qty.' %}">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label fw-semibold" for="precioNuevoPedidoPreset">{% trans "Price" %}</label>
+            <select id="precioNuevoPedidoPreset" class="form-select form-select-sm mb-2 preset-price-select" data-target-input="precioNuevoPedido" disabled>
+              <option value="">{% trans "Manual price" %}</option>
+            </select>
+            <input type="number" min="0.01" step="0.01" id="precioNuevoPedido" name="precio_nuevo" class="form-control form-control-sm" placeholder="{% trans 'Price' %}" disabled>
+          </div>
+        </div>
+        {% endif %}
 
         <div class="mb-3">
           <label class="form-label fw-semibold">{% trans "Customer note" %}</label>
@@ -156,7 +263,9 @@
 
         <div class="d-flex justify-content-between align-items-center quote-save-row">
           <strong>{% trans "Updated total" %}: <span id="quoteTotalValue">${{ display_total }}</span></strong>
+          {% if can_manage_quote_lines %}
           <button type="submit" class="btn btn-primary">{% trans "Save changes" %}</button>
+          {% endif %}
         </div>
       </div>
     </form>
@@ -279,6 +388,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const noteInput = quoteForm ? quoteForm.querySelector('textarea[name="nota_backoffice"]') : null;
   const bulkPriceTierSelect = document.getElementById('bulkPriceTierSelect');
   const applyBulkPriceTierButton = document.getElementById('applyBulkPriceTierButton');
+  const bulkDiscountPresetSelect = document.getElementById('bulkDiscountPresetSelect');
+  const applyBulkDiscountButton = document.getElementById('applyBulkDiscountButton');
   const emailButton = document.querySelector('.quote-send-email-button');
   const whatsappButton = document.querySelector('.quote-send-whatsapp-button');
   const whatsappOriginalHref = whatsappButton ? whatsappButton.getAttribute('href') : '#';
@@ -329,6 +440,10 @@ document.addEventListener('DOMContentLoaded', function () {
     return `$${value.toFixed(2)}`;
   }
 
+  function formatNumber(value) {
+    return value.toFixed(2);
+  }
+
   function validateQuotePrices(showAlert) {
     for (const input of priceInputs) {
       const price = parseDecimal(input.value);
@@ -363,15 +478,74 @@ document.addEventListener('DOMContentLoaded', function () {
     const quantityInput = document.querySelector(`.quote-quantity-input[data-item-id="${itemId}"]`);
     const priceInput = document.querySelector(`.customer-price-input[data-item-id="${itemId}"]`);
     const subtotalElement = document.querySelector(`.quote-subtotal[data-item-id="${itemId}"]`);
+    const toggle = document.querySelector(`.quote-item-discount-toggle[data-item-id="${itemId}"]`);
+    const amountInput = document.querySelector(`.quote-item-discount-amount[data-item-id="${itemId}"]`);
+    const netPrice = document.querySelector(`.quote-item-net-price[data-item-id="${itemId}"]`);
+    const savings = document.querySelector(`.quote-item-savings[data-item-id="${itemId}"]`);
+    const summary = document.querySelector(`.quote-item-discount-summary[data-item-id="${itemId}"]`);
+    const discountFields = document.querySelector(`[data-quote-item-row="${itemId}"] .quote-item-discount-fields`);
     if (!quantityInput || !priceInput || !subtotalElement) {
       return 0;
     }
 
     const quantity = Math.max(parseInt(quantityInput.value || '1', 10) || 1, 1);
-    const price = parseDecimal(priceInput.value) || 0;
-    const subtotal = quantity * price;
+    const listPrice = parseDecimal(priceInput.value) || 0;
+    const discountEnabled = Boolean(toggle && toggle.checked);
+    const discountAmount = discountEnabled ? (parseDecimal(amountInput ? amountInput.value : null) || 0) : 0;
+
+    if (discountFields) {
+      discountFields.classList.toggle('d-none', !discountEnabled);
+    }
+    if (amountInput && !amountInput.hasAttribute('readonly')) {
+      amountInput.disabled = !discountEnabled;
+    }
+
+    const netUnit = Math.max(0, listPrice - discountAmount);
+    const subtotal = netUnit * quantity;
+    const lineSavings = discountAmount * quantity;
+
+    if (summary) {
+      if (discountEnabled && discountAmount > 0) {
+        summary.textContent = `List $${formatNumber(listPrice)} - $${formatNumber(discountAmount)} = $${formatNumber(netUnit)} / unit`;
+      } else {
+        summary.textContent = '';
+      }
+    }
+    if (netPrice) {
+      netPrice.textContent = formatCurrency(netUnit);
+    }
+    if (savings) {
+      savings.classList.toggle('d-none', !(discountEnabled && lineSavings > 0));
+      if (discountEnabled && lineSavings > 0) {
+        savings.textContent = `You save ${formatCurrency(lineSavings)}`;
+      }
+    }
+
     subtotalElement.textContent = formatCurrency(subtotal);
     return subtotal;
+  }
+
+  function syncQuoteDiscountPresetFromInput(presetSelect, amountInput) {
+    if (!presetSelect || !amountInput) {
+      return;
+    }
+    const inputValue = parseDecimal(amountInput.value);
+    let matchedValue = '';
+    Array.from(presetSelect.options).forEach(function (option) {
+      if (!option.value) {
+        return;
+      }
+      const optionValue = parseDecimal(option.value);
+      if (inputValue !== null && optionValue !== null && optionValue === inputValue) {
+        matchedValue = option.value;
+      }
+    });
+    presetSelect.value = matchedValue;
+  }
+
+  function refreshQuoteItemDiscountRow(itemId) {
+    updateSubtotal(itemId);
+    updateQuoteTotal();
   }
 
   function updateQuoteTotal() {
@@ -414,10 +588,70 @@ document.addEventListener('DOMContentLoaded', function () {
         targetInput.value = select.value;
       }
       updateUtilityIndicator(targetInput);
-      updateSubtotal(targetInput.dataset.itemId);
-      updateQuoteTotal();
+      refreshQuoteItemDiscountRow(targetInput.dataset.itemId);
       markQuoteAsDirty();
     });
+  });
+
+  if (applyBulkDiscountButton && bulkDiscountPresetSelect) {
+    applyBulkDiscountButton.addEventListener('click', function () {
+      const selectedDiscountValue = bulkDiscountPresetSelect.value;
+      if (!selectedDiscountValue) {
+        return;
+      }
+
+      document.querySelectorAll('[data-quote-item-row]').forEach(function (row) {
+        const itemId = row.dataset.quoteItemRow;
+        const toggle = row.querySelector(`.quote-item-discount-toggle[data-item-id="${itemId}"]`);
+        const presetSelect = row.querySelector(`.quote-item-discount-preset[data-item-id="${itemId}"]`);
+        const amountInput = row.querySelector(`.quote-item-discount-amount[data-item-id="${itemId}"]`);
+        if (!toggle || !presetSelect || !amountInput) {
+          return;
+        }
+        toggle.checked = true;
+        presetSelect.value = selectedDiscountValue;
+        amountInput.value = selectedDiscountValue;
+        amountInput.disabled = false;
+        refreshQuoteItemDiscountRow(itemId);
+      });
+      markQuoteAsDirty();
+    });
+  }
+
+  document.querySelectorAll('.quote-item-discount-toggle, .quote-item-discount-amount, .quote-item-list-price').forEach(function (input) {
+    input.addEventListener('input', function () {
+      refreshQuoteItemDiscountRow(input.dataset.itemId);
+      markQuoteAsDirty();
+    });
+    input.addEventListener('change', function () {
+      refreshQuoteItemDiscountRow(input.dataset.itemId);
+      markQuoteAsDirty();
+    });
+  });
+
+  document.querySelectorAll('.quote-item-discount-preset').forEach(function (presetSelect) {
+    const amountInput = document.getElementById(presetSelect.dataset.targetInput);
+    if (!amountInput) {
+      return;
+    }
+
+    presetSelect.addEventListener('change', function () {
+      if (presetSelect.value) {
+        amountInput.value = presetSelect.value;
+      }
+      refreshQuoteItemDiscountRow(presetSelect.dataset.itemId);
+      markQuoteAsDirty();
+    });
+
+    amountInput.addEventListener('input', function () {
+      syncQuoteDiscountPresetFromInput(presetSelect, amountInput);
+    });
+
+    syncQuoteDiscountPresetFromInput(presetSelect, amountInput);
+  });
+
+  document.querySelectorAll('.quote-item-discount-toggle').forEach(function (toggle) {
+    refreshQuoteItemDiscountRow(toggle.dataset.itemId);
   });
 
   if (applyBulkPriceTierButton && bulkPriceTierSelect) {
@@ -444,8 +678,7 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!input.value || parseInt(input.value, 10) < 1) {
         input.value = '1';
       }
-      updateSubtotal(input.dataset.itemId);
-      updateQuoteTotal();
+      refreshQuoteItemDiscountRow(input.dataset.itemId);
       markQuoteAsDirty();
     });
   });
@@ -472,13 +705,16 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       updateUtilityIndicator(input);
-      updateSubtotal(input.dataset.itemId);
-      updateQuoteTotal();
+      refreshQuoteItemDiscountRow(input.dataset.itemId);
     }
 
     input.addEventListener('input', syncState);
     input.addEventListener('input', markQuoteAsDirty);
     syncState();
+  });
+
+  document.querySelectorAll('input[name^="eliminar_"]').forEach(function (checkbox) {
+    checkbox.addEventListener('change', markQuoteAsDirty);
   });
 
   if (noteInput) {
@@ -504,5 +740,8 @@ document.addEventListener('DOMContentLoaded', function () {
   updateQuoteTotal();
 });
 </script>
+{% if can_manage_quote_lines %}
+<script defer src="{% static 'js/pedido_detalle_product_search.js' %}"></script>
+{% endif %}
 </div>
 {% endblock %}

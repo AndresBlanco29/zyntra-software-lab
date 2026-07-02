@@ -86,6 +86,8 @@ class CotizacionItem(models.Model):
         max_digits=12,
         decimal_places=2
     )
+    descuento_aplicado = models.BooleanField(default=False)
+    descuento_monto = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def __str__(self):
         return f"{self.presentacion.producto.nombre} x {self.cantidad}"

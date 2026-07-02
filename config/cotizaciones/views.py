@@ -21,11 +21,14 @@ from config.notificaciones.models import crear_notificacion_backoffice
 from config.pedidos.models import Pedido
 from config.facturacion.services import get_recent_customer_invoice_items_by_presentation
 from config.pedidos.services import (
+    calcular_precio_unitario_neto_item,
+    calcular_subtotal_item_pedido,
     crear_pedido_desde_items,
+    normalizar_descuento_item_pedido,
     notificar_backoffice_pedido,
     notificar_cliente_pedido,
 )
-from config.productos.models import ConfiguracionPrecios, Presentacion
+from config.productos.models import ConfiguracionDescuentos, ConfiguracionPrecios, Presentacion
 from config.usuarios.permissions import internal_permission_required
 
 from .models import Cotizacion, CotizacionItem
@@ -115,9 +118,12 @@ def _quote_item_price_for_customer(*, cliente, presentacion, session_price):
     return session_price_decimal
 
 
-def _validate_backoffice_quote_price(*, item, price):
-    product_label = f'{item.presentacion.producto.nombre} ({item.presentacion.nombre})'
-    cost = item.presentacion.costo
+def _validate_backoffice_quote_price(*, item=None, presentacion=None, price):
+    presentation = presentacion or (item.presentacion if item else None)
+    if presentation is None:
+        return _('Unable to validate the product price.')
+    product_label = f'{presentation.producto.nombre} ({presentation.nombre})'
+    cost = presentation.costo
 
     if price <= MIN_BACKOFFICE_QUOTE_PRICE:
         return _('The price for %(product)s must be greater than $1.00.') % {
@@ -135,8 +141,21 @@ def _validate_backoffice_quote_price(*, item, price):
     return ''
 
 
+def _build_quote_discount_preset_options():
+    return ConfiguracionDescuentos.obtener().opciones_activas()
+
+
+def _match_discount_preset_key(discount_options, current_amount):
+    current = format(_parse_decimal(current_amount, 0).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP), '.2f')
+    for option in discount_options:
+        if option['value'] == current:
+            return option['key']
+    return ''
+
+
 def _build_quote_item_rows(cotizacion):
     margin_values = ConfiguracionPrecios.obtener().porcentajes_lista()
+    discount_options = _build_quote_discount_preset_options()
     rows = []
     display_total = Decimal('0.00')
     quote_items = list(cotizacion.items.select_related('presentacion__producto'))
@@ -147,7 +166,22 @@ def _build_quote_item_rows(cotizacion):
 
     for item in quote_items:
         current_price = _default_backoffice_quote_price(item, cotizacion)
-        display_subtotal = (current_price * Decimal(str(item.cantidad))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        display_subtotal = calcular_subtotal_item_pedido(
+            precio=current_price,
+            cantidad=item.cantidad,
+            descuento_aplicado=item.descuento_aplicado,
+            descuento_monto=item.descuento_monto,
+        )
+        net_unit_price = calcular_precio_unitario_neto_item(
+            precio=current_price,
+            descuento_aplicado=item.descuento_aplicado,
+            descuento_monto=item.descuento_monto,
+        )
+        discount_line_total = (
+            _parse_decimal(item.descuento_monto, 0) * Decimal(str(item.cantidad or 0))
+            if item.descuento_aplicado
+            else Decimal('0.00')
+        ).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         price_options = []
         selected_option = ''
 
@@ -172,6 +206,13 @@ def _build_quote_item_rows(cotizacion):
             'selected_option': selected_option,
             'current_price': current_price,
             'display_subtotal': display_subtotal,
+            'precio_unitario_neto': net_unit_price,
+            'descuento_linea_total': discount_line_total,
+            'selected_discount_preset_key': (
+                _match_discount_preset_key(discount_options, item.descuento_monto)
+                if item.descuento_aplicado
+                else ''
+            ),
             'cost': item.presentacion.costo,
             'minimum_price': max(
                 (_parse_decimal(item.presentacion.costo, 0) if item.presentacion.costo is not None else Decimal('0.00')),
@@ -236,6 +277,8 @@ def _build_order_items_payload_from_quote(cotizacion):
             'presentacion': item.presentacion,
             'cantidad': item.cantidad,
             'precio': item.precio,
+            'descuento_aplicado': item.descuento_aplicado,
+            'descuento_monto': item.descuento_monto,
         })
     return items_payload
 
@@ -539,28 +582,105 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
             messages.error(request, _('You do not have permission to update this quote.'))
             return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
+        if pedido_existente is not None:
+            messages.error(
+                request,
+                _('This quote cannot be edited because a sales order was already generated from it.'),
+            )
+            return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
+
+        quote_items = list(cotizacion.items.select_related('presentacion__producto'))
+        deleted_ids = {
+            item.id for item in quote_items if request.POST.get(f'eliminar_{item.id}')
+        }
+        nueva_presentacion_id = (request.POST.get('presentacion_nueva') or '').strip()
+        remaining_count = sum(1 for item in quote_items if item.id not in deleted_ids)
+        if nueva_presentacion_id:
+            remaining_count += 1
+
+        if remaining_count == 0:
+            messages.error(request, _('You must leave at least one product in the quote.'))
+            return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
+
         updated_items = []
         validation_error = ''
-        for item in cotizacion.items.select_related('presentacion__producto'):
+        for item in quote_items:
+            if item.id in deleted_ids:
+                continue
+
             cantidad = _parse_quantity(request.POST.get(f'cantidad_{item.id}'), item.cantidad)
             precio = _parse_decimal(request.POST.get(f'precio_{item.id}'), item.precio)
             validation_error = _validate_backoffice_quote_price(item=item, price=precio)
             if validation_error:
                 break
-            updated_items.append((item, cantidad, precio))
+
+            try:
+                descuento_aplicado, descuento_monto = normalizar_descuento_item_pedido(
+                    precio=precio,
+                    descuento_aplicado=request.POST.get(f'descuento_aplicado_{item.id}'),
+                    descuento_monto=_parse_decimal(request.POST.get(f'descuento_monto_{item.id}'), item.descuento_monto),
+                )
+            except ValidationError as exc:
+                validation_error = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
+                break
+
+            updated_items.append((item, cantidad, precio, descuento_aplicado, descuento_monto))
+
+        nueva_presentacion = None
+        if not validation_error and nueva_presentacion_id:
+            nueva_presentacion = get_object_or_404(
+                Presentacion.objects.select_related('producto'),
+                id=nueva_presentacion_id,
+            )
+            precio_nuevo = _parse_decimal(request.POST.get('precio_nuevo'), 0)
+            validation_error = _validate_backoffice_quote_price(presentacion=nueva_presentacion, price=precio_nuevo)
 
         if validation_error:
             messages.error(request, validation_error)
             return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
         with transaction.atomic():
+            if deleted_ids:
+                CotizacionItem.objects.filter(cotizacion=cotizacion, id__in=deleted_ids).delete()
+
             total = Decimal('0')
-            for item, cantidad, precio in updated_items:
+            for item, cantidad, precio, descuento_aplicado, descuento_monto in updated_items:
                 item.cantidad = cantidad
                 item.precio = precio
-                item.subtotal = precio * cantidad
-                item.save(update_fields=['cantidad', 'precio', 'subtotal'])
+                item.descuento_aplicado = descuento_aplicado
+                item.descuento_monto = descuento_monto
+                item.subtotal = calcular_subtotal_item_pedido(
+                    precio=precio,
+                    cantidad=cantidad,
+                    descuento_aplicado=descuento_aplicado,
+                    descuento_monto=descuento_monto,
+                )
+                item.save(update_fields=['cantidad', 'precio', 'descuento_aplicado', 'descuento_monto', 'subtotal'])
                 total += item.subtotal
+
+            if nueva_presentacion is not None:
+                cantidad_nueva = _parse_quantity(request.POST.get('cantidad_nueva'), 1)
+                precio_nuevo = _parse_decimal(request.POST.get('precio_nuevo'), 0)
+                descuento_aplicado_nuevo, descuento_monto_nuevo = normalizar_descuento_item_pedido(
+                    precio=precio_nuevo,
+                    descuento_aplicado=request.POST.get('descuento_aplicado_nuevo'),
+                    descuento_monto=_parse_decimal(request.POST.get('descuento_monto_nuevo'), 0),
+                )
+                new_item = CotizacionItem.objects.create(
+                    cotizacion=cotizacion,
+                    presentacion=nueva_presentacion,
+                    cantidad=cantidad_nueva,
+                    precio=precio_nuevo,
+                    descuento_aplicado=descuento_aplicado_nuevo,
+                    descuento_monto=descuento_monto_nuevo,
+                    subtotal=calcular_subtotal_item_pedido(
+                        precio=precio_nuevo,
+                        cantidad=cantidad_nueva,
+                        descuento_aplicado=descuento_aplicado_nuevo,
+                        descuento_monto=descuento_monto_nuevo,
+                    ),
+                )
+                total += new_item.subtotal
 
             cotizacion.nota_backoffice = (request.POST.get('nota_backoffice') or '').strip()
             cotizacion.total = total
@@ -586,8 +706,10 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
     context = {
         'cotizacion': cotizacion,
         'pedido_existente': pedido_existente,
+        'can_manage_quote_lines': pedido_existente is None,
         'cotizacion_item_rows': cotizacion_item_rows,
         'bulk_price_options': _build_bulk_quote_price_options(),
+        'discount_preset_options': _build_quote_discount_preset_options(),
         'display_total': display_total,
         'can_send_customer_quote': can_send_customer_quote,
         'can_generate_backoffice_order': can_generate_backoffice_order,

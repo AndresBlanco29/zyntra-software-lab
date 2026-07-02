@@ -695,8 +695,12 @@ def backoffice_buscar_presentaciones(request):
 
 	pedido = None
 	pedido_id = (request.GET.get('pedido_id') or '').strip()
+	cotizacion_id = (request.GET.get('cotizacion_id') or '').strip()
 	if pedido_id.isdigit():
 		pedido = Pedido.objects.select_related('cliente').filter(id=int(pedido_id)).first()
+	elif cotizacion_id.isdigit():
+		from config.cotizaciones.models import Cotizacion
+		pedido = Cotizacion.objects.select_related('cliente').filter(id=int(cotizacion_id)).first()
 
 	results = []
 	for presentacion in presentaciones:

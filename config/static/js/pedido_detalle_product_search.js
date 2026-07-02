@@ -32,6 +32,7 @@
     var priceInput = document.getElementById('precioNuevoPedido');
     var searchUrl = root.dataset.searchUrl;
     var pedidoId = root.dataset.pedidoId;
+    var cotizacionId = root.dataset.cotizacionId;
     var emptyMessage = root.dataset.emptyMessage || 'No products found.';
     var minCharsMessage = root.dataset.minCharsMessage || 'Type at least 2 characters to search.';
     var manualPriceLabel = root.dataset.manualPriceLabel || 'Manual price';
@@ -164,6 +165,8 @@
       url.searchParams.set('q', query);
       if (pedidoId) {
         url.searchParams.set('pedido_id', pedidoId);
+      } else if (cotizacionId) {
+        url.searchParams.set('cotizacion_id', cotizacionId);
       }
 
       fetch(url.toString(), {

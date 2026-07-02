@@ -11,7 +11,7 @@ from config.clientes.models import Cliente
 from config.cotizaciones.models import Cotizacion, CotizacionItem
 from config.facturacion.models import Invoice, InvoiceItem
 from config.pedidos.models import Pedido, PedidoItem
-from config.productos.models import Categoria, ConfiguracionPrecios, Marca, Presentacion, Producto
+from config.productos.models import Categoria, ConfiguracionDescuentos, ConfiguracionPrecios, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
 
 
@@ -59,6 +59,13 @@ class BackofficeQuotePricingTests(TestCase):
 			unidades=1,
 			tipo_contenido='caja',
 			costo=Decimal('100.00'),
+		)
+		self.presentacion_extra = Presentacion.objects.create(
+			producto=producto,
+			nombre='Unidad',
+			unidades=1,
+			tipo_contenido='unidad',
+			costo=Decimal('50.00'),
 		)
 		self.cotizacion = Cotizacion.objects.create(cliente=self.cliente, estado='ENVIADA', total=self.presentacion.precio_1)
 		CotizacionItem.objects.create(
@@ -484,6 +491,135 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertRedirects(response, reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]))
 		item.refresh_from_db()
 		self.assertEqual(item.precio, self.presentacion.precio_1)
+
+	def test_backoffice_quote_detail_shows_discount_add_product_and_remove_ui(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'bulkDiscountPresetSelect')
+		self.assertContains(response, 'applyBulkDiscountButton')
+		self.assertContains(response, 'Apply discount to all products')
+		self.assertContains(response, 'Add a new product to this quote')
+		self.assertContains(response, 'buscadorProductoPedido')
+		self.assertContains(response, 'pedido_detalle_product_search.js')
+		self.assertContains(response, f'name="eliminar_{self.cotizacion.items.first().id}"', html=False)
+		self.assertContains(response, 'Apply discount')
+		self.assertContains(response, 'You pay')
+
+	def test_backoffice_can_apply_discount_to_quote_item(self):
+		item = self.cotizacion.items.first()
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]), {
+			f'cantidad_{item.id}': '2',
+			f'precio_{item.id}': '142.86',
+			f'descuento_aplicado_{item.id}': 'on',
+			f'descuento_monto_{item.id}': '2.00',
+			'nota_backoffice': 'Descuento aplicado',
+		})
+
+		self.assertRedirects(response, f"{reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id])}?saved=1")
+		item.refresh_from_db()
+		self.cotizacion.refresh_from_db()
+		self.assertTrue(item.descuento_aplicado)
+		self.assertEqual(item.descuento_monto, Decimal('2.00'))
+		self.assertEqual(item.subtotal, Decimal('281.72'))
+		self.assertEqual(self.cotizacion.total, Decimal('281.72'))
+
+	def test_backoffice_can_add_product_to_quote(self):
+		item = self.cotizacion.items.first()
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]), {
+			f'cantidad_{item.id}': '1',
+			f'precio_{item.id}': '142.86',
+			'presentacion_nueva': str(self.presentacion_extra.id),
+			'cantidad_nueva': '2',
+			'precio_nuevo': '120.00',
+			'nota_backoffice': 'Producto extra',
+		})
+
+		self.assertRedirects(response, f"{reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id])}?saved=1")
+		new_item = CotizacionItem.objects.get(cotizacion=self.cotizacion, presentacion=self.presentacion_extra)
+		self.assertEqual(new_item.cantidad, 2)
+		self.assertEqual(new_item.precio, Decimal('120.00'))
+		self.assertEqual(new_item.subtotal, Decimal('240.00'))
+		self.cotizacion.refresh_from_db()
+		self.assertEqual(self.cotizacion.total, Decimal('382.86'))
+
+	def test_backoffice_can_remove_product_from_quote_when_another_remains(self):
+		item = self.cotizacion.items.first()
+		CotizacionItem.objects.create(
+			cotizacion=self.cotizacion,
+			presentacion=self.presentacion_extra,
+			cantidad=1,
+			precio=Decimal('120.00'),
+			subtotal=Decimal('120.00'),
+		)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]), {
+			f'cantidad_{item.id}': '1',
+			f'precio_{item.id}': '142.86',
+			f'eliminar_{item.id}': 'on',
+			f'cantidad_{CotizacionItem.objects.get(cotizacion=self.cotizacion, presentacion=self.presentacion_extra).id}': '1',
+			f'precio_{CotizacionItem.objects.get(cotizacion=self.cotizacion, presentacion=self.presentacion_extra).id}': '120.00',
+			'nota_backoffice': 'Quitar linea',
+		})
+
+		self.assertRedirects(response, f"{reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id])}?saved=1")
+		self.assertFalse(CotizacionItem.objects.filter(id=item.id).exists())
+		self.cotizacion.refresh_from_db()
+		self.assertEqual(self.cotizacion.total, Decimal('120.00'))
+
+	def test_generate_order_from_quote_preserves_line_discount(self):
+		item = self.cotizacion.items.first()
+		self.client.force_login(self.backoffice)
+		self.client.post(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]), {
+			f'cantidad_{item.id}': '2',
+			f'precio_{item.id}': '142.86',
+			f'descuento_aplicado_{item.id}': 'on',
+			f'descuento_monto_{item.id}': '2.00',
+			'nota_backoffice': 'Descuento confirmado',
+		})
+
+		response = self.client.post(reverse('generar_pedido_desde_cotizacion', args=[self.cotizacion.id]))
+		pedido = Pedido.objects.get(cotizacion=self.cotizacion)
+		pedido_item = pedido.items.get()
+
+		self.assertRedirects(response, reverse('backoffice_pedido_detalle', args=[pedido.id]))
+		self.assertTrue(pedido_item.descuento_aplicado)
+		self.assertEqual(pedido_item.descuento_monto, Decimal('2.00'))
+		self.assertEqual(pedido_item.subtotal, Decimal('281.72'))
+
+	def test_backoffice_can_search_presentations_for_quote(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_buscar_presentaciones'), {
+			'q': 'Producto Cotizacion',
+			'cotizacion_id': self.cotizacion.id,
+		})
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(any(result['id'] == self.presentacion.id for result in payload['results']))
+
+	def test_backoffice_quote_detail_selects_matching_discount_preset(self):
+		configuracion = ConfiguracionDescuentos.obtener()
+		configuracion.descuento_2 = Decimal('0.50')
+		configuracion.save()
+
+		item = self.cotizacion.items.first()
+		item.descuento_aplicado = True
+		item.descuento_monto = Decimal('0.50')
+		item.subtotal = Decimal('142.36')
+		item.save(update_fields=['descuento_aplicado', 'descuento_monto', 'subtotal'])
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'data-discount-key="descuento_2" selected', html=False)
 
 	def test_backoffice_can_generate_purchase_order_from_quote_and_notify_customer(self):
 		self.client.force_login(self.backoffice)

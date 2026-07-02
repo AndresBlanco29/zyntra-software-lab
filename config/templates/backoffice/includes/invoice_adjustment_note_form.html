@@ -1,6 +1,9 @@
 {% load i18n %}
 {% if prominent %}
 <div id="backoffice-adjustment-note" class="mb-3 driver-adjustment-callout">
+{% if adjustment_note_form_draft %}
+<div class="alert alert-info mb-3">{% trans "Your previous entries were restored so you can finish the missing fields." %}</div>
+{% endif %}
     <div class="driver-adjustment-callout-head mb-3">
       <div class="driver-adjustment-callout-icon" aria-hidden="true">
         <i class="bi bi-receipt-cutoff"></i>
@@ -131,6 +134,9 @@
 
   <button type="submit" class="btn btn-primary{% if prominent %} btn-lg{% endif %} w-100" id="backofficeSaveAdjustmentNoteButton">{% trans "Save draft note" %}</button>
 </form>
+{% if adjustment_note_form_draft %}
+{{ adjustment_note_form_draft|json_script:"adjustment-note-form-draft-data" }}
+{% endif %}
 {% if prominent %}
     </div>
 </div>

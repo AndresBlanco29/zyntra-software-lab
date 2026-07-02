@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n shipment_summary_tags %}
+{% load i18n static shipment_summary_tags %}
 
 {% block title %}{% trans "Create Adjustment Note" %}{% endblock %}
 
@@ -192,7 +192,10 @@
         {% elif selected_invoice_quickbooks_locked %}
         <div class="alert alert-light border mb-0">{% trans "The selected invoice is already synced with QuickBooks, so no new linked adjustment note can be created from this screen." %}</div>
         {% else %}
-        <form method="post" enctype="multipart/form-data">
+        {% if form_draft %}
+        <div class="alert alert-info mb-3">{% trans "Your previous entries were restored so you can finish the missing fields." %}</div>
+        {% endif %}
+        <form method="post" enctype="multipart/form-data" class="adjustment-note-create-form">
           {% csrf_token %}
           <input type="hidden" name="cliente_id" value="{{ selected_client.id }}">
           {% if selected_invoice %}<input type="hidden" name="invoice_id" value="{{ selected_invoice.id }}">{% endif %}
@@ -339,6 +342,9 @@
 
           <button type="submit" class="btn btn-primary">{% trans "Save draft note" %}</button>
         </form>
+        {% if form_draft %}
+        {{ form_draft|json_script:"adjustment-note-create-form-draft-data" }}
+        {% endif %}
         {% endif %}
       </div>
     </div>
@@ -414,6 +420,7 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+<script src="{% static 'js/form-draft-restore.js' %}"></script>
 <script>
   (function () {
     const noteType = document.getElementById('advancedNoteType');
@@ -436,6 +443,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (!noteType || !creditTypeWrapper || !creditType || !adjustmentType) {
       return;
+    }
+
+    const adjustmentForm = document.querySelector('.adjustment-note-create-form');
+    if (adjustmentForm && window.LTGFormDraftRestore) {
+      window.LTGFormDraftRestore.restoreFormDraft(adjustmentForm, 'adjustment-note-create-form-draft-data');
     }
 
     function syncCreditTypeVisibility() {

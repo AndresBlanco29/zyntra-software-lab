@@ -1628,6 +1628,53 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(invoice.delivery.completed_by, self.backoffice)
 		self.assertEqual(invoice.pedido.estado, 'DESPACHADO')
 
+	def test_failed_pickup_complete_preserves_form_draft_in_session(self):
+		from config.facturacion.form_drafts import INVOICE_PICKUP_DRAFT_SCOPE, get_workflow_draft
+
+		invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', driver=None, total='30.00')
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(
+			reverse('backoffice_invoice_complete_pickup', args=[invoice.id]),
+			{
+				'estado_pago': 'NO_PAGADO',
+				'recibido_por': 'Cliente Mostrador',
+				'notas_driver': 'Cliente pagará después',
+				'firma_cliente_data': self.signature_data,
+			},
+		)
+
+		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		draft = get_workflow_draft(self.client.session, INVOICE_PICKUP_DRAFT_SCOPE, invoice.id)
+		self.assertEqual(draft.get('estado_pago'), 'NO_PAGADO')
+		self.assertEqual(draft.get('recibido_por'), 'Cliente Mostrador')
+		self.assertEqual(draft.get('notas_driver'), 'Cliente pagará después')
+
+		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertContains(response, 'pickup-form-draft-data')
+		self.assertContains(response, 'Your previous entries were restored')
+
+	def test_failed_adjustment_note_save_preserves_form_draft_in_session(self):
+		from config.facturacion.form_drafts import INVOICE_ADJUSTMENT_DRAFT_SCOPE, get_workflow_draft
+
+		invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', driver=None, total='30.00')
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(
+			reverse('backoffice_invoice_create_note', args=[invoice.id]),
+			{
+				'note_descripcion': 'Producto dañado sin evidencia',
+			},
+		)
+
+		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertFalse(invoice.notas_ajuste.exists())
+		draft = get_workflow_draft(self.client.session, INVOICE_ADJUSTMENT_DRAFT_SCOPE, invoice.id)
+		self.assertEqual(draft.get('note_descripcion'), 'Producto dañado sin evidencia')
+
+		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertContains(response, 'adjustment-note-form-draft-data')
+
 	def test_driver_complete_view_can_create_credit_note_with_evidence_without_disabled_credit_type_field(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,

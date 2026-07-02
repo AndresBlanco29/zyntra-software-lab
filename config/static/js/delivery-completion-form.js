@@ -302,10 +302,15 @@
   if (driverFinancialAmountInput) driverFinancialAmountInput.addEventListener('input', updatePaymentAmountSuggestion);
   root.querySelectorAll('.js-driver-adjustment-package-qty, .js-driver-adjustment-unit-qty').forEach((field) => field.addEventListener('input', recalculateDriverAdjustmentAmounts));
 
+  if (window.LTGFormDraftRestore) {
+    window.LTGFormDraftRestore.restoreFormDraft(root, 'pickup-form-draft-data');
+  }
+
   togglePaymentSections();
   toggleDriverNoteFields();
   toggleDriverAdjustmentMode();
   syncPickupSaveNoteButton();
+  recalculateDriverAdjustmentAmounts();
 
   if (!canvas || !signatureInput || !clearSignature) return;
   const context = canvas.getContext('2d');
@@ -355,4 +360,7 @@
   canvas.addEventListener('touchend', stopDrawing);
   window.addEventListener('resize', resizeCanvas);
   resizeCanvas();
+  if (window.LTGFormDraftRestore) {
+    window.LTGFormDraftRestore.restoreSignatureFromHiddenInput(canvas, signatureInput);
+  }
 })();

@@ -49,6 +49,18 @@ from config.pedidos.models import Pedido
 from config.usuarios.models import Usuario
 from config.usuarios.permissions import internal_permission_required
 
+from .form_drafts import (
+	DELIVERY_COMPLETE_DRAFT_SCOPE,
+	DELIVERY_NOTE_DRAFT_SCOPE,
+	INVOICE_ADJUSTMENT_DRAFT_SCOPE,
+	INVOICE_PICKUP_DRAFT_SCOPE,
+	clear_invoice_workflow_drafts,
+	clear_workflow_draft,
+	get_workflow_draft,
+	merge_post_into_workflow_draft,
+	remove_post_prefix_from_workflow_draft,
+	serialize_post_data,
+)
 from .models import Delivery, DeliveryEvidencePhoto, FacturacionRegistroAnulacion, Invoice, NotaAjuste, NotaAjusteEvidencePhoto
 from .services import (
 	DEFAULT_SUGGESTED_PROFIT_PERCENTAGE,
@@ -1348,6 +1360,7 @@ def backoffice_adjustment_note_create(request):
 			_save_adjustment_note_evidence_files(nota, request.FILES.getlist('note_evidence_photos'))
 		except ValidationError as exc:
 			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+			context['form_draft'] = serialize_post_data(request.POST)
 			return render(request, 'backoffice/adjustment_note_create.html', context)
 
 		messages.success(request, _('Adjustment note %(note)s saved as draft.') % {'note': nota.numero})
@@ -1471,6 +1484,8 @@ def backoffice_invoice_detail(request, invoice_id):
 		'pickup_delivery': pickup_delivery,
 		'pickup_collectible_balance': pickup_collectible_balance,
 		'can_complete_pickup': can_complete_pickup,
+		'pickup_form_draft': get_workflow_draft(request.session, INVOICE_PICKUP_DRAFT_SCOPE, invoice.id),
+		'adjustment_note_form_draft': get_workflow_draft(request.session, INVOICE_ADJUSTMENT_DRAFT_SCOPE, invoice.id),
 	})
 
 
@@ -1530,11 +1545,12 @@ def backoffice_invoice_create_note(request, invoice_id):
 	if request.method != 'POST':
 		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
 
+	field_prefix = (request.POST.get('adjustment_field_prefix') or 'note_').strip()
+	if field_prefix not in {'note_', 'driver_note_'}:
+		field_prefix = 'note_'
+
 	try:
 		_validate_invoice_is_not_quickbooks_locked(invoice)
-		field_prefix = (request.POST.get('adjustment_field_prefix') or 'note_').strip()
-		if field_prefix not in {'note_', 'driver_note_'}:
-			field_prefix = 'note_'
 		evidence_field = 'driver_note_evidence_photos' if field_prefix == 'driver_note_' else 'note_evidence_photos'
 		note_request = _extract_adjustment_note_request(invoice, request.POST, field_prefix=field_prefix)
 		if note_request is None:
@@ -1553,8 +1569,31 @@ def backoffice_invoice_create_note(request, invoice_id):
 		_save_adjustment_note_evidence_files(nota, request.FILES.getlist(evidence_field))
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+		if field_prefix == 'driver_note_':
+			merge_post_into_workflow_draft(
+				request.session,
+				INVOICE_PICKUP_DRAFT_SCOPE,
+				invoice.id,
+				request.POST,
+			)
+		else:
+			merge_post_into_workflow_draft(
+				request.session,
+				INVOICE_ADJUSTMENT_DRAFT_SCOPE,
+				invoice.id,
+				request.POST,
+			)
 	else:
 		messages.success(request, _('Adjustment note %(note)s saved as draft.') % {'note': nota.numero})
+		if field_prefix == 'driver_note_':
+			remove_post_prefix_from_workflow_draft(
+				request.session,
+				INVOICE_PICKUP_DRAFT_SCOPE,
+				invoice.id,
+				'driver_note_',
+			)
+		else:
+			clear_workflow_draft(request.session, INVOICE_ADJUSTMENT_DRAFT_SCOPE, invoice.id)
 
 	return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
 
@@ -1607,10 +1646,17 @@ def backoffice_invoice_complete_pickup(request, invoice_id):
 	except ValidationError as exc:
 		transaction.set_rollback(True)
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+		merge_post_into_workflow_draft(
+			request.session,
+			INVOICE_PICKUP_DRAFT_SCOPE,
+			invoice.id,
+			request.POST,
+		)
 	else:
 		messages.success(request, _('Customer pick up completed successfully.'))
 		if nota is not None:
 			messages.success(request, _('Adjustment note %(note)s saved as draft.') % {'note': nota.numero})
+		clear_invoice_workflow_drafts(request.session, invoice.id)
 	return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
 
 
@@ -1823,6 +1869,8 @@ def driver_delivery_detail(request, delivery_id):
 		'delivery': delivery,
 		'invoice': delivery.invoice,
 		'delivery_collectible_balance': calculate_delivery_collectible_balance(delivery=delivery),
+		'delivery_complete_form_draft': get_workflow_draft(request.session, DELIVERY_COMPLETE_DRAFT_SCOPE, delivery.id),
+		'delivery_note_form_draft': get_workflow_draft(request.session, DELIVERY_NOTE_DRAFT_SCOPE, delivery.id),
 	})
 
 
@@ -1984,10 +2032,17 @@ def driver_delivery_complete(request, delivery_id):
 	except ValidationError as exc:
 		transaction.set_rollback(True)
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+		merge_post_into_workflow_draft(
+			request.session,
+			DELIVERY_COMPLETE_DRAFT_SCOPE,
+			delivery.id,
+			request.POST,
+		)
 	else:
 		messages.success(request, _('Delivery saved successfully.'))
 		if nota is not None:
 			messages.success(request, _('Adjustment note %(note)s saved as draft for BackOffice review.') % {'note': nota.numero})
+		clear_workflow_draft(request.session, DELIVERY_COMPLETE_DRAFT_SCOPE, delivery.id)
 	return redirect('driver_delivery_detail', delivery_id=delivery.id)
 
 
@@ -2026,8 +2081,15 @@ def driver_delivery_create_note(request, delivery_id):
 		_save_adjustment_note_evidence_files(nota, note_evidence_files)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+		merge_post_into_workflow_draft(
+			request.session,
+			DELIVERY_NOTE_DRAFT_SCOPE,
+			delivery.id,
+			request.POST,
+		)
 	else:
 		messages.success(request, _('Adjustment note %(note)s saved as draft for BackOffice review.') % {'note': nota.numero})
+		clear_workflow_draft(request.session, DELIVERY_NOTE_DRAFT_SCOPE, delivery.id)
 	return redirect('driver_delivery_detail', delivery_id=delivery.id)
 
 

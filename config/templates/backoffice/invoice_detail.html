@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n shipment_summary_tags %}
+{% load i18n static shipment_summary_tags %}
 
 {% block title %}{{ invoice.numero }}{% endblock %}
 
@@ -216,7 +216,7 @@
 </div>
 
 {% if show_prominent_adjustment_note %}
-{% include 'backoffice/includes/invoice_adjustment_note_form.html' with prominent=True invoice=invoice invoice_items=invoice_items %}
+{% include 'backoffice/includes/invoice_adjustment_note_form.html' with prominent=True invoice=invoice invoice_items=invoice_items adjustment_note_form_draft=adjustment_note_form_draft %}
 {% endif %}
 
 <div class="row g-3 mb-3">
@@ -521,7 +521,7 @@
 </div>
 
 {% if show_customer_pickup_completion %}
-{% include 'backoffice/includes/invoice_customer_pickup_form.html' with invoice=invoice pickup_delivery=pickup_delivery pickup_collectible_balance=pickup_collectible_balance %}
+{% include 'backoffice/includes/invoice_customer_pickup_form.html' with invoice=invoice pickup_delivery=pickup_delivery pickup_collectible_balance=pickup_collectible_balance pickup_form_draft=pickup_form_draft %}
 {% else %}
 {% product_shipment_summary source='invoice' value=invoice %}
 
@@ -610,12 +610,13 @@
     <div class="d-flex justify-content-end mb-2">
       <a href="{{ advanced_adjustment_note_url }}" class="btn btn-sm btn-outline-primary">{% trans "Choose customer and invoice" %}</a>
     </div>
-    {% include 'backoffice/includes/invoice_adjustment_note_form.html' with prominent=True invoice=invoice invoice_items=invoice_items %}
+    {% include 'backoffice/includes/invoice_adjustment_note_form.html' with prominent=True invoice=invoice invoice_items=invoice_items adjustment_note_form_draft=adjustment_note_form_draft %}
     {% endif %}
   </div>
   {% endif %}
 </div>
 {% endif %}
+<script src="{% static 'js/form-draft-restore.js' %}"></script>
 <script>
   (function () {
     const noteType = document.getElementById('backofficeNoteType');
@@ -649,6 +650,11 @@
       if (saveButton) {
         saveButton.disabled = !hasType;
       }
+    }
+
+    const adjustmentForm = document.querySelector('.invoice-adjustment-note-form');
+    if (adjustmentForm && window.LTGFormDraftRestore) {
+      window.LTGFormDraftRestore.restoreFormDraft(adjustmentForm, 'adjustment-note-form-draft-data');
     }
 
     function syncCreditTypeVisibility() {

@@ -326,6 +326,10 @@
   }
 </style>
 <div class="pickup-completion-shell" id="pickupCompletionShell">
+{% if pickup_form_draft %}
+<div class="alert alert-info mb-3">{% trans "Your previous entries were restored so you can finish the missing fields." %}</div>
+{{ pickup_form_draft|json_script:"pickup-form-draft-data" }}
+{% endif %}
 {% if pickup_delivery and not pickup_delivery.is_completed %}
 <form method="post" enctype="multipart/form-data" action="{% url 'backoffice_invoice_complete_pickup' invoice.id %}" class="pickup-flow-form">
   {% csrf_token %}
@@ -624,4 +628,5 @@
 
 {% endif %}
 </div>
+<script src="{% static 'js/form-draft-restore.js' %}"></script>
 <script src="{% static 'js/delivery-completion-form.js' %}"></script>

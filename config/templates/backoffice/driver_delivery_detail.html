@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n shipment_summary_tags %}
+{% load i18n static shipment_summary_tags %}
 {% get_current_language as CURRENT_LANGUAGE %}
 
 {% block title %}{{ delivery.invoice.numero }}{% endblock %}
@@ -613,9 +613,13 @@
 </div>
 
 {% if not delivery.is_completed %}
-<form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_complete' delivery.id %}" class="card shadow-sm driver-step-card">
+<form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_complete' delivery.id %}" class="card shadow-sm driver-step-card" id="driverDeliveryCompleteForm">
   {% csrf_token %}
   <div class="card-body">
+    {% if delivery_complete_form_draft %}
+    <div class="alert alert-info mb-3">{% trans "Your previous entries were restored so you can finish the missing fields." %}</div>
+    {{ delivery_complete_form_draft|json_script:"delivery-complete-form-draft-data" }}
+    {% endif %}
     <div class="driver-step-head">
       <span class="driver-step-index">3</span>
       <div>
@@ -888,8 +892,12 @@
         <p class="driver-adjustment-callout-lead mb-0">{% trans "Use this form to register a credit note after the delivery has been closed." %}</p>
       </div>
     </div>
-    <form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_create_note' delivery.id %}">
+    <form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_create_note' delivery.id %}" id="driverDeliveryNoteForm">
       {% csrf_token %}
+      {% if delivery_note_form_draft %}
+      <div class="alert alert-info mb-3">{% trans "Your previous entries were restored so you can finish the missing fields." %}</div>
+      {{ delivery_note_form_draft|json_script:"delivery-note-form-draft-data" }}
+      {% endif %}
       <div class="row g-3">
         <div class="col-12 col-md-4">
           <label class="form-label fw-semibold">{% trans "Type" %}</label>
@@ -1085,6 +1093,7 @@
 {% endif %}
 </div>
 
+<script src="{% static 'js/form-draft-restore.js' %}"></script>
 <script>
   (function () {
     const cameraWidgets = document.querySelectorAll('[data-camera-upload]');
@@ -1657,6 +1666,16 @@
     document.querySelectorAll('.js-driver-adjustment-package-qty, .js-driver-adjustment-unit-qty').forEach((field) => {
       field.addEventListener('input', recalculateDriverAdjustmentAmounts);
     });
+
+    const deliveryCompleteForm = document.getElementById('driverDeliveryCompleteForm');
+    if (deliveryCompleteForm && window.LTGFormDraftRestore) {
+      window.LTGFormDraftRestore.restoreFormDraft(deliveryCompleteForm, 'delivery-complete-form-draft-data');
+    }
+    const deliveryNoteForm = document.getElementById('driverDeliveryNoteForm');
+    if (deliveryNoteForm && window.LTGFormDraftRestore) {
+      window.LTGFormDraftRestore.restoreFormDraft(deliveryNoteForm, 'delivery-note-form-draft-data');
+    }
+
     togglePaymentSections();
     toggleDriverNoteFields();
     toggleDriverNotePostFields();
@@ -1725,6 +1744,9 @@
     canvas.addEventListener('touchend', stopDrawing);
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
+    if (window.LTGFormDraftRestore) {
+      window.LTGFormDraftRestore.restoreSignatureFromHiddenInput(canvas, signatureInput);
+    }
   })();
 </script>
 {% endblock %}

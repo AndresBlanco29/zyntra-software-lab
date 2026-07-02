@@ -75,10 +75,10 @@ input[id^="buscador"]::placeholder {
 #catalogo-filter-form input[name="q"],
 #catalogo-vendedor-filter-form #buscador,
 #catalogo-filter-form #buscador {
-    flex: 1 1 460px;
+    flex: 0 0 auto;
     width: 100%;
-    max-width: none;
-    min-width: min(100%, 460px);
+    max-width: 100%;
+    min-width: 0;
 }
 
 #catalogo-vendedor-filter-form .form-select,
@@ -111,18 +111,44 @@ form.d-flex > input[type="search"]:not(.navbar-search-input) {
         width: 460px;
         min-width: 360px;
     }
+
+    #catalogo-vendedor-filter-form input[name="q"],
+    #catalogo-filter-form input[name="q"],
+    #catalogo-vendedor-filter-form #buscador,
+    #catalogo-filter-form #buscador {
+        flex: 1 1 460px;
+        width: auto;
+        max-width: none;
+        min-width: min(100%, 460px);
+    }
 }
 
 @media (max-width: 767.98px) {
     input[type="search"]:not(.select2-search__field):not(.navbar-search-input),
     input[name="q"],
     input[id^="buscador"] {
-        min-width: 100%;
+        min-width: 0;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    #catalogo-vendedor-filter-form,
+    #catalogo-filter-form {
+        align-items: stretch;
+    }
+
+    #catalogo-vendedor-filter-form input[name="q"],
+    #catalogo-filter-form input[name="q"],
+    #catalogo-vendedor-filter-form #buscador,
+    #catalogo-filter-form #buscador {
+        flex: 0 0 auto;
+        height: auto;
     }
 
     #catalogo-vendedor-filter-form .form-select,
     #catalogo-filter-form .form-select {
-        flex: 1 1 100%;
+        flex: 0 0 auto;
+        width: 100%;
     }
 }
 

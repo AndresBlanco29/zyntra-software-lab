@@ -425,6 +425,7 @@ z-index:9999;
     #buscador {
         width: 100%;
         min-width: unset !important;
+        flex: 0 0 auto;
         margin-bottom: 6px;
     }
 
@@ -487,6 +488,7 @@ z-index:9999;
     .catalog-header .selects-row > #buscador {
         width: 100%;
         min-width: 0;
+        flex: 0 0 auto;
     }
 
     .catalog-header .selects-row {

@@ -843,8 +843,11 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertTrue(any(result['id'] == self.presentacion.id for result in payload['results']))
 		self.assertTrue(any('Producto test' in result['label'] for result in payload['results']))
 		matched = next(result for result in payload['results'] if result['id'] == self.presentacion.id)
-		self.assertLessEqual(len(matched['prices']), 2)
+		self.assertEqual(len(matched['prices']), 5)
+		self.assertEqual(matched['prices'][0]['key'], 'precio_1')
+		self.assertEqual(matched['prices'][0]['value'], '12.00')
 		self.assertIn('default_price_key', matched)
+		self.assertEqual(matched['default_price_key'], 'precio_1')
 
 	def test_searchable_selects_script_uses_dropdown_input_plugin(self):
 		from pathlib import Path

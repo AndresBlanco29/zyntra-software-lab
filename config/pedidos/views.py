@@ -550,6 +550,33 @@ def _default_presentacion_price_key_for_pedido(*, pedido):
 	return 'invoice_sale_1'
 
 
+def _default_catalog_presentacion_price_key_for_pedido(*, pedido, presentacion):
+	default_price = _default_presentacion_price_for_pedido(presentacion=presentacion, pedido=pedido)
+	catalog_prices, _, _ = _build_catalog_presentacion_price_options(presentacion=presentacion, pedido=None)
+	return _match_presentacion_price_key(catalog_prices, default_price) or 'precio_1'
+
+
+def _build_catalog_presentacion_price_options(*, presentacion, pedido=None):
+	prices = []
+	for index in range(1, 6):
+		key = f'precio_{index}'
+		value = _quantize_money(getattr(presentacion, key, 0) or 0)
+		prices.append({
+			'key': key,
+			'value': format(value, '.2f'),
+			'label': f'{_("Price")} {index} - ${format(value, ".2f")}',
+		})
+
+	if pedido is not None:
+		default_price = _default_presentacion_price_for_pedido(presentacion=presentacion, pedido=pedido)
+		default_key = _default_catalog_presentacion_price_key_for_pedido(pedido=pedido, presentacion=presentacion)
+	else:
+		default_key = 'precio_1'
+		default_price = _quantize_money(presentacion.precio_1 or 0)
+
+	return prices, default_key, format(default_price, '.2f')
+
+
 def _build_presentacion_price_options(*, presentacion, pedido=None):
 	cliente = getattr(pedido, 'cliente', None) if pedido is not None else None
 	if cliente is not None:
@@ -669,7 +696,7 @@ def backoffice_buscar_presentaciones(request):
 
 	results = []
 	for presentacion in presentaciones:
-		price_options, default_price_key, default_price = _build_presentacion_price_options(
+		price_options, default_price_key, default_price = _build_catalog_presentacion_price_options(
 			presentacion=presentacion,
 			pedido=pedido,
 		)

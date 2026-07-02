@@ -1764,13 +1764,11 @@ class InvoiceFlowTests(TestCase):
 		)
 		self.client.force_login(self.backoffice)
 
-		response = self.client.get(
-			reverse('backoffice_invoice_detail', args=[invoice.id]),
-			{'focus_adjustment_note': '1'},
-		)
+		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
 
 		self.assertEqual(response.status_code, 200)
 		self.assertTrue(response.context['show_prominent_adjustment_note'])
+		self.assertContains(response, 'driver-adjustment-callout', html=False)
 		self.assertContains(response, 'id="backoffice-adjustment-note"', html=False)
 		self.assertContains(response, 'Start here: note type')
 		self.assertContains(response, 'No adjustment note')

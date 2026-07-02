@@ -1422,7 +1422,7 @@ def backoffice_invoice_detail(request, invoice_id):
 	driver_created_notes_count = invoice.notas_ajuste.filter(creada_por__role='driver').count()
 	focus_adjustment_note = str(request.GET.get('focus_adjustment_note') or '').strip() == '1'
 	can_create_adjustment_note = not is_sync_locked(invoice) and invoice.estado != 'ANULADA'
-	show_prominent_adjustment_note = focus_adjustment_note and can_create_adjustment_note
+	show_prominent_adjustment_note = can_create_adjustment_note
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
 		'customer_company_name': resolve_customer_company_name(invoice.cliente),

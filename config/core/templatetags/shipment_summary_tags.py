@@ -2,12 +2,11 @@ from django import template
 
 from config.core.shipment_summary import (
 	build_shipment_summary_from_cart_entries,
-	build_shipment_summary_from_invoice,
 	build_shipment_summary_from_pedido_items,
 	build_shipment_summary_from_vendor_cart_products,
 	unwrap_quote_rows,
 )
-
+from config.facturacion.services import build_invoice_shipment_summary
 register = template.Library()
 
 
@@ -21,7 +20,7 @@ def product_shipment_summary(source, value, quantity='cantidad'):
 		return {'shipment_summary': _empty_summary()}
 
 	if source == 'invoice':
-		summary = build_shipment_summary_from_invoice(value)
+		summary = build_invoice_shipment_summary(value)
 	elif source == 'pedido_items':
 		summary = build_shipment_summary_from_pedido_items(value, quantity_attr=quantity)
 	elif source == 'pedido':

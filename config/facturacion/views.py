@@ -69,6 +69,7 @@ from .services import (
 	aprobar_nota_ajuste,
 	anular_invoice,
 	anular_nota_ajuste,
+	attach_invoice_item_net_dispatched_quantities,
 	build_google_maps_route_url,
 	build_invoice_shipment_summary,
 	calculate_delivery_collectible_balance,
@@ -410,6 +411,11 @@ def _build_adjustment_note_creation_context(*, selected_client_id=None, selected
 			.order_by('-creada_en')
 		)
 
+	selected_invoice_items = []
+	if selected_invoice is not None:
+		selected_invoice_items = order_invoice_items_for_display(selected_invoice)
+		attach_invoice_item_net_dispatched_quantities(selected_invoice, selected_invoice_items)
+
 	return {
 		'customers': filtered_customers,
 		'customer_search_query': query,
@@ -419,6 +425,7 @@ def _build_adjustment_note_creation_context(*, selected_client_id=None, selected
 		'product_presentations': _build_note_product_presentations(selected_client),
 		'selected_client': selected_client,
 		'selected_invoice': selected_invoice,
+		'selected_invoice_items': selected_invoice_items,
 		'selected_invoice_quickbooks_locked': bool(selected_invoice and is_sync_locked(selected_invoice)),
 	}
 
@@ -455,7 +462,9 @@ def _calculate_invoice_line_discount_total(invoice):
 
 def _build_invoice_pdf_item_data(invoice):
 	items = []
-	for item in order_invoice_items_for_display(invoice):
+	display_items = order_invoice_items_for_display(invoice)
+	attach_invoice_item_net_dispatched_quantities(invoice, display_items)
+	for item in display_items:
 		barcode = _resolve_invoice_barcode(item)
 		requested_quantity = item.cantidad_facturada
 		if item.pedido_item_id:
@@ -488,7 +497,7 @@ def _build_invoice_pdf_item_data(invoice):
 			'product_name': item.producto_nombre,
 			'pack_size': INVOICE_PDF_UNIT_OF_MEASURE,
 			'requested_quantity': str(requested_quantity),
-			'dispatched_quantity': str(item.cantidad_facturada),
+			'dispatched_quantity': str(item.cantidad_despachada_neta),
 			'list_price': _format_pdf_money(list_price_value),
 			'discount_amount_unit': _format_pdf_money(discount_amount_unit) if discount_amount_unit > 0 else '—',
 			'discount_percentage': f'{discount_percentage:.2f}%' if discount_percentage > 0 else '—',
@@ -1464,10 +1473,13 @@ def backoffice_invoice_detail(request, invoice_id):
 	focus_adjustment_note = str(request.GET.get('focus_adjustment_note') or '').strip() == '1'
 	can_create_adjustment_note = not is_sync_locked(invoice) and invoice.estado != 'ANULADA'
 	show_prominent_adjustment_note = can_create_adjustment_note and not show_customer_pickup_completion
+	invoice_items = list(order_invoice_items_for_display(invoice))
+	attach_invoice_item_net_dispatched_quantities(invoice, invoice_items)
+	attach_invoice_item_net_dispatched_quantities(invoice, list(invoice.items.all()))
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
 		'customer_company_name': resolve_customer_company_name(invoice.cliente),
-		'invoice_items': order_invoice_items_for_display(invoice),
+		'invoice_items': invoice_items,
 		'invoice_shipment_summary': build_invoice_shipment_summary(invoice),
 		'invoice_payment_due_date': resolve_invoice_payment_due_date(invoice),
 		'customer_amount_owed': resolve_customer_amount_owed(cliente=invoice.cliente, invoice=invoice),
@@ -1865,6 +1877,7 @@ def driver_delivery_detail(request, delivery_id):
 		driver=request.user,
 	)
 	delivery.workflow_badge = build_delivery_workflow_badge(delivery)
+	attach_invoice_item_net_dispatched_quantities(delivery.invoice, list(delivery.invoice.items.all()))
 	return render(request, 'backoffice/driver_delivery_detail.html', {
 		'delivery': delivery,
 		'invoice': delivery.invoice,

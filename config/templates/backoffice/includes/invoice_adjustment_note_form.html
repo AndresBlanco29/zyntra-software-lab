@@ -90,7 +90,7 @@
           <th>{% trans "Line" %}</th>
           {% if prominent %}
           <th>{% trans "Requested qty." %}</th>
-          <th>{% trans "Invoiced qty." %}</th>
+          <th>{% trans "Dispatched qty." %}</th>
           {% endif %}
           <th>{% trans "Boxes / pallets" %}</th>
           <th>{% trans "Partial content" %}</th>
@@ -102,15 +102,15 @@
         <tr>
           <td>
             {{ item.producto_nombre }}
-            <div class="small text-muted">{{ item.presentacion_nombre_display }}{% if not prominent %} | {% trans "Max" %}: {{ item.cantidad_facturada }}{% endif %}</div>
+            <div class="small text-muted">{{ item.presentacion_nombre_display }}{% if not prominent %} | {% trans "Max" %}: {{ item.cantidad_despachada_neta }}{% endif %}</div>
           </td>
           {% if prominent %}
           <td>{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
-          <td>{{ item.cantidad_facturada }}</td>
+          <td>{{ item.cantidad_despachada_neta }}</td>
           {% endif %}
           <td>
             <label class="form-label small text-muted mb-1">{{ item.presentacion_nombre_display }}</label>
-            <input type="number" min="0" max="{{ item.cantidad_facturada }}" name="note_qty_{{ item.id }}" class="form-control form-control-sm js-adjustment-package-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades|default:1 }}">
+            <input type="number" min="0" max="{{ item.cantidad_despachada_neta }}" name="note_qty_{{ item.id }}" class="form-control form-control-sm js-adjustment-package-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades|default:1 }}">
           </td>
           <td>
             {% if item.presentacion and item.presentacion.unidades > 1 %}

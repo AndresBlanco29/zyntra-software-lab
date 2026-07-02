@@ -498,7 +498,7 @@
             <td data-label="{% trans 'Description' %}">{{ item.producto_nombre }}</td>
             <td data-label="{% trans 'U/M' %}">{{ item.presentacion_nombre_display }}</td>
             <td data-label="{% trans 'Requested qty.' %}">{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
-            <td data-label="{% trans 'Dispatched qty.' %}">{{ item.cantidad_facturada }}</td>
+            <td data-label="{% trans 'Dispatched qty.' %}">{{ item.cantidad_despachada_neta }}</td>
             <td data-label="{% trans 'List price' %}">{% if item.precio_unitario_lista %}${{ item.precio_unitario_lista }}{% else %}—{% endif %}</td>
             <td data-label="{% trans 'Discount' %}">
               {% if item.descuento_monto_unitario and item.descuento_monto_unitario > 0 %}

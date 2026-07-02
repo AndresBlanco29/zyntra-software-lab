@@ -556,7 +556,7 @@
             <td data-label="{% trans 'Product' %}">{{ item.producto_nombre }}</td>
             <td data-label="{% trans 'Presentation' %}">{{ item.presentacion_nombre }}</td>
             <td data-label="QTY ORD">{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
-            <td data-label="QTY DSP">{{ item.cantidad_facturada }}</td>
+            <td data-label="QTY DSP">{{ item.cantidad_despachada_neta }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -729,7 +729,7 @@
                       <td data-label="{% trans 'Invoiced qty.' %}">{{ item.cantidad_facturada }}</td>
                       <td class="driver-stack-field" data-label="{% trans 'Boxes / pallets' %}">
                         <label class="form-label small text-muted mb-1">{{ item.presentacion_nombre }}</label>
-                        <input type="number" min="0" max="{{ item.cantidad_facturada }}" name="driver_note_qty_{{ item.id }}" class="form-control form-control-sm js-driver-adjustment-package-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="driver_note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades|default:1 }}">
+                        <input type="number" min="0" max="{{ item.cantidad_despachada_neta }}" name="driver_note_qty_{{ item.id }}" class="form-control form-control-sm js-driver-adjustment-package-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="driver_note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades|default:1 }}">
                       </td>
                       <td class="driver-stack-field" data-label="{% trans 'Partial content' %}">
                         {% if item.presentacion and item.presentacion.unidades > 1 %}
@@ -984,7 +984,7 @@
                   <td data-label="{% trans 'Invoiced qty.' %}">{{ item.cantidad_facturada }}</td>
                   <td class="driver-stack-field" data-label="{% trans 'Boxes / pallets' %}">
                     <label class="form-label small text-muted mb-1">{{ item.presentacion_nombre }}</label>
-                    <input type="number" min="0" max="{{ item.cantidad_facturada }}" name="driver_note_qty_{{ item.id }}" class="form-control form-control-sm js-driver-adjustment-package-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="driver_note_amount_post_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades|default:1 }}">
+                    <input type="number" min="0" max="{{ item.cantidad_despachada_neta }}" name="driver_note_qty_{{ item.id }}" class="form-control form-control-sm js-driver-adjustment-package-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="driver_note_amount_post_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades|default:1 }}">
                   </td>
                   <td class="driver-stack-field" data-label="{% trans 'Partial content' %}">
                     {% if item.presentacion and item.presentacion.unidades > 1 %}

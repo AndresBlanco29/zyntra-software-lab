@@ -553,6 +553,15 @@ class InvoiceItem(models.Model):
 				return effective_name
 		return self.presentacion_nombre
 
+	@property
+	def cantidad_despachada_neta(self):
+		cached = getattr(self, '_cantidad_despachada_neta', None)
+		if cached is not None:
+			return cached
+		from config.facturacion.services import resolve_invoice_item_net_dispatched_quantity
+
+		return resolve_invoice_item_net_dispatched_quantity(self)
+
 
 class NotaAjuste(models.Model):
 	DOCUMENT_TYPE_CHOICES = (

@@ -49,10 +49,84 @@ def resolve_invoice_item_case_weight(item):
 	)
 
 
-def build_invoice_shipment_summary(invoice):
-	from config.core.shipment_summary import build_shipment_summary_from_invoice
+PRODUCT_CREDIT_NOTE_TYPES = frozenset({'CREDIT_RETURN', 'CREDIT_DUMP'})
 
-	return build_shipment_summary_from_invoice(invoice)
+
+def _invoice_item_units_per_package(invoice_item):
+	return max(int(getattr(getattr(invoice_item, 'presentacion', None), 'unidades', 0) or 0), 1)
+
+
+def _note_item_returned_units(note_item):
+	if note_item.contenido_fraccionado:
+		return int(note_item.cantidad or 0)
+	presentation = note_item.presentacion
+	invoice_item = note_item.invoice_item
+	units_per_package = max(
+		int(getattr(presentation, 'unidades', 0) or 0),
+		_invoice_item_units_per_package(invoice_item) if invoice_item is not None else 1,
+		1,
+	)
+	return int(note_item.cantidad or 0) * units_per_package
+
+
+def build_invoice_item_returned_units_map(invoice):
+	returned_units = {}
+	note_items = NotaAjusteItem.objects.filter(
+		invoice_item__invoice=invoice,
+		nota__estado='APROBADA',
+		nota__tipo_documento='CREDITO',
+		nota__tipo_ajuste='PRODUCTO',
+		nota__tipo_credito__in=PRODUCT_CREDIT_NOTE_TYPES,
+	).select_related('presentacion', 'invoice_item__presentacion')
+	for note_item in note_items:
+		if not note_item.invoice_item_id:
+			continue
+		returned_units[note_item.invoice_item_id] = returned_units.get(note_item.invoice_item_id, 0) + _note_item_returned_units(note_item)
+	return returned_units
+
+
+def resolve_invoice_item_returned_packages(invoice_item, returned_units_map=None):
+	returned_units = (returned_units_map or {}).get(invoice_item.id, 0)
+	if returned_units <= 0:
+		return 0
+	units_per_package = _invoice_item_units_per_package(invoice_item)
+	return min(int(invoice_item.cantidad_facturada or 0), returned_units // units_per_package)
+
+
+def resolve_invoice_item_net_dispatched_quantity(invoice_item, returned_units_map=None):
+	if returned_units_map is None and getattr(invoice_item, 'invoice_id', None):
+		returned_units_map = build_invoice_item_returned_units_map(invoice_item.invoice)
+	returned_packages = resolve_invoice_item_returned_packages(invoice_item, returned_units_map)
+	return max(0, int(invoice_item.cantidad_facturada or 0) - returned_packages)
+
+
+def resolve_invoice_item_returnable_units(invoice_item, returned_units_map=None):
+	if returned_units_map is None and getattr(invoice_item, 'invoice_id', None):
+		returned_units_map = build_invoice_item_returned_units_map(invoice_item.invoice)
+	max_units = int(invoice_item.cantidad_facturada or 0) * _invoice_item_units_per_package(invoice_item)
+	already_returned = (returned_units_map or {}).get(invoice_item.id, 0)
+	return max(0, max_units - already_returned)
+
+
+def attach_invoice_item_net_dispatched_quantities(invoice, items):
+	returned_units_map = build_invoice_item_returned_units_map(invoice)
+	for item in items:
+		item._cantidad_despachada_neta = resolve_invoice_item_net_dispatched_quantity(item, returned_units_map)
+	return items
+
+
+def build_invoice_shipment_summary(invoice):
+	from config.core.shipment_summary import build_shipment_summary_from_lines
+
+	returned_units_map = build_invoice_item_returned_units_map(invoice)
+	return build_shipment_summary_from_lines([
+		{
+			'quantity': resolve_invoice_item_net_dispatched_quantity(item, returned_units_map),
+			'case_weight': item.peso_por_caja,
+			'presentacion': getattr(item, 'presentacion', None),
+		}
+		for item in invoice.items.all()
+	])
 
 
 def _to_decimal(value, default='0'):
@@ -1300,6 +1374,7 @@ def crear_nota_ajuste(
 	if tipo_documento == 'CREDITO' and tipo_ajuste == 'FINANCIERO' and tipo_credito != 'CREDIT_DUMP':
 		raise ValidationError(_('Financial credit notes must use Credit Dump.'))
 	general_amount = _quantize_money(monto or '0.00')
+	returned_units_map = build_invoice_item_returned_units_map(invoice) if invoice is not None else {}
 
 	normalized_items = []
 	for payload in items_payload or []:
@@ -1336,7 +1411,7 @@ def crear_nota_ajuste(
 			continue
 
 		if invoice_item is not None:
-			max_units = int(invoice_item.cantidad_facturada or 0) * units_per_package
+			max_units = resolve_invoice_item_returnable_units(invoice_item, returned_units_map)
 			if requested_units > max_units:
 				raise ValidationError(
 					_('The returned quantity for %(product)s cannot exceed the invoiced units.') % {

@@ -17,7 +17,7 @@ from reportlab.platypus import SimpleDocTemplate
 
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, DeliveryNotificationLog, FacturacionRegistroAnulacion, Invoice, NotaAjuste, NotaAjusteAplicacion
-from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, build_google_maps_route_url, build_invoice_shipment_summary, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, invoice_delete_requires_confirmation_phrase, mark_delivery_unpaid_from_backoffice, resolve_customer_amount_owed, resolve_invoice_payment_base_date, resolve_invoice_payment_due_date, start_delivery_route, unlock_client_from_delivery, validate_invoice_delete_confirmation_phrase
+from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, attach_invoice_item_net_dispatched_quantities, build_google_maps_route_url, build_invoice_shipment_summary, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, invoice_delete_requires_confirmation_phrase, mark_delivery_unpaid_from_backoffice, resolve_customer_amount_owed, resolve_invoice_item_net_dispatched_quantity, resolve_invoice_payment_base_date, resolve_invoice_payment_due_date, start_delivery_route, unlock_client_from_delivery, validate_invoice_delete_confirmation_phrase
 from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_footer_layout, _build_invoice_pdf_item_data, _build_invoice_pdf_shipment_summary_table, _build_invoice_pdf_terms_paragraph, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_pdf_due_date_label, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_SYNCED
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
@@ -580,6 +580,71 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(nota.inventario_estado, 'PROCESADO')
 		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, 26)
 		self.assertTrue(InventarioMovimiento.objects.filter(nota_ajuste=nota, tipo='ENTRADA_NOTA_CREDITO').exists())
+
+	def test_approved_credit_return_reduces_invoice_dispatched_qty_and_case_count(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		item = invoice.items.get()
+		nota = crear_nota_ajuste_desde_invoice(
+			invoice=invoice,
+			tipo_documento='CREDITO',
+			motivo='DEFECT',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Defecto de fabrica',
+			usuario=self.backoffice,
+			items_payload=[{
+				'invoice_item': item,
+				'cantidad': 1,
+				'monto_unitario': Decimal('15.00'),
+			}],
+		)
+
+		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
+		item.refresh_from_db()
+
+		self.assertEqual(item.cantidad_facturada, 3)
+		self.assertEqual(resolve_invoice_item_net_dispatched_quantity(item), 2)
+		self.assertEqual(build_invoice_shipment_summary(invoice)['total_cases'], 2)
+
+		rows = _build_invoice_pdf_item_data(invoice)
+		self.assertEqual(rows[0]['dispatched_quantity'], '2')
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertContains(response, 'data-label="Dispatched qty.">2</td>', html=False)
+
+	def test_full_credit_return_sets_invoice_line_dispatched_qty_to_zero(self):
+		pedido = self._create_verified_order(total='25.03', quantity=1)
+		invoice = generar_invoice_desde_picking(
+			pedido=pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		item = invoice.items.get()
+		nota = crear_nota_ajuste_desde_invoice(
+			invoice=invoice,
+			tipo_documento='CREDITO',
+			motivo='DEFECT',
+			tipo_credito='CREDIT_RETURN',
+			descripcion='Devolucion total',
+			usuario=self.backoffice,
+			items_payload=[{
+				'invoice_item': item,
+				'cantidad': 1,
+				'monto_unitario': Decimal('25.03'),
+			}],
+		)
+
+		aprobar_nota_ajuste(nota=nota, usuario=self.backoffice)
+
+		self.assertEqual(resolve_invoice_item_net_dispatched_quantity(item), 0)
+		self.assertEqual(build_invoice_shipment_summary(invoice)['total_cases'], 0)
+		self.assertEqual(_build_invoice_pdf_item_data(invoice)[0]['dispatched_quantity'], '0')
 
 	def test_credit_note_without_invoice_increases_customer_credit_balance(self):
 		nota = crear_nota_ajuste(

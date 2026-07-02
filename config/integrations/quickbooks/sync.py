@@ -1807,7 +1807,7 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
         brand=brand,
         preserve_local=True,
     )
-    producto.activo = _resolve_quickbooks_item_active(payload, client=client)
+    producto.activo = _resolve_quickbooks_item_active(payload, client=client, fetch_when_missing=True)
     if sku:
         if producto.codigo_barras == sku:
             pass
@@ -1883,12 +1883,16 @@ def import_quickbooks_item_record(payload, *, client=None, skip_enrich=False, sk
     unit_price = _quantize_money(payload.get('UnitPrice') or 0)
     item_cost = _extract_quickbooks_item_cost(payload)
     category, brand = _resolve_quickbooks_item_category_and_brand(payload, lookup_cache=lookup_cache)
-    item_active = _resolve_quickbooks_item_active(payload, client=client)
     existing = prefetched_presentacion
     if existing is None:
         existing = Presentacion.objects.select_related('producto').filter(quickbooks_id=quickbooks_id).first()
     elif getattr(existing, 'quickbooks_id', None) and str(existing.quickbooks_id) != quickbooks_id:
         existing = Presentacion.objects.select_related('producto').filter(quickbooks_id=quickbooks_id).first()
+    item_active = _resolve_quickbooks_item_active(
+        payload,
+        client=client,
+        fetch_when_missing=existing is not None,
+    )
     if not item_active and existing is None:
         return _skip_import_result(
             entity='Item',
@@ -2035,6 +2039,55 @@ def import_quickbooks_item_record(payload, *, client=None, skip_enrich=False, sk
     }
 
 
+def _deactivate_local_product_for_quickbooks_item(*, quickbooks_id, prefetched_presentacion=None):
+    qb_id = str(quickbooks_id or '').strip()
+    if not qb_id:
+        return None
+    presentacion = prefetched_presentacion
+    if presentacion is None:
+        presentacion = Presentacion.objects.select_related('producto').filter(quickbooks_id=qb_id).first()
+    if presentacion is None:
+        return None
+    producto = presentacion.producto
+    if producto is None or not producto.activo:
+        return presentacion
+    producto.activo = False
+    producto.save(update_fields=['activo'])
+    return presentacion
+
+
+def _merge_import_batch_results(*results):
+    merged = {
+        'entity': 'CatalogSync',
+        'count': 0,
+        'created_count': 0,
+        'updated_count': 0,
+        'deactivated_count': 0,
+        'skipped_count': 0,
+        'conflict_count': 0,
+        'failed_count': 0,
+        'latest_updated_at': None,
+        'results': [],
+    }
+    latest_dt = None
+    for result in results or []:
+        if not result:
+            continue
+        merged['count'] += int(result.get('count') or 0)
+        merged['created_count'] += int(result.get('created_count') or 0)
+        merged['updated_count'] += int(result.get('updated_count') or 0)
+        merged['deactivated_count'] += int(result.get('deactivated_count') or 0)
+        merged['skipped_count'] += int(result.get('skipped_count') or 0)
+        merged['conflict_count'] += int(result.get('conflict_count') or 0)
+        merged['failed_count'] += int(result.get('failed_count') or 0)
+        merged['results'].extend(result.get('results') or [])
+        candidate = _parse_quickbooks_datetime(result.get('latest_updated_at'))
+        if candidate and (latest_dt is None or candidate > latest_dt):
+            latest_dt = candidate
+            merged['latest_updated_at'] = result.get('latest_updated_at')
+    return merged
+
+
 def _import_batch_result(*, entity_name, records, import_callable, task_cache_key=None, client=None):
     results = []
     total = len(records or [])
@@ -2101,6 +2154,7 @@ def _import_batch_result(*, entity_name, records, import_callable, task_cache_ke
         'count': len(records),
         'created_count': sum(1 for item in results if item.get('ok') and item.get('action') == 'created'),
         'updated_count': sum(1 for item in results if item.get('ok') and item.get('action') == 'updated'),
+        'deactivated_count': sum(1 for item in results if item.get('ok') and item.get('action') == 'deactivated'),
         'skipped_count': sum(1 for item in results if item.get('action') == 'skipped'),
         'conflict_count': sum(1 for item in results if item.get('action') == 'conflict'),
         'failed_count': sum(1 for item in results if not item.get('ok') and item.get('action') not in {'conflict', 'skipped'}),
@@ -3461,11 +3515,24 @@ def pull_quickbooks_items_to_local(*, max_results=25, client=None, force_full=Fa
     }
 
 
-def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None, task_cache_key=None):
-    """Re-fetch only catalog rows already linked by quickbooks_id (update, not full re-import)."""
+def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None, task_cache_key=None, skip_images=None):
+    """Refresh linked catalog rows and import any new/changed QuickBooks items since the last cursor."""
     if limit is None:
         limit = max_results
     client = client or QuickBooksAPIClient()
+    connection = client.connection
+    if skip_images is None:
+        skip_images = _catalog_sync_skip_images()
+
+    item_cursor = _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('item')))
+    incremental_result = import_quickbooks_items(
+        max_results=limit,
+        client=client,
+        updated_after=item_cursor,
+        task_cache_key=task_cache_key,
+        skip_images=skip_images,
+    )
+
     queryset = (
         Presentacion.objects.filter(quickbooks_id__isnull=False)
         .exclude(quickbooks_id='')
@@ -3490,31 +3557,57 @@ def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None
         payloads.append(payload)
 
     def _import_payload(payload):
+        qb_id = str(payload.get('Id') or '').strip()
         if payload.get('_missing_in_qb'):
+            presentacion = _deactivate_local_product_for_quickbooks_item(
+                quickbooks_id=qb_id,
+                prefetched_presentacion=prefetched_presentaciones.get(qb_id),
+            )
+            if presentacion is not None:
+                producto = presentacion.producto
+                return {
+                    'ok': True,
+                    'action': 'deactivated',
+                    'entity': 'Item',
+                    'quickbooks_id': qb_id,
+                    'local_id': presentacion.id,
+                    'label': f'{producto.nombre} / {presentacion.nombre}',
+                }
             return {
                 'ok': False,
                 'action': 'missing',
                 'entity': 'Item',
-                'quickbooks_id': str(payload.get('Id') or ''),
-                'label': str(payload.get('Id') or ''),
+                'quickbooks_id': qb_id,
+                'label': qb_id,
                 'error': payload.get('_error') or 'Item not found in QuickBooks.',
             }
         return import_quickbooks_item_record(
             payload,
             client=client,
-            prefetched_presentacion=prefetched_presentaciones.get(str(payload.get('Id') or '').strip()),
+            skip_enrich=True,
+            skip_images=skip_images,
+            prefetched_presentacion=prefetched_presentaciones.get(qb_id),
             lookup_cache=lookup_cache,
         )
 
-    result = _import_batch_result(
+    linked_result = _import_batch_result(
         entity_name='LinkedItem',
         records=payloads,
         import_callable=_import_payload,
         task_cache_key=task_cache_key,
+        client=client,
     )
     cache.delete('catalogo:productos_activos_v2')
+
+    latest_updated_at = incremental_result.get('latest_updated_at') or linked_result.get('latest_updated_at')
+    if latest_updated_at:
+        connection.set_sync_cursor(_sync_cursor_key('item'), latest_updated_at)
+        connection.save(update_fields=['sync_state', 'updated_at'])
+
+    result = _merge_import_batch_results(incremental_result, linked_result)
     result['linked_count'] = len(qb_ids)
     result['incremental'] = True
+    result['incremental_count'] = int(incremental_result.get('count') or 0)
     return result
 
 

@@ -870,7 +870,7 @@
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
                 <button type="submit" class="btn btn-outline-primary w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Update linked catalog only" %}</button>
               </form>
-              <p class="qb-action-note">{% trans "Fast refresh for products already linked to QuickBooks: cost, prices, stock, packaging, names, images, and active/inactive status. Does not scan the full QuickBooks catalog." %}</p>
+              <p class="qb-action-note">{% trans "Updates linked products from QuickBooks (cost, stock, names, active/inactive status) and also imports any new or changed catalog items since the last sync." %}</p>
             </div>
             {% if quickbooks_import_accounting_enabled %}
             <div class="qb-action-item" id="qb-pull-accounting">
@@ -1317,6 +1317,9 @@
       if (operation === 'sync_item_images_to_local') {
         return 'Estamos descargando imágenes de productos desde QuickBooks.';
       }
+      if (operation === 'refresh_linked_items_to_local') {
+        return 'Estamos actualizando catálogo desde QuickBooks e importando productos nuevos.';
+      }
       return 'Estamos importando datos desde QuickBooks.';
     }
 
@@ -1335,6 +1338,11 @@
         return processed && total
           ? `Descargando imágenes ${processed} de ${total}...`
           : 'Descargando imágenes — por favor espera.';
+      }
+      if (operation === 'refresh_linked_items_to_local') {
+        return processed && total
+          ? `Actualizando catálogo ${processed} de ${total}...`
+          : 'Actualizando catálogo — por favor espera.';
       }
       return processed && total
         ? `Importando ${processed} de ${total}...`
@@ -1394,10 +1402,11 @@
             let details = '';
             try{
               const res = data.result || {};
-              if (res.created_count || res.updated_count || res.conflict_count || res.failed_count){
+              if (res.created_count || res.updated_count || res.deactivated_count || res.conflict_count || res.failed_count){
                 const parts = [];
                 if (typeof res.created_count !== 'undefined') parts.push('Creados: ' + (res.created_count||0));
                 if (typeof res.updated_count !== 'undefined') parts.push('Actualizados: ' + (res.updated_count||0));
+                if (typeof res.deactivated_count !== 'undefined' && res.deactivated_count) parts.push('Inactivados: ' + (res.deactivated_count||0));
                 if (typeof res.conflict_count !== 'undefined') parts.push('Conflictos: ' + (res.conflict_count||0));
                 if (typeof res.failed_count !== 'undefined') parts.push('Fallidos: ' + (res.failed_count||0));
                 details = parts.join(' · ');

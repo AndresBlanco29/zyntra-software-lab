@@ -381,9 +381,11 @@ class QuickBooksItemCostSyncTests(TestCase):
         self.assertEqual(_extract_quickbooks_item_cost(result), Decimal('35.99'))
         mock_fetch.assert_called_once()
 
+    @patch('config.integrations.quickbooks.sync.import_quickbooks_items')
     @patch('config.integrations.quickbooks.sync.import_quickbooks_item_record')
     @patch('config.integrations.quickbooks.sync._fetch_quickbooks_items_map')
-    def test_refresh_linked_items_uses_full_item_payload_for_cost(self, mock_fetch_map, mock_import):
+    def test_refresh_linked_items_uses_full_item_payload_for_cost(self, mock_fetch_map, mock_import, mock_incremental):
+        mock_incremental.return_value = {'count': 0, 'created_count': 0, 'updated_count': 0, 'latest_updated_at': None}
         categoria = Categoria.objects.create(nombre='Aceites')
         marca = Marca.objects.create(nombre='123')
         producto = Producto.objects.create(
@@ -412,9 +414,24 @@ class QuickBooksItemCostSyncTests(TestCase):
 
         refresh_linked_quickbooks_items()
 
-        mock_fetch_map.assert_called_once()
+        mock_import.assert_called_once()
         imported_payload = mock_import.call_args[0][0]
         self.assertEqual(_extract_quickbooks_item_cost(imported_payload), Decimal('35.99'))
+        mock_incremental.assert_called_once()
+
+    @patch('config.integrations.quickbooks.sync.import_quickbooks_items')
+    @patch('config.integrations.quickbooks.sync._fetch_quickbooks_items_map')
+    def test_refresh_linked_items_deactivates_missing_quickbooks_item(self, mock_fetch_map, mock_incremental):
+        mock_incremental.return_value = {'count': 0, 'created_count': 0, 'updated_count': 0, 'latest_updated_at': None}
+        producto = Producto.objects.create(nombre='Missing Product', activo=True, quickbooks_id='QB-MISSING')
+        Presentacion.objects.create(producto=producto, nombre='Unit', quickbooks_id='QB-MISSING')
+        mock_fetch_map.return_value = {}
+
+        result = refresh_linked_quickbooks_items()
+
+        producto.refresh_from_db()
+        self.assertFalse(producto.activo)
+        self.assertEqual(result['deactivated_count'], 1)
 
 
 class QuickBooksLinkedItemUpdateTests(TestCase):

@@ -6,8 +6,10 @@ from django.utils import timezone
 
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, Invoice
+from config.facturacion.services import eliminar_invoice, generar_invoice_desde_picking
+from config.inventario.services import registrar_entrada_manual
 from config.pedidos.crm_pipeline import build_crm_pipeline
-from config.pedidos.models import Pedido
+from config.pedidos.models import Pedido, PedidoItem
 from config.productos.models import Categoria, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
 
@@ -178,3 +180,54 @@ class CrmPipelineTests(TestCase):
 
 		self.assertEqual(len(cards), 1)
 		self.assertEqual(cards[0].pedido_id, target.id)
+
+	def test_verified_orders_waiting_for_first_invoice_stay_in_backoffice_column(self):
+		pedido = self._create_pedido(estado='VERIFICADO_AJUSTADO', total=Decimal('150.00'))
+
+		pipeline = build_crm_pipeline(period='today')
+		cards = self._column_cards(pipeline, 'backoffice_review')
+
+		self.assertEqual(len(cards), 1)
+		self.assertEqual(cards[0].pedido_id, pedido.id)
+
+	def test_deleted_invoice_order_is_removed_from_backoffice_pipeline_column(self):
+		pedido = self._create_pedido(estado='VERIFICADO_AJUSTADO', total=Decimal('122.34'))
+		registrar_entrada_manual(presentacion=self.presentacion, cantidad=20, observacion='Seed stock')
+		PedidoItem.objects.create(
+			pedido=pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=2,
+			cantidad=2,
+			cantidad_inventario_aplicada=2,
+			precio=Decimal('10.00'),
+			subtotal=Decimal('20.00'),
+		)
+		invoice = generar_invoice_desde_picking(
+			pedido=pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		eliminar_invoice(invoice=invoice)
+
+		pedido.refresh_from_db()
+		self.assertEqual(pedido.estado, 'VERIFICADO_AJUSTADO')
+		self.assertFalse(Invoice.objects.filter(pedido_id=pedido.id).exists())
+
+		pipeline = build_crm_pipeline(period='today')
+		backoffice_cards = self._column_cards(pipeline, 'backoffice_review')
+		pickup_cards = self._column_cards(pipeline, 'pickup')
+
+		self.assertEqual(len(backoffice_cards), 0)
+		self.assertEqual(len(pickup_cards), 0)
+		self.assertEqual(
+			sum(column.card_count for column in pipeline['columns'] if column.key != 'delivered'),
+			0,
+		)
+
+	def test_invoice_generated_without_active_invoice_is_hidden_from_pipeline(self):
+		pedido = self._create_pedido(estado='INVOICE_GENERADA', total=Decimal('75.00'))
+
+		pipeline = build_crm_pipeline(period='today')
+
+		self.assertEqual(sum(column.card_count for column in pipeline['columns']), 0)

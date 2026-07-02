@@ -11,6 +11,34 @@ from django.utils.translation import gettext as _
 from config.pedidos.models import Pedido
 
 
+def _has_active_invoice(pedido):
+	invoice = getattr(pedido, 'invoice', None)
+	return invoice is not None and invoice.estado == 'GENERADA'
+
+
+def _pedido_had_invoice_reversed(pedido, *, reversed_invoice_pedido_ids=None):
+	if reversed_invoice_pedido_ids is not None:
+		return pedido.id in reversed_invoice_pedido_ids
+	from config.inventario.models import InventarioMovimiento
+
+	return InventarioMovimiento.objects.filter(
+		pedido_id=pedido.id,
+		tipo='ANULACION_PEDIDO',
+		referencia__startswith='INV-',
+	).exists()
+
+
+def _should_show_in_backoffice_review(pedido, *, reversed_invoice_pedido_ids=None):
+	if pedido.estado != 'VERIFICADO_AJUSTADO':
+		return False
+	invoice = getattr(pedido, 'invoice', None)
+	if invoice and invoice.estado == 'ANULADA':
+		return False
+	if _pedido_had_invoice_reversed(pedido, reversed_invoice_pedido_ids=reversed_invoice_pedido_ids):
+		return False
+	return True
+
+
 CRM_COLUMN_KEYS = (
 	'confirmed',
 	'picking_pending',
@@ -143,7 +171,7 @@ def _created_in_period(pedido, period_start, period_end):
 	return period_start <= created <= period_end
 
 
-def _resolve_column_key(pedido):
+def _resolve_column_key(pedido, *, reversed_invoice_pedido_ids=None):
 	estado = pedido.estado
 	invoice = getattr(pedido, 'invoice', None)
 	delivery = getattr(invoice, 'delivery', None) if invoice else None
@@ -155,8 +183,12 @@ def _resolve_column_key(pedido):
 	if estado in CRM_COLUMN_CONFIG['picking_pending']['statuses']:
 		return 'picking_pending'
 	if estado in CRM_COLUMN_CONFIG['backoffice_review']['statuses']:
-		return 'backoffice_review'
+		if _should_show_in_backoffice_review(pedido, reversed_invoice_pedido_ids=reversed_invoice_pedido_ids):
+			return 'backoffice_review'
+		return None
 	if estado == 'INVOICE_GENERADA':
+		if not _has_active_invoice(pedido):
+			return None
 		if invoice and invoice.metodo_entrega == 'RUTA_DRIVER':
 			return 'driver'
 		if invoice and invoice.metodo_entrega == 'CUSTOMER_PICK_UP':
@@ -238,6 +270,20 @@ def _build_card(pedido, column_key):
 	)
 
 
+def _load_reversed_invoice_pedido_ids(pedido_ids):
+	if not pedido_ids:
+		return set()
+	from config.inventario.models import InventarioMovimiento
+
+	return set(
+		InventarioMovimiento.objects.filter(
+			pedido_id__in=pedido_ids,
+			tipo='ANULACION_PEDIDO',
+			referencia__startswith='INV-',
+		).values_list('pedido_id', flat=True)
+	)
+
+
 def build_crm_pipeline(*, period='today', search_term='', vendedor_id=None, cliente_id=None, reference_date: Optional[date] = None):
 	period_start, period_end = _period_bounds(period, reference_date=reference_date)
 	queryset = _apply_filters(
@@ -246,10 +292,12 @@ def build_crm_pipeline(*, period='today', search_term='', vendedor_id=None, clie
 		vendedor_id=vendedor_id,
 		cliente_id=cliente_id,
 	)
+	pedidos = list(queryset)
+	reversed_invoice_pedido_ids = _load_reversed_invoice_pedido_ids([pedido.id for pedido in pedidos])
 
 	cards_by_column = {key: [] for key in CRM_COLUMN_KEYS}
-	for pedido in queryset:
-		column_key = _resolve_column_key(pedido)
+	for pedido in pedidos:
+		column_key = _resolve_column_key(pedido, reversed_invoice_pedido_ids=reversed_invoice_pedido_ids)
 		if column_key is None:
 			continue
 		if not _should_show_card(pedido, column_key=column_key, period_start=period_start, period_end=period_end):
@@ -257,7 +305,7 @@ def build_crm_pipeline(*, period='today', search_term='', vendedor_id=None, clie
 		cards_by_column[column_key].append(_build_card(pedido, column_key))
 
 	columns = []
-	pedido_map = {pedido.id: pedido for pedido in queryset}
+	pedido_map = {pedido.id: pedido for pedido in pedidos}
 	for key in CRM_COLUMN_KEYS:
 		config = CRM_COLUMN_CONFIG[key]
 		column_cards = cards_by_column[key]

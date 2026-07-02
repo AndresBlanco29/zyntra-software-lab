@@ -50,7 +50,9 @@ from config.integrations.quickbooks.sync import (
     import_quickbooks_invoice_record,
     import_quickbooks_item_record,
     import_quickbooks_items,
+    pull_quickbooks_items_to_local,
     refresh_linked_quickbooks_items,
+    _resolve_item_import_force_full,
     refresh_linked_quickbooks_invoice_status,
 )
 from config.inventario.models import StockPresentacion
@@ -457,6 +459,30 @@ class QuickBooksLinkedItemUpdateTests(TestCase):
         self.assertEqual(producto.nombre, 'ACEITE 123 CANOLA OLI 12/1 LT')
         self.assertEqual(producto.descripcion, 'Updated from QuickBooks')
         self.assertEqual(producto.codigo_barras, '012005000596')
+
+
+class QuickBooksItemImportModeTests(TestCase):
+    def test_force_full_when_no_linked_catalog_items(self):
+        self.assertTrue(_resolve_item_import_force_full(False))
+
+    def test_incremental_when_catalog_already_linked(self):
+        producto = Producto.objects.create(nombre='Existing', quickbooks_id='QB-1')
+        Presentacion.objects.create(producto=producto, nombre='Unit', quickbooks_id='QB-1')
+        self.assertFalse(_resolve_item_import_force_full(False))
+
+    @patch('config.integrations.quickbooks.sync.import_quickbooks_items')
+    @patch('config.integrations.quickbooks.sync.QuickBooksAPIClient')
+    def test_pull_items_auto_uses_full_import_on_empty_catalog(self, mock_client_cls, mock_import_items):
+        mock_client = mock_client_cls.return_value
+        mock_client.connection.get_sync_cursor.return_value = '2026-01-01T00:00:00Z'
+        mock_import_items.return_value = {'created_count': 1000, 'latest_updated_at': None}
+
+        result = pull_quickbooks_items_to_local(max_results=None)
+
+        self.assertTrue(result['force_full'])
+        self.assertFalse(result['incremental'])
+        mock_import_items.assert_called_once()
+        self.assertIsNone(mock_import_items.call_args.kwargs.get('updated_after'))
 
 
 class QuickBooksCategoryBrandImportTests(TestCase):

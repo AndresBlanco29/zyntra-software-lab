@@ -844,11 +844,15 @@
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
                 <button type="submit" class="btn btn-outline-success w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Import catalog to the app" %}</button>
                 <label class="form-check mt-2 mb-0">
+                  <input type="checkbox" class="form-check-input" name="mode" value="full">
+                  <span class="form-check-label small">{% trans "Import entire catalog (ignore sync cursor)" %}</span>
+                </label>
+                <label class="form-check mt-2 mb-0">
                   <input type="checkbox" class="form-check-input" name="skip_images" value="1">
                   <span class="form-check-label small">{% trans "Skip product images (faster import)" %}</span>
                 </label>
               </form>
-              <p class="qb-action-note">{% trans "Brings new QuickBooks items and updates changed ones using incremental sync cursors. Product images and active/inactive status are synced from QuickBooks by default." %}</p>
+              <p class="qb-action-note">{% trans "Brings QuickBooks items into your catalog. After clearing the catalog, the first import automatically pulls all items. Later runs only fetch new or changed items unless you check full import above." %}</p>
             </div>
             <div class="qb-action-item" id="qb-sync-product-images">
               <form method="post" action="{% url 'quickbooks_sync_item_images_to_local' %}" data-qb-operation="sync_item_images_to_local">
@@ -924,7 +928,7 @@
               <div class="qb-action-item h-100" id="qb-full-resync">
                 <form method="post" action="{% url 'quickbooks_pull_sync_to_local' %}" data-qb-operation="pull_sync_to_local">
                   {% csrf_token %}
-                  <input type="hidden" name="limit" value="100">
+                  <input type="hidden" name="limit" value="0">
                   <input type="hidden" name="mode" value="full">
                   <input type="hidden" name="redirect_to" value="{{ request.path }}">
                   <button type="submit" class="btn btn-outline-primary w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Run full resync" %}</button>
@@ -1442,6 +1446,10 @@
         const skipImages = form.querySelector('input[name=skip_images]');
         if (skipImages && skipImages.checked) {
           payload.set('skip_images', '1');
+        }
+        const fullImport = form.querySelector('input[name=mode][value=full]');
+        if (fullImport && fullImport.checked) {
+          payload.set('mode', 'full');
         }
         fetch('/quickbooks/task/start', {
           method: 'POST',

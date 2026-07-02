@@ -3329,11 +3329,26 @@ def _resolve_product_quickbooks_item_id(producto):
     ).strip()
 
 
+def _local_catalog_has_quickbooks_linked_items():
+    return (
+        Presentacion.objects.filter(quickbooks_id__isnull=False)
+        .exclude(quickbooks_id='')
+        .exists()
+    )
+
+
+def _resolve_item_import_force_full(force_full=False):
+    if force_full:
+        return True
+    return not _local_catalog_has_quickbooks_linked_items()
+
+
 def pull_quickbooks_items_to_local(*, max_results=25, client=None, force_full=False, task_cache_key=None, skip_images=None):
     client = client or QuickBooksAPIClient()
     connection = client.connection
     run_started_at = timezone.now()
 
+    force_full = _resolve_item_import_force_full(force_full)
     item_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('item')))
     items = import_quickbooks_items(
         max_results=max_results,
@@ -3350,6 +3365,7 @@ def pull_quickbooks_items_to_local(*, max_results=25, client=None, force_full=Fa
         'items': items,
         'run_started_at': _serialize_cursor(run_started_at),
         'incremental': not force_full,
+        'force_full': force_full,
     }
 
 

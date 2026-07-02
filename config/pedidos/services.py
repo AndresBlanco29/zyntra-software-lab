@@ -456,6 +456,18 @@ def asignar_picking_a_seleccionador(*, pedido, seleccionador, asignado_por=None)
     return pedido
 
 
+def resolve_picking_send_ui_state(pedido):
+    if hasattr(pedido, 'invoice') or pedido.estado in {'INVOICE_GENERADA', 'DESPACHADO', 'CANCELADO'}:
+        return False, _('Sent')
+    if pedido.estado == 'VERIFICADO_AJUSTADO':
+        return False, _('Picking completed')
+    if pedido.estado == 'PARA_VERIFICAR' and pedido.seleccionador_id:
+        return False, _('Sent to picker')
+    if pedido.estado in {'RECIBIDO', 'EN_GESTION', 'LISTO_PARA_PICKING', 'PARA_VERIFICAR'}:
+        return True, _('Send picking')
+    return False, _('Sent')
+
+
 @transaction.atomic
 def guardar_verificacion_picking(
     *,

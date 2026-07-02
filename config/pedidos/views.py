@@ -72,6 +72,7 @@ from .services import (
 	reemplazar_presentacion_linea_pedido_sin_aplicar_inventario,
 	release_pedido_edit_lock,
 	resolver_bloqueo_picking_desde_backoffice,
+	resolve_picking_send_ui_state,
 	validar_estado_backoffice_con_bloqueo,
 )
 
@@ -491,6 +492,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 		and not edit_lock_context['pedido_edit_blocked']
 		and not pedido_form_disabled
 	)
+	can_send_picking, picking_send_button_label = resolve_picking_send_ui_state(pedido)
 
 	context = {
 		'pending_customer_notes_summary': summarize_pending_customer_notes(cliente=pedido.cliente),
@@ -508,6 +510,8 @@ def backoffice_pedido_detalle(request, pedido_id):
 		'lineas_bloqueadas_para_picking': hasattr(pedido, 'invoice'),
 		'pedido_form_disabled': pedido_form_disabled,
 		'can_manage_pedido': can_manage_pedido,
+		'can_send_picking': can_send_picking,
+		'picking_send_button_label': picking_send_button_label,
 		'can_unlock_pedido': (
 			pedido.picking_bloqueado
 			and pedido.estado == 'VERIFICADO_AJUSTADO'

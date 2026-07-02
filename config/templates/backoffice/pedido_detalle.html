@@ -114,6 +114,7 @@
       </div>
       <div class="col-lg-7">
         <fieldset {% if not can_manage_pedido %}disabled{% endif %}>
+        {% if can_send_picking %}
         <form method="post" action="{% url 'backoffice_asignar_picking' pedido.id %}" class="row g-2">
           {% csrf_token %}
           <div class="col-md-8">
@@ -126,9 +127,29 @@
             </select>
           </div>
           <div class="col-md-4 d-flex align-items-end">
-            <button type="submit" class="btn btn-outline-primary w-100">{% trans "Send picking" %}</button>
+            <button type="submit" class="btn btn-outline-primary w-100">{{ picking_send_button_label }}</button>
           </div>
         </form>
+        {% else %}
+        <div class="row g-2">
+          <div class="col-md-8">
+            <label class="form-label fw-semibold">{% trans "Send picking ticket to selector" %}</label>
+            <select class="form-select" disabled>
+              {% if pedido.seleccionador %}
+                <option selected>{% firstof pedido.seleccionador.get_full_name pedido.seleccionador.username %}</option>
+              {% else %}
+                <option selected>{% trans "Not assigned" %}</option>
+              {% endif %}
+            </select>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button type="button" class="btn btn-outline-secondary w-100" disabled>{{ picking_send_button_label }}</button>
+          </div>
+        </div>
+        {% if pedido.estado == 'VERIFICADO_AJUSTADO' and not invoice %}
+        <div class="form-text mt-2">{% trans "Picking was already completed. Review the order and generate the invoice when ready." %}</div>
+        {% endif %}
+        {% endif %}
         </fieldset>
       </div>
       <div class="col-12">

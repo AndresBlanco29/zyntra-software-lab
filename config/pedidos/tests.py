@@ -23,6 +23,7 @@ from config.pedidos.services import (
 	evaluar_stock_fisico_verificacion_picking,
 	guardar_verificacion_picking,
 	resolver_bloqueo_picking_desde_backoffice,
+	resolve_picking_send_ui_state,
 )
 from config.productos.models import Categoria, ConfiguracionDescuentos, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
@@ -110,6 +111,49 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(self.pedido.seleccionador, self.selector)
 		self.assertEqual(self.item.cantidad_solicitada, 2)
 		self.assertTrue(Notificacion.objects.filter(usuario=self.selector, titulo__icontains='picking').exists())
+
+	def test_resolve_picking_send_ui_state_after_assignment(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+
+		can_send, label = resolve_picking_send_ui_state(self.pedido)
+
+		self.assertFalse(can_send)
+		self.assertEqual(str(label), 'Sent to picker')
+
+	def test_resolve_picking_send_ui_state_after_picking_completed(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 2},
+			nota='OK',
+			nota_resuelta=True,
+		)
+		self.pedido.refresh_from_db()
+
+		can_send, label = resolve_picking_send_ui_state(self.pedido)
+
+		self.assertFalse(can_send)
+		self.assertEqual(str(label), 'Picking completed')
+
+	def test_backoffice_detail_disables_send_picking_after_picking_completed(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 2},
+			nota='OK',
+			nota_resuelta=True,
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertFalse(response.context['can_send_picking'])
+		self.assertContains(response, 'Picking completed')
+		self.assertContains(response, 'Picking was already completed. Review the order and generate the invoice when ready.')
+		self.assertNotContains(response, 'name="seleccionador_id"')
 
 	def test_backoffice_detail_keeps_lines_editable_during_selector_verification(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)

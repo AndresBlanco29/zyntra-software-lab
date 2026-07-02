@@ -269,7 +269,10 @@ class InvoiceFlowTests(TestCase):
 			'driver_id': '',
 		})
 		invoice = Invoice.objects.get(pedido=self.pedido)
-		self.assertRedirects(second_response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertRedirects(
+			second_response,
+			f"{reverse('backoffice_invoice_detail', args=[invoice.id])}?focus_adjustment_note=1",
+		)
 
 	def test_generate_invoice_keeps_zero_quantity_lines_with_zero_subtotal(self):
 		self.pedido_item.cantidad = 0
@@ -1752,6 +1755,29 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(response, 'Driver-created adjustment notes detected.')
 		self.assertContains(response, 'Created by driver')
 
+	def test_backoffice_invoice_detail_shows_prominent_adjustment_note_after_invoice_generation(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(
+			reverse('backoffice_invoice_detail', args=[invoice.id]),
+			{'focus_adjustment_note': '1'},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertTrue(response.context['show_prominent_adjustment_note'])
+		self.assertContains(response, 'id="backoffice-adjustment-note"', html=False)
+		self.assertContains(response, 'Start here: note type')
+		self.assertContains(response, 'No adjustment note')
+		self.assertContains(response, 'Requested qty.')
+		self.assertContains(response, 'Invoiced qty.')
+		self.assertNotContains(response, 'Choose customer and invoice')
+
 	def test_backoffice_invoice_detail_shows_adjustment_action_and_products(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
@@ -2950,7 +2976,10 @@ class InvoiceFlowTests(TestCase):
 		})
 
 		invoice = Invoice.objects.get(pedido=self.pedido)
-		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertRedirects(
+			response,
+			f"{reverse('backoffice_invoice_detail', args=[invoice.id])}?focus_adjustment_note=1",
+		)
 		self.assertEqual(invoice.items.first().precio_venta_sugerido_unitario, Decimal('2.75'))
 
 	def test_generar_invoice_desde_picking_applies_line_discount(self):
@@ -2995,7 +3024,10 @@ class InvoiceFlowTests(TestCase):
 		})
 
 		invoice = Invoice.objects.get(pedido=self.pedido)
-		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertRedirects(
+			response,
+			f"{reverse('backoffice_invoice_detail', args=[invoice.id])}?focus_adjustment_note=1",
+		)
 		item = invoice.items.get()
 		self.assertEqual(item.precio_unitario, Decimal('13.50'))
 		self.assertEqual(invoice.subtotal, Decimal('40.50'))
@@ -3029,7 +3061,10 @@ class InvoiceFlowTests(TestCase):
 		})
 
 		invoice = Invoice.objects.get(pedido=self.pedido)
-		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertRedirects(
+			response,
+			f"{reverse('backoffice_invoice_detail', args=[invoice.id])}?focus_adjustment_note=1",
+		)
 		self.assertEqual(timezone.localtime(invoice.delivery.estimated_delivery_at).strftime('%Y-%m-%d %H:%M'), '2026-04-18 09:30')
 
 	def test_backoffice_generate_invoice_view_applies_selected_general_note_amounts(self):
@@ -3074,7 +3109,10 @@ class InvoiceFlowTests(TestCase):
 		nota_debito.refresh_from_db()
 		self.cliente.refresh_from_db()
 
-		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		self.assertRedirects(
+			response,
+			f"{reverse('backoffice_invoice_detail', args=[invoice.id])}?focus_adjustment_note=1",
+		)
 		self.assertEqual(invoice.total_creditos, Decimal('10.00'))
 		self.assertEqual(invoice.total_debitos, Decimal('30.00'))
 		self.assertEqual(invoice.saldo_cliente, Decimal('65.00'))

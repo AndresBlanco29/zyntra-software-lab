@@ -1,0 +1,139 @@
+{% load i18n %}
+{% if prominent %}
+<div id="backoffice-adjustment-note" class="card shadow-sm mb-3 driver-adjustment-callout">
+  <div class="card-body">
+    <div class="driver-adjustment-callout-head mb-3">
+      <div class="driver-adjustment-callout-icon" aria-hidden="true">
+        <i class="bi bi-receipt-cutoff"></i>
+      </div>
+      <div class="flex-grow-1">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+          <h5 class="driver-adjustment-callout-title mb-0">{% trans "Create adjustment note" %}</h5>
+          <span class="badge driver-adjustment-callout-pill">{% trans "Credit notes" %}</span>
+        </div>
+        <p class="driver-adjustment-callout-lead mb-0">{% trans "Use this section when the customer returns products, reports damage, or needs a credit note right after invoicing." %}</p>
+      </div>
+    </div>
+    <div class="driver-adjustment-callout-body">
+{% endif %}
+<form method="post" enctype="multipart/form-data" action="{% url 'backoffice_invoice_create_note' invoice.id %}" class="invoice-adjustment-note-form">
+  {% csrf_token %}
+  <div class="row g-2 mb-3">
+    <div class="col-md-{% if prominent %}4{% else %}6{% endif %}{% if prominent %} driver-adjustment-type-highlight{% endif %}">
+      <label class="form-label fw-semibold mb-2">{% if prominent %}{% trans "Start here: note type" %}{% else %}{% trans "Type" %}{% endif %}</label>
+      <select name="note_tipo_documento" id="backofficeNoteType" class="form-select{% if prominent %} form-select-lg driver-adjustment-type-select{% endif %}"{% if not prominent %} required{% endif %}>
+        <option value="">{% if prominent %}{% trans "No adjustment note" %}{% else %}{% trans "Select..." %}{% endif %}</option>
+        <option value="CREDITO">{% trans "Credit note" %}</option>
+        <option value="DEBITO">{% trans "Debit note" %}</option>
+      </select>
+      {% if prominent %}
+      <div class="form-text mt-2 mb-0">{% trans "Select Credit note to register returned or damaged products." %}</div>
+      {% endif %}
+    </div>
+    <div class="col-md-{% if prominent %}4{% else %}6{% endif %}">
+      <label class="form-label fw-semibold">{% trans "Adjustment mode" %}</label>
+      <select name="note_tipo_ajuste" id="backofficeAdjustmentType" class="form-select" required>
+        <option value="PRODUCTO" data-credit-label="{% trans 'Product return / item lines' %}" data-debit-label="{% trans 'Product to charge' %}">{% trans "Product return / item lines" %}</option>
+        <option value="FINANCIERO" data-credit-label="{% trans 'Financial amount' %}" data-debit-label="{% trans 'Amount to charge' %}">{% trans "Financial amount" %}</option>
+      </select>
+    </div>
+    <div class="col-md-{% if prominent %}4{% else %}6{% endif %}" id="backofficeReasonWrapper">
+      <label class="form-label fw-semibold">{% trans "Reason" %}</label>
+      <select name="note_motivo" id="backofficeReasonSelect" class="form-select"{% if not prominent %} required{% endif %}>
+        <option value="">{% trans "Select..." %}</option>
+        <option value="DAMAGE">{% trans "Damage / transport" %}</option>
+        <option value="DEFECT">{% trans "Factory defect / quality issue" %}</option>
+        <option value="MISSING_ITEM">{% trans "Missing item" %}</option>
+        <option value="OTHER">{% trans "Other" %}</option>
+      </select>
+    </div>
+    <div class="col-12 d-none" id="backofficeCreditTypeWrapper">
+      <label class="form-label fw-semibold">{% trans "Credit type" %}</label>
+      <select name="note_tipo_credito" id="backofficeCreditType" class="form-select" disabled>
+        <option value="">{% trans "Select" %}</option>
+        <option value="CREDIT_DUMP">{% trans "Credit Dump" %}</option>
+        <option value="CREDIT_RETURN">{% trans "Credit Return" %}</option>
+      </select>
+    </div>
+    <div class="col-12">
+      <label class="form-label fw-semibold" id="backofficeDescriptionLabel" data-credit-label="{% trans 'Description' %}" data-debit-label="{% trans 'Charge description' %}">{% trans "Description" %}</label>
+      <textarea name="note_descripcion" rows="{% if prominent %}2{% else %}3{% endif %}" class="form-control"></textarea>
+      <div class="form-text" id="backofficeDescriptionHelp" data-credit-help="{% trans 'Use this field for the manual comment, especially when the reason is Other.' %}" data-debit-help="{% trans 'Use this field to clearly explain what will be charged to the customer.' %}">{% trans "Use this field for the manual comment, especially when the reason is Other." %}</div>
+    </div>
+    <div class="col-12 d-none" id="backofficeFinancialAmountWrapper">
+      <label class="form-label fw-semibold">{% trans "Amount" %}</label>
+      <div class="input-group">
+        <span class="input-group-text">$</span>
+        <input type="number" min="0" step="0.01" name="note_monto" class="form-control">
+      </div>
+    </div>
+    <div class="col-12">
+      <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
+      <input type="file" name="note_evidence_photos" class="form-control" accept="image/*" capture="environment" multiple>
+      <div class="form-text">{% if prominent %}{% trans "Optional photos that support the credit note created during invoicing." %}{% else %}{% trans "Optional photos or evidence that support this adjustment note." %}{% endif %}</div>
+    </div>
+    {% if prominent %}
+    <div class="col-12">
+      <div class="alert alert-info-tone small mb-0">
+        {% trans "Product credit notes can use Credit Dump or Credit Return depending on whether returned products should go back to inventory." %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="table-responsive mb-3" id="backofficeProductLinesWrapper">
+    <table class="table table-sm align-middle">
+      <thead>
+        <tr>
+          <th>{% trans "Line" %}</th>
+          {% if prominent %}
+          <th>{% trans "Requested qty." %}</th>
+          <th>{% trans "Invoiced qty." %}</th>
+          {% endif %}
+          <th>{% trans "Boxes / pallets" %}</th>
+          <th>{% trans "Partial content" %}</th>
+          <th>{% trans "Calculated amount" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in invoice_items %}
+        <tr>
+          <td>
+            {{ item.producto_nombre }}
+            <div class="small text-muted">{{ item.presentacion_nombre }}{% if not prominent %} | {% trans "Max" %}: {{ item.cantidad_facturada }}{% endif %}</div>
+          </td>
+          {% if prominent %}
+          <td>{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
+          <td>{{ item.cantidad_facturada }}</td>
+          {% endif %}
+          <td>
+            <label class="form-label small text-muted mb-1">{{ item.presentacion_nombre }}</label>
+            <input type="number" min="0" max="{{ item.cantidad_facturada }}" name="note_qty_{{ item.id }}" class="form-control form-control-sm js-adjustment-package-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades|default:1 }}">
+          </td>
+          <td>
+            {% if item.presentacion and item.presentacion.unidades > 1 %}
+            <label class="form-label small text-muted mb-1">{{ item.presentacion.tipo_contenido_traducido|capfirst }}</label>
+            <input type="number" min="0" name="note_unit_qty_{{ item.id }}" class="form-control form-control-sm js-adjustment-unit-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades }}">
+            <div class="small text-muted">1 {{ item.presentacion_nombre|lower }} = {{ item.presentacion.unidades }} {{ item.presentacion.tipo_contenido_traducido|lower }}</div>
+            {% else %}
+            <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td>
+            <input type="number" min="0" step="0.01" name="note_amount_{{ item.id }}" class="form-control form-control-sm js-adjustment-amount" placeholder="0.00" inputmode="decimal">
+            <div class="small text-muted">{% trans "Calculated automatically from the quantities you enter." %}</div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="form-text">{% trans "Partial returns are prorated from the package amount. If a child presentation exists, inventory returns there automatically. Otherwise the remainder is stored as internal product stock." %}</div>
+  </div>
+
+  <button type="submit" class="btn btn-primary{% if prominent %} btn-lg{% endif %} w-100" id="backofficeSaveAdjustmentNoteButton">{% trans "Save draft note" %}</button>
+</form>
+{% if prominent %}
+    </div>
+  </div>
+</div>
+{% endif %}

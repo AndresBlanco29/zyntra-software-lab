@@ -65,6 +65,10 @@
   </div>
 </div>
 
+{% if show_prominent_adjustment_note %}
+{% include 'backoffice/includes/invoice_adjustment_note_form.html' with prominent=True invoice=invoice invoice_items=invoice_items %}
+{% endif %}
+
 <div class="row g-3 mb-3">
   <div class="col-lg-8">
     <div class="card shadow-sm h-100">
@@ -427,10 +431,99 @@
       max-height: 3.5rem;
     }
   }
+
+  .driver-adjustment-callout {
+    position: relative;
+    overflow: hidden;
+    border: 2px solid #0b3d91;
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #eef4ff 0%, #fffdf5 58%, #ffffff 100%);
+    box-shadow: 0 14px 32px rgba(11, 61, 145, 0.14);
+    padding: 1.2rem 1.25rem 1.25rem 1.45rem;
+  }
+
+  .driver-adjustment-callout::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 6px;
+    background: linear-gradient(180deg, #0b3d91 0%, #ffd400 100%);
+  }
+
+  .driver-adjustment-callout-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.9rem;
+  }
+
+  .driver-adjustment-callout-icon {
+    width: 2.85rem;
+    height: 2.85rem;
+    border-radius: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #0b3d91;
+    color: #fff;
+    font-size: 1.35rem;
+    flex: 0 0 auto;
+    box-shadow: 0 8px 18px rgba(11, 61, 145, 0.28);
+  }
+
+  .driver-adjustment-callout-title {
+    color: #0b3d91;
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+
+  .driver-adjustment-callout-pill {
+    background: #ffd400;
+    color: #1e293b;
+    font-weight: 700;
+    border: 1px solid rgba(11, 61, 145, 0.12);
+  }
+
+  .driver-adjustment-callout-lead {
+    color: #334155;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    margin-top: 0.35rem;
+  }
+
+  .driver-adjustment-callout-body {
+    border: 1px solid rgba(11, 61, 145, 0.12);
+    border-radius: 0.9rem;
+    background: rgba(255, 255, 255, 0.92);
+    padding: 1rem;
+  }
+
+  .driver-adjustment-type-highlight {
+    border: 1px dashed rgba(11, 61, 145, 0.35);
+    border-radius: 0.85rem;
+    background: #f8fbff;
+    padding: 0.85rem 0.95rem;
+  }
+
+  .driver-adjustment-type-highlight .form-label {
+    color: #0b3d91;
+    font-size: 0.95rem;
+  }
+
+  .driver-adjustment-type-select {
+    border-color: #0b3d91;
+    font-weight: 600;
+  }
+
+  .driver-adjustment-callout .alert-info-tone {
+    background: #eef6ff;
+    border: 1px solid rgba(11, 61, 145, 0.14);
+    color: #1e3a5f;
+  }
 </style>
 
 <div class="row g-3">
-  <div class="col-lg-7">
+  <div class="{% if show_prominent_adjustment_note %}col-12{% else %}col-lg-7{% endif %}">
     <div class="card shadow-sm h-100">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3">
@@ -620,6 +713,7 @@
       </div>
     </div>
   </div>
+  {% if not show_prominent_adjustment_note %}
   <div class="col-lg-5">
     <div class="card shadow-sm h-100">
       <div class="card-body">
@@ -632,108 +726,12 @@
         {% if invoice_quickbooks_locked %}
           <div class="alert alert-light border mb-0">{% trans "This invoice is locked after QuickBooks sync. Create or change accounting notes directly in QuickBooks or sync a new local record before locking it." %}</div>
         {% else %}
-        <form method="post" enctype="multipart/form-data" action="{% url 'backoffice_invoice_create_note' invoice.id %}">
-          {% csrf_token %}
-          <div class="row g-2 mb-3">
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">{% trans "Type" %}</label>
-              <select name="note_tipo_documento" id="backofficeNoteType" class="form-select" required>
-                <option value="">{% trans "Select..." %}</option>
-                <option value="CREDITO">{% trans "Credit note" %}</option>
-                <option value="DEBITO">{% trans "Debit note" %}</option>
-              </select>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label fw-semibold">{% trans "Adjustment mode" %}</label>
-              <select name="note_tipo_ajuste" id="backofficeAdjustmentType" class="form-select" required>
-                <option value="PRODUCTO" data-credit-label="{% trans 'Product return / item lines' %}" data-debit-label="{% trans 'Product to charge' %}">{% trans "Product return / item lines" %}</option>
-                <option value="FINANCIERO" data-credit-label="{% trans 'Financial amount' %}" data-debit-label="{% trans 'Amount to charge' %}">{% trans "Financial amount" %}</option>
-              </select>
-            </div>
-            <div class="col-md-6" id="backofficeReasonWrapper">
-              <label class="form-label fw-semibold">{% trans "Reason" %}</label>
-              <select name="note_motivo" id="backofficeReasonSelect" class="form-select" required>
-                <option value="">{% trans "Select..." %}</option>
-                <option value="DAMAGE">{% trans "Damage / transport" %}</option>
-                <option value="DEFECT">{% trans "Factory defect / quality issue" %}</option>
-                <option value="MISSING_ITEM">{% trans "Missing item" %}</option>
-                <option value="OTHER">{% trans "Other" %}</option>
-              </select>
-            </div>
-            <div class="col-12 d-none" id="backofficeCreditTypeWrapper">
-              <label class="form-label fw-semibold">{% trans "Credit type" %}</label>
-              <select name="note_tipo_credito" id="backofficeCreditType" class="form-select" disabled>
-				<option value="">{% trans "Select" %}</option>
-                <option value="CREDIT_DUMP">{% trans "Credit Dump" %}</option>
-                <option value="CREDIT_RETURN">{% trans "Credit Return" %}</option>
-              </select>
-            </div>
-            <div class="col-12">
-              <label class="form-label fw-semibold" id="backofficeDescriptionLabel" data-credit-label="{% trans 'Description' %}" data-debit-label="{% trans 'Charge description' %}">{% trans "Description" %}</label>
-              <textarea name="note_descripcion" rows="3" class="form-control"></textarea>
-              <div class="form-text" id="backofficeDescriptionHelp" data-credit-help="{% trans 'Use this field for the manual comment, especially when the reason is Other.' %}" data-debit-help="{% trans 'Use this field to clearly explain what will be charged to the customer.' %}">{% trans "Use this field for the manual comment, especially when the reason is Other." %}</div>
-            </div>
-            <div class="col-12 d-none" id="backofficeFinancialAmountWrapper">
-              <label class="form-label fw-semibold">{% trans "Amount" %}</label>
-              <div class="input-group">
-                <span class="input-group-text">$</span>
-                <input type="number" min="0" step="0.01" name="note_monto" class="form-control">
-              </div>
-            </div>
-            <div class="col-12">
-              <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
-              <input type="file" name="note_evidence_photos" class="form-control" accept="image/*" capture="environment" multiple>
-              <div class="form-text">{% trans "Optional photos or evidence that support this adjustment note." %}</div>
-            </div>
-          </div>
-
-          <div class="table-responsive mb-3" id="backofficeProductLinesWrapper">
-            <table class="table table-sm align-middle">
-              <thead>
-                <tr>
-                  <th>{% trans "Line" %}</th>
-                  <th>{% trans "Boxes / pallets" %}</th>
-                  <th>{% trans "Partial content" %}</th>
-                  <th>{% trans "Calculated amount" %}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for item in invoice_items %}
-                <tr>
-                  <td>
-                    {{ item.producto_nombre }}
-                    <div class="small text-muted">{{ item.presentacion_nombre }} | {% trans "Max" %}: {{ item.cantidad_facturada }}</div>
-                  </td>
-                  <td>
-                    <label class="form-label small text-muted mb-1">{{ item.presentacion_nombre }}</label>
-                    <input type="number" min="0" max="{{ item.cantidad_facturada }}" name="note_qty_{{ item.id }}" class="form-control form-control-sm js-adjustment-package-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades|default:1 }}">
-                  </td>
-                  <td>
-                    {% if item.presentacion and item.presentacion.unidades > 1 %}
-                    <label class="form-label small text-muted mb-1">{{ item.presentacion.tipo_contenido_traducido|capfirst }}</label>
-                    <input type="number" min="0" name="note_unit_qty_{{ item.id }}" class="form-control form-control-sm js-adjustment-unit-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades }}">
-                    <div class="small text-muted">1 {{ item.presentacion_nombre|lower }} = {{ item.presentacion.unidades }} {{ item.presentacion.tipo_contenido_traducido|lower }}</div>
-                    {% else %}
-                    <span class="text-muted">-</span>
-                    {% endif %}
-                  </td>
-                  <td>
-                    <input type="number" min="0" step="0.01" name="note_amount_{{ item.id }}" class="form-control form-control-sm js-adjustment-amount" placeholder="0.00" inputmode="decimal">
-                    <div class="small text-muted">{% trans "Calculated automatically from the quantities you enter." %}</div>
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            <div class="form-text">{% trans "Partial returns are prorated from the package amount. If a child presentation exists, inventory returns there automatically. Otherwise the remainder is stored as internal product stock." %}</div>
-          </div>
-
-          <button type="submit" class="btn btn-primary w-100">{% trans "Save draft note" %}</button>
-        </form>
+        {% include 'backoffice/includes/invoice_adjustment_note_form.html' with prominent=False invoice=invoice invoice_items=invoice_items %}
         {% endif %}
       </div>
     </div>
   </div>
+  {% endif %}
 </div>
 <script>
   (function () {
@@ -756,6 +754,20 @@
       return;
     }
 
+    function syncNoteTypeRequirements() {
+      const hasType = Boolean(noteType.value);
+      if (reasonSelect) {
+        reasonSelect.required = hasType && noteType.value !== 'DEBITO';
+      }
+      if (adjustmentType) {
+        adjustmentType.required = hasType;
+      }
+      const saveButton = document.getElementById('backofficeSaveAdjustmentNoteButton');
+      if (saveButton) {
+        saveButton.disabled = !hasType;
+      }
+    }
+
     function syncCreditTypeVisibility() {
       const isCredit = noteType.value === 'CREDITO';
       creditTypeWrapper.classList.toggle('d-none', !isCredit);
@@ -767,7 +779,9 @@
 
     noteType.addEventListener('change', syncCreditTypeVisibility);
     noteType.addEventListener('change', syncAdjustmentMode);
+    noteType.addEventListener('change', syncNoteTypeRequirements);
     syncCreditTypeVisibility();
+    syncNoteTypeRequirements();
 
     function syncAdjustmentMode() {
       const isProduct = adjustmentType.value === 'PRODUCTO';
@@ -837,6 +851,15 @@
         updateCalculatedAmount(input.dataset.lineId);
       });
     });
+
+    {% if show_prominent_adjustment_note %}
+    const adjustmentAnchor = document.getElementById('backoffice-adjustment-note');
+    if (adjustmentAnchor) {
+      window.requestAnimationFrame(function () {
+        adjustmentAnchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+    {% endif %}
   })();
 </script>
 {% endblock %}

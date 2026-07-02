@@ -1401,7 +1401,7 @@ def backoffice_generate_invoice(request, pedido_id):
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
 	messages.success(request, _('Invoice generated successfully.'))
-	return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
+	return redirect(f"{reverse('backoffice_invoice_detail', args=[invoice.id])}?focus_adjustment_note=1")
 
 
 @login_required
@@ -1420,6 +1420,9 @@ def backoffice_invoice_detail(request, invoice_id):
 		leida=False,
 	).update(leida=True)
 	driver_created_notes_count = invoice.notas_ajuste.filter(creada_por__role='driver').count()
+	focus_adjustment_note = str(request.GET.get('focus_adjustment_note') or '').strip() == '1'
+	can_create_adjustment_note = not is_sync_locked(invoice) and invoice.estado != 'ANULADA'
+	show_prominent_adjustment_note = focus_adjustment_note and can_create_adjustment_note
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
 		'customer_company_name': resolve_customer_company_name(invoice.cliente),
@@ -1433,6 +1436,8 @@ def backoffice_invoice_detail(request, invoice_id):
 		'can_void_invoice': invoice.can_void_from_backoffice(),
 		'can_delete_invoice': invoice.can_delete_from_backoffice(),
 		'void_registro': invoice.registros_anulacion.order_by('-anulado_en', '-id').first(),
+		'focus_adjustment_note': focus_adjustment_note,
+		'show_prominent_adjustment_note': show_prominent_adjustment_note,
 	})
 
 

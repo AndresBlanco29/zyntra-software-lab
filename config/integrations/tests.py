@@ -42,6 +42,7 @@ from config.integrations.quickbooks.sync import (
     _parse_quickbooks_presentation,
     _prepare_inventory_item_for_txn_date,
     _resolve_item_payload_name,
+    _resolve_quickbooks_item_category_and_brand,
     _strip_ltg_customer_export_prefix,
     _quickbooks_payload_active,
     import_quickbooks_credit_memo_record,
@@ -456,6 +457,93 @@ class QuickBooksLinkedItemUpdateTests(TestCase):
         self.assertEqual(producto.nombre, 'ACEITE 123 CANOLA OLI 12/1 LT')
         self.assertEqual(producto.descripcion, 'Updated from QuickBooks')
         self.assertEqual(producto.codigo_barras, '012005000596')
+
+
+class QuickBooksCategoryBrandImportTests(TestCase):
+    def test_resolve_returns_none_when_quickbooks_has_no_category_or_brand(self):
+        category, brand = _resolve_quickbooks_item_category_and_brand({
+            'Id': 'QB-PLAIN',
+            'Name': 'Plain Product',
+            'Type': 'Inventory',
+        })
+        self.assertIsNone(category)
+        self.assertIsNone(brand)
+
+    @patch('config.integrations.quickbooks.sync._save_quickbooks_item_image', return_value=False)
+    @patch('config.integrations.quickbooks.sync._enrich_quickbooks_item_payload', side_effect=lambda payload, **kwargs: payload)
+    def test_new_import_without_qb_category_or_brand_stays_empty(self, _mock_enrich, _mock_image):
+        result = import_quickbooks_item_record({
+            'Id': 'QB-PLAIN-NEW',
+            'Name': 'Plain Product',
+            'Type': 'Inventory',
+            'Active': True,
+        })
+        self.assertEqual(result['action'], 'created')
+        presentacion = Presentacion.objects.get(quickbooks_id='QB-PLAIN-NEW')
+        self.assertIsNone(presentacion.producto.categoria)
+        self.assertIsNone(presentacion.producto.marca)
+
+    @patch('config.integrations.quickbooks.sync._save_quickbooks_item_image', return_value=False)
+    @patch('config.integrations.quickbooks.sync._enrich_quickbooks_item_payload', side_effect=lambda payload, **kwargs: payload)
+    def test_linked_update_clears_placeholder_and_preserves_real_local_category(self, _mock_enrich, _mock_image):
+        real_category = Categoria.objects.create(nombre='GROCERY')
+        real_brand = Marca.objects.create(nombre='123')
+        placeholder_category = Categoria.objects.create(nombre='QuickBooks Imported')
+        placeholder_brand = Marca.objects.create(nombre='QuickBooks Imported')
+        producto = Producto.objects.create(
+            nombre='Local Product',
+            categoria=real_category,
+            marca=real_brand,
+            quickbooks_id='QB-LOCAL-1',
+        )
+        presentacion = Presentacion.objects.create(
+            producto=producto,
+            nombre='Unit',
+            quickbooks_id='QB-LOCAL-1',
+        )
+
+        result = import_quickbooks_item_record({
+            'Id': 'QB-LOCAL-1',
+            'Name': 'Local Product Updated',
+            'Type': 'Inventory',
+            'Active': True,
+        })
+
+        producto.refresh_from_db()
+        self.assertEqual(result['action'], 'updated')
+        self.assertEqual(producto.categoria.nombre, 'GROCERY')
+        self.assertEqual(producto.marca.nombre, '123')
+        self.assertNotEqual(producto.categoria_id, placeholder_category.id)
+        self.assertNotEqual(producto.marca_id, placeholder_brand.id)
+
+    @patch('config.integrations.quickbooks.sync._save_quickbooks_item_image', return_value=False)
+    @patch('config.integrations.quickbooks.sync._enrich_quickbooks_item_payload', side_effect=lambda payload, **kwargs: payload)
+    def test_linked_update_clears_quickbooks_imported_placeholder(self, _mock_enrich, _mock_image):
+        placeholder_category = Categoria.objects.create(nombre='QuickBooks Imported')
+        placeholder_brand = Marca.objects.create(nombre='QuickBooks Imported')
+        producto = Producto.objects.create(
+            nombre='Imported Product',
+            categoria=placeholder_category,
+            marca=placeholder_brand,
+            quickbooks_id='QB-PLACEHOLDER-1',
+        )
+        presentacion = Presentacion.objects.create(
+            producto=producto,
+            nombre='Unit',
+            quickbooks_id='QB-PLACEHOLDER-1',
+        )
+
+        result = import_quickbooks_item_record({
+            'Id': 'QB-PLACEHOLDER-1',
+            'Name': 'Imported Product',
+            'Type': 'Inventory',
+            'Active': True,
+        })
+
+        producto.refresh_from_db()
+        self.assertEqual(result['action'], 'updated')
+        self.assertIsNone(producto.categoria)
+        self.assertIsNone(producto.marca)
 
 
 class QuickBooksDeletedRecordImportTests(TestCase):

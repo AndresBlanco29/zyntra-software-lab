@@ -1284,32 +1284,39 @@ def import_quickbooks_customer_record(payload):
     }
 
 
-def _ensure_import_category_and_brand():
-    category, _ = Categoria.objects.get_or_create(nombre='QuickBooks Imported')
-    brand, _ = Marca.objects.get_or_create(nombre='QuickBooks Imported')
-    return category, brand
+QUICKBOOKS_IMPORT_PLACEHOLDER_LABEL = 'QuickBooks Imported'
 
 
-def _first_populated(*values):
-    for value in values:
-        normalized = _normalize_text(value)
-        if normalized:
-            return normalized
-    return ''
+def _is_quickbooks_import_placeholder_name(value):
+    return _normalize_text(value).lower() == QUICKBOOKS_IMPORT_PLACEHOLDER_LABEL.lower()
 
 
-def _split_quickbooks_item_hierarchy(payload):
-    full_name = _normalize_text(payload.get('FullyQualifiedName'))
-    if not full_name:
-        return []
-    return [part.strip() for part in full_name.split(':') if part.strip()]
+def _is_quickbooks_import_placeholder_relation(obj):
+    if obj is None:
+        return False
+    return _is_quickbooks_import_placeholder_name(getattr(obj, 'nombre', ''))
+
+
+def _apply_quickbooks_category_and_brand_to_producto(producto, *, category, brand, preserve_local=False):
+    if category is not None:
+        producto.categoria = category
+    elif preserve_local:
+        if _is_quickbooks_import_placeholder_relation(producto.categoria):
+            producto.categoria = None
+    else:
+        producto.categoria = None
+
+    if brand is not None:
+        producto.marca = brand
+    elif preserve_local:
+        if _is_quickbooks_import_placeholder_relation(producto.marca):
+            producto.marca = None
+    else:
+        producto.marca = None
 
 
 def _build_catalog_lookup_cache():
-    fallback_category, fallback_brand = _ensure_import_category_and_brand()
     return {
-        'fallback_category': fallback_category,
-        'fallback_brand': fallback_brand,
         'categories': {},
         'brands': {},
         'brand_category_pairs': set(),
@@ -1318,13 +1325,10 @@ def _build_catalog_lookup_cache():
 
 def _resolve_quickbooks_item_category_and_brand(payload, *, lookup_cache=None):
     if lookup_cache is not None:
-        fallback_category = lookup_cache['fallback_category']
-        fallback_brand = lookup_cache['fallback_brand']
         categories = lookup_cache.setdefault('categories', {})
         brands = lookup_cache.setdefault('brands', {})
         brand_category_pairs = lookup_cache.setdefault('brand_category_pairs', set())
     else:
-        fallback_category, fallback_brand = _ensure_import_category_and_brand()
         categories = brands = brand_category_pairs = None
     hierarchy = _split_quickbooks_item_hierarchy(payload)
     parent_name = _normalize_text((payload.get('ParentRef') or {}).get('name'))
@@ -1354,7 +1358,7 @@ def _resolve_quickbooks_item_category_and_brand(payload, *, lookup_cache=None):
             if len(name_parts) >= 2:
                 brand_name = name_parts[0]
 
-    category = fallback_category
+    category = None
     if category_name:
         if categories is not None:
             category = categories.get(category_name)
@@ -1364,7 +1368,7 @@ def _resolve_quickbooks_item_category_and_brand(payload, *, lookup_cache=None):
         else:
             category, _ = Categoria.objects.get_or_create(nombre=category_name)
 
-    brand = fallback_brand
+    brand = None
     if brand_name:
         if brands is not None:
             brand = brands.get(brand_name)
@@ -1373,13 +1377,29 @@ def _resolve_quickbooks_item_category_and_brand(payload, *, lookup_cache=None):
                 brands[brand_name] = brand
         else:
             brand, _ = Marca.objects.get_or_create(nombre=brand_name)
-        pair_key = (brand.pk, category.pk)
-        if brand_category_pairs is None or pair_key not in brand_category_pairs:
-            brand.categorias.add(category)
-            if brand_category_pairs is not None:
-                brand_category_pairs.add(pair_key)
+        if category is not None:
+            pair_key = (brand.pk, category.pk)
+            if brand_category_pairs is None or pair_key not in brand_category_pairs:
+                brand.categorias.add(category)
+                if brand_category_pairs is not None:
+                    brand_category_pairs.add(pair_key)
 
     return category, brand
+
+
+def _first_populated(*values):
+    for value in values:
+        normalized = _normalize_text(value)
+        if normalized:
+            return normalized
+    return ''
+
+
+def _split_quickbooks_item_hierarchy(payload):
+    full_name = _normalize_text(payload.get('FullyQualifiedName'))
+    if not full_name:
+        return []
+    return [part.strip() for part in full_name.split(':') if part.strip()]
 
 
 def _normalize_packaging_term(value):
@@ -1727,8 +1747,12 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
     image_saved = _save_quickbooks_item_image(producto=producto, payload=payload, client=client, skip=skip_images)
     producto.nombre = product_name
     producto.descripcion = description
-    producto.categoria = category
-    producto.marca = brand
+    _apply_quickbooks_category_and_brand_to_producto(
+        producto,
+        category=category,
+        brand=brand,
+        preserve_local=True,
+    )
     producto.activo = _quickbooks_payload_active(payload)
     if sku:
         if producto.codigo_barras == sku:

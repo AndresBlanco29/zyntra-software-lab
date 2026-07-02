@@ -1266,6 +1266,7 @@ width:100%;
 
     .content {
         padding: 14px;
+        overflow-x: clip;
     }
 
     .sidebar {

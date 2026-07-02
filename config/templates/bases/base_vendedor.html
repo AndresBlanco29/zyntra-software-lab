@@ -32,7 +32,8 @@
 
   function syncPanelNavbarOffset() {
     const height = Math.max(Math.ceil(navbar.getBoundingClientRect().height), 56);
-    root.style.setProperty('--panel-navbar-offset', height + 'px');
+    const buffer = window.matchMedia('(max-width: 767.98px)').matches ? 16 : 6;
+    root.style.setProperty('--panel-navbar-offset', (height + buffer) + 'px');
   }
 
   syncPanelNavbarOffset();

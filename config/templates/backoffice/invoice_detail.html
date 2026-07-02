@@ -4,6 +4,7 @@
 {% block title %}{{ invoice.numero }}{% endblock %}
 
 {% block content %}
+<div class="invoice-detail-page">
 <style>
   .driver-adjustment-callout {
     position: relative;
@@ -93,6 +94,59 @@
     border: 1px solid rgba(11, 61, 145, 0.14);
     color: #1e3a5f;
   }
+
+  .invoice-detail-page {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: clip;
+  }
+
+  @media (max-width: 767.98px) {
+    .invoice-detail-page .card-body {
+      padding: 1rem;
+    }
+
+    .invoice-detail-page .invoice-page-header {
+      flex-direction: column;
+      align-items: stretch !important;
+      gap: 0.85rem;
+    }
+
+    .invoice-detail-page .invoice-page-header .d-flex.flex-wrap {
+      width: 100%;
+    }
+
+    .invoice-detail-page .invoice-page-header .btn,
+    .invoice-detail-page .invoice-page-header .form-control {
+      width: 100%;
+    }
+
+    .invoice-detail-page .invoice-page-header form.d-flex {
+      flex-direction: column;
+      align-items: stretch !important;
+      width: 100%;
+    }
+
+    .invoice-detail-page .mobile-stack-table--invoice-lines td,
+    .invoice-detail-page .mobile-stack-table--notes td {
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+
+    .invoice-detail-page .mobile-stack-table--notes tr.mobile-stack-table__details-row td::before {
+      display: none;
+    }
+
+    .invoice-detail-page .mobile-stack-table--notes tr.mobile-stack-table__details-row td {
+      padding-top: 0;
+    }
+
+    .invoice-detail-page .mobile-stack-table--notes tr.mobile-stack-table__evidence-row td::before {
+      display: none;
+    }
+  }
 </style>
 {% if driver_created_notes_count %}
 <div class="alert alert-warning d-flex justify-content-between align-items-center gap-3 mb-3">
@@ -127,7 +181,7 @@
   <div class="small mb-0">{% trans "Audit entry" %} #{{ void_registro.id }} · {% trans "Document ID" %} {{ void_registro.documento_id }}</div>
 </div>
 {% endif %}
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center mb-3 invoice-page-header">
   <div>
     <h2 class="mb-1">{{ invoice.numero }}</h2>
     <p class="text-muted mb-0">{% trans "Invoice generated from verified picking quantities." %}</p>
@@ -422,8 +476,8 @@
 <div class="card shadow-sm mb-3">
   <div class="card-body">
     <h5 class="mb-3">{% trans "Invoice lines" %}</h5>
-    <div class="table-responsive">
-      <table class="table align-middle mb-0">
+    <div class="table-responsive mobile-stack-responsive">
+      <table class="table align-middle mb-0 mobile-stack-table mobile-stack-table--invoice-lines">
         <thead>
           <tr>
             <th>{% trans "Description" %}</th>
@@ -441,12 +495,12 @@
         <tbody>
           {% for item in invoice_items %}
           <tr>
-            <td>{{ item.producto_nombre }}</td>
-            <td>{{ item.presentacion_nombre }}</td>
-            <td>{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
-            <td>{{ item.cantidad_facturada }}</td>
-            <td>{% if item.precio_unitario_lista %}${{ item.precio_unitario_lista }}{% else %}—{% endif %}</td>
-            <td>
+            <td data-label="{% trans 'Description' %}">{{ item.producto_nombre }}</td>
+            <td data-label="{% trans 'U/M' %}">{{ item.presentacion_nombre }}</td>
+            <td data-label="{% trans 'Requested qty.' %}">{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
+            <td data-label="{% trans 'Dispatched qty.' %}">{{ item.cantidad_facturada }}</td>
+            <td data-label="{% trans 'List price' %}">{% if item.precio_unitario_lista %}${{ item.precio_unitario_lista }}{% else %}—{% endif %}</td>
+            <td data-label="{% trans 'Discount' %}">
               {% if item.descuento_monto_unitario and item.descuento_monto_unitario > 0 %}
                 <span class="text-success fw-semibold">-${{ item.descuento_monto_unitario }}</span>
                 <div class="small text-muted">{% blocktrans with total=item.descuento_monto_unitario|floatformat:2 qty=item.cantidad_facturada %}${{ total }} / unit · {{ qty }} units{% endblocktrans %}</div>
@@ -454,10 +508,10 @@
                 —
               {% endif %}
             </td>
-            <td>{% if item.descuento_porcentaje %}{{ item.descuento_porcentaje }}%{% else %}—{% endif %}</td>
-            <td>${{ item.precio_unitario }}</td>
-            <td>${{ item.precio_venta_sugerido_unitario|default:'0.00' }}</td>
-            <td>${{ item.subtotal }}</td>
+            <td data-label="{% trans 'Disc. %' %}">{% if item.descuento_porcentaje %}{{ item.descuento_porcentaje }}%{% else %}—{% endif %}</td>
+            <td data-label="{% trans 'Unit price' %}">${{ item.precio_unitario }}</td>
+            <td data-label="{% trans 'Sug. rtl / unit' %}">${{ item.precio_venta_sugerido_unitario|default:'0.00' }}</td>
+            <td data-label="{% trans 'Subtotal' %}">${{ item.subtotal }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -767,4 +821,5 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 });
 </script>
+</div>
 {% endblock %}

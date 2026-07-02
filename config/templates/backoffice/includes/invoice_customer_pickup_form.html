@@ -3,10 +3,17 @@
   .pickup-completion-shell {
     display: grid;
     gap: 1rem;
+    width: 100%;
     max-width: 100%;
     min-width: 0;
-    overflow-x: hidden;
+    overflow-x: clip;
     margin-bottom: 1.25rem;
+    box-sizing: border-box;
+  }
+  .pickup-completion-shell *,
+  .pickup-completion-shell *::before,
+  .pickup-completion-shell *::after {
+    box-sizing: border-box;
   }
   .pickup-completion-shell .pickup-flow-form {
     display: contents;
@@ -22,6 +29,9 @@
     background: #fff;
     box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
     padding: 1rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
   .pickup-completion-shell .pickup-section-head {
     display: flex;
@@ -48,7 +58,10 @@
     border: 1px solid rgba(11, 61, 145, 0.18);
     border-radius: 0.85rem;
     background: linear-gradient(135deg, #eef4ff 0%, #ffffff 100%);
-    padding: 0.95rem 1rem 1rem 1.1rem;
+    padding: 0.95rem 0.85rem 1rem 1rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
   .pickup-completion-shell .pickup-adjustment-callout::before {
     content: '';
@@ -99,6 +112,9 @@
     border-radius: 0.75rem;
     background: rgba(255, 255, 255, 0.95);
     padding: 0.85rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
   .pickup-completion-shell .pickup-note-type-highlight {
     border: 1px dashed rgba(11, 61, 145, 0.35);
@@ -130,9 +146,22 @@
     border-radius: 0.85rem;
     background: #fff;
     overflow: hidden;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
   .pickup-completion-shell .pickup-notes-table__body {
     padding: 1rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .pickup-completion-shell .pickup-payment-panel,
+  .pickup-completion-shell .pickup-signature-card,
+  .pickup-completion-shell .pickup-submit-bar {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
   .pickup-completion-shell .pickup-payment-panel {
     border: 1px solid rgba(15, 23, 42, 0.08);
@@ -170,9 +199,88 @@
     color: #1e3a5f;
   }
   @media (max-width: 767.98px) {
+    .pickup-completion-shell {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .pickup-completion-shell .pickup-flow-form {
+      display: contents;
+    }
+
+    .pickup-completion-shell .pickup-flow-adjustment { order: 1; }
+    .pickup-completion-shell .pickup-flow-notes { order: 2; }
+    .pickup-completion-shell .pickup-flow-payment { order: 3; }
+    .pickup-completion-shell .pickup-flow-signature { order: 4; }
+    .pickup-completion-shell .pickup-flow-submit { order: 5; }
+
+    .pickup-completion-shell .pickup-flow-card {
+      padding: 0.85rem;
+    }
+
+    .pickup-completion-shell .pickup-flow-adjustment.pickup-flow-card {
+      padding: 0;
+      border: 0;
+      box-shadow: none;
+      background: transparent;
+    }
+
+    .pickup-completion-shell .pickup-flow-notes {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    .pickup-completion-shell .pickup-adjustment-callout-head {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .pickup-completion-shell .pickup-adjustment-callout-lead,
+    .pickup-completion-shell .pickup-submit-copy,
+    .pickup-completion-shell .alert-info-tone {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      white-space: normal;
+    }
+
+    .pickup-completion-shell .pickup-adjustment-callout-body .row {
+      --bs-gutter-x: 0.75rem;
+      margin-left: 0;
+      margin-right: 0;
+    }
+
+    .pickup-completion-shell .pickup-adjustment-callout-body .row > [class*="col-"] {
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .pickup-completion-shell .pickup-note-type-highlight {
+      max-width: 100%;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .pickup-completion-shell .form-control,
+    .pickup-completion-shell .form-select,
+    .pickup-completion-shell .input-group,
+    .pickup-completion-shell .camera-upload-widget,
+    .pickup-completion-shell canvas {
+      width: 100%;
+      max-width: 100%;
+    }
+
     .pickup-completion-shell .driver-stack-table .driver-data-table thead { display: none; }
-    .pickup-completion-shell .driver-stack-table .driver-data-table tr {
+    .pickup-completion-shell .driver-stack-table .driver-data-table,
+    .pickup-completion-shell .driver-stack-table .driver-data-table tbody,
+    .pickup-completion-shell .driver-stack-table .driver-data-table tr,
+    .pickup-completion-shell .driver-stack-table .driver-data-table td {
       display: block;
+      width: 100%;
+      max-width: 100%;
+    }
+    .pickup-completion-shell .driver-stack-table .driver-data-table tr {
       border: 1px solid rgba(15, 23, 42, 0.08);
       border-radius: 0.85rem;
       padding: 0.75rem;
@@ -180,25 +288,32 @@
       background: #fff;
     }
     .pickup-completion-shell .driver-stack-table .driver-data-table td {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.75rem;
       border: 0;
-      padding: 0.35rem 0;
-      text-align: right;
+      padding: 0.45rem 0;
+      text-align: left !important;
     }
     .pickup-completion-shell .driver-stack-table .driver-data-table td::before {
       content: attr(data-label);
-      font-weight: 600;
+      display: block;
+      font-weight: 700;
+      font-size: 0.78rem;
       color: #64748b;
-      text-align: left;
-      flex: 0 0 42%;
+      margin-bottom: 0.3rem;
+      line-height: 1.35;
+    }
+    .pickup-completion-shell .driver-stack-table .driver-data-table td.driver-stack-field .form-label.small {
+      display: none;
+    }
+    .pickup-completion-shell .driver-stack-table .driver-data-table td.driver-stack-field,
+    .pickup-completion-shell .driver-stack-table .driver-data-table td.driver-stack-field .driver-stack-field-help {
+      min-width: 0;
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      white-space: normal;
     }
     .pickup-completion-shell .payment-entry .row > [class*="col-"] {
       flex: 0 0 100%;
-      max-width: 100%;
-    }
-    .pickup-completion-shell .pickup-note-type-highlight {
       max-width: 100%;
     }
     .pickup-completion-shell .pickup-submit-bar {

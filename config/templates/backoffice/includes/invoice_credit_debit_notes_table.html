@@ -4,8 +4,8 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h5 class="mb-0">{% trans "Credit and debit notes" %}</h5>
     </div>
-    <div class="table-responsive">
-      <table class="table align-middle mb-0">
+    <div class="table-responsive mobile-stack-responsive">
+      <table class="table align-middle mb-0 mobile-stack-table mobile-stack-table--notes">
         <thead>
           <tr>
             <th>{% trans "Number" %}</th>
@@ -20,7 +20,7 @@
         <tbody>
           {% for nota in invoice.notas_ajuste.all %}
           <tr>
-            <td>
+            <td data-label="{% trans 'Number' %}">
               <strong>{{ nota.numero }}</strong>
               <div class="small text-muted">{{ nota.creada_en|date:"m/d/Y H:i" }}</div>
               {% if nota.creada_por and nota.creada_por.role == 'driver' %}
@@ -30,8 +30,8 @@
                 <div class="small text-muted">{% blocktrans count total=nota.evidence_photos.all|length %}1 evidence photo{% plural %}{{ total }} evidence photos{% endblocktrans %}</div>
               {% endif %}
             </td>
-            <td>{{ nota.get_tipo_documento_display }}</td>
-            <td>
+            <td data-label="{% trans 'Type' %}">{{ nota.get_tipo_documento_display }}</td>
+            <td data-label="{% trans 'Status' %}">
               {% if nota.estado == 'APROBADA' %}
                 <span class="badge bg-success">{{ nota.get_estado_display }}</span>
               {% elif nota.estado == 'ANULADA' %}
@@ -40,15 +40,15 @@
                 <span class="badge bg-warning text-dark">{{ nota.get_estado_display }}</span>
               {% endif %}
             </td>
-            <td>
+            <td data-label="{% trans 'Reason' %}">
               {{ nota.get_motivo_display }}
               {% if nota.tipo_credito %}
                 <div class="small text-muted">{{ nota.get_tipo_credito_display }}</div>
               {% endif %}
             </td>
-            <td>{{ nota.get_inventario_estado_display }}</td>
-            <td>${{ nota.total }}</td>
-            <td class="text-end">
+            <td data-label="{% trans 'Inventory' %}">{{ nota.get_inventario_estado_display }}</td>
+            <td data-label="{% trans 'Total' %}">${{ nota.total }}</td>
+            <td data-label="{% trans 'Actions' %}" class="text-end mobile-stack-table__action">
               {% if nota.quickbooks_id and nota.sync_status == 'SYNCED' %}
                 <span class="badge text-bg-primary">{% trans "Locked by QuickBooks" %}</span>
               {% elif invoice_quickbooks_locked %}
@@ -89,7 +89,7 @@
               {% endif %}
             </td>
           </tr>
-          <tr>
+          <tr class="mobile-stack-table__details-row">
             <td colspan="7" class="bg-light-subtle" data-note-details="{{ nota.id }}">
               <div class="row g-3 py-2">
                 <div class="col-lg-4">
@@ -164,7 +164,7 @@
             </td>
           </tr>
           {% if nota.evidence_photos.all %}
-          <tr>
+          <tr class="mobile-stack-table__evidence-row">
             <td colspan="7">
               <div class="small text-muted mb-2">{% trans "Adjustment note evidence" %}</div>
               <div class="d-flex flex-wrap gap-2">
@@ -179,7 +179,7 @@
           {% endif %}
           {% empty %}
           <tr>
-            <td colspan="7" class="text-center text-muted py-4">{% trans "No adjustment notes created yet." %}</td>
+            <td colspan="7" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No adjustment notes created yet." %}</td>
           </tr>
           {% endfor %}
         </tbody>

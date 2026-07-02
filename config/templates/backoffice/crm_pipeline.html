@@ -62,11 +62,11 @@
       <div class="form-text mt-2">
         {% if period == 'today' %}
         {% blocktrans with start=period_start|date:"m/d/Y" %}
-        Open orders from previous days stay visible. Completed deliveries only appear for {{ start }}.
+        Open orders from previous days stay visible. Completed driver deliveries and customer pickups only appear for {{ start }}.
         {% endblocktrans %}
         {% else %}
         {% blocktrans with start=period_start|date:"m/d/Y" end=period_end|date:"m/d/Y" %}
-        Open orders from previous days stay visible. Completed deliveries only appear for {{ start }} – {{ end }}.
+        Open orders from previous days stay visible. Completed driver deliveries and customer pickups only appear for {{ start }} – {{ end }}.
         {% endblocktrans %}
         {% endif %}
       </div>

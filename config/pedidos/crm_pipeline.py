@@ -171,13 +171,28 @@ def _created_in_period(pedido, period_start, period_end):
 	return period_start <= created <= period_end
 
 
+def _is_completed_pedido(pedido):
+	invoice = getattr(pedido, 'invoice', None)
+	delivery = getattr(invoice, 'delivery', None) if invoice else None
+	if delivery and delivery.estado in DELIVERED_DELIVERY_STATUSES:
+		return True
+	return pedido.estado == 'DESPACHADO'
+
+
+def _completed_column_key(pedido):
+	invoice = getattr(pedido, 'invoice', None)
+	if invoice and invoice.metodo_entrega == 'CUSTOMER_PICK_UP':
+		return 'pickup'
+	return 'delivered'
+
+
 def _resolve_column_key(pedido, *, reversed_invoice_pedido_ids=None):
 	estado = pedido.estado
 	invoice = getattr(pedido, 'invoice', None)
 	delivery = getattr(invoice, 'delivery', None) if invoice else None
 
 	if delivery and delivery.estado in DELIVERED_DELIVERY_STATUSES:
-		return 'delivered'
+		return _completed_column_key(pedido)
 	if estado in CRM_COLUMN_CONFIG['confirmed']['statuses']:
 		return 'confirmed'
 	if estado in CRM_COLUMN_CONFIG['picking_pending']['statuses']:
@@ -195,7 +210,7 @@ def _resolve_column_key(pedido, *, reversed_invoice_pedido_ids=None):
 			return 'pickup'
 		return 'backoffice_review'
 	if estado == 'DESPACHADO':
-		return 'delivered'
+		return _completed_column_key(pedido)
 	return None
 
 
@@ -239,7 +254,7 @@ def _apply_filters(queryset, *, search_term, vendedor_id, cliente_id):
 
 
 def _should_show_card(pedido, *, column_key, period_start, period_end):
-	if column_key == 'delivered':
+	if column_key in {'delivered', 'pickup'} and _is_completed_pedido(pedido):
 		completion_date = _completion_date(pedido)
 		if completion_date is None:
 			return False

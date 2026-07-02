@@ -149,6 +149,79 @@ class CrmPipelineTests(TestCase):
 		self.assertTrue(pickup_cards[0].is_pickup)
 		self.assertIn(f'/facturacion/backoffice/invoices/{invoice.pk}/', pickup_cards[0].detail_url)
 
+	def test_completed_customer_pickup_appears_in_pickup_column_not_delivered(self):
+		pedido = self._create_pedido(estado='DESPACHADO', total=Decimal('99.31'))
+		invoice = Invoice.objects.create(
+			pedido=pedido,
+			cliente=self.cliente,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			subtotal=pedido.total,
+			total_neto=pedido.total,
+			saldo_cliente=Decimal('0.00'),
+			creada_por=self.backoffice,
+		)
+		completed_at = timezone.now()
+		Delivery.objects.create(
+			invoice=invoice,
+			driver=None,
+			delivery_address=self.cliente.direccion,
+			delivery_city=self.cliente.ciudad,
+			delivery_state=self.cliente.estado,
+			delivery_postal_code=self.cliente.codigo_postal,
+			delivery_country=self.cliente.pais,
+			estado='ENTREGADA_PAGADA',
+			estado_pago='PAGADO',
+			monto_pagado=pedido.total,
+			recibido_por='Cliente Mostrador',
+			delivered_at=completed_at,
+			completed_by=self.backoffice,
+		)
+
+		pipeline = build_crm_pipeline(period='today')
+		delivered_cards = self._column_cards(pipeline, 'delivered')
+		pickup_cards = self._column_cards(pipeline, 'pickup')
+
+		self.assertEqual(len(delivered_cards), 0)
+		self.assertEqual(len(pickup_cards), 1)
+		self.assertEqual(pickup_cards[0].pedido_id, pedido.id)
+		self.assertTrue(pickup_cards[0].is_pickup)
+
+	def test_completed_route_delivery_appears_in_delivered_column(self):
+		pedido = self._create_pedido(estado='DESPACHADO', total=Decimal('120.00'))
+		invoice = Invoice.objects.create(
+			pedido=pedido,
+			cliente=self.cliente,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			subtotal=pedido.total,
+			total_neto=pedido.total,
+			saldo_cliente=Decimal('0.00'),
+			creada_por=self.backoffice,
+		)
+		Delivery.objects.create(
+			invoice=invoice,
+			driver=self.driver,
+			delivery_address=self.cliente.direccion,
+			delivery_city=self.cliente.ciudad,
+			delivery_state=self.cliente.estado,
+			delivery_postal_code=self.cliente.codigo_postal,
+			delivery_country=self.cliente.pais,
+			estado='ENTREGADA_PAGADA',
+			estado_pago='PAGADO',
+			monto_pagado=pedido.total,
+			recibido_por='Cliente',
+			delivered_at=timezone.now(),
+			completed_by=self.driver,
+		)
+
+		pipeline = build_crm_pipeline(period='today')
+		delivered_cards = self._column_cards(pipeline, 'delivered')
+		pickup_cards = self._column_cards(pipeline, 'pickup')
+
+		self.assertEqual(len(delivered_cards), 1)
+		self.assertEqual(delivered_cards[0].pedido_id, pedido.id)
+		self.assertEqual(len(pickup_cards), 0)
+
 	def test_quickbooks_imported_orders_are_excluded_from_pipeline(self):
 		pedido = self._create_pedido(estado='VERIFICADO_AJUSTADO', total=Decimal('999.00'))
 		pedido.canal_toma = 'QUICKBOOKS_IMPORT'

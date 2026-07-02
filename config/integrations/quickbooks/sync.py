@@ -67,10 +67,25 @@ def _looks_like_quickbooks_deleted_label(value):
     return '(deleted)' in normalized or '(eliminado)' in normalized
 
 
-def _quickbooks_record_is_active(payload):
+def _quickbooks_payload_active(payload):
     if not payload:
         return False
-    return bool(payload.get('Active', True))
+    if 'Active' not in payload:
+        return True
+    value = payload.get('Active')
+    if value is None:
+        return True
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {'false', '0', 'no', 'off'}:
+            return False
+        if normalized in {'true', '1', 'yes', 'on'}:
+            return True
+    return bool(value)
+
+
+def _quickbooks_record_is_active(payload):
+    return _quickbooks_payload_active(payload)
 
 
 def _quickbooks_ref_looks_deleted(ref):
@@ -93,7 +108,7 @@ def _quickbooks_customer_payload_is_importable(payload):
 
 
 def _quickbooks_item_payload_is_importable(payload):
-    if not payload or not _quickbooks_record_is_active(payload):
+    if not payload:
         return False
     for name in (payload.get('Name'), payload.get('FullyQualifiedName')):
         if _looks_like_quickbooks_deleted_label(name):
@@ -1714,7 +1729,7 @@ def _apply_quickbooks_item_to_local_record(presentacion, payload, *, client=None
     producto.descripcion = description
     producto.categoria = category
     producto.marca = brand
-    producto.activo = bool(payload.get('Active', True))
+    producto.activo = _quickbooks_payload_active(payload)
     if sku:
         if producto.codigo_barras == sku:
             pass
@@ -1766,7 +1781,7 @@ def import_quickbooks_item_record(payload, *, client=None, skip_enrich=False, sk
             entity='Item',
             quickbooks_id=quickbooks_id,
             label=(payload or {}).get('Name') or quickbooks_id,
-            reason='QuickBooks item is inactive or deleted.',
+            reason='QuickBooks item is deleted.',
         )
 
     if skip_images is None:
@@ -1780,7 +1795,7 @@ def import_quickbooks_item_record(payload, *, client=None, skip_enrich=False, sk
             entity='Item',
             quickbooks_id=quickbooks_id,
             label=payload.get('Name') or quickbooks_id,
-            reason='QuickBooks item is inactive or deleted.',
+            reason='QuickBooks item is deleted.',
         )
     client = client or QuickBooksAPIClient()
 
@@ -1841,7 +1856,7 @@ def import_quickbooks_item_record(payload, *, client=None, skip_enrich=False, sk
                 categoria=category,
                 marca=brand,
                 codigo_barras=sku or None,
-                activo=bool(payload.get('Active', True)),
+                activo=_quickbooks_payload_active(payload),
                 quickbooks_id=quickbooks_id,
                 sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
                 last_synced_at=timezone.now(),
@@ -1874,7 +1889,7 @@ def import_quickbooks_item_record(payload, *, client=None, skip_enrich=False, sk
                     categoria=category,
                     marca=brand,
                     codigo_barras=None,
-                    activo=bool(payload.get('Active', True)),
+                    activo=_quickbooks_payload_active(payload),
                     quickbooks_id=quickbooks_id,
                     sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
                     last_synced_at=timezone.now(),
@@ -2112,8 +2127,12 @@ def import_quickbooks_items(*, max_results=25, client=None, updated_after=None, 
 
     # If QuickBooks no longer returns some linked items, mark their local
     # `Producto` as inactive to reflect deletion/disable in QuickBooks.
+    # Only mark missing items inactive after a full unlimited catalog pull.
+    # Incremental or capped imports would otherwise deactivate linked products
+    # that simply were not included in the current batch.
+    deactivate_missing_items = updated_after is None and max_results is None
     try:
-        if all_ids:
+        if deactivate_missing_items and all_ids:
             missing_qb_pres = Presentacion.objects.select_related('producto').filter(quickbooks_id__isnull=False).exclude(quickbooks_id__in=all_ids)
             disabled = []
             for pres in missing_qb_pres:
@@ -3351,7 +3370,6 @@ def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None
         return import_quickbooks_item_record(
             payload,
             client=client,
-            skip_images=True,
             prefetched_presentacion=prefetched_presentaciones.get(str(payload.get('Id') or '').strip()),
             lookup_cache=lookup_cache,
         )

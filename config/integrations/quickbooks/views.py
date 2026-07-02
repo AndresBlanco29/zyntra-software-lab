@@ -1142,8 +1142,10 @@ def quickbooks_import_customers_to_local(request):
     return _response_or_redirect(request, operation='import_customers_to_local', result=result)
 
 
-def _quickbooks_import_include_images(request):
-    return str(request.POST.get('include_images') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+def _quickbooks_import_skip_images(request):
+    if str(request.POST.get('skip_images') or '').strip().lower() in {'1', 'true', 'yes', 'on'}:
+        return True
+    return bool(getattr(settings, 'QUICKBOOKS_CATALOG_SYNC_SKIP_IMAGES', False))
 
 
 @require_POST
@@ -1153,7 +1155,7 @@ def quickbooks_import_items_to_local(request):
         pull_result = pull_quickbooks_items_to_local(
             max_results=_parse_quickbooks_import_limit(request.POST.get('limit'), default=None),
             force_full=request.POST.get('mode') == 'full',
-            skip_images=not _quickbooks_import_include_images(request),
+            skip_images=_quickbooks_import_skip_images(request),
         )
         result = pull_result.get('items', {})
         result['incremental'] = pull_result.get('incremental')
@@ -1277,7 +1279,7 @@ def quickbooks_start_task(request):
     except Exception:
         limit = None
     force_full = str(request.POST.get('mode') or '').strip().lower() == 'full'
-    skip_images = not _quickbooks_import_include_images(request)
+    skip_images = _quickbooks_import_skip_images(request)
 
     # map allowed operations to internal functions
     op_map = {

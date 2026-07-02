@@ -262,7 +262,7 @@ QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS = env_bool('QUICKBOOKS_IMPORT_ACCOUNTING_
 QUICKBOOKS_TOKEN_MAINTENANCE_HOURS = int(os.environ.get('QUICKBOOKS_TOKEN_MAINTENANCE_HOURS', '12') or '12')
 # QuickBooks catalog sync tuning: larger pages and deferred image downloads speed up import/refresh.
 QUICKBOOKS_CATALOG_SYNC_PAGE_SIZE = min(max(int(os.environ.get('QUICKBOOKS_CATALOG_SYNC_PAGE_SIZE', '1000') or 1000), 1), 1000)
-QUICKBOOKS_CATALOG_SYNC_SKIP_IMAGES = env_bool('QUICKBOOKS_CATALOG_SYNC_SKIP_IMAGES', default=True)
+QUICKBOOKS_CATALOG_SYNC_SKIP_IMAGES = env_bool('QUICKBOOKS_CATALOG_SYNC_SKIP_IMAGES', default=False)
 # When True, new QuickBooks items are created as Inventory so invoicing reduces QtyOnHand in QuickBooks.
 QUICKBOOKS_USE_INVENTORY_ITEMS = env_bool('QUICKBOOKS_USE_INVENTORY_ITEMS', default=True)
 

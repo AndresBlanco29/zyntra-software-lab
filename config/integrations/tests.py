@@ -43,10 +43,12 @@ from config.integrations.quickbooks.sync import (
     _prepare_inventory_item_for_txn_date,
     _resolve_item_payload_name,
     _strip_ltg_customer_export_prefix,
+    _quickbooks_payload_active,
     import_quickbooks_credit_memo_record,
     import_quickbooks_customer_record,
     import_quickbooks_invoice_record,
     import_quickbooks_item_record,
+    import_quickbooks_items,
     refresh_linked_quickbooks_items,
     refresh_linked_quickbooks_invoice_status,
 )
@@ -457,17 +459,37 @@ class QuickBooksLinkedItemUpdateTests(TestCase):
 
 
 class QuickBooksDeletedRecordImportTests(TestCase):
+    def test_active_defaults_to_true_when_missing_or_none(self):
+        self.assertTrue(_quickbooks_payload_active({'Id': '1', 'Name': 'X'}))
+        self.assertTrue(_quickbooks_payload_active({'Id': '1', 'Name': 'X', 'Active': None}))
+        self.assertFalse(_quickbooks_payload_active({'Id': '1', 'Name': 'X', 'Active': False}))
+
+    @patch('config.integrations.quickbooks.sync.fetch_quickbooks_items')
+    @patch('config.integrations.quickbooks.sync.import_quickbooks_item_record')
+    def test_incremental_import_does_not_deactivate_products_outside_batch(self, mock_import, mock_fetch):
+        producto = Producto.objects.create(nombre='Keep Active', activo=True, quickbooks_id='QB-KEEP-1')
+        Presentacion.objects.create(producto=producto, nombre='Unit', quickbooks_id='QB-KEEP-1')
+
+        mock_fetch.return_value = [{'Id': 'QB-OTHER', 'Name': 'Other', 'Type': 'Inventory', 'Active': True}]
+        mock_import.return_value = {'ok': True, 'action': 'updated'}
+
+        import_quickbooks_items(max_results=None, updated_after='2026-01-01T00:00:00Z')
+
+        producto.refresh_from_db()
+        self.assertTrue(producto.activo)
+
     @patch('config.integrations.quickbooks.sync._save_quickbooks_item_image', return_value=False)
     @patch('config.integrations.quickbooks.sync._enrich_quickbooks_item_payload', side_effect=lambda payload, **kwargs: payload)
-    def test_inactive_item_is_skipped(self, _mock_enrich, _mock_image):
+    def test_inactive_item_is_imported_as_inactive(self, _mock_enrich, _mock_image):
         result = import_quickbooks_item_record({
             'Id': 'QB-INACTIVE-ITEM',
             'Name': 'Inactive Product',
             'Type': 'Inventory',
             'Active': False,
         })
-        self.assertEqual(result['action'], 'skipped')
-        self.assertFalse(Presentacion.objects.filter(quickbooks_id='QB-INACTIVE-ITEM').exists())
+        self.assertEqual(result['action'], 'created')
+        presentacion = Presentacion.objects.get(quickbooks_id='QB-INACTIVE-ITEM')
+        self.assertFalse(presentacion.producto.activo)
 
     def test_inactive_customer_is_skipped(self):
         result = import_quickbooks_customer_record({

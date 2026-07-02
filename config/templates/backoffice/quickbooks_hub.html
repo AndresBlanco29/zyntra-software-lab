@@ -844,11 +844,11 @@
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
                 <button type="submit" class="btn btn-outline-success w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Import catalog to the app" %}</button>
                 <label class="form-check mt-2 mb-0">
-                  <input type="checkbox" class="form-check-input" name="include_images" value="1">
-                  <span class="form-check-label small">{% trans "Include product images (slower)" %}</span>
+                  <input type="checkbox" class="form-check-input" name="skip_images" value="1">
+                  <span class="form-check-label small">{% trans "Skip product images (faster import)" %}</span>
                 </label>
               </form>
-              <p class="qb-action-note">{% trans "Brings new QuickBooks items and updates changed ones using incremental sync cursors. Images are skipped by default; use the image sync action below after import." %}</p>
+              <p class="qb-action-note">{% trans "Brings new QuickBooks items and updates changed ones using incremental sync cursors. Product images and active/inactive status are synced from QuickBooks by default." %}</p>
             </div>
             <div class="qb-action-item" id="qb-sync-product-images">
               <form method="post" action="{% url 'quickbooks_sync_item_images_to_local' %}" data-qb-operation="sync_item_images_to_local">
@@ -866,7 +866,7 @@
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
                 <button type="submit" class="btn btn-outline-primary w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Update linked catalog only" %}</button>
               </form>
-              <p class="qb-action-note">{% trans "Fast refresh for products already linked to QuickBooks: cost, prices, stock, packaging, and names. Does not scan the full QuickBooks catalog." %}</p>
+              <p class="qb-action-note">{% trans "Fast refresh for products already linked to QuickBooks: cost, prices, stock, packaging, names, images, and active/inactive status. Does not scan the full QuickBooks catalog." %}</p>
             </div>
             {% if quickbooks_import_accounting_enabled %}
             <div class="qb-action-item" id="qb-pull-accounting">
@@ -1439,9 +1439,9 @@
         if (mode) {
           payload.set('mode', mode);
         }
-        const includeImages = form.querySelector('input[name=include_images]');
-        if (includeImages && includeImages.checked) {
-          payload.set('include_images', '1');
+        const skipImages = form.querySelector('input[name=skip_images]');
+        if (skipImages && skipImages.checked) {
+          payload.set('skip_images', '1');
         }
         fetch('/quickbooks/task/start', {
           method: 'POST',

@@ -176,6 +176,33 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(pedido_item.cantidad_inventario_aplicada, 2)
 		self.assertTrue(InventarioMovimiento.objects.filter(pedido=invoice.pedido, tipo='SALIDA_PICKING').exists())
 
+	def test_generar_invoice_desde_picking_applies_pending_inventory_before_invoice(self):
+		starting_stock = 20
+		stock, _created = StockPresentacion.objects.get_or_create(
+			presentacion=self.presentacion,
+			defaults={'stock_fisico': starting_stock, 'stock_reservado': 0, 'stock_disponible': starting_stock},
+		)
+		stock.stock_fisico = starting_stock
+		stock.stock_reservado = 0
+		stock.stock_disponible = starting_stock
+		stock.save(update_fields=['stock_fisico', 'stock_reservado', 'stock_disponible', 'actualizado_en'])
+		self.pedido_item.cantidad = 2
+		self.pedido_item.cantidad_inventario_aplicada = 0
+		self.pedido_item.save(update_fields=['cantidad', 'cantidad_inventario_aplicada'])
+
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+		self.pedido_item.refresh_from_db()
+		stock.refresh_from_db()
+		self.assertEqual(invoice.items.first().cantidad_facturada, 2)
+		self.assertEqual(self.pedido_item.cantidad_inventario_aplicada, 2)
+		self.assertEqual(stock.stock_fisico, starting_stock - 2)
+
 	def test_generar_invoice_directa_backoffice_creates_driver_route_with_delivery(self):
 		invoice = generar_invoice_directa_backoffice(
 			cliente=self.cliente,

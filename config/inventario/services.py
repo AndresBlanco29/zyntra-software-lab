@@ -672,6 +672,25 @@ def aplicar_verificacion_picking_inventario(*, pedido, pedido_item_ids, creado_p
         item.save(update_fields=['cantidad_reservada_inventario', 'cantidad_inventario_aplicada'])
 
 
+def aplicar_inventario_pendiente_pedido(*, pedido, pedido_item_ids=None, creado_por=None):
+    items_queryset = pedido.items.all()
+    if pedido_item_ids is not None:
+        items_queryset = items_queryset.filter(id__in=pedido_item_ids)
+    pending_item_ids = [
+        item.id
+        for item in items_queryset
+        if int(item.cantidad or 0) > int(item.cantidad_inventario_aplicada or 0)
+    ]
+    if not pending_item_ids:
+        return []
+    aplicar_verificacion_picking_inventario(
+        pedido=pedido,
+        pedido_item_ids=pending_item_ids,
+        creado_por=creado_por,
+    )
+    return pending_item_ids
+
+
 @transaction.atomic
 def cancelar_pedido_con_inventario(*, pedido, creado_por=None):
     items = list(

@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from config.auditoria.models import AuditLog
-from config.inventario.services import _apply_fractional_inventory_change, _apply_inventory_change, _lock_fractional_stock_records, _lock_stock_records, aplicar_verificacion_picking_inventario, restaurar_inventario_por_anulacion_factura
+from config.inventario.services import _apply_fractional_inventory_change, _apply_inventory_change, _lock_fractional_stock_records, _lock_stock_records, aplicar_inventario_pendiente_pedido, aplicar_verificacion_picking_inventario, restaurar_inventario_por_anulacion_factura
 from config.notificaciones.models import crear_notificacion_backoffice
 from config.pedidos.services import crear_pedido_desde_items
 from config.productos.models import Presentacion
@@ -164,6 +164,29 @@ def _validate_invoice_generation(pedido, metodo_entrega, driver):
 		raise ValidationError(_('Driver assignment is not allowed for customer pickup invoices.'))
 	if driver is not None and getattr(driver, 'role', '') != 'driver':
 		raise ValidationError(_('Only users with driver role can be assigned.'))
+
+
+def _ensure_picking_inventory_applied_for_invoice(*, pedido, usuario):
+	aplicar_inventario_pendiente_pedido(pedido=pedido, creado_por=usuario)
+	pending_items = [
+		item
+		for item in pedido.items.select_related('presentacion__producto')
+		if int(item.cantidad or 0) > int(item.cantidad_inventario_aplicada or 0)
+	]
+	if not pending_items:
+		return
+	product_labels = ', '.join(
+		f'{item.presentacion.producto.nombre} - {item.presentacion.nombre}'
+		for item in pending_items[:3]
+	)
+	ellipsis = '...' if len(pending_items) > 3 else ''
+	raise ValidationError(
+		_('Physical stock could not be applied for %(count)s invoiced item(s): %(products)s%(ellipsis)s. Review inventory before generating the invoice.') % {
+			'count': len(pending_items),
+			'products': product_labels,
+			'ellipsis': ellipsis,
+		}
+	)
 
 
 def resolve_presentacion_suggested_unit_price(*, presentacion, base_case_price):
@@ -434,6 +457,7 @@ def generar_invoice_desde_picking(
 	estimated_delivery_at=None,
 ):
 	_validate_invoice_generation(pedido, metodo_entrega, driver)
+	_ensure_picking_inventory_applied_for_invoice(pedido=pedido, usuario=usuario)
 	suggested_unit_prices = suggested_unit_prices or {}
 	line_discounts = line_discounts or {}
 

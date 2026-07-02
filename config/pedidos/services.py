@@ -13,6 +13,7 @@ from datetime import timedelta
 
 from config.inventario.services import (
     aplicar_verificacion_picking_inventario,
+    aplicar_inventario_pendiente_pedido,
     eliminar_item_pedido_con_inventario,
     reemplazar_presentacion_item_pedido,
     reservar_stock_para_pedido_items,
@@ -614,25 +615,9 @@ def resolver_bloqueo_picking_desde_backoffice(*, pedido, usuario):
     if pedido.estado != 'VERIFICADO_AJUSTADO':
         raise ValidationError(_('Picking must be verified before unlocking the order.'))
 
+    pending_item_ids = aplicar_inventario_pendiente_pedido(pedido=pedido, creado_por=usuario)
     pedido.nota_seleccionador_resuelta = True
     pedido.save(update_fields=['nota_seleccionador_resuelta', 'picking_bloqueado', 'actualizada_en'])
-
-    pending_item_ids = [
-        item.id
-        for item in pedido.items.all()
-        if int(item.cantidad or 0) > int(item.cantidad_inventario_aplicada or 0)
-    ]
-    inventory_warning = None
-    if pending_item_ids:
-        try:
-            with transaction.atomic():
-                aplicar_verificacion_picking_inventario(
-                    pedido=pedido,
-                    pedido_item_ids=pending_item_ids,
-                    creado_por=usuario,
-                )
-        except ValidationError as exc:
-            inventory_warning = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
 
     from config.auditoria.business_events import log_business_event
     from config.auditoria.models import AuditLog
@@ -644,10 +629,10 @@ def resolver_bloqueo_picking_desde_backoffice(*, pedido, usuario):
         entity_type='Pedido',
         entity_id=str(pedido.id),
         entity_label=_('Order #%(id)s') % {'id': pedido.id},
-        metadata={'inventory_warning': inventory_warning},
+        metadata={'pending_inventory_applied_count': len(pending_item_ids)},
     )
 
-    return pedido, inventory_warning
+    return pedido
 
 
 def notificar_backoffice_pedido(pedido):

@@ -1278,7 +1278,7 @@
   <div id="qb-task-overlay" style="display:none;position:fixed;inset:0;background:rgba(4,12,30,0.6);backdrop-filter:blur(4px);z-index:1050;align-items:center;justify-content:center;">
     <div style="max-width:520px;width:92%;background:linear-gradient(180deg,#ffffff,#f1fbff);border-radius:18px;padding:28px 26px;box-shadow:0 30px 60px rgba(2,16,52,0.5);text-align:center;color:#102a63;">
       <div style="font-weight:800;font-size:28px;margin-bottom:6px;">Cargando</div>
-      <div style="color:#4f6484;margin-bottom:16px;">Estamos importando datos desde QuickBooks. El catálogo puede tardar 1-3 minutos; las imágenes se descargan por separado.</div>
+      <div id="qb-task-description" style="color:#4f6484;margin-bottom:16px;">Estamos importando datos desde QuickBooks.</div>
       <div style="position:relative;height:18px;background:linear-gradient(90deg,#e6f7ff,#dff3ff);border-radius:999px;overflow:hidden;margin:14px 0;">
         <div id="qb-task-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#1f6fd1,#73d7ff);transition:width 400ms ease;"></div>
       </div>
@@ -1304,7 +1304,48 @@
     const bar = document.getElementById('qb-task-progress-bar');
     const text = document.getElementById('qb-task-progress-text');
     const message = document.getElementById('qb-task-message');
+    const description = document.getElementById('qb-task-description');
     const cancelBtn = document.getElementById('qb-task-cancel');
+
+    function operationDescription(operation){
+      if (operation === 'import_customers_to_local') {
+        return 'Estamos importando clientes desde QuickBooks.';
+      }
+      if (operation === 'import_items_to_local') {
+        return 'Estamos importando catálogo desde QuickBooks. Las imágenes se descargan por separado.';
+      }
+      if (operation === 'sync_item_images_to_local') {
+        return 'Estamos descargando imágenes de productos desde QuickBooks.';
+      }
+      return 'Estamos importando datos desde QuickBooks.';
+    }
+
+    function operationProgressLabel(operation, processed, total){
+      if (operation === 'import_customers_to_local') {
+        return processed && total
+          ? `Importando ${processed} de ${total} clientes...`
+          : 'Importando clientes — por favor espera.';
+      }
+      if (operation === 'import_items_to_local') {
+        return processed && total
+          ? `Importando ${processed} de ${total} productos...`
+          : 'Importando catálogo — por favor espera.';
+      }
+      if (operation === 'sync_item_images_to_local') {
+        return processed && total
+          ? `Descargando imágenes ${processed} de ${total}...`
+          : 'Descargando imágenes — por favor espera.';
+      }
+      return processed && total
+        ? `Importando ${processed} de ${total}...`
+        : 'Importando — por favor espera.';
+    }
+
+    function setTaskDescription(operation){
+      if (description) {
+        description.textContent = operationDescription(operation);
+      }
+    }
 
     function showOverlay(){ overlay.style.display='flex'; }
     function hideOverlay(){ overlay.style.display='none'; }
@@ -1327,26 +1368,23 @@
       requestAnimationFrame(step);
     }
 
-    function startPolling(taskId){
+    function startPolling(taskId, operation){
       let polling = true;
       let lastKnown = 0;
       function poll(){
         fetch('/quickbooks/task/status/' + taskId, {credentials: 'same-origin'}).then(r=>r.json()).then(function(data){
           if (!data) return;
+          const activeOperation = data.operation || operation || '';
           const p = parseInt(data.progress || 0, 10);
           lastKnown = Math.max(lastKnown, p);
           if (data.status === 'running'){
             animateTo(p);
             const batch = data.result || {};
-            if (batch.processed && batch.total) {
-              message.textContent = data.operation === 'sync_item_images_to_local'
-                ? `Descargando imágenes ${batch.processed} de ${batch.total}...`
-                : `Importando ${batch.processed} de ${batch.total} productos...`;
-            } else {
-              message.textContent = data.operation === 'sync_item_images_to_local'
-                ? 'Descargando imágenes — por favor espera.'
-                : 'Importando — por favor espera.';
-            }
+            message.textContent = operationProgressLabel(
+              activeOperation,
+              batch.processed,
+              batch.total
+            );
             setTimeout(poll, 900);
             return;
           }
@@ -1442,6 +1480,7 @@
         const mode = (form.querySelector('input[name=mode]')||{}).value || '';
         const csrftoken = getCookie('csrftoken');
         showOverlay();
+        setTaskDescription(op);
         setProgress(6);
         message.textContent = 'Iniciando tarea...';
         const payload = new URLSearchParams({operation: op, limit: limit});
@@ -1466,7 +1505,7 @@
           body: payload
         }).then(function(r){ return r.json(); }).then(function(json){
           if (json && json.task_id){
-            startPolling(json.task_id);
+            startPolling(json.task_id, op);
           } else {
             message.textContent = 'No se pudo crear la tarea.';
             hideOverlay();

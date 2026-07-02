@@ -1213,8 +1213,50 @@ def _extract_quickbooks_customer_phone(payload):
 
 
 def _extract_quickbooks_customer_balance(payload):
-    """QuickBooks Customer Balance / OpenBalance (A/R): positive = customer owes, negative = customer credit."""
-    return _quantize_money(payload.get('Balance') or payload.get('OpenBalance') or 0)
+    """QuickBooks Customer balance: positive = customer owes, negative = customer credit."""
+    for key in ('BalanceWithJobs', 'Balance', 'OpenBalance'):
+        raw = (payload or {}).get(key)
+        if raw not in (None, ''):
+            return _quantize_money(raw)
+    return Decimal('0.00')
+
+
+def _customer_payload_has_balance(payload):
+    return any((payload or {}).get(key) not in (None, '') for key in ('BalanceWithJobs', 'Balance', 'OpenBalance'))
+
+
+def _enrich_quickbooks_customer_payload(payload, *, client=None):
+    normalized = dict(payload or {})
+    if _customer_payload_has_balance(normalized):
+        return normalized
+    customer_id = str(normalized.get('Id') or '').strip()
+    if not customer_id:
+        return normalized
+    client = client or QuickBooksAPIClient()
+    full_payload = client.read_entity('Customer', customer_id)
+    if not full_payload:
+        full_payload = client.find_by_id('Customer', customer_id)
+    if not full_payload:
+        return normalized
+    merged = dict(normalized)
+    for key in (
+        'Balance',
+        'BalanceWithJobs',
+        'OpenBalance',
+        'Active',
+        'DisplayName',
+        'CompanyName',
+        'PrimaryEmailAddr',
+        'PrimaryPhone',
+        'BillAddr',
+        'ShipAddr',
+    ):
+        if key in full_payload and full_payload.get(key) not in (None, '', [], {}):
+            merged[key] = full_payload[key]
+        elif key not in merged or merged.get(key) in (None, '', [], {}):
+            if key in full_payload:
+                merged[key] = full_payload[key]
+    return merged
 
 
 def _build_customer_import_defaults(payload):
@@ -1284,6 +1326,9 @@ def import_quickbooks_customer_record(payload):
             label=display_name,
             reason='QuickBooks customer is inactive or deleted.',
         )
+
+    client = client or QuickBooksAPIClient()
+    payload = _enrich_quickbooks_customer_payload(payload, client=client)
 
     company_name = _extract_quickbooks_customer_company_name(payload)
     display_name = _extract_quickbooks_customer_display_name(payload)

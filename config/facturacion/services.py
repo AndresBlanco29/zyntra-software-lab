@@ -242,6 +242,13 @@ def annotate_clientes_open_invoice_balance(queryset):
 	)
 
 
+def _customer_stored_due_balance_is_trusted(cliente):
+    qb_id = str(getattr(cliente, 'quickbooks_id', None) or '').strip()
+    if not qb_id:
+        return False
+    return str(getattr(cliente, 'sync_status', '') or '').upper() == 'SYNCED'
+
+
 def resolve_customer_amount_owed(*, cliente, invoice=None):
 	stored_due = _quantize_money(cliente.due_balance)
 	if invoice is not None:
@@ -259,7 +266,11 @@ def resolve_customer_amount_owed(*, cliente, invoice=None):
 	if operational_open > 0:
 		return _quantize_money(stored_due + operational_open)
 
-	if not _customer_has_open_invoice_saldo(cliente=cliente) and stored_due > Decimal('1000.00'):
+	if (
+		not _customer_has_open_invoice_saldo(cliente=cliente)
+		and stored_due > Decimal('1000.00')
+		and not _customer_stored_due_balance_is_trusted(cliente)
+	):
 		return Decimal('0.00')
 
 	return stored_due

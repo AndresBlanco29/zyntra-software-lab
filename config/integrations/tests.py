@@ -176,6 +176,42 @@ class QuickBooksCustomerNamingTests(TestCase):
         })
         self.assertEqual(company_name, '(BHM) MI TIERRA')
 
+    @patch('config.integrations.quickbooks.sync.QuickBooksAPIClient')
+    def test_enrich_customer_payload_fetches_balance_when_missing(self, mock_client_cls):
+        mock_client = mock_client_cls.return_value
+        mock_client.read_entity.return_value = {
+            'Id': '701',
+            'DisplayName': '(BHM) MI TIERRA LINDA',
+            'BalanceWithJobs': 22545.71,
+            'Active': True,
+        }
+        from config.integrations.quickbooks.sync import _enrich_quickbooks_customer_payload, _extract_quickbooks_customer_balance
+
+        enriched = _enrich_quickbooks_customer_payload({'Id': '701', 'DisplayName': '(BHM) MI TIERRA LINDA'})
+        self.assertEqual(_extract_quickbooks_customer_balance(enriched), Decimal('22545.71'))
+        mock_client.read_entity.assert_called_once_with('Customer', '701')
+
+    @patch('config.integrations.quickbooks.sync._enrich_quickbooks_customer_payload')
+    def test_import_customer_record_uses_enriched_balance(self, mock_enrich):
+        mock_enrich.side_effect = lambda payload, **kwargs: {
+            **payload,
+            'Balance': '22545.71',
+            'CompanyName': '(BHM) MI TIERRA LINDA',
+            'DisplayName': '(BHM) MI TIERRA LINDA',
+            'PrimaryPhone': {'FreeFormNumber': '2052663085'},
+            'BillAddr': {'Line1': '1 Main', 'City': 'Birmingham', 'CountrySubDivisionCode': 'AL', 'PostalCode': '35203', 'Country': 'USA'},
+            'Active': True,
+        }
+        result = import_quickbooks_customer_record({
+            'Id': 'QB-MI-TIERRA',
+            'DisplayName': '(BHM) MI TIERRA LINDA',
+            'CompanyName': '(BHM) MI TIERRA LINDA',
+            'Active': True,
+        })
+        self.assertEqual(result['action'], 'created')
+        imported = Cliente.objects.get(quickbooks_id='QB-MI-TIERRA')
+        self.assertEqual(imported.balance, Decimal('22545.71'))
+
 
 class QuickBooksItemPayloadTests(TestCase):
     def setUp(self):

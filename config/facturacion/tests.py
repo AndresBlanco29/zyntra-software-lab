@@ -1195,6 +1195,13 @@ class InvoiceFlowTests(TestCase):
 		self.cliente.save(update_fields=['balance'])
 		self.assertEqual(resolve_customer_amount_owed(cliente=self.cliente), Decimal('0.00'))
 
+	def test_resolve_customer_amount_owed_shows_quickbooks_synced_balance_without_local_invoices(self):
+		self.cliente.quickbooks_id = 'QB-MI-TIERRA'
+		self.cliente.sync_status = 'SYNCED'
+		self.cliente.balance = Decimal('22545.71')
+		self.cliente.save(update_fields=['quickbooks_id', 'sync_status', 'balance'])
+		self.assertEqual(resolve_customer_amount_owed(cliente=self.cliente), Decimal('22545.71'))
+
 	def test_backoffice_can_mark_completed_paid_delivery_as_unpaid(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,

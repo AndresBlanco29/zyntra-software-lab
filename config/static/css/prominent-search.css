@@ -93,6 +93,35 @@ form.d-flex > input[type="search"]:not(.navbar-search-input) {
     min-width: min(100%, 320px);
 }
 
+.inventory-list-search-form {
+    width: auto;
+    max-width: min(100%, 420px);
+    flex: 0 0 auto;
+}
+
+.inventory-list-search-form > input[name="q"],
+.inventory-list-search-form > input[type="search"] {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+}
+
+.inventory-list-search-form > .btn {
+    flex: 0 0 auto;
+}
+
+@media (max-width: 991.98px) {
+    .inventory-list-header {
+        align-items: stretch !important;
+    }
+
+    .inventory-list-search-form {
+        width: 100%;
+        max-width: 100%;
+    }
+}
+
 .admin-toolbar-filters-narrow {
     max-width: min(100%, 520px);
     flex: 1 1 360px;

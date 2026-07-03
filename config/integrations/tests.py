@@ -433,6 +433,74 @@ class QuickBooksItemPayloadTests(TestCase):
         mock_recreate.assert_called_once()
         mock_mark_synced.assert_called_once_with(presentacion, '2001')
 
+    def test_prepare_inventory_item_for_txn_date_skips_recreation_during_invoice_sync(self):
+        presentacion = Mock(pk=12, quickbooks_id='1062')
+        client = Mock()
+        client.read_entity.return_value = {
+            'Id': '1062',
+            'SyncToken': '4',
+            'Type': 'Inventory',
+            'InvStartDate': '2026-06-22',
+        }
+
+        with patch('config.integrations.quickbooks.sync._recreate_presentacion_as_inventory_item') as mock_recreate:
+            _prepare_inventory_item_for_txn_date(
+                client=client,
+                presentacion=presentacion,
+                txn_date=date(2026, 5, 1),
+                sync_qty_on_hand=False,
+            )
+
+        mock_recreate.assert_not_called()
+        client.read_entity.assert_not_called()
+
+    def test_normalize_inventory_start_date_if_needed_skips_recreation_during_invoice_sync(self):
+        presentacion = Mock(pk=12)
+        existing = {
+            'Id': '1062',
+            'SyncToken': '4',
+            'Type': 'Inventory',
+            'InvStartDate': '2026-06-22',
+        }
+
+        with patch('config.integrations.quickbooks.sync._recreate_presentacion_as_inventory_item') as mock_recreate:
+            result = _normalize_inventory_start_date_if_needed(
+                presentacion,
+                existing,
+                client=Mock(),
+                sync_qty_on_hand=False,
+            )
+
+        self.assertIs(result, existing)
+        mock_recreate.assert_not_called()
+
+    @patch('config.integrations.quickbooks.sync._sync_inventory_qty_after_conversion')
+    def test_recreate_presentacion_preserves_quickbooks_qty_during_invoice_sync(self, mock_sync_qty):
+        from config.integrations.quickbooks.sync import _recreate_presentacion_as_inventory_item
+
+        presentacion = Mock(pk=12)
+        existing = {
+            'Id': '1062',
+            'SyncToken': '4',
+            'Type': 'Inventory',
+            'QtyOnHand': 15,
+        }
+        client = Mock()
+        client.create_item.return_value = {'Id': '2001', 'Type': 'Inventory', 'QtyOnHand': 15}
+
+        result = _recreate_presentacion_as_inventory_item(
+            presentacion,
+            existing,
+            {'Type': 'Inventory', 'Name': 'MAZOLA CORN', 'InvStartDate': '2015-01-01'},
+            client=client,
+            sync_qty_on_hand=False,
+        )
+
+        self.assertEqual(result['Id'], '2001')
+        mock_sync_qty.assert_not_called()
+        create_payload = client.create_item.call_args.args[0]
+        self.assertEqual(create_payload['QtyOnHand'], 15)
+
     @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
     @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
     @patch('config.integrations.quickbooks.sync._get_default_expense_account_ref', return_value={'value': '80', 'name': 'COGS'})

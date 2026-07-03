@@ -414,6 +414,11 @@ def _prepare_inventory_item_for_txn_date(*, client, presentacion, txn_date, sync
     QuickBooks does not allow changing InvStartDate through the API on existing items,
     so when the stored start date is too late we recreate the item with an earlier one.
     """
+    if not sync_qty_on_hand:
+        # Outbound transactions (invoice/credit memo) must not recreate items or push
+        # local quantities; QuickBooks will adjust inventory when the document posts.
+        return
+
     txn_date = _coerce_local_date(txn_date)
     if txn_date is None:
         return
@@ -445,6 +450,7 @@ def _prepare_inventory_item_for_txn_date(*, client, presentacion, txn_date, sync
             remote,
             desired_payload,
             client=client,
+            sync_qty_on_hand=sync_qty_on_hand,
         )
     except QuickBooksAPIError as exc:
         raise QuickBooksSyncError(
@@ -526,7 +532,7 @@ def _sync_inventory_qty_after_conversion(*, client, item_payload, presentacion):
         return item_payload
 
 
-def _recreate_presentacion_as_inventory_item(presentacion, existing, desired_payload, *, client):
+def _recreate_presentacion_as_inventory_item(presentacion, existing, desired_payload, *, client, sync_qty_on_hand=True):
     try:
         client.update_item({
             'Id': str(existing.get('Id', '')),
@@ -540,6 +546,8 @@ def _recreate_presentacion_as_inventory_item(presentacion, existing, desired_pay
     create_payload = dict(desired_payload)
     for key in ('Id', 'SyncToken', 'sparse'):
         create_payload.pop(key, None)
+    if not sync_qty_on_hand and 'QtyOnHand' not in create_payload:
+        create_payload['QtyOnHand'] = _extract_quickbooks_item_qty_on_hand(existing) or 0
 
     try:
         created = client.create_item(create_payload)
@@ -547,7 +555,9 @@ def _recreate_presentacion_as_inventory_item(presentacion, existing, desired_pay
         alt_name = _truncate(f"{create_payload.get('Name', '')} [Inventory]", limit=100)
         create_payload['Name'] = alt_name
         created = client.create_item(create_payload)
-    return _sync_inventory_qty_after_conversion(client=client, item_payload=created, presentacion=presentacion)
+    if sync_qty_on_hand:
+        return _sync_inventory_qty_after_conversion(client=client, item_payload=created, presentacion=presentacion)
+    return created
 
 
 def _convert_linked_item_to_inventory(presentacion, existing, desired_payload, *, client, sync_qty_on_hand=True):
@@ -556,7 +566,10 @@ def _convert_linked_item_to_inventory(presentacion, existing, desired_payload, *
     conversion_payload['SyncToken'] = str(existing.get('SyncToken', ''))
     conversion_payload['sparse'] = False
     conversion_payload['TrackQtyOnHand'] = True
-    conversion_payload['QtyOnHand'] = 0
+    if sync_qty_on_hand:
+        conversion_payload['QtyOnHand'] = 0
+    elif 'QtyOnHand' in conversion_payload:
+        conversion_payload.pop('QtyOnHand', None)
     if not conversion_payload.get('PurchaseCost'):
         conversion_payload['PurchaseCost'] = _as_float(presentacion.costo or 0)
 
@@ -568,6 +581,7 @@ def _convert_linked_item_to_inventory(presentacion, existing, desired_payload, *
             existing,
             desired_payload,
             client=client,
+            sync_qty_on_hand=sync_qty_on_hand,
         )
         return updated
     if sync_qty_on_hand:
@@ -3904,7 +3918,10 @@ def link_quickbooks_import_conflict(conflict, *, local_record_id=None, local_mod
     }
 
 
-def _normalize_inventory_start_date_if_needed(presentacion, existing, *, client):
+def _normalize_inventory_start_date_if_needed(presentacion, existing, *, client, sync_qty_on_hand=True):
+    if not sync_qty_on_hand:
+        return existing
+
     if not _quickbooks_item_is_inventory(existing):
         return existing
 
@@ -3918,6 +3935,7 @@ def _normalize_inventory_start_date_if_needed(presentacion, existing, *, client)
         client=client,
         income_account_ref=existing.get('IncomeAccountRef') or None,
         remote_payload=existing,
+        sync_qty_on_hand=sync_qty_on_hand,
     )
     desired_payload['InvStartDate'] = target_start.isoformat()
     recreated = _recreate_presentacion_as_inventory_item(
@@ -3925,6 +3943,7 @@ def _normalize_inventory_start_date_if_needed(presentacion, existing, *, client)
         existing,
         desired_payload,
         client=client,
+        sync_qty_on_hand=sync_qty_on_hand,
     )
     _mark_synced(presentacion, recreated.get('Id'))
     return recreated
@@ -3940,7 +3959,12 @@ def _push_presentacion_to_quickbooks_item(presentacion, existing, *, client, syn
         sync_qty_on_hand=sync_qty_on_hand,
     )
     if not _item_payload_needs_update(existing, desired_payload, sync_qty_on_hand=sync_qty_on_hand):
-        normalized = _normalize_inventory_start_date_if_needed(presentacion, existing, client=client)
+        normalized = _normalize_inventory_start_date_if_needed(
+            presentacion,
+            existing,
+            client=client,
+            sync_qty_on_hand=sync_qty_on_hand,
+        )
         if normalized is not existing:
             return _sync_result(entity='Item', action='converted', payload=normalized)
         _mark_synced(presentacion, existing.get('Id'))

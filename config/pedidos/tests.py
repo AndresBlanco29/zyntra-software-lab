@@ -101,6 +101,14 @@ class PickingVerificationFlowTests(TestCase):
 		stock.stock_disponible = stock.stock_fisico - 2
 		stock.save(update_fields=['stock_reservado', 'stock_disponible', 'actualizado_en'])
 
+	def test_backoffice_detail_shows_available_stock_per_line(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Available stock: 10 CS')
+		self.assertContains(response, 'Physical: 10 CS')
+
 	def test_assigning_picking_sets_selector_and_notifies(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 

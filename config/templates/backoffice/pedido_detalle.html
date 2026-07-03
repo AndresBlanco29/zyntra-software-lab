@@ -660,6 +660,12 @@
           <tr class="{% if item.has_picker_stock_shortage or item.selector_has_changes %}table-danger{% endif %}" data-pedido-item-row="{{ item.id }}" {% if item.has_picker_stock_shortage %}data-stock-shortage="true"{% endif %}>
             <td>
               {{ item.presentacion.producto.nombre }}
+              <div class="small mt-1 {% if item.stock_available_packages <= 0 %}text-danger fw-semibold{% else %}text-muted{% endif %}">
+                {% blocktrans with amount=item.stock_available_packages %}Available stock: {{ amount }} CS{% endblocktrans %}
+                <span class="text-muted fw-normal">
+                  ({% blocktrans with amount=item.stock_fisico_packages %}Physical: {{ amount }} CS{% endblocktrans %})
+                </span>
+              </div>
               {% if item.has_picker_stock_shortage %}
               <div><span class="badge text-bg-danger">{% trans "Insufficient stock" %}</span></div>
               {% endif %}

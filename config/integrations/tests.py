@@ -233,6 +233,26 @@ class QuickBooksCustomerNamingTests(TestCase):
         imported = Cliente.objects.get(quickbooks_id='QB-MI-TIERRA')
         self.assertEqual(imported.balance, Decimal('22545.71'))
 
+    @patch('config.integrations.quickbooks.sync._enrich_quickbooks_customer_payload')
+    def test_import_customer_record_normalizes_formatted_phone(self, mock_enrich):
+        mock_enrich.side_effect = lambda payload, **kwargs: {
+            **payload,
+            'CompanyName': 'Morelos Market',
+            'DisplayName': 'Morelos Market',
+            'PrimaryPhone': {'FreeFormNumber': '(706) 263-7500'},
+            'BillAddr': {'Line1': '1 Main', 'City': 'Rome', 'CountrySubDivisionCode': 'GA', 'PostalCode': '30165', 'Country': 'USA'},
+            'Active': True,
+        }
+        result = import_quickbooks_customer_record({
+            'Id': 'QB-MORELOS-PHONE',
+            'DisplayName': 'Morelos Market',
+            'CompanyName': 'Morelos Market',
+            'Active': True,
+        })
+        self.assertEqual(result['action'], 'created')
+        imported = Cliente.objects.get(quickbooks_id='QB-MORELOS-PHONE')
+        self.assertEqual(imported.telefono, '7062637500')
+
 
 class QuickBooksItemPayloadTests(TestCase):
     def setUp(self):

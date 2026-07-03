@@ -562,6 +562,30 @@ class VendedorEditarClienteTests(TestCase):
 		self.assertEqual(self.customer.ciudad, 'Dallas')
 		self.assertEqual(self.customer.pais, 'USA')
 
+	def test_edit_customer_accepts_formatted_phone_number(self):
+		self.client.force_login(self.admin)
+
+		response = self.client.post(
+			reverse('editar_cliente'),
+			data=json.dumps({
+				'cliente_id': self.customer.id,
+				'empresa': self.customer.nombre_empresa,
+				'correo': self.customer_user.email,
+				'telefono': '(706) 263-7500',
+				'direccion': self.customer.direccion,
+				'ciudad': self.customer.ciudad,
+				'estado': self.customer.estado,
+				'codigo_postal': self.customer.codigo_postal,
+				'pais': self.customer.pais,
+				'manual_location': True,
+			}),
+			content_type='application/json',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.customer.refresh_from_db()
+		self.assertEqual(self.customer.telefono, '7062637500')
+
 	def test_edit_customer_rejects_invalid_usa_city_for_selected_state(self):
 		self.client.force_login(self.admin)
 

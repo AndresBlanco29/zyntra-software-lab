@@ -134,6 +134,10 @@ function collectLocationValues() {
     };
 }
 
+function sanitizePhoneDigits(value) {
+    return String(value || '').replace(/\D/g, '').slice(0, 10);
+}
+
 // Función para abrir el modal de editar cliente
 function abrirEditarCliente(button) {
     const elements = getEditLocationElements();
@@ -142,7 +146,7 @@ function abrirEditarCliente(button) {
     document.getElementById('nombreCliente').value = button.dataset.clienteNombre;
     document.getElementById('empresaCliente').value = button.dataset.clienteEmpresa;
     document.getElementById('correoCliente').value = button.dataset.clienteCorreo;
-    document.getElementById('telefonoCliente').value = button.dataset.clienteTelefono;
+    document.getElementById('telefonoCliente').value = sanitizePhoneDigits(button.dataset.clienteTelefono);
     document.getElementById('direccionCliente').value = button.dataset.clienteDireccion || '';
     document.getElementById('codigoPostalCliente').value = button.dataset.clienteCodigoPostal || '';
     elements.countryInput.value = button.dataset.clientePais || 'USA';
@@ -155,7 +159,8 @@ function guardarEditarCliente() {
     const clienteId = document.getElementById('clienteId').value;
     const empresa = document.getElementById('empresaCliente').value;
     const correo = document.getElementById('correoCliente').value;
-    const telefono = document.getElementById('telefonoCliente').value;
+    const telefono = sanitizePhoneDigits(document.getElementById('telefonoCliente').value);
+    document.getElementById('telefonoCliente').value = telefono;
     const direccion = document.getElementById('direccionCliente').value;
     const codigoPostal = document.getElementById('codigoPostalCliente').value;
     const locationValues = collectLocationValues();

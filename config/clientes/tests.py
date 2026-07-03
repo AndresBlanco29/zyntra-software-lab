@@ -12,6 +12,7 @@ from config.clientes.assignment import (
     sync_vendedor_cliente_assignments,
 )
 from config.clientes.models import Cliente
+from config.clientes.phone import normalize_stored_phone_number
 from config.cotizaciones.models import Cotizacion
 from config.usuarios.models import Usuario
 
@@ -165,3 +166,34 @@ class CustomerVendorAssignmentTests(TestCase):
         self.client.force_login(self.vendedor)
         response = self.client.get(reverse('lista_asignacion_clientes_vendedores'))
         self.assertEqual(response.status_code, 302)
+
+
+class CustomerPhoneNormalizationTests(TestCase):
+    def test_normalize_stored_phone_number_strips_formatting(self):
+        self.assertEqual(normalize_stored_phone_number('(706) 263-7500'), '7062637500')
+        self.assertEqual(normalize_stored_phone_number('+1 (706) 263-7500'), '7062637500')
+        self.assertEqual(normalize_stored_phone_number('7062637500'), '7062637500')
+
+    def test_repair_customer_phones_command_normalizes_existing_records(self):
+        user = Usuario.objects.create_user(
+            username='cliente-phone-format',
+            password='secret123',
+            role='cliente',
+        )
+        cliente = Cliente.objects.create(
+            usuario=user,
+            nombre_empresa='Cliente Phone Format',
+            telefono='(706) 263-7500',
+            direccion='123 Main',
+            ciudad='Rome',
+            estado='GA',
+            codigo_postal='30165',
+            pais='USA',
+            sales_tax_number='GA-1',
+            certificado_tax='certificados/test.pdf',
+        )
+
+        call_command('repair_customer_phones')
+
+        cliente.refresh_from_db()
+        self.assertEqual(cliente.telefono, '7062637500')

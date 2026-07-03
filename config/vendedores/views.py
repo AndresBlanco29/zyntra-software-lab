@@ -4,6 +4,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from config.clientes.models import Cliente
 from config.clientes.assignment import filter_clientes_for_vendedor
+from config.clientes.phone import normalize_stored_phone_number
 from config.usuarios.models import Usuario
 from config.productos.models import Producto, Presentacion, Categoria, Marca, ConfiguracionPrecios, ConfiguracionDescuentos
 from config.productos.views import _hydrate_productos
@@ -185,6 +186,7 @@ def crear_cliente(request):
         apellido = request.POST.get("apellido")
         email = request.POST.get("email")
         telefono = request.POST.get("telefono")
+        telefono = normalize_stored_phone_number(telefono)
 
         # datos empresa
         empresa = request.POST.get("empresa")
@@ -780,7 +782,7 @@ def editar_cliente(request):
     cliente_id = data.get('cliente_id')
     empresa = (data.get('empresa') or '').strip()
     correo = (data.get('correo') or '').strip()
-    telefono = (data.get('telefono') or '').strip()
+    telefono = normalize_stored_phone_number(data.get('telefono'))
 
     if not cliente_id:
         return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)

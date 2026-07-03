@@ -727,7 +727,10 @@ def _extract_quickbooks_vendor_email(payload):
 
 
 def _extract_quickbooks_vendor_phone(payload):
-    return _truncate((payload.get('PrimaryPhone') or {}).get('FreeFormNumber', ''), limit=40)
+    from config.clientes.phone import normalize_stored_phone_number
+
+    raw = (payload.get('PrimaryPhone') or {}).get('FreeFormNumber', '')
+    return normalize_stored_phone_number(raw) or _truncate(raw, limit=40)
 
 
 def _extract_quickbooks_vendor_balance(payload):
@@ -1264,7 +1267,10 @@ def _extract_quickbooks_customer_email(payload):
 
 
 def _extract_quickbooks_customer_phone(payload):
-    return _truncate((payload.get('PrimaryPhone') or {}).get('FreeFormNumber', ''), limit=20)
+    from config.clientes.phone import normalize_stored_phone_number
+
+    raw = (payload.get('PrimaryPhone') or {}).get('FreeFormNumber', '')
+    return normalize_stored_phone_number(raw)
 
 
 def _extract_quickbooks_customer_balance(payload):

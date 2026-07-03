@@ -125,6 +125,7 @@ CATALOG_ONLY_ALLOWED_VIEW_NAMES = frozenset({
     'quickbooks_sync_products_batch',
     'quickbooks_push_linked_products_batch',
     'quickbooks_push_linked_products_to_quickbooks',
+    'quickbooks_outbound_search',
     'quickbooks_sync_invoices_batch',
     'quickbooks_sync_adjustment_notes_batch',
 })
@@ -732,7 +733,6 @@ def _outbound_scope_queryset(scope):
 def _outbound_catalog_presentacion_queryset():
     return (
         Presentacion.objects.select_related('producto')
-        .filter(producto__activo=True)
         .order_by('producto__nombre', 'nombre', 'id')
     )
 
@@ -744,10 +744,21 @@ def _presentation_is_quickbooks_linked(record):
     )
 
 
+def _normalize_outbound_search_text(value):
+    return re.sub(r'\s+', ' ', str(value or '').strip())
+
+
+def _outbound_search_tokens(query):
+    normalized = re.sub(r'[/|,]+', ' ', _normalize_outbound_search_text(query))
+    return [token for token in re.split(r'\s+', normalized) if token]
+
+
 def _annotate_presentation_search_blob(queryset):
     return queryset.annotate(
         _catalog_search_blob=Concat(
             Coalesce('producto__nombre', Value('')),
+            Value(' '),
+            Coalesce('producto__descripcion', Value('')),
             Value(' '),
             Coalesce('nombre', Value('')),
             Value(' '),
@@ -758,37 +769,40 @@ def _annotate_presentation_search_blob(queryset):
 
 
 def _filter_presentation_queryset(queryset, query):
-    query = str(query or '').strip()
+    query = _normalize_outbound_search_text(query)
     if not query:
         return queryset
     if query.isdigit():
         return queryset.filter(pk=int(query))
 
+    queryset = _annotate_presentation_search_blob(queryset)
+    normalized_blob = _normalize_outbound_search_text(query)
+    blob_filters = Q(_catalog_search_blob__icontains=normalized_blob)
+    for variant in {
+        query,
+        normalized_blob,
+        re.sub(r'\s*/\s*', '/', query),
+        re.sub(r'/', ' / ', query),
+    }:
+        variant = _normalize_outbound_search_text(variant)
+        if variant and variant != normalized_blob:
+            blob_filters |= Q(_catalog_search_blob__icontains=variant)
+
     tokens = _outbound_search_tokens(query)
     if not tokens:
-        return queryset.none()
+        return queryset.filter(blob_filters).distinct()
 
-    queryset = _annotate_presentation_search_blob(queryset)
-    if len(tokens) == 1:
-        token = tokens[0]
-        return queryset.filter(
-            Q(_catalog_search_blob__icontains=token)
-            | _presentation_search_token_filter(token)
-        ).distinct()
-
+    token_filters = Q()
     for token in tokens:
-        queryset = queryset.filter(_presentation_search_token_filter(token))
-    return queryset.distinct()
+        token_filters &= _presentation_search_token_filter(token)
 
-
-def _outbound_search_tokens(query):
-    normalized = re.sub(r'[/|,]+', ' ', str(query or ''))
-    return [token for token in re.split(r'\s+', normalized.strip()) if token]
+    return queryset.filter(blob_filters | token_filters).distinct()
 
 
 def _presentation_search_token_filter(token):
     return (
         Q(producto__nombre__icontains=token)
+        | Q(producto__descripcion__icontains=token)
         | Q(nombre__icontains=token)
         | Q(producto__codigo_barras__icontains=token)
         | Q(quickbooks_id__icontains=token)

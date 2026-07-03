@@ -2690,6 +2690,17 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         self.assertIsNotNone(match)
         self.assertFalse(match['is_linked'])
 
+    @override_settings(QUICKBOOKS_CATALOG_ONLY_MODE=True)
+    def test_outbound_search_allowed_in_catalog_only_mode(self):
+        response = self.client.get(
+            reverse('quickbooks_outbound_search'),
+            {'scope': 'linked_presentations', 'q': 'Tortilla'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result_ids = [item['id'] for item in response.json()['results']]
+        self.assertIn(self.presentacion.id, result_ids)
+
     def test_build_sales_line_keeps_amount_equal_to_unit_price_times_qty(self):
         from config.integrations.quickbooks.sync import _build_sales_line
 

@@ -1740,8 +1740,12 @@
           signal: controller.signal,
           headers: { 'Accept': 'application/json' }
         }).then(function (response) {
-          return response.json().then(function (payload) {
-            if (!response.ok) throw new Error((payload && payload.error) || 'Search failed');
+          return response.json().catch(function () {
+            return {};
+          }).then(function (payload) {
+            if (!response.ok) {
+              throw new Error((payload && payload.error) || ('Search failed (' + response.status + ')'));
+            }
             return payload;
           });
         }).then(function (payload) {

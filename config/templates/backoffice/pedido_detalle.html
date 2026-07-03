@@ -172,7 +172,7 @@
               {% for row in picker_stock_shortage_rows %}
               <li>
                 {{ row.product_name }} - {{ row.presentation_name }}:
-                {% blocktrans with requested=row.quantity_to_pick available=row.available_physical_stock shortage=row.shortage_amount %}picker entered {{ requested }} boxes, available stock {{ available }} boxes, shortage {{ shortage }} boxes.{% endblocktrans %}
+                {% blocktrans with requested=row.quantity_to_pick available=row.available_physical_stock shortage=row.shortage_amount %}picker entered {{ requested }} CS, available stock {{ available }} CS, shortage {{ shortage }} CS.{% endblocktrans %}
               </li>
               {% endfor %}
             </ul>

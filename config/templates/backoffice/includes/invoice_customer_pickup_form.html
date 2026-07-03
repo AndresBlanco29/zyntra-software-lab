@@ -430,7 +430,7 @@
                         <th>{% trans "Line" %}</th>
                         <th>{% trans "Requested qty." %}</th>
                         <th>{% trans "Invoiced qty." %}</th>
-                        <th>{% trans "Boxes / pallets" %}</th>
+                        <th>{% trans "CS / pallets" %}</th>
                         <th>{% trans "Partial content" %}</th>
                         <th>{% trans "Calculated amount" %}</th>
                       </tr>
@@ -444,7 +444,7 @@
                         </td>
                         <td data-label="{% trans 'Requested qty.' %}">{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
                         <td data-label="{% trans 'Invoiced qty.' %}">{{ item.cantidad_facturada }}</td>
-                        <td class="driver-stack-field" data-label="{% trans 'Boxes / pallets' %}">
+                        <td class="driver-stack-field" data-label="{% trans 'CS / pallets' %}">
                           <label class="form-label small text-muted mb-1">{{ item.presentacion_nombre_display }}</label>
                           <input type="number" min="0" max="{{ item.cantidad_despachada_neta }}" name="driver_note_qty_{{ item.id }}" class="form-control form-control-sm js-driver-adjustment-package-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="driver_note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades|default:1 }}">
                         </td>

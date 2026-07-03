@@ -315,7 +315,7 @@ class InventarioBackofficeViewsTests(TestCase):
 		self.assertContains(response, 'Internal partial stock')
 		self.assertContains(response, 'unidades')
 		self.assertContains(response, '7')
-		self.assertContains(response, '6 box')
+		self.assertContains(response, '6 CS')
 		self.assertContains(response, '7 unidades')
 
 	def test_inventory_detail_view_displays_fractional_stock_for_product(self):

@@ -127,7 +127,7 @@ class QuickBooksPresentationParsingTests(TestCase):
         })
 
         self.assertEqual(product, '123 DETERGENT MAXI EFECTO COLOR 4/4.65 LT')
-        self.assertEqual(presentation, 'Caja')
+        self.assertEqual(presentation, 'caja')
         self.assertEqual(units, 4)
         self.assertEqual(tipo, '4.65 LT')
 
@@ -138,7 +138,7 @@ class QuickBooksPresentationParsingTests(TestCase):
         })
 
         self.assertEqual(product, 'BOUNCE CHECK')
-        self.assertEqual(presentation, 'Caja')
+        self.assertEqual(presentation, 'caja')
         self.assertEqual(tipo, 'caja')
         self.assertEqual(units, 1)
 
@@ -149,7 +149,7 @@ class QuickBooksPresentationParsingTests(TestCase):
         })
 
         self.assertEqual(product, 'BOING TRIANGULO ASSORTED 3/6//6.76OZ')
-        self.assertEqual(presentation, 'Caja')
+        self.assertEqual(presentation, 'caja')
         self.assertEqual(units, 6)
         self.assertEqual(tipo, '6.76 OZ')
 
@@ -162,7 +162,7 @@ class QuickBooksPresentationParsingTests(TestCase):
         })
 
         self.assertEqual(product, 'PRUEBA 2 PRODUCTO 8/250ML')
-        self.assertEqual(presentation, 'Caja')
+        self.assertEqual(presentation, 'caja')
         self.assertEqual(tipo, '250 ML')
         self.assertEqual(units, 8)
 
@@ -624,7 +624,7 @@ class QuickBooksLinkedItemUpdateTests(TestCase):
         presentacion.refresh_from_db()
         producto.refresh_from_db()
         self.assertEqual(result['action'], 'updated')
-        self.assertEqual(presentacion.nombre, 'Caja')
+        self.assertEqual(presentacion.nombre, 'caja')
         self.assertEqual(presentacion.nombre_en, 'Box')
         self.assertEqual(presentacion.unidades, 12)
         self.assertEqual(presentacion.tipo_contenido, 'caja')

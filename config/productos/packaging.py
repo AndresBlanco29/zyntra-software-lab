@@ -38,6 +38,11 @@ GENERIC_PRESENTATION_CONTENT = {
     'caja', 'cajas', 'box', 'boxes', '',
 }
 
+CASE_PRESENTATION_LABEL = 'CS'
+CASE_PRESENTATION_TERMS = frozenset({
+    'caja', 'cajas', 'box', 'boxes', 'case', 'cases', 'cs', 'bx',
+})
+
 UNIT_ALIASES = {
     'LTR': 'LT',
     'L': 'LT',
@@ -68,7 +73,7 @@ def _parse_slash_packaging_match(match):
     return {
         'units_per_case': units_per_case,
         'unit_size_label': unit_size_label,
-        'presentation_name': 'Caja',
+        'presentation_name': 'caja',
         'content_type': unit_size_label,
     }
 
@@ -105,7 +110,7 @@ def parse_case_packaging_from_product_name(name):
         return {
             'units_per_case': units_per_case,
             'unit_size_label': f'{units_per_case} CT',
-            'presentation_name': 'Caja',
+            'presentation_name': 'caja',
             'content_type': 'piezas',
         }
 
@@ -134,11 +139,17 @@ def presentation_looks_unconfigured(presentacion):
     return units <= 1 and nombre in GENERIC_PRESENTATION_NAMES and tipo in GENERIC_PRESENTATION_CONTENT
 
 
+def format_presentation_display_name(value):
+    if _normalize_content_token(value) in CASE_PRESENTATION_TERMS:
+        return CASE_PRESENTATION_LABEL
+    text = (value or '').strip()
+    if not text:
+        return ''
+    return text[:1].upper() + text[1:] if len(text) > 1 else text.upper()
+
+
 def _localized_presentation_name(name, *, english):
-    normalized = _normalize_content_token(name)
-    if normalized in {'caja', 'cajas', 'box', 'boxes'}:
-        return 'box' if english else 'caja'
-    return (name or '').strip().lower()
+    return format_presentation_display_name(name)
 
 
 def _localized_content_type_label(content_type, *, english):
@@ -172,7 +183,9 @@ def get_effective_packaging_for_display(presentacion, *, language=None):
     else:
         units = presentacion.unidades
         content_type = presentacion.tipo_contenido_traducido
-        presentation_name = presentacion.nombre_traducido
+        presentation_name = format_presentation_display_name(presentacion.nombre_traducido)
+
+    presentation_name = format_presentation_display_name(presentation_name)
 
     description = build_packaging_customer_description(
         units=units,
@@ -193,7 +206,7 @@ def build_packaging_customer_description(*, units, content_type, presentation_na
 
     units = max(int(units or 1), 1)
     content_type = (content_type or '').strip()
-    presentation_name = (presentation_name or '').strip().lower()
+    presentation_name = format_presentation_display_name(presentation_name)
     active_language = (language or get_language() or 'en').lower()
     english = active_language.startswith('en')
 
@@ -275,21 +288,21 @@ def finalize_quickbooks_import_packaging(*, product_name, presentation_name, tip
         tipo_contenido = parsed['content_type']
         unidades = parsed['units_per_case']
     elif presentation_token in generic_presentation_tokens or content_token in generic_content_tokens:
-        presentation_name = 'Caja'
+        presentation_name = 'caja'
         if content_token in generic_content_tokens:
             tipo_contenido = 'caja'
         if int(unidades or 0) <= 1:
             unidades = 1
     elif presentation_name_looks_like_unit_size(presentation_name):
         inferred_content = (presentation_name or '').strip()
-        presentation_name = 'Caja'
+        presentation_name = 'caja'
         if content_type_looks_like_unit_size(tipo_contenido) or content_token in generic_content_tokens or not tipo_contenido:
             tipo_contenido = inferred_content
         if int(unidades or 0) <= 1:
             unidades = 1
 
     return {
-        'presentation_name': (presentation_name or 'Caja').strip() or 'Caja',
+        'presentation_name': (presentation_name or 'caja').strip() or 'caja',
         'tipo_contenido': (tipo_contenido or 'caja').strip() or 'caja',
         'unidades': max(int(unidades or 1), 1),
     }

@@ -18,10 +18,14 @@ PRESENTACION_TERM_TRANSLATIONS = {
     "unidades": {"es": "unidades", "en": "units"},
     "unit": {"es": "unidad", "en": "unit"},
     "units": {"es": "unidades", "en": "units"},
-    "caja": {"es": "caja", "en": "box"},
-    "cajas": {"es": "cajas", "en": "boxes"},
-    "box": {"es": "caja", "en": "box"},
-    "boxes": {"es": "cajas", "en": "boxes"},
+    "caja": {"es": "CS", "en": "CS"},
+    "cajas": {"es": "CS", "en": "CS"},
+    "box": {"es": "CS", "en": "CS"},
+    "boxes": {"es": "CS", "en": "CS"},
+    "case": {"es": "CS", "en": "CS"},
+    "cases": {"es": "CS", "en": "CS"},
+    "cs": {"es": "CS", "en": "CS"},
+    "bx": {"es": "CS", "en": "CS"},
     "paquete": {"es": "paquete", "en": "package"},
     "paquetes": {"es": "paquetes", "en": "packages"},
     "package": {"es": "paquete", "en": "package"},
@@ -273,8 +277,7 @@ class Presentacion(models.Model):
     def nombre_empaque_cliente(self):
         from config.productos.packaging import get_effective_packaging_for_display
 
-        presentation_name = get_effective_packaging_for_display(self)['presentation_name']
-        return presentation_name[:1].upper() + presentation_name[1:] if presentation_name else ''
+        return get_effective_packaging_for_display(self)['presentation_name']
 
     def recalcular_precios(self):
         if self.costo is None:

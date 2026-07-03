@@ -16,7 +16,7 @@ class CasePackagingParserTests(TestCase):
         parsed = parse_case_packaging_from_product_name('123 DETERGENT MAXI EFECTO COLOR 4/4.65 LT')
         self.assertEqual(parsed['units_per_case'], 4)
         self.assertEqual(parsed['unit_size_label'], '4.65 LT')
-        self.assertEqual(parsed['presentation_name'], 'Caja')
+        self.assertEqual(parsed['presentation_name'], 'caja')
 
     def test_parses_canola_oil_pattern(self):
         parsed = parse_case_packaging_from_product_name('ACEITE 123 CANOLA 24/ 16.91 OZ')
@@ -74,7 +74,7 @@ class PackagingCustomerDescriptionTests(TestCase):
             presentation_name='Caja',
             language='es',
         )
-        self.assertEqual(description, '4 unidades de tamaño 4.65 LT por caja')
+        self.assertEqual(description, '4 unidades de tamaño 4.65 LT por CS')
 
     def test_generic_content_type_keeps_simple_wording(self):
         description = build_packaging_customer_description(
@@ -97,7 +97,7 @@ class PackagingCustomerDescriptionTests(TestCase):
             presentation_name='Caja',
             language='es',
         )
-        self.assertEqual(description, '1 paquete de 32 CT por caja')
+        self.assertEqual(description, '1 paquete de 32 CT por CS')
 
     def test_candle_count_uses_pieces_wording(self):
         description = build_packaging_customer_description(
@@ -106,7 +106,7 @@ class PackagingCustomerDescriptionTests(TestCase):
             presentation_name='Caja',
             language='es',
         )
-        self.assertEqual(description, '6 piezas por caja')
+        self.assertEqual(description, '6 piezas por CS')
 
         description_en = build_packaging_customer_description(
             units=12,
@@ -114,7 +114,7 @@ class PackagingCustomerDescriptionTests(TestCase):
             presentation_name='box',
             language='en',
         )
-        self.assertEqual(description_en, '12 pieces per box')
+        self.assertEqual(description_en, '12 pieces per CS')
 
 
 class EffectivePackagingDisplayTests(TestCase):
@@ -133,8 +133,8 @@ class EffectivePackagingDisplayTests(TestCase):
         packaging = get_effective_packaging_for_display(presentacion, language='es')
 
         self.assertTrue(presentation_looks_unconfigured(presentacion))
-        self.assertEqual(packaging['description'], '6 piezas por caja')
-        self.assertEqual(packaging['presentation_name'], 'caja')
+        self.assertEqual(packaging['description'], '6 piezas por CS')
+        self.assertEqual(packaging['presentation_name'], 'CS')
 
 
 class QuickBooksImportPackagingTests(TestCase):
@@ -146,7 +146,7 @@ class QuickBooksImportPackagingTests(TestCase):
             unidades=1,
         )
 
-        self.assertEqual(finalized['presentation_name'], 'Caja')
+        self.assertEqual(finalized['presentation_name'], 'caja')
         self.assertEqual(finalized['tipo_contenido'], '250 ML')
         self.assertEqual(finalized['unidades'], 8)
 
@@ -158,7 +158,7 @@ class QuickBooksImportPackagingTests(TestCase):
             unidades=1,
         )
 
-        self.assertEqual(finalized['presentation_name'], 'Caja')
+        self.assertEqual(finalized['presentation_name'], 'caja')
         self.assertEqual(finalized['tipo_contenido'], '250 ML')
         self.assertEqual(finalized['unidades'], 1)
 
@@ -182,6 +182,6 @@ class MisconfiguredPresentationDisplayTests(TestCase):
 
         packaging = get_effective_packaging_for_display(presentacion, language='en')
 
-        self.assertEqual(packaging['presentation_name'], 'box')
+        self.assertEqual(packaging['presentation_name'], 'CS')
         self.assertEqual(packaging['content_type'], '250 ML')
         self.assertEqual(packaging['units'], 8)

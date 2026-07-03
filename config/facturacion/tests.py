@@ -1633,12 +1633,12 @@ class InvoiceFlowTests(TestCase):
 		)
 		item = invoice.items.get()
 
-		self.assertEqual(item.presentacion_nombre, 'Box')
-		self.assertEqual(item.presentacion_nombre_display, 'Box')
+		self.assertEqual(item.presentacion_nombre, 'CS')
+		self.assertEqual(item.presentacion_nombre_display, 'CS')
 		self.client.force_login(self.backoffice)
 		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'data-label="U/M">Box</td>', html=False)
+		self.assertContains(response, 'data-label="U/M">CS</td>', html=False)
 
 	def test_pickup_flow_can_save_adjustment_note_before_completion(self):
 		invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', driver=None, total='30.00')
@@ -2645,7 +2645,7 @@ class InvoiceFlowTests(TestCase):
 
 		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
 
-		self.assertContains(response, 'Boxes / pallets')
+		self.assertContains(response, 'CS / pallets')
 		self.assertContains(response, 'Calculated amount')
 		self.assertContains(response, 'Calculated automatically from the quantities you enter.')
 		self.assertContains(response, 'Partial content')

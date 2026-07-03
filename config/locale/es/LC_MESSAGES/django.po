@@ -3898,8 +3898,8 @@ msgstr "Requested qty."
 msgid "Dispatched qty."
 msgstr "Dispatched qty."
 
-msgid "Boxes / pallets"
-msgstr "Boxes / pallets"
+msgid "CS / pallets"
+msgstr "CS / pallets"
 
 msgid "Partial content"
 msgstr "Partial content"
@@ -6421,6 +6421,15 @@ msgstr "Insufficient f√≠sico stock detected. You can still save this verificaci√
 
 msgid "Approved by picker"
 msgstr "Aprobado por el picker"
+
+msgid "CS ordered"
+msgstr "CS pedidos"
+
+msgid "CS dispatched"
+msgstr "CS despachados"
+
+msgid "CS not sent"
+msgstr "CS no enviados"
 
 msgid "Boxes ordered"
 msgstr "Cajas pedidas"

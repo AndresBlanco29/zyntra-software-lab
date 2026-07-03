@@ -186,7 +186,7 @@ def _build_invoice_suggested_price_row(item):
 	return {
 		'item_id': item.id,
 		'product_name': item.presentacion.producto.nombre,
-		'presentation_name': item.presentacion.nombre,
+		'presentation_name': item.presentacion.nombre_empaque_cliente,
 		'quantity': quantity,
 		'base_unit_value': format(_pedido_item_customer_unit_price(item), '.2f'),
 		'list_unit_value': format(item.precio, '.2f'),
@@ -240,7 +240,7 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 		rows.append({
 			'id': item.id,
 			'product': item.presentacion.producto.nombre,
-			'presentation': item.presentacion.nombre,
+			'presentation': item.presentacion.nombre_empaque_cliente,
 			'presentation_id': presentation_overrides.get(item.id, item.presentacion_id),
 			'presentation_options': [
 				{
@@ -351,7 +351,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 	picker_stock_shortage_rows = [
 		{
 			'product_name': item.presentacion.producto.nombre,
-			'presentation_name': item.presentacion.nombre,
+			'presentation_name': item.presentacion.nombre_empaque_cliente,
 			'quantity_to_pick': picker_stock_evaluation[item.id]['cantidad_pendiente_aplicar'],
 			'available_physical_stock': picker_stock_evaluation[item.id]['available_packages'],
 			'shortage_amount': picker_stock_evaluation[item.id]['shortage_amount'],
@@ -454,7 +454,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 			{
 				'item_id': item.id,
 				'producto': item.presentacion.producto.nombre,
-				'presentacion': item.presentacion.nombre,
+				'presentacion': item.presentacion.nombre_empaque_cliente,
 				'cantidad': item.cantidad,
 				'precio': str(item.precio),
 				'descuento_aplicado': bool(item.descuento_aplicado),
@@ -710,7 +710,7 @@ def backoffice_buscar_presentaciones(request):
 		)
 		results.append({
 			'id': presentacion.id,
-			'label': f'{presentacion.producto.nombre} - {presentacion.nombre}',
+			'label': f'{presentacion.producto.nombre} - {presentacion.nombre_empaque_cliente}',
 			'price': default_price,
 			'default_price_key': default_price_key,
 			'prices': price_options,
@@ -913,7 +913,7 @@ def backoffice_picking_pdf(request, pedido_id):
 	for item in order_pedido_items_for_display(pedido):
 		rows.append([
 			Paragraph(escape(item.presentacion.producto.nombre), item_cell_style),
-			Paragraph(escape(item.presentacion.nombre), item_cell_style),
+			Paragraph(escape(item.presentacion.nombre_empaque_cliente), item_cell_style),
 			Paragraph(escape(str(item.cantidad)), item_cell_style),
 			Paragraph('______', item_cell_style),
 		])

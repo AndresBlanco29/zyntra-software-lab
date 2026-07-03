@@ -16,8 +16,10 @@ document.addEventListener('DOMContentLoaded', function() {
         gramo: { es: "gramo", en: "gram" },
         gramos: { es: "gramos", en: "grams" },
 
-        caja: { es: "caja", en: "box" },
-        cajas: { es: "cajas", en: "boxes" },
+        caja: { es: "CS", en: "CS" },
+        cajas: { es: "CS", en: "CS" },
+        box: { es: "CS", en: "CS" },
+        boxes: { es: "CS", en: "CS" },
 
         pallet: { es: "pallet", en: "pallet" },
         pallets: { es: "pallets", en: "pallets" }

@@ -379,9 +379,9 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'Si hay stock fisico disponible, la aprobacion del picker es obligatoria para guardar esta verificacion como desbloqueada.', html=False)
 		self.assertContains(response, 'Aprobado por el picker')
 		self.assertContains(response, 'Guardar verificación')
-		self.assertContains(response, 'Cajas pedidas')
-		self.assertContains(response, 'Cajas despachadas')
-		self.assertContains(response, 'Cajas no enviadas')
+		self.assertContains(response, 'CS pedidos')
+		self.assertContains(response, 'CS despachados')
+		self.assertContains(response, 'CS no enviados')
 		self.assertContains(response, 'id="pickerDispatchSummary"', html=False)
 
 	def test_selector_post_verification_redirects_to_assigned_list(self):
@@ -631,7 +631,7 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'Reviewed')
 		self.assertContains(response, 'data-requested-quantity="2"', html=False)
 		self.assertContains(response, 'id="pickerSummaryOrdered"', html=False)
-		self.assertContains(response, 'Boxes ordered')
+		self.assertContains(response, 'CS ordered')
 
 	def test_selector_must_review_every_line_before_saving(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)

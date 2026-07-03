@@ -235,8 +235,15 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 	rows = []
 	actual_quantity_overrides = actual_quantity_overrides or {}
 	presentation_overrides = presentation_overrides or {}
+	picking_verified = bool(pedido.picking_verificado_en)
 	for item in pedido.items.select_related('presentacion__producto').all():
 		product_presentations = item.presentacion.producto.presentaciones.order_by('nombre')
+		if item.id in actual_quantity_overrides:
+			actual_quantity = actual_quantity_overrides[item.id]
+		elif picking_verified:
+			actual_quantity = int(item.cantidad_inventario_aplicada or item.cantidad or 0)
+		else:
+			actual_quantity = 0
 		rows.append({
 			'id': item.id,
 			'product': item.presentacion.producto.nombre,
@@ -250,12 +257,21 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 				for presentation in product_presentations
 			],
 			'requested_quantity': item.cantidad_solicitada,
-			'actual_quantity': actual_quantity_overrides.get(item.id, 0),
+			'actual_quantity': actual_quantity,
 			'stock_physical': int(getattr(getattr(item.presentacion, 'stock_operativo', None), 'stock_fisico', 0) or 0),
 			'applied_quantity': int(item.cantidad_inventario_aplicada or 0),
 		})
 	rows.sort(key=lambda row: (row['product'].casefold(), row['id']))
 	return rows
+
+
+def _saved_selector_picking_quantities(pedido):
+	if not pedido.picking_verificado_en:
+		return {}
+	return {
+		item.id: int(item.cantidad_inventario_aplicada or item.cantidad or 0)
+		for item in pedido.items.all()
+	}
 
 
 @login_required
@@ -1000,9 +1016,11 @@ def selector_picking_detail(request, pedido_id):
 	form_note = pedido.nota_seleccionador
 	form_note_resolved = pedido.nota_seleccionador_resuelta
 	additional_item_rows = []
+	saved_quantities = _saved_selector_picking_quantities(pedido)
+	initial_quantities = saved_quantities or {item.id: 0 for item in pedido.items.all()}
 	stock_evaluation = evaluar_stock_fisico_verificacion_picking(
 		pedido_items=list(pedido.items.all()),
-		cantidades_reales={item.id: 0 for item in pedido.items.all()},
+		cantidades_reales=initial_quantities,
 	)
 	form_has_stock_shortage = any(item_result['has_shortage'] for item_result in stock_evaluation.values())
 

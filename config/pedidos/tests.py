@@ -333,6 +333,26 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(completed_response, reverse('selector_picking_detail', args=[processed_order.id]))
 		self.assertNotContains(completed_response, reverse('selector_picking_detail', args=[self.pedido.id]))
 
+	def test_completed_picking_ticket_shows_saved_quantities(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 7},
+			nota='Cantidades verificadas',
+			nota_resuelta=True,
+		)
+
+		self.client.force_login(self.selector)
+		response = self.client.get(reverse('selector_picking_detail', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(
+			response,
+			f'name="cantidad_real_{self.item.id}" value="7"',
+			html=False,
+		)
+
 	def test_selector_picking_list_renders_in_spanish_when_selected(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		self.client.force_login(self.selector)

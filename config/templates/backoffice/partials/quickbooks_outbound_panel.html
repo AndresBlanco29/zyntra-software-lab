@@ -1,0 +1,109 @@
+{% load i18n %}
+<div class="qb-outbound-panel{% if panel_class %} {{ panel_class }}{% endif %}" data-qb-outbound-panel{% if panel_id %} id="{{ panel_id }}"{% endif %}>
+  {% if title %}
+  <div class="qb-outbound-panel__head">
+    <div>
+      <h4 class="qb-outbound-panel__title">{{ title }}</h4>
+      {% if panel_subtitle %}
+      <p class="qb-outbound-panel__subtitle">{{ panel_subtitle }}</p>
+      {% endif %}
+    </div>
+    <span class="qb-outbound-panel__badge">{{ pending_count|default:0 }}</span>
+  </div>
+  {% endif %}
+
+  <form method="post" action="{{ form_action }}" class="qb-outbound-form d-flex flex-column flex-grow-1"{% if form_data_operation %} data-qb-operation="{{ form_data_operation }}"{% endif %}>
+    {% csrf_token %}
+    <input type="hidden" name="redirect_to" value="{{ request.path }}">
+
+    <div class="qb-outbound-toolbar">
+      <div class="qb-outbound-search-wrap">
+        <svg class="qb-outbound-search-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input
+          type="search"
+          class="form-control qb-outbound-search"
+          placeholder="{% trans 'Search by name, number or ID…' %}"
+          autocomplete="off"
+          {% if not records %}disabled{% endif %}
+        >
+      </div>
+      <div class="qb-outbound-toolbar-actions">
+        <button type="button" class="btn btn-sm btn-light qb-outbound-select-visible" {% if not records %}disabled{% endif %}>{% trans "Select visible" %}</button>
+        <button type="button" class="btn btn-sm btn-light qb-outbound-clear-selection" {% if not records %}disabled{% endif %}>{% trans "Clear" %}</button>
+      </div>
+    </div>
+
+    <div class="qb-outbound-list" role="group" aria-label="{{ title }}">
+      {% if record_mode == 'customer' %}
+        {% for record in records %}
+        <label class="qb-outbound-row" data-search-text="#{{ record.id }} {{ record.nombre_empresa|lower }}">
+          <input type="checkbox" class="form-check-input qb-outbound-check" name="ids" value="{{ record.id }}">
+          <span class="qb-outbound-row__id">#{{ record.id }}</span>
+          <span class="qb-outbound-row__body">
+            <span class="qb-outbound-row__label">{{ record.nombre_empresa }}</span>
+          </span>
+        </label>
+        {% empty %}
+        <div class="qb-outbound-empty">{% trans "No pending customers" %}</div>
+        {% endfor %}
+      {% elif record_mode == 'presentation' or record_mode == 'linked_presentation' %}
+        {% for record in records %}
+        <label class="qb-outbound-row" data-search-text="#{{ record.id }} {{ record.producto.nombre|lower }} {{ record.nombre|lower }}">
+          <input type="checkbox" class="form-check-input qb-outbound-check" name="ids" value="{{ record.id }}">
+          <span class="qb-outbound-row__id">#{{ record.id }}</span>
+          <span class="qb-outbound-row__body">
+            <span class="qb-outbound-row__label">{{ record.producto.nombre }}</span>
+            <span class="qb-outbound-row__meta">{{ record.nombre }}</span>
+          </span>
+        </label>
+        {% empty %}
+        <div class="qb-outbound-empty">
+          {% if record_mode == 'linked_presentation' %}
+            {% trans "No linked items yet" %}
+          {% else %}
+            {% trans "No pending items" %}
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% elif record_mode == 'invoice' %}
+        {% for record in records %}
+        <label class="qb-outbound-row" data-search-text="#{{ record.id }} {{ record.numero|lower }} {{ record.cliente.nombre_empresa|lower }}">
+          <input type="checkbox" class="form-check-input qb-outbound-check" name="ids" value="{{ record.id }}">
+          <span class="qb-outbound-row__id">#{{ record.id }}</span>
+          <span class="qb-outbound-row__body">
+            <span class="qb-outbound-row__label">{{ record.numero }}</span>
+            <span class="qb-outbound-row__meta">{{ record.cliente.nombre_empresa }}</span>
+          </span>
+        </label>
+        {% empty %}
+        <div class="qb-outbound-empty">{% trans "No pending invoices" %}</div>
+        {% endfor %}
+      {% elif record_mode == 'note' %}
+        {% for record in records %}
+        <label class="qb-outbound-row" data-search-text="#{{ record.id }} {{ record.numero|lower }} {{ record.cliente.nombre_empresa|lower }}">
+          <input type="checkbox" class="form-check-input qb-outbound-check" name="ids" value="{{ record.id }}">
+          <span class="qb-outbound-row__id">#{{ record.id }}</span>
+          <span class="qb-outbound-row__body">
+            <span class="qb-outbound-row__label">{{ record.numero }}</span>
+            <span class="qb-outbound-row__meta">{{ record.cliente.nombre_empresa }}</span>
+          </span>
+        </label>
+        {% empty %}
+        <div class="qb-outbound-empty">{% trans "No pending approved notes" %}</div>
+        {% endfor %}
+      {% endif %}
+    </div>
+
+    <div class="qb-outbound-footer">
+      <span class="qb-outbound-selected-count">{% trans "0 selected" %}</span>
+      <div class="qb-outbound-actions">
+        <button type="submit" class="btn btn-outline-primary" data-action="send-selected" {% if not records %}disabled{% endif %}>{{ send_selected_label|default:_("Send selected") }}</button>
+        <button type="submit" name="send_all" value="1" class="btn btn-primary" {% if not pending_count %}disabled{% endif %}>{{ send_all_label|default:_("Send all pending") }} ({{ pending_count|default:0 }})</button>
+      </div>
+    </div>
+
+    {% if panel_note %}
+    <p class="qb-outbound-note">{{ panel_note }}</p>
+    {% endif %}
+  </form>
+</div>

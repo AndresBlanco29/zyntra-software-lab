@@ -325,6 +325,360 @@
     font-size: 0.9rem;
   }
 
+  .qb-outbound-section-head {
+    margin-bottom: 1.5rem;
+  }
+
+  .qb-outbound-section-head h3 {
+    color: var(--qb-navy);
+    font-weight: 700;
+  }
+
+  .qb-outbound-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .qb-outbound-stat {
+    border: 1px solid var(--qb-stroke);
+    border-radius: 16px;
+    padding: 0.85rem 1rem;
+    background: linear-gradient(180deg, #fff 0%, var(--qb-ice) 100%);
+  }
+
+  .qb-outbound-stat-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--qb-navy);
+    line-height: 1.1;
+  }
+
+  .qb-outbound-stat-label {
+    font-size: 0.82rem;
+    color: var(--qb-text-soft);
+    margin-top: 0.15rem;
+  }
+
+  .qb-outbound-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem;
+  }
+
+  .qb-outbound-grid__full {
+    grid-column: 1 / -1;
+  }
+
+  @media (max-width: 991.98px) {
+    .qb-outbound-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .qb-outbound-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 420px;
+    border: 1px solid rgba(16, 42, 99, 0.1);
+    border-radius: 22px;
+    background: #fff;
+    padding: 1.15rem 1.25rem 1.25rem;
+    box-shadow: 0 12px 32px rgba(16, 42, 99, 0.06);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .qb-outbound-panel:focus-within {
+    border-color: rgba(31, 111, 209, 0.35);
+    box-shadow: 0 16px 40px rgba(31, 111, 209, 0.12);
+  }
+
+  .qb-outbound-panel--wide {
+    min-height: 460px;
+  }
+
+  .qb-outbound-panel__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .qb-outbound-panel__title {
+    margin: 0;
+    font-size: 1.08rem;
+    font-weight: 700;
+    color: var(--qb-navy);
+  }
+
+  .qb-outbound-panel__subtitle {
+    margin: 0.25rem 0 0;
+    font-size: 0.88rem;
+    color: var(--qb-text-soft);
+  }
+
+  .qb-outbound-panel__badge {
+    flex: 0 0 auto;
+    min-width: 2.4rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(31, 111, 209, 0.12), rgba(125, 227, 255, 0.28));
+    color: var(--qb-navy);
+    font-size: 0.92rem;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .qb-outbound-form {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .qb-outbound-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    align-items: center;
+    margin-bottom: 0.85rem;
+  }
+
+  .qb-outbound-search-wrap {
+    position: relative;
+    flex: 1 1 220px;
+    min-width: 0;
+  }
+
+  .qb-outbound-search-icon {
+    position: absolute;
+    left: 0.85rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1rem;
+    height: 1rem;
+    color: var(--qb-text-soft);
+    pointer-events: none;
+  }
+
+  .qb-outbound-search {
+    padding-left: 2.35rem;
+    border-radius: 14px;
+    border-color: rgba(16, 42, 99, 0.14);
+    background: #f8fbff;
+  }
+
+  .qb-outbound-search:focus {
+    background: #fff;
+    border-color: rgba(31, 111, 209, 0.45);
+    box-shadow: 0 0 0 0.2rem rgba(31, 111, 209, 0.12);
+  }
+
+  .qb-outbound-toolbar-actions {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  .qb-outbound-toolbar-actions .btn {
+    border-radius: 12px;
+    font-size: 0.84rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .qb-outbound-list {
+    flex: 1 1 auto;
+    min-height: 240px;
+    max-height: 320px;
+    overflow: auto;
+    border: 1px solid rgba(16, 42, 99, 0.08);
+    border-radius: 16px;
+    background: #fafcff;
+    padding: 0.35rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .qb-outbound-panel--wide .qb-outbound-list {
+    min-height: 280px;
+    max-height: 360px;
+  }
+
+  .qb-outbound-row {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    gap: 0.65rem;
+    align-items: center;
+    padding: 0.65rem 0.75rem;
+    margin-bottom: 0.35rem;
+    border-radius: 14px;
+    border: 1px solid transparent;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .qb-outbound-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .qb-outbound-row:hover {
+    border-color: rgba(31, 111, 209, 0.18);
+    background: #f4f9ff;
+  }
+
+  .qb-outbound-row:has(.qb-outbound-check:checked) {
+    border-color: rgba(31, 111, 209, 0.35);
+    background: linear-gradient(90deg, rgba(31, 111, 209, 0.08), rgba(125, 227, 255, 0.12));
+    box-shadow: 0 4px 14px rgba(31, 111, 209, 0.08);
+  }
+
+  .qb-outbound-row.is-hidden {
+    display: none;
+  }
+
+  .qb-outbound-check {
+    width: 1.05rem;
+    height: 1.05rem;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .qb-outbound-row__id {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--qb-blue);
+    background: rgba(31, 111, 209, 0.1);
+    padding: 0.2rem 0.45rem;
+    border-radius: 8px;
+    white-space: nowrap;
+  }
+
+  .qb-outbound-row__body {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  .qb-outbound-row__label {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--qb-navy);
+    line-height: 1.3;
+    word-break: break-word;
+  }
+
+  .qb-outbound-row__meta {
+    font-size: 0.82rem;
+    color: var(--qb-text-soft);
+    line-height: 1.25;
+    word-break: break-word;
+  }
+
+  .qb-outbound-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--qb-text-soft);
+    font-size: 0.95rem;
+  }
+
+  .qb-outbound-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-top: 0.15rem;
+  }
+
+  .qb-outbound-selected-count {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--qb-text-soft);
+  }
+
+  .qb-outbound-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-left: auto;
+  }
+
+  .qb-outbound-actions .btn {
+    border-radius: 14px;
+    font-weight: 600;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .qb-outbound-note {
+    margin: 0.85rem 0 0;
+    padding-top: 0.85rem;
+    border-top: 1px dashed rgba(16, 42, 99, 0.12);
+    color: var(--qb-text-soft);
+    font-size: 0.88rem;
+    line-height: 1.45;
+  }
+
+  .qb-outbound-linked-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+    gap: 1.25rem;
+    align-items: stretch;
+  }
+
+  @media (max-width: 991.98px) {
+    .qb-outbound-linked-layout {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .qb-outbound-quick-action {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.75rem;
+    border: 1px dashed rgba(34, 181, 115, 0.35);
+    border-radius: 18px;
+    padding: 1.15rem;
+    background: linear-gradient(180deg, rgba(34, 181, 115, 0.06), rgba(255, 255, 255, 0.9));
+    height: 100%;
+  }
+
+  .qb-outbound-quick-action .btn-success {
+    border-radius: 14px;
+    font-weight: 700;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .qb-outbound-panel--embedded {
+    min-height: 0;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+    background: transparent;
+  }
+
+  .qb-outbound-panel--embedded:focus-within {
+    border: 0;
+    box-shadow: none;
+  }
+
+  .qb-outbound-panel--embedded .qb-outbound-panel__head {
+    display: none;
+  }
+
+  .qb-outbound-panel--embedded .qb-outbound-list {
+    min-height: 280px;
+    max-height: 360px;
+  }
+
   .qb-recent-item {
     border: 1px solid var(--qb-stroke);
     border-radius: 18px;
@@ -1021,144 +1375,76 @@
   </section>
 
   <section class="qb-section-card p-4 p-xl-5 mb-4">
-    <div class="row g-4 align-items-start">
-      <div class="col-xl-4">
-        <h3 class="mb-2">{% trans "Send local records to QuickBooks" %}</h3>
-        <p class="qb-soft-copy mb-3">{% trans "Use this area when the record was created in your system first and still needs to be sent to QuickBooks." %}</p>
-        <div class="qb-chip-list mb-3">
-          <span class="qb-chip">{{ quickbooks_pending_customer_count }} {% trans "customers pending" %}</span>
-          <span class="qb-chip">{{ quickbooks_pending_presentation_count }} {% trans "items pending" %}</span>
-          <span class="qb-chip">{{ quickbooks_linked_presentation_count }} {% trans "items linked" %}</span>
-          <span class="qb-chip">{{ quickbooks_pending_invoice_count }} {% trans "invoices" %}</span>
-          <span class="qb-chip">{{ quickbooks_pending_note_count }} {% trans "notes" %}</span>
-        </div>
-        <div class="qb-strip">
-          <div class="fw-semibold mb-1">{% trans "How to send records" %}</div>
-          <div class="small text-muted">{% trans "Pick one or more rows in the list, then click Send selected. To send everything pending, use Send all pending. Hold Ctrl or Shift to select multiple rows." %}</div>
-        </div>
+    <div class="qb-outbound-section-head">
+      <h3 class="mb-2">{% trans "Send local records to QuickBooks" %}</h3>
+      <p class="qb-soft-copy mb-0">{% trans "Use this area when the record was created in your system first and still needs to be sent to QuickBooks." %}</p>
+    </div>
+
+    <div class="qb-outbound-stat-grid">
+      <div class="qb-outbound-stat">
+        <div class="qb-outbound-stat-value">{{ quickbooks_pending_customer_count }}</div>
+        <div class="qb-outbound-stat-label">{% trans "customers pending" %}</div>
       </div>
-      <div class="col-xl-8">
-        <div class="row g-3">
-          <div class="col-md-6">
-            <div class="qb-action-item h-100">
-              <label class="form-label fw-semibold">{% trans "Customers" %}</label>
-              <form method="post" action="{% url 'quickbooks_sync_customers_batch' %}" class="d-grid gap-2">
-                {% csrf_token %}
-                <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                <select name="ids" class="form-select" multiple size="6" {% if not quickbooks_pending_customers %}disabled{% endif %}>
-                  {% for cliente in quickbooks_pending_customers %}
-                  <option value="{{ cliente.id }}">#{{ cliente.id }} · {{ cliente.nombre_empresa }}</option>
-                  {% empty %}
-                  <option value="" disabled>{% trans "No pending customers" %}</option>
-                  {% endfor %}
-                </select>
-                <div class="d-flex gap-2 flex-wrap">
-                  <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_customers %}disabled{% endif %}>{% trans "Send selected" %}</button>
-                  <button type="submit" name="send_all" value="1" class="btn btn-primary" {% if not quickbooks_pending_customer_count %}disabled{% endif %}>{% trans "Send all pending" %} ({{ quickbooks_pending_customer_count }})</button>
-                </div>
-              </form>
-              <p class="qb-action-note">{% trans "Creates or links the customer in QuickBooks before invoices can be sent." %}</p>
+      <div class="qb-outbound-stat">
+        <div class="qb-outbound-stat-value">{{ quickbooks_pending_presentation_count }}</div>
+        <div class="qb-outbound-stat-label">{% trans "items pending" %}</div>
+      </div>
+      <div class="qb-outbound-stat">
+        <div class="qb-outbound-stat-value">{{ quickbooks_linked_presentation_count }}</div>
+        <div class="qb-outbound-stat-label">{% trans "items linked" %}</div>
+      </div>
+      <div class="qb-outbound-stat">
+        <div class="qb-outbound-stat-value">{{ quickbooks_pending_invoice_count }}</div>
+        <div class="qb-outbound-stat-label">{% trans "invoices pending" %}</div>
+      </div>
+      <div class="qb-outbound-stat">
+        <div class="qb-outbound-stat-value">{{ quickbooks_pending_note_count }}</div>
+        <div class="qb-outbound-stat-label">{% trans "notes pending" %}</div>
+      </div>
+    </div>
+
+    <div class="qb-strip mb-4">
+      <div class="fw-semibold mb-1">{% trans "How to send records" %}</div>
+      <div class="small text-muted">{% trans "Search the list, tick one or more rows, then click Send selected. To send everything pending, use Send all pending." %}</div>
+    </div>
+
+    <div class="qb-outbound-grid">
+      {% url 'quickbooks_sync_customers_batch' as customers_batch_url %}
+      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Customers") form_action=customers_batch_url records=quickbooks_pending_customers record_mode="customer" pending_count=quickbooks_pending_customer_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") panel_note=_("Creates or links the customer in QuickBooks before invoices can be sent.") only %}
+
+      {% url 'quickbooks_sync_products_batch' as products_batch_url %}
+      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Catalog items") form_action=products_batch_url records=quickbooks_pending_presentations record_mode="presentation" pending_count=quickbooks_pending_presentation_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") panel_note=_("For products not yet in QuickBooks. Already linked products are updated in the section below.") only %}
+
+      <div class="qb-outbound-grid__full" id="qb-push-linked-catalog">
+        <div class="qb-outbound-panel qb-outbound-panel--wide">
+          <div class="qb-outbound-panel__head">
+            <div>
+              <h4 class="qb-outbound-panel__title">{% trans "Update linked catalog in QuickBooks" %}</h4>
+              <p class="qb-outbound-panel__subtitle">{% trans "Use this when products are already linked and you changed prices, names, descriptions, or inventory quantities in the app. Linked Non-inventory items in QuickBooks will be converted to Inventory with the current on-hand quantity when you update them here." %}</p>
             </div>
+            <span class="qb-outbound-panel__badge">{{ quickbooks_linked_presentation_count }}</span>
           </div>
-          <div class="col-md-6">
-            <div class="qb-action-item h-100">
-              <label class="form-label fw-semibold">{% trans "Catalog items" %}</label>
-              <form method="post" action="{% url 'quickbooks_sync_products_batch' %}" class="d-grid gap-2">
+          <div class="qb-outbound-linked-layout">
+            {% url 'quickbooks_push_linked_products_batch' as linked_products_batch_url %}
+            {% include "backoffice/partials/quickbooks_outbound_panel.html" with title="" form_action=linked_products_batch_url records=quickbooks_linked_presentations record_mode="linked_presentation" pending_count=quickbooks_linked_presentation_count send_selected_label=_("Update selected") send_all_label=_("Update all linked") panel_class="qb-outbound-panel--embedded" only %}
+            <div class="qb-outbound-quick-action">
+              <form method="post" action="{% url 'quickbooks_push_linked_products_to_quickbooks' %}" data-qb-operation="push_linked_products_to_quickbooks">
                 {% csrf_token %}
+                <input type="hidden" name="limit" value="0">
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                <select name="ids" class="form-select" multiple size="6" {% if not quickbooks_pending_presentations %}disabled{% endif %}>
-                  {% for presentacion in quickbooks_pending_presentations %}
-                  <option value="{{ presentacion.id }}">#{{ presentacion.id }} · {{ presentacion.producto.nombre }} / {{ presentacion.nombre }}</option>
-                  {% empty %}
-                  <option value="" disabled>{% trans "No pending items" %}</option>
-                  {% endfor %}
-                </select>
-                <div class="d-flex gap-2 flex-wrap">
-                  <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_presentations %}disabled{% endif %}>{% trans "Send selected" %}</button>
-                  <button type="submit" name="send_all" value="1" class="btn btn-primary" {% if not quickbooks_pending_presentation_count %}disabled{% endif %}>{% trans "Send all pending" %} ({{ quickbooks_pending_presentation_count }})</button>
-                </div>
+                <button type="submit" class="btn btn-success w-100" {% if not quickbooks_status.is_active or not quickbooks_linked_presentation_count %}disabled{% endif %}>{% trans "Update all linked items now" %}</button>
               </form>
-              <p class="qb-action-note">{% trans "For products not yet in QuickBooks. Already linked products are updated in the section below." %}</p>
-            </div>
-          </div>
-          <div class="col-12">
-            <div class="qb-action-item" id="qb-push-linked-catalog">
-              <label class="form-label fw-semibold">{% trans "Update linked catalog in QuickBooks" %}</label>
-              <p class="qb-soft-copy small mb-3">{% trans "Use this when products are already linked and you changed prices, names, descriptions, or inventory quantities in the app. Linked Non-inventory items in QuickBooks will be converted to Inventory with the current on-hand quantity when you update them here." %}</p>
-              <div class="row g-3">
-                <div class="col-lg-7">
-                  <form method="post" action="{% url 'quickbooks_push_linked_products_batch' %}" class="d-grid gap-2">
-                    {% csrf_token %}
-                    <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                    <select name="ids" class="form-select" multiple size="6" {% if not quickbooks_linked_presentations %}disabled{% endif %}>
-                      {% for presentacion in quickbooks_linked_presentations %}
-                      <option value="{{ presentacion.id }}">#{{ presentacion.id }} · {{ presentacion.producto.nombre }} / {{ presentacion.nombre }}</option>
-                      {% empty %}
-                      <option value="" disabled>{% trans "No linked items yet" %}</option>
-                      {% endfor %}
-                    </select>
-                    <div class="d-flex gap-2 flex-wrap">
-                      <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_linked_presentations %}disabled{% endif %}>{% trans "Update selected" %}</button>
-                      <button type="submit" name="send_all" value="1" class="btn btn-primary" {% if not quickbooks_linked_presentation_count %}disabled{% endif %}>{% trans "Update all linked" %} ({{ quickbooks_linked_presentation_count }})</button>
-                    </div>
-                  </form>
-                </div>
-                <div class="col-lg-5">
-                  <form method="post" action="{% url 'quickbooks_push_linked_products_to_quickbooks' %}" data-qb-operation="push_linked_products_to_quickbooks">
-                    {% csrf_token %}
-                    <input type="hidden" name="limit" value="0">
-                    <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                    <button type="submit" class="btn btn-success w-100" {% if not quickbooks_status.is_active or not quickbooks_linked_presentation_count %}disabled{% endif %}>{% trans "Update all linked items now" %}</button>
-                  </form>
-                  <p class="qb-action-note mb-0 mt-2">{% trans "Same as Update all linked, but runs as one quick action without selecting rows first." %}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <div class="qb-action-item h-100">
-              <label class="form-label fw-semibold">{% trans "Invoices" %}</label>
-              <form method="post" action="{% url 'quickbooks_sync_invoices_batch' %}" class="d-grid gap-2">
-                {% csrf_token %}
-                <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                <select name="ids" class="form-select" multiple size="6" {% if not quickbooks_pending_invoices %}disabled{% endif %}>
-                  {% for invoice in quickbooks_pending_invoices %}
-                  <option value="{{ invoice.id }}">#{{ invoice.id }} · {{ invoice.numero }} · {{ invoice.cliente.nombre_empresa }}</option>
-                  {% empty %}
-                  <option value="" disabled>{% trans "No pending invoices" %}</option>
-                  {% endfor %}
-                </select>
-                <div class="d-flex gap-2 flex-wrap">
-                  <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_invoices %}disabled{% endif %}>{% trans "Send selected" %}</button>
-                  <button type="submit" name="send_all" value="1" class="btn btn-primary" {% if not quickbooks_pending_invoice_count %}disabled{% endif %}>{% trans "Send all pending" %} ({{ quickbooks_pending_invoice_count }})</button>
-                </div>
-              </form>
-              <p class="qb-action-note">{% trans "QuickBooks will also create or link the customer and catalog items used by the invoice." %}</p>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <div class="qb-action-item h-100">
-              <label class="form-label fw-semibold">{% trans "Adjustment notes" %}</label>
-              <form method="post" action="{% url 'quickbooks_sync_adjustment_notes_batch' %}" class="d-grid gap-2">
-                {% csrf_token %}
-                <input type="hidden" name="redirect_to" value="{{ request.path }}">
-                <select name="ids" class="form-select" multiple size="6" {% if not quickbooks_pending_notes %}disabled{% endif %}>
-                  {% for nota in quickbooks_pending_notes %}
-                  <option value="{{ nota.id }}">#{{ nota.id }} · {{ nota.numero }} · {{ nota.cliente.nombre_empresa }}</option>
-                  {% empty %}
-                  <option value="" disabled>{% trans "No pending approved notes" %}</option>
-                  {% endfor %}
-                </select>
-                <div class="d-flex gap-2 flex-wrap">
-                  <button type="submit" class="btn btn-outline-primary" {% if not quickbooks_pending_notes %}disabled{% endif %}>{% trans "Send selected" %}</button>
-                  <button type="submit" name="send_all" value="1" class="btn btn-primary" {% if not quickbooks_pending_note_count %}disabled{% endif %}>{% trans "Send all pending" %} ({{ quickbooks_pending_note_count }})</button>
-                </div>
-              </form>
-              <p class="qb-action-note">{% trans "Only approved credit or debit notes can be sent to QuickBooks." %}</p>
+              <p class="qb-outbound-note mb-0">{% trans "Same as Update all linked, but runs as one quick action without selecting rows first." %}</p>
             </div>
           </div>
         </div>
       </div>
+
+      {% url 'quickbooks_sync_invoices_batch' as invoices_batch_url %}
+      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Invoices") form_action=invoices_batch_url records=quickbooks_pending_invoices record_mode="invoice" pending_count=quickbooks_pending_invoice_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") panel_note=_("QuickBooks will also create or link the customer and catalog items used by the invoice.") only %}
+
+      {% url 'quickbooks_sync_adjustment_notes_batch' as notes_batch_url %}
+      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Adjustment notes") form_action=notes_batch_url records=quickbooks_pending_notes record_mode="note" pending_count=quickbooks_pending_note_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") panel_note=_("Only approved credit or debit notes can be sent to QuickBooks.") only %}
     </div>
   </section>
 
@@ -1303,6 +1589,91 @@
       </div>
     </div>
   </div>
+
+  <script>
+  (function () {
+    const selectedLabels = {
+      zero: '{% filter escapejs %}{% trans "0 selected" %}{% endfilter %}',
+      one: '{% filter escapejs %}{% trans "1 selected" %}{% endfilter %}',
+      manyPrefix: '{% filter escapejs %}{% trans "selected" %}{% endfilter %}'
+    };
+
+    function formatSelectedCount(count) {
+      if (count === 0) return selectedLabels.zero;
+      if (count === 1) return selectedLabels.one;
+      return count + ' ' + selectedLabels.manyPrefix;
+    }
+
+    document.querySelectorAll('[data-qb-outbound-panel]').forEach(function (panel) {
+      const form = panel.querySelector('form.qb-outbound-form');
+      if (!form) return;
+
+      const searchInput = panel.querySelector('.qb-outbound-search');
+      const rows = Array.from(panel.querySelectorAll('.qb-outbound-row'));
+      const selectVisibleBtn = panel.querySelector('.qb-outbound-select-visible');
+      const clearBtn = panel.querySelector('.qb-outbound-clear-selection');
+      const countEl = panel.querySelector('.qb-outbound-selected-count');
+      const sendSelectedBtn = form.querySelector('[data-action="send-selected"]');
+
+      function visibleRows() {
+        return rows.filter(function (row) { return !row.classList.contains('is-hidden'); });
+      }
+
+      function updateSelectionState() {
+        const checked = panel.querySelectorAll('.qb-outbound-row input.qb-outbound-check:checked').length;
+        if (countEl) countEl.textContent = formatSelectedCount(checked);
+        if (sendSelectedBtn) sendSelectedBtn.disabled = checked === 0 || rows.length === 0;
+      }
+
+      function filterRows() {
+        const query = (searchInput && searchInput.value || '').trim().toLowerCase();
+        rows.forEach(function (row) {
+          const haystack = (row.getAttribute('data-search-text') || row.textContent || '').toLowerCase();
+          row.classList.toggle('is-hidden', Boolean(query) && haystack.indexOf(query) === -1);
+        });
+      }
+
+      if (searchInput) {
+        searchInput.addEventListener('input', filterRows);
+      }
+
+      if (selectVisibleBtn) {
+        selectVisibleBtn.addEventListener('click', function () {
+          visibleRows().forEach(function (row) {
+            const checkbox = row.querySelector('input.qb-outbound-check');
+            if (checkbox) checkbox.checked = true;
+          });
+          updateSelectionState();
+        });
+      }
+
+      if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+          panel.querySelectorAll('input.qb-outbound-check').forEach(function (checkbox) {
+            checkbox.checked = false;
+          });
+          updateSelectionState();
+        });
+      }
+
+      panel.querySelectorAll('input.qb-outbound-check').forEach(function (checkbox) {
+        checkbox.addEventListener('change', updateSelectionState);
+      });
+
+      form.addEventListener('submit', function (event) {
+        const submitter = event.submitter;
+        if (submitter && submitter.name === 'send_all') return;
+        const checked = panel.querySelectorAll('.qb-outbound-row input.qb-outbound-check:checked').length;
+        if (!checked) {
+          event.preventDefault();
+          updateSelectionState();
+        }
+      });
+
+      updateSelectionState();
+    });
+  })();
+  </script>
 
   <script>
   (function(){

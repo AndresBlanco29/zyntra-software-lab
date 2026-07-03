@@ -278,20 +278,20 @@
         <input class="form-control form-control-sm mb-2" value="{{ confirm_url }}" readonly>
 
         <div class="form-check mb-3">
-          <input class="form-check-input" type="checkbox" id="emailIncludePrices" checked>
+          <input class="form-check-input" type="checkbox" id="emailIncludePrices">
           <label class="form-check-label" for="emailIncludePrices">{% trans "Send email with prices" %}</label>
           <div class="form-text">{% trans "Uncheck to send the customer notification without unit prices or totals." %}</div>
         </div>
 
         <form method="post" action="{% url 'enviar_cotizacion_cliente' cotizacion.id %}" id="sendQuoteEmailForm">
           {% csrf_token %}
-          <input type="hidden" name="enviar_correo_con_precios" value="1" class="email-include-prices-field">
+          <input type="hidden" name="enviar_correo_con_precios" value="0" class="email-include-prices-field">
           <button type="submit" class="btn btn-warning w-100 quote-send-email-button" {% if not can_send_customer_quote %}disabled{% endif %}>{% trans "Send quote to customer" %}</button>
         </form>
 
         <form method="post" action="{% url 'generar_pedido_desde_cotizacion' cotizacion.id %}" class="mt-2" id="generateSalesOrderForm">
           {% csrf_token %}
-          <input type="hidden" name="enviar_correo_con_precios" value="1" class="email-include-prices-field">
+          <input type="hidden" name="enviar_correo_con_precios" value="0" class="email-include-prices-field">
           <button type="submit" class="btn btn-success w-100" {% if not can_generate_backoffice_order %}disabled{% endif %}>{% trans "Generate sales order" %}</button>
         </form>
 

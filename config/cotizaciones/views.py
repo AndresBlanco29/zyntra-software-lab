@@ -373,7 +373,7 @@ def _send_twilio_message(*, phone_number, message, channel):
 
 
 def _email_includes_prices(request):
-    return request.POST.get('enviar_correo_con_precios', '1') == '1'
+    return request.POST.get('enviar_correo_con_precios', '0') == '1'
 
 
 def _get_whatsapp_contact_data(cotizacion, request):

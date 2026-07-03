@@ -1,4 +1,5 @@
 import logging
+import re
 from functools import wraps
 from pathlib import Path
 from urllib.parse import quote
@@ -59,6 +60,7 @@ from .sync import (
     quickbooks_accounting_import_enabled,
     refresh_linked_quickbooks_items,
     refresh_linked_quickbooks_invoice_status,
+    _linked_catalog_presentacion_queryset,
     QuickBooksSyncError,
     fetch_quickbooks_credit_memos,
     fetch_quickbooks_customers,
@@ -726,35 +728,69 @@ def _outbound_scope_queryset(scope):
     raise ValueError('Invalid outbound search scope.')
 
 
+def _outbound_search_tokens(query):
+    normalized = re.sub(r'[/|,]+', ' ', str(query or ''))
+    return [token for token in re.split(r'\s+', normalized.strip()) if token]
+
+
+def _presentation_search_token_filter(token):
+    return (
+        Q(producto__nombre__icontains=token)
+        | Q(nombre__icontains=token)
+        | Q(producto__codigo_barras__icontains=token)
+        | Q(quickbooks_id__icontains=token)
+        | Q(producto__quickbooks_id__icontains=token)
+    )
+
+
 def _filter_outbound_queryset(queryset, *, scope, query):
     query = str(query or '').strip()
     if not query:
         return queryset
 
     if query.isdigit():
-        numeric_query = Q(pk=int(query))
-    else:
-        numeric_query = Q()
-
-    if scope == 'customers':
-        text_query = Q(nombre_empresa__icontains=query)
-        return queryset.filter(text_query | numeric_query)
+        return queryset.filter(pk=int(query))
 
     if scope in {'presentations', 'linked_presentations'}:
-        text_query = (
-            Q(producto__nombre__icontains=query)
-            | Q(nombre__icontains=query)
-            | Q(producto__codigo_barras__icontains=query)
-        )
-        return queryset.filter(text_query | numeric_query)
+        tokens = _outbound_search_tokens(query)
+        if not tokens:
+            return queryset.none()
+        for token in tokens:
+            queryset = queryset.filter(_presentation_search_token_filter(token))
+        return queryset
+
+    if scope == 'customers':
+        tokens = _outbound_search_tokens(query)
+        if not tokens:
+            return queryset.none()
+        for token in tokens:
+            queryset = queryset.filter(
+                Q(nombre_empresa__icontains=token)
+                | Q(telefono__icontains=token)
+            )
+        return queryset
 
     if scope == 'invoices':
-        text_query = Q(numero__icontains=query) | Q(cliente__nombre_empresa__icontains=query)
-        return queryset.filter(text_query | numeric_query)
+        tokens = _outbound_search_tokens(query)
+        if not tokens:
+            return queryset.none()
+        for token in tokens:
+            queryset = queryset.filter(
+                Q(numero__icontains=token)
+                | Q(cliente__nombre_empresa__icontains=token)
+            )
+        return queryset
 
     if scope == 'notes':
-        text_query = Q(numero__icontains=query) | Q(cliente__nombre_empresa__icontains=query)
-        return queryset.filter(text_query | numeric_query)
+        tokens = _outbound_search_tokens(query)
+        if not tokens:
+            return queryset.none()
+        for token in tokens:
+            queryset = queryset.filter(
+                Q(numero__icontains=token)
+                | Q(cliente__nombre_empresa__icontains=token)
+            )
+        return queryset
 
     return queryset.none()
 
@@ -767,10 +803,15 @@ def _serialize_outbound_record(record, *, scope):
             'meta': '',
         }
     if scope in {'presentations', 'linked_presentations'}:
+        label = record.producto.nombre
+        meta = record.nombre
+        if meta and meta.lower() not in label.lower():
+            label = f'{label} / {meta}'
+            meta = ''
         return {
             'id': record.id,
-            'label': record.producto.nombre,
-            'meta': record.nombre,
+            'label': label,
+            'meta': meta,
         }
     if scope == 'invoices':
         return {
@@ -812,12 +853,7 @@ def _outbound_pending_querysets():
 
 
 def _outbound_linked_querysets():
-    linked_presentations = (
-        Presentacion.objects.filter(quickbooks_id__isnull=False)
-        .exclude(quickbooks_id='')
-        .select_related('producto')
-        .order_by('-id')
-    )
+    linked_presentations = _linked_catalog_presentacion_queryset().order_by('-id')
     return {
         'presentations': linked_presentations,
     }

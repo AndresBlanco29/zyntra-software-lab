@@ -2609,6 +2609,59 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         result_ids = [item['id'] for item in response.json()['results']]
         self.assertIn(presentacion.id, result_ids)
 
+    def test_outbound_search_finds_linked_product_by_split_name_tokens(self):
+        categoria = Categoria.objects.create(nombre='Aceites')
+        marca = Marca.objects.create(nombre='Mazola')
+        producto = Producto.objects.create(
+            nombre='MAZOLA CORN',
+            categoria=categoria,
+            marca=marca,
+            codigo_barras='7508880001111',
+            quickbooks_id='QB-MAZOLA-PRODUCT',
+        )
+        presentacion = Presentacion.objects.create(
+            producto=producto,
+            nombre='12/ 40 OZ',
+            unidades=12,
+            precio_3=Decimal('61.24'),
+            quickbooks_id='QB-MAZOLA-PRES',
+        )
+
+        response = self.client.get(
+            reverse('quickbooks_outbound_search'),
+            {'scope': 'linked_presentations', 'q': 'MAZOLA CORN 12/ 40 OZ'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result_ids = [item['id'] for item in response.json()['results']]
+        self.assertIn(presentacion.id, result_ids)
+
+    def test_outbound_search_includes_product_linked_when_presentacion_qb_id_missing(self):
+        categoria = Categoria.objects.create(nombre='Aceites 2')
+        marca = Marca.objects.create(nombre='Mazola 2')
+        producto = Producto.objects.create(
+            nombre='MAZOLA CORN',
+            categoria=categoria,
+            marca=marca,
+            codigo_barras='7508880002222',
+            quickbooks_id='QB-MAZOLA-ONLY-PRODUCT',
+        )
+        presentacion = Presentacion.objects.create(
+            producto=producto,
+            nombre='12/ 40 OZ',
+            unidades=12,
+            precio_3=Decimal('61.24'),
+        )
+
+        response = self.client.get(
+            reverse('quickbooks_outbound_search'),
+            {'scope': 'linked_presentations', 'q': 'MAZOLA CORN 12'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result_ids = [item['id'] for item in response.json()['results']]
+        self.assertIn(presentacion.id, result_ids)
+
     def test_build_sales_line_keeps_amount_equal_to_unit_price_times_qty(self):
         from config.integrations.quickbooks.sync import _build_sales_line
 

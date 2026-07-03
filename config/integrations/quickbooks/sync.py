@@ -4023,12 +4023,7 @@ def sync_product(*, presentacion, client=None, sync_qty_on_hand=True):
 def push_linked_quickbooks_items(*, limit=None, client=None, task_cache_key=None):
     """Push local changes for catalog rows already linked in QuickBooks."""
     del client, task_cache_key
-    queryset = (
-        Presentacion.objects.filter(quickbooks_id__isnull=False)
-        .exclude(quickbooks_id='')
-        .select_related('producto', 'stock_operativo')
-        .order_by('producto__nombre', 'id')
-    )
+    queryset = _linked_catalog_presentacion_queryset().select_related('stock_operativo')
     if limit is not None:
         queryset = queryset[:max(int(limit), 0)]
 

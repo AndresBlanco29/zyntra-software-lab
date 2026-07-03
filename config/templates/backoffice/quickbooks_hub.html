@@ -1618,6 +1618,33 @@
     };
     const searchingLabel = '{% filter escapejs %}{% trans "Searching…" %}{% endfilter %}';
 
+    function getCookie(name) {
+      const value = '; ' + document.cookie;
+      const parts = value.split('; ' + name + '=');
+      if (parts.length === 2) return parts.pop().split(';').shift();
+      return '';
+    }
+
+    function getCsrfToken(form) {
+      const input = form ? form.querySelector('input[name="csrfmiddlewaretoken"]') : null;
+      if (input && input.value) return input.value;
+      const fallback = document.querySelector('input[name="csrfmiddlewaretoken"]');
+      if (fallback && fallback.value) return fallback.value;
+      return getCookie('csrftoken') || '';
+    }
+
+    function ensureCsrfInput(form, token) {
+      let input = form.querySelector('input[name="csrfmiddlewaretoken"]');
+      if (!input) {
+        input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'csrfmiddlewaretoken';
+        form.insertBefore(input, form.firstChild);
+      }
+      if (token) input.value = token;
+      return input.value;
+    }
+
     function escapeHtml(value) {
       return String(value || '')
         .replace(/&/g, '&amp;')
@@ -1800,13 +1827,65 @@
       bindRowEvents();
 
       form.addEventListener('submit', function (event) {
+        event.preventDefault();
         const submitter = event.submitter;
-        if (submitter && submitter.name === 'send_all') return;
-        syncSelectedFromDom();
-        if (!selectedIds.size) {
-          event.preventDefault();
-          updateSelectionState();
+        const isSendAll = submitter && submitter.name === 'send_all';
+
+        if (!isSendAll) {
+          syncSelectedFromDom();
+          if (!selectedIds.size) {
+            updateSelectionState();
+            return;
+          }
         }
+
+        const csrfToken = ensureCsrfInput(form, getCsrfToken(form));
+        if (!csrfToken) {
+          if (listEl) {
+            listEl.innerHTML = '<div class="qb-outbound-empty">{% filter escapejs %}{% trans "Session expired. Refresh the page and try again." %}{% endfilter %}</div>';
+          }
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', csrfToken);
+        const redirectInput = form.querySelector('input[name="redirect_to"]');
+        if (redirectInput && redirectInput.value) {
+          formData.append('redirect_to', redirectInput.value);
+        }
+        if (isSendAll) {
+          formData.append('send_all', '1');
+        } else {
+          selectedIds.forEach(function (id) {
+            formData.append('ids', id);
+          });
+        }
+
+        const actionButtons = form.querySelectorAll('button[type="submit"]');
+        actionButtons.forEach(function (button) { button.disabled = true; });
+        if (listEl) listEl.classList.add('is-loading');
+
+        fetch(form.action, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'X-CSRFToken': csrfToken },
+          body: formData,
+        }).then(function (response) {
+          if (response.redirected) {
+            window.location.href = response.url;
+            return;
+          }
+          if (response.ok) {
+            window.location.reload();
+            return;
+          }
+          throw new Error('{% filter escapejs %}{% trans "Update failed" %}{% endfilter %} (' + response.status + ')');
+        }).catch(function (error) {
+          form.querySelectorAll('button[type="submit"]').forEach(function (button) { button.disabled = false; });
+          updateSelectionState();
+          if (listEl) listEl.classList.remove('is-loading');
+          window.alert(error.message || '{% filter escapejs %}{% trans "Update failed" %}{% endfilter %}');
+        });
       });
 
       updateSelectionState();
@@ -2012,7 +2091,7 @@
         const op = form.getAttribute('data-qb-operation');
         const limit = (form.querySelector('input[name=limit]')||{}).value || '';
         const mode = (form.querySelector('input[name=mode]')||{}).value || '';
-        const csrftoken = getCookie('csrftoken');
+        const csrftoken = getCookie('csrftoken') || (form.querySelector('input[name="csrfmiddlewaretoken"]') || {}).value || '';
         showOverlay();
         setTaskDescription(op);
         setProgress(6);

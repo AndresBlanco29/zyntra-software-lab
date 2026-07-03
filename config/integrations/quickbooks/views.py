@@ -6,7 +6,7 @@ from urllib.parse import quote
 from django.contrib import messages
 from django.conf import settings
 from django.core.files.storage import default_storage
-from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -700,6 +700,106 @@ def _parse_id_list(raw_value):
 
 OUTBOUND_SYNC_SELECTOR_LIMIT = 100
 OUTBOUND_SYNC_MAX_IDS = 200
+OUTBOUND_SEARCH_MAX_RESULTS = 75
+OUTBOUND_SEARCH_SCOPES = frozenset({
+    'customers',
+    'presentations',
+    'linked_presentations',
+    'invoices',
+    'notes',
+})
+
+
+def _outbound_scope_queryset(scope):
+    pending = _outbound_pending_querysets()
+    linked = _outbound_linked_querysets()
+    if scope == 'customers':
+        return pending['customers']
+    if scope == 'presentations':
+        return pending['presentations']
+    if scope == 'linked_presentations':
+        return linked['presentations']
+    if scope == 'invoices':
+        return pending['invoices']
+    if scope == 'notes':
+        return pending['notes']
+    raise ValueError('Invalid outbound search scope.')
+
+
+def _filter_outbound_queryset(queryset, *, scope, query):
+    query = str(query or '').strip()
+    if not query:
+        return queryset
+
+    if query.isdigit():
+        numeric_query = Q(pk=int(query))
+    else:
+        numeric_query = Q()
+
+    if scope == 'customers':
+        text_query = Q(nombre_empresa__icontains=query)
+        return queryset.filter(text_query | numeric_query)
+
+    if scope in {'presentations', 'linked_presentations'}:
+        text_query = (
+            Q(producto__nombre__icontains=query)
+            | Q(nombre__icontains=query)
+            | Q(producto__codigo_barras__icontains=query)
+        )
+        return queryset.filter(text_query | numeric_query)
+
+    if scope == 'invoices':
+        text_query = Q(numero__icontains=query) | Q(cliente__nombre_empresa__icontains=query)
+        return queryset.filter(text_query | numeric_query)
+
+    if scope == 'notes':
+        text_query = Q(numero__icontains=query) | Q(cliente__nombre_empresa__icontains=query)
+        return queryset.filter(text_query | numeric_query)
+
+    return queryset.none()
+
+
+def _serialize_outbound_record(record, *, scope):
+    if scope == 'customers':
+        return {
+            'id': record.id,
+            'label': record.nombre_empresa,
+            'meta': '',
+        }
+    if scope in {'presentations', 'linked_presentations'}:
+        return {
+            'id': record.id,
+            'label': record.producto.nombre,
+            'meta': record.nombre,
+        }
+    if scope == 'invoices':
+        return {
+            'id': record.id,
+            'label': record.numero,
+            'meta': record.cliente.nombre_empresa,
+        }
+    if scope == 'notes':
+        return {
+            'id': record.id,
+            'label': record.numero,
+            'meta': record.cliente.nombre_empresa,
+        }
+    raise ValueError('Invalid outbound search scope.')
+
+
+def search_outbound_records(*, scope, query='', limit=OUTBOUND_SEARCH_MAX_RESULTS):
+    if scope not in OUTBOUND_SEARCH_SCOPES:
+        raise ValueError('Invalid outbound search scope.')
+
+    queryset = _outbound_scope_queryset(scope)
+    query = str(query or '').strip()
+    if query:
+        queryset = _filter_outbound_queryset(queryset, scope=scope, query=query)
+    else:
+        queryset = queryset.order_by('-id')
+
+    limit = max(1, min(int(limit or OUTBOUND_SEARCH_MAX_RESULTS), OUTBOUND_SEARCH_MAX_RESULTS))
+    return [_serialize_outbound_record(record, scope=scope) for record in queryset[:limit]]
 
 
 def _outbound_pending_querysets():
@@ -782,6 +882,7 @@ def get_dashboard_sync_context(*, request=None):
         'quickbooks_pending_invoice_count': pending_invoices.count(),
         'quickbooks_pending_note_count': pending_notes.count(),
         'quickbooks_linked_presentation_count': linked_presentations.count(),
+        'quickbooks_outbound_search_url': reverse('quickbooks_outbound_search'),
         'quickbooks_outbound_sync_enabled': True,
         'quickbooks_alignment_sync_enabled': True,
         'quickbooks_import_conflicts_count': QuickBooksImportConflict.objects.filter(status=QuickBooksImportConflict.STATUS_CONFLICT).count(),
@@ -1793,6 +1894,26 @@ def quickbooks_sync_adjustment_note(request, note_id):
         logger.warning('QuickBooks adjustment note sync failed: %s', exc)
         return _response_or_redirect(request, operation='sync_adjustment_note', error=str(exc), status_code=502)
     return _response_or_redirect(request, operation='sync_adjustment_note', result=result)
+
+
+@require_GET
+@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_full_mode
+def quickbooks_outbound_search(request):
+    scope = str(request.GET.get('scope') or '').strip()
+    query = str(request.GET.get('q') or '').strip()
+    if scope not in OUTBOUND_SEARCH_SCOPES:
+        return JsonResponse({'error': _('Invalid search scope.')}, status=400)
+    try:
+        results = search_outbound_records(scope=scope, query=query)
+    except ValueError as exc:
+        return JsonResponse({'error': str(exc)}, status=400)
+    return JsonResponse({
+        'scope': scope,
+        'query': query,
+        'results': results,
+        'count': len(results),
+    })
 
 
 @require_POST

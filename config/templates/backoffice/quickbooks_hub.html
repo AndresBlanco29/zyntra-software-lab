@@ -657,6 +657,11 @@
     padding-bottom: 0.75rem;
   }
 
+  .qb-outbound-list.is-loading {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
   .qb-outbound-panel--embedded {
     min-height: 0;
     border: 0;
@@ -1405,15 +1410,15 @@
 
     <div class="qb-strip mb-4">
       <div class="fw-semibold mb-1">{% trans "How to send records" %}</div>
-      <div class="small text-muted">{% trans "Search the list, tick one or more rows, then click Send selected. To send everything pending, use Send all pending." %}</div>
+      <div class="small text-muted">{% trans "Search searches the full pending list, not only what is shown initially. Tick one or more rows, then click Send selected. To send everything pending, use Send all pending." %}</div>
     </div>
 
     <div class="qb-outbound-grid">
       {% url 'quickbooks_sync_customers_batch' as customers_batch_url %}
-      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Customers") form_action=customers_batch_url records=quickbooks_pending_customers record_mode="customer" pending_count=quickbooks_pending_customer_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") panel_note=_("Creates or links the customer in QuickBooks before invoices can be sent.") only %}
+      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Customers") form_action=customers_batch_url records=quickbooks_pending_customers record_mode="customer" outbound_scope="customers" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_pending_customer_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") empty_message=_("No pending customers match your search.") panel_note=_("Creates or links the customer in QuickBooks before invoices can be sent.") only %}
 
       {% url 'quickbooks_sync_products_batch' as products_batch_url %}
-      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Catalog items") form_action=products_batch_url records=quickbooks_pending_presentations record_mode="presentation" pending_count=quickbooks_pending_presentation_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") panel_note=_("For products not yet in QuickBooks. Already linked products are updated in the section below.") only %}
+      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Catalog items") form_action=products_batch_url records=quickbooks_pending_presentations record_mode="presentation" outbound_scope="presentations" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_pending_presentation_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") empty_message=_("No pending items match your search.") panel_note=_("For products not yet in QuickBooks. Already linked products are updated in the section below.") only %}
 
       <div class="qb-outbound-grid__full" id="qb-push-linked-catalog">
         <div class="qb-outbound-panel qb-outbound-panel--wide">
@@ -1426,7 +1431,7 @@
           </div>
           <div class="qb-outbound-linked-layout">
             {% url 'quickbooks_push_linked_products_batch' as linked_products_batch_url %}
-            {% include "backoffice/partials/quickbooks_outbound_panel.html" with title="" form_action=linked_products_batch_url records=quickbooks_linked_presentations record_mode="linked_presentation" pending_count=quickbooks_linked_presentation_count send_selected_label=_("Update selected") send_all_label=_("Update all linked") panel_class="qb-outbound-panel--embedded" only %}
+            {% include "backoffice/partials/quickbooks_outbound_panel.html" with title="" form_action=linked_products_batch_url records=quickbooks_linked_presentations record_mode="linked_presentation" outbound_scope="linked_presentations" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_linked_presentation_count send_selected_label=_("Update selected") send_all_label=_("Update all linked") empty_message=_("No linked items match your search.") panel_class="qb-outbound-panel--embedded" only %}
             <div class="qb-outbound-quick-action">
               <form method="post" action="{% url 'quickbooks_push_linked_products_to_quickbooks' %}" data-qb-operation="push_linked_products_to_quickbooks">
                 {% csrf_token %}
@@ -1441,10 +1446,10 @@
       </div>
 
       {% url 'quickbooks_sync_invoices_batch' as invoices_batch_url %}
-      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Invoices") form_action=invoices_batch_url records=quickbooks_pending_invoices record_mode="invoice" pending_count=quickbooks_pending_invoice_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") panel_note=_("QuickBooks will also create or link the customer and catalog items used by the invoice.") only %}
+      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Invoices") form_action=invoices_batch_url records=quickbooks_pending_invoices record_mode="invoice" outbound_scope="invoices" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_pending_invoice_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") empty_message=_("No pending invoices match your search.") panel_note=_("QuickBooks will also create or link the customer and catalog items used by the invoice.") only %}
 
       {% url 'quickbooks_sync_adjustment_notes_batch' as notes_batch_url %}
-      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Adjustment notes") form_action=notes_batch_url records=quickbooks_pending_notes record_mode="note" pending_count=quickbooks_pending_note_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") panel_note=_("Only approved credit or debit notes can be sent to QuickBooks.") only %}
+      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Adjustment notes") form_action=notes_batch_url records=quickbooks_pending_notes record_mode="note" outbound_scope="notes" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_pending_note_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") empty_message=_("No pending approved notes match your search.") panel_note=_("Only approved credit or debit notes can be sent to QuickBooks.") only %}
     </div>
   </section>
 
@@ -1597,6 +1602,15 @@
       one: '{% filter escapejs %}{% trans "1 selected" %}{% endfilter %}',
       manyPrefix: '{% filter escapejs %}{% trans "selected" %}{% endfilter %}'
     };
+    const searchingLabel = '{% filter escapejs %}{% trans "Searching…" %}{% endfilter %}';
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
 
     function formatSelectedCount(count) {
       if (count === 0) return selectedLabels.zero;
@@ -1604,67 +1618,170 @@
       return count + ' ' + selectedLabels.manyPrefix;
     }
 
+    function buildRowHtml(item) {
+      const metaHtml = item.meta
+        ? '<span class="qb-outbound-row__meta">' + escapeHtml(item.meta) + '</span>'
+        : '';
+      const searchText = ('#' + item.id + ' ' + (item.label || '') + ' ' + (item.meta || '')).toLowerCase();
+      return (
+        '<label class="qb-outbound-row" data-search-text="' + escapeHtml(searchText) + '">' +
+          '<input type="checkbox" class="form-check-input qb-outbound-check" name="ids" value="' + escapeHtml(item.id) + '">' +
+          '<span class="qb-outbound-row__id">#' + escapeHtml(item.id) + '</span>' +
+          '<span class="qb-outbound-row__body">' +
+            '<span class="qb-outbound-row__label">' + escapeHtml(item.label) + '</span>' +
+            metaHtml +
+          '</span>' +
+        '</label>'
+      );
+    }
+
     document.querySelectorAll('[data-qb-outbound-panel]').forEach(function (panel) {
       const form = panel.querySelector('form.qb-outbound-form');
       if (!form) return;
 
+      const listEl = panel.querySelector('.qb-outbound-list');
       const searchInput = panel.querySelector('.qb-outbound-search');
-      const rows = Array.from(panel.querySelectorAll('.qb-outbound-row'));
       const selectVisibleBtn = panel.querySelector('.qb-outbound-select-visible');
       const clearBtn = panel.querySelector('.qb-outbound-clear-selection');
       const countEl = panel.querySelector('.qb-outbound-selected-count');
       const sendSelectedBtn = form.querySelector('[data-action="send-selected"]');
+      const searchUrl = panel.getAttribute('data-outbound-search-url') || '';
+      const scope = panel.getAttribute('data-outbound-scope') || '';
+      const emptyMessage = panel.getAttribute('data-outbound-empty-msg') || 'No matching records.';
+      const selectedIds = new Set();
+      const initialListHtml = listEl ? listEl.innerHTML : '';
+      let searchTimer = null;
+      let activeRequest = null;
+
+      function currentRows() {
+        return Array.from(panel.querySelectorAll('.qb-outbound-row'));
+      }
 
       function visibleRows() {
-        return rows.filter(function (row) { return !row.classList.contains('is-hidden'); });
+        return currentRows().filter(function (row) { return !row.classList.contains('is-hidden'); });
       }
 
-      function updateSelectionState() {
-        const checked = panel.querySelectorAll('.qb-outbound-row input.qb-outbound-check:checked').length;
-        if (countEl) countEl.textContent = formatSelectedCount(checked);
-        if (sendSelectedBtn) sendSelectedBtn.disabled = checked === 0 || rows.length === 0;
-      }
-
-      function filterRows() {
-        const query = (searchInput && searchInput.value || '').trim().toLowerCase();
-        rows.forEach(function (row) {
-          const haystack = (row.getAttribute('data-search-text') || row.textContent || '').toLowerCase();
-          row.classList.toggle('is-hidden', Boolean(query) && haystack.indexOf(query) === -1);
+      function syncSelectedFromDom() {
+        selectedIds.clear();
+        panel.querySelectorAll('.qb-outbound-row input.qb-outbound-check:checked').forEach(function (checkbox) {
+          selectedIds.add(String(checkbox.value));
         });
       }
 
+      function applySelectedToDom() {
+        panel.querySelectorAll('.qb-outbound-row input.qb-outbound-check').forEach(function (checkbox) {
+          checkbox.checked = selectedIds.has(String(checkbox.value));
+        });
+      }
+
+      function updateSelectionState() {
+        syncSelectedFromDom();
+        const checked = selectedIds.size;
+        if (countEl) countEl.textContent = formatSelectedCount(checked);
+        if (sendSelectedBtn) sendSelectedBtn.disabled = checked === 0;
+      }
+
+      function bindRowEvents() {
+        panel.querySelectorAll('input.qb-outbound-check').forEach(function (checkbox) {
+          checkbox.addEventListener('change', updateSelectionState);
+        });
+      }
+
+      function renderItems(items) {
+        if (!listEl) return;
+        if (!items.length) {
+          listEl.innerHTML = '<div class="qb-outbound-empty">' + escapeHtml(emptyMessage) + '</div>';
+          updateSelectionState();
+          return;
+        }
+        listEl.innerHTML = items.map(buildRowHtml).join('');
+        applySelectedToDom();
+        bindRowEvents();
+        updateSelectionState();
+      }
+
+      function restoreInitialList() {
+        if (!listEl) return;
+        listEl.innerHTML = initialListHtml;
+        applySelectedToDom();
+        bindRowEvents();
+        updateSelectionState();
+      }
+
+      function runServerSearch(query) {
+        if (!searchUrl || !scope) return;
+        if (activeRequest) activeRequest.abort();
+        listEl.classList.add('is-loading');
+        if (countEl) countEl.textContent = searchingLabel;
+
+        const controller = new AbortController();
+        activeRequest = controller;
+        const params = new URLSearchParams({ scope: scope, q: query });
+        fetch(searchUrl + '?' + params.toString(), {
+          credentials: 'same-origin',
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' }
+        }).then(function (response) {
+          return response.json().then(function (payload) {
+            if (!response.ok) throw new Error((payload && payload.error) || 'Search failed');
+            return payload;
+          });
+        }).then(function (payload) {
+          renderItems((payload && payload.results) || []);
+        }).catch(function (error) {
+          if (error.name === 'AbortError') return;
+          listEl.innerHTML = '<div class="qb-outbound-empty">' + escapeHtml(error.message || emptyMessage) + '</div>';
+          updateSelectionState();
+        }).finally(function () {
+          if (activeRequest === controller) {
+            activeRequest = null;
+            listEl.classList.remove('is-loading');
+          }
+        });
+      }
+
+      function handleSearchInput() {
+        const query = (searchInput && searchInput.value || '').trim();
+        if (searchTimer) window.clearTimeout(searchTimer);
+        searchTimer = window.setTimeout(function () {
+          if (!query) {
+            restoreInitialList();
+            return;
+          }
+          runServerSearch(query);
+        }, 280);
+      }
+
       if (searchInput) {
-        searchInput.addEventListener('input', filterRows);
+        searchInput.addEventListener('input', handleSearchInput);
       }
 
       if (selectVisibleBtn) {
         selectVisibleBtn.addEventListener('click', function () {
           visibleRows().forEach(function (row) {
             const checkbox = row.querySelector('input.qb-outbound-check');
-            if (checkbox) checkbox.checked = true;
+            if (checkbox) selectedIds.add(String(checkbox.value));
           });
+          applySelectedToDom();
           updateSelectionState();
         });
       }
 
       if (clearBtn) {
         clearBtn.addEventListener('click', function () {
-          panel.querySelectorAll('input.qb-outbound-check').forEach(function (checkbox) {
-            checkbox.checked = false;
-          });
+          selectedIds.clear();
+          applySelectedToDom();
           updateSelectionState();
         });
       }
 
-      panel.querySelectorAll('input.qb-outbound-check').forEach(function (checkbox) {
-        checkbox.addEventListener('change', updateSelectionState);
-      });
+      bindRowEvents();
 
       form.addEventListener('submit', function (event) {
         const submitter = event.submitter;
         if (submitter && submitter.name === 'send_all') return;
-        const checked = panel.querySelectorAll('.qb-outbound-row input.qb-outbound-check:checked').length;
-        if (!checked) {
+        syncSelectedFromDom();
+        if (!selectedIds.size) {
           event.preventDefault();
           updateSelectionState();
         }

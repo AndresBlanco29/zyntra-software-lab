@@ -2584,6 +2584,31 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         mock_sync_product.assert_called_once()
         self.assertIs(mock_sync_product.call_args.kwargs.get('sync_qty_on_hand'), False)
 
+    def test_outbound_search_finds_pending_catalog_item_by_product_name(self):
+        categoria = Categoria.objects.create(nombre='Busqueda Cat')
+        marca = Marca.objects.create(nombre='Marca Busqueda')
+        producto = Producto.objects.create(
+            nombre='PRODUCTO BUSQUEDA UNICA',
+            categoria=categoria,
+            marca=marca,
+            codigo_barras='7509990001111',
+        )
+        presentacion = Presentacion.objects.create(
+            producto=producto,
+            nombre='Caja',
+            unidades=12,
+            precio_3=Decimal('12.00'),
+        )
+
+        response = self.client.get(
+            reverse('quickbooks_outbound_search'),
+            {'scope': 'presentations', 'q': 'BUSQUEDA UNICA'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        result_ids = [item['id'] for item in response.json()['results']]
+        self.assertIn(presentacion.id, result_ids)
+
     def test_build_sales_line_keeps_amount_equal_to_unit_price_times_qty(self):
         from config.integrations.quickbooks.sync import _build_sales_line
 

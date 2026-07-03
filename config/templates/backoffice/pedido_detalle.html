@@ -603,6 +603,11 @@
     </div>
 
     <h5 class="mb-3">{% trans "Editable product details" %}</h5>
+    {% if picker_stock_shortage_rows %}
+    <div class="alert alert-danger py-2 mb-3">
+      {% trans "Rows marked in red have insufficient physical stock. Set Quantity to 0 on those lines before unlocking the order." %}
+    </div>
+    {% endif %}
     {% if not lineas_bloqueadas_para_picking %}
     <div class="row g-2 align-items-end mb-3">
       <div class="col-md-8 col-lg-7">
@@ -652,9 +657,12 @@
         </thead>
         <tbody>
           {% for item in pedido_items %}
-          <tr class="{% if item.selector_has_changes %}table-danger{% endif %}" data-pedido-item-row="{{ item.id }}">
+          <tr class="{% if item.has_picker_stock_shortage or item.selector_has_changes %}table-danger{% endif %}" data-pedido-item-row="{{ item.id }}" {% if item.has_picker_stock_shortage %}data-stock-shortage="true"{% endif %}>
             <td>
               {{ item.presentacion.producto.nombre }}
+              {% if item.has_picker_stock_shortage %}
+              <div><span class="badge text-bg-danger">{% trans "Insufficient stock" %}</span></div>
+              {% endif %}
               {% if item.selector_added_by_picker %}
               <div><span class="badge text-bg-danger">{% trans "Added by picker" %}</span></div>
               {% endif %}
@@ -682,7 +690,7 @@
             </td>
             <td>{{ item.cantidad_solicitada }}</td>
             <td>
-              <input type="number" min="0" class="form-control form-control-sm {% if item.selector_changed_quantity %}border-danger text-danger fw-semibold{% endif %}" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+              <input type="number" min="0" class="form-control form-control-sm {% if item.has_picker_stock_shortage or item.selector_changed_quantity %}border-danger text-danger fw-semibold{% endif %}" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
             </td>
             <td>
               <select class="form-select form-select-sm mb-1 preset-price-select pedido-item-price-preset" data-target-input="precio_{{ item.id }}" data-item-id="{{ item.id }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>

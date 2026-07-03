@@ -377,6 +377,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 	]
 	for item in pedido_items:
 		item.presentation_options = list(item.presentacion.producto.presentaciones.order_by('nombre'))
+		item.has_picker_stock_shortage = picker_stock_evaluation[item.id]['has_shortage']
 	_enrich_pedido_items_with_price_options(pedido=pedido, pedido_items=pedido_items)
 
 	if request.method == 'POST':

@@ -799,6 +799,10 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'Picker reported physical stock shortage')
 		self.assertContains(response, 'This order stays blocked until BackOffice reviews the shortage reported during picking.')
 		self.assertContains(response, 'BackOffice action required: the picker reported insufficient physical stock for one or more items.')
+		self.assertContains(response, 'Insufficient stock')
+		self.assertContains(response, 'Set Quantity to 0 on those lines before unlocking the order.')
+		self.assertContains(response, f'data-pedido-item-row="{self.item.id}"', html=False)
+		self.assertContains(response, 'data-stock-shortage="true"', html=False)
 
 	def test_backoffice_detail_shows_suggested_resale_inputs_by_percentage_and_value(self):
 		self.pedido.estado = 'VERIFICADO_AJUSTADO'

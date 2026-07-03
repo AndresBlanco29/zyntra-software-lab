@@ -50,6 +50,14 @@ def resolve_invoice_item_case_weight(item):
 
 
 PRODUCT_CREDIT_NOTE_TYPES = frozenset({'CREDIT_RETURN', 'CREDIT_DUMP'})
+DRIVER_INVENTORY_RETURN_CREDIT_REASONS = frozenset({'DEFECT'})
+
+
+def resolve_driver_credit_type_from_motivo(motivo):
+	"""Factory defects can return to inventory; damaged or missing items cannot."""
+	if (motivo or '').strip().upper() in DRIVER_INVENTORY_RETURN_CREDIT_REASONS:
+		return 'CREDIT_RETURN'
+	return 'CREDIT_DUMP'
 
 
 def _invoice_item_units_per_package(invoice_item):

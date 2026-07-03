@@ -675,7 +675,7 @@
               </select>
             </div>
             <div class="col-12 col-md-4 driver-credit-type d-none">
-                <input type="hidden" name="driver_note_tipo_credito" id="driverNoteCreditType" value="CREDIT_DUMP">
+                <input type="hidden" name="driver_note_tipo_credito" id="driverNoteCreditType" value="">
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold" id="driverDescriptionLabel" data-credit-label="{% trans 'Description' %}" data-debit-label="{% trans 'Charge description' %}">{% trans "Description" %}</label>
@@ -701,9 +701,7 @@
               <div class="form-text">{% trans "Optional photos that support the credit note created during delivery." %}</div>
             </div>
             <div class="col-12">
-              <div class="alert alert-info-tone small mb-0">
-                {% trans "Driver credit notes use returned invoice lines and are always recorded as Credit Dump, so damaged products do not return to inventory." %}
-              </div>
+              <div class="alert alert-info small mb-0" id="driverCreditTypeHint">{% trans "Select a reason to see whether returned products go back to inventory." %}</div>
             </div>
             <div class="col-12" id="driverProductLinesWrapper">
               <div class="driver-stack-table">
@@ -922,7 +920,7 @@
           </select>
         </div>
         <div class="col-12 col-md-4 driver-credit-type-post d-none">
-          <input type="hidden" name="driver_note_tipo_credito" id="driverNoteCreditTypePostDelivery" value="CREDIT_DUMP">
+          <input type="hidden" name="driver_note_tipo_credito" id="driverNoteCreditTypePostDelivery" value="">
         </div>
         <div class="col-12">
           <label class="form-label fw-semibold" id="driverDescriptionLabelPostDelivery" data-credit-label="{% trans 'Description' %}" data-debit-label="{% trans 'Charge description' %}">{% trans "Description" %}</label>
@@ -956,9 +954,7 @@
           <div class="form-text">{% trans "Optional photos that support the credit note created during delivery." %}</div>
         </div>
         <div class="col-12">
-          <div class="alert alert-secondary small mb-0">
-            {% trans "Driver credit notes use returned invoice lines and are always recorded as Credit Dump, so damaged products do not return to inventory." %}
-          </div>
+          <div class="alert alert-info small mb-0" id="driverCreditTypeHintPostDelivery">{% trans "Select a reason to see whether returned products go back to inventory." %}</div>
         </div>
         <div class="col-12" id="driverProductLinesWrapperPostDelivery">
           <div class="driver-stack-table">
@@ -1131,10 +1127,15 @@
     const creditTypePostFields = document.querySelectorAll('.driver-credit-type-post');
     const driverCreditType = document.getElementById('driverNoteCreditType');
     const driverCreditTypePostDelivery = document.getElementById('driverNoteCreditTypePostDelivery');
-    const driverCreditDumpOption = driverCreditType ? driverCreditType.querySelector('option[value="CREDIT_DUMP"]') : null;
-    const driverCreditReturnOption = driverCreditType ? driverCreditType.querySelector('option[value="CREDIT_RETURN"]') : null;
-    const driverCreditDumpOptionPostDelivery = driverCreditTypePostDelivery ? driverCreditTypePostDelivery.querySelector('option[value="CREDIT_DUMP"]') : null;
-    const driverCreditReturnOptionPostDelivery = driverCreditTypePostDelivery ? driverCreditTypePostDelivery.querySelector('option[value="CREDIT_RETURN"]') : null;
+    const driverCreditTypeHint = document.getElementById('driverCreditTypeHint');
+    const driverCreditTypeHintPostDelivery = document.getElementById('driverCreditTypeHintPostDelivery');
+    const creditTypeHintStrings = {
+      selectReason: '{% trans "Select a reason to see whether returned products go back to inventory." %}',
+      defectReturn: '{% trans "Factory defect: products will return to inventory as Credit Return for supplier exchange." %}',
+      damageDump: '{% trans "Damage / transport: products are recorded as Credit Dump and do not return to inventory." %}',
+      missingDump: '{% trans "Missing item: recorded as Credit Dump and does not return to inventory." %}',
+      otherDump: '{% trans "This reason is recorded as Credit Dump and does not return to inventory." %}',
+    };
     const driverFinancialAmountWrapper = document.getElementById('driverFinancialAmountWrapper');
     const driverFinancialAmountWrapperPostDelivery = document.getElementById('driverFinancialAmountWrapperPostDelivery');
     const driverProductLinesWrapper = document.getElementById('driverProductLinesWrapper');
@@ -1359,24 +1360,41 @@
       toggleDriverAdjustmentModePostDelivery();
     }
 
-    function syncDriverCreditTypeOptions(adjustmentSelect, creditSelect, dumpOption, returnOption) {
+    function resolveDriverCreditTypeFromMotivo(motivo) {
+      return motivo === 'DEFECT' ? 'CREDIT_RETURN' : 'CREDIT_DUMP';
+    }
+
+    function creditTypeHintForMotivo(motivo) {
+      if (motivo === 'DEFECT') {
+        return creditTypeHintStrings.defectReturn;
+      }
+      if (motivo === 'DAMAGE') {
+        return creditTypeHintStrings.damageDump;
+      }
+      if (motivo === 'MISSING_ITEM') {
+        return creditTypeHintStrings.missingDump;
+      }
+      if (motivo) {
+        return creditTypeHintStrings.otherDump;
+      }
+      return creditTypeHintStrings.selectReason;
+    }
+
+    function syncDriverCreditTypeFromReason(reasonSelect, creditSelect, hintElement) {
       if (!creditSelect) {
         return;
       }
-      const isCredit = !creditSelect.disabled;
-      if (!isCredit) {
+      if (creditSelect.disabled) {
         creditSelect.value = '';
+        if (hintElement) {
+          hintElement.textContent = creditTypeHintStrings.selectReason;
+        }
         return;
       }
-      const isProduct = !adjustmentSelect || adjustmentSelect.value === 'PRODUCTO';
-      if (dumpOption) {
-        dumpOption.disabled = false;
-      }
-      if (returnOption) {
-        returnOption.disabled = true;
-      }
-      if (isProduct && creditSelect.value !== 'CREDIT_DUMP') {
-        creditSelect.value = 'CREDIT_DUMP';
+      const motivo = reasonSelect ? reasonSelect.value : '';
+      creditSelect.value = resolveDriverCreditTypeFromMotivo(motivo);
+      if (hintElement) {
+        hintElement.textContent = creditTypeHintForMotivo(motivo);
       }
     }
 
@@ -1404,7 +1422,7 @@
       const isDebit = driverNoteType && driverNoteType.value === 'DEBITO';
       setAdjustmentInputState(driverProductLinesWrapper, isProduct);
       setAdjustmentInputState(driverFinancialAmountWrapper, !isProduct);
-      syncDriverCreditTypeOptions(driverAdjustmentType, driverCreditType, driverCreditDumpOption, driverCreditReturnOption);
+      syncDriverCreditTypeFromReason(driverReasonSelect, driverCreditType, driverCreditTypeHint);
       driverAdjustmentTypeOptions.forEach((option) => {
         const nextLabel = isDebit ? option.dataset.debitLabel : option.dataset.creditLabel;
         if (nextLabel) {
@@ -1432,7 +1450,7 @@
       const isDebit = driverNoteTypePostDelivery && driverNoteTypePostDelivery.value === 'DEBITO';
       setAdjustmentInputState(driverProductLinesWrapperPostDelivery, isProduct);
       setAdjustmentInputState(driverFinancialAmountWrapperPostDelivery, !isProduct);
-      syncDriverCreditTypeOptions(driverAdjustmentTypePostDelivery, driverCreditTypePostDelivery, driverCreditDumpOptionPostDelivery, driverCreditReturnOptionPostDelivery);
+      syncDriverCreditTypeFromReason(driverReasonSelectPostDelivery, driverCreditTypePostDelivery, driverCreditTypeHintPostDelivery);
       driverAdjustmentTypePostOptions.forEach((option) => {
         const nextLabel = isDebit ? option.dataset.debitLabel : option.dataset.creditLabel;
         if (nextLabel) {
@@ -1488,6 +1506,12 @@
     if (driverNoteTypePostDelivery) {
       driverNoteTypePostDelivery.addEventListener('change', toggleDriverNotePostFields);
       driverNoteTypePostDelivery.addEventListener('change', toggleDriverAdjustmentModePostDelivery);
+    }
+    if (driverReasonSelect) {
+      driverReasonSelect.addEventListener('change', toggleDriverAdjustmentMode);
+    }
+    if (driverReasonSelectPostDelivery) {
+      driverReasonSelectPostDelivery.addEventListener('change', toggleDriverAdjustmentModePostDelivery);
     }
     if (driverAdjustmentType) {
       driverAdjustmentType.addEventListener('change', toggleDriverAdjustmentMode);

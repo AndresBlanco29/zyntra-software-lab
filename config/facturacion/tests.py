@@ -1838,7 +1838,41 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(invoice.notas_ajuste.count(), 0)
 		self.assertContains(response, 'The total paid amount must exactly match the amount due from the customer.')
 
-	def test_driver_complete_view_rejects_credit_return_for_product_return(self):
+	def test_driver_complete_view_uses_credit_return_for_factory_defect(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		self.client.force_login(self.driver)
+
+		response = self.client.post(
+			reverse('driver_delivery_complete', args=[invoice.delivery.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'metodo_pago': 'CASH',
+				'monto_pagado': '30.00',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+				'driver_note_tipo_documento': 'CREDITO',
+				'driver_note_tipo_ajuste': 'PRODUCTO',
+				'driver_note_motivo': 'DEFECT',
+				'driver_note_tipo_credito': 'CREDIT_DUMP',
+				'driver_note_descripcion': 'Producto con defecto de fabrica',
+				f'driver_note_qty_{invoice.items.first().id}': '1',
+				f'driver_note_amount_{invoice.items.first().id}': '15.00',
+			},
+		)
+
+		invoice.refresh_from_db()
+		nota = invoice.notas_ajuste.get()
+		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertEqual(nota.tipo_credito, 'CREDIT_RETURN')
+		self.assertEqual(nota.motivo, 'DEFECT')
+		self.assertEqual(nota.inventario_estado, 'PENDIENTE')
+
+	def test_driver_complete_view_uses_credit_dump_for_damage(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
 			metodo_entrega='RUTA_DRIVER',
@@ -1859,16 +1893,18 @@ class InvoiceFlowTests(TestCase):
 				'driver_note_tipo_ajuste': 'PRODUCTO',
 				'driver_note_motivo': 'DAMAGE',
 				'driver_note_tipo_credito': 'CREDIT_RETURN',
-				'driver_note_descripcion': 'Intento invalido de devolucion con return',
+				'driver_note_descripcion': 'Producto dañado en transporte',
 				f'driver_note_qty_{invoice.items.first().id}': '1',
 				f'driver_note_amount_{invoice.items.first().id}': '15.00',
 			},
-			follow=True,
 		)
 
 		invoice.refresh_from_db()
-		self.assertEqual(invoice.notas_ajuste.count(), 0)
-		self.assertContains(response, 'Drivers must use Credit Dump for damaged return notes.')
+		nota = invoice.notas_ajuste.get()
+		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertEqual(nota.tipo_credito, 'CREDIT_DUMP')
+		self.assertEqual(nota.motivo, 'DAMAGE')
+		self.assertEqual(nota.inventario_estado, 'NO_APLICA')
 
 	def test_driver_complete_view_can_attach_evidence_to_adjustment_note(self):
 		invoice = self._create_invoice(metodo_entrega='RUTA_DRIVER', driver=self.driver, total='45.00')
@@ -1972,6 +2008,7 @@ class InvoiceFlowTests(TestCase):
 		nota = invoice.notas_ajuste.get()
 		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
 		self.assertEqual(nota.tipo_documento, 'CREDITO')
+		self.assertEqual(nota.tipo_credito, 'CREDIT_DUMP')
 		self.assertEqual(nota.estado, 'BORRADOR')
 		self.assertEqual(nota.creada_por, self.driver)
 		notificacion = Notificacion.objects.filter(titulo__icontains=nota.numero).latest('creada_en')
@@ -3728,7 +3765,7 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, 'name="driver_note_tipo_ajuste" id="driverAdjustmentType" value="PRODUCTO"', html=False)
-		self.assertContains(response, 'name="driver_note_tipo_credito" id="driverNoteCreditType" value="CREDIT_DUMP"', html=False)
+		self.assertContains(response, 'id="driverCreditTypeHint"', html=False)
 		self.assertContains(response, 'Product return / item lines')
 
 	def test_driver_delivery_tracking_renders_in_spanish_when_selected(self):

@@ -4149,6 +4149,21 @@ msgstr "Ya estamos preparando tu pedido para despacho. A continuacion el resumen
 msgid "Use the camera or choose an existing photo of the cheque."
 msgstr "Usa la camara o elige una foto existente del cheque."
 
+msgid "Select a reason to see whether returned products go back to inventory."
+msgstr "Selecciona un motivo para saber si los productos devueltos vuelven al inventario."
+
+msgid "Factory defect: products will return to inventory as Credit Return for supplier exchange."
+msgstr "Defecto de fabrica: los productos vuelven al inventario como Credit Return para cambio con el proveedor."
+
+msgid "Damage / transport: products are recorded as Credit Dump and do not return to inventory."
+msgstr "Dano / transporte: los productos se registran como Credit Dump y no vuelven al inventario."
+
+msgid "Missing item: recorded as Credit Dump and does not return to inventory."
+msgstr "Producto faltante: se registra como Credit Dump y no vuelve al inventario."
+
+msgid "This reason is recorded as Credit Dump and does not return to inventory."
+msgstr "Este motivo se registra como Credit Dump y no vuelve al inventario."
+
 msgid "Choose file"
 msgstr "Elegir archivo"
 

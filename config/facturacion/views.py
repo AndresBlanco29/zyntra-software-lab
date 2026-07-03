@@ -88,6 +88,7 @@ from .services import (
 	list_pending_customer_notes,
 	resolve_invoice_payment_due_date,
 	resolve_presentacion_suggested_unit_price,
+	resolve_driver_credit_type_from_motivo,
 	summarize_pending_customer_notes,
 	start_delivery_route,
 	unlock_client_from_delivery,
@@ -349,15 +350,17 @@ def _extract_adjustment_note_request(invoice, post_data, *, field_prefix=''):
 	}
 
 
-def _validate_driver_note_request(*, note_request):
+def _prepare_driver_note_request(note_request):
 	if note_request is None:
-		return
+		return None
 	if note_request['tipo_documento'] != 'CREDITO':
 		raise ValidationError(_('Drivers can only request credit notes.'))
 	if note_request['tipo_ajuste'] != 'PRODUCTO':
 		raise ValidationError(_('Drivers can only request product return credit notes.'))
-	if note_request['tipo_credito'] != 'CREDIT_DUMP':
-		raise ValidationError(_('Drivers must use Credit Dump for damaged return notes.'))
+	if not note_request.get('motivo'):
+		raise ValidationError(_('Select a reason to save the adjustment.'))
+	note_request['tipo_credito'] = resolve_driver_credit_type_from_motivo(note_request['motivo'])
+	return note_request
 
 
 def _save_adjustment_note_evidence_files(nota, uploaded_files):
@@ -2014,8 +2017,9 @@ def driver_delivery_complete(request, delivery_id):
 		return redirect('driver_delivery_detail', delivery_id=delivery.id)
 	try:
 		nota = None
-		note_request = _extract_adjustment_note_request(delivery.invoice, request.POST, field_prefix='driver_note_')
-		_validate_driver_note_request(note_request=note_request)
+		note_request = _prepare_driver_note_request(
+			_extract_adjustment_note_request(delivery.invoice, request.POST, field_prefix='driver_note_'),
+		)
 		note_evidence_files = _normalize_uploaded_files(request.FILES.getlist('driver_note_evidence_photos'))
 		if note_request is None and note_evidence_files:
 			raise ValidationError(_('Select a note type before uploading adjustment evidence.'))
@@ -2075,8 +2079,9 @@ def driver_delivery_create_note(request, delivery_id):
 		return redirect('driver_delivery_detail', delivery_id=delivery.id)
 
 	try:
-		note_request = _extract_adjustment_note_request(delivery.invoice, request.POST, field_prefix='driver_note_')
-		_validate_driver_note_request(note_request=note_request)
+		note_request = _prepare_driver_note_request(
+			_extract_adjustment_note_request(delivery.invoice, request.POST, field_prefix='driver_note_'),
+		)
 		note_evidence_files = _normalize_uploaded_files(request.FILES.getlist('driver_note_evidence_photos'))
 		if note_request is None:
 			raise ValidationError(_('Add note details before saving the adjustment.'))

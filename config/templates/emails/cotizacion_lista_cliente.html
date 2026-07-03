@@ -7,7 +7,18 @@
 
 {% block content %}
 <p style="margin:0 0 14px 0; font-size:15px; line-height:1.7;">{% blocktrans with customer_name=cliente.usuario.first_name|default:cliente.nombre_empresa %}Hello {{ customer_name }},{% endblocktrans %}</p>
-<p style="margin:0 0 16px 0; font-size:15px; line-height:1.7;">{% blocktrans with quote_id=cotizacion.id %}Your order <strong>#{{ quote_id }}</strong> already has prices defined and is ready to continue to the purchase order.{% endblocktrans %}</p>
+<p style="margin:0 0 16px 0; font-size:15px; line-height:1.7;">
+  {% if include_prices %}
+  {% blocktrans with quote_id=cotizacion.id %}Your order <strong>#{{ quote_id }}</strong> already has prices defined and is ready to continue to the purchase order.{% endblocktrans %}
+  {% else %}
+  {% blocktrans with quote_id=cotizacion.id %}Your order <strong>#{{ quote_id }}</strong> is ready for your review and confirmation.{% endblocktrans %}
+  {% endif %}
+</p>
+
+{% if include_prices and items %}
+<p style="margin:0 0 20px 0; font-size:15px; line-height:1.7;">{% trans "Below is the summary of your order:" %}</p>
+{% include "emails/includes/customer_order_items_table.html" with items=items include_prices=True total=cotizacion.total %}
+{% endif %}
 
 <div style="margin:22px 0; text-align:center;">
   <a href="{{ confirm_url }}" style="display:inline-block; background:#ffd400; color:#1e293b; padding:14px 24px; text-decoration:none; border-radius:10px; font-size:14px; font-weight:700;">{% trans "Go to Received Orders" %}</a>

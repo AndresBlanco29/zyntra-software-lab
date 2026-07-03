@@ -4131,6 +4131,21 @@ msgstr "Official delivery a customer"
 msgid "Send quote to customer"
 msgstr "Send quote a customer"
 
+msgid "Send email with prices"
+msgstr "Enviar correo con precios"
+
+msgid "Uncheck to send the customer notification without unit prices or totals."
+msgstr "Desmarca para enviar la notificacion al cliente sin precios unitarios ni totales."
+
+msgid "Below is the summary of your order:"
+msgstr "A continuacion el resumen de tu pedido:"
+
+msgid "Your order <strong>#%(quote_id)s</strong> is ready for your review and confirmation."
+msgstr "Tu pedido <strong>#%(quote_id)s</strong> esta listo para tu revision y confirmacion."
+
+msgid "We are already preparing your order for dispatch. Below is the product summary:"
+msgstr "Ya estamos preparando tu pedido para despacho. A continuacion el resumen de productos:"
+
 msgid "Generate sales order"
 msgstr "Generate sales order"
 

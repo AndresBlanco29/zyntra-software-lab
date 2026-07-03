@@ -647,6 +647,66 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertIn('Sales order in process', mail.outbox[-1].subject)
 		self.assertIn('generated successfully', mail.outbox[-1].body)
 
+	def test_backoffice_can_generate_purchase_order_without_prices_in_customer_email(self):
+		self.client.force_login(self.backoffice)
+		item = self.cotizacion.items.first()
+
+		self.client.post(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]), {
+			f'cantidad_{item.id}': '2',
+			f'precio_{item.id}': '142.86',
+			'nota_backoffice': 'Cliente confirmo por telefono',
+		})
+
+		mail.outbox.clear()
+		response = self.client.post(reverse('generar_pedido_desde_cotizacion', args=[self.cotizacion.id]), {
+			'enviar_correo_con_precios': '0',
+		})
+
+		pedido = Pedido.objects.get(cotizacion=self.cotizacion)
+		self.assertRedirects(response, reverse('backoffice_pedido_detalle', args=[pedido.id]))
+		self.assertEqual(len(mail.outbox), 2)
+		customer_email = mail.outbox[-1]
+		self.assertNotIn('Subtotal', customer_email.alternatives[0][0])
+		self.assertNotIn('Total:', customer_email.alternatives[0][0])
+
+	def test_backoffice_can_send_quote_email_with_prices_when_requested(self):
+		self.client.force_login(self.backoffice)
+		item = self.cotizacion.items.first()
+
+		self.client.post(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]), {
+			f'cantidad_{item.id}': '2',
+			f'precio_{item.id}': str(self.presentacion.precio_1),
+			'nota_backoffice': 'Precio confirmado',
+		})
+
+		mail.outbox.clear()
+		response = self.client.post(reverse('enviar_cotizacion_cliente', args=[self.cotizacion.id]), {
+			'enviar_correo_con_precios': '1',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.assertEqual(len(mail.outbox), 1)
+		self.assertIn('Subtotal', mail.outbox[0].alternatives[0][0])
+
+	def test_backoffice_can_send_quote_email_without_prices_when_requested(self):
+		self.client.force_login(self.backoffice)
+		item = self.cotizacion.items.first()
+
+		self.client.post(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]), {
+			f'cantidad_{item.id}': '2',
+			f'precio_{item.id}': str(self.presentacion.precio_1),
+			'nota_backoffice': 'Precio confirmado',
+		})
+
+		mail.outbox.clear()
+		response = self.client.post(reverse('enviar_cotizacion_cliente', args=[self.cotizacion.id]), {
+			'enviar_correo_con_precios': '0',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.assertEqual(len(mail.outbox), 1)
+		self.assertNotIn('Subtotal', mail.outbox[0].alternatives[0][0])
+
 	def test_backoffice_cannot_generate_duplicate_purchase_order_from_quote(self):
 		pedido = Pedido.objects.create(
 			cliente=self.cliente,

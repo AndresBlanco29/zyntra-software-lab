@@ -8,26 +8,13 @@
 {% block content %}
 <p style="margin:0 0 14px 0; font-size:15px; line-height:1.7;">{% blocktrans with company=cliente.nombre_empresa %}Dear customer {{ company }},{% endblocktrans %}</p>
 <p style="margin:0 0 12px 0; font-size:15px; line-height:1.7;">{% blocktrans with order_id=pedido.id %}Your purchase order <strong>#{{ order_id }}</strong> was created successfully.{% endblocktrans %}</p>
-<p style="margin:0 0 20px 0; font-size:15px; line-height:1.7;">{% trans "We are already preparing your order for dispatch. Below is the summary:" %}</p>
+<p style="margin:0 0 20px 0; font-size:15px; line-height:1.7;">
+  {% if include_prices %}
+  {% trans "We are already preparing your order for dispatch. Below is the summary:" %}
+  {% else %}
+  {% trans "We are already preparing your order for dispatch. Below is the product summary:" %}
+  {% endif %}
+</p>
 
-<table width="100%" cellpadding="8" cellspacing="0" role="presentation" style="border-collapse:collapse; font-size:14px; border:1px solid #cbd5e1; border-radius:12px; overflow:hidden;">
-  <tr style="background:#0b3d91; color:#ffffff;">
-    <th align="left">{% trans "Product" %}</th>
-    <th align="center">{% trans "Qty." %}</th>
-    <th align="center">{% trans "Price" %}</th>
-    <th align="center">{% trans "Subtotal" %}</th>
-  </tr>
-  {% for item in items %}
-  <tr style="border-bottom:1px solid #e2e8f0; background:{% cycle '#ffffff' '#f8fafc' %};">
-    <td>{{ item.presentacion.producto.nombre }} ({{ item.presentacion.nombre }})</td>
-    <td align="center">{{ item.cantidad }}</td>
-    <td align="center">${{ item.precio }}</td>
-    <td align="center">${{ item.subtotal }}</td>
-  </tr>
-  {% endfor %}
-  <tr style="background:#dbeafe;">
-    <td colspan="3" align="right" style="padding-top:12px;"><strong>{% trans "Total:" %}</strong></td>
-    <td align="center" style="padding-top:12px;"><strong>${{ pedido.total }}</strong></td>
-  </tr>
-</table>
+{% include "emails/includes/customer_order_items_table.html" with items=items include_prices=include_prices total=total %}
 {% endblock %}

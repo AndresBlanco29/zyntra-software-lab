@@ -372,6 +372,10 @@ def _send_twilio_message(*, phone_number, message, channel):
     return True
 
 
+def _email_includes_prices(request):
+    return request.POST.get('enviar_correo_con_precios', '1') == '1'
+
+
 def _get_whatsapp_contact_data(cotizacion, request):
     confirm_url = _build_confirm_url(request, cotizacion)
     message = _build_quote_message(cotizacion, confirm_url)
@@ -771,6 +775,7 @@ def enviar_cotizacion_cliente(request, cotizacion_id):
         return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
     confirm_url, telefono_contacto, whatsapp_link, outbound_message = _get_whatsapp_contact_data(cotizacion, request)
+    include_prices_in_email = _email_includes_prices(request)
     now = timezone.now()
     updates = ['estado']
     cotizacion.estado = 'LISTA_PARA_CONFIRMACION'
@@ -782,6 +787,8 @@ def enviar_cotizacion_cliente(request, cotizacion_id):
                 'cliente': cotizacion.cliente,
                 'cotizacion': cotizacion,
                 'confirm_url': confirm_url,
+                'include_prices': include_prices_in_email,
+                'items': cotizacion.items.select_related('presentacion__producto'),
             },
         )
 
@@ -909,8 +916,9 @@ def generar_pedido_desde_cotizacion(request, cotizacion_id):
         logger.exception('Error notificando pedido generado desde BackOffice %s: %s', pedido.id, exc)
 
     cliente_notificado = False
+    include_prices_in_email = _email_includes_prices(request)
     try:
-        cliente_notificado = notificar_cliente_pedido(pedido)
+        cliente_notificado = notificar_cliente_pedido(pedido, include_prices=include_prices_in_email)
     except Exception as exc:
         logger.exception('Error notificando al cliente sobre el pedido %s generado desde BackOffice: %s', pedido.id, exc)
 

@@ -686,7 +686,7 @@ def notificar_backoffice_pedido(pedido):
     email.send(fail_silently=False)
 
 
-def notificar_cliente_pedido(pedido):
+def notificar_cliente_pedido(pedido, *, include_prices=True):
     cliente_email = getattr(getattr(pedido.cliente, 'usuario', None), 'email', '')
     if not cliente_email:
         return False
@@ -697,6 +697,8 @@ def notificar_cliente_pedido(pedido):
             'pedido': pedido,
             'cliente': pedido.cliente,
             'items': pedido.items.select_related('presentacion__producto').all(),
+            'include_prices': include_prices,
+            'total': pedido.total,
         },
     )
     text_content = _('Your sales order #%(id)s was generated successfully and is now being prepared for dispatch.') % {

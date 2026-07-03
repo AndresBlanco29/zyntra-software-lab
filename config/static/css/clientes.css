@@ -631,6 +631,14 @@ transform:scale(1.05);
     .clientes-filters > * {
         width: 100%;
         max-width: none !important;
+        flex: 0 0 auto;
+    }
+
+    .clientes-filters #buscadorClientes,
+    .clientes-filters #filtroEstado {
+        height: auto;
+        min-height: 48px;
+        max-height: none;
     }
 
     .clientes-acciones-group {
@@ -719,6 +727,9 @@ background:#f3f4f6;
     .clientes-filters #filtroEstado {
         width: 100%;
         max-width: 100% !important;
+        flex: 0 0 auto;
+        height: auto;
+        min-height: 48px;
     }
 
     .table-responsive {

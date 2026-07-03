@@ -132,6 +132,13 @@ form.d-flex > input[type="search"]:not(.navbar-search-input) {
         max-width: 100%;
     }
 
+    form.d-flex > input[name="q"],
+    form.d-flex > input[type="search"]:not(.navbar-search-input) {
+        flex: 0 0 auto;
+        flex-basis: auto;
+        height: auto;
+    }
+
     #catalogo-vendedor-filter-form,
     #catalogo-filter-form {
         align-items: stretch;

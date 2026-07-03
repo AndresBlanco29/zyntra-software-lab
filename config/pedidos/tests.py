@@ -1072,6 +1072,31 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(self.item.subtotal, Decimal('0.00'))
 		self.assertEqual(self.pedido.total, Decimal('0.00'))
 
+	def test_backoffice_zero_quantity_preserves_requested_qty_after_stock_shortage(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=0, stock_disponible=0)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 2},
+			nota='Sin stock fisico',
+			nota_resuelta=False,
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), {
+			'estado': 'VERIFICADO_AJUSTADO',
+			'nota_backoffice': 'No despachar por falta de stock',
+			f'cantidad_{self.item.id}': '0',
+			f'precio_{self.item.id}': '12.00',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.item.refresh_from_db()
+		self.assertEqual(self.item.cantidad, 0)
+		self.assertEqual(self.item.cantidad_solicitada, 2)
+		self.assertEqual(self.item.cantidad_inventario_aplicada, 0)
+
 	def test_backoffice_can_delete_picker_added_item_after_verified_picking(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		guardar_verificacion_picking(

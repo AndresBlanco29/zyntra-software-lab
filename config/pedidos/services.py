@@ -94,8 +94,7 @@ def recalcular_pedido(pedido):
 def actualizar_cantidad_linea_pedido_sin_aplicar_inventario(*, item, nueva_cantidad):
     objetivo = max(int(nueva_cantidad), 0)
     item.cantidad = objetivo
-    item.cantidad_solicitada = objetivo
-    item.save(update_fields=['cantidad', 'cantidad_solicitada'])
+    item.save(update_fields=['cantidad'])
     return item
 
 

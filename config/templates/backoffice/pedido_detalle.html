@@ -688,7 +688,7 @@
                 {% endfor %}
               </select>
             </td>
-            <td>{{ item.cantidad_solicitada }}</td>
+            <td>{{ item.cantidad_solicitada_documentada }}</td>
             <td>
               <input type="number" min="0" class="form-control form-control-sm {% if item.has_picker_stock_shortage or item.selector_changed_quantity %}border-danger text-danger fw-semibold{% endif %}" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
             </td>

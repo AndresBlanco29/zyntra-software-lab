@@ -256,7 +256,7 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 				}
 				for presentation in product_presentations
 			],
-			'requested_quantity': item.cantidad_solicitada,
+			'requested_quantity': item.cantidad_solicitada_documentada,
 			'actual_quantity': actual_quantity,
 			'stock_physical': int(getattr(getattr(item.presentacion, 'stock_operativo', None), 'stock_fisico', 0) or 0),
 			'applied_quantity': int(item.cantidad_inventario_aplicada or 0),

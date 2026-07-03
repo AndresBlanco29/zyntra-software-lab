@@ -5,7 +5,7 @@ from django.db.models import Q
 from config.clientes.models import Cliente
 from config.clientes.assignment import filter_clientes_for_vendedor
 from config.usuarios.models import Usuario
-from config.productos.models import Producto, Presentacion, Categoria, Marca, ConfiguracionPrecios
+from config.productos.models import Producto, Presentacion, Categoria, Marca, ConfiguracionPrecios, ConfiguracionDescuentos
 from config.productos.views import _hydrate_productos
 from django.views.decorators.http import require_POST
 import uuid
@@ -288,6 +288,10 @@ def _build_catalog_bulk_price_options():
     ]
 
 
+def _build_order_summary_discount_preset_options():
+    return ConfiguracionDescuentos.obtener().opciones_activas()
+
+
 def _tomar_pedido_clientes_filter_params(request):
     params = {}
     query = str(request.GET.get('q') or '').strip()
@@ -559,7 +563,9 @@ def ver_pedido(request):
         "productos": productos,
         "total": _money_decimal(total),
         "cliente": cliente,
-        "cliente_id": cliente_id
+        "cliente_id": cliente_id,
+        "bulk_price_options": _build_catalog_bulk_price_options(),
+        "discount_preset_options": _build_order_summary_discount_preset_options(),
     }
 
     return render(

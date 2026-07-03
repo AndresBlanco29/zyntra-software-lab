@@ -76,8 +76,8 @@ body::-webkit-scrollbar,
 
 .main-content {
     margin-left: 250px;
-    margin-top: 70px;
-    min-height: calc(100vh - 70px);
+    margin-top: calc(var(--panel-navbar-offset, 70px) + var(--panel-content-top-gap, 0px));
+    min-height: calc(100vh - var(--panel-navbar-offset, 70px));
     padding: 30px !important;
     overflow-y: auto;
     overflow-x: hidden;

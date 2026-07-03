@@ -13,11 +13,34 @@
 <link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
 
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}" />
+<link rel="stylesheet" href="{% static 'css/layout_vendedor.css' %}" />
 <link rel="stylesheet" href="{% static 'css/catalogo.css' %}" />
 <link rel="stylesheet" href="{% static 'css/tomar_pedido_catalogo.css' %}">
 {% include "includes/searchable_selects_assets.html" %}
 
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+<script>
+(function () {
+  const navbar = document.querySelector('.navbar-custom');
+  if (!navbar) {
+    return;
+  }
+  const root = document.documentElement;
+  function syncPanelNavbarOffset() {
+    const height = Math.max(Math.ceil(navbar.getBoundingClientRect().height), 56);
+    const isMobile = window.matchMedia('(max-width: 767.98px)').matches;
+    const isSmallPhone = window.matchMedia('(max-width: 576px)').matches;
+    const buffer = isSmallPhone ? 28 : (isMobile ? 20 : 6);
+    const topGap = isSmallPhone ? 18 : (isMobile ? 12 : 0);
+    root.style.setProperty('--panel-navbar-offset', (height + buffer) + 'px');
+    root.style.setProperty('--panel-content-top-gap', topGap + 'px');
+  }
+  syncPanelNavbarOffset();
+  window.addEventListener('load', syncPanelNavbarOffset);
+  document.addEventListener('DOMContentLoaded', syncPanelNavbarOffset);
+  window.addEventListener('resize', syncPanelNavbarOffset);
+})();
+</script>
 <script src="{% static 'js/preserve-search-focus.js' %}"></script>
 <script defer src="{% static 'js/language-session.js' %}"></script>
 
@@ -38,7 +61,7 @@ data-msg-add-default="{% trans 'Add to Order' %}"
 
 <div class="container-fluid">
 
-<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="vendedorCatalogSidebarToggle" aria-label="{% trans 'Open menu' %}">
+<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="sidebarToggleBtn" aria-label="{% trans 'Open menu' %}">
 ☰
 </button>
 
@@ -68,43 +91,9 @@ La Tortilla Grocery
 
 <!-- SIDEBAR -->
 
-<div class="col-md-2 sidebar p-0" id="vendedorCatalogSidebar">
-
-<div class="sidebar-user">
-{% if request.user.role == 'backoffice' %}
-{% trans "BackOffice" %} {{ request.user.username }}
-{% elif request.user.role == 'admin' %}
-{% trans "Admin" %} {{ request.user.username }}
-{% else %}
-{% trans "Vendedor" %} {{ request.user.username }}
-{% endif %}
+<div class="col-md-2 p-0" id="vendedorCatalogSidebarColumn">
+{% include "includes/panel_sidebar.html" %}
 </div>
-
-<div class="list-group list-group-flush">
-
-{% if request.user|has_internal_permission:'vendor.customers.manage' %}
-<a href="{% url 'crear_cliente' %}" class="list-group-item">
-{% trans "Crear Cliente" %}
-</a>
-{% endif %}
-
-{% if request.user|has_internal_permission:'vendor.customers.view' %}
-<a href="{% url 'vendedores_clientes' %}" class="list-group-item">
-{% trans "Clientes" %}
-</a>
-{% endif %}
-
-{% if request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'backoffice.orders.view' %}
-<a href="{% url 'tomar_pedido' %}" class="list-group-item active">
-{% trans "Tomar Pedido" %}
-</a>
-{% endif %}
-
-</div>
-
-</div>
-
-<div class="sidebar-backdrop" id="vendedorCatalogSidebarBackdrop"></div>
 
 
 <!-- CONTENIDO -->
@@ -571,9 +560,9 @@ $<span id="pedidoTotal">{{ total }}</span>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-	const toggleBtn = document.getElementById('vendedorCatalogSidebarToggle');
-	const sidebar = document.getElementById('vendedorCatalogSidebar');
-	const backdrop = document.getElementById('vendedorCatalogSidebarBackdrop');
+	const toggleBtn = document.getElementById('sidebarToggleBtn');
+	const sidebar = document.getElementById('panelSidebar');
+	const backdrop = document.getElementById('sidebarBackdrop');
 
 	if (!toggleBtn || !sidebar || !backdrop) {
 		return;

@@ -1,5 +1,5 @@
 {% load static %}
-{% load i18n permissions_tags shipment_summary_tags %}
+{% load i18n permissions_tags l10n shipment_summary_tags %}
 
 <!DOCTYPE html>
 
@@ -17,12 +17,35 @@
 <link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
 
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
+<link rel="stylesheet" href="{% static 'css/layout_vendedor.css' %}">
 <link rel="stylesheet" href="{% static 'css/ver_cotizacion.css' %}">
 {% include "includes/searchable_selects_assets.html" %}
 <script defer src="{% static 'js/language-session.js' %}"></script>
 <link rel="stylesheet" href="{% static 'css/tomar_pedido_resumen.css' %}">
 
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+<script>
+(function () {
+  const navbar = document.querySelector('.navbar-custom');
+  if (!navbar) {
+    return;
+  }
+  const root = document.documentElement;
+  function syncPanelNavbarOffset() {
+    const height = Math.max(Math.ceil(navbar.getBoundingClientRect().height), 56);
+    const isMobile = window.matchMedia('(max-width: 767.98px)').matches;
+    const isSmallPhone = window.matchMedia('(max-width: 576px)').matches;
+    const buffer = isSmallPhone ? 28 : (isMobile ? 20 : 6);
+    const topGap = isSmallPhone ? 18 : (isMobile ? 12 : 0);
+    root.style.setProperty('--panel-navbar-offset', (height + buffer) + 'px');
+    root.style.setProperty('--panel-content-top-gap', topGap + 'px');
+  }
+  syncPanelNavbarOffset();
+  window.addEventListener('load', syncPanelNavbarOffset);
+  document.addEventListener('DOMContentLoaded', syncPanelNavbarOffset);
+  window.addEventListener('resize', syncPanelNavbarOffset);
+})();
+</script>
 
 </head>
 
@@ -42,7 +65,7 @@ style="margin: 0; padding: 0;">
 
 <div class="container-fluid">
 
-<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="pedidoResumenSidebarToggle" aria-label="{% trans 'Open menu' %}">
+<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="sidebarToggleBtn" aria-label="{% trans 'Open menu' %}">
 ☰
 </button>
 
@@ -64,43 +87,7 @@ La Tortilla Grocery
 
 <!-- SIDEBAR -->
 
-<div class="sidebar p-0 bg-white" id="pedidoResumenSidebar">
-
-<div class="sidebar-user">
-{% if request.user.role == 'backoffice' %}
-{% trans "BackOffice" %} {{ request.user.username }}
-{% elif request.user.role == 'admin' %}
-{% trans "Admin" %} {{ request.user.username }}
-{% else %}
-{% trans "Vendedor" %} {{ request.user.username }}
-{% endif %}
-</div>
-
-<div class="list-group list-group-flush">
-
-{% if request.user|has_internal_permission:'vendor.customers.manage' %}
-<a href="{% url 'crear_cliente' %}" class="list-group-item">
-{% trans "Crear Cliente" %}
-</a>
-{% endif %}
-
-{% if request.user|has_internal_permission:'vendor.customers.view' %}
-<a href="{% url 'vendedores_clientes' %}" class="list-group-item">
-{% trans "Clientes" %}
-</a>
-{% endif %}
-
-{% if request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'backoffice.orders.view' %}
-<a href="{% url 'tomar_pedido' %}" class="list-group-item active">
-{% trans "Tomar Pedido" %}
-</a>
-{% endif %}
-
-</div>
-
-</div>
-
-<div class="sidebar-backdrop" id="pedidoResumenSidebarBackdrop"></div>
+{% include "includes/panel_sidebar.html" %}
 
 <div class="main-content">
 
@@ -130,6 +117,48 @@ La Tortilla Grocery
 </a>
 
 </div>
+
+{% if productos %}
+<div class="card shadow-sm mb-4 bulk-price-tier-panel">
+  <div class="card-body py-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-8 col-lg-7">
+        <label for="bulkPriceTierSelect" class="form-label fw-semibold mb-1">{% trans "Assign one price tier to all products" %}</label>
+        <select id="bulkPriceTierSelect" class="form-select form-select-sm">
+          <option value="">{% trans "Select one of the 5 prices" %}</option>
+          {% for option in bulk_price_options %}
+          <option value="{{ option.key }}">{{ option.label }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text mb-0">{% trans "Apply the selected price tier to every product in this order so you do not have to change them one by one." %}</div>
+      </div>
+      <div class="col-md-4 col-lg-5 d-grid d-md-flex justify-content-md-end">
+        <button type="button" class="btn btn-outline-primary btn-sm" id="applyBulkPriceTierButton">{% trans "Apply to all products" %}</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4 bulk-price-tier-panel">
+  <div class="card-body py-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-8 col-lg-7">
+        <label for="bulkDiscountPresetSelect" class="form-label fw-semibold mb-1">{% trans "Assign one preset discount to all products" %}</label>
+        <select id="bulkDiscountPresetSelect" class="form-select form-select-sm no-search-select">
+          <option value="">{% trans "Select one of the preset discounts" %}</option>
+          {% for option in discount_preset_options %}
+          <option value="{{ option.value|unlocalize }}">{{ option.label }}</option>
+          {% endfor %}
+        </select>
+        <div class="form-text mb-0">{% trans "This enables the discount on every line and applies the selected dollar amount." %}{% if request.user|has_internal_permission:'admin.products.view' %} <a href="{% url 'configurar_descuentos' %}">{% trans "Configure preset discounts" %}</a>{% endif %}</div>
+      </div>
+      <div class="col-md-4 col-lg-5 d-grid d-md-flex justify-content-md-end">
+        <button type="button" class="btn btn-outline-primary btn-sm" id="applyBulkDiscountButton">{% trans "Apply discount to all products" %}</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <!-- TABLA -->
 
@@ -403,14 +432,16 @@ ${{ item.subtotal|floatformat:2 }}
 
 </div>
 
+</div>
+
 
 <script src="{% static 'js/pedido_resumen.js' %}"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-	const toggleBtn = document.getElementById('pedidoResumenSidebarToggle');
-	const sidebar = document.getElementById('pedidoResumenSidebar');
-	const backdrop = document.getElementById('pedidoResumenSidebarBackdrop');
+	const toggleBtn = document.getElementById('sidebarToggleBtn');
+	const sidebar = document.getElementById('panelSidebar');
+	const backdrop = document.getElementById('sidebarBackdrop');
 
 	if (!toggleBtn || !sidebar || !backdrop) {
 		return;

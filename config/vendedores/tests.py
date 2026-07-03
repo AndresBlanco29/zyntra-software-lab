@@ -165,6 +165,54 @@ class VendedorPedidoTests(TestCase):
 		self.assertContains(summary_response, 'data-price-key="precio_2" selected', html=False)
 		self.assertContains(summary_response, f'Precio 2 - ${self.presentacion.precio_2}', html=False)
 
+	def test_ver_pedido_shows_bulk_price_and_discount_controls(self):
+		self.client.force_login(self.vendor)
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session['pedido'] = {
+			'item-1': {
+				'producto_id': self.presentacion.producto_id,
+				'presentacion_id': self.presentacion.id,
+				'nombre': self.presentacion.producto.nombre,
+				'cantidad': 1,
+				'precio': float(self.presentacion.precio_1),
+				'precio_key': 'precio_1',
+			}
+		}
+		session.save()
+
+		response = self.client.get(reverse('ver_pedido'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Assign one price tier to all products')
+		self.assertContains(response, 'Apply to all products')
+		self.assertContains(response, 'Assign one preset discount to all products')
+		self.assertContains(response, 'Apply discount to all products')
+		self.assertContains(response, 'option value="precio_1"')
+
+	def test_ver_pedido_shows_full_sidebar_for_backoffice_user(self):
+		self.client.force_login(self.backoffice)
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session['pedido'] = {
+			'item-1': {
+				'producto_id': self.presentacion.producto_id,
+				'presentacion_id': self.presentacion.id,
+				'nombre': self.presentacion.producto.nombre,
+				'cantidad': 1,
+				'precio': float(self.presentacion.precio_1),
+				'precio_key': 'precio_1',
+			}
+		}
+		session.save()
+
+		response = self.client.get(reverse('ver_pedido'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Commercial')
+		self.assertContains(response, 'Inventory')
+		self.assertContains(response, 'panelSidebar')
+
 	def test_tomar_pedido_paginates_approved_customers(self):
 		self.customer.aprobado = True
 		self.customer.save(update_fields=['aprobado'])

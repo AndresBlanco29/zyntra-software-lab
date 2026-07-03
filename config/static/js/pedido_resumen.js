@@ -297,38 +297,90 @@ refreshDiscountRow(id, data)
 
 })
 
-document.querySelectorAll(".precio-resumen").forEach(select => {
+function applyPriceChange(id, precio, precioKey) {
+    return fetch(actualizarURL, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrf,
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `producto_id=${id}&precio=${precio}&precio_key=${encodeURIComponent(precioKey)}&accion=cambiar_precio`
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById(`subtotal-${id}`).innerText = '$' + formatMoney(data.subtotal)
+        updateOrderTotals(data.total)
+        refreshDiscountRow(id, data)
+        return data
+    })
+}
 
-select.addEventListener("change", function(){
+function applyBulkPriceTier(priceKey) {
+    let chain = Promise.resolve()
+    document.querySelectorAll('.precio-resumen').forEach(select => {
+        const matchingOption = select.querySelector(`option[data-price-key="${priceKey}"]`)
+        if (!matchingOption) {
+            return
+        }
+        const id = select.dataset.id
+        select.value = matchingOption.value
+        chain = chain.then(() => applyPriceChange(id, matchingOption.value, priceKey))
+    })
+    return chain
+}
 
-let id = this.dataset.id
-let precio = this.value
-const precioKey = this.selectedOptions[0]?.dataset.priceKey || ''
+function applyBulkDiscount(discountValue) {
+    let chain = Promise.resolve()
+    document.querySelectorAll('.descuento-toggle').forEach(toggle => {
+        const id = toggle.dataset.id
+        const amountInput = document.querySelector(`.descuento-monto[data-id="${id}"]`)
+        if (!amountInput) {
+            return
+        }
+        toggle.checked = true
+        amountInput.value = discountValue
+        const wrap = amountInput.closest('.descuento-input-wrap')
+        if (wrap) {
+            wrap.classList.remove('d-none')
+        }
+        chain = chain.then(() => persistDiscount(id))
+    })
+    return chain
+}
 
-fetch(actualizarURL,{
-
-method:"POST",
-
-headers:{
-"X-CSRFToken":csrf,
-"Content-Type":"application/x-www-form-urlencoded"
-},
-
-body:`producto_id=${id}&precio=${precio}&precio_key=${encodeURIComponent(precioKey)}&accion=cambiar_precio`
-
+document.querySelectorAll('.precio-resumen').forEach(select => {
+    select.addEventListener('change', function () {
+        const id = this.dataset.id
+        const precio = this.value
+        const precioKey = this.selectedOptions[0]?.dataset.priceKey || ''
+        applyPriceChange(id, precio, precioKey)
+    })
 })
-.then(res=>res.json())
-.then(data=>{
 
-document.getElementById(`subtotal-${id}`).innerText = "$"+formatMoney(data.subtotal)
-updateOrderTotals(data.total)
-refreshDiscountRow(id, data)
+const applyBulkPriceTierButton = document.getElementById('applyBulkPriceTierButton')
+const bulkPriceTierSelect = document.getElementById('bulkPriceTierSelect')
+if (applyBulkPriceTierButton && bulkPriceTierSelect) {
+    applyBulkPriceTierButton.addEventListener('click', function () {
+        const selectedPriceKey = bulkPriceTierSelect.value
+        if (!selectedPriceKey) {
+            return
+        }
+        applyBulkPriceTier(selectedPriceKey)
+    })
+}
 
-})
+const applyBulkDiscountButton = document.getElementById('applyBulkDiscountButton')
+const bulkDiscountPresetSelect = document.getElementById('bulkDiscountPresetSelect')
+if (applyBulkDiscountButton && bulkDiscountPresetSelect) {
+    applyBulkDiscountButton.addEventListener('click', function () {
+        const selectedDiscountValue = bulkDiscountPresetSelect.value
+        if (!selectedDiscountValue) {
+            return
+        }
+        applyBulkDiscount(selectedDiscountValue)
+    })
+}
 
-})
-
-})
 
 // BOTON SUMAR
 

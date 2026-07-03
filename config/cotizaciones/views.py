@@ -376,6 +376,11 @@ def _email_includes_prices(request):
     return request.POST.get('enviar_correo_con_precios', '0') == '1'
 
 
+def _cliente_tiene_email(cliente):
+    email = getattr(getattr(cliente, 'usuario', None), 'email', '') or ''
+    return bool(email.strip())
+
+
 def _get_whatsapp_contact_data(cotizacion, request):
     confirm_url = _build_confirm_url(request, cotizacion)
     message = _build_quote_message(cotizacion, confirm_url)
@@ -723,6 +728,7 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
         'telefono_contacto': telefono_contacto,
         'whatsapp_link': whatsapp_link,
         'outbound_message': outbound_message,
+        'cliente_tiene_email': _cliente_tiene_email(cotizacion.cliente),
     }
     return render(request, 'backoffice/cotizacion_detalle.html', context)
 
@@ -776,35 +782,37 @@ def enviar_cotizacion_cliente(request, cotizacion_id):
 
     confirm_url, telefono_contacto, whatsapp_link, outbound_message = _get_whatsapp_contact_data(cotizacion, request)
     include_prices_in_email = _email_includes_prices(request)
+    cliente_tiene_email = _cliente_tiene_email(cotizacion.cliente)
     now = timezone.now()
     updates = ['estado']
     cotizacion.estado = 'LISTA_PARA_CONFIRMACION'
 
-    try:
-        html_content = render_to_string(
-            'emails/cotizacion_lista_cliente.html',
-            {
-                'cliente': cotizacion.cliente,
-                'cotizacion': cotizacion,
-                'confirm_url': confirm_url,
-                'include_prices': include_prices_in_email,
-                'items': cotizacion.items.select_related('presentacion__producto'),
-            },
-        )
+    if cliente_tiene_email:
+        try:
+            html_content = render_to_string(
+                'emails/cotizacion_lista_cliente.html',
+                {
+                    'cliente': cotizacion.cliente,
+                    'cotizacion': cotizacion,
+                    'confirm_url': confirm_url,
+                    'include_prices': include_prices_in_email,
+                    'items': cotizacion.items.select_related('presentacion__producto'),
+                },
+            )
 
-        email = EmailMultiAlternatives(
-            subject=_('Order ready to confirm #{id}').format(id=cotizacion.id),
-            body=_('Your order is ready to confirm: {url}').format(url=confirm_url),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[cotizacion.cliente.usuario.email],
-        )
-        email.attach_alternative(html_content, 'text/html')
-        email.send(fail_silently=False)
-        cotizacion.correo_enviado = True
-        cotizacion.correo_enviado_en = now
-        updates.extend(['correo_enviado', 'correo_enviado_en'])
-    except Exception as exc:
-        logger.exception('Error enviando correo al cliente para cotizacion %s: %s', cotizacion.id, exc)
+            email = EmailMultiAlternatives(
+                subject=_('Order ready to confirm #{id}').format(id=cotizacion.id),
+                body=_('Your order is ready to confirm: {url}').format(url=confirm_url),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[cotizacion.cliente.usuario.email.strip()],
+            )
+            email.attach_alternative(html_content, 'text/html')
+            email.send(fail_silently=False)
+            cotizacion.correo_enviado = True
+            cotizacion.correo_enviado_en = now
+            updates.extend(['correo_enviado', 'correo_enviado_en'])
+        except Exception as exc:
+            logger.exception('Error enviando correo al cliente para cotizacion %s: %s', cotizacion.id, exc)
 
     sms_sent = False
     whatsapp_sent = False
@@ -838,6 +846,15 @@ def enviar_cotizacion_cliente(request, cotizacion_id):
         elif telefono_contacto and whatsapp_link:
             success_message += ' ' + _('The manual WhatsApp link is available as a fallback.')
         messages.success(request, success_message)
+    elif not cliente_tiene_email:
+        warning_message = _(
+            'The order was marked as ready to confirm, but this customer does not have an email on file.'
+        )
+        if sms_sent or whatsapp_sent:
+            warning_message += ' ' + _('Additional automatic channels were processed.')
+        elif telefono_contacto and whatsapp_link:
+            warning_message += ' ' + _('The manual WhatsApp link is available as a fallback.')
+        messages.warning(request, warning_message)
     else:
         messages.warning(request, _('The order was marked as ready to confirm, but the email could not be sent.'))
 
@@ -917,6 +934,7 @@ def generar_pedido_desde_cotizacion(request, cotizacion_id):
 
     cliente_notificado = False
     include_prices_in_email = _email_includes_prices(request)
+    cliente_tiene_email = _cliente_tiene_email(pedido.cliente)
     try:
         cliente_notificado = notificar_cliente_pedido(pedido, include_prices=include_prices_in_email)
     except Exception as exc:
@@ -928,6 +946,13 @@ def generar_pedido_desde_cotizacion(request, cotizacion_id):
         messages.success(
             request,
             _('Sales order #%(id)s was generated successfully and the customer was notified.') % {'id': pedido.id},
+        )
+    elif not cliente_tiene_email:
+        messages.warning(
+            request,
+            _('Sales order #%(id)s was generated successfully, but this customer does not have an email on file.') % {
+                'id': pedido.id,
+            },
         )
     else:
         messages.warning(

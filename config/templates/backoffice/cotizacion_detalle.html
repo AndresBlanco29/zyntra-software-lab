@@ -277,6 +277,12 @@
         <h6 class="fw-bold">{% trans "Official delivery to customer" %}</h6>
         <input class="form-control form-control-sm mb-2" value="{{ confirm_url }}" readonly>
 
+        {% if not cliente_tiene_email %}
+        <div class="alert alert-warning py-2 mb-3" role="alert">
+          {% trans "This customer does not have an email on file. Email notifications cannot be sent until an email is added to the customer profile." %}
+        </div>
+        {% endif %}
+
         <div class="form-check mb-3">
           <input class="form-check-input" type="checkbox" id="emailIncludePrices">
           <label class="form-check-label" for="emailIncludePrices">{% trans "Send email with prices" %}</label>

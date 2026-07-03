@@ -687,7 +687,7 @@ def notificar_backoffice_pedido(pedido):
 
 
 def notificar_cliente_pedido(pedido, *, include_prices=True):
-    cliente_email = getattr(getattr(pedido.cliente, 'usuario', None), 'email', '')
+    cliente_email = (getattr(getattr(pedido.cliente, 'usuario', None), 'email', '') or '').strip()
     if not cliente_email:
         return False
 

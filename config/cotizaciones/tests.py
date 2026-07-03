@@ -707,6 +707,59 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertEqual(len(mail.outbox), 1)
 		self.assertNotIn('Subtotal', mail.outbox[0].alternatives[0][0])
 
+	def test_backoffice_quote_detail_warns_when_customer_has_no_email(self):
+		self.customer_user.email = ''
+		self.customer_user.save(update_fields=['email'])
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'This customer does not have an email on file.')
+
+	def test_backoffice_send_quote_skips_email_when_customer_has_no_email(self):
+		self.customer_user.email = ''
+		self.customer_user.save(update_fields=['email'])
+		self.client.force_login(self.backoffice)
+		item = self.cotizacion.items.first()
+
+		self.client.post(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]), {
+			f'cantidad_{item.id}': '2',
+			f'precio_{item.id}': str(self.presentacion.precio_1),
+			'nota_backoffice': 'Precio confirmado',
+		})
+
+		mail.outbox.clear()
+		response = self.client.post(reverse('enviar_cotizacion_cliente', args=[self.cotizacion.id]), follow=True)
+
+		self.assertEqual(len(mail.outbox), 0)
+		self.cotizacion.refresh_from_db()
+		self.assertFalse(self.cotizacion.correo_enviado)
+		self.assertContains(response, 'this customer does not have an email on file', status_code=200)
+
+	def test_backoffice_generate_order_warns_when_customer_has_no_email(self):
+		self.customer_user.email = ''
+		self.customer_user.save(update_fields=['email'])
+		self.client.force_login(self.backoffice)
+		item = self.cotizacion.items.first()
+
+		self.client.post(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]), {
+			f'cantidad_{item.id}': '2',
+			f'precio_{item.id}': str(self.presentacion.precio_1),
+			'nota_backoffice': 'Precio confirmado',
+		})
+		self.cotizacion.backoffice_pricing_confirmed = True
+		self.cotizacion.save(update_fields=['backoffice_pricing_confirmed'])
+
+		mail.outbox.clear()
+		response = self.client.post(reverse('generar_pedido_desde_cotizacion', args=[self.cotizacion.id]), follow=True)
+
+		pedido = Pedido.objects.get(cotizacion=self.cotizacion)
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.request['PATH_INFO'], reverse('backoffice_pedido_detalle', args=[pedido.id]))
+		self.assertEqual(len(mail.outbox), 1)
+		self.assertContains(response, 'this customer does not have an email on file', status_code=200)
+
 	def test_backoffice_cannot_generate_duplicate_purchase_order_from_quote(self):
 		pedido = Pedido.objects.create(
 			cliente=self.cliente,

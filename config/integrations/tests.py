@@ -22,7 +22,7 @@ from django.utils import timezone
 
 from config.cotizaciones.models import Cotizacion
 from config.clientes.models import Cliente
-from config.facturacion.models import Invoice, NotaAjuste
+from config.facturacion.models import Invoice, InvoiceItem, NotaAjuste
 from config.facturacion.services import generar_invoice_desde_picking
 from config.integrations.backups import _backup_modified_time
 from config.integrations.quickbooks.client import QuickBooksAPIClient, QuickBooksAPIError
@@ -2515,6 +2515,75 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
 
         mock_sync_product.assert_called_once()
         self.assertIs(mock_sync_product.call_args.kwargs.get('sync_qty_on_hand'), False)
+
+    def test_build_sales_line_keeps_amount_equal_to_unit_price_times_qty(self):
+        from config.integrations.quickbooks.sync import _build_sales_line
+
+        zero_qty_line = _build_sales_line(
+            item_ref={'value': '801', 'name': 'Tortilla 12'},
+            amount=Decimal('0.00'),
+            description='Not dispatched',
+            quantity=0,
+            unit_price=Decimal('12.00'),
+        )
+        self.assertEqual(zero_qty_line['Amount'], 0.0)
+        self.assertEqual(zero_qty_line['SalesItemLineDetail']['Qty'], 0)
+        self.assertEqual(zero_qty_line['SalesItemLineDetail']['UnitPrice'], 12.0)
+
+        billed_line = _build_sales_line(
+            item_ref={'value': '801', 'name': 'Tortilla 12'},
+            amount=Decimal('30.00'),
+            description='Dispatched',
+            quantity=2,
+            unit_price=Decimal('15.00'),
+        )
+        self.assertEqual(billed_line['Amount'], 30.0)
+        self.assertEqual(billed_line['SalesItemLineDetail']['Qty'], 2)
+        self.assertEqual(billed_line['SalesItemLineDetail']['UnitPrice'], 15.0)
+
+    @patch('config.integrations.quickbooks.sync._find_transaction_by_doc_number', return_value=None)
+    @patch('config.integrations.quickbooks.sync.sync_customer', return_value={'quickbooks_id': '701'})
+    @patch('config.integrations.quickbooks.sync.sync_product')
+    def test_sync_invoice_omits_zero_quantity_lines(
+        self,
+        mock_sync_product,
+        mock_sync_customer,
+        mock_find_transaction,
+    ):
+        from config.integrations.quickbooks.sync import sync_invoice
+
+        categoria = Categoria.objects.create(nombre='Snacks')
+        marca = Marca.objects.create(nombre='Marca Snack')
+        producto = Producto.objects.create(nombre='Sabritas', categoria=categoria, marca=marca, codigo_barras='7501234567891')
+        presentacion = Presentacion.objects.create(
+            producto=producto,
+            nombre='Caja',
+            unidades=12,
+            precio_3=Decimal('12.00'),
+        )
+        InvoiceItem.objects.create(
+            invoice=self.invoice,
+            presentacion=presentacion,
+            producto_nombre=producto.nombre,
+            presentacion_nombre=presentacion.nombre,
+            cantidad_facturada=0,
+            precio_unitario=Decimal('12.00'),
+            subtotal=Decimal('0.00'),
+        )
+        mock_sync_product.return_value = {
+            'quickbooks_id': '801',
+            'payload': {'Id': '801', 'InvStartDate': '2015-01-01', 'Type': 'Inventory'},
+        }
+        mock_client = Mock()
+        mock_client.create_invoice.return_value = {'Id': '901', 'DocNumber': self.invoice.numero}
+
+        sync_invoice(invoice=self.invoice, client=mock_client)
+
+        payload = mock_client.create_invoice.call_args.args[0]
+        self.assertEqual(len(payload['Line']), 1)
+        line = payload['Line'][0]
+        self.assertEqual(line['SalesItemLineDetail']['Qty'], 3)
+        self.assertEqual(line['Amount'], 45.0)
 
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_sync_invoice_endpoint_creates_invoice_in_quickbooks(self, mock_request):

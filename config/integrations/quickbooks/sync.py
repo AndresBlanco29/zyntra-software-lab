@@ -4053,16 +4053,23 @@ def _ensure_adjustment_item(client):
 
 
 def _build_sales_line(*, item_ref, amount, description, quantity=1, unit_price=None):
-    quantity = int(quantity or 1)
-    unit_price = unit_price if unit_price is not None else (Decimal(str(amount or 0)) / Decimal(str(quantity or 1)))
+    quantity = 1 if quantity is None else int(quantity)
+    amount_decimal = _quantize_money(amount or 0)
+    if unit_price is not None:
+        unit_price_decimal = _quantize_money(unit_price)
+    elif quantity > 0:
+        unit_price_decimal = _quantize_money(amount_decimal / Decimal(str(quantity)))
+    else:
+        unit_price_decimal = Decimal('0.00')
+    amount_decimal = _quantize_money(unit_price_decimal * Decimal(str(quantity)))
     return {
         'DetailType': 'SalesItemLineDetail',
-        'Amount': _as_float(amount),
+        'Amount': _as_float(amount_decimal),
         'Description': _truncate(description, limit=4000),
         'SalesItemLineDetail': {
             'ItemRef': item_ref,
             'Qty': quantity,
-            'UnitPrice': _as_float(unit_price),
+            'UnitPrice': _as_float(unit_price_decimal),
         },
     }
 
@@ -4306,6 +4313,9 @@ def sync_invoice(*, invoice, client=None):
         adjustment_item_ref = None
         inventory_presentaciones = []
         for item in invoice.items.select_related('presentacion__producto').all():
+            quantity = int(item.cantidad_facturada or 0)
+            if quantity <= 0:
+                continue
             if item.presentacion_id:
                 product_result = sync_product(
                     presentacion=item.presentacion,
@@ -4331,9 +4341,12 @@ def sync_invoice(*, invoice, client=None):
                 item_ref=item_ref,
                 amount=item.subtotal,
                 description=f'{item.producto_nombre} - {item.presentacion_nombre}',
-                quantity=item.cantidad_facturada,
+                quantity=quantity,
                 unit_price=item.precio_unitario,
             ))
+
+        if not lines:
+            raise QuickBooksSyncError(_('Invoice has no billable line items to send to QuickBooks.'))
 
         existing = _find_transaction_by_doc_number(client, 'Invoice', invoice.numero)
         if existing:

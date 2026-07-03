@@ -5,8 +5,9 @@ import time
 from decimal import Decimal
 from io import StringIO
 from pathlib import Path
-from datetime import date
+from datetime import date, datetime
 from datetime import timedelta
+from zoneinfo import ZoneInfo
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
 
@@ -26,7 +27,13 @@ from config.facturacion.services import generar_invoice_desde_picking
 from config.integrations.backups import _backup_modified_time
 from config.integrations.quickbooks.client import QuickBooksAPIClient, QuickBooksAPIError
 from config.integrations.quickbooks.services import get_connection
-from config.integrations.models import QuickBooksConnection, QuickBooksImportConflict
+from config.integrations.models import QuickBooksConnection, QuickBooksImportConflict, QuickBooksSyncRun
+from config.integrations.quickbooks.alignment_sync import (
+    alignment_slot_is_due,
+    build_alignment_sync_summary,
+    push_new_outbound_records_to_quickbooks,
+    run_quickbooks_alignment_sync,
+)
 from config.integrations.quickbooks.sync import (
     _build_customer_display_name,
     _build_customer_payload,
@@ -2257,12 +2264,16 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_catalog_only_mode_allows_pull_sync(self, mock_request):
         self._activate_connection()
+        self.cliente.quickbooks_id = 'QB-CUST-PULL'
+        self.cliente.save(update_fields=['quickbooks_id'])
+        self.presentacion.quickbooks_id = 'QB-ITEM-PULL'
+        self.presentacion.save(update_fields=['quickbooks_id'])
         mock_request.side_effect = [
             self._json_response({'QueryResponse': {'Customer': []}}),
             self._json_response({'QueryResponse': {'Item': []}}),
         ]
 
-        response = self.client.post(reverse('quickbooks_pull_sync_to_local'), {'limit': '10'})
+        response = self.client.post(reverse('quickbooks_pull_sync_to_local'), {'limit': '0'})
 
         self.assertEqual(response.status_code, 200)
 
@@ -2270,6 +2281,10 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_pull_sync_uses_saved_cursors_for_incremental_queries(self, mock_request):
         connection = self._activate_connection()
+        self.cliente.quickbooks_id = 'QB-CUST-PULL'
+        self.cliente.save(update_fields=['quickbooks_id'])
+        self.presentacion.quickbooks_id = 'QB-ITEM-PULL'
+        self.presentacion.save(update_fields=['quickbooks_id'])
         connection.sync_state = {
             'cursors': {
                 'quickbooks:customer': '2026-05-13T08:00:00+00:00',
@@ -2285,12 +2300,13 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
             self._json_response({'QueryResponse': {'Item': []}}),
         ]
 
-        response = self.client.post(reverse('quickbooks_pull_sync_to_local'), {'limit': '10'})
+        response = self.client.post(reverse('quickbooks_pull_sync_to_local'), {'limit': '0'})
 
         self.assertEqual(response.status_code, 200)
         queries = [call.kwargs['params']['query'] for call in mock_request.call_args_list]
         self.assertEqual(len(queries), 2)
         self.assertTrue(all('MetaData.LastUpdatedTime >' in query for query in queries))
+        self.assertEqual(QuickBooksSyncRun.objects.count(), 1)
 
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_sync_customer_updates_existing_remote_customer(self, mock_request):
@@ -2584,3 +2600,122 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         self.assertEqual(response.status_code, 200)
         messages = [message.message for message in get_messages(response.wsgi_request)]
         self.assertTrue(any('Succeeded: 1. Failed: 0.' in message for message in messages))
+
+
+class QuickBooksAlignmentSyncTests(QuickBooksIntegrationTests):
+    def test_alignment_slot_is_due_only_on_schedule_hours(self):
+        due, slot = alignment_slot_is_due(now=datetime(2026, 7, 3, 6, 15, tzinfo=ZoneInfo('America/New_York')))
+        self.assertTrue(due)
+        self.assertEqual(slot, '2026-07-03T06:00')
+
+        due, slot = alignment_slot_is_due(now=datetime(2026, 7, 3, 9, 0, tzinfo=ZoneInfo('America/New_York')))
+        self.assertFalse(due)
+        self.assertEqual(slot, '')
+
+    def test_build_alignment_sync_summary_shapes_export_and_import_counts(self):
+        summary = build_alignment_sync_summary(
+            pull_result={
+                'customers': {'created_count': 2, 'updated_count': 1, 'conflict_count': 0},
+                'items': {'created_count': 3, 'updated_count': 4, 'conflict_count': 1},
+            },
+            invoice_status_result={'linked_count': 10, 'updated_count': 2},
+            export_result={
+                'customers': {'requested_ids': [1], 'success_count': 1, 'failed_count': 0, 'results': []},
+                'presentations': {'requested_ids': [2, 3], 'success_count': 1, 'failed_count': 1, 'results': []},
+                'invoices_skipped': True,
+            },
+            force_full=False,
+        )
+        self.assertEqual(summary['import']['customers']['created'], 2)
+        self.assertEqual(summary['export']['presentations']['failed'], 1)
+        self.assertTrue(summary['export']['invoices_skipped'])
+
+    @patch('config.integrations.quickbooks.alignment_sync.sync_product_batch_by_ids')
+    @patch('config.integrations.quickbooks.alignment_sync.sync_customer_batch_by_ids')
+    @patch('config.integrations.quickbooks.alignment_sync.refresh_linked_quickbooks_invoice_status')
+    @patch('config.integrations.quickbooks.alignment_sync.pull_quickbooks_to_local')
+    def test_run_quickbooks_alignment_sync_records_history(
+        self,
+        mock_pull,
+        mock_refresh,
+        mock_export_customers,
+        mock_export_products,
+    ):
+        mock_pull.return_value = {
+            'customers': {'created_count': 1, 'updated_count': 0, 'conflict_count': 0},
+            'items': {'created_count': 2, 'updated_count': 0, 'conflict_count': 0},
+            'incremental': True,
+        }
+        mock_refresh.return_value = {'linked_count': 4, 'updated_count': 1}
+        mock_export_customers.return_value = {'requested_ids': [], 'success_count': 0, 'failed_count': 0, 'results': []}
+        mock_export_products.return_value = {'requested_ids': [], 'success_count': 0, 'failed_count': 0, 'results': []}
+
+        result = run_quickbooks_alignment_sync(save_history=True, scheduled_slot='2026-07-03T12:00')
+
+        self.assertEqual(QuickBooksSyncRun.objects.count(), 1)
+        sync_run = QuickBooksSyncRun.objects.get()
+        self.assertEqual(sync_run.status, QuickBooksSyncRun.STATUS_SUCCESS)
+        self.assertEqual(sync_run.scheduled_slot, '2026-07-03T12:00')
+        self.assertEqual(result['summary']['import']['items']['created'], 2)
+
+    @patch('config.integrations.quickbooks.management.commands.run_scheduled_quickbooks_sync.run_quickbooks_alignment_sync')
+    def test_run_scheduled_quickbooks_sync_skips_outside_window(self, mock_alignment):
+        self._activate_connection()
+        stdout = StringIO()
+        call_command('run_scheduled_quickbooks_sync', '--now=2026-07-03T09:00:00', stdout=stdout)
+        mock_alignment.assert_not_called()
+        self.assertIn('Skipped QuickBooks alignment sync', stdout.getvalue())
+
+    @patch('config.integrations.quickbooks.management.commands.run_scheduled_quickbooks_sync.run_quickbooks_alignment_sync')
+    def test_run_scheduled_quickbooks_sync_runs_on_due_slot(self, mock_alignment):
+        connection = self._activate_connection()
+        mock_alignment.return_value = {'summary': {'import': {}, 'export': {}}}
+        stdout = StringIO()
+        call_command('run_scheduled_quickbooks_sync', '--now=2026-07-03T06:00:00', stdout=stdout)
+        mock_alignment.assert_called_once()
+        connection.refresh_from_db()
+        self.assertEqual(connection.sync_state['alignment_automation']['last_slot'], '2026-07-03T06:00')
+        self.assertIn('QuickBooks alignment sync complete', stdout.getvalue())
+
+    def test_push_new_outbound_records_only_targets_unlinked_records(self):
+        linked_user = Usuario.objects.create_user(username='linked-cust', password='secret123', role='cliente')
+        linked_cliente = Cliente.objects.create(
+            usuario=linked_user,
+            nombre_empresa='Linked Customer',
+            telefono='5550000001',
+            direccion='1 Main',
+            ciudad='Dallas',
+            estado='TX',
+            codigo_postal='75001',
+            pais='USA',
+            quickbooks_id='QB-LINKED-CUST',
+        )
+        pending_user = Usuario.objects.create_user(username='pending-cust', password='secret123', role='cliente')
+        pending_cliente = Cliente.objects.create(
+            usuario=pending_user,
+            nombre_empresa='Pending Customer',
+            telefono='5550000002',
+            direccion='2 Main',
+            ciudad='Dallas',
+            estado='TX',
+            codigo_postal='75001',
+            pais='USA',
+        )
+        with patch('config.integrations.quickbooks.alignment_sync.sync_customer_batch_by_ids') as mock_customers:
+            with patch('config.integrations.quickbooks.alignment_sync.sync_product_batch_by_ids') as mock_products:
+                mock_customers.return_value = {'requested_ids': [pending_cliente.pk], 'success_count': 1, 'failed_count': 0, 'results': []}
+                mock_products.return_value = {'requested_ids': [], 'success_count': 0, 'failed_count': 0, 'results': []}
+                push_new_outbound_records_to_quickbooks()
+        mock_customers.assert_called_once_with([pending_cliente.pk])
+        self.assertNotIn(linked_cliente.pk, mock_customers.call_args[0][0])
+
+    def test_sync_history_page_loads(self):
+        QuickBooksSyncRun.objects.create(
+            trigger=QuickBooksSyncRun.TRIGGER_SCHEDULED,
+            status=QuickBooksSyncRun.STATUS_SUCCESS,
+            summary={'import': {'customers': {'created': 1, 'updated': 0}}, 'export': {'customers': {'success': 0}}},
+            finished_at=timezone.now(),
+        )
+        response = self.client.get(reverse('quickbooks_sync_history'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'QuickBooks sync history')

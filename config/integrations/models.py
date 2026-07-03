@@ -120,3 +120,50 @@ class QuickBooksImportConflict(models.Model):
     def __str__(self):
         label = self.doc_number or self.display_name or self.quickbooks_id
         return f'{self.get_entity_type_display()} {label}'
+
+
+class QuickBooksSyncRun(models.Model):
+    TRIGGER_MANUAL = 'MANUAL'
+    TRIGGER_MANUAL_FULL = 'MANUAL_FULL'
+    TRIGGER_SCHEDULED = 'SCHEDULED'
+
+    STATUS_RUNNING = 'RUNNING'
+    STATUS_SUCCESS = 'SUCCESS'
+    STATUS_PARTIAL = 'PARTIAL'
+    STATUS_FAILED = 'FAILED'
+    STATUS_SKIPPED = 'SKIPPED'
+
+    TRIGGER_CHOICES = (
+        (TRIGGER_MANUAL, _('Manual incremental')),
+        (TRIGGER_MANUAL_FULL, _('Manual full resync')),
+        (TRIGGER_SCHEDULED, _('Scheduled (every 6 hours)')),
+    )
+    STATUS_CHOICES = (
+        (STATUS_RUNNING, _('Running')),
+        (STATUS_SUCCESS, _('Success')),
+        (STATUS_PARTIAL, _('Partial success')),
+        (STATUS_FAILED, _('Failed')),
+        (STATUS_SKIPPED, _('Skipped')),
+    )
+
+    trigger = models.CharField(max_length=20, choices=TRIGGER_CHOICES, default=TRIGGER_MANUAL)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_RUNNING, db_index=True)
+    force_full = models.BooleanField(default=False)
+    scheduled_slot = models.CharField(max_length=40, blank=True, db_index=True)
+    timezone_name = models.CharField(max_length=64, default='America/New_York')
+    summary = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True)
+    started_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    finished_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ('-started_at',)
+
+    def __str__(self):
+        return f'QuickBooks sync {self.get_trigger_display()} ({self.get_status_display()})'
+
+    @property
+    def duration_seconds(self):
+        if self.finished_at is None:
+            return None
+        return max(0, int((self.finished_at - self.started_at).total_seconds()))

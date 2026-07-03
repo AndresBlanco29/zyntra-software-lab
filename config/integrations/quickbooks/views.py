@@ -17,7 +17,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from config.clientes.models import Cliente
 from config.facturacion.models import Invoice, NotaAjuste
-from config.integrations.models import QuickBooksImportConflict
+from config.integrations.models import QuickBooksImportConflict, QuickBooksSyncRun
 from config.productos.models import Presentacion
 
 from config.usuarios.permissions import get_redirect_url_for_user, internal_permission_required
@@ -39,6 +39,12 @@ from config.integrations.backups import (
 from .auth import QuickBooksConfigurationError, quickbooks_credentials_configured, quickbooks_credentials_setup_message
 from .client import QuickBooksAPIClient, QuickBooksAPIError
 from .services import QuickBooksServiceError, get_connection, get_connection_status, get_oauth_login_url, handle_oauth_callback, maybe_maintain_quickbooks_connection
+from .alignment_sync import (
+    ALIGNMENT_TIMEZONE_NAME,
+    SCHEDULED_ALIGNMENT_HOURS,
+    alignment_schedule_label,
+    run_quickbooks_alignment_sync,
+)
 from .sync import (
     dismiss_quickbooks_import_conflict,
     dismiss_quickbooks_import_conflicts_bulk,
@@ -98,6 +104,7 @@ CATALOG_ONLY_ALLOWED_VIEW_NAMES = frozenset({
     'quickbooks_sync_item_images_to_local',
     'quickbooks_pull_items_sync_to_local',
     'quickbooks_pull_sync_to_local',
+    'quickbooks_sync_history',
     'quickbooks_start_task',
     'quickbooks_task_status',
     'quickbooks_import_customers',
@@ -129,6 +136,7 @@ CATALOG_ONLY_ALLOWED_TASK_OPERATIONS = frozenset({
     'refresh_linked_invoice_status_to_local',
     'pull_items_sync_to_local',
     'pull_sync_to_local',
+    'alignment_sync_to_local',
     'sync_item_images_to_local',
 })
 
@@ -417,6 +425,58 @@ def _build_dashboard_feedback(*, operation, ok, result=None, error=None):
         feedback['details'].append(
             _('Incremental sync used saved cursors.') if result.get('incremental') else _('Full sync ignored saved cursors.')
         )
+        return feedback
+
+    if operation == 'alignment_sync_to_local':
+        feedback['title'] = _('QuickBooks alignment sync')
+        summary = result.get('summary') or {}
+        import_summary = summary.get('import') or {}
+        export_summary = summary.get('export') or {}
+        customers = import_summary.get('customers') or {}
+        items = import_summary.get('items') or {}
+        invoice_status = import_summary.get('invoice_status') or {}
+        export_customers = export_summary.get('customers') or {}
+        export_items = export_summary.get('presentations') or {}
+        feedback['details'].append(
+            _('Import customers -> created %(created)s, updated %(updated)s, conflicts %(conflicts)s.') % {
+                'created': customers.get('created', 0),
+                'updated': customers.get('updated', 0),
+                'conflicts': customers.get('conflicts', 0),
+            }
+        )
+        feedback['details'].append(
+            _('Import catalog -> created %(created)s, updated %(updated)s, conflicts %(conflicts)s.') % {
+                'created': items.get('created', 0),
+                'updated': items.get('updated', 0),
+                'conflicts': items.get('conflicts', 0),
+            }
+        )
+        feedback['details'].append(
+            _('Invoice payment status -> updated %(updated)s of %(linked)s linked invoices.') % {
+                'updated': invoice_status.get('updated', 0),
+                'linked': invoice_status.get('linked', 0),
+            }
+        )
+        feedback['details'].append(
+            _('Export new customers -> sent %(success)s, failed %(failed)s.') % {
+                'success': export_customers.get('success', 0),
+                'failed': export_customers.get('failed', 0),
+            }
+        )
+        feedback['details'].append(
+            _('Export new products -> sent %(success)s, failed %(failed)s.') % {
+                'success': export_items.get('success', 0),
+                'failed': export_items.get('failed', 0),
+            }
+        )
+        feedback['details'].append(_('Invoices were not exported automatically (manual only).'))
+        feedback['details'].append(
+            _('Incremental sync used saved cursors.') if result.get('incremental') else _('Full sync ignored saved cursors.')
+        )
+        if result.get('sync_run_id'):
+            feedback['details'].append(
+                _('Details were saved to sync history (run #%(run_id)s).') % {'run_id': result.get('sync_run_id')}
+            )
         return feedback
 
     if operation == 'refresh_linked_items_to_local':
@@ -858,6 +918,52 @@ def _build_quickbooks_preview_context(*, request):
     }
 
 
+def _build_sync_history_row(sync_run):
+    summary = sync_run.summary if isinstance(sync_run.summary, dict) else {}
+    import_summary = summary.get('import') or {}
+    export_summary = summary.get('export') or {}
+    customers = import_summary.get('customers') or {}
+    items = import_summary.get('items') or {}
+    invoice_status = import_summary.get('invoice_status') or {}
+    export_customers = export_summary.get('customers') or {}
+    export_items = export_summary.get('presentations') or {}
+    status_class = {
+        QuickBooksSyncRun.STATUS_SUCCESS: 'success',
+        QuickBooksSyncRun.STATUS_PARTIAL: 'warning',
+        QuickBooksSyncRun.STATUS_FAILED: 'danger',
+        QuickBooksSyncRun.STATUS_SKIPPED: 'secondary',
+    }.get(sync_run.status, 'secondary')
+    return {
+        'id': sync_run.pk,
+        'trigger_label': sync_run.get_trigger_display(),
+        'status_label': sync_run.get_status_display(),
+        'status_class': status_class,
+        'started_label': format_local_datetime(timezone.localtime(sync_run.started_at), seconds=True),
+        'finished_label': (
+            format_local_datetime(timezone.localtime(sync_run.finished_at), seconds=True)
+            if sync_run.finished_at else '-'
+        ),
+        'duration_label': (
+            _('%(seconds)ss') % {'seconds': sync_run.duration_seconds}
+            if sync_run.duration_seconds is not None else '-'
+        ),
+        'scheduled_slot': sync_run.scheduled_slot or '-',
+        'timezone_name': sync_run.timezone_name,
+        'error_message': sync_run.error_message,
+        'import_customers_created': customers.get('created', 0),
+        'import_customers_updated': customers.get('updated', 0),
+        'import_items_created': items.get('created', 0),
+        'import_items_updated': items.get('updated', 0),
+        'invoice_status_updated': invoice_status.get('updated', 0),
+        'export_customers_success': export_customers.get('success', 0),
+        'export_items_success': export_items.get('success', 0),
+        'export_customers_failed': export_customers.get('failed', 0),
+        'export_items_failed': export_items.get('failed', 0),
+        'summary': summary,
+        'force_full': sync_run.force_full,
+    }
+
+
 def _build_quickbooks_center_context(*, request):
     maybe_maintain_quickbooks_connection()
     dashboard_context = get_dashboard_sync_context(request=request)
@@ -876,8 +982,15 @@ def _build_quickbooks_center_context(*, request):
             ('credit_memo', _('Credit memos')),
         )
     for key, label in cursor_labels:
-        if raw_cursors.get(key):
-            sync_cursors.append({'label': label, 'value': raw_cursors[key]})
+        cursor_value = raw_cursors.get(f'quickbooks:{key}') or raw_cursors.get(key)
+        if cursor_value:
+            sync_cursors.append({'label': label, 'value': cursor_value})
+
+    automation = dict((connection.sync_state or {}).get('alignment_automation') or {})
+    last_scheduled_run = QuickBooksSyncRun.objects.filter(
+        trigger=QuickBooksSyncRun.TRIGGER_SCHEDULED,
+    ).exclude(status=QuickBooksSyncRun.STATUS_SKIPPED).first()
+    recent_sync_runs = QuickBooksSyncRun.objects.exclude(status=QuickBooksSyncRun.STATUS_RUNNING)[:5]
 
     return {
         'quickbooks_catalog_only_mode': _quickbooks_catalog_only_enabled(),
@@ -888,9 +1001,36 @@ def _build_quickbooks_center_context(*, request):
         'quickbooks_resolved_conflicts_count': conflicts.exclude(status=QuickBooksImportConflict.STATUS_CONFLICT).count(),
         'quickbooks_sync_cursors': sync_cursors,
         'quickbooks_has_saved_cursors': bool(sync_cursors),
+        'quickbooks_alignment_schedule_hours': sorted(SCHEDULED_ALIGNMENT_HOURS),
+        'quickbooks_alignment_schedule_label': alignment_schedule_label(),
+        'quickbooks_alignment_timezone': ALIGNMENT_TIMEZONE_NAME,
+        'quickbooks_alignment_last_slot': automation.get('last_slot', ''),
+        'quickbooks_alignment_last_run_label': (
+            format_local_datetime(timezone.localtime(last_scheduled_run.started_at))
+            if last_scheduled_run else ''
+        ),
+        'quickbooks_recent_sync_runs': [_build_sync_history_row(run) for run in recent_sync_runs],
         **preview_context,
         **dashboard_context,
     }
+
+
+@require_GET
+@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+def quickbooks_sync_history(request):
+    page_size = 25
+    runs = QuickBooksSyncRun.objects.all()[:page_size]
+    return render(
+        request,
+        'backoffice/quickbooks_sync_history.html',
+        {
+            'quickbooks_status': get_connection_status(),
+            'quickbooks_sync_runs': [_build_sync_history_row(run) for run in runs],
+            'quickbooks_alignment_schedule_hours': sorted(SCHEDULED_ALIGNMENT_HOURS),
+            'quickbooks_alignment_schedule_label': alignment_schedule_label(),
+            'quickbooks_alignment_timezone': ALIGNMENT_TIMEZONE_NAME,
+        },
+    )
 
 
 @require_GET
@@ -1303,6 +1443,19 @@ def quickbooks_start_task(request):
             max_results=kwargs.get('max_results'),
             force_full=kwargs.get('force_full', False),
             task_cache_key=kwargs.get('task_cache_key'),
+            skip_images=kwargs.get('skip_images'),
+        ),
+        'alignment_sync_to_local': lambda **kwargs: run_quickbooks_alignment_sync(
+            max_results=kwargs.get('max_results'),
+            force_full=kwargs.get('force_full', False),
+            task_cache_key=kwargs.get('task_cache_key'),
+            skip_images=kwargs.get('skip_images'),
+            trigger=(
+                QuickBooksSyncRun.TRIGGER_MANUAL_FULL
+                if kwargs.get('force_full', False)
+                else QuickBooksSyncRun.TRIGGER_MANUAL
+            ),
+            save_history=True,
         ),
         'sync_item_images_to_local': pull_quickbooks_item_images_to_local,
     }
@@ -1379,15 +1532,22 @@ def quickbooks_task_status(request, task_id):
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 @quickbooks_requires_full_mode
 def quickbooks_pull_sync_to_local(request):
+    force_full = request.POST.get('mode') == 'full'
     try:
-        result = pull_quickbooks_to_local(
-            max_results=int(request.POST.get('limit', 25) or 25),
-            force_full=request.POST.get('mode') == 'full',
+        limit = _parse_quickbooks_import_limit(request.POST.get('limit'), default=None)
+        result = run_quickbooks_alignment_sync(
+            max_results=limit,
+            force_full=force_full,
+            skip_images=_quickbooks_import_skip_images(request),
+            trigger=(
+                QuickBooksSyncRun.TRIGGER_MANUAL_FULL if force_full else QuickBooksSyncRun.TRIGGER_MANUAL
+            ),
+            save_history=True,
         )
     except (ValueError, QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
-        logger.warning('QuickBooks pull sync failed: %s', exc)
-        return _response_or_redirect(request, operation='pull_sync_to_local', error=str(exc), status_code=502)
-    return _response_or_redirect(request, operation='pull_sync_to_local', result=result)
+        logger.warning('QuickBooks alignment sync failed: %s', exc)
+        return _response_or_redirect(request, operation='alignment_sync_to_local', error=str(exc), status_code=502)
+    return _response_or_redirect(request, operation='alignment_sync_to_local', result=result)
 
 
 @require_POST

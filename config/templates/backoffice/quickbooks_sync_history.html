@@ -1,0 +1,72 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "QuickBooks sync history" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+  <div>
+    <h2 class="mb-1">{% trans "QuickBooks sync history" %}</h2>
+    <p class="text-muted mb-0">
+      {% blocktrans with timezone=quickbooks_alignment_timezone schedule=quickbooks_alignment_schedule_label %}
+      Automatic alignment runs every 6 hours at {{ schedule }} (US Eastern, {{ timezone }}). Manual runs from QuickBooks Center are listed here too.
+      {% endblocktrans %}
+    </p>
+  </div>
+  <a href="{% url 'quickbooks_center' %}" class="btn btn-outline-primary">{% trans "Back to QuickBooks Center" %}</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    {% if quickbooks_sync_runs %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>{% trans "Started" %}</th>
+            <th>{% trans "Trigger" %}</th>
+            <th>{% trans "Status" %}</th>
+            <th>{% trans "Import" %}</th>
+            <th>{% trans "Invoice status" %}</th>
+            <th>{% trans "Export" %}</th>
+            <th>{% trans "Duration" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for run in quickbooks_sync_runs %}
+          <tr>
+            <td>
+              <div class="fw-semibold">{{ run.started_label }}</div>
+              {% if run.scheduled_slot and run.scheduled_slot != '-' %}
+              <div class="small text-muted">{% trans "Slot" %}: {{ run.scheduled_slot }}</div>
+              {% endif %}
+            </td>
+            <td>{{ run.trigger_label }}{% if run.force_full %} · {% trans "full" %}{% endif %}</td>
+            <td><span class="badge text-bg-{{ run.status_class }}">{{ run.status_label }}</span></td>
+            <td class="small">
+              <div>{% trans "Customers" %}: +{{ run.import_customers_created }} / ~{{ run.import_customers_updated }}</div>
+              <div>{% trans "Catalog" %}: +{{ run.import_items_created }} / ~{{ run.import_items_updated }}</div>
+            </td>
+            <td class="small">{{ run.invoice_status_updated }} {% trans "updated" %}</td>
+            <td class="small">
+              <div>{% trans "Customers" %}: {{ run.export_customers_success }}{% if run.export_customers_failed %} / {{ run.export_customers_failed }} {% trans "failed" %}{% endif %}</div>
+              <div>{% trans "Products" %}: {{ run.export_items_success }}{% if run.export_items_failed %} / {{ run.export_items_failed }} {% trans "failed" %}{% endif %}</div>
+              <div class="text-muted">{% trans "Invoices manual" %}</div>
+            </td>
+            <td class="small">{{ run.duration_label }}</td>
+          </tr>
+          {% if run.error_message %}
+          <tr>
+            <td colspan="7" class="small text-danger bg-danger bg-opacity-10">{{ run.error_message }}</td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-muted">{% trans "No sync runs recorded yet. Use Run pull sync now or wait for the next scheduled run." %}</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

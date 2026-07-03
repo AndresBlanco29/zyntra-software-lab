@@ -273,12 +273,16 @@ La Tortilla Grocery
 {% endif %}
 
 {% if request.user|has_internal_permission:'admin.dashboard.view' or request.user|has_internal_permission:'backoffice.dashboard.view' %}
-<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'quickbooks_center' or request.resolver_match.url_name == 'quickbooks_import_conflicts' or request.resolver_match.url_name == 'database_backups_center' %}open{% endif %}>
+<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'quickbooks_center' or request.resolver_match.url_name == 'quickbooks_import_conflicts' or request.resolver_match.url_name == 'quickbooks_sync_history' or request.resolver_match.url_name == 'database_backups_center' %}open{% endif %}>
   <summary class="sidebar-collapsible-summary">{% trans "QuickBooks" %}</summary>
   <div class="sidebar-collapsible-links">
     <a href="{% url 'quickbooks_center' %}"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'quickbooks_center' %}active{% endif %}">
       {% trans "QuickBooks Center" %}
+    </a>
+    <a href="{% url 'quickbooks_sync_history' %}"
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'quickbooks_sync_history' %}active{% endif %}">
+      {% trans "Sync history" %}
     </a>
     <a href="{% url 'quickbooks_import_conflicts' %}"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'quickbooks_import_conflicts' %}active{% endif %}">

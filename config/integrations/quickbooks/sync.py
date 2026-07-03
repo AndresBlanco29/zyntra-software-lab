@@ -3752,10 +3752,12 @@ def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None
     return result
 
 
-def pull_quickbooks_to_local(*, max_results=25, client=None, force_full=False, task_cache_key=None):
+def pull_quickbooks_to_local(*, max_results=25, client=None, force_full=False, task_cache_key=None, skip_images=None):
     client = client or QuickBooksAPIClient()
     connection = client.connection
     run_started_at = timezone.now()
+    if skip_images is None:
+        skip_images = bool(getattr(settings, 'QUICKBOOKS_CATALOG_SYNC_SKIP_IMAGES', True))
 
     customer_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('customer')))
     item_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('item')))
@@ -3773,6 +3775,7 @@ def pull_quickbooks_to_local(*, max_results=25, client=None, force_full=False, t
         client=client,
         updated_after=item_cursor,
         task_cache_key=task_cache_key,
+        skip_images=skip_images,
     )
     if quickbooks_accounting_import_enabled():
         accounting_documents = import_quickbooks_accounting_documents(

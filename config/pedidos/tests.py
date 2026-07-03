@@ -107,6 +107,7 @@ class PickingVerificationFlowTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, 'Available stock: 10 CS')
+		self.assertContains(response, 'text-success fw-semibold')
 		self.assertNotContains(response, 'Physical:')
 
 	def test_assigning_picking_sets_selector_and_notifies(self):

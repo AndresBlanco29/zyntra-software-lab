@@ -793,7 +793,7 @@
                   <div class="col-12 col-md-4"><label class="form-label fw-semibold">{% trans "Amount 1" %}</label><div class="input-group"><span class="input-group-text">$</span><input type="number" min="0" step="0.01" name="payment_amount_1" class="form-control js-payment-entry-amount" data-entry-index="1"></div></div>
                   <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque number" %}</label><input type="text" name="payment_cheque_numero_1" class="form-control" disabled></div>
                   <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque bank" %}</label><input type="text" name="payment_cheque_banco_1" class="form-control" disabled></div>
-                  <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque image" %}</label><input type="file" name="payment_cheque_image_1" class="form-control" accept="image/*" capture="environment" disabled></div>
+                  <div class="col-12 payment-entry-field d-none" data-entry-index="1" data-methods="CHEQUE">{% include "backoffice/includes/cheque_image_upload_field.html" with field_name="payment_cheque_image_1" %}</div>
                   <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="TRANSFERENCIA"><label class="form-label fw-semibold">{% trans "Transfer reference" %}</label><input type="text" name="payment_transferencia_referencia_1" class="form-control" disabled></div>
                   <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Card last 4" %}</label><input type="text" name="payment_tarjeta_ultimos_4_1" maxlength="4" class="form-control" disabled></div>
                   <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="1" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Authorization code" %}</label><input type="text" name="payment_tarjeta_autorizacion_1" class="form-control" disabled></div>
@@ -807,7 +807,7 @@
                   <div class="col-12 col-md-4"><label class="form-label fw-semibold">{% trans "Amount 2" %}</label><div class="input-group"><span class="input-group-text">$</span><input type="number" min="0" step="0.01" name="payment_amount_2" class="form-control js-payment-entry-amount" data-entry-index="2"></div></div>
                   <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque number" %}</label><input type="text" name="payment_cheque_numero_2" class="form-control" disabled></div>
                   <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque bank" %}</label><input type="text" name="payment_cheque_banco_2" class="form-control" disabled></div>
-                  <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque image" %}</label><input type="file" name="payment_cheque_image_2" class="form-control" accept="image/*" capture="environment" disabled></div>
+                  <div class="col-12 payment-entry-field d-none" data-entry-index="2" data-methods="CHEQUE">{% include "backoffice/includes/cheque_image_upload_field.html" with field_name="payment_cheque_image_2" %}</div>
                   <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="TRANSFERENCIA"><label class="form-label fw-semibold">{% trans "Transfer reference" %}</label><input type="text" name="payment_transferencia_referencia_2" class="form-control" disabled></div>
                   <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Card last 4" %}</label><input type="text" name="payment_tarjeta_ultimos_4_2" maxlength="4" class="form-control" disabled></div>
                   <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="2" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Authorization code" %}</label><input type="text" name="payment_tarjeta_autorizacion_2" class="form-control" disabled></div>
@@ -821,7 +821,7 @@
                   <div class="col-12 col-md-4"><label class="form-label fw-semibold">{% trans "Amount 3" %}</label><div class="input-group"><span class="input-group-text">$</span><input type="number" min="0" step="0.01" name="payment_amount_3" class="form-control js-payment-entry-amount" data-entry-index="3"></div></div>
                   <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque number" %}</label><input type="text" name="payment_cheque_numero_3" class="form-control" disabled></div>
                   <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque bank" %}</label><input type="text" name="payment_cheque_banco_3" class="form-control" disabled></div>
-                  <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="CHEQUE"><label class="form-label fw-semibold">{% trans "Cheque image" %}</label><input type="file" name="payment_cheque_image_3" class="form-control" accept="image/*" capture="environment" disabled></div>
+                  <div class="col-12 payment-entry-field d-none" data-entry-index="3" data-methods="CHEQUE">{% include "backoffice/includes/cheque_image_upload_field.html" with field_name="payment_cheque_image_3" %}</div>
                   <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="TRANSFERENCIA"><label class="form-label fw-semibold">{% trans "Transfer reference" %}</label><input type="text" name="payment_transferencia_referencia_3" class="form-control" disabled></div>
                   <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Card last 4" %}</label><input type="text" name="payment_tarjeta_ultimos_4_3" maxlength="4" class="form-control" disabled></div>
                   <div class="col-12 col-md-4 payment-entry-field d-none" data-entry-index="3" data-methods="TARJETA"><label class="form-label fw-semibold">{% trans "Authorization code" %}</label><input type="text" name="payment_tarjeta_autorizacion_3" class="form-control" disabled></div>
@@ -1093,11 +1093,26 @@
 {% endif %}
 </div>
 
+<script src="{% static 'js/camera-upload-widget.js' %}"></script>
 <script src="{% static 'js/form-draft-restore.js' %}"></script>
 <script>
   (function () {
-    const cameraWidgets = document.querySelectorAll('[data-camera-upload]');
-    const supportsInlineCamera = Boolean(window.isSecureContext && navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function');
+    const cameraStrings = {
+      notSupported: '{% trans "Your browser does not support camera access." %}',
+      chooseFilesOnly: '{% trans "Choose files to attach photos." %}',
+      ready: '{% trans "Camera ready. Take a photo to attach it to the form." %}',
+      added: '{% trans "Photo added to the form." %}',
+      stopped: '{% trans "Camera stopped." %}',
+      selectOrCamera: '{% trans "Choose files or use the camera to attach photos." %}',
+      chequeSelectOrCamera: '{% trans "Use the camera or choose an existing photo of the cheque." %}',
+      denied: '{% trans "Camera permission was denied or is not available." %}',
+      filesSelected: '{% trans "Files selected." %}',
+      previewTitle: '{% trans "Selected photos" %}',
+    };
+    if (window.LTGCameraUpload) {
+      window.LTGCameraUpload.init(document, cameraStrings);
+    }
+
     const paymentStatus = document.getElementById('paymentStatus');
     const paymentAmountInput = document.getElementById('paymentAmount');
     const paymentAmountSummary = document.getElementById('paymentAmountSummary');
@@ -1136,17 +1151,6 @@
     const canvas = document.getElementById('signatureCanvas');
     const signatureInput = document.getElementById('signatureData');
     const clearSignature = document.getElementById('clearSignature');
-    const cameraStrings = {
-      notSupported: '{% trans "Your browser does not support camera access." %}',
-      chooseFilesOnly: '{% trans "Choose files to attach photos." %}',
-      ready: '{% trans "Camera ready. Take a photo to attach it to the form." %}',
-      added: '{% trans "Photo added to the form." %}',
-      stopped: '{% trans "Camera stopped." %}',
-      selectOrCamera: '{% trans "Choose files or use the camera to attach photos." %}',
-      denied: '{% trans "Camera permission was denied or is not available." %}',
-      filesSelected: '{% trans "Files selected." %}',
-      previewTitle: '{% trans "Selected photos" %}',
-    };
     const paymentStrings = {
       customerPays: '{% trans "Customer must pay" %}',
       customerReceives: '{% trans "Customer must receive" %}',
@@ -1160,180 +1164,6 @@
     function formatMoney(value) {
       return `$${Number(value || 0).toFixed(2)}`;
     }
-
-    function setCameraStatus(widget, message) {
-      const status = widget.querySelector('[data-camera-status]');
-      if (status) {
-        status.textContent = message;
-      }
-    }
-
-    function toggleCameraButtons(widget, active) {
-      const startButton = widget.querySelector('[data-camera-start]');
-      const captureButton = widget.querySelector('[data-camera-capture]');
-      const stopButton = widget.querySelector('[data-camera-stop]');
-      if (startButton) {
-        startButton.classList.toggle('d-none', active || !supportsInlineCamera);
-      }
-      if (captureButton) {
-        captureButton.classList.toggle('d-none', !active);
-      }
-      if (stopButton) {
-        stopButton.classList.toggle('d-none', !active);
-      }
-    }
-
-    function stopCamera(widget, options) {
-      const settings = options || {};
-      const preview = widget.querySelector('[data-camera-preview]');
-      const video = widget.querySelector('[data-camera-video]');
-      const hadStream = Boolean(widget._cameraStream);
-      if (widget._cameraStream) {
-        widget._cameraStream.getTracks().forEach((track) => track.stop());
-        widget._cameraStream = null;
-      }
-      if (video) {
-        video.srcObject = null;
-      }
-      if (preview) {
-        preview.classList.add('d-none');
-      }
-      toggleCameraButtons(widget, false);
-      if (!settings.silent && hadStream) {
-        setCameraStatus(widget, cameraStrings.stopped);
-      }
-    }
-
-    function clearFilePreview(widget) {
-      const preview = widget.querySelector('[data-file-preview]');
-      if (!preview) {
-        return;
-      }
-      if (widget._previewUrls) {
-        widget._previewUrls.forEach((url) => URL.revokeObjectURL(url));
-      }
-      widget._previewUrls = [];
-      preview.innerHTML = '';
-      preview.classList.add('d-none');
-    }
-
-    function renderFilePreview(widget, files) {
-      const preview = widget.querySelector('[data-file-preview]');
-      if (!preview) {
-        return;
-      }
-      clearFilePreview(widget);
-      const imageFiles = Array.from(files || []).filter((file) => file && String(file.type || '').startsWith('image/'));
-      if (!imageFiles.length) {
-        return;
-      }
-      widget._previewUrls = [];
-      imageFiles.forEach((file, index) => {
-        const url = URL.createObjectURL(file);
-        widget._previewUrls.push(url);
-        const col = document.createElement('div');
-        col.className = 'col-6 col-md-4';
-        col.innerHTML = `
-          <div class="border rounded p-2 h-100 bg-white">
-            <img src="${url}" alt="${cameraStrings.previewTitle} ${index + 1}" class="img-fluid rounded mb-2" style="max-height: 140px; width: 100%; object-fit: cover;">
-            <div class="small text-muted text-truncate">${file.name}</div>
-          </div>
-        `;
-        preview.appendChild(col);
-      });
-      preview.classList.remove('d-none');
-    }
-
-    async function startCamera(widget) {
-      const preview = widget.querySelector('[data-camera-preview]');
-      const video = widget.querySelector('[data-camera-video]');
-      if (!supportsInlineCamera || !video) {
-        setCameraStatus(widget, cameraStrings.notSupported);
-        return;
-      }
-
-      stopCamera(widget, { silent: true });
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
-          audio: false,
-        });
-        widget._cameraStream = stream;
-        video.srcObject = stream;
-        if (preview) {
-          preview.classList.remove('d-none');
-        }
-        toggleCameraButtons(widget, true);
-        setCameraStatus(widget, cameraStrings.ready);
-      } catch (error) {
-        setCameraStatus(widget, cameraStrings.denied);
-      }
-    }
-
-    function appendCapturedPhoto(widget) {
-      const input = widget.querySelector('[data-camera-input]');
-      const video = widget.querySelector('[data-camera-video]');
-      const cameraCanvas = widget.querySelector('[data-camera-canvas]');
-      if (!input || !video || !cameraCanvas || typeof DataTransfer === 'undefined') {
-        return;
-      }
-      const width = video.videoWidth || 1280;
-      const height = video.videoHeight || 720;
-      cameraCanvas.width = width;
-      cameraCanvas.height = height;
-      const cameraContext = cameraCanvas.getContext('2d');
-      cameraContext.drawImage(video, 0, 0, width, height);
-      cameraCanvas.toBlob(function (blob) {
-        if (!blob) {
-          return;
-        }
-        const dataTransfer = new DataTransfer();
-        Array.from(input.files || []).forEach((file) => dataTransfer.items.add(file));
-        dataTransfer.items.add(new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' }));
-        input.files = dataTransfer.files;
-        input.dispatchEvent(new Event('change', { bubbles: true }));
-        setCameraStatus(widget, cameraStrings.added);
-      }, 'image/jpeg', 0.92);
-    }
-
-    cameraWidgets.forEach((widget) => {
-      const input = widget.querySelector('[data-camera-input]');
-      const startButton = widget.querySelector('[data-camera-start]');
-      const captureButton = widget.querySelector('[data-camera-capture]');
-      const stopButton = widget.querySelector('[data-camera-stop]');
-
-      toggleCameraButtons(widget, false);
-      setCameraStatus(widget, supportsInlineCamera ? cameraStrings.selectOrCamera : cameraStrings.chooseFilesOnly);
-
-      if (input) {
-        input.addEventListener('change', function () {
-          const hasFiles = input.files && input.files.length;
-          renderFilePreview(widget, input.files);
-          setCameraStatus(widget, hasFiles ? cameraStrings.filesSelected : (supportsInlineCamera ? cameraStrings.selectOrCamera : cameraStrings.chooseFilesOnly));
-        });
-      }
-      if (startButton) {
-        startButton.addEventListener('click', function () {
-          startCamera(widget);
-        });
-      }
-      if (captureButton) {
-        captureButton.addEventListener('click', function () {
-          appendCapturedPhoto(widget);
-        });
-      }
-      if (stopButton) {
-        stopButton.addEventListener('click', function () {
-          stopCamera(widget);
-        });
-      }
-    });
-
-    document.addEventListener('visibilitychange', function () {
-      if (document.hidden) {
-        cameraWidgets.forEach((widget) => stopCamera(widget, { silent: true }));
-      }
-    });
 
     function togglePaymentSections() {
       if (!paymentStatus) {
@@ -1483,10 +1313,15 @@
           const methods = (element.dataset.methods || '').split(',').map((value) => value.trim()).filter(Boolean);
           const shouldShow = paymentStatus.value === 'PAGADO' && method && methods.includes(method);
           element.classList.toggle('d-none', !shouldShow);
-          element.querySelectorAll('input, select, textarea').forEach((field) => {
+          element.querySelectorAll('input, select, textarea, button').forEach((field) => {
             field.disabled = !shouldShow;
-            if (!shouldShow && field.type !== 'file') {
-              field.value = '';
+            if (!shouldShow) {
+              if (field.type === 'file') {
+                field.value = '';
+                field.dispatchEvent(new Event('change', { bubbles: true }));
+              } else if (field.type !== 'button' && field.type !== 'submit') {
+                field.value = '';
+              }
             }
           });
         });

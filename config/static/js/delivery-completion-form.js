@@ -2,8 +2,22 @@
   const root = document.getElementById('pickupCompletionShell');
   if (!root) return;
 
-  const cameraWidgets = root.querySelectorAll('[data-camera-upload]');
-  const supportsInlineCamera = Boolean(window.isSecureContext && navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function');
+  const cameraStrings = {
+    notSupported: 'Your browser does not support camera access.',
+    chooseFilesOnly: 'Choose files to attach photos.',
+    ready: 'Camera ready. Take a photo to attach it to the form.',
+    added: 'Photo added to the form.',
+    stopped: 'Camera stopped.',
+    selectOrCamera: 'Choose files or use the camera to attach photos.',
+    chequeSelectOrCamera: 'Use the camera or choose an existing photo of the cheque.',
+    denied: 'Camera permission was denied or is not available.',
+    filesSelected: 'Files selected.',
+    previewTitle: 'Selected photos',
+  };
+  if (window.LTGCameraUpload) {
+    window.LTGCameraUpload.init(root, cameraStrings);
+  }
+
   const paymentStatus = root.querySelector('#paymentStatus');
   const paymentAmountInput = root.querySelector('#paymentAmount');
   const paymentAmountSummary = root.querySelector('#paymentAmountSummary');
@@ -44,90 +58,6 @@
   function formatMoney(value) {
     return `$${Number(value || 0).toFixed(2)}`;
   }
-
-  function setCameraStatus(widget, message) {
-    const status = widget.querySelector('[data-camera-status]');
-    if (status) status.textContent = message;
-  }
-
-  function toggleCameraButtons(widget, active) {
-    const startButton = widget.querySelector('[data-camera-start]');
-    const captureButton = widget.querySelector('[data-camera-capture]');
-    const stopButton = widget.querySelector('[data-camera-stop]');
-    if (startButton) startButton.classList.toggle('d-none', active || !supportsInlineCamera);
-    if (captureButton) captureButton.classList.toggle('d-none', !active);
-    if (stopButton) stopButton.classList.toggle('d-none', !active);
-  }
-
-  function stopCamera(widget, options) {
-    const settings = options || {};
-    const preview = widget.querySelector('[data-camera-preview]');
-    const video = widget.querySelector('[data-camera-video]');
-    const hadStream = Boolean(widget._cameraStream);
-    if (widget._cameraStream) {
-      widget._cameraStream.getTracks().forEach((track) => track.stop());
-      widget._cameraStream = null;
-    }
-    if (video) video.srcObject = null;
-    if (preview) preview.classList.add('d-none');
-    toggleCameraButtons(widget, false);
-    if (!settings.silent && hadStream) setCameraStatus(widget, 'Camera stopped.');
-  }
-
-  async function startCamera(widget) {
-    const preview = widget.querySelector('[data-camera-preview]');
-    const video = widget.querySelector('[data-camera-video]');
-    if (!supportsInlineCamera || !video) {
-      setCameraStatus(widget, 'Your browser does not support camera access.');
-      return;
-    }
-    stopCamera(widget, { silent: true });
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
-      widget._cameraStream = stream;
-      video.srcObject = stream;
-      if (preview) preview.classList.remove('d-none');
-      toggleCameraButtons(widget, true);
-      setCameraStatus(widget, 'Camera ready. Take a photo to attach it to the form.');
-    } catch (_error) {
-      setCameraStatus(widget, 'Camera permission was denied or is not available.');
-    }
-  }
-
-  function appendCapturedPhoto(widget) {
-    const input = widget.querySelector('[data-camera-input]');
-    const video = widget.querySelector('[data-camera-video]');
-    const cameraCanvas = widget.querySelector('[data-camera-canvas]');
-    if (!input || !video || !cameraCanvas || typeof DataTransfer === 'undefined') return;
-    const width = video.videoWidth || 1280;
-    const height = video.videoHeight || 720;
-    cameraCanvas.width = width;
-    cameraCanvas.height = height;
-    const cameraContext = cameraCanvas.getContext('2d');
-    cameraContext.drawImage(video, 0, 0, width, height);
-    cameraCanvas.toBlob((blob) => {
-      if (!blob) return;
-      const dataTransfer = new DataTransfer();
-      Array.from(input.files || []).forEach((file) => dataTransfer.items.add(file));
-      dataTransfer.items.add(new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' }));
-      input.files = dataTransfer.files;
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-      setCameraStatus(widget, 'Photo added to the form.');
-    }, 'image/jpeg', 0.92);
-  }
-
-  cameraWidgets.forEach((widget) => {
-    const input = widget.querySelector('[data-camera-input]');
-    const startButton = widget.querySelector('[data-camera-start]');
-    const captureButton = widget.querySelector('[data-camera-capture]');
-    const stopButton = widget.querySelector('[data-camera-stop]');
-    toggleCameraButtons(widget, false);
-    setCameraStatus(widget, supportsInlineCamera ? 'Choose files or use the camera to attach photos.' : 'Choose files to attach photos.');
-    if (startButton) startButton.addEventListener('click', () => startCamera(widget));
-    if (captureButton) captureButton.addEventListener('click', () => appendCapturedPhoto(widget));
-    if (stopButton) stopButton.addEventListener('click', () => stopCamera(widget));
-    if (input) input.addEventListener('change', () => setCameraStatus(widget, (input.files && input.files.length) ? 'Files selected.' : 'Choose files or use the camera to attach photos.'));
-  });
 
   function getDriverDraftCreditAmount() {
     if (!driverNoteType || driverNoteType.value !== 'CREDITO') return 0;
@@ -212,7 +142,17 @@
         const methods = (element.dataset.methods || '').split(',').map((value) => value.trim()).filter(Boolean);
         const shouldShow = paymentStatus.value === 'PAGADO' && method && methods.includes(method);
         element.classList.toggle('d-none', !shouldShow);
-        element.querySelectorAll('input').forEach((field) => { field.disabled = !shouldShow; });
+        element.querySelectorAll('input, select, textarea, button').forEach((field) => {
+          field.disabled = !shouldShow;
+          if (!shouldShow) {
+            if (field.type === 'file') {
+              field.value = '';
+              field.dispatchEvent(new Event('change', { bubbles: true }));
+            } else if (field.type !== 'button' && field.type !== 'submit') {
+              field.value = '';
+            }
+          }
+        });
       });
     });
   }

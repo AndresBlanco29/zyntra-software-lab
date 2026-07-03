@@ -1,0 +1,17 @@
+{% load i18n %}
+<label class="form-label fw-semibold">{% trans "Cheque image" %}</label>
+<div class="camera-upload-widget" data-camera-upload data-camera-single>
+  <input type="file" name="{{ field_name }}" class="d-none" accept="image/*" data-camera-input disabled>
+  <div class="d-grid gap-2">
+    <button type="button" class="btn btn-sm btn-outline-primary" data-camera-start>{% trans "Use camera" %}</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" data-cheque-gallery-trigger>{% trans "Choose file" %}</button>
+    <button type="button" class="btn btn-sm btn-outline-primary d-none" data-camera-capture>{% trans "Take photo" %}</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-stop>{% trans "Stop camera" %}</button>
+  </div>
+  <div class="form-text mt-2" data-camera-status>{% trans "Use the camera or choose an existing photo of the cheque." %}</div>
+  <div class="mt-2 d-none" data-camera-preview>
+    <video class="w-100 rounded border bg-dark" style="max-height: 220px; object-fit: cover;" playsinline autoplay muted data-camera-video></video>
+    <canvas class="d-none" data-camera-canvas></canvas>
+  </div>
+  <div class="row g-2 mt-2 d-none" data-file-preview></div>
+</div>

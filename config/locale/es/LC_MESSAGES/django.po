@@ -4146,6 +4146,12 @@ msgstr "Tu pedido <strong>#%(quote_id)s</strong> esta listo para tu revision y c
 msgid "We are already preparing your order for dispatch. Below is the product summary:"
 msgstr "Ya estamos preparando tu pedido para despacho. A continuacion el resumen de productos:"
 
+msgid "Use the camera or choose an existing photo of the cheque."
+msgstr "Usa la camara o elige una foto existente del cheque."
+
+msgid "Choose file"
+msgstr "Elegir archivo"
+
 msgid "Generate sales order"
 msgstr "Generate sales order"
 

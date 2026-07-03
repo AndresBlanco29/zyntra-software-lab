@@ -2662,6 +2662,34 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         result_ids = [item['id'] for item in response.json()['results']]
         self.assertIn(presentacion.id, result_ids)
 
+    def test_outbound_linked_search_finds_unlinked_catalog_product(self):
+        categoria = Categoria.objects.create(nombre='Catalogo libre')
+        marca = Marca.objects.create(nombre='Libre')
+        producto = Producto.objects.create(
+            nombre='MAZOLA CORN 12/ 40 OZ',
+            categoria=categoria,
+            marca=marca,
+            codigo_barras='7508880003333',
+            activo=True,
+        )
+        presentacion = Presentacion.objects.create(
+            producto=producto,
+            nombre='Caja',
+            unidades=12,
+            precio_3=Decimal('61.24'),
+        )
+
+        response = self.client.get(
+            reverse('quickbooks_outbound_search'),
+            {'scope': 'linked_presentations', 'q': 'MAZOLA CORN'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        match = next((item for item in payload['results'] if item['id'] == presentacion.id), None)
+        self.assertIsNotNone(match)
+        self.assertFalse(match['is_linked'])
+
     def test_build_sales_line_keeps_amount_equal_to_unit_price_times_qty(self):
         from config.integrations.quickbooks.sync import _build_sales_line
 

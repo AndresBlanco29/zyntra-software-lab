@@ -105,7 +105,7 @@
       <span class="qb-outbound-selected-count">{% trans "0 selected" %}</span>
       <div class="qb-outbound-actions">
         <button type="submit" class="btn btn-outline-primary" data-action="send-selected" {% if not pending_count %}disabled{% endif %}>{{ send_selected_label|default:_("Send selected") }}</button>
-        <button type="submit" name="send_all" value="1" class="btn btn-primary" {% if not pending_count %}disabled{% endif %}>{{ send_all_label|default:_("Send all pending") }} ({{ pending_count|default:0 }})</button>
+        <button type="submit" name="send_all" value="1" class="btn btn-primary" {% if not send_all_count|default:pending_count %}disabled{% endif %}>{{ send_all_label|default:_("Send all pending") }} ({{ send_all_count|default:pending_count|default:0 }})</button>
       </div>
     </div>
 

@@ -7,7 +7,8 @@ from urllib.parse import quote
 from django.contrib import messages
 from django.conf import settings
 from django.core.files.storage import default_storage
-from django.db.models import Q
+from django.db.models import CharField, Q, Value
+from django.db.models.functions import Coalesce, Concat
 from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -703,6 +704,7 @@ def _parse_id_list(raw_value):
 OUTBOUND_SYNC_SELECTOR_LIMIT = 100
 OUTBOUND_SYNC_MAX_IDS = 200
 OUTBOUND_SEARCH_MAX_RESULTS = 75
+OUTBOUND_LINKED_SEARCH_MAX_RESULTS = 150
 OUTBOUND_SEARCH_SCOPES = frozenset({
     'customers',
     'presentations',
@@ -714,18 +716,69 @@ OUTBOUND_SEARCH_SCOPES = frozenset({
 
 def _outbound_scope_queryset(scope):
     pending = _outbound_pending_querysets()
-    linked = _outbound_linked_querysets()
     if scope == 'customers':
         return pending['customers']
     if scope == 'presentations':
         return pending['presentations']
     if scope == 'linked_presentations':
-        return linked['presentations']
+        return _outbound_catalog_presentacion_queryset()
     if scope == 'invoices':
         return pending['invoices']
     if scope == 'notes':
         return pending['notes']
     raise ValueError('Invalid outbound search scope.')
+
+
+def _outbound_catalog_presentacion_queryset():
+    return (
+        Presentacion.objects.select_related('producto')
+        .filter(producto__activo=True)
+        .order_by('producto__nombre', 'nombre', 'id')
+    )
+
+
+def _presentation_is_quickbooks_linked(record):
+    return bool(
+        str(getattr(record, 'quickbooks_id', '') or '').strip()
+        or str(getattr(getattr(record, 'producto', None), 'quickbooks_id', '') or '').strip()
+    )
+
+
+def _annotate_presentation_search_blob(queryset):
+    return queryset.annotate(
+        _catalog_search_blob=Concat(
+            Coalesce('producto__nombre', Value('')),
+            Value(' '),
+            Coalesce('nombre', Value('')),
+            Value(' '),
+            Coalesce('producto__codigo_barras', Value('')),
+            output_field=CharField(),
+        )
+    )
+
+
+def _filter_presentation_queryset(queryset, query):
+    query = str(query or '').strip()
+    if not query:
+        return queryset
+    if query.isdigit():
+        return queryset.filter(pk=int(query))
+
+    tokens = _outbound_search_tokens(query)
+    if not tokens:
+        return queryset.none()
+
+    queryset = _annotate_presentation_search_blob(queryset)
+    if len(tokens) == 1:
+        token = tokens[0]
+        return queryset.filter(
+            Q(_catalog_search_blob__icontains=token)
+            | _presentation_search_token_filter(token)
+        ).distinct()
+
+    for token in tokens:
+        queryset = queryset.filter(_presentation_search_token_filter(token))
+    return queryset.distinct()
 
 
 def _outbound_search_tokens(query):
@@ -752,12 +805,7 @@ def _filter_outbound_queryset(queryset, *, scope, query):
         return queryset.filter(pk=int(query))
 
     if scope in {'presentations', 'linked_presentations'}:
-        tokens = _outbound_search_tokens(query)
-        if not tokens:
-            return queryset.none()
-        for token in tokens:
-            queryset = queryset.filter(_presentation_search_token_filter(token))
-        return queryset
+        return _filter_presentation_queryset(queryset, query)
 
     if scope == 'customers':
         tokens = _outbound_search_tokens(query)
@@ -808,11 +856,14 @@ def _serialize_outbound_record(record, *, scope):
         if meta and meta.lower() not in label.lower():
             label = f'{label} / {meta}'
             meta = ''
-        return {
+        payload = {
             'id': record.id,
             'label': label,
             'meta': meta,
         }
+        if scope == 'linked_presentations':
+            payload['is_linked'] = _presentation_is_quickbooks_linked(record)
+        return payload
     if scope == 'invoices':
         return {
             'id': record.id,
@@ -828,7 +879,7 @@ def _serialize_outbound_record(record, *, scope):
     raise ValueError('Invalid outbound search scope.')
 
 
-def search_outbound_records(*, scope, query='', limit=OUTBOUND_SEARCH_MAX_RESULTS):
+def search_outbound_records(*, scope, query='', limit=None):
     if scope not in OUTBOUND_SEARCH_SCOPES:
         raise ValueError('Invalid outbound search scope.')
 
@@ -836,10 +887,14 @@ def search_outbound_records(*, scope, query='', limit=OUTBOUND_SEARCH_MAX_RESULT
     query = str(query or '').strip()
     if query:
         queryset = _filter_outbound_queryset(queryset, scope=scope, query=query)
+    elif scope == 'linked_presentations':
+        pass
     else:
         queryset = queryset.order_by('-id')
 
-    limit = max(1, min(int(limit or OUTBOUND_SEARCH_MAX_RESULTS), OUTBOUND_SEARCH_MAX_RESULTS))
+    if limit is None:
+        limit = OUTBOUND_LINKED_SEARCH_MAX_RESULTS if scope == 'linked_presentations' else OUTBOUND_SEARCH_MAX_RESULTS
+    limit = max(1, min(int(limit), OUTBOUND_LINKED_SEARCH_MAX_RESULTS))
     return [_serialize_outbound_record(record, scope=scope) for record in queryset[:limit]]
 
 
@@ -853,9 +908,8 @@ def _outbound_pending_querysets():
 
 
 def _outbound_linked_querysets():
-    linked_presentations = _linked_catalog_presentacion_queryset().order_by('-id')
     return {
-        'presentations': linked_presentations,
+        'presentations': _linked_catalog_presentacion_queryset(),
     }
 
 
@@ -907,17 +961,19 @@ def get_dashboard_sync_context(*, request=None):
     pending_invoices = pending['invoices']
     pending_notes = pending['notes']
     linked_presentations = linked['presentations']
+    catalog_presentations = _outbound_catalog_presentacion_queryset()
     return {
         'quickbooks_pending_customers': pending_customers[:OUTBOUND_SYNC_SELECTOR_LIMIT],
         'quickbooks_pending_presentations': pending_presentations[:OUTBOUND_SYNC_SELECTOR_LIMIT],
         'quickbooks_pending_invoices': pending_invoices[:OUTBOUND_SYNC_SELECTOR_LIMIT],
         'quickbooks_pending_notes': pending_notes[:OUTBOUND_SYNC_SELECTOR_LIMIT],
-        'quickbooks_linked_presentations': linked_presentations[:OUTBOUND_SYNC_SELECTOR_LIMIT],
+        'quickbooks_linked_presentations': catalog_presentations[:OUTBOUND_SYNC_SELECTOR_LIMIT],
         'quickbooks_pending_customer_count': pending_customers.count(),
         'quickbooks_pending_presentation_count': pending_presentations.count(),
         'quickbooks_pending_invoice_count': pending_invoices.count(),
         'quickbooks_pending_note_count': pending_notes.count(),
         'quickbooks_linked_presentation_count': linked_presentations.count(),
+        'quickbooks_catalog_presentation_count': catalog_presentations.count(),
         'quickbooks_outbound_search_url': reverse('quickbooks_outbound_search'),
         'quickbooks_outbound_sync_enabled': True,
         'quickbooks_alignment_sync_enabled': True,
@@ -2003,10 +2059,13 @@ def quickbooks_push_linked_products_to_quickbooks(request):
 @quickbooks_requires_full_mode
 def quickbooks_push_linked_products_batch(request):
     linked = _outbound_linked_querysets()['presentations']
+    catalog = _outbound_catalog_presentacion_queryset()
+    send_all = str(request.POST.get('send_all') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
+    target_queryset = linked if send_all else catalog
     try:
         record_ids = _validate_outbound_sync_ids(
-            _parse_outbound_sync_ids(request, pending_queryset=linked),
-            linked,
+            _parse_outbound_sync_ids(request, pending_queryset=target_queryset),
+            target_queryset,
         )
         result = sync_product_batch_by_ids(record_ids)
     except ValueError as exc:

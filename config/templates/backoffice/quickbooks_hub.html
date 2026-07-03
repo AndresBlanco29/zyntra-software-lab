@@ -576,6 +576,20 @@
     word-break: break-word;
   }
 
+  .qb-outbound-row__status {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 0.15rem;
+    padding: 0.12rem 0.45rem;
+    border-radius: 999px;
+    background: rgba(240, 180, 41, 0.16);
+    color: #8a6116;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
   .qb-outbound-empty {
     display: flex;
     align-items: center;
@@ -1425,13 +1439,13 @@
           <div class="qb-outbound-panel__head">
             <div>
               <h4 class="qb-outbound-panel__title">{% trans "Update linked catalog in QuickBooks" %}</h4>
-              <p class="qb-outbound-panel__subtitle">{% trans "Use this when products are already linked and you changed prices, names, descriptions, or inventory quantities in the app. Linked Non-inventory items in QuickBooks will be converted to Inventory with the current on-hand quantity when you update them here." %}</p>
+              <p class="qb-outbound-panel__subtitle">{% trans "Search any product in your catalog and update it in QuickBooks, whether it was synced recently or not. The list below shows the first items alphabetically; use search to find any product. Update all linked only updates the items already connected to QuickBooks." %}</p>
             </div>
-            <span class="qb-outbound-panel__badge">{{ quickbooks_linked_presentation_count }}</span>
+            <span class="qb-outbound-panel__badge">{{ quickbooks_catalog_presentation_count }}</span>
           </div>
           <div class="qb-outbound-linked-layout">
             {% url 'quickbooks_push_linked_products_batch' as linked_products_batch_url %}
-            {% include "backoffice/partials/quickbooks_outbound_panel.html" with title="" form_action=linked_products_batch_url records=quickbooks_linked_presentations record_mode="linked_presentation" outbound_scope="linked_presentations" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_linked_presentation_count send_selected_label=_("Update selected") send_all_label=_("Update all linked") empty_message=_("No linked items match your search.") panel_class="qb-outbound-panel--embedded" only %}
+            {% include "backoffice/partials/quickbooks_outbound_panel.html" with title="" form_action=linked_products_batch_url records=quickbooks_linked_presentations record_mode="linked_presentation" outbound_scope="linked_presentations" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_catalog_presentation_count send_all_count=quickbooks_linked_presentation_count send_selected_label=_("Update selected") send_all_label=_("Update all linked") empty_message=_("No products match your search.") panel_class="qb-outbound-panel--embedded" only %}
             <div class="qb-outbound-quick-action">
               <form method="post" action="{% url 'quickbooks_push_linked_products_to_quickbooks' %}" data-qb-operation="push_linked_products_to_quickbooks">
                 {% csrf_token %}
@@ -1622,6 +1636,9 @@
       const metaHtml = item.meta
         ? '<span class="qb-outbound-row__meta">' + escapeHtml(item.meta) + '</span>'
         : '';
+      const statusHtml = item.is_linked === false
+        ? '<span class="qb-outbound-row__status">{% filter escapejs %}{% trans "Not linked yet" %}{% endfilter %}</span>'
+        : '';
       const searchText = ('#' + item.id + ' ' + (item.label || '') + ' ' + (item.meta || '')).toLowerCase();
       return (
         '<label class="qb-outbound-row" data-search-text="' + escapeHtml(searchText) + '">' +
@@ -1630,6 +1647,7 @@
           '<span class="qb-outbound-row__body">' +
             '<span class="qb-outbound-row__label">' + escapeHtml(item.label) + '</span>' +
             metaHtml +
+            statusHtml +
           '</span>' +
         '</label>'
       );

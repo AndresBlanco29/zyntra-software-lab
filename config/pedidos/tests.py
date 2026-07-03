@@ -552,12 +552,15 @@ class PickingVerificationFlowTests(TestCase):
 		self.item.refresh_from_db()
 		self.assertFalse(self.pedido.picking_bloqueado)
 		self.assertTrue(self.pedido.nota_seleccionador_resuelta)
-		self.assertEqual(self.item.cantidad_inventario_aplicada, 2)
+		self.assertEqual(self.item.cantidad_inventario_aplicada, 0)
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		self.assertEqual(stock.stock_fisico, 10)
 
 		detail_response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
 		self.assertContains(detail_response, 'name="metodo_entrega"', html=False)
+		self.assertNotContains(detail_response, 'data-stock-shortage="true"', html=False)
 
-	def test_backoffice_cannot_unlock_order_when_inventory_still_unavailable(self):
+	def test_backoffice_can_unlock_order_even_when_inventory_is_unavailable(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=0, stock_disponible=0)
 		guardar_verificacion_picking(
@@ -568,12 +571,44 @@ class PickingVerificationFlowTests(TestCase):
 			nota_resuelta=False,
 		)
 
-		with self.assertRaises(ValidationError):
-			resolver_bloqueo_picking_desde_backoffice(pedido=self.pedido, usuario=self.backoffice)
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_resolver_bloqueo_picking', args=[self.pedido.id]))
 
+		self.assertEqual(response.status_code, 302)
 		self.pedido.refresh_from_db()
-		self.assertTrue(self.pedido.picking_bloqueado)
-		self.assertFalse(self.pedido.nota_seleccionador_resuelta)
+		self.assertFalse(self.pedido.picking_bloqueado)
+		self.assertEqual(self.item.cantidad_inventario_aplicada, 0)
+
+	def test_backoffice_unlock_after_zeroing_shortage_line_preserves_physical_stock(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=6, stock_disponible=4)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 2},
+			nota='Falta stock fisico',
+			nota_resuelta=False,
+		)
+
+		self.client.force_login(self.backoffice)
+		self.client.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), {
+			'estado': 'VERIFICADO_AJUSTADO',
+			'nota_backoffice': 'No despachar esta linea',
+			f'cantidad_{self.item.id}': '0',
+			f'precio_{self.item.id}': '12.00',
+		})
+		self.client.post(reverse('backoffice_resolver_bloqueo_picking', args=[self.pedido.id]))
+
+		self.item.refresh_from_db()
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		self.assertEqual(self.item.cantidad, 0)
+		self.assertEqual(self.item.cantidad_inventario_aplicada, 0)
+		self.assertEqual(stock.stock_fisico, 6)
+
+		detail_response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+		self.assertContains(detail_response, 'Available stock: 6 CS')
+		self.assertNotContains(detail_response, 'Insufficient stock')
+		self.assertNotContains(detail_response, 'data-stock-shortage="true"', html=False)
 
 	def test_resolver_bloqueo_service_rejects_already_unlocked_order(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)

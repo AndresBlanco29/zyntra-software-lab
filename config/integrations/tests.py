@@ -212,6 +212,33 @@ class QuickBooksCustomerNamingTests(TestCase):
         self.assertEqual(_extract_quickbooks_customer_balance(enriched), Decimal('22545.71'))
         mock_client.read_entity.assert_called_once_with('Customer', '701')
 
+    @patch('config.integrations.quickbooks.sync.QuickBooksAPIClient')
+    def test_import_customer_record_works_without_enrich_mock(self, mock_client_cls):
+        mock_client = mock_client_cls.return_value
+        mock_client.read_entity.return_value = {
+            'Id': 'QB-NEW-CUSTOMER',
+            'DisplayName': 'Cliente Prueba QB',
+            'CompanyName': 'Cliente Prueba QB',
+            'Balance': 0,
+            'Active': True,
+            'PrimaryPhone': {'FreeFormNumber': '5551234567'},
+            'BillAddr': {
+                'Line1': '1 Main',
+                'City': 'Dallas',
+                'CountrySubDivisionCode': 'TX',
+                'PostalCode': '75001',
+                'Country': 'USA',
+            },
+        }
+        result = import_quickbooks_customer_record({
+            'Id': 'QB-NEW-CUSTOMER',
+            'DisplayName': 'Cliente Prueba QB',
+            'CompanyName': 'Cliente Prueba QB',
+            'Active': True,
+        })
+        self.assertEqual(result['action'], 'created')
+        self.assertTrue(Cliente.objects.filter(quickbooks_id='QB-NEW-CUSTOMER').exists())
+
     @patch('config.integrations.quickbooks.sync._enrich_quickbooks_customer_payload')
     def test_import_customer_record_uses_enriched_balance(self, mock_enrich):
         mock_enrich.side_effect = lambda payload, **kwargs: {
@@ -2975,9 +3002,17 @@ class QuickBooksAlignmentSyncTests(QuickBooksIntegrationTests):
         call_command('run_scheduled_quickbooks_sync', '--now=2026-07-03T06:00:00', stdout=stdout)
         mock_alignment.assert_called_once()
         self.assertIs(mock_alignment.call_args.kwargs.get('include_export'), False)
+        self.assertIs(mock_alignment.call_args.kwargs.get('force_full'), False)
         connection.refresh_from_db()
         self.assertEqual(connection.sync_state['alignment_automation']['last_slot'], '2026-07-03T06:00')
         self.assertIn('QuickBooks alignment sync complete', stdout.getvalue())
+
+    @patch('config.integrations.quickbooks.management.commands.run_scheduled_quickbooks_sync.run_quickbooks_alignment_sync')
+    def test_run_scheduled_quickbooks_sync_force_runs_full_import(self, mock_alignment):
+        self._activate_connection()
+        mock_alignment.return_value = {'summary': {'import': {}, 'export': {}}}
+        call_command('run_scheduled_quickbooks_sync', '--force', '--now=2026-07-03T06:00:00')
+        self.assertTrue(mock_alignment.call_args.kwargs.get('force_full'))
 
     def test_push_new_outbound_records_only_targets_unlinked_records(self):
         linked_user = Usuario.objects.create_user(username='linked-cust', password='secret123', role='cliente')

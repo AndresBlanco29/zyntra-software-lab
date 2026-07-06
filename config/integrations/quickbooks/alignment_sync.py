@@ -176,7 +176,10 @@ def _resolve_alignment_status(*, summary, error_message=''):
             export_summary.get('customers', {}).get('failed', 0)
             + export_summary.get('presentations', {}).get('failed', 0)
         )
-    import_failed = summary.get('import', {}).get('items', {}).get('failed', 0)
+    import_failed = (
+        summary.get('import', {}).get('items', {}).get('failed', 0)
+        + summary.get('import', {}).get('customers', {}).get('failed', 0)
+    )
     if export_failed or import_failed:
         return QuickBooksSyncRun.STATUS_PARTIAL
     return QuickBooksSyncRun.STATUS_SUCCESS

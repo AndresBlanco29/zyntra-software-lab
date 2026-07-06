@@ -37,7 +37,7 @@ class Command(BaseCommand):
         parser.add_argument(
             '--force',
             action='store_true',
-            help='Run immediately, ignoring the schedule window and last-slot tracking.',
+            help='Run immediately, ignoring the schedule window and last-slot tracking. Also runs a full import.',
         )
         parser.add_argument(
             '--now',
@@ -68,7 +68,7 @@ class Command(BaseCommand):
         )
         try:
             result = run_quickbooks_alignment_sync(
-                force_full=False,
+                force_full=force,
                 trigger=QuickBooksSyncRun.TRIGGER_SCHEDULED,
                 max_results=None,
                 save_history=True,

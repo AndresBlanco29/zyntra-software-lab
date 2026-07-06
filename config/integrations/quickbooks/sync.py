@@ -1402,7 +1402,7 @@ def import_quickbooks_customer_record(payload):
             reason='QuickBooks customer is inactive or deleted.',
         )
 
-    client = client or QuickBooksAPIClient()
+    client = QuickBooksAPIClient()
     payload = _enrich_quickbooks_customer_payload(payload, client=client)
 
     company_name = _extract_quickbooks_customer_company_name(payload)
@@ -3772,6 +3772,16 @@ def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None
     return result
 
 
+def _advance_sync_cursor(connection, *, key, batch_result, run_started_at):
+    latest_updated_at = (batch_result or {}).get('latest_updated_at')
+    if latest_updated_at:
+        connection.set_sync_cursor(key, latest_updated_at)
+        return
+    if int((batch_result or {}).get('count') or 0) <= 0:
+        return
+    connection.set_sync_cursor(key, _serialize_cursor(run_started_at))
+
+
 def pull_quickbooks_to_local(*, max_results=25, client=None, force_full=False, task_cache_key=None, skip_images=None):
     client = client or QuickBooksAPIClient()
     connection = client.connection
@@ -3808,11 +3818,21 @@ def pull_quickbooks_to_local(*, max_results=25, client=None, force_full=False, t
         accounting_documents = _empty_accounting_documents_import_result()
 
     serialized_run_started_at = _serialize_cursor(run_started_at)
-    connection.set_sync_cursor(_sync_cursor_key('customer'), customers.get('latest_updated_at') or serialized_run_started_at)
-    connection.set_sync_cursor(_sync_cursor_key('item'), items.get('latest_updated_at') or serialized_run_started_at)
+    _advance_sync_cursor(connection, key=_sync_cursor_key('customer'), batch_result=customers, run_started_at=run_started_at)
+    _advance_sync_cursor(connection, key=_sync_cursor_key('item'), batch_result=items, run_started_at=run_started_at)
     if quickbooks_accounting_import_enabled():
-        connection.set_sync_cursor(_sync_cursor_key('invoice'), accounting_documents.get('invoice_result', {}).get('latest_updated_at') or serialized_run_started_at)
-        connection.set_sync_cursor(_sync_cursor_key('credit_memo'), accounting_documents.get('credit_memo_result', {}).get('latest_updated_at') or serialized_run_started_at)
+        _advance_sync_cursor(
+            connection,
+            key=_sync_cursor_key('invoice'),
+            batch_result=accounting_documents.get('invoice_result'),
+            run_started_at=run_started_at,
+        )
+        _advance_sync_cursor(
+            connection,
+            key=_sync_cursor_key('credit_memo'),
+            batch_result=accounting_documents.get('credit_memo_result'),
+            run_started_at=run_started_at,
+        )
     connection.save(update_fields=['sync_state', 'updated_at'])
 
     return {

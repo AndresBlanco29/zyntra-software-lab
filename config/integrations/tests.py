@@ -2916,8 +2916,24 @@ class QuickBooksAlignmentSyncTests(QuickBooksIntegrationTests):
     def test_build_alignment_sync_summary_shapes_export_and_import_counts(self):
         summary = build_alignment_sync_summary(
             pull_result={
-                'customers': {'created_count': 2, 'updated_count': 1, 'conflict_count': 0},
-                'items': {'created_count': 3, 'updated_count': 4, 'conflict_count': 1},
+                'customers': {
+                    'created_count': 2,
+                    'updated_count': 1,
+                    'conflict_count': 0,
+                    'results': [
+                        {'ok': True, 'action': 'created', 'local_id': 11, 'label': 'New Customer A', 'quickbooks_id': 'QB-11'},
+                        {'ok': True, 'action': 'created', 'local_id': 12, 'label': 'New Customer B', 'quickbooks_id': 'QB-12'},
+                        {'ok': True, 'action': 'updated', 'local_id': 13, 'label': 'Existing Customer', 'quickbooks_id': 'QB-13'},
+                    ],
+                },
+                'items': {
+                    'created_count': 3,
+                    'updated_count': 4,
+                    'conflict_count': 1,
+                    'results': [
+                        {'ok': True, 'action': 'created', 'local_id': 21, 'label': 'Mazola 12/40', 'quickbooks_id': 'QB-21'},
+                    ],
+                },
             },
             invoice_status_result={'linked_count': 10, 'updated_count': 2},
             export_result={
@@ -2928,6 +2944,9 @@ class QuickBooksAlignmentSyncTests(QuickBooksIntegrationTests):
             force_full=False,
         )
         self.assertEqual(summary['import']['customers']['created'], 2)
+        self.assertEqual(len(summary['import']['customers']['created_samples']), 2)
+        self.assertEqual(summary['import']['customers']['created_samples'][0]['label'], 'New Customer A')
+        self.assertEqual(len(summary['import']['items']['created_samples']), 1)
         self.assertEqual(summary['export']['presentations']['failed'], 1)
         self.assertTrue(summary['export']['invoices_skipped'])
 
@@ -3050,9 +3069,30 @@ class QuickBooksAlignmentSyncTests(QuickBooksIntegrationTests):
         QuickBooksSyncRun.objects.create(
             trigger=QuickBooksSyncRun.TRIGGER_SCHEDULED,
             status=QuickBooksSyncRun.STATUS_SUCCESS,
-            summary={'import': {'customers': {'created': 1, 'updated': 0}}, 'export': {'customers': {'success': 0}}},
+            summary={
+                'import': {
+                    'customers': {
+                        'created': 1,
+                        'updated': 0,
+                        'created_samples': [
+                            {'label': 'Cliente Prueba QB', 'local_id': 99, 'quickbooks_id': 'QB-99'},
+                        ],
+                    },
+                    'items': {
+                        'created': 0,
+                        'updated': 1,
+                        'updated_samples': [
+                            {'label': 'Mazola Corn 12/40', 'local_id': 100, 'quickbooks_id': 'QB-100'},
+                        ],
+                    },
+                },
+                'export': {'customers': {'success': 0}, 'skipped': True},
+            },
             finished_at=timezone.now(),
         )
         response = self.client.get(reverse('quickbooks_sync_history'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'QuickBooks sync history')
+        self.assertContains(response, 'View import details')
+        self.assertContains(response, 'Cliente Prueba QB')
+        self.assertContains(response, 'Mazola Corn 12/40')

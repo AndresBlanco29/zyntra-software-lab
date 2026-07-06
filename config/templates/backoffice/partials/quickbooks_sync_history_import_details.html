@@ -1,0 +1,84 @@
+{% load i18n %}
+{% if details.has_samples %}
+<div class="qb-sync-detail-grid">
+  {% if details.created %}
+  <div class="qb-sync-detail-block">
+    <div class="qb-sync-detail-title text-success">{% trans "New" %} ({{ details.created|length }}{% if details.created_truncated %}+{% endif %})</div>
+    <ul class="qb-sync-detail-list">
+      {% for row in details.created %}
+      <li>
+        <span class="fw-semibold">{{ row.label|default:"—" }}</span>
+        {% if row.local_id %}<span class="text-muted">#{{ row.local_id }}</span>{% endif %}
+        {% if row.quickbooks_id %}<span class="text-muted">QB {{ row.quickbooks_id }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% if details.created_truncated %}
+    <div class="small text-muted">{% trans "Showing the first records only." %}</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if details.updated %}
+  <div class="qb-sync-detail-block">
+    <div class="qb-sync-detail-title text-primary">{% trans "Updated" %} ({{ details.updated|length }}{% if details.updated_truncated %}+{% endif %})</div>
+    <ul class="qb-sync-detail-list">
+      {% for row in details.updated %}
+      <li>
+        <span class="fw-semibold">{{ row.label|default:"—" }}</span>
+        {% if row.local_id %}<span class="text-muted">#{{ row.local_id }}</span>{% endif %}
+        {% if row.quickbooks_id %}<span class="text-muted">QB {{ row.quickbooks_id }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% if details.updated_truncated %}
+    <div class="small text-muted">{% trans "Showing the first records only." %}</div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if details.skipped %}
+  <div class="qb-sync-detail-block">
+    <div class="qb-sync-detail-title text-muted">{% trans "Skipped" %} ({{ details.skipped|length }}{% if details.skipped_truncated %}+{% endif %})</div>
+    <ul class="qb-sync-detail-list">
+      {% for row in details.skipped %}
+      <li>
+        <span class="fw-semibold">{{ row.label|default:"—" }}</span>
+        {% if row.error %}<span class="text-muted">· {{ row.error }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if details.failed %}
+  <div class="qb-sync-detail-block">
+    <div class="qb-sync-detail-title text-danger">{% trans "Failed" %} ({{ details.failed|length }}{% if details.failed_truncated %}+{% endif %})</div>
+    <ul class="qb-sync-detail-list">
+      {% for row in details.failed %}
+      <li>
+        <span class="fw-semibold">{{ row.label|default:"—" }}</span>
+        {% if row.error %}<span class="text-danger">· {{ row.error }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if details.conflict %}
+  <div class="qb-sync-detail-block">
+    <div class="qb-sync-detail-title text-warning">{% trans "Conflicts" %} ({{ details.conflict|length }}{% if details.conflict_truncated %}+{% endif %})</div>
+    <ul class="qb-sync-detail-list">
+      {% for row in details.conflict %}
+      <li>
+        <span class="fw-semibold">{{ row.label|default:"—" }}</span>
+        {% if row.error %}<span class="text-muted">· {{ row.error }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="small text-muted">{% trans "No per-record details were stored for this run." %}</div>
+{% endif %}

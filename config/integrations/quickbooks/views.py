@@ -1130,6 +1130,20 @@ def _build_quickbooks_preview_context(*, request):
     }
 
 
+def _sync_history_import_details(entity_summary):
+    entity_summary = entity_summary if isinstance(entity_summary, dict) else {}
+    actions = ('created', 'updated', 'skipped', 'failed', 'conflict')
+    details = {
+        action: entity_summary.get(f'{action}_samples') or []
+        for action in actions
+    }
+    for action in actions:
+        details[f'{action}_truncated'] = bool(entity_summary.get(f'{action}_truncated'))
+    details['truncated'] = any(details[f'{action}_truncated'] for action in actions)
+    details['has_samples'] = any(details[action] for action in actions)
+    return details
+
+
 def _build_sync_history_row(sync_run):
     summary = sync_run.summary if isinstance(sync_run.summary, dict) else {}
     import_summary = summary.get('import') or {}
@@ -1139,6 +1153,8 @@ def _build_sync_history_row(sync_run):
     invoice_status = import_summary.get('invoice_status') or {}
     export_customers = export_summary.get('customers') or {}
     export_items = export_summary.get('presentations') or {}
+    customers_details = _sync_history_import_details(customers)
+    items_details = _sync_history_import_details(items)
     status_class = {
         QuickBooksSyncRun.STATUS_SUCCESS: 'success',
         QuickBooksSyncRun.STATUS_PARTIAL: 'warning',
@@ -1172,6 +1188,9 @@ def _build_sync_history_row(sync_run):
         'export_customers_failed': export_customers.get('failed', 0),
         'export_items_failed': export_items.get('failed', 0),
         'export_skipped': bool(export_summary.get('skipped')),
+        'import_customers_details': customers_details,
+        'import_items_details': items_details,
+        'has_import_details': customers_details['has_samples'] or items_details['has_samples'],
         'summary': summary,
         'force_full': sync_run.force_full,
     }

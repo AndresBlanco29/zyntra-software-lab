@@ -105,6 +105,42 @@ def _entity_import_counts(section):
     }
 
 
+def _import_action_samples(batch_result, *, limit_per_action=40):
+    buckets = {
+        'created': [],
+        'updated': [],
+        'skipped': [],
+        'failed': [],
+        'conflict': [],
+    }
+    for item in batch_result.get('results') or []:
+        action = str(item.get('action') or '').strip().lower()
+        if not item.get('ok') and action not in {'skipped', 'conflict'}:
+            action = 'failed'
+        if action not in buckets:
+            continue
+        if len(buckets[action]) >= limit_per_action:
+            continue
+        buckets[action].append({
+            'label': str(item.get('label') or item.get('quickbooks_id') or item.get('local_id') or '').strip(),
+            'local_id': item.get('local_id'),
+            'quickbooks_id': str(item.get('quickbooks_id') or '').strip(),
+            'error': str(item.get('error') or item.get('reason') or '').strip(),
+        })
+    return buckets
+
+
+def _entity_import_summary(section, *, sample_limit=40):
+    counts = _entity_import_counts(section)
+    samples = _import_action_samples(section, limit_per_action=sample_limit)
+    for action, rows in samples.items():
+        count_key = 'conflicts' if action == 'conflict' else action
+        total = counts.get(count_key, 0)
+        counts[f'{action}_samples'] = rows
+        counts[f'{action}_truncated'] = total > len(rows)
+    return counts
+
+
 def _export_samples(batch_result, *, limit=8):
     samples = []
     for item in batch_result.get('results') or []:
@@ -136,8 +172,8 @@ def build_alignment_sync_summary(*, pull_result, invoice_status_result, export_r
         'incremental': not force_full,
         'force_full': force_full,
         'import': {
-            'customers': _entity_import_counts(customers),
-            'items': _entity_import_counts(items),
+            'customers': _entity_import_summary(customers),
+            'items': _entity_import_summary(items),
             'invoice_status': {
                 'linked': int(invoice_status_result.get('linked_count') or invoice_status_result.get('count') or 0),
                 'updated': int(invoice_status_result.get('updated_count') or 0),

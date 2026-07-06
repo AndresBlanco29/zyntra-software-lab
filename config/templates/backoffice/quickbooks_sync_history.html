@@ -9,7 +9,7 @@
     <h2 class="mb-1">{% trans "QuickBooks sync history" %}</h2>
     <p class="text-muted mb-0">
       {% blocktrans with timezone=quickbooks_alignment_timezone schedule=quickbooks_alignment_schedule_label %}
-      Automatic alignment runs every 6 hours at {{ schedule }} (US Eastern, {{ timezone }}). Manual runs from QuickBooks Center are listed here too.
+      Automatic import runs every 6 hours at {{ schedule }} (US Eastern, {{ timezone }}). Inventory follows QuickBooks on each catalog import. Export to QuickBooks stays manual. Manual runs from QuickBooks Center are listed here too.
       {% endblocktrans %}
     </p>
   </div>
@@ -49,8 +49,12 @@
             </td>
             <td class="small">{{ run.invoice_status_updated }} {% trans "updated" %}</td>
             <td class="small">
+              {% if run.export_skipped %}
+              <div class="text-muted">{% trans "Manual only" %}</div>
+              {% else %}
               <div>{% trans "Customers" %}: {{ run.export_customers_success }}{% if run.export_customers_failed %} / {{ run.export_customers_failed }} {% trans "failed" %}{% endif %}</div>
               <div>{% trans "Products" %}: {{ run.export_items_success }}{% if run.export_items_failed %} / {{ run.export_items_failed }} {% trans "failed" %}{% endif %}</div>
+              {% endif %}
               <div class="text-muted">{% trans "Invoices manual" %}</div>
             </td>
             <td class="small">{{ run.duration_label }}</td>

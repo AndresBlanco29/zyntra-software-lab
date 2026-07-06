@@ -461,18 +461,23 @@ def _build_dashboard_feedback(*, operation, ok, result=None, error=None):
                 'linked': invoice_status.get('linked', 0),
             }
         )
-        feedback['details'].append(
-            _('Export new customers -> sent %(success)s, failed %(failed)s.') % {
-                'success': export_customers.get('success', 0),
-                'failed': export_customers.get('failed', 0),
-            }
-        )
-        feedback['details'].append(
-            _('Export new products -> sent %(success)s, failed %(failed)s.') % {
-                'success': export_items.get('success', 0),
-                'failed': export_items.get('failed', 0),
-            }
-        )
+        if export_summary.get('skipped'):
+            feedback['details'].append(
+                _('Inventory quantities follow QuickBooks on catalog import. Nothing was exported to QuickBooks (manual export only).')
+            )
+        else:
+            feedback['details'].append(
+                _('Export new customers -> sent %(success)s, failed %(failed)s.') % {
+                    'success': export_customers.get('success', 0),
+                    'failed': export_customers.get('failed', 0),
+                }
+            )
+            feedback['details'].append(
+                _('Export new products -> sent %(success)s, failed %(failed)s.') % {
+                    'success': export_items.get('success', 0),
+                    'failed': export_items.get('failed', 0),
+                }
+            )
         feedback['details'].append(_('Invoices were not exported automatically (manual only).'))
         feedback['details'].append(
             _('Incremental sync used saved cursors.') if result.get('incremental') else _('Full sync ignored saved cursors.')
@@ -1166,6 +1171,7 @@ def _build_sync_history_row(sync_run):
         'export_items_success': export_items.get('success', 0),
         'export_customers_failed': export_customers.get('failed', 0),
         'export_items_failed': export_items.get('failed', 0),
+        'export_skipped': bool(export_summary.get('skipped')),
         'summary': summary,
         'force_full': sync_run.force_full,
     }

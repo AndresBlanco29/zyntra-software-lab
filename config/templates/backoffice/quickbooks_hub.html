@@ -1294,7 +1294,7 @@
                   <input type="hidden" name="redirect_to" value="{{ request.path }}">
                   <button type="submit" class="btn btn-primary w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Run pull sync now" %}</button>
                 </form>
-                <p class="qb-action-note">{% trans "Imports new or changed customers and catalog items from QuickBooks, refreshes linked invoice payment status, and exports only new local customers and products. Invoices stay manual." %}</p>
+                <p class="qb-action-note">{% trans "Imports new or changed customers and catalog items from QuickBooks, refreshes linked invoice payment status, and updates local inventory from QuickBooks quantities. Nothing is exported to QuickBooks from this button." %}</p>
               </div>
             </div>
             <div class="col-md-6">
@@ -1306,7 +1306,7 @@
                   <input type="hidden" name="redirect_to" value="{{ request.path }}">
                   <button type="submit" class="btn btn-outline-primary w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Run full resync" %}</button>
                 </form>
-                <p class="qb-action-note">{% trans "Same alignment rules as pull sync, but ignores saved cursors and reviews every linked invoice status again." %}</p>
+                <p class="qb-action-note">{% trans "Same import rules as pull sync, but ignores saved cursors and reviews every linked invoice status again. Inventory still follows QuickBooks." %}</p>
               </div>
             </div>
           </div>
@@ -1314,7 +1314,7 @@
             <div class="fw-semibold mb-1">{% trans "Automatic sync every 6 hours" %}</div>
             <div class="small text-muted">
               {% blocktrans with timezone=quickbooks_alignment_timezone schedule=quickbooks_alignment_schedule_label %}
-              Runs automatically at {{ schedule }} (US Eastern, {{ timezone }}) without anyone on this page.
+              Runs automatically at {{ schedule }} (US Eastern, {{ timezone }}) without anyone on this page. Imports new customers and products from QuickBooks and updates local inventory from QuickBooks quantities. Nothing is exported automatically.
               {% endblocktrans %}
               {% if quickbooks_alignment_last_run_label %}
               {% blocktrans with last_run=quickbooks_alignment_last_run_label %}Last scheduled run: {{ last_run }}.{% endblocktrans %}

@@ -2908,7 +2908,7 @@ class QuickBooksAlignmentSyncTests(QuickBooksIntegrationTests):
     @patch('config.integrations.quickbooks.alignment_sync.sync_customer_batch_by_ids')
     @patch('config.integrations.quickbooks.alignment_sync.refresh_linked_quickbooks_invoice_status')
     @patch('config.integrations.quickbooks.alignment_sync.pull_quickbooks_to_local')
-    def test_run_quickbooks_alignment_sync_records_history(
+    def test_run_quickbooks_alignment_sync_records_history_without_export(
         self,
         mock_pull,
         mock_refresh,
@@ -2921,16 +2921,43 @@ class QuickBooksAlignmentSyncTests(QuickBooksIntegrationTests):
             'incremental': True,
         }
         mock_refresh.return_value = {'linked_count': 4, 'updated_count': 1}
-        mock_export_customers.return_value = {'requested_ids': [], 'success_count': 0, 'failed_count': 0, 'results': []}
-        mock_export_products.return_value = {'requested_ids': [], 'success_count': 0, 'failed_count': 0, 'results': []}
 
         result = run_quickbooks_alignment_sync(save_history=True, scheduled_slot='2026-07-03T12:00')
 
+        mock_export_customers.assert_not_called()
+        mock_export_products.assert_not_called()
         self.assertEqual(QuickBooksSyncRun.objects.count(), 1)
         sync_run = QuickBooksSyncRun.objects.get()
         self.assertEqual(sync_run.status, QuickBooksSyncRun.STATUS_SUCCESS)
         self.assertEqual(sync_run.scheduled_slot, '2026-07-03T12:00')
         self.assertEqual(result['summary']['import']['items']['created'], 2)
+        self.assertTrue(result['summary']['export']['skipped'])
+
+    @patch('config.integrations.quickbooks.alignment_sync.push_new_outbound_records_to_quickbooks')
+    @patch('config.integrations.quickbooks.alignment_sync.refresh_linked_quickbooks_invoice_status')
+    @patch('config.integrations.quickbooks.alignment_sync.pull_quickbooks_to_local')
+    def test_run_quickbooks_alignment_sync_can_export_when_requested(
+        self,
+        mock_pull,
+        mock_refresh,
+        mock_export,
+    ):
+        mock_pull.return_value = {
+            'customers': {'created_count': 0, 'updated_count': 0, 'conflict_count': 0},
+            'items': {'created_count': 0, 'updated_count': 0, 'conflict_count': 0},
+            'incremental': True,
+        }
+        mock_refresh.return_value = {'linked_count': 0, 'updated_count': 0}
+        mock_export.return_value = {
+            'customers': {'requested_ids': [], 'success_count': 0, 'failed_count': 0, 'results': []},
+            'presentations': {'requested_ids': [], 'success_count': 0, 'failed_count': 0, 'results': []},
+            'invoices_skipped': True,
+            'notes_skipped': True,
+        }
+
+        run_quickbooks_alignment_sync(include_export=True, save_history=False)
+
+        mock_export.assert_called_once()
 
     @patch('config.integrations.quickbooks.management.commands.run_scheduled_quickbooks_sync.run_quickbooks_alignment_sync')
     def test_run_scheduled_quickbooks_sync_skips_outside_window(self, mock_alignment):
@@ -2947,6 +2974,7 @@ class QuickBooksAlignmentSyncTests(QuickBooksIntegrationTests):
         stdout = StringIO()
         call_command('run_scheduled_quickbooks_sync', '--now=2026-07-03T06:00:00', stdout=stdout)
         mock_alignment.assert_called_once()
+        self.assertIs(mock_alignment.call_args.kwargs.get('include_export'), False)
         connection.refresh_from_db()
         self.assertEqual(connection.sync_state['alignment_automation']['last_slot'], '2026-07-03T06:00')
         self.assertIn('QuickBooks alignment sync complete', stdout.getvalue())

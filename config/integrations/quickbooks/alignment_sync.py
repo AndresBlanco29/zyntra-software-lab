@@ -64,6 +64,17 @@ def _pending_new_presentation_ids():
     )
 
 
+def _export_skipped_result():
+    return {
+        'customers': {'requested_ids': [], 'success_count': 0, 'failed_count': 0, 'results': []},
+        'presentations': {'requested_ids': [], 'success_count': 0, 'failed_count': 0, 'results': []},
+        'invoices_skipped': True,
+        'notes_skipped': True,
+        'skipped': True,
+        'reason': 'manual_only',
+    }
+
+
 def push_new_outbound_records_to_quickbooks(*, max_records=None):
     """Export only local customers and products that were never sent to QuickBooks."""
     customer_ids = _pending_new_customer_ids()
@@ -116,7 +127,7 @@ def _export_samples(batch_result, *, limit=8):
     return samples
 
 
-def build_alignment_sync_summary(*, pull_result, invoice_status_result, export_result, force_full=False):
+def build_alignment_sync_summary(*, pull_result, invoice_status_result, export_result, force_full=False, export_skipped=False):
     customers = pull_result.get('customers') or {}
     items = pull_result.get('items') or {}
     export_customers = export_result.get('customers') or {}
@@ -149,6 +160,8 @@ def build_alignment_sync_summary(*, pull_result, invoice_status_result, export_r
             },
             'invoices_skipped': True,
             'notes_skipped': True,
+            'skipped': export_skipped or bool(export_result.get('skipped')),
+            'reason': export_result.get('reason') or ('manual_only' if export_skipped else ''),
         },
     }
 
@@ -156,10 +169,13 @@ def build_alignment_sync_summary(*, pull_result, invoice_status_result, export_r
 def _resolve_alignment_status(*, summary, error_message=''):
     if error_message:
         return QuickBooksSyncRun.STATUS_FAILED
-    export_failed = (
-        summary.get('export', {}).get('customers', {}).get('failed', 0)
-        + summary.get('export', {}).get('presentations', {}).get('failed', 0)
-    )
+    export_summary = summary.get('export') or {}
+    export_failed = 0
+    if not export_summary.get('skipped'):
+        export_failed = (
+            export_summary.get('customers', {}).get('failed', 0)
+            + export_summary.get('presentations', {}).get('failed', 0)
+        )
     import_failed = summary.get('import', {}).get('items', {}).get('failed', 0)
     if export_failed or import_failed:
         return QuickBooksSyncRun.STATUS_PARTIAL
@@ -179,6 +195,7 @@ def run_quickbooks_alignment_sync(
     skip_images=None,
     save_history=True,
     scheduled_slot='',
+    include_export=False,
 ):
     skip_images = _default_skip_images() if skip_images is None else bool(skip_images)
     sync_run = None
@@ -203,12 +220,17 @@ def run_quickbooks_alignment_sync(
             task_cache_key=task_cache_key,
             force_all=force_full,
         )
-        export_result = push_new_outbound_records_to_quickbooks()
+        export_result = (
+            push_new_outbound_records_to_quickbooks()
+            if include_export
+            else _export_skipped_result()
+        )
         summary = build_alignment_sync_summary(
             pull_result=pull_result,
             invoice_status_result=invoice_status_result,
             export_result=export_result,
             force_full=force_full,
+            export_skipped=not include_export,
         )
         status = _resolve_alignment_status(summary=summary)
         result = {

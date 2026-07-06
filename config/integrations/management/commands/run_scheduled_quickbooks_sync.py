@@ -73,6 +73,7 @@ class Command(BaseCommand):
                 max_results=None,
                 save_history=True,
                 scheduled_slot=slot_key,
+                include_export=False,
             )
         except Exception as exc:
             raise CommandError(f'QuickBooks alignment sync failed: {exc}') from exc
@@ -99,10 +100,14 @@ class Command(BaseCommand):
         self.stdout.write(
             f"Invoice payment status -> updated {invoice_status.get('updated', 0)} of {invoice_status.get('linked', 0)} linked."
         )
-        self.stdout.write(
-            f"Export new customers -> sent {export_customers.get('success', 0)}, failed {export_customers.get('failed', 0)}."
-        )
-        self.stdout.write(
-            f"Export new products -> sent {export_items.get('success', 0)}, failed {export_items.get('failed', 0)}."
-        )
+        if export_summary.get('skipped'):
+            self.stdout.write('Export skipped (manual export only).')
+        else:
+            self.stdout.write(
+                f"Export new customers -> sent {export_customers.get('success', 0)}, failed {export_customers.get('failed', 0)}."
+            )
+            self.stdout.write(
+                f"Export new products -> sent {export_items.get('success', 0)}, failed {export_items.get('failed', 0)}."
+            )
+        self.stdout.write('Catalog import updates local inventory from QuickBooks quantities.')
         self.stdout.write('Invoices were not exported automatically (manual only).')

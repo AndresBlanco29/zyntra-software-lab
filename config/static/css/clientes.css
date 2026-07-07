@@ -773,6 +773,36 @@ background:#f3f4f6;
     padding: 4px 0;
 }
 
+.customer-balance-line__invoice {
+    font-size: 12px;
+    font-weight: 700;
+    color: #0b3d91;
+}
+
+.customer-balance-line__date {
+    font-size: 11px;
+    color: #6c757d;
+}
+
+.customer-invoice-subrow {
+    background: rgba(243, 248, 255, 0.55);
+}
+
+.customer-invoice-subrow__spacer {
+    border-top: none !important;
+    background: rgba(243, 248, 255, 0.55);
+}
+
+.customer-invoice-subrow td {
+    border-top: 1px dashed rgba(15, 23, 42, 0.1) !important;
+}
+
+.customer-invoice-subrow .customer-balance-cell,
+.customer-invoice-subrow .customer-aging-cell {
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
 .customer-balance-line + .customer-balance-line,
 .customer-aging-line + .customer-aging-line {
     border-top: 1px dashed rgba(15, 23, 42, 0.12);

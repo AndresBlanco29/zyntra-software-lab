@@ -3,10 +3,10 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from django.utils import timezone
+from django.utils.formats import date_format
 from django.utils.translation import gettext_lazy as _
 
 from config.facturacion.services import (
-    _invoice_operational_outstanding,
     resolve_invoice_payment_base_date,
     resolve_invoice_payment_due_date,
 )
@@ -23,18 +23,34 @@ class CustomerBalanceLine:
     is_overdue: bool
     aging_days: int
     due_date: object = None
+    invoice_date: object = None
     invoice_id: int | None = None
     invoice_number: str = ''
+    source: str = 'invoice'
 
     @property
     def aging_display(self):
         if not self.is_overdue:
             return '0'
         if self.aging_days <= 0:
-            return '—'
+            return str(_('Due today'))
         if self.aging_days == 1:
             return str(_('1 day past due'))
         return str(_('%(days)s days past due') % {'days': self.aging_days})
+
+    @property
+    def invoice_date_display(self):
+        if not self.invoice_date:
+            return ''
+        return date_format(self.invoice_date, format='SHORT_DATE', use_l10n=True)
+
+    @property
+    def balance_label(self):
+        if self.source != 'invoice':
+            return str(_('QuickBooks balance'))
+        if self.is_overdue:
+            return str(_('Due balance'))
+        return str(_('Open'))
 
 
 @dataclass(frozen=True)
@@ -56,6 +72,13 @@ class CustomerBalanceSummary:
         return self.customer_credit > 0
 
 
+@dataclass(frozen=True)
+class ClienteListDisplayRow:
+    cliente: object
+    line: CustomerBalanceLine | None = None
+    is_primary: bool = True
+
+
 def _invoice_due_date(invoice):
     if invoice.qb_due_date:
         return invoice.qb_due_date
@@ -65,13 +88,19 @@ def _invoice_due_date(invoice):
     return resolve_invoice_payment_base_date(invoice)
 
 
+def _invoice_document_date(invoice):
+    if invoice.fecha_documento:
+        return invoice.fecha_documento
+    return timezone.localtime(invoice.creada_en).date()
+
+
 def _build_line_from_invoice(invoice, *, today):
-    amount = _invoice_operational_outstanding(invoice)
+    amount = _quantize_money(invoice.saldo_cliente)
     if amount <= 0:
         return None
 
     due_date = _invoice_due_date(invoice)
-    base_date = resolve_invoice_payment_base_date(invoice)
+    invoice_date = _invoice_document_date(invoice)
     is_overdue = due_date < today
     aging_days = (today - due_date).days if is_overdue else 0
 
@@ -80,16 +109,18 @@ def _build_line_from_invoice(invoice, *, today):
         is_overdue=is_overdue,
         aging_days=aging_days,
         due_date=due_date,
+        invoice_date=invoice_date,
         invoice_id=invoice.pk,
-        invoice_number=str(invoice.numero or ''),
+        invoice_number=str(invoice.numero or f'#{invoice.pk}'),
+        source='invoice',
     )
 
 
 def _sort_balance_lines(lines):
     def sort_key(line):
         if line.is_overdue:
-            return (0, -line.aging_days, line.due_date or timezone.localdate())
-        return (1, line.due_date or timezone.localdate(), -(line.invoice_id or 0))
+            return (0, -line.aging_days, line.due_date or timezone.localdate(), line.invoice_date or timezone.localdate())
+        return (1, line.due_date or timezone.localdate(), line.invoice_date or timezone.localdate(), -(line.invoice_id or 0))
 
     return tuple(sorted(lines, key=sort_key))
 
@@ -114,10 +145,16 @@ def build_customer_balance_summary(cliente, *, invoices=None, today=None):
     customer_credit = _quantize_money(cliente.customer_credit_balance)
 
     if invoices is None:
-        from config.facturacion.services import _operational_open_invoice_outstanding_queryset
+        from config.facturacion.models import Invoice
 
         invoices = list(
-            _operational_open_invoice_outstanding_queryset(cliente=cliente).select_related('delivery')
+            Invoice.objects.filter(
+                cliente=cliente,
+                estado='GENERADA',
+                saldo_cliente__gt=0,
+            )
+            .select_related('delivery')
+            .order_by('creada_en')
         )
 
     raw_lines = []
@@ -136,6 +173,8 @@ def build_customer_balance_summary(cliente, *, invoices=None, today=None):
                 is_overdue=True,
                 aging_days=0,
                 due_date=None,
+                invoice_date=None,
+                source='quickbooks',
             )
         )
 
@@ -146,6 +185,8 @@ def build_customer_balance_summary(cliente, *, invoices=None, today=None):
                 is_overdue=True,
                 aging_days=0,
                 due_date=None,
+                invoice_date=None,
+                source='quickbooks',
             )
         )
 
@@ -178,7 +219,6 @@ def attach_customer_balance_summaries(clientes):
         return clientes
 
     from config.facturacion.models import Invoice
-    from config.facturacion.services import _invoice_operational_outstanding
 
     cliente_ids = [cliente.id for cliente in clientes]
     invoices_by_cliente = defaultdict(list)
@@ -192,8 +232,7 @@ def attach_customer_balance_summaries(clientes):
         .order_by('creada_en')
     )
     for invoice in invoices:
-        if _invoice_operational_outstanding(invoice) > 0:
-            invoices_by_cliente[invoice.cliente_id].append(invoice)
+        invoices_by_cliente[invoice.cliente_id].append(invoice)
 
     today = timezone.localdate()
     for cliente in clientes:
@@ -203,3 +242,24 @@ def attach_customer_balance_summaries(clientes):
             today=today,
         )
     return clientes
+
+
+def expand_clientes_for_list_display(clientes):
+    rows = []
+    for cliente in clientes:
+        summary = cliente.balance_summary
+        if summary.has_credit:
+            rows.append(ClienteListDisplayRow(cliente=cliente, line=None, is_primary=True))
+            continue
+        if summary.lines:
+            for index, line in enumerate(summary.lines):
+                rows.append(
+                    ClienteListDisplayRow(
+                        cliente=cliente,
+                        line=line,
+                        is_primary=index == 0,
+                    )
+                )
+            continue
+        rows.append(ClienteListDisplayRow(cliente=cliente, line=None, is_primary=True))
+    return rows

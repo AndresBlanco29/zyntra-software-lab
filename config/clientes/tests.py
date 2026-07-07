@@ -14,7 +14,10 @@ from config.clientes.assignment import (
     filter_clientes_for_vendedor,
     sync_vendedor_cliente_assignments,
 )
-from config.clientes.balance_summary import build_customer_balance_summary
+from config.clientes.balance_summary import (
+    build_customer_balance_summary,
+    expand_clientes_for_list_display,
+)
 from config.clientes.models import Cliente
 from config.clientes.phone import normalize_stored_phone_number
 from config.cotizaciones.models import Cotizacion
@@ -256,6 +259,30 @@ class CustomerBalanceSummaryTests(TestCase):
         self.assertFalse(summary.lines[1].is_overdue)
         self.assertEqual(summary.lines[1].aging_display, '0')
         self.assertFalse(summary.exceeds_credit_limit)
+
+    @patch('config.clientes.balance_summary.timezone')
+    def test_expand_clientes_creates_one_row_per_invoice(self, mock_timezone):
+        mock_timezone.localdate.return_value = date(2026, 7, 6)
+        mock_timezone.make_aware.side_effect = timezone.make_aware
+
+        self._create_open_invoice(
+            amount=Decimal('100.00'),
+            created_at=timezone.make_aware(datetime(2026, 6, 20, 12, 0, 0)),
+        )
+        self._create_open_invoice(
+            amount=Decimal('50.00'),
+            created_at=timezone.make_aware(datetime(2026, 7, 6, 10, 0, 0)),
+        )
+
+        self.cliente.balance_summary = build_customer_balance_summary(self.cliente, today=date(2026, 7, 6))
+        rows = expand_clientes_for_list_display([self.cliente])
+
+        self.assertEqual(len(rows), 2)
+        self.assertTrue(rows[0].is_primary)
+        self.assertFalse(rows[1].is_primary)
+        self.assertIsNotNone(rows[0].line.invoice_number)
+        self.assertIsNotNone(rows[1].line.invoice_number)
+        self.assertGreater(rows[0].line.aging_days, 0)
 
     @patch('config.clientes.balance_summary.timezone')
     def test_flags_credit_limit_exceeded(self, mock_timezone):

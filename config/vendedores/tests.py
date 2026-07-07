@@ -477,6 +477,7 @@ class VendedorEditarClienteTests(TestCase):
 		self.assertContains(response, '<th>PHONE</th>', html=True)
 		self.assertContains(response, '<th>Balance</th>', html=True)
 		self.assertContains(response, '<th>Aging</th>', html=True)
+		self.assertIn('cliente_rows', response.context)
 		self.assertContains(response, 'Imported QB Contact')
 		self.assertContains(response, 'Cliente Editable')
 		self.assertContains(response, '$239.00')

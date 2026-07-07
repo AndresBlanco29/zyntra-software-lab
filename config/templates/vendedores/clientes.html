@@ -142,9 +142,11 @@
 
 <tbody>
 
-{% for cliente in clientes %}
+{% for row in cliente_rows %}
+{% with cliente=row.cliente summary=row.cliente.balance_summary line=row.line %}
 
 <tr
+class="{% if not row.is_primary %}customer-invoice-subrow{% endif %}"
 data-nombre="{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa }}"
 data-empresa="{{ cliente.nombre_empresa }}"
 data-correo="{{ cliente.usuario.email }}"
@@ -152,6 +154,7 @@ data-telefono="{{ cliente.telefono }}"
 data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 >
 
+{% if row.is_primary %}
 <td data-label="{% trans 'Name' %}">
   <div class="vendor-person-name">{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa }}</div>
 </td>
@@ -161,48 +164,46 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 </td>
 
 <td data-label="{% trans 'Phone' %}" class="vendor-muted-cell">{{ cliente.telefono }}</td>
+{% else %}
+<td colspan="3" class="customer-invoice-subrow__spacer" aria-hidden="true"></td>
+{% endif %}
 
 <td data-label="{% trans 'Balance' %}" class="vendor-muted-cell customer-balance-cell">
-  {% with summary=cliente.balance_summary %}
-  {% if summary.exceeds_credit_limit %}
+  {% if row.is_primary and summary.exceeds_credit_limit %}
   <div class="customer-credit-limit-alert" role="alert">
     {% trans "Collect payment — over credit limit" %}
   </div>
   {% endif %}
-  {% if summary.has_credit %}
+  {% if summary.has_credit and row.is_primary %}
     <span class="d-block small text-muted">{% trans "Customer credit" %}</span>
     <span class="text-success">${{ summary.customer_credit|floatformat:2 }}</span>
-  {% elif summary.lines %}
-    {% for line in summary.lines %}
+  {% elif line %}
     <div class="customer-balance-line {% if line.is_overdue %}is-overdue{% else %}is-current{% endif %}">
-      {% if line.is_overdue %}
-      <span class="customer-balance-line__label">{% trans "Due balance" %}</span>
-      {% else %}
-      <span class="customer-balance-line__label">{% trans "Open" %}</span>
+      <span class="customer-balance-line__label">{{ line.balance_label }}</span>
+      {% if line.invoice_number %}
+      <span class="customer-balance-line__invoice">{% trans "Invoice" %} {{ line.invoice_number }}</span>
+      {% endif %}
+      {% if line.invoice_date_display %}
+      <span class="customer-balance-line__date">{% trans "Invoice date" %}: {{ line.invoice_date_display }}</span>
       {% endif %}
       <span class="customer-balance-line__amount">${{ line.amount|floatformat:2 }}</span>
     </div>
-    {% endfor %}
-  {% else %}
+  {% elif row.is_primary %}
     $0.00
   {% endif %}
-  {% endwith %}
 </td>
 
 <td data-label="{% trans 'Aging' %}" class="vendor-muted-cell customer-aging-cell">
-  {% with summary=cliente.balance_summary %}
-  {% if summary.lines %}
-    {% for line in summary.lines %}
+  {% if line %}
     <div class="customer-aging-line {% if line.is_overdue %}is-overdue{% else %}is-current{% endif %}">
       {{ line.aging_display }}
     </div>
-    {% endfor %}
-  {% else %}
+  {% elif row.is_primary %}
     <span class="text-muted">—</span>
   {% endif %}
-  {% endwith %}
 </td>
 
+{% if row.is_primary %}
 <td data-label="{% trans 'Acción' %}" class="mobile-stack-table__action clientes-acciones-cell">
 
 <div class="clientes-acciones-group">
@@ -264,13 +265,17 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 </div>
 
 </td>
+{% else %}
+<td class="customer-invoice-subrow__spacer" aria-hidden="true"></td>
+{% endif %}
 
 </tr>
 
+{% endwith %}
 {% empty %}
 
 <tr>
-<td colspan="5" class="text-center text-muted py-4 mobile-stack-table__empty vendor-empty-cell">
+<td colspan="6" class="text-center text-muted py-4 mobile-stack-table__empty vendor-empty-cell">
 {% trans "No hay clientes registrados." %}
 </td>
 </tr>

@@ -26,7 +26,11 @@ from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-from config.clientes.balance_summary import attach_customer_balance_summaries, build_customer_balance_summary
+from config.clientes.balance_summary import (
+    attach_customer_balance_summaries,
+    build_customer_balance_summary,
+    expand_clientes_for_list_display,
+)
 from config.facturacion.services import annotate_clientes_open_invoice_balance, get_recent_customer_invoice_items_by_presentation
 from config.pedidos.services import (
     calcular_precio_unitario_neto_item,
@@ -376,8 +380,10 @@ def clientes(request):
     paginator = Paginator(_clientes_queryset(request), VENDEDOR_CLIENTES_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get('page'))
 
+    clientes = attach_customer_balance_summaries(page_obj.object_list)
     context = {
-        'clientes': attach_customer_balance_summaries(page_obj.object_list),
+        'clientes': clientes,
+        'cliente_rows': expand_clientes_for_list_display(clientes),
         'page_obj': page_obj,
         'filter_params': filter_params,
         'filter_q': filter_params.get('q', ''),

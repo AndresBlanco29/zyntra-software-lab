@@ -42,7 +42,10 @@ class CustomerBalanceLine:
     def invoice_date_display(self):
         if not self.invoice_date:
             return ''
-        return date_format(self.invoice_date, format='SHORT_DATE', use_l10n=True)
+        try:
+            return date_format(self.invoice_date, format='SHORT_DATE', use_l10n=True)
+        except (TypeError, ValueError):
+            return str(self.invoice_date)
 
     @property
     def balance_label(self):
@@ -77,6 +80,7 @@ class ClienteListDisplayRow:
     cliente: object
     line: CustomerBalanceLine | None = None
     is_primary: bool = True
+    hidden_line_count: int = 0
 
 
 def _invoice_due_date(invoice):
@@ -244,20 +248,29 @@ def attach_customer_balance_summaries(clientes):
     return clientes
 
 
-def expand_clientes_for_list_display(clientes):
+def expand_clientes_for_list_display(clientes, *, max_lines_per_customer=None):
     rows = []
     for cliente in clientes:
-        summary = cliente.balance_summary
+        summary = getattr(cliente, 'balance_summary', None)
+        if summary is None:
+            summary = build_customer_balance_summary(cliente)
+            cliente.balance_summary = summary
         if summary.has_credit:
             rows.append(ClienteListDisplayRow(cliente=cliente, line=None, is_primary=True))
             continue
         if summary.lines:
-            for index, line in enumerate(summary.lines):
+            visible_lines = summary.lines
+            hidden_line_count = 0
+            if max_lines_per_customer is not None and len(visible_lines) > max_lines_per_customer:
+                hidden_line_count = len(visible_lines) - max_lines_per_customer
+                visible_lines = visible_lines[:max_lines_per_customer]
+            for index, line in enumerate(visible_lines):
                 rows.append(
                     ClienteListDisplayRow(
                         cliente=cliente,
                         line=line,
                         is_primary=index == 0,
+                        hidden_line_count=hidden_line_count if index == 0 else 0,
                     )
                 )
             continue

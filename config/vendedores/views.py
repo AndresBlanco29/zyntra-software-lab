@@ -243,6 +243,7 @@ def crear_cliente(request):
     return render(request, "vendedores/crear_cliente.html")
 
 VENDEDOR_CLIENTES_PAGE_SIZE = 50
+VENDOR_CLIENTE_MAX_INVOICE_LINES = 25
 VENDEDOR_CATALOGO_PAGE_SIZE = 50
 
 
@@ -383,7 +384,10 @@ def clientes(request):
     clientes = attach_customer_balance_summaries(page_obj.object_list)
     context = {
         'clientes': clientes,
-        'cliente_rows': expand_clientes_for_list_display(clientes),
+        'cliente_rows': expand_clientes_for_list_display(
+            clientes,
+            max_lines_per_customer=VENDOR_CLIENTE_MAX_INVOICE_LINES,
+        ),
         'page_obj': page_obj,
         'filter_params': filter_params,
         'filter_q': filter_params.get('q', ''),

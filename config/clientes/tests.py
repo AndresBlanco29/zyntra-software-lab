@@ -298,3 +298,21 @@ class CustomerBalanceSummaryTests(TestCase):
 
         self.assertTrue(summary.exceeds_credit_limit)
         self.assertEqual(summary.credit_limit_excess, Decimal('500.00'))
+
+    @patch('config.clientes.balance_summary.timezone')
+    def test_expand_clientes_can_limit_invoice_rows_per_customer(self, mock_timezone):
+        mock_timezone.localdate.return_value = date(2026, 7, 6)
+        mock_timezone.make_aware.side_effect = timezone.make_aware
+
+        for index in range(3):
+            self._create_open_invoice(
+                amount=Decimal('10.00') + Decimal(index),
+                created_at=timezone.make_aware(datetime(2026, 6, 1, 12, index, 0)),
+            )
+
+        self.cliente.balance_summary = build_customer_balance_summary(self.cliente, today=date(2026, 7, 6))
+        rows = expand_clientes_for_list_display([self.cliente], max_lines_per_customer=2)
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0].hidden_line_count, 1)
+        self.assertEqual(rows[1].hidden_line_count, 0)

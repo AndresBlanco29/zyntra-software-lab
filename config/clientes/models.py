@@ -288,7 +288,8 @@ class Cliente(models.Model):
     @property
     def due_balance(self):
         """Amount the customer owes La Tortilla (QuickBooks positive balance)."""
-        return self.balance if self.balance > 0 else Decimal('0.00')
+        balance = self.balance if self.balance is not None else Decimal('0.00')
+        return balance if balance > 0 else Decimal('0.00')
 
     @property
     def total_amount_owed(self):
@@ -299,7 +300,8 @@ class Cliente(models.Model):
     @property
     def customer_credit_balance(self):
         """Credit in favor of the customer (QuickBooks negative balance, shown as a positive amount)."""
-        return abs(self.balance) if self.balance < 0 else Decimal('0.00')
+        balance = self.balance if self.balance is not None else Decimal('0.00')
+        return abs(balance) if balance < 0 else Decimal('0.00')
 
     @property
     def available_credit(self):

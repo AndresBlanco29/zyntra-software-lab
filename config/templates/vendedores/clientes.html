@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load static i18n permissions_tags pagination_tags l10n %}
+{% load static i18n permissions_tags pagination_tags %}
 
 {% block title %}
 {% trans "Clientes" %}
@@ -189,7 +189,29 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
       <span class="customer-balance-line__amount">${{ line.amount|floatformat:2 }}</span>
     </div>
   {% elif row.is_primary %}
+    {% if summary.has_balance %}
+    <div class="customer-balance-line is-current">
+      <span class="customer-balance-line__label">{% trans "Total open balance" %}</span>
+      <span class="customer-balance-line__amount">${{ summary.total_open_balance|floatformat:2 }}</span>
+    </div>
+    {% if summary.overdue_balance > 0 %}
+    <div class="customer-balance-line is-overdue">
+      <span class="customer-balance-line__label">{% trans "Due balance" %}</span>
+      <span class="customer-balance-line__amount">${{ summary.overdue_balance|floatformat:2 }}</span>
+    </div>
+    {% endif %}
+    {% else %}
     $0.00
+    {% endif %}
+  {% endif %}
+  {% if row.is_primary and row.hidden_line_count %}
+  <div class="small text-muted mt-1">
+    {% blocktrans count counter=row.hidden_line_count %}
+    +{{ counter }} more open invoice
+    {% plural %}
+    +{{ counter }} more open invoices
+    {% endblocktrans %}
+  </div>
   {% endif %}
 </td>
 
@@ -233,7 +255,7 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 <button
   type="button"
   class="btn btn-sm vendor-credit-limit-btn"
-  onclick="abrirModalLimiteCreditoCliente({{ cliente.id }}, '{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa|escapejs }}', '{{ cliente.credit_limit|default_if_none:''|unlocalize }}', '{{ cliente.balance_summary.overdue_balance|unlocalize }}', '{{ cliente.balance_summary.total_open_balance|unlocalize }}', {{ cliente.balance_summary.exceeds_credit_limit|yesno:'true,false' }})">
+  onclick="abrirModalLimiteCreditoCliente({{ cliente.id }}, '{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa|escapejs }}', '{% if cliente.credit_limit != None %}{{ cliente.credit_limit|floatformat:2 }}{% endif %}', '{{ summary.overdue_balance|floatformat:2 }}', '{{ summary.total_open_balance|floatformat:2 }}', {{ summary.exceeds_credit_limit|yesno:'true,false' }})">
 {% trans "Credit limit" %}
 </button>
 

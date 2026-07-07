@@ -294,6 +294,14 @@ def _build_order_summary_discount_preset_options():
     return ConfiguracionDescuentos.obtener().opciones_activas()
 
 
+def _match_discount_preset_key(discount_options, current_amount):
+    current = format(_money_decimal(current_amount or 0), '.2f')
+    for option in discount_options:
+        if option['value'] == current:
+            return option['key']
+    return ''
+
+
 def _tomar_pedido_clientes_filter_params(request):
     params = {}
     raw_query = str(request.GET.get('q') or '')
@@ -514,6 +522,7 @@ def ver_pedido(request):
 
     total = 0
     productos = []
+    discount_options = _build_order_summary_discount_preset_options()
 
     for key, item in carrito.items():
 
@@ -544,6 +553,11 @@ def ver_pedido(request):
             "cantidad": item["cantidad"],
             "descuento_aplicado": bool(item.get("descuento_aplicado")),
             "descuento_monto": _money_decimal(item.get("descuento_monto", 0) if item.get("descuento_aplicado") else 0),
+            "selected_discount_preset_key": (
+                _match_discount_preset_key(discount_options, item.get("descuento_monto", 0))
+                if item.get("descuento_aplicado")
+                else ''
+            ),
             "precio_neto": calcular_precio_unitario_neto_item(
                 precio=precio,
                 descuento_aplicado=item.get("descuento_aplicado", False),

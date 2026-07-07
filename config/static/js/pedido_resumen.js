@@ -63,7 +63,7 @@ function updateOrderTotals(total) {
 }
 
 function refreshDiscountRow(id, data) {
-    const wrap = document.querySelector(`.descuento-input-wrap input.descuento-monto[data-id="${id}"]`)?.closest('.descuento-input-wrap')
+    const fieldsWrap = document.querySelector(`.pedido-discount-cell[data-id="${id}"] .descuento-fields-wrap`)
     const resumen = document.querySelector(`.descuento-resumen[data-id="${id}"]`)
     const netPrice = document.querySelector(`.precio-neto[data-id="${id}"]`)
     const savings = document.querySelector(`.ahorro-linea[data-id="${id}"]`)
@@ -72,8 +72,8 @@ function refreshDiscountRow(id, data) {
     const discountApplied = Boolean(data ? data.discount_applied : document.querySelector(`.descuento-toggle[data-id="${id}"]`)?.checked)
     const discountAmount = Number(data ? data.discount_amount : document.querySelector(`.descuento-monto[data-id="${id}"]`)?.value || 0)
 
-    if (wrap) {
-        wrap.classList.toggle('d-none', !discountApplied)
+    if (fieldsWrap) {
+        fieldsWrap.classList.toggle('d-none', !discountApplied)
     }
     if (resumen) {
         if (discountApplied && discountAmount > 0) {
@@ -93,6 +93,33 @@ function refreshDiscountRow(id, data) {
             savings.textContent = `Ahorras $${formatMoney(lineSavings)}`
         }
     }
+}
+
+function parseDecimalValue(value) {
+    const normalized = String(value || '').trim().replace(',', '.')
+    if (!normalized) {
+        return null
+    }
+    const parsed = Number(normalized)
+    return Number.isFinite(parsed) ? parsed : null
+}
+
+function syncDiscountPresetFromInput(presetSelect, amountInput) {
+    if (!presetSelect || !amountInput) {
+        return
+    }
+    const inputValue = parseDecimalValue(amountInput.value)
+    let matchedValue = ''
+    Array.from(presetSelect.options).forEach(function (option) {
+        if (!option.value) {
+            return
+        }
+        const optionValue = parseDecimalValue(option.value)
+        if (inputValue !== null && optionValue !== null && optionValue === inputValue) {
+            matchedValue = option.value
+        }
+    })
+    presetSelect.value = matchedValue
 }
 
 function persistDiscount(id) {
@@ -115,6 +142,10 @@ function persistDiscount(id) {
         document.getElementById(`subtotal-${id}`).innerText = '$' + formatMoney(data.subtotal)
         updateOrderTotals(data.total)
         refreshDiscountRow(id, data)
+        syncDiscountPresetFromInput(
+            document.querySelector(`.descuento-preset[data-id="${id}"]`),
+            document.querySelector(`.descuento-monto[data-id="${id}"]`)
+        )
         return data
     })
 }
@@ -334,14 +365,19 @@ function applyBulkDiscount(discountValue) {
     document.querySelectorAll('.descuento-toggle').forEach(toggle => {
         const id = toggle.dataset.id
         const amountInput = document.querySelector(`.descuento-monto[data-id="${id}"]`)
+        const presetSelect = document.querySelector(`.descuento-preset[data-id="${id}"]`)
         if (!amountInput) {
             return
         }
         toggle.checked = true
         amountInput.value = discountValue
-        const wrap = amountInput.closest('.descuento-input-wrap')
-        if (wrap) {
-            wrap.classList.remove('d-none')
+        if (presetSelect) {
+            presetSelect.value = discountValue
+            syncDiscountPresetFromInput(presetSelect, amountInput)
+        }
+        const fieldsWrap = document.querySelector(`.pedido-discount-cell[data-id="${id}"] .descuento-fields-wrap`)
+        if (fieldsWrap) {
+            fieldsWrap.classList.remove('d-none')
         }
         chain = chain.then(() => persistDiscount(id))
     })
@@ -480,12 +516,33 @@ refreshDiscountRow(id, data)
 document.querySelectorAll('.descuento-toggle').forEach(toggle => {
     toggle.addEventListener('change', function () {
         const id = this.dataset.id
-        const wrap = document.querySelector(`.descuento-monto[data-id="${id}"]`)?.closest('.descuento-input-wrap')
-        if (wrap) {
-            wrap.classList.toggle('d-none', !this.checked)
+        const fieldsWrap = document.querySelector(`.pedido-discount-cell[data-id="${id}"] .descuento-fields-wrap`)
+        if (fieldsWrap) {
+            fieldsWrap.classList.toggle('d-none', !this.checked)
         }
         persistDiscount(id)
     })
+})
+
+document.querySelectorAll('.descuento-preset').forEach(presetSelect => {
+    const id = presetSelect.dataset.id
+    const amountInput = document.querySelector(`.descuento-monto[data-id="${id}"]`)
+    if (!amountInput) {
+        return
+    }
+
+    presetSelect.addEventListener('change', function () {
+        if (presetSelect.value) {
+            amountInput.value = presetSelect.value
+        }
+        persistDiscount(id)
+    })
+
+    amountInput.addEventListener('input', function () {
+        syncDiscountPresetFromInput(presetSelect, amountInput)
+    })
+
+    syncDiscountPresetFromInput(presetSelect, amountInput)
 })
 
 document.querySelectorAll('.descuento-monto').forEach(input => {

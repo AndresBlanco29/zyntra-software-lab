@@ -190,9 +190,34 @@ class VendedorPedidoTests(TestCase):
 		self.assertContains(response, 'Apply discount to all products')
 		self.assertContains(response, 'option value="precio_1"')
 		self.assertContains(response, 'discount-toggle-box', html=False)
+		self.assertContains(response, 'descuento-preset', html=False)
+		self.assertContains(response, 'Manual discount')
 		self.assertContains(response, 'order-type-panel', html=False)
 		self.assertContains(response, 'id="tipoOrdenPersonal"', html=False)
 		self.assertContains(response, 'id="tipoOrdenTelefono"', html=False)
+
+	def test_ver_pedido_selects_matching_discount_preset_for_saved_amount(self):
+		self.client.force_login(self.vendor)
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session['pedido'] = {
+			'item-1': {
+				'producto_id': self.presentacion.producto_id,
+				'presentacion_id': self.presentacion.id,
+				'nombre': self.presentacion.producto.nombre,
+				'cantidad': 1,
+				'precio': float(self.presentacion.precio_1),
+				'precio_key': 'precio_1',
+				'descuento_aplicado': True,
+				'descuento_monto': 0.50,
+			}
+		}
+		session.save()
+
+		response = self.client.get(reverse('ver_pedido'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'data-discount-key="descuento_2" selected', html=False)
 
 	def test_ver_pedido_shows_full_sidebar_for_backoffice_user(self):
 		self.client.force_login(self.backoffice)

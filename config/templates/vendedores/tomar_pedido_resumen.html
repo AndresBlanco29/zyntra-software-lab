@@ -296,7 +296,14 @@ min="1"
   {% if item.descuento_aplicado %}checked{% endif %}>
 <label class="form-check-label small" for="descuentoToggle{{ item.id }}">{% trans "Aplicar descuento" %}</label>
 </div>
-<div class="input-group input-group-sm mb-1 descuento-input-wrap {% if not item.descuento_aplicado %}d-none{% endif %}">
+<div class="descuento-fields-wrap {% if not item.descuento_aplicado %}d-none{% endif %}">
+<select class="form-select form-select-sm mb-2 descuento-preset no-search-select" data-id="{{ item.id }}">
+<option value="">{% trans "Manual discount" %}</option>
+{% for option in discount_preset_options %}
+<option value="{{ option.value|unlocalize }}" data-discount-key="{{ option.key }}" {% if item.selected_discount_preset_key == option.key %}selected{% endif %}>{{ option.label }}</option>
+{% endfor %}
+</select>
+<div class="input-group input-group-sm mb-1 descuento-input-wrap">
 <span class="input-group-text">$</span>
 <input
   type="number"
@@ -305,6 +312,7 @@ min="1"
   class="form-control descuento-monto"
   data-id="{{ item.id }}"
   value="{{ item.descuento_monto|floatformat:2 }}">
+</div>
 </div>
 <div class="small text-muted descuento-resumen" data-id="{{ item.id }}"></div>
 </td>

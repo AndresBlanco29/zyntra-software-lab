@@ -27,23 +27,26 @@ class CreditLimitEvaluation:
 
 def evaluate_customer_credit_limit(*, cliente, additional_amount):
 	additional_amount = _quantize_money(additional_amount)
+	from config.clientes.balance_summary import build_customer_balance_summary
+
+	summary = build_customer_balance_summary(cliente)
 	credit_limit = cliente.credit_limit
 	if credit_limit is None:
 		return CreditLimitEvaluation(
 			configured=False,
 			exceeds_limit=False,
 			credit_limit=Decimal('0.00'),
-			due_balance=cliente.due_balance,
+			due_balance=summary.overdue_balance,
 			request_amount=additional_amount,
-			projected_balance=_quantize_money(cliente.due_balance + additional_amount),
+			projected_balance=_quantize_money(summary.total_open_balance + additional_amount),
 			remaining_limit=Decimal('0.00'),
 			excess_amount=Decimal('0.00'),
 		)
 
 	credit_limit = _quantize_money(credit_limit)
-	due_balance = _quantize_money(cliente.due_balance)
-	projected_balance = _quantize_money(due_balance + additional_amount)
-	remaining_limit = _quantize_money(max(credit_limit - due_balance, Decimal('0.00')))
+	due_balance = _quantize_money(summary.overdue_balance)
+	projected_balance = _quantize_money(summary.total_open_balance + additional_amount)
+	remaining_limit = _quantize_money(max(credit_limit - summary.total_open_balance, Decimal('0.00')))
 	excess_amount = _quantize_money(max(projected_balance - credit_limit, Decimal('0.00')))
 	return CreditLimitEvaluation(
 		configured=True,

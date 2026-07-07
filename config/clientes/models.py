@@ -292,9 +292,9 @@ class Cliente(models.Model):
 
     @property
     def total_amount_owed(self):
-        from config.facturacion.services import resolve_customer_amount_owed
+        from config.clientes.balance_summary import build_customer_balance_summary
 
-        return resolve_customer_amount_owed(cliente=self)
+        return build_customer_balance_summary(cliente=self).overdue_balance
 
     @property
     def customer_credit_balance(self):
@@ -309,7 +309,10 @@ class Cliente(models.Model):
     def get_credit_limit_remaining(self):
         if self.credit_limit is None:
             return None
-        return max(Decimal(str(self.credit_limit)) - self.due_balance, Decimal('0.00'))
+        from config.clientes.balance_summary import build_customer_balance_summary
+
+        summary = build_customer_balance_summary(self)
+        return max(Decimal(str(self.credit_limit)) - summary.total_open_balance, Decimal('0.00'))
 
     def __str__(self):
         return self.nombre_empresa

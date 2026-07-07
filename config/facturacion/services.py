@@ -381,13 +381,18 @@ def resolve_customer_amount_owed(*, cliente, invoice=None):
 	return stored_due
 
 
-def _remaining_invoice_balance_before_payment(*, invoice):
-	return _clamp_non_negative_money(
-		Decimal(str(invoice.subtotal or '0.00'))
-		- Decimal(str(invoice.credito_cliente_aplicado or '0.00'))
-		- Decimal(str(invoice.total_creditos or '0.00'))
-		+ Decimal(str(invoice.total_debitos or '0.00'))
-	)
+def resolve_customer_overdue_balance(*, cliente):
+	"""Sum of open invoice balances that are already past due (excludes not-yet-due invoices)."""
+	from config.clientes.balance_summary import build_customer_balance_summary
+
+	return build_customer_balance_summary(cliente=cliente).overdue_balance
+
+
+def resolve_customer_open_balance(*, cliente):
+	"""Total open invoice balance for the customer (overdue + not yet due)."""
+	from config.clientes.balance_summary import build_customer_balance_summary
+
+	return build_customer_balance_summary(cliente=cliente).total_open_balance
 
 
 def _calculate_invoice_totals(*, subtotal, credito_cliente_aplicado=Decimal('0.00'), total_creditos=Decimal('0.00'), total_debitos=Decimal('0.00'), total_pagado=Decimal('0.00')):

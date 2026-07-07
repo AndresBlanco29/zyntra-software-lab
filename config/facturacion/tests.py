@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import base64
 from io import BytesIO
 from datetime import datetime
@@ -17,7 +19,7 @@ from reportlab.platypus import SimpleDocTemplate
 
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, DeliveryNotificationLog, FacturacionRegistroAnulacion, Invoice, NotaAjuste, NotaAjusteAplicacion
-from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, attach_invoice_item_net_dispatched_quantities, build_google_maps_route_url, build_invoice_shipment_summary, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, invoice_delete_requires_confirmation_phrase, mark_delivery_unpaid_from_backoffice, resolve_customer_amount_owed, resolve_invoice_item_net_dispatched_quantity, resolve_invoice_payment_base_date, resolve_invoice_payment_due_date, start_delivery_route, unlock_client_from_delivery, validate_invoice_delete_confirmation_phrase
+from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, attach_invoice_item_net_dispatched_quantities, build_google_maps_route_url, build_invoice_shipment_summary, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, invoice_delete_requires_confirmation_phrase, mark_delivery_unpaid_from_backoffice, resolve_customer_amount_owed, resolve_customer_overdue_balance, resolve_invoice_item_net_dispatched_quantity, resolve_invoice_payment_base_date, resolve_invoice_payment_due_date, start_delivery_route, unlock_client_from_delivery, validate_invoice_delete_confirmation_phrase
 from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_footer_layout, _build_invoice_pdf_item_data, _build_invoice_pdf_shipment_summary_table, _build_invoice_pdf_terms_paragraph, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_pdf_due_date_label, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_SYNCED
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
@@ -1297,6 +1299,48 @@ class InvoiceFlowTests(TestCase):
 		self.cliente.balance = Decimal('22545.71')
 		self.cliente.save(update_fields=['quickbooks_id', 'sync_status', 'balance'])
 		self.assertEqual(resolve_customer_amount_owed(cliente=self.cliente), Decimal('22545.71'))
+
+	@patch('config.clientes.balance_summary.timezone')
+	def test_resolve_customer_overdue_balance_excludes_not_yet_due_invoices(self, mock_timezone):
+		from datetime import date, datetime
+
+		mock_timezone.localdate.return_value = date(2026, 7, 6)
+		mock_timezone.make_aware.side_effect = timezone.make_aware
+
+		overdue_invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			usuario=self.backoffice,
+		)
+		Invoice.objects.filter(pk=overdue_invoice.pk).update(
+			creada_en=timezone.make_aware(datetime(2026, 6, 1, 12, 0, 0)),
+			fecha_documento=date(2026, 6, 1),
+		)
+		overdue_invoice.refresh_from_db()
+
+		current_pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='BACKOFFICE',
+			estado='INVOICE_GENERADA',
+			total=Decimal('50.00'),
+		)
+		current_invoice = Invoice.objects.create(
+			pedido=current_pedido,
+			cliente=self.cliente,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			subtotal=Decimal('50.00'),
+			total_neto=Decimal('50.00'),
+			saldo_cliente=Decimal('50.00'),
+		)
+		Invoice.objects.filter(pk=current_invoice.pk).update(
+			creada_en=timezone.make_aware(datetime(2026, 7, 6, 10, 0, 0)),
+			fecha_documento=date(2026, 7, 6),
+		)
+
+		self.assertEqual(
+			resolve_customer_overdue_balance(cliente=self.cliente),
+			overdue_invoice.saldo_cliente,
+		)
 
 	def test_backoffice_can_mark_completed_paid_delivery_as_unpaid(self):
 		invoice = generar_invoice_desde_picking(

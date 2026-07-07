@@ -94,6 +94,8 @@ from .services import (
 	unlock_client_from_delivery,
 	mark_delivery_unpaid_from_backoffice,
 	resolve_customer_amount_owed,
+	resolve_customer_open_balance,
+	resolve_customer_overdue_balance,
 )
 
 
@@ -108,8 +110,9 @@ def _build_invoice_pdf_terms_paragraph(invoice, body_style):
 	payment_terms_label = cliente.get_terminos_pago_label()
 	if payment_terms_label:
 		lines.append(f'<b>{payment_terms_label}</b>')
-	if cliente.balance > 0:
-		lines.append(f'<b>{_("DUE BALANCE")}</b>: {_format_pdf_money(cliente.balance)}')
+	overdue_balance = resolve_customer_overdue_balance(cliente=cliente)
+	if overdue_balance > 0:
+		lines.append(f'<b>{_("DUE BALANCE")}</b>: {_format_pdf_money(overdue_balance)}')
 	elif cliente.balance < 0:
 		lines.append(f'<b>{_("CUSTOMER CREDIT")}</b>: {_format_pdf_money(cliente.customer_credit_balance)}')
 	return Paragraph('<br/>'.join(lines), body_style)
@@ -1479,13 +1482,17 @@ def backoffice_invoice_detail(request, invoice_id):
 	invoice_items = list(order_invoice_items_for_display(invoice))
 	attach_invoice_item_net_dispatched_quantities(invoice, invoice_items)
 	attach_invoice_item_net_dispatched_quantities(invoice, list(invoice.items.all()))
+	customer_overdue_balance = resolve_customer_overdue_balance(cliente=invoice.cliente)
+	customer_open_balance = resolve_customer_open_balance(cliente=invoice.cliente)
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
 		'customer_company_name': resolve_customer_company_name(invoice.cliente),
 		'invoice_items': invoice_items,
 		'invoice_shipment_summary': build_invoice_shipment_summary(invoice),
 		'invoice_payment_due_date': resolve_invoice_payment_due_date(invoice),
-		'customer_amount_owed': resolve_customer_amount_owed(cliente=invoice.cliente, invoice=invoice),
+		'customer_overdue_balance': customer_overdue_balance,
+		'customer_open_balance': customer_open_balance,
+		'customer_amount_owed': customer_overdue_balance,
 		'driver_created_notes_count': driver_created_notes_count,
 		'advanced_adjustment_note_url': f"{reverse('backoffice_adjustment_note_create')}?cliente_id={invoice.cliente_id}&invoice_id={invoice.id}",
 		'invoice_quickbooks_locked': is_sync_locked(invoice),

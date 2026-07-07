@@ -189,6 +189,10 @@ class VendedorPedidoTests(TestCase):
 		self.assertContains(response, 'Assign one preset discount to all products')
 		self.assertContains(response, 'Apply discount to all products')
 		self.assertContains(response, 'option value="precio_1"')
+		self.assertContains(response, 'discount-toggle-box', html=False)
+		self.assertContains(response, 'order-type-panel', html=False)
+		self.assertContains(response, 'id="tipoOrdenPersonal"', html=False)
+		self.assertContains(response, 'id="tipoOrdenTelefono"', html=False)
 
 	def test_ver_pedido_shows_full_sidebar_for_backoffice_user(self):
 		self.client.force_login(self.backoffice)

@@ -287,7 +287,7 @@ min="1"
 </td>
 
 <td data-label="{% trans "Descuento" %}" class="pedido-discount-cell" data-id="{{ item.id }}">
-<div class="form-check mb-2">
+<div class="form-check discount-toggle-box mb-2">
 <input
   type="checkbox"
   class="form-check-input descuento-toggle"
@@ -354,23 +354,28 @@ ${{ item.subtotal|floatformat:2 }}
 
 <hr>
 
-<div class="form-check mb-2">
+<div class="order-type-panel">
+<p class="order-type-panel__title mb-3">{% trans "How was this order taken?" %}</p>
 
-<input class="form-check-input tipo-orden" type="radio" name="tipo_orden" value="personal">
+<div class="form-check order-type-option mb-2">
 
-<label class="form-check-label">
+<input class="form-check-input tipo-orden" type="radio" name="tipo_orden" id="tipoOrdenPersonal" value="personal">
+
+<label class="form-check-label" for="tipoOrdenPersonal">
 {% trans "Orden tomada en persona" %}
 </label>
 
 </div>
 
-<div class="form-check">
+<div class="form-check order-type-option mb-0">
 
-<input class="form-check-input tipo-orden" type="radio" name="tipo_orden" value="telefono">
+<input class="form-check-input tipo-orden" type="radio" name="tipo_orden" id="tipoOrdenTelefono" value="telefono">
 
-<label class="form-check-label">
+<label class="form-check-label" for="tipoOrdenTelefono">
 {% trans "Orden telefónica" %}
 </label>
+
+</div>
 
 </div>
 

@@ -188,6 +188,112 @@ body::-webkit-scrollbar,
     padding: 9px 12px;
 }
 
+.pedido-discount-cell {
+    min-width: 170px;
+}
+
+.pedido-discount-cell .discount-toggle-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    padding: 0.7rem 0.8rem;
+    border: 2px solid #0c64cf;
+    border-radius: 10px;
+    background: #eef4ff;
+}
+
+.pedido-discount-cell .discount-toggle-box .form-check-input {
+    width: 1.2rem;
+    height: 1.2rem;
+    margin-top: 0.1rem;
+    border: 2px solid #0c64cf;
+    background-color: #fff;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.pedido-discount-cell .discount-toggle-box .form-check-input:checked {
+    background-color: #0c64cf;
+    border-color: #0c64cf;
+}
+
+.pedido-discount-cell .discount-toggle-box .form-check-input:focus {
+    border-color: #0c64cf;
+    box-shadow: 0 0 0 0.2rem rgba(12, 100, 207, 0.25);
+}
+
+.pedido-discount-cell .discount-toggle-box .form-check-label {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #0b3d91;
+    line-height: 1.35;
+    cursor: pointer;
+}
+
+.pedido-discount-cell .descuento-input-wrap {
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.order-type-panel {
+    padding: 1rem 1.15rem;
+    border: 2px solid #94a3b8;
+    border-radius: 12px;
+    background: #f8fafc;
+}
+
+.order-type-panel__title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.order-type-panel .order-type-option {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.75rem 0.9rem;
+    border: 2px solid #cbd5e1;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.order-type-panel .order-type-option .form-check-input {
+    width: 1.2rem;
+    height: 1.2rem;
+    margin-top: 0;
+    border: 2px solid #0c64cf;
+    background-color: #fff;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.order-type-panel .order-type-option .form-check-input:checked {
+    background-color: #0c64cf;
+    border-color: #0c64cf;
+}
+
+.order-type-panel .order-type-option .form-check-input:focus {
+    border-color: #0c64cf;
+    box-shadow: 0 0 0 0.2rem rgba(12, 100, 207, 0.25);
+}
+
+.order-type-panel .order-type-option .form-check-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #1e293b;
+    cursor: pointer;
+}
+
+.order-type-panel .order-type-option:has(.form-check-input:checked) {
+    border-color: #0c64cf;
+    background: #eef4ff;
+    box-shadow: inset 0 0 0 1px rgba(12, 100, 207, 0.12);
+}
+
 .totales-box {
     width: 100%;
     max-width: 370px;

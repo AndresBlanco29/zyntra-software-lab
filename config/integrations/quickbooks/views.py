@@ -65,6 +65,8 @@ from .sync import (
     refresh_linked_quickbooks_invoice_status,
     _linked_catalog_presentacion_queryset,
     QuickBooksSyncError,
+    QB_TASK_STALE_AFTER_SECONDS,
+    _qb_task_progress_payload,
     fetch_quickbooks_credit_memos,
     fetch_quickbooks_customers,
     fetch_quickbooks_invoices,
@@ -1737,11 +1739,19 @@ def quickbooks_start_task(request):
 
     task_id = uuid.uuid4().hex
     cache_key = f'quickbooks_task_{task_id}'
-    cache.set(cache_key, {'status': 'running', 'progress': 0, 'operation': operation}, timeout=60 * 60)
+    cache.set(
+        cache_key,
+        _qb_task_progress_payload(status='running', progress=0, operation=operation),
+        timeout=60 * 60,
+    )
 
     def _runner(task_key, fn, limit_value, force_full_value, skip_images_value):
         try:
-            cache.set(task_key, {'status': 'running', 'progress': 5, 'operation': operation}, timeout=60 * 60)
+            cache.set(
+                task_key,
+                _qb_task_progress_payload(status='running', progress=5, operation=operation),
+                timeout=60 * 60,
+            )
             try:
                 result = fn(
                     max_results=limit_value,
@@ -1764,9 +1774,27 @@ def quickbooks_start_task(request):
                             result = fn(max_results=limit_value, force_full=force_full_value)
                         except TypeError:
                             result = fn(max_results=limit_value)
-            cache.set(task_key, {'status': 'completed', 'progress': 100, 'operation': operation, 'result': result}, timeout=60 * 60)
+            cache.set(
+                task_key,
+                _qb_task_progress_payload(
+                    status='completed',
+                    progress=100,
+                    operation=operation,
+                    result=result,
+                ),
+                timeout=60 * 60,
+            )
         except Exception as exc:
-            cache.set(task_key, {'status': 'failed', 'progress': 100, 'operation': operation, 'error': str(exc)}, timeout=60 * 60)
+            cache.set(
+                task_key,
+                _qb_task_progress_payload(
+                    status='failed',
+                    progress=100,
+                    operation=operation,
+                    error=str(exc),
+                ),
+                timeout=60 * 60,
+            )
 
     thread = threading.Thread(target=_runner, args=(cache_key, func, limit, force_full, skip_images), daemon=True)
     thread.start()
@@ -1784,6 +1812,10 @@ def quickbooks_task_status(request, task_id):
 
     status = data.get('status')
     operation = data.get('operation')
+    if status == 'running':
+        updated_at = data.get('updated_at')
+        if updated_at and time.time() - float(updated_at) > QB_TASK_STALE_AFTER_SECONDS:
+            status = 'stale'
     if status in {'completed', 'failed'} and operation and not data.get('audit_logged'):
         from config.auditoria.business_events import log_quickbooks_operation
 
@@ -1796,7 +1828,13 @@ def quickbooks_task_status(request, task_id):
         data['audit_logged'] = True
         cache.set(cache_key, data, timeout=60 * 60)
 
-    return JsonResponse({'status': data.get('status'), 'progress': int(data.get('progress') or 0), 'operation': data.get('operation'), 'result': data.get('result', None), 'error': data.get('error', None)})
+    return JsonResponse({
+        'status': status,
+        'progress': int(data.get('progress') or 0),
+        'operation': data.get('operation'),
+        'result': data.get('result', None),
+        'error': data.get('error', None),
+    })
 
 
 @require_POST

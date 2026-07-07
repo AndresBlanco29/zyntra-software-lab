@@ -1,5 +1,6 @@
 import logging
 import re
+import time
 import unicodedata
 from datetime import date, datetime, timezone as dt_timezone
 from decimal import Decimal, ROUND_HALF_UP
@@ -2240,14 +2241,69 @@ def _merge_import_batch_results(*results):
     return merged
 
 
-def _import_batch_result(*, entity_name, records, import_callable, task_cache_key=None, client=None):
+QB_TASK_PROGRESS_CACHE_TIMEOUT = 60 * 60
+QB_TASK_STALE_AFTER_SECONDS = 180
+
+
+def _qb_task_progress_payload(*, status, progress, operation, result=None, error=None):
+    payload = {
+        'status': status,
+        'progress': progress,
+        'operation': operation,
+        'updated_at': time.time(),
+    }
+    if result is not None:
+        payload['result'] = result
+    if error is not None:
+        payload['error'] = error
+    return payload
+
+
+def _empty_import_batch_summary(*, entity_name):
+    return {
+        'entity': entity_name,
+        'count': 0,
+        'created_count': 0,
+        'updated_count': 0,
+        'deactivated_count': 0,
+        'skipped_count': 0,
+        'conflict_count': 0,
+        'failed_count': 0,
+        'latest_updated_at': '',
+        'results': [],
+    }
+
+
+def _merge_import_batch_summaries(base_summary, page_summary):
+    merged = dict(base_summary)
+    merged['count'] = int(base_summary.get('count') or 0) + int(page_summary.get('count') or 0)
+    for key in ('created_count', 'updated_count', 'deactivated_count', 'skipped_count', 'conflict_count', 'failed_count'):
+        merged[key] = int(base_summary.get(key) or 0) + int(page_summary.get(key) or 0)
+    page_latest = page_summary.get('latest_updated_at') or ''
+    base_latest = base_summary.get('latest_updated_at') or ''
+    if page_latest and (not base_latest or page_latest > base_latest):
+        merged['latest_updated_at'] = page_latest
+    merged['results'] = list(base_summary.get('results') or []) + list(page_summary.get('results') or [])
+    return merged
+
+
+def _import_batch_result(*, entity_name, records, import_callable, task_cache_key=None, client=None, progress_offset=0, progress_total=None):
     results = []
-    total = len(records or [])
+    total = progress_total if progress_total is not None else len(records or [])
     processed = 0
     batch_client = client
     # initialize progress if we have a task key
     if task_cache_key:
-        cache.set(task_cache_key, {'status': 'running', 'progress': 0, 'operation': entity_name}, timeout=60 * 60)
+        cache.set(
+            task_cache_key,
+            _qb_task_progress_payload(
+                status='running',
+                progress=0,
+                operation=entity_name,
+                result={'processed': progress_offset, 'total': total},
+            ),
+            timeout=QB_TASK_PROGRESS_CACHE_TIMEOUT,
+        )
     for record in records:
         if batch_client and processed and processed % 100 == 0:
             try:
@@ -2285,20 +2341,21 @@ def _import_batch_result(*, entity_name, records, import_callable, task_cache_ke
 
         # update progress in cache after each record (throttled for large batches)
         processed += 1
+        processed_global = progress_offset + processed
         progress_interval = 1 if total <= 100 else 5 if total <= 500 else 10
-        if task_cache_key and total > 0 and (processed == total or processed % progress_interval == 0):
+        if task_cache_key and total > 0 and (processed_global == total or processed % progress_interval == 0):
             # keep some headroom for finalization; map processed/total to 5..95
-            pct = int((processed / total) * 90) + 5
+            pct = int((processed_global / total) * 90) + 5
             pct = min(max(pct, 0), 95)
             cache.set(
                 task_cache_key,
-                {
-                    'status': 'running',
-                    'progress': pct,
-                    'operation': entity_name,
-                    'result': {'processed': processed, 'total': total},
-                },
-                timeout=60 * 60,
+                _qb_task_progress_payload(
+                    status='running',
+                    progress=pct,
+                    operation=entity_name,
+                    result={'processed': processed_global, 'total': total},
+                ),
+                timeout=QB_TASK_PROGRESS_CACHE_TIMEOUT,
             )
 
     return {
@@ -3733,24 +3790,36 @@ def import_quickbooks_invoices(*, max_results=25, client=None, updated_after=Non
         )
     client = client or QuickBooksAPIClient()
     page_size = _quickbooks_catalog_page_size()
-    records = fetch_quickbooks_invoices(
-        max_results=max_results,
-        client=client,
-        updated_after=updated_after,
-        page_size=page_size,
-    )
     customer_cache = {}
 
     def _import_invoice(record):
         return import_quickbooks_invoice_record(record, client=client, customer_cache=customer_cache)
 
-    return _import_batch_result(
-        entity_name='Invoice',
-        records=records,
-        import_callable=_import_invoice,
-        task_cache_key=task_cache_key,
+    summary = _empty_import_batch_summary(entity_name='Invoice')
+    processed_offset = 0
+    progress_total = None
+
+    for page_records, total_count in iter_quickbooks_invoice_pages(
+        max_results=max_results,
         client=client,
-    )
+        updated_after=updated_after,
+        page_size=page_size,
+    ):
+        if progress_total is None:
+            progress_total = total_count or len(page_records)
+        page_result = _import_batch_result(
+            entity_name='Invoice',
+            records=page_records,
+            import_callable=_import_invoice,
+            task_cache_key=task_cache_key,
+            client=client,
+            progress_offset=processed_offset,
+            progress_total=progress_total,
+        )
+        summary = _merge_import_batch_summaries(summary, page_result)
+        processed_offset += len(page_records)
+
+    return summary
 
 
 def pull_quickbooks_invoices_to_local(*, max_results=None, client=None, force_full=False, task_cache_key=None):
@@ -4344,6 +4413,44 @@ def fetch_quickbooks_invoices(*, max_results=25, client=None, updated_after=None
     if updated_after:
         return client.find_updated_since('Invoice', updated_after, max_results=max_results, page_size=page_size)
     return client.find_all('Invoice', max_results=max_results, order_by='MetaData.LastUpdatedTime', page_size=page_size)
+
+
+def iter_quickbooks_invoice_pages(*, max_results=None, client=None, updated_after=None, page_size=100):
+    """Yield QuickBooks invoice pages so large imports can be processed incrementally."""
+    client = client or QuickBooksAPIClient()
+    page_size = max(int(page_size or 100), 1)
+    where_clause = None
+    if updated_after:
+        where_clause = f"MetaData.LastUpdatedTime > '{client._escape_query_value(updated_after)}'"
+
+    start_position = 1
+    remaining = None if max_results is None else max(int(max_results), 0)
+    total_count = None
+
+    while True:
+        batch_size = page_size if remaining is None else min(page_size, remaining)
+        response = client.query(
+            client._build_select_statement(
+                'Invoice',
+                where_clause=where_clause,
+                order_by='MetaData.LastUpdatedTime',
+                start_position=start_position,
+                max_results=batch_size,
+            )
+        )
+        if total_count is None:
+            total_count = int(response.get('totalCount') or 0)
+        batch = response.get('Invoice', []) or []
+        if not batch:
+            break
+        yield batch, total_count
+        if remaining is not None:
+            remaining -= len(batch)
+            if remaining <= 0:
+                break
+        if len(batch) < batch_size:
+            break
+        start_position += len(batch)
 
 
 def _quickbooks_invoice_fetch_chunk_size():

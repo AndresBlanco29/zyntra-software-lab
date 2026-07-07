@@ -2038,6 +2038,18 @@
             setTimeout(poll, 900);
             return;
           }
+          if (data.status === 'stale'){
+            animateTo(p);
+            const batch = data.result || {};
+            const processed = batch.processed || 0;
+            const total = batch.total || 0;
+            message.textContent = total
+              ? `La importación se interrumpió (${processed} de ${total}). Las facturas ya guardadas quedaron en la app. Vuelve a ejecutar "Import invoices from QuickBooks" con "Full import" para completar el resto.`
+              : 'La importación se interrumpió, probablemente por un reinicio del servidor. Vuelve a ejecutar la importación con "Full import" para completar el resto.';
+            document.getElementById('qb-task-reload').style.display = 'inline-block';
+            cancelBtn.style.display = 'inline-block';
+            return;
+          }
           if (data.status === 'completed'){
             animateTo(100);
             // show success and details (if present)

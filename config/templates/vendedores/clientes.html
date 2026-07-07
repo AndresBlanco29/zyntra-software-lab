@@ -132,6 +132,8 @@
 
 <th>{% trans "Balance" %}</th>
 
+<th>{% trans "Aging" %}</th>
+
 <th>{% trans "Acción" %}</th>
 
 </tr>
@@ -160,16 +162,45 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 
 <td data-label="{% trans 'Phone' %}" class="vendor-muted-cell">{{ cliente.telefono }}</td>
 
-<td data-label="{% trans 'Balance' %}" class="vendor-muted-cell">
-  {% if cliente.total_amount_owed > 0 %}
-    <span class="d-block small text-muted">{% trans "Due balance" %}</span>
-    <span>${{ cliente.total_amount_owed|floatformat:2 }}</span>
-  {% elif cliente.customer_credit_balance > 0 %}
+<td data-label="{% trans 'Balance' %}" class="vendor-muted-cell customer-balance-cell">
+  {% with summary=cliente.balance_summary %}
+  {% if summary.exceeds_credit_limit %}
+  <div class="customer-credit-limit-alert" role="alert">
+    {% trans "Collect payment — over credit limit" %}
+  </div>
+  {% endif %}
+  {% if summary.has_credit %}
     <span class="d-block small text-muted">{% trans "Customer credit" %}</span>
-    <span class="text-success">${{ cliente.customer_credit_balance|floatformat:2 }}</span>
+    <span class="text-success">${{ summary.customer_credit|floatformat:2 }}</span>
+  {% elif summary.lines %}
+    {% for line in summary.lines %}
+    <div class="customer-balance-line {% if line.is_overdue %}is-overdue{% else %}is-current{% endif %}">
+      {% if line.is_overdue %}
+      <span class="customer-balance-line__label">{% trans "Due balance" %}</span>
+      {% else %}
+      <span class="customer-balance-line__label">{% trans "Open" %}</span>
+      {% endif %}
+      <span class="customer-balance-line__amount">${{ line.amount|floatformat:2 }}</span>
+    </div>
+    {% endfor %}
   {% else %}
     $0.00
   {% endif %}
+  {% endwith %}
+</td>
+
+<td data-label="{% trans 'Aging' %}" class="vendor-muted-cell customer-aging-cell">
+  {% with summary=cliente.balance_summary %}
+  {% if summary.lines %}
+    {% for line in summary.lines %}
+    <div class="customer-aging-line {% if line.is_overdue %}is-overdue{% else %}is-current{% endif %}">
+      {{ line.aging_display }}
+    </div>
+    {% endfor %}
+  {% else %}
+    <span class="text-muted">—</span>
+  {% endif %}
+  {% endwith %}
 </td>
 
 <td data-label="{% trans 'Acción' %}" class="mobile-stack-table__action clientes-acciones-cell">
@@ -201,7 +232,7 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 <button
   type="button"
   class="btn btn-sm vendor-credit-limit-btn"
-  onclick="abrirModalLimiteCreditoCliente({{ cliente.id }}, '{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa|escapejs }}', '{{ cliente.credit_limit|default_if_none:''|unlocalize }}', '{{ cliente.total_amount_owed|unlocalize }}')">
+  onclick="abrirModalLimiteCreditoCliente({{ cliente.id }}, '{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa|escapejs }}', '{{ cliente.credit_limit|default_if_none:''|unlocalize }}', '{{ cliente.balance_summary.overdue_balance|unlocalize }}', '{{ cliente.balance_summary.total_open_balance|unlocalize }}', {{ cliente.balance_summary.exceeds_credit_limit|yesno:'true,false' }})">
 {% trans "Credit limit" %}
 </button>
 
@@ -451,7 +482,8 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
             </div>
           </div>
           <div class="border rounded-3 p-3 bg-light-subtle small">
-            <div class="d-flex justify-content-between mb-1"><span class="text-muted">{% trans "Current due balance" %}</span><strong id="limiteCreditoDueBalance">$0.00</strong></div>
+            <div class="d-flex justify-content-between mb-1"><span class="text-muted">{% trans "Due balance (overdue)" %}</span><strong id="limiteCreditoDueBalance">$0.00</strong></div>
+            <div class="d-flex justify-content-between mb-1"><span class="text-muted">{% trans "Total open balance" %}</span><strong id="limiteCreditoTotalOpen">$0.00</strong></div>
             <div class="d-flex justify-content-between"><span class="text-muted">{% trans "Remaining limit" %}</span><strong id="limiteCreditoRemaining">-</strong></div>
           </div>
         </form>

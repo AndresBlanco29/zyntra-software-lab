@@ -759,3 +759,65 @@ background:#f3f4f6;
         margin: 0.5rem auto;
     }
 }
+
+.customer-balance-cell,
+.customer-aging-cell {
+    min-width: 120px;
+}
+
+.customer-balance-line,
+.customer-aging-line {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 4px 0;
+}
+
+.customer-balance-line + .customer-balance-line,
+.customer-aging-line + .customer-aging-line {
+    border-top: 1px dashed rgba(15, 23, 42, 0.12);
+    margin-top: 4px;
+    padding-top: 8px;
+}
+
+.customer-balance-line__label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #6c757d;
+}
+
+.customer-balance-line.is-overdue .customer-balance-line__amount {
+    color: #b4232e;
+    font-weight: 700;
+}
+
+.customer-balance-line.is-current .customer-balance-line__amount {
+    color: #0b3d91;
+    font-weight: 600;
+}
+
+.customer-aging-line.is-overdue {
+    color: #b4232e;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.customer-aging-line.is-current {
+    color: #6c757d;
+    font-size: 12px;
+}
+
+.customer-credit-limit-alert {
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: rgba(220, 53, 69, 0.12);
+    border: 1px solid rgba(220, 53, 69, 0.28);
+    color: #b4232e;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}

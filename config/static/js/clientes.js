@@ -398,13 +398,13 @@ function formatMoney(value) {
 
 function updateCreditLimitRemainingPreview() {
     const limitInput = document.getElementById('limiteCreditoMonto');
-    const dueBalanceLabel = document.getElementById('limiteCreditoDueBalance');
+    const totalOpenLabel = document.getElementById('limiteCreditoTotalOpen');
     const remainingLabel = document.getElementById('limiteCreditoRemaining');
-    if (!limitInput || !dueBalanceLabel || !remainingLabel) {
+    if (!limitInput || !totalOpenLabel || !remainingLabel) {
         return;
     }
 
-    const dueBalance = Number(dueBalanceLabel.dataset.dueBalance || '0');
+    const totalOpen = Number(totalOpenLabel.dataset.totalOpen || '0');
     const limitValue = limitInput.value.trim();
     if (!limitValue) {
         remainingLabel.textContent = '-';
@@ -417,16 +417,19 @@ function updateCreditLimitRemainingPreview() {
         return;
     }
 
-    remainingLabel.textContent = formatMoney(Math.max(limit - dueBalance, 0));
+    remainingLabel.textContent = formatMoney(Math.max(limit - totalOpen, 0));
 }
 
-function abrirModalLimiteCreditoCliente(clienteId, nombreCliente, limiteActual, dueBalance) {
+function abrirModalLimiteCreditoCliente(clienteId, nombreCliente, limiteActual, dueBalance, totalOpenBalance, exceedsCreditLimit) {
     document.getElementById('limiteCreditoClienteId').value = clienteId;
     document.getElementById('limiteCreditoClienteNombre').textContent = nombreCliente || customerMessages.customerFallbackName;
     document.getElementById('limiteCreditoMonto').value = limiteActual || '';
     const dueBalanceLabel = document.getElementById('limiteCreditoDueBalance');
+    const totalOpenLabel = document.getElementById('limiteCreditoTotalOpen');
     dueBalanceLabel.textContent = formatMoney(dueBalance);
     dueBalanceLabel.dataset.dueBalance = dueBalance || '0';
+    totalOpenLabel.textContent = formatMoney(totalOpenBalance);
+    totalOpenLabel.dataset.totalOpen = totalOpenBalance || '0';
     updateCreditLimitRemainingPreview();
 
     const modal = new bootstrap.Modal(document.getElementById('configurarLimiteCreditoClienteModal'));

@@ -26,6 +26,7 @@ from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
+from config.clientes.balance_summary import attach_customer_balance_summaries, build_customer_balance_summary
 from config.facturacion.services import annotate_clientes_open_invoice_balance, get_recent_customer_invoice_items_by_presentation
 from config.pedidos.services import (
     calcular_precio_unitario_neto_item,
@@ -376,7 +377,7 @@ def clientes(request):
     page_obj = paginator.get_page(request.GET.get('page'))
 
     context = {
-        'clientes': page_obj.object_list,
+        'clientes': attach_customer_balance_summaries(page_obj.object_list),
         'page_obj': page_obj,
         'filter_params': filter_params,
         'filter_q': filter_params.get('q', ''),
@@ -979,13 +980,20 @@ def configurar_limite_credito_cliente(request):
 
     cliente.save(update_fields=['credit_limit'])
 
-    remaining_limit = cliente.get_credit_limit_remaining()
+    balance_summary = build_customer_balance_summary(cliente)
+    remaining_limit = None
+    if cliente.credit_limit is not None:
+        remaining_limit = max(
+            Decimal(str(cliente.credit_limit)).quantize(Decimal('0.01')) - balance_summary.total_open_balance,
+            Decimal('0.00'),
+        )
     return JsonResponse({
         'success': True,
         'message': _('Credit limit updated successfully.'),
         'credit_limit': str(cliente.credit_limit) if cliente.credit_limit is not None else '',
         'remaining_limit': str(remaining_limit) if remaining_limit is not None else '',
-        'due_balance': str(cliente.total_amount_owed),
+        'due_balance': str(balance_summary.overdue_balance),
+        'total_open_balance': str(balance_summary.total_open_balance),
     })
 
 

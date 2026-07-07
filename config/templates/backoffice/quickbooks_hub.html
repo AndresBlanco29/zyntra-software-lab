@@ -1255,6 +1255,19 @@
               <p class="qb-action-note">{% trans "Updates linked products from QuickBooks (cost, stock, names, active/inactive status) and also imports any new or changed catalog items since the last sync." %}</p>
             </div>
             {% if quickbooks_import_accounting_enabled %}
+            <div class="qb-action-item" id="qb-import-invoices">
+              <form method="post" action="{% url 'quickbooks_import_invoices_to_local' %}" data-qb-operation="import_invoices_to_local">
+                {% csrf_token %}
+                <input type="hidden" name="limit" value="0">
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <button type="submit" class="btn btn-outline-info w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Import invoices from QuickBooks" %}</button>
+                <label class="form-check mt-2 mb-0">
+                  <input class="form-check-input" type="checkbox" name="mode" value="full">
+                  <span class="form-check-label small">{% trans "Full import (ignore last sync cursor)" %}</span>
+                </label>
+              </form>
+              <p class="qb-action-note">{% trans "Imports QuickBooks invoices with invoice number, invoice date (TxnDate), due date, open balance, and payment status. Use this so customer aging shows each invoice separately with the correct dates." %}</p>
+            </div>
             <div class="qb-action-item" id="qb-pull-accounting">
               <form method="post" action="{% url 'quickbooks_import_accounting_documents_to_local' %}" data-qb-operation="import_accounting_documents_to_local">
                 {% csrf_token %}
@@ -1933,6 +1946,9 @@
       if (operation === 'import_inventory_quantities_to_local') {
         return 'Estamos actualizando solo las cantidades de inventario desde QuickBooks.';
       }
+      if (operation === 'import_invoices_to_local') {
+        return 'Estamos importando facturas desde QuickBooks con número, fecha, vencimiento y saldo.';
+      }
       if (operation === 'alignment_sync_to_local') {
         return 'Estamos alineando Tortilla y QuickBooks: importación, estado de facturas y exportación de registros nuevos.';
       }
@@ -1964,6 +1980,11 @@
         return processed && total
           ? `Actualizando inventario ${processed} de ${total}...`
           : 'Actualizando inventario — por favor espera.';
+      }
+      if (operation === 'import_invoices_to_local') {
+        return processed && total
+          ? `Importando facturas ${processed} de ${total}...`
+          : 'Importando facturas — por favor espera.';
       }
       return processed && total
         ? `Importando ${processed} de ${total}...`

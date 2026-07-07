@@ -3445,6 +3445,10 @@ def _apply_quickbooks_invoice_to_local_record(record, payload, *, client=None):
         if record.saldo_cliente != balance:
             record.saldo_cliente = balance
             update_fields.append('saldo_cliente')
+        txn_date = _parse_quickbooks_date(payload.get('TxnDate'))
+        if txn_date and record.fecha_documento != txn_date:
+            record.fecha_documento = txn_date
+            update_fields.append('fecha_documento')
         update_fields.extend(_apply_quickbooks_invoice_status_to_local_record(record, payload, client=client))
     else:
         if record.total != total_amount:
@@ -3535,6 +3539,9 @@ def import_quickbooks_invoice_record(payload, *, client=None, customer_cache=Non
         local_model=local_model,
         local_record_id=record.id,
     )
+    txn_date = _parse_quickbooks_date(payload.get('TxnDate'))
+    due_date = _parse_quickbooks_date(payload.get('DueDate'))
+    invoice_balance = _quantize_money(payload.get('Balance') if payload.get('Balance') not in (None, '') else payload.get('TotalAmt') or 0)
     return {
         'ok': True,
         'action': action,
@@ -3542,6 +3549,11 @@ def import_quickbooks_invoice_record(payload, *, client=None, customer_cache=Non
         'quickbooks_id': quickbooks_id,
         'local_id': record.id,
         'label': doc_number or getattr(record, 'numero', '') or quickbooks_id,
+        'doc_number': doc_number,
+        'txn_date': txn_date.isoformat() if txn_date else '',
+        'due_date': due_date.isoformat() if due_date else '',
+        'balance': str(invoice_balance),
+        'fecha_documento': getattr(record, 'fecha_documento', None).isoformat() if getattr(record, 'fecha_documento', None) else '',
     }
 
 
@@ -3710,6 +3722,72 @@ def pull_quickbooks_accounting_documents_to_local(*, max_results=None, client=No
             {'status': 'completed', 'progress': 100, 'operation': 'AccountingDocument', 'result': result},
             timeout=60 * 60,
         )
+    return result
+
+
+def import_quickbooks_invoices(*, max_results=25, client=None, updated_after=None, task_cache_key=None):
+    """Import QuickBooks invoices into local Invoice records with dates, balances, and status."""
+    if not quickbooks_accounting_import_enabled():
+        raise QuickBooksSyncError(
+            'QuickBooks invoice import is disabled. Invoices are only exported from this app to QuickBooks.'
+        )
+    client = client or QuickBooksAPIClient()
+    page_size = _quickbooks_catalog_page_size()
+    records = fetch_quickbooks_invoices(
+        max_results=max_results,
+        client=client,
+        updated_after=updated_after,
+        page_size=page_size,
+    )
+    customer_cache = {}
+
+    def _import_invoice(record):
+        return import_quickbooks_invoice_record(record, client=client, customer_cache=customer_cache)
+
+    return _import_batch_result(
+        entity_name='Invoice',
+        records=records,
+        import_callable=_import_invoice,
+        task_cache_key=task_cache_key,
+        client=client,
+    )
+
+
+def pull_quickbooks_invoices_to_local(*, max_results=None, client=None, force_full=False, task_cache_key=None):
+    """Pull QuickBooks invoices into local Invoice records (invoice date, due date, open balance)."""
+    if not quickbooks_accounting_import_enabled():
+        raise QuickBooksSyncError(
+            'QuickBooks invoice import is disabled. Invoices are only exported from this app to QuickBooks.'
+        )
+    client = client or QuickBooksAPIClient()
+    connection = client.connection
+    run_started_at = timezone.now()
+    serialized_run_started_at = _serialize_cursor(run_started_at)
+    invoice_cursor = None if force_full else _cursor_for_query(connection.get_sync_cursor(_sync_cursor_key('invoice')))
+
+    if task_cache_key:
+        cache.set(
+            task_cache_key,
+            {'status': 'running', 'progress': 5, 'operation': 'import_invoices_to_local'},
+            timeout=60 * 60,
+        )
+
+    result = import_quickbooks_invoices(
+        max_results=max_results,
+        client=client,
+        updated_after=invoice_cursor,
+        task_cache_key=task_cache_key,
+    )
+
+    latest_updated_at = result.get('latest_updated_at')
+    if latest_updated_at:
+        connection.set_sync_cursor(_sync_cursor_key('invoice'), latest_updated_at)
+    elif int(result.get('count') or 0) > 0:
+        connection.set_sync_cursor(_sync_cursor_key('invoice'), serialized_run_started_at)
+    connection.save(update_fields=['sync_state', 'updated_at'])
+
+    result['incremental'] = not force_full
+    result['run_started_at'] = serialized_run_started_at
     return result
 
 

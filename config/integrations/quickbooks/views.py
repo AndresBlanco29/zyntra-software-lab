@@ -56,6 +56,7 @@ from .sync import (
     pull_quickbooks_accounting_documents_to_local,
     pull_quickbooks_item_images_to_local,
     pull_quickbooks_inventory_quantities_to_local,
+    pull_quickbooks_invoices_to_local,
     pull_quickbooks_items_to_local,
     pull_quickbooks_to_local,
     push_linked_quickbooks_items,
@@ -1636,6 +1637,22 @@ def quickbooks_import_credit_memos(request):
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 @quickbooks_requires_accounting_import
+def quickbooks_import_invoices_to_local(request):
+    force_full = str(request.POST.get('mode') or '').strip().lower() == 'full'
+    try:
+        result = pull_quickbooks_invoices_to_local(
+            max_results=_parse_quickbooks_import_limit(request.POST.get('limit'), default=None),
+            force_full=force_full,
+        )
+    except (ValueError, QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
+        logger.warning('QuickBooks invoice import to local failed: %s', exc)
+        return _response_or_redirect(request, operation='import_invoices_to_local', error=str(exc), status_code=502)
+    return _response_or_redirect(request, operation='import_invoices_to_local', result=result)
+
+
+@require_POST
+@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+@quickbooks_requires_accounting_import
 def quickbooks_import_accounting_documents_to_local(request):
     force_full = str(request.POST.get('mode') or '').strip().lower() == 'full'
     try:
@@ -1653,7 +1670,7 @@ def quickbooks_import_accounting_documents_to_local(request):
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def quickbooks_start_task(request):
     operation = str(request.POST.get('operation') or '').strip()
-    if operation == 'import_accounting_documents_to_local':
+    if operation in {'import_accounting_documents_to_local', 'import_invoices_to_local'}:
         blocked = _guard_quickbooks_accounting_import(request, operation='task_start')
         if blocked is not None:
             return blocked
@@ -1688,6 +1705,7 @@ def quickbooks_start_task(request):
             skip_images=kwargs.get('skip_images'),
         ).get('items', {}),
         'import_accounting_documents_to_local': pull_quickbooks_accounting_documents_to_local,
+        'import_invoices_to_local': pull_quickbooks_invoices_to_local,
         'pull_sync_to_local': lambda **kwargs: pull_quickbooks_to_local(
             max_results=kwargs.get('max_results'),
             force_full=kwargs.get('force_full', False),

@@ -1160,6 +1160,75 @@ class QuickBooksInvoiceStatusImportTests(TestCase):
         self.assertEqual(invoice.qb_email_status, 'NEED_TO_SEND')
         self.assertEqual(invoice.get_qb_payment_status_display_label(), 'Due in 8 days')
 
+    def test_import_invoice_sets_fecha_documento_from_txn_date(self):
+        user = Usuario.objects.create_user(username='qb-txn-date-client', password='secret123', role='cliente')
+        cliente = Cliente.objects.create(
+            usuario=user,
+            nombre_empresa='Txn Date Customer LLC',
+            telefono='5550000003',
+            direccion='123 Main',
+            ciudad='Dallas',
+            estado='TX',
+            codigo_postal='75001',
+            pais='USA',
+            sales_tax_number='TX-3',
+            certificado_tax='certificados/test.pdf',
+        )
+        txn_date = timezone.localdate() - timedelta(days=12)
+        due_date = txn_date + timedelta(days=7)
+        result = import_quickbooks_invoice_record({
+            'Id': 'QB-INV-TXN-1',
+            'DocNumber': 'LU200001',
+            'CustomerRef': {'value': 'C-3', 'name': cliente.nombre_empresa},
+            'TxnDate': txn_date.isoformat(),
+            'DueDate': due_date.isoformat(),
+            'TotalAmt': '6247.90',
+            'Balance': '6247.90',
+        })
+        invoice = Invoice.objects.get(quickbooks_id='QB-INV-TXN-1')
+        self.assertEqual(result['txn_date'], txn_date.isoformat())
+        self.assertEqual(result['due_date'], due_date.isoformat())
+        self.assertEqual(invoice.fecha_documento, txn_date)
+        self.assertEqual(invoice.saldo_cliente, Decimal('6247.90'))
+
+    def test_import_invoice_update_refreshes_fecha_documento(self):
+        user = Usuario.objects.create_user(username='qb-txn-update-client', password='secret123', role='cliente')
+        cliente = Cliente.objects.create(
+            usuario=user,
+            nombre_empresa='Txn Update Customer LLC',
+            telefono='5550000004',
+            direccion='123 Main',
+            ciudad='Dallas',
+            estado='TX',
+            codigo_postal='75001',
+            pais='USA',
+            sales_tax_number='TX-4',
+            certificado_tax='certificados/test.pdf',
+        )
+        txn_date = timezone.localdate() - timedelta(days=20)
+        import_quickbooks_invoice_record({
+            'Id': 'QB-INV-TXN-UPDATE',
+            'DocNumber': 'LU200002',
+            'CustomerRef': {'value': 'C-4', 'name': cliente.nombre_empresa},
+            'TxnDate': txn_date.isoformat(),
+            'TotalAmt': '100.00',
+            'Balance': '100.00',
+        })
+        invoice = Invoice.objects.get(quickbooks_id='QB-INV-TXN-UPDATE')
+        Invoice.objects.filter(pk=invoice.pk).update(fecha_documento=None)
+        new_txn_date = timezone.localdate() - timedelta(days=5)
+        import_quickbooks_invoice_record({
+            'Id': 'QB-INV-TXN-UPDATE',
+            'DocNumber': 'LU200002',
+            'CustomerRef': {'value': 'C-4', 'name': cliente.nombre_empresa},
+            'TxnDate': new_txn_date.isoformat(),
+            'TotalAmt': '100.00',
+            'Balance': '80.00',
+        })
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.fecha_documento, new_txn_date)
+        self.assertEqual(invoice.saldo_cliente, Decimal('80.00'))
+
     @patch('config.integrations.quickbooks.sync._fetch_quickbooks_invoices_by_ids')
     def test_refresh_linked_invoice_status_updates_unsynced_invoices(self, mock_fetch_invoices):
         user = Usuario.objects.create_user(username='qb-refresh-client', password='secret123', role='cliente')
@@ -1881,6 +1950,35 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertEqual(self.invoice.saldo_cliente, Decimal('12.50'))
         self.assertEqual(self.adjustment_note.total, Decimal('10.00'))
         self.assertEqual(QuickBooksImportConflict.objects.count(), 0)
+
+    @override_settings(QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS=True)
+    @patch('config.integrations.quickbooks.client.requests.request')
+    def test_pull_invoices_to_local_imports_txn_date_and_balance(self, mock_request):
+        self._activate_connection()
+        txn_date = '2026-06-24'
+        mock_request.return_value = self._json_response({
+            'QueryResponse': {
+                'Invoice': [{
+                    'Id': 'QB-INV-PULL-TXN',
+                    'DocNumber': 'LU300001',
+                    'CustomerRef': {'name': self.cliente.nombre_empresa},
+                    'TxnDate': txn_date,
+                    'DueDate': '2026-07-01',
+                    'TotalAmt': '12555.02',
+                    'Balance': '12555.02',
+                    'MetaData': {'LastUpdatedTime': '2026-06-24T10:00:00+00:00'},
+                }],
+            },
+        })
+
+        response = self.client.post(reverse('quickbooks_import_invoices_to_local'), {'limit': '10'})
+
+        self.assertEqual(response.status_code, 200)
+        invoice = Invoice.objects.get(quickbooks_id='QB-INV-PULL-TXN')
+        self.assertEqual(invoice.numero, 'LU300001')
+        self.assertEqual(invoice.fecha_documento.isoformat(), txn_date)
+        self.assertEqual(invoice.saldo_cliente, Decimal('12555.02'))
+        self.assertEqual(invoice.qb_due_date.isoformat(), '2026-07-01')
 
     @override_settings(QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS=True)
     @patch('config.integrations.quickbooks.client.requests.request')

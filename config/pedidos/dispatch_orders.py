@@ -224,7 +224,7 @@ def _open_quote_queryset():
 
 
 def _pedido_base_queryset():
-	return Pedido.objects.select_related(
+	return Pedido.objects.exclude(canal_toma='QUICKBOOKS_IMPORT').select_related(
 		'cliente__usuario',
 		'vendedor',
 		'seleccionador',
@@ -235,7 +235,7 @@ def _pedido_base_queryset():
 
 
 def _count_pedido_buckets():
-	pedidos = list(Pedido.objects.all())
+	pedidos = list(_pedido_base_queryset())
 	reversed_invoice_pedido_ids = _load_reversed_invoice_pedido_ids([pedido.id for pedido in pedidos])
 	buckets = {
 		'pending': 0,
@@ -272,7 +272,27 @@ def get_dispatch_order_counts():
 	}
 
 
-def build_dispatch_order_page(*, view_mode, page_number, page_size):
+def _matches_dispatch_search(row, search_term):
+	query = (search_term or '').strip().lower()
+	if not query:
+		return True
+	haystack = ' '.join([
+		str(row.source_id),
+		row.customer_name or '',
+		row.selector_name or '',
+		str(row.origin_label or ''),
+		str(row.status_label or ''),
+	]).lower()
+	return query in haystack
+
+
+def _filter_dispatch_rows(rows, *, search_term):
+	if not (search_term or '').strip():
+		return rows
+	return [row for row in rows if _matches_dispatch_search(row, search_term)]
+
+
+def build_dispatch_order_page(*, view_mode, page_number, page_size, search_term=''):
 	pedido_buckets = _classify_pedidos(_pedido_base_queryset())
 
 	if view_mode == 'in-progress':
@@ -288,6 +308,7 @@ def build_dispatch_order_page(*, view_mode, page_number, page_size):
 		rows = _quote_rows_for_statuses(statuses=QUOTE_PENDING_STATUSES)
 		rows.extend(_pedido_rows_from_pedidos(pedidos=pedido_buckets['pending'], bucket='pending'))
 
+	rows = _filter_dispatch_rows(rows, search_term=search_term)
 	rows.sort(key=lambda row: row.date, reverse=True)
 	page_obj = Paginator(rows, page_size).get_page(page_number)
 	return view_mode, page_obj

@@ -1108,8 +1108,7 @@ def _ordered_driver_deliveries(queryset):
 
 INVOICES_LIST_PAGE_SIZE = 50
 
-# Operational invoice lists exclude records created by QuickBooks import pulls.
-OPERATIONAL_INVOICES_FILTER = ~Q(pedido__canal_toma='QUICKBOOKS_IMPORT')
+QUICKBOOKS_IMPORTED_PEDIDO = Q(pedido__canal_toma='QUICKBOOKS_IMPORT')
 
 INVOICE_QB_STATUS_FILTERS = {
 	'due': Q(qb_payment_status__in=['DUE', 'DUE_TODAY']),
@@ -1137,17 +1136,19 @@ def _invoice_qb_status_counts(queryset):
 
 def _invoice_list_view_querysets(*, base_queryset=None):
 	queryset = base_queryset if base_queryset is not None else Invoice.objects.all()
-	queryset = queryset.filter(OPERATIONAL_INVOICES_FILTER)
 	return {
 		'pending': queryset.filter(
 			estado='GENERADA',
 			despachador_notificado=False,
 		).exclude(
+			QUICKBOOKS_IMPORTED_PEDIDO,
+		).exclude(
 			delivery__estado__in=['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'],
 		),
 		'ready': queryset.filter(
 			estado='GENERADA',
-			despachador_notificado=True,
+		).filter(
+			Q(despachador_notificado=True) | QUICKBOOKS_IMPORTED_PEDIDO,
 		).exclude(
 			delivery__estado__in=['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'],
 		),

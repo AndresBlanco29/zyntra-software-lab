@@ -313,16 +313,19 @@ def backoffice_dashboard(request):
 @login_required
 @internal_permission_required('backoffice.orders.view')
 def backoffice_pedidos(request):
+	search_query = (request.GET.get('q') or '').strip()
 	view_mode, page_obj = build_dispatch_order_page(
 		view_mode=request.GET.get('view'),
 		page_number=request.GET.get('page'),
 		page_size=BACKOFFICE_PEDIDOS_PAGE_SIZE,
+		search_term=search_query,
 	)
 	counts = get_dispatch_order_counts()
 	return render(request, 'backoffice/pedidos_lista.html', {
 		'dispatch_orders': page_obj,
 		'page_obj': page_obj,
 		'view_mode': view_mode,
+		'search_query': search_query,
 		**counts,
 	})
 

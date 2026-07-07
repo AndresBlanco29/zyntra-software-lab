@@ -8,23 +8,40 @@
 <p class="text-muted">{% trans "Customer requests and sales orders ready to manage, pick, and ship." %}</p>
 
 <div class="btn-group mb-3" role="group" aria-label="{% trans 'Order views' %}">
-  <a href="{% url 'backoffice_pedidos' %}" class="btn {% if view_mode == 'pending' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+  <a href="{% url 'backoffice_pedidos' %}{% if search_query %}?q={{ search_query|urlencode }}{% endif %}" class="btn {% if view_mode == 'pending' %}btn-primary{% else %}btn-outline-primary{% endif %}">
     {% trans "Pending orders" %}
     <span class="badge {% if view_mode == 'pending' %}bg-light text-primary{% else %}bg-primary{% endif %} ms-1">{{ pending_count }}</span>
   </a>
-  <a href="{% url 'backoffice_pedidos' %}?view=in-progress" class="btn {% if view_mode == 'in-progress' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+  <a href="{% url 'backoffice_pedidos' %}?view=in-progress{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn {% if view_mode == 'in-progress' %}btn-warning{% else %}btn-outline-warning{% endif %}">
     {% trans "Orders in progress" %}
     <span class="badge {% if view_mode == 'in-progress' %}bg-light text-dark{% else %}bg-warning text-dark{% endif %} ms-1">{{ in_progress_count }}</span>
   </a>
-  <a href="{% url 'backoffice_pedidos' %}?view=completed" class="btn {% if view_mode == 'completed' %}btn-success{% else %}btn-outline-success{% endif %}">
+  <a href="{% url 'backoffice_pedidos' %}?view=completed{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn {% if view_mode == 'completed' %}btn-success{% else %}btn-outline-success{% endif %}">
     {% trans "Completed orders" %}
     <span class="badge {% if view_mode == 'completed' %}bg-light text-success{% else %}bg-success{% endif %} ms-1">{{ completed_count }}</span>
   </a>
-  <a href="{% url 'backoffice_pedidos' %}?view=cancelled" class="btn {% if view_mode == 'cancelled' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+  <a href="{% url 'backoffice_pedidos' %}?view=cancelled{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn {% if view_mode == 'cancelled' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
     {% trans "Cancelled orders" %}
     <span class="badge {% if view_mode == 'cancelled' %}bg-light text-secondary{% else %}bg-secondary{% endif %} ms-1">{{ cancelled_count }}</span>
   </a>
 </div>
+
+<form method="get" class="d-flex flex-wrap gap-2 mb-4 align-items-center">
+  <input type="hidden" name="view" value="{{ view_mode }}">
+  <input
+    type="search"
+    name="q"
+    value="{{ search_query }}"
+    class="form-control"
+    style="max-width: 360px;"
+    placeholder="{% trans 'Search by order #, customer, selector, or status' %}"
+    autocomplete="off"
+  >
+  <button type="submit" class="btn btn-outline-primary">{% trans "Search" %}</button>
+  {% if search_query %}
+  <a href="{% url 'backoffice_pedidos' %}?view={{ view_mode }}" class="btn btn-outline-secondary">{% trans "Clear" %}</a>
+  {% endif %}
+</form>
 
 {% if page_obj.paginator.count %}
 <p class="text-muted small mb-3">
@@ -89,6 +106,6 @@
     </table>
   </div>
 
-  {% pagination_controls page_obj aria_label=_('Order pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0 px-3 pb-3" view=view_mode %}
+  {% pagination_controls page_obj aria_label=_('Order pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0 px-3 pb-3" view=view_mode q=search_query %}
 </div>
 {% endblock %}

@@ -198,6 +198,8 @@
                 <span class="badge bg-success">{% trans "Paid" %}</span>
               {% elif invoice.delivery and invoice.delivery.estado == 'ENTREGADA_SIN_PAGO' %}
                 <span class="badge bg-warning text-dark">{% trans "Unpaid" %}</span>
+              {% elif invoice.pedido.canal_toma == 'QUICKBOOKS_IMPORT' %}
+                <span class="badge bg-info text-dark">{% trans "QuickBooks import" %}</span>
               {% elif invoice.despachador_notificado %}
                 <span class="badge bg-success">{% trans "Ready" %}</span>
               {% else %}

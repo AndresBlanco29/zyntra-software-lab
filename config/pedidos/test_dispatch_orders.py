@@ -132,3 +132,17 @@ class DispatchOrderClassificationTests(TestCase):
 		counts = get_dispatch_order_counts()
 		self.assertGreaterEqual(counts['cancelled_count'], 1)
 		self.assertGreaterEqual(counts['completed_count'], 1)
+
+	def test_quickbooks_imported_pedidos_are_excluded_from_dispatch_buckets(self):
+		imported_pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='BACKOFFICE',
+			canal_toma='QUICKBOOKS_IMPORT',
+			estado='INVOICE_GENERADA',
+			total=Decimal('99.00'),
+		)
+
+		self.assertNotIn(imported_pedido.id, self._order_ids_for_view('in-progress'))
+		counts = get_dispatch_order_counts()
+		self.assertNotIn(imported_pedido.id, self._order_ids_for_view('pending'))
+		self.assertEqual(counts['in_progress_count'], len(self._order_ids_for_view('in-progress')))

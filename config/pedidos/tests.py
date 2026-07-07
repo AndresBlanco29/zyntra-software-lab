@@ -1318,6 +1318,55 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(first_page, 'Page 1 of')
 		self.assertContains(first_page, 'Showing 1-2 of 3 orders')
 		self.assertEqual(len(list(second_page.context['dispatch_orders'])), 1)
+
+	def test_backoffice_order_list_excludes_quickbooks_imported_pedidos(self):
+		imported_pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='BACKOFFICE',
+			canal_toma='QUICKBOOKS_IMPORT',
+			estado='INVOICE_GENERADA',
+			total=Decimal('99.00'),
+		)
+		in_progress_order = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='EN_GESTION',
+			total=Decimal('15.00'),
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedidos'), {'view': 'in-progress'})
+		visible_ids = [row.source_id for row in response.context['dispatch_orders'] if row.record_type == 'order']
+
+		self.assertEqual(visible_ids, [in_progress_order.id])
+		self.assertNotIn(imported_pedido.id, visible_ids)
+		self.assertEqual(response.context['in_progress_count'], 1)
+
+	def test_backoffice_order_list_can_search_within_active_tab(self):
+		target_order = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='EN_GESTION',
+			total=Decimal('15.00'),
+		)
+		Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='EN_GESTION',
+			total=Decimal('18.00'),
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedidos'), {
+			'view': 'in-progress',
+			'q': str(target_order.id),
+		})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(
+			[row.source_id for row in response.context['dispatch_orders'] if row.record_type == 'order'],
+			[target_order.id],
+		)
 		self.assertContains(second_page, 'Page 2 of 2')
 
 

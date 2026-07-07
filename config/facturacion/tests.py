@@ -2918,7 +2918,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(response.context['summary']['total'], 1)
 		self.assertEqual(response.context['selected_creator_role'], 'driver')
 
-	def test_backoffice_invoice_list_excludes_quickbooks_imported_invoices(self):
+	def test_backoffice_invoice_list_shows_quickbooks_imported_invoices_in_ready(self):
 		local_invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total='10.00')
 		local_invoice.despachador_notificado = False
 		local_invoice.save(update_fields=['despachador_notificado'])
@@ -2930,11 +2930,14 @@ class InvoiceFlowTests(TestCase):
 		imported_invoice.pedido.save(update_fields=['canal_toma'])
 
 		self.client.force_login(self.backoffice)
-		response = self.client.get(reverse('backoffice_invoices_list'))
+		pending_response = self.client.get(reverse('backoffice_invoices_list'))
+		ready_response = self.client.get(reverse('backoffice_invoices_list'), {'view': 'ready'})
 
-		self.assertEqual(response.status_code, 200)
-		self.assertEqual([invoice.id for invoice in response.context['page_obj']], [local_invoice.id])
-		self.assertEqual(response.context['pending_count'], 1)
+		self.assertEqual(pending_response.status_code, 200)
+		self.assertEqual([invoice.id for invoice in pending_response.context['page_obj']], [local_invoice.id])
+		self.assertEqual(pending_response.context['pending_count'], 1)
+		self.assertEqual(ready_response.context['ready_count'], 1)
+		self.assertEqual([invoice.id for invoice in ready_response.context['page_obj']], [imported_invoice.id])
 
 	def test_backoffice_invoice_list_defaults_to_pending_dispatch(self):
 		pending_invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total='10.00')

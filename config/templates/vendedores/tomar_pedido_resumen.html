@@ -56,7 +56,8 @@ data-csrf="{{ csrf_token }}"
 data-msg-order-type="{% trans 'You must indicate how the order was taken.' %}"
 data-msg-submit-error="{% trans 'The order could not be created.' %}"
 data-msg-remove-error="{% trans 'The product could not be removed from the order.' %}"
-data-msg-request-error="{% trans 'An error occurred while processing the request.' %}"
+data-msg-request-error="{% trans 'An error occurred while processing the request.'|escapejs %}"
+data-manual-price-label="{% trans 'Manual price'|escapejs %}"
 style="margin: 0; padding: 0;">
 
 <!-- NAVBAR -->
@@ -247,42 +248,32 @@ min="1"
 
 </td>
 
-<td data-label="{% trans "Precio" %}">
+<td data-label="{% trans "Precio" %}" class="pedido-price-cell">
 
-<select class="precio-resumen" data-id="{{ item.id }}">
-
+<select class="form-select form-select-sm precio-resumen-preset no-search-select mb-1" data-id="{{ item.id }}">
+<option value="">{% trans "Manual price" %}</option>
 {% for p in item.presentaciones %}
 {% if p.id|stringformat:"s" == item.presentacion_id|stringformat:"s" %}
-
-<option value="{{ p.precio_1 }}" data-price-key="precio_1"
-{% if item.precio_key == 'precio_1' %}selected{% endif %}>
-{% trans "Precio" %} 1 - ${{ p.precio_1 }}
-</option>
-
-<option value="{{ p.precio_2 }}" data-price-key="precio_2"
-{% if item.precio_key == 'precio_2' %}selected{% endif %}>
-{% trans "Precio" %} 2 - ${{ p.precio_2 }}
-</option>
-
-<option value="{{ p.precio_3 }}" data-price-key="precio_3"
-{% if item.precio_key == 'precio_3' %}selected{% endif %}>
-{% trans "Precio" %} 3 - ${{ p.precio_3 }}
-</option>
-
-<option value="{{ p.precio_4 }}" data-price-key="precio_4"
-{% if item.precio_key == 'precio_4' %}selected{% endif %}>
-{% trans "Precio" %} 4 - ${{ p.precio_4 }}
-</option>
-
-<option value="{{ p.precio_5 }}" data-price-key="precio_5"
-{% if item.precio_key == 'precio_5' %}selected{% endif %}>
-{% trans "Precio" %} 5 - ${{ p.precio_5 }}
-</option>
-
+<option value="{{ p.precio_1|floatformat:2 }}" data-price-key="precio_1" {% if item.precio_key == 'precio_1' %}selected{% endif %}>PC1 · ${{ p.precio_1|floatformat:2 }}</option>
+<option value="{{ p.precio_2|floatformat:2 }}" data-price-key="precio_2" {% if item.precio_key == 'precio_2' %}selected{% endif %}>PC2 · ${{ p.precio_2|floatformat:2 }}</option>
+<option value="{{ p.precio_3|floatformat:2 }}" data-price-key="precio_3" {% if item.precio_key == 'precio_3' %}selected{% endif %}>PC3 · ${{ p.precio_3|floatformat:2 }}</option>
+<option value="{{ p.precio_4|floatformat:2 }}" data-price-key="precio_4" {% if item.precio_key == 'precio_4' %}selected{% endif %}>PC4 · ${{ p.precio_4|floatformat:2 }}</option>
+<option value="{{ p.precio_5|floatformat:2 }}" data-price-key="precio_5" {% if item.precio_key == 'precio_5' %}selected{% endif %}>PC5 · ${{ p.precio_5|floatformat:2 }}</option>
 {% endif %}
 {% endfor %}
-
 </select>
+
+<div class="input-group input-group-sm precio-resumen-manual-wrap">
+<span class="input-group-text">$</span>
+<input
+  type="number"
+  min="0"
+  step="0.01"
+  class="form-control precio-resumen-manual"
+  data-id="{{ item.id }}"
+  value="{{ item.precio|floatformat:2 }}"
+  aria-label="{% trans 'Manual price' %}">
+</div>
 
 </td>
 

@@ -32,6 +32,7 @@ const orderTypeMessage = document.body.dataset.msgOrderType || 'You must indicat
 const submitErrorMessage = document.body.dataset.msgSubmitError || 'The order could not be created.'
 const removeErrorMessage = document.body.dataset.msgRemoveError || 'The product could not be removed from the order.'
 const requestErrorMessage = document.body.dataset.msgRequestError || 'An error occurred while processing the request.'
+const manualPriceLabel = document.body.dataset.manualPriceLabel || 'Manual price'
 const feedbackBox = document.getElementById('pedidoFeedback')
 
 function formatMoney(value) {
@@ -67,8 +68,8 @@ function refreshDiscountRow(id, data) {
     const resumen = document.querySelector(`.descuento-resumen[data-id="${id}"]`)
     const netPrice = document.querySelector(`.precio-neto[data-id="${id}"]`)
     const savings = document.querySelector(`.ahorro-linea[data-id="${id}"]`)
-    const listPriceSelect = document.querySelector(`.precio-resumen[data-id="${id}"]`)
-    const listPrice = listPriceSelect ? Number(listPriceSelect.value || 0) : 0
+    const listPriceInput = document.querySelector(`.precio-resumen-manual[data-id="${id}"]`)
+    const listPrice = listPriceInput ? Number(listPriceInput.value || 0) : 0
     const discountApplied = Boolean(data ? data.discount_applied : document.querySelector(`.descuento-toggle[data-id="${id}"]`)?.checked)
     const discountAmount = Number(data ? data.discount_amount : document.querySelector(`.descuento-monto[data-id="${id}"]`)?.value || 0)
 
@@ -120,6 +121,70 @@ function syncDiscountPresetFromInput(presetSelect, amountInput) {
         }
     })
     presetSelect.value = matchedValue
+}
+
+function getPriceControls(id) {
+    return {
+        presetSelect: document.querySelector(`.precio-resumen-preset[data-id="${id}"]`),
+        priceInput: document.querySelector(`.precio-resumen-manual[data-id="${id}"]`),
+    }
+}
+
+function formatPriceTierLabel(tierNumber, amount) {
+    return `PC${tierNumber} · $${formatMoney(amount)}`
+}
+
+function buildPricePresetOptions(precio1, precio2, precio3, precio4, precio5, selectedKey) {
+    const tiers = [
+        ['precio_1', precio1, 1],
+        ['precio_2', precio2, 2],
+        ['precio_3', precio3, 3],
+        ['precio_4', precio4, 4],
+        ['precio_5', precio5, 5],
+    ]
+    let html = `<option value="">${manualPriceLabel}</option>`
+    tiers.forEach(function (tier) {
+        const key = tier[0]
+        const amount = tier[1]
+        const number = tier[2]
+        const selected = selectedKey === key ? ' selected' : ''
+        html += `<option value="${amount}" data-price-key="${key}"${selected}>${formatPriceTierLabel(number, amount)}</option>`
+    })
+    return html
+}
+
+function syncPricePresetFromInput(presetSelect, priceInput) {
+    if (!presetSelect || !priceInput) {
+        return
+    }
+    const inputValue = parseDecimalValue(priceInput.value)
+    let matchedValue = ''
+    Array.from(presetSelect.options).forEach(function (option) {
+        if (!option.value) {
+            return
+        }
+        const optionValue = parseDecimalValue(option.value)
+        if (inputValue !== null && optionValue !== null && optionValue === inputValue) {
+            matchedValue = option.value
+        }
+    })
+    presetSelect.value = matchedValue
+}
+
+function resolvePriceKey(presetSelect) {
+    if (!presetSelect || !presetSelect.value) {
+        return ''
+    }
+    return presetSelect.selectedOptions[0]?.dataset.priceKey || ''
+}
+
+function persistPrice(id) {
+    const controls = getPriceControls(id)
+    if (!controls.priceInput) {
+        return Promise.resolve()
+    }
+    syncPricePresetFromInput(controls.presetSelect, controls.priceInput)
+    return applyPriceChange(id, controls.priceInput.value, resolvePriceKey(controls.presetSelect))
 }
 
 function persistDiscount(id) {
@@ -283,21 +348,31 @@ let precio4 = option.dataset.precio4
 let precio5 = option.dataset.precio5
 
 let id = this.dataset.id
+const controls = getPriceControls(id)
+const currentPriceKey = resolvePriceKey(controls.presetSelect) || 'precio_1'
 
-let precioSelect = document.querySelector(`.precio-resumen[data-id="${id}"]`)
-const currentPriceKey = precioSelect?.selectedOptions?.[0]?.dataset.priceKey || 'precio_1'
+if (controls.presetSelect) {
+    controls.presetSelect.innerHTML = buildPricePresetOptions(
+        precio1,
+        precio2,
+        precio3,
+        precio4,
+        precio5,
+        currentPriceKey
+    )
+}
 
-precioSelect.innerHTML = `
-<option value="${precio1}" data-price-key="precio_1">Precio 1 - $${precio1}</option>
-<option value="${precio2}" data-price-key="precio_2">Precio 2 - $${precio2}</option>
-<option value="${precio3}" data-price-key="precio_3">Precio 3 - $${precio3}</option>
-<option value="${precio4}" data-price-key="precio_4">Precio 4 - $${precio4}</option>
-<option value="${precio5}" data-price-key="precio_5">Precio 5 - $${precio5}</option>
-`
-
-const matchingOption = precioSelect.querySelector(`option[data-price-key="${currentPriceKey}"]`)
-precioSelect.value = matchingOption ? matchingOption.value : precio1
+const matchingOption = controls.presetSelect?.querySelector(`option[data-price-key="${currentPriceKey}"]`)
 const selectedPriceKey = matchingOption ? currentPriceKey : 'precio_1'
+const nextPrice = matchingOption ? matchingOption.value : precio1
+
+if (controls.presetSelect) {
+    controls.presetSelect.value = matchingOption ? matchingOption.value : ''
+    syncPricePresetFromInput(controls.presetSelect, controls.priceInput)
+}
+if (controls.priceInput) {
+    controls.priceInput.value = formatMoney(nextPrice)
+}
 
 fetch(actualizarURL,{
 method:"POST",
@@ -307,15 +382,7 @@ headers:{
 },
 body:`producto_id=${id}&presentacion_id=${this.value}&accion=cambiar_presentacion`
 })
-.then(() => fetch(actualizarURL,{
-method:"POST",
-headers:{
-"X-CSRFToken":csrf,
-"Content-Type":"application/x-www-form-urlencoded"
-},
-body:`producto_id=${id}&precio=${precioSelect.value}&precio_key=${encodeURIComponent(selectedPriceKey)}&accion=cambiar_precio`
-}))
-.then(res=>res.json())
+.then(() => applyPriceChange(id, nextPrice, matchingOption ? selectedPriceKey : ''))
 .then(data=>{
 
 document.getElementById(`subtotal-${id}`).innerText = "$"+formatMoney(data.subtotal)
@@ -348,13 +415,17 @@ function applyPriceChange(id, precio, precioKey) {
 
 function applyBulkPriceTier(priceKey) {
     let chain = Promise.resolve()
-    document.querySelectorAll('.precio-resumen').forEach(select => {
-        const matchingOption = select.querySelector(`option[data-price-key="${priceKey}"]`)
+    document.querySelectorAll('.precio-resumen-preset').forEach(presetSelect => {
+        const matchingOption = presetSelect.querySelector(`option[data-price-key="${priceKey}"]`)
         if (!matchingOption) {
             return
         }
-        const id = select.dataset.id
-        select.value = matchingOption.value
+        const id = presetSelect.dataset.id
+        const controls = getPriceControls(id)
+        presetSelect.value = matchingOption.value
+        if (controls.priceInput) {
+            controls.priceInput.value = formatMoney(matchingOption.value)
+        }
         chain = chain.then(() => applyPriceChange(id, matchingOption.value, priceKey))
     })
     return chain
@@ -384,13 +455,29 @@ function applyBulkDiscount(discountValue) {
     return chain
 }
 
-document.querySelectorAll('.precio-resumen').forEach(select => {
-    select.addEventListener('change', function () {
-        const id = this.dataset.id
-        const precio = this.value
-        const precioKey = this.selectedOptions[0]?.dataset.priceKey || ''
-        applyPriceChange(id, precio, precioKey)
+document.querySelectorAll('.precio-resumen-preset').forEach(presetSelect => {
+    const id = presetSelect.dataset.id
+    const controls = getPriceControls(id)
+    if (!controls.priceInput) {
+        return
+    }
+
+    presetSelect.addEventListener('change', function () {
+        if (presetSelect.value) {
+            controls.priceInput.value = formatMoney(presetSelect.value)
+        }
+        persistPrice(id)
     })
+
+    controls.priceInput.addEventListener('input', function () {
+        syncPricePresetFromInput(presetSelect, controls.priceInput)
+    })
+
+    controls.priceInput.addEventListener('change', function () {
+        persistPrice(id)
+    })
+
+    syncPricePresetFromInput(presetSelect, controls.priceInput)
 })
 
 const applyBulkPriceTierButton = document.getElementById('applyBulkPriceTierButton')

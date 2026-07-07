@@ -155,7 +155,8 @@ body::-webkit-scrollbar,
 }
 
 .presentacion-resumen,
-.precio-resumen {
+.precio-resumen-preset,
+.precio-resumen-manual {
     width: 100%;
     min-width: 0;
     border-radius: 10px;
@@ -166,14 +167,44 @@ body::-webkit-scrollbar,
     font-weight: 500;
 }
 
+.pedido-price-cell {
+    min-width: 168px;
+}
+
+.pedido-price-cell .precio-resumen-preset {
+    min-width: 156px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.pedido-price-cell .precio-resumen-manual-wrap {
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.pedido-price-cell .precio-resumen-manual {
+    min-width: 96px;
+    font-weight: 600;
+}
+
+.tabla-productos th:nth-child(4),
+.tabla-productos td:nth-child(4) {
+    min-width: 168px;
+}
+
 .presentacion-resumen:hover,
-.precio-resumen:hover {
+.precio-resumen-preset:hover,
+.precio-resumen-manual:hover {
     border-color: #3f89da;
     background: #fff;
 }
 
 .presentacion-resumen:focus,
-.precio-resumen:focus,
+.precio-resumen-preset:focus,
+.precio-resumen-manual:focus,
 .cantidad-input:focus {
     outline: none;
     border-color: #0c64cf;
@@ -564,7 +595,8 @@ body::-webkit-scrollbar,
     }
 
     .mobile-stack-table .presentacion-resumen,
-    .mobile-stack-table .precio-resumen {
+    .mobile-stack-table .precio-resumen-preset,
+    .mobile-stack-table .precio-resumen-manual {
         display: block !important;
         width: 100% !important;
         max-width: 100% !important;
@@ -648,7 +680,8 @@ body::-webkit-scrollbar,
     }
 
     .presentacion-resumen,
-    .precio-resumen {
+    .precio-resumen-preset,
+    .precio-resumen-manual {
         font-size: 12px;
         padding: 7px 8px;
     }

@@ -163,7 +163,7 @@ class VendedorPedidoTests(TestCase):
 		summary_response = self.client.get(reverse('ver_pedido'))
 		self.assertEqual(summary_response.status_code, 200)
 		self.assertContains(summary_response, 'data-price-key="precio_2" selected', html=False)
-		self.assertContains(summary_response, f'Precio 2 - ${self.presentacion.precio_2}', html=False)
+		self.assertContains(summary_response, 'PC2 ·', html=False)
 
 	def test_ver_pedido_shows_bulk_price_and_discount_controls(self):
 		self.client.force_login(self.vendor)
@@ -192,6 +192,9 @@ class VendedorPedidoTests(TestCase):
 		self.assertContains(response, 'discount-toggle-box', html=False)
 		self.assertContains(response, 'descuento-preset', html=False)
 		self.assertContains(response, 'Manual discount')
+		self.assertContains(response, 'precio-resumen-manual', html=False)
+		self.assertContains(response, 'Manual price')
+		self.assertContains(response, 'PC1 ·', html=False)
 		self.assertContains(response, 'order-type-panel', html=False)
 		self.assertContains(response, 'id="tipoOrdenPersonal"', html=False)
 		self.assertContains(response, 'id="tipoOrdenTelefono"', html=False)

@@ -2128,16 +2128,12 @@
         ev.preventDefault();
         const op = form.getAttribute('data-qb-operation');
         const limit = (form.querySelector('input[name=limit]')||{}).value || '';
-        const mode = (form.querySelector('input[name=mode]')||{}).value || '';
         const csrftoken = getCookie('csrftoken') || (form.querySelector('input[name="csrfmiddlewaretoken"]') || {}).value || '';
         showOverlay();
         setTaskDescription(op);
         setProgress(6);
         message.textContent = 'Iniciando tarea...';
         const payload = new URLSearchParams({operation: op, limit: limit});
-        if (mode) {
-          payload.set('mode', mode);
-        }
         const skipImages = form.querySelector('input[name=skip_images]');
         if (skipImages) {
           payload.set('skip_images', skipImages.checked ? '1' : '0');
@@ -2154,14 +2150,20 @@
             'X-CSRFToken': csrftoken
           },
           body: payload
-        }).then(function(r){ return r.json(); }).then(function(json){
-          if (json && json.task_id){
-            startPolling(json.task_id, op);
+        }).then(function(r){
+          return r.json().then(function(json){ return {ok: r.ok, status: r.status, json: json}; });
+        }).then(function(res){
+          if (res.ok && res.json && res.json.task_id){
+            startPolling(res.json.task_id, op);
           } else {
-            message.textContent = 'No se pudo crear la tarea.';
-            hideOverlay();
+            const err = (res.json && (res.json.error || res.json.message)) || ('No se pudo crear la tarea (' + (res.status || '') + ').');
+            message.textContent = err;
+            document.getElementById('qb-task-result-details').textContent = '';
+            document.getElementById('qb-task-result-details').style.display = 'none';
+            cancelBtn.style.display = 'inline-block';
+            document.getElementById('qb-task-reload').style.display = 'none';
           }
-        }).catch(function(){ message.textContent = 'Error iniciando la tarea.'; });
+        }).catch(function(){ message.textContent = 'Error iniciando la tarea.'; cancelBtn.style.display = 'inline-block'; });
       });
     });
   })();

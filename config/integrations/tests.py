@@ -2051,6 +2051,17 @@ class QuickBooksIntegrationTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
 
+    @override_settings(QUICKBOOKS_CATALOG_ONLY_MODE=True, QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS=True)
+    def test_task_start_allows_import_invoices_in_catalog_only_mode(self):
+        self._activate_connection()
+        response = self.client.post(
+            reverse('quickbooks_start_task'),
+            {'operation': 'import_invoices_to_local', 'limit': '0'},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload.get('task_id'))
+
     @override_settings(QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS=True)
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_pull_accounting_documents_imports_missing_customer_from_quickbooks(self, mock_request):

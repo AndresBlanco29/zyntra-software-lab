@@ -106,6 +106,8 @@ CATALOG_ONLY_ALLOWED_VIEW_NAMES = frozenset({
     'quickbooks_import_items_to_local',
     'quickbooks_refresh_linked_items_to_local',
     'quickbooks_import_inventory_quantities_to_local',
+    'quickbooks_import_invoices_to_local',
+    'quickbooks_import_accounting_documents_to_local',
     'quickbooks_refresh_linked_invoice_status_to_local',
     'quickbooks_sync_item_images_to_local',
     'quickbooks_pull_items_sync_to_local',
@@ -146,6 +148,8 @@ CATALOG_ONLY_ALLOWED_TASK_OPERATIONS = frozenset({
     'pull_sync_to_local',
     'alignment_sync_to_local',
     'sync_item_images_to_local',
+    'import_invoices_to_local',
+    'import_accounting_documents_to_local',
 })
 
 CATALOG_ONLY_ALLOWED_CONFLICT_ENTITY_TYPES = frozenset({

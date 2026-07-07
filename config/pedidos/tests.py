@@ -694,6 +694,8 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, f'name="linea_revisada_{self.item.id}"', html=False)
 		self.assertContains(response, 'Reviewed')
 		self.assertContains(response, 'data-requested-quantity="2"', html=False)
+		self.assertContains(response, 'Available stock: 10 CS')
+		self.assertContains(response, 'text-success')
 		self.assertContains(response, 'id="pickerSummaryOrdered"', html=False)
 		self.assertContains(response, 'CS ordered')
 
@@ -720,6 +722,8 @@ class PickingVerificationFlowTests(TestCase):
 		response = self.client.get(reverse('selector_picking_detail', args=[self.pedido.id]))
 
 		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Available stock: 0 CS')
+		self.assertContains(response, 'text-danger')
 		self.assertContains(response, 'name="nota_seleccionador_resuelta"', html=False)
 		self.assertNotContains(response, 'disabled>', html=False)
 		self.assertContains(response, 'badge bg-success', html=False)

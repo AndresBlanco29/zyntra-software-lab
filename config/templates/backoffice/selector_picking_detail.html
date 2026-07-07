@@ -60,11 +60,16 @@
         <tbody id="pickerItemsTableBody">
           {% for item in item_rows %}
           <tr data-picker-order-line>
-            <td data-label="{% trans 'Product' %}">{{ item.product }}</td>
+            <td data-label="{% trans 'Product' %}">
+              {{ item.product }}
+              <div class="small mt-1 picker-stock-label {% if item.stock_physical <= 0 %}text-danger fw-semibold{% else %}text-success fw-semibold{% endif %}" data-picker-stock-label>
+                {% blocktrans with amount=item.stock_physical %}Available stock: {{ amount }} CS{% endblocktrans %}
+              </div>
+            </td>
             <td data-label="U/M">
-              <select class="form-select form-select-sm" name="presentacion_{{ item.id }}">
+              <select class="form-select form-select-sm" name="presentacion_{{ item.id }}" data-picker-presentation-select>
                 {% for option in item.presentation_options %}
-                <option value="{{ option.id }}" {% if option.id == item.presentation_id %}selected{% endif %}>{{ option.label }}</option>
+                <option value="{{ option.id }}" data-stock-physical="{{ option.stock_fisico }}" {% if option.id == item.presentation_id %}selected{% endif %}>{{ option.label }}</option>
                 {% endfor %}
               </select>
             </td>
@@ -98,6 +103,7 @@
                 <option value="{{ presentacion.id }}" data-stock-physical="{{ presentacion.stock_operativo.stock_fisico|default:0 }}" {% if row.presentacion_id == presentacion.id|stringformat:'s' %}selected{% endif %}>{{ presentacion.producto.nombre }} - {{ presentacion.nombre_traducido }}</option>
                 {% endfor %}
               </select>
+              <div class="small mt-1 picker-stock-label text-muted" data-picker-stock-label>{% trans "Available stock: - CS" %}</div>
             </td>
             <td data-label="U/M"><span class="badge text-bg-danger">{% trans "New" %}</span></td>
             <td data-label="QTY ORD">-</td>
@@ -189,6 +195,48 @@
     var pickerItemsTableBody = document.getElementById('pickerItemsTableBody');
     var availablePresentationOptionsHtml = '{% for presentacion in available_presentations %}<option value="{{ presentacion.id }}" data-stock-physical="{{ presentacion.stock_operativo.stock_fisico|default:0 }}">{{ presentacion.producto.nombre|escapejs }} - {{ presentacion.nombre_traducido|escapejs }}</option>{% endfor %}';
     var reviewValidationMessage = '{% trans "Check every product line in the Reviewed column before saving."|escapejs %}';
+    var stockAvailableLabelPrefix = '{% trans "Available stock:"|escapejs %}';
+
+    function formatAvailableStockLabel(amount) {
+      return stockAvailableLabelPrefix + ' ' + amount + ' CS';
+    }
+
+    function applyStockLabelStyles(label, amount) {
+      if (!label) {
+        return;
+      }
+      label.textContent = formatAvailableStockLabel(amount);
+      label.classList.remove('text-success', 'text-danger', 'text-muted', 'fw-semibold');
+      if (amount <= 0) {
+        label.classList.add('text-danger', 'fw-semibold');
+      } else {
+        label.classList.add('text-success', 'fw-semibold');
+      }
+    }
+
+    function selectedOptionStock(select) {
+      if (!select || !select.value) {
+        return null;
+      }
+      var selectedOption = Array.from(select.options).find(function (option) {
+        return option.value === select.value;
+      });
+      return selectedOption ? Number(selectedOption.dataset.stockPhysical || 0) : null;
+    }
+
+    function syncOrderLinePresentationStock(row) {
+      var select = row.querySelector('[data-picker-presentation-select]');
+      var stepper = row.querySelector('[data-quantity-stepper]');
+      var stockLabel = row.querySelector('[data-picker-stock-label]');
+      var stockPhysical = selectedOptionStock(select);
+      if (stockPhysical === null) {
+        return;
+      }
+      if (stepper) {
+        stepper.dataset.stockPhysical = String(stockPhysical);
+      }
+      applyStockLabelStyles(stockLabel, stockPhysical);
+    }
 
     function getRequiredReviewCheckboxes() {
       var checkboxes = Array.from(document.querySelectorAll('[data-picker-order-line] .picker-line-reviewed'));
@@ -215,14 +263,24 @@
     function syncAddedProductRow(row) {
       var select = row.querySelector('[data-added-product-select]');
       var stepper = row.querySelector('[data-quantity-stepper]');
+      var stockLabel = row.querySelector('[data-picker-stock-label]');
       if (!select || !stepper) {
         return;
       }
 
-      var selectedOption = Array.from(select.options).find(function (option) {
-        return option.value === select.value;
-      });
-      stepper.dataset.stockPhysical = selectedOption ? Number(selectedOption.dataset.stockPhysical || 0) : 0;
+      var stockPhysical = selectedOptionStock(select);
+      if (stockPhysical === null) {
+        stepper.dataset.stockPhysical = '0';
+        if (stockLabel) {
+          stockLabel.textContent = '{% trans "Available stock: - CS"|escapejs %}';
+          stockLabel.classList.remove('text-success', 'text-danger', 'fw-semibold');
+          stockLabel.classList.add('text-muted');
+        }
+        return;
+      }
+
+      stepper.dataset.stockPhysical = String(stockPhysical);
+      applyStockLabelStyles(stockLabel, stockPhysical);
     }
 
     function initQuantityStepper(stepper) {
@@ -257,6 +315,7 @@
             '<option value="">{% trans "Select a product..." %}</option>' +
             availablePresentationOptionsHtml +
           '</select>' +
+          '<div class="small mt-1 picker-stock-label text-muted" data-picker-stock-label>{% trans "Available stock: - CS"|escapejs %}</div>' +
         '</td>' +
         '<td data-label="U/M"><span class="badge text-bg-danger">{% trans "New" %}</span></td>' +
         '<td data-label="QTY ORD">-</td>' +
@@ -370,6 +429,17 @@
     form.addEventListener('submit', function (event) {
       if (!validateRequiredLineReviews()) {
         event.preventDefault();
+      }
+    });
+
+    document.querySelectorAll('[data-picker-order-line]').forEach(function (row) {
+      var presentationSelect = row.querySelector('[data-picker-presentation-select]');
+      syncOrderLinePresentationStock(row);
+      if (presentationSelect) {
+        presentationSelect.addEventListener('change', function () {
+          syncOrderLinePresentationStock(row);
+          updateFormState();
+        });
       }
     });
 

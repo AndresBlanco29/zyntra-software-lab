@@ -237,28 +237,44 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 	presentation_overrides = presentation_overrides or {}
 	picking_verified = bool(pedido.picking_verificado_en)
 	for item in pedido.items.select_related('presentacion__producto').all():
-		product_presentations = item.presentacion.producto.presentaciones.order_by('nombre')
+		product_presentations = item.presentacion.producto.presentaciones.select_related('stock_operativo').order_by('nombre')
 		if item.id in actual_quantity_overrides:
 			actual_quantity = actual_quantity_overrides[item.id]
 		elif picking_verified:
 			actual_quantity = int(item.cantidad_inventario_aplicada or item.cantidad or 0)
 		else:
 			actual_quantity = 0
+		selected_presentation_id = presentation_overrides.get(item.id, item.presentacion_id)
+		selected_stock = next(
+			(
+				option['stock_fisico']
+				for option in [
+					{
+						'id': presentation.id,
+						'stock_fisico': int(getattr(getattr(presentation, 'stock_operativo', None), 'stock_fisico', 0) or 0),
+					}
+					for presentation in product_presentations
+				]
+				if option['id'] == selected_presentation_id
+			),
+			int(getattr(getattr(item.presentacion, 'stock_operativo', None), 'stock_fisico', 0) or 0),
+		)
 		rows.append({
 			'id': item.id,
 			'product': item.presentacion.producto.nombre,
 			'presentation': item.presentacion.nombre_empaque_cliente,
-			'presentation_id': presentation_overrides.get(item.id, item.presentacion_id),
+			'presentation_id': selected_presentation_id,
 			'presentation_options': [
 				{
 					'id': presentation.id,
 					'label': presentation.nombre_traducido,
+					'stock_fisico': int(getattr(getattr(presentation, 'stock_operativo', None), 'stock_fisico', 0) or 0),
 				}
 				for presentation in product_presentations
 			],
 			'requested_quantity': item.cantidad_solicitada_documentada,
 			'actual_quantity': actual_quantity,
-			'stock_physical': int(getattr(getattr(item.presentacion, 'stock_operativo', None), 'stock_fisico', 0) or 0),
+			'stock_physical': selected_stock,
 			'applied_quantity': int(item.cantidad_inventario_aplicada or 0),
 		})
 	rows.sort(key=lambda row: (row['product'].casefold(), row['id']))

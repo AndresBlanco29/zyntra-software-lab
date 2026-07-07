@@ -296,9 +296,9 @@ def _build_order_summary_discount_preset_options():
 
 def _tomar_pedido_clientes_filter_params(request):
     params = {}
-    query = str(request.GET.get('q') or '').strip()
-    if query:
-        params['q'] = query
+    raw_query = str(request.GET.get('q') or '')
+    if raw_query:
+        params['q'] = raw_query
     return params
 
 
@@ -309,7 +309,7 @@ def _tomar_pedido_clientes_queryset(request):
         .order_by('nombre_empresa', 'id')
     )
 
-    query = _tomar_pedido_clientes_filter_params(request).get('q')
+    query = (_tomar_pedido_clientes_filter_params(request).get('q') or '').strip()
     if query:
         queryset = queryset.filter(
             Q(nombre_empresa__icontains=query)
@@ -325,9 +325,9 @@ def _tomar_pedido_clientes_queryset(request):
 
 def _catalogo_vendedor_filter_params(request):
     params = {}
-    query = str(request.GET.get('q') or '').strip()
-    if query:
-        params['q'] = query
+    raw_query = str(request.GET.get('q') or '')
+    if raw_query:
+        params['q'] = raw_query
     categoria_id = str(request.GET.get('categoria') or '').strip()
     if categoria_id.isdigit():
         params['categoria'] = categoria_id
@@ -346,7 +346,7 @@ def _catalogo_vendedor_queryset(request):
     )
 
     filters = _catalogo_vendedor_filter_params(request)
-    query = filters.get('q')
+    query = (filters.get('q') or '').strip()
     if query:
         queryset = queryset.filter(
             Q(nombre__icontains=query)

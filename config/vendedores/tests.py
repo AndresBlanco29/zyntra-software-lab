@@ -286,6 +286,25 @@ class VendedorPedidoTests(TestCase):
 		self.assertEqual(len(response.context['productos']), 1)
 		self.assertContains(response, 'Unique Catalog Search Product')
 
+	def test_catalogo_vendedor_search_preserves_trailing_space_in_input(self):
+		self.client.force_login(self.vendor)
+		response = self.client.get(
+			reverse('catalogo_vendedor', args=[self.customer.id]),
+			{'q': 'coca '},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context['filter_q'], 'coca ')
+		self.assertContains(response, 'value="coca "', html=False)
+
+	def test_tomar_pedido_search_preserves_trailing_space_in_input(self):
+		self.client.force_login(self.vendor)
+		response = self.client.get(reverse('tomar_pedido'), {'q': 'alex '})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context['filter_q'], 'alex ')
+		self.assertContains(response, 'value="alex "', html=False)
+
 	def test_catalogo_vendedor_shows_bulk_price_tier_selector(self):
 		self.client.force_login(self.vendor)
 		response = self.client.get(reverse('catalogo_vendedor', args=[self.customer.id]))

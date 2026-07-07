@@ -93,7 +93,13 @@
 
         input.addEventListener('input', function () {
             clearTimeout(timer);
-            timer = setTimeout(submitWithFocus, delay);
+            timer = setTimeout(function () {
+                // Keep trailing spaces while the user is typing multi-word queries.
+                if ((input.value || '').endsWith(' ')) {
+                    return;
+                }
+                submitWithFocus();
+            }, delay);
         });
 
         input.addEventListener('keydown', function (event) {

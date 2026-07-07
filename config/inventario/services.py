@@ -338,13 +338,14 @@ def validar_disponibilidad_para_items(items_payload, bypass_stock_check=False):
         cantidad = max(int(item['cantidad']), 1)
         reserved_packages = inventory_packages_for_quantity(item['presentacion'], cantidad)
         stock = stock_map[item['presentacion'].id]
-        if stock.stock_disponible < reserved_packages:
+        available_packages = stock.computed_stock_disponible()
+        if available_packages < reserved_packages:
             raise ValidationError(
                 _('Insufficient available stock for %(product)s - %(presentation)s. Requested %(requested)s, available %(available)s.') % {
                     'product': stock.presentacion.producto.nombre,
                     'presentation': stock.presentacion.nombre,
                     'requested': cantidad,
-                    'available': stock.stock_disponible,
+                    'available': available_packages,
                 }
             )
 

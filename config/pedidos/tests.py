@@ -662,6 +662,24 @@ class PickingVerificationFlowTests(TestCase):
 
 		self.assertFalse(evaluation[self.item.id]['has_shortage'])
 
+	def test_evaluar_stock_ignores_stale_available_field_when_physical_is_enough(self):
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(
+			stock_fisico=227,
+			stock_reservado=0,
+			stock_disponible=2,
+		)
+		self.item.cantidad = 15
+		self.item.save(update_fields=['cantidad'])
+
+		evaluation = evaluar_stock_fisico_verificacion_picking(
+			pedido_items=[self.item],
+			cantidades_reales={self.item.id: 15},
+		)
+
+		self.assertFalse(evaluation[self.item.id]['has_shortage'])
+		self.assertEqual(evaluation[self.item.id]['available_packages'], 227)
+		self.assertEqual(evaluation[self.item.id]['shortage_amount'], 0)
+
 	def test_selector_post_with_stock_error_preserves_typed_quantities_and_note(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		self.client.force_login(self.selector)

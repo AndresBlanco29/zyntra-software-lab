@@ -31,8 +31,15 @@ class StockPresentacion(models.Model):
 			raise ValidationError(_('Available stock must match physical stock minus reserved stock.'))
 
 	def save(self, *args, **kwargs):
-		self.stock_disponible = self.stock_fisico - self.stock_reservado
+		self.stock_disponible = max(int(self.stock_fisico or 0) - int(self.stock_reservado or 0), 0)
 		super().save(*args, **kwargs)
+
+	def computed_stock_disponible(self):
+		return max(int(self.stock_fisico or 0) - int(self.stock_reservado or 0), 0)
+
+	def packages_available_for_picking(self, reserved_for_item=0):
+		reserved_for_item = max(int(reserved_for_item or 0), 0)
+		return max(int(self.stock_fisico or 0) - int(self.stock_reservado or 0) + reserved_for_item, 0)
 
 
 class StockProductoFraccionado(models.Model):

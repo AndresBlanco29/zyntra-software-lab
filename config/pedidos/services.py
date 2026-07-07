@@ -394,18 +394,26 @@ def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales
     evaluation = {}
     for item in pedido_items:
         stock = stock_map.get(item.presentacion_id)
-        stock_disponible = int(getattr(stock, 'stock_disponible', 0) or 0)
         cantidad_real = max(int(cantidades_reales.get(item.id, item.cantidad) or 0), 0)
         cantidad_aplicada_previa = max(int(item.cantidad_inventario_aplicada or 0), 0)
         cantidad_pendiente_aplicar = max(cantidad_real - cantidad_aplicada_previa, 0)
         reserved_packages_for_item = max(int(item.cantidad_reservada_inventario or 0), 0)
-        available_packages = stock_disponible + reserved_packages_for_item
+        stock_fisico = int(getattr(stock, 'stock_fisico', 0) or 0)
+        stock_reservado = int(getattr(stock, 'stock_reservado', 0) or 0)
+        if stock is not None:
+            available_packages = stock.packages_available_for_picking(reserved_packages_for_item)
+            stock_disponible = stock.computed_stock_disponible()
+        else:
+            available_packages = 0
+            stock_reservado = 0
+            stock_disponible = 0
         shortage_packages = max(cantidad_pendiente_aplicar - available_packages, 0)
 
         evaluation[item.id] = {
             'units_per_package': max(int(getattr(item.presentacion, 'unidades', 0) or 0), 1),
-            'stock_fisico': int(getattr(stock, 'stock_fisico', 0) or 0),
+            'stock_fisico': stock_fisico,
             'stock_disponible': stock_disponible,
+            'stock_reservado': stock_reservado,
             'available_packages': available_packages,
             'cantidad_real': cantidad_real,
             'cantidad_aplicada_previa': cantidad_aplicada_previa,

@@ -1872,11 +1872,15 @@ def _sync_stock_from_quickbooks_item(presentacion, payload):
         return False
     stock, created = StockPresentacion.objects.get_or_create(
         presentacion=presentacion,
-        defaults={'stock_fisico': qty_on_hand, 'stock_reservado': 0},
+        defaults={'stock_fisico': qty_on_hand, 'stock_reservado': 0, 'stock_disponible': qty_on_hand},
     )
-    if not created and stock.stock_fisico != qty_on_hand:
-        stock.stock_fisico = qty_on_hand
-        stock.save(update_fields=['stock_fisico', 'actualizado_en'])
+    if created:
+        return True
+    if stock.stock_fisico == qty_on_hand and stock.computed_stock_disponible() == stock.stock_disponible:
+        return False
+    stock.stock_fisico = qty_on_hand
+    stock.stock_disponible = stock.computed_stock_disponible()
+    stock.save(update_fields=['stock_fisico', 'stock_disponible', 'actualizado_en'])
     return True
 
 

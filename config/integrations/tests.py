@@ -1988,6 +1988,45 @@ class QuickBooksIntegrationTests(TestCase):
         self.assertEqual(stock.stock_fisico, 18)
         self.assertEqual(stock.stock_disponible, 18)
 
+    @patch('config.integrations.quickbooks.client.requests.request')
+    def test_import_items_to_local_repairs_stale_available_stock(self, mock_request):
+        self._activate_connection()
+        categoria = Categoria.objects.create(nombre='Stale stock category')
+        marca = Marca.objects.create(nombre='Stale stock brand')
+        presentacion = Presentacion.objects.create(
+            producto=Producto.objects.create(nombre='Stale stock product', categoria=categoria, marca=marca),
+            nombre='caja',
+            unidades=1,
+            tipo_contenido='caja',
+            quickbooks_id='QB-ITEM-STALE',
+        )
+        StockPresentacion.objects.create(
+            presentacion=presentacion,
+            stock_fisico=227,
+            stock_reservado=0,
+            stock_disponible=2,
+        )
+        mock_request.return_value = self._json_response({
+            'QueryResponse': {
+                'Item': [
+                    {
+                        'Id': 'QB-ITEM-STALE',
+                        'Name': 'stale stock product',
+                        'Type': 'Inventory',
+                        'QtyOnHand': 227,
+                        'Active': True,
+                    }
+                ]
+            }
+        })
+
+        response = self.client.post(reverse('quickbooks_import_items_to_local'), {'limit': '10'})
+
+        self.assertEqual(response.status_code, 200)
+        stock = StockPresentacion.objects.get(presentacion=presentacion)
+        self.assertEqual(stock.stock_fisico, 227)
+        self.assertEqual(stock.stock_disponible, 227)
+
     @override_settings(QUICKBOOKS_CATALOG_ONLY_MODE=True)
     @patch('config.integrations.quickbooks.client.requests.request')
     def test_catalog_only_mode_allows_customer_import(self, mock_request):

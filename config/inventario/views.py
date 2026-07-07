@@ -111,7 +111,7 @@ def backoffice_inventory_list(request):
 		stock = getattr(presentacion, 'stock_operativo', None)
 		stock_fisico = stock.stock_fisico if stock else 0
 		stock_reservado = stock.stock_reservado if stock else 0
-		stock_disponible = stock.stock_disponible if stock else 0
+		stock_disponible = stock.computed_stock_disponible() if stock else 0
 		if stock_disponible <= 0:
 			zero_stock_count += 1
 		fractional_match = fractional_by_presentacion_id.get(presentacion.id)

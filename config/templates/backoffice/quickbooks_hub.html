@@ -1236,6 +1236,15 @@
               </form>
               <p class="qb-action-note">{% trans "Downloads missing product images from QuickBooks attachments for products already imported without images." %}</p>
             </div>
+            <div class="qb-action-item" id="qb-import-inventory-quantities">
+              <form method="post" action="{% url 'quickbooks_import_inventory_quantities_to_local' %}" data-qb-operation="import_inventory_quantities_to_local">
+                {% csrf_token %}
+                <input type="hidden" name="limit" value="0">
+                <input type="hidden" name="redirect_to" value="{{ request.path }}">
+                <button type="submit" class="btn btn-outline-success w-100" {% if not quickbooks_status.is_active %}disabled{% endif %}>{% trans "Import inventory quantities only" %}</button>
+              </form>
+              <p class="qb-action-note">{% trans "Fast update of physical stock (QtyOnHand) for linked products. Does not change names, costs, images, or import new catalog items." %}</p>
+            </div>
             <div class="qb-action-item" id="qb-refresh-linked-catalog">
               <form method="post" action="{% url 'quickbooks_refresh_linked_items_to_local' %}" data-qb-operation="refresh_linked_items_to_local">
                 {% csrf_token %}
@@ -1921,6 +1930,9 @@
       if (operation === 'refresh_linked_items_to_local') {
         return 'Estamos actualizando catálogo desde QuickBooks e importando productos nuevos.';
       }
+      if (operation === 'import_inventory_quantities_to_local') {
+        return 'Estamos actualizando solo las cantidades de inventario desde QuickBooks.';
+      }
       if (operation === 'alignment_sync_to_local') {
         return 'Estamos alineando Tortilla y QuickBooks: importación, estado de facturas y exportación de registros nuevos.';
       }
@@ -1947,6 +1959,11 @@
         return processed && total
           ? `Actualizando catálogo ${processed} de ${total}...`
           : 'Actualizando catálogo — por favor espera.';
+      }
+      if (operation === 'import_inventory_quantities_to_local') {
+        return processed && total
+          ? `Actualizando inventario ${processed} de ${total}...`
+          : 'Actualizando inventario — por favor espera.';
       }
       return processed && total
         ? `Importando ${processed} de ${total}...`

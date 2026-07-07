@@ -55,6 +55,7 @@ from .sync import (
     link_quickbooks_import_conflict,
     pull_quickbooks_accounting_documents_to_local,
     pull_quickbooks_item_images_to_local,
+    pull_quickbooks_inventory_quantities_to_local,
     pull_quickbooks_items_to_local,
     pull_quickbooks_to_local,
     push_linked_quickbooks_items,
@@ -103,6 +104,7 @@ CATALOG_ONLY_ALLOWED_VIEW_NAMES = frozenset({
     'quickbooks_import_items',
     'quickbooks_import_items_to_local',
     'quickbooks_refresh_linked_items_to_local',
+    'quickbooks_import_inventory_quantities_to_local',
     'quickbooks_refresh_linked_invoice_status_to_local',
     'quickbooks_sync_item_images_to_local',
     'quickbooks_pull_items_sync_to_local',
@@ -136,6 +138,7 @@ CATALOG_ONLY_ALLOWED_TASK_OPERATIONS = frozenset({
     'import_items_to_local',
     'import_customers_to_local',
     'refresh_linked_items_to_local',
+    'import_inventory_quantities_to_local',
     'push_linked_products_to_quickbooks',
     'refresh_linked_invoice_status_to_local',
     'pull_items_sync_to_local',
@@ -1552,6 +1555,19 @@ def quickbooks_refresh_linked_items_to_local(request):
 
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
+def quickbooks_import_inventory_quantities_to_local(request):
+    try:
+        result = pull_quickbooks_inventory_quantities_to_local(
+            limit=_parse_quickbooks_import_limit(request.POST.get('limit'), default=None),
+        )
+    except (ValueError, QuickBooksServiceError, QuickBooksAPIError, QuickBooksSyncError) as exc:
+        logger.warning('QuickBooks inventory quantity import failed: %s', exc)
+        return _response_or_redirect(request, operation='import_inventory_quantities_to_local', error=str(exc), status_code=502)
+    return _response_or_redirect(request, operation='import_inventory_quantities_to_local', result=result)
+
+
+@require_POST
+@internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def quickbooks_refresh_linked_invoice_status_to_local(request):
     force_all = str(request.POST.get('force_all') or '').strip().lower() in {'1', 'true', 'yes', 'on'}
     try:
@@ -1663,6 +1679,7 @@ def quickbooks_start_task(request):
             skip_images=kwargs.get('skip_images'),
         ).get('items', {}),
         'refresh_linked_items_to_local': refresh_linked_quickbooks_items,
+        'import_inventory_quantities_to_local': pull_quickbooks_inventory_quantities_to_local,
         'refresh_linked_invoice_status_to_local': refresh_linked_quickbooks_invoice_status,
         'pull_items_sync_to_local': lambda **kwargs: pull_quickbooks_items_to_local(
             max_results=kwargs.get('max_results'),

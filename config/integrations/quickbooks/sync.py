@@ -2534,6 +2534,138 @@ def pull_quickbooks_item_images_to_local(*, limit=None, client=None, task_cache_
     )
 
 
+def _quickbooks_id_for_presentacion(presentacion):
+    for raw_id in (presentacion.quickbooks_id, getattr(presentacion.producto, 'quickbooks_id', None)):
+        qb_id = str(raw_id or '').strip()
+        if qb_id:
+            return qb_id
+    return ''
+
+
+def import_quickbooks_inventory_quantities(*, limit=None, max_results=None, client=None, task_cache_key=None):
+    """Update local physical stock from QuickBooks QtyOnHand for linked catalog rows only."""
+    if limit is None:
+        limit = max_results
+    client = client or QuickBooksAPIClient()
+
+    queryset = _linked_catalog_presentacion_queryset()
+    if limit is not None:
+        queryset = queryset[:max(int(limit), 0)]
+
+    linked_presentaciones = list(queryset)
+    total = len(linked_presentaciones)
+    if total == 0:
+        return {
+            'entity': 'InventoryQuantity',
+            'count': 0,
+            'processed': 0,
+            'total': 0,
+            'updated_count': 0,
+            'skipped_count': 0,
+            'failed_count': 0,
+            'results': [],
+        }
+
+    qb_ids = _linked_catalog_quickbooks_ids(linked_presentaciones)
+    items_map = _fetch_quickbooks_items_map(client=client, wanted_ids=qb_ids)
+
+    if task_cache_key:
+        cache.set(
+            task_cache_key,
+            {
+                'status': 'running',
+                'progress': 5,
+                'operation': 'import_inventory_quantities_to_local',
+                'result': {'processed': 0, 'total': total},
+            },
+            timeout=60 * 60,
+        )
+
+    results = []
+    updated_count = 0
+    skipped_count = 0
+    failed_count = 0
+    processed = 0
+    progress_interval = 1 if total <= 100 else 5 if total <= 500 else 10
+
+    for presentacion in linked_presentaciones:
+        qb_id = _quickbooks_id_for_presentacion(presentacion)
+        label = f'{presentacion.producto.nombre} / {presentacion.nombre}'
+
+        if not qb_id:
+            skipped_count += 1
+            processed += 1
+            continue
+
+        payload = items_map.get(qb_id)
+        if not payload:
+            failed_count += 1
+            results.append({
+                'ok': False,
+                'action': 'missing',
+                'entity': 'InventoryQuantity',
+                'quickbooks_id': qb_id,
+                'label': label,
+                'error': 'Item not found in QuickBooks.',
+            })
+            processed += 1
+            continue
+
+        try:
+            with transaction.atomic():
+                changed = _sync_stock_from_quickbooks_item(presentacion, payload)
+        except Exception as exc:
+            failed_count += 1
+            results.append({
+                'ok': False,
+                'action': 'failed',
+                'entity': 'InventoryQuantity',
+                'quickbooks_id': qb_id,
+                'label': label,
+                'error': str(exc),
+            })
+        else:
+            if changed:
+                updated_count += 1
+            else:
+                skipped_count += 1
+
+        processed += 1
+        if task_cache_key and total > 0 and (processed == total or processed % progress_interval == 0):
+            pct = int((processed / total) * 90) + 5
+            pct = min(max(pct, 0), 95)
+            cache.set(
+                task_cache_key,
+                {
+                    'status': 'running',
+                    'progress': pct,
+                    'operation': 'import_inventory_quantities_to_local',
+                    'result': {'processed': processed, 'total': total},
+                },
+                timeout=60 * 60,
+            )
+
+    return {
+        'entity': 'InventoryQuantity',
+        'count': total,
+        'processed': processed,
+        'total': total,
+        'updated_count': updated_count,
+        'skipped_count': skipped_count,
+        'failed_count': failed_count,
+        'results': results,
+    }
+
+
+def pull_quickbooks_inventory_quantities_to_local(*, limit=None, max_results=None, client=None, task_cache_key=None):
+    return import_quickbooks_inventory_quantities(
+        limit=limit,
+        max_results=max_results,
+        client=client,
+        task_cache_key=task_cache_key,
+    )
+
+
 def fetch_quickbooks_credit_memos(*, max_results=25, client=None, updated_after=None, page_size=100):
     client = client or QuickBooksAPIClient()
     if updated_after:

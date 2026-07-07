@@ -59,6 +59,7 @@ from config.integrations.quickbooks.sync import (
     import_quickbooks_item_record,
     import_quickbooks_items,
     pull_quickbooks_items_to_local,
+    import_quickbooks_inventory_quantities,
     refresh_linked_quickbooks_items,
     _filter_catalog_import_items,
     _is_quickbooks_catalog_product_item,
@@ -645,6 +646,53 @@ class QuickBooksItemCostSyncTests(TestCase):
         imported_payload = mock_import.call_args[0][0]
         self.assertEqual(_extract_quickbooks_item_cost(imported_payload), Decimal('35.99'))
         mock_incremental.assert_called_once()
+
+    @patch('config.integrations.quickbooks.sync.import_quickbooks_item_record')
+    @patch('config.integrations.quickbooks.sync._fetch_quickbooks_items_map')
+    def test_import_inventory_quantities_updates_stock_only(self, mock_fetch_map, mock_import):
+        categoria = Categoria.objects.create(nombre='Snacks')
+        marca = Marca.objects.create(nombre='Laky')
+        producto = Producto.objects.create(
+            nombre='Original Product Name',
+            categoria=categoria,
+            marca=marca,
+            quickbooks_id='QB-STOCK-ONLY',
+        )
+        presentacion = Presentacion.objects.create(
+            producto=producto,
+            nombre='Unit',
+            unidades=1,
+            tipo_contenido='unidad',
+            costo=Decimal('10.00'),
+            quickbooks_id='QB-STOCK-ONLY',
+        )
+        StockPresentacion.objects.create(
+            presentacion=presentacion,
+            stock_fisico=5,
+            stock_reservado=0,
+            stock_disponible=5,
+        )
+        mock_fetch_map.return_value = {
+            'QB-STOCK-ONLY': {
+                'Id': 'QB-STOCK-ONLY',
+                'Name': 'Changed QB Name',
+                'Type': 'Inventory',
+                'PurchaseCost': 99.99,
+                'QtyOnHand': 42,
+            }
+        }
+
+        result = import_quickbooks_inventory_quantities()
+
+        mock_import.assert_not_called()
+        self.assertEqual(result['updated_count'], 1)
+        producto.refresh_from_db()
+        presentacion.refresh_from_db()
+        stock = StockPresentacion.objects.get(presentacion=presentacion)
+        self.assertEqual(producto.nombre, 'Original Product Name')
+        self.assertEqual(presentacion.costo, Decimal('10.00'))
+        self.assertEqual(stock.stock_fisico, 42)
+        self.assertEqual(stock.stock_disponible, 42)
 
     @patch('config.integrations.quickbooks.sync._fetch_quickbooks_item_payload', return_value=None)
     @patch('config.integrations.quickbooks.sync.import_quickbooks_items')

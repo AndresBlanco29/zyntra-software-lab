@@ -261,6 +261,50 @@ class CustomerBalanceSummaryTests(TestCase):
         self.assertFalse(summary.exceeds_credit_limit)
 
     @patch('config.clientes.balance_summary.timezone')
+    def test_excludes_quickbooks_paid_invoices_from_balance(self, mock_timezone):
+        mock_timezone.localdate.return_value = date(2026, 7, 6)
+        mock_timezone.make_aware.side_effect = timezone.make_aware
+
+        paid_invoice = self._create_open_invoice(
+            amount=Decimal('500.00'),
+            created_at=timezone.make_aware(datetime(2026, 6, 1, 12, 0, 0)),
+        )
+        Invoice.objects.filter(pk=paid_invoice.pk).update(
+            estado='GENERADA', qb_payment_status='PAID'
+        )
+        self._create_open_invoice(
+            amount=Decimal('80.00'),
+            created_at=timezone.make_aware(datetime(2026, 6, 20, 12, 0, 0)),
+        )
+
+        summary = build_customer_balance_summary(self.cliente, today=date(2026, 7, 6))
+
+        self.assertEqual(summary.total_open_balance, Decimal('80.00'))
+        self.assertEqual(len(summary.overdue_lines), 1)
+
+    @patch('config.clientes.balance_summary.timezone')
+    def test_summary_exposes_overdue_and_current_line_groups(self, mock_timezone):
+        mock_timezone.localdate.return_value = date(2026, 7, 6)
+        mock_timezone.make_aware.side_effect = timezone.make_aware
+
+        self._create_open_invoice(
+            amount=Decimal('100.00'),
+            created_at=timezone.make_aware(datetime(2026, 6, 20, 12, 0, 0)),
+        )
+        self._create_open_invoice(
+            amount=Decimal('50.00'),
+            created_at=timezone.make_aware(datetime(2026, 7, 6, 10, 0, 0)),
+        )
+
+        summary = build_customer_balance_summary(self.cliente, today=date(2026, 7, 6))
+
+        self.assertEqual(summary.overdue_count, 1)
+        self.assertEqual(summary.current_count, 1)
+        self.assertGreater(summary.max_aging_days, 0)
+        self.assertTrue(all(line.is_overdue for line in summary.overdue_lines))
+        self.assertTrue(all(not line.is_overdue for line in summary.current_lines))
+
+    @patch('config.clientes.balance_summary.timezone')
     def test_expand_clientes_creates_one_row_per_invoice(self, mock_timezone):
         mock_timezone.localdate.return_value = date(2026, 7, 6)
         mock_timezone.make_aware.side_effect = timezone.make_aware

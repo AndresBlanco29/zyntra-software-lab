@@ -29,7 +29,6 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from config.clientes.balance_summary import (
     attach_customer_balance_summaries,
     build_customer_balance_summary,
-    expand_clientes_for_list_display,
 )
 from config.facturacion.services import annotate_clientes_open_invoice_balance, get_recent_customer_invoice_items_by_presentation
 from config.pedidos.services import (
@@ -243,7 +242,6 @@ def crear_cliente(request):
     return render(request, "vendedores/crear_cliente.html")
 
 VENDEDOR_CLIENTES_PAGE_SIZE = 50
-VENDOR_CLIENTE_MAX_INVOICE_LINES = 25
 VENDEDOR_CATALOGO_PAGE_SIZE = 50
 
 
@@ -384,10 +382,6 @@ def clientes(request):
     clientes = attach_customer_balance_summaries(page_obj.object_list)
     context = {
         'clientes': clientes,
-        'cliente_rows': expand_clientes_for_list_display(
-            clientes,
-            max_lines_per_customer=VENDOR_CLIENTE_MAX_INVOICE_LINES,
-        ),
         'page_obj': page_obj,
         'filter_params': filter_params,
         'filter_q': filter_params.get('q', ''),

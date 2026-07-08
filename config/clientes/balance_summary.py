@@ -12,6 +12,9 @@ from config.facturacion.services import (
 )
 
 
+PAID_QB_PAYMENT_STATUSES = ('PAID', 'DEPOSITED')
+
+
 def _quantize_money(value):
     amount = Decimal(str(value or '0.00'))
     return amount.quantize(Decimal('0.01'))
@@ -27,6 +30,7 @@ class CustomerBalanceLine:
     invoice_id: int | None = None
     invoice_number: str = ''
     source: str = 'invoice'
+    terms_label: str = ''
 
     @property
     def aging_display(self):
@@ -39,13 +43,40 @@ class CustomerBalanceLine:
         return str(_('%(days)s days past due') % {'days': self.aging_days})
 
     @property
+    def due_in_display(self):
+        """Human readable countdown for invoices that are not yet due."""
+        if self.is_overdue or self.due_date is None:
+            return ''
+        today = timezone.localdate()
+        days = (self.due_date - today).days
+        if days <= 0:
+            return str(_('Due today'))
+        if days == 1:
+            return str(_('Due in 1 day'))
+        return str(_('Due in %(days)s days') % {'days': days})
+
+    @property
     def invoice_date_display(self):
-        if not self.invoice_date:
+        return self._format_date(self.invoice_date)
+
+    @property
+    def due_date_display(self):
+        return self._format_date(self.due_date)
+
+    @staticmethod
+    def _format_date(value):
+        if not value:
             return ''
         try:
-            return date_format(self.invoice_date, format='SHORT_DATE', use_l10n=True)
+            return date_format(value, format='SHORT_DATE', use_l10n=True)
         except (TypeError, ValueError):
-            return str(self.invoice_date)
+            return str(value)
+
+    @property
+    def invoice_label(self):
+        if self.invoice_number:
+            return str(_('Invoice %(number)s') % {'number': self.invoice_number})
+        return str(_('QuickBooks balance'))
 
     @property
     def balance_label(self):
@@ -74,6 +105,29 @@ class CustomerBalanceSummary:
     def has_credit(self):
         return self.customer_credit > 0
 
+    @property
+    def overdue_lines(self):
+        return tuple(line for line in self.lines if line.is_overdue)
+
+    @property
+    def current_lines(self):
+        return tuple(line for line in self.lines if not line.is_overdue)
+
+    @property
+    def overdue_count(self):
+        return len(self.overdue_lines)
+
+    @property
+    def current_count(self):
+        return len(self.current_lines)
+
+    @property
+    def max_aging_days(self):
+        overdue = self.overdue_lines
+        if not overdue:
+            return 0
+        return max(line.aging_days for line in overdue)
+
 
 @dataclass(frozen=True)
 class ClienteListDisplayRow:
@@ -98,7 +152,7 @@ def _invoice_document_date(invoice):
     return timezone.localtime(invoice.creada_en).date()
 
 
-def _build_line_from_invoice(invoice, *, today):
+def _build_line_from_invoice(invoice, *, today, terms_label=''):
     amount = _quantize_money(invoice.saldo_cliente)
     if amount <= 0:
         return None
@@ -117,6 +171,7 @@ def _build_line_from_invoice(invoice, *, today):
         invoice_id=invoice.pk,
         invoice_number=str(invoice.numero or f'#{invoice.pk}'),
         source='invoice',
+        terms_label=terms_label,
     )
 
 
@@ -157,13 +212,16 @@ def build_customer_balance_summary(cliente, *, invoices=None, today=None):
                 estado='GENERADA',
                 saldo_cliente__gt=0,
             )
+            .exclude(qb_payment_status__in=PAID_QB_PAYMENT_STATUSES)
             .select_related('delivery')
             .order_by('creada_en')
         )
 
+    terms_label = cliente.get_terminos_pago_label() if hasattr(cliente, 'get_terminos_pago_label') else ''
+
     raw_lines = []
     for invoice in invoices:
-        line = _build_line_from_invoice(invoice, today=today)
+        line = _build_line_from_invoice(invoice, today=today, terms_label=terms_label)
         if line is not None:
             raw_lines.append(line)
 
@@ -232,6 +290,7 @@ def attach_customer_balance_summaries(clientes):
             estado='GENERADA',
             saldo_cliente__gt=0,
         )
+        .exclude(qb_payment_status__in=PAID_QB_PAYMENT_STATUSES)
         .select_related('delivery')
         .order_by('creada_en')
     )

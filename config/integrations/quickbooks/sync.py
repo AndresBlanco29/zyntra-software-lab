@@ -3491,7 +3491,8 @@ def _apply_quickbooks_invoice_to_local_record(record, payload, *, client=None):
     update_fields = []
     update_fields.extend(_assign_unique_document_number(record, payload.get('DocNumber')))
     total_amount = _quantize_money(payload.get('TotalAmt') or payload.get('Balance') or 0)
-    balance = _quantize_money(payload.get('Balance') or total_amount)
+    raw_balance = payload.get('Balance')
+    balance = _quantize_money(raw_balance if raw_balance not in (None, '') else total_amount)
     if isinstance(record, Invoice):
         if record.subtotal != total_amount:
             record.subtotal = total_amount

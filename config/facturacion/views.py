@@ -519,7 +519,7 @@ def _build_invoice_pdf_item_data(invoice):
 INVOICE_PDF_ITEMS_PER_PAGE = 20
 INVOICE_PDF_UNIT_OF_MEASURE = 'CS'
 INVOICE_PDF_SHOW_SUGGESTED_RETAIL = False
-INVOICE_PDF_ITEM_COLUMN_WEIGHTS_BASE = (70, 138, 38, 28, 28, 48, 34, 48, 48)
+INVOICE_PDF_ITEM_COLUMN_WEIGHTS_BASE = (104, 108, 36, 26, 26, 46, 32, 46, 46)
 INVOICE_PDF_SUGGESTED_RETAIL_COLUMN_WEIGHT = 84
 
 
@@ -637,12 +637,14 @@ def _build_invoice_pdf_compact_header(*, styles, invoice_number, total_width):
 
 
 def _build_invoice_pdf_barcode(value, *, max_width=66):
-	barcode = code128.Code128(value, barHeight=15, barWidth=0.45, humanReadable=True)
+	bar_height = 30
+	default_bar_width = 0.6
+	barcode = code128.Code128(value, barHeight=bar_height, barWidth=default_bar_width, humanReadable=True)
 	if barcode.width > max_width:
-		scaled_bar_width = max(0.2, round(0.45 * (max_width / float(barcode.width)), 3))
-		barcode = code128.Code128(value, barHeight=15, barWidth=scaled_bar_width, humanReadable=True)
+		scaled_bar_width = max(0.32, round(default_bar_width * (max_width / float(barcode.width)), 3))
+		barcode = code128.Code128(value, barHeight=bar_height, barWidth=scaled_bar_width, humanReadable=True)
 	barcode.fontName = 'Helvetica'
-	barcode.fontSize = 5.5
+	barcode.fontSize = 7
 	barcode.hAlign = 'CENTER'
 	barcode_wrapper = Table([[barcode]], colWidths=[max_width])
 	barcode_wrapper.setStyle(TableStyle([
@@ -715,8 +717,15 @@ def _build_invoice_pdf_shipment_summary_table(summary, *, box_style, value_style
 
 
 def _build_invoice_pdf_signature_flowables(invoice, *, section_title_style, body_style, note_style, signature_width):
+	signature_title_style = ParagraphStyle(
+		'InvoiceSignatureTitle',
+		parent=section_title_style,
+		fontSize=11,
+		leading=14,
+		spaceAfter=4,
+	)
 	flowables = [
-		Paragraph("Customer's Signature:", section_title_style),
+		Paragraph("Customer's Signature:", signature_title_style),
 	]
 	signature_bytes = None
 	delivery = getattr(invoice, 'delivery', None)
@@ -731,7 +740,7 @@ def _build_invoice_pdf_signature_flowables(invoice, *, section_title_style, body
 		signature_image = Image(BytesIO(signature_bytes), width=image_width, height=52)
 		signature_image.hAlign = 'LEFT'
 		flowables.extend([
-			Spacer(1, 4),
+			Spacer(1, 18),
 			signature_image,
 		])
 	else:
@@ -742,13 +751,16 @@ def _build_invoice_pdf_signature_flowables(invoice, *, section_title_style, body
 			('BOTTOMPADDING', (0, 0), (-1, -1), 0),
 		]))
 		flowables.extend([
-			Spacer(1, 2),
+			Spacer(1, 18),
 			signature_line,
 		])
 	flowables.extend([
 		Spacer(1, 6),
 		Paragraph(
-			'In case of default of payment, Customer agrees to pay all cost of collection and legal fees.',
+			'In case of default of payment, the Customer agrees to pay all costs of collection and legal fees. '
+			'Past due balances will be subject to late payment fees and interest at the maximum rate permitted by law. '
+			'Pursuant to Article 2 of the Uniform Commercial Code (UCC), the seller retains a security interest in all '
+			'goods delivered until payment is received in full.',
 			note_style,
 		),
 		Spacer(1, 2),

@@ -14,6 +14,7 @@ from config.productos.models import Presentacion
 
 from .sync import (
     pull_quickbooks_to_local,
+    quickbooks_accounting_import_enabled,
     refresh_linked_quickbooks_invoice_status,
     sync_customer_batch_by_ids,
     sync_product_batch_by_ids,
@@ -45,6 +46,77 @@ def _empty_batch_result():
         'success_count': 0,
         'failed_count': 0,
         'results': [],
+    }
+
+
+def _empty_invoice_import_result(*, disabled=False):
+    return {
+        'entity': 'Invoice',
+        'count': 0,
+        'created_count': 0,
+        'updated_count': 0,
+        'skipped_count': 0,
+        'conflict_count': 0,
+        'failed_count': 0,
+        'results': [],
+        'disabled': disabled,
+    }
+
+
+def _invoice_import_result_from_pull(pull_result):
+    """Extract invoice-only import counts from the accounting documents pulled during alignment.
+
+    ``pull_quickbooks_to_local`` already imports new and modified invoices (and credit
+    memos) incrementally. This isolates the invoice results so the sync history can show
+    how many invoices were created/updated on each run.
+    """
+    if not quickbooks_accounting_import_enabled():
+        return _empty_invoice_import_result(disabled=True)
+
+    accounting_documents = (pull_result or {}).get('accounting_documents') or {}
+    invoice_results = [
+        item
+        for item in (accounting_documents.get('results') or [])
+        if str(item.get('entity') or '').strip().lower() == 'invoice'
+    ]
+
+    created = 0
+    updated = 0
+    skipped = 0
+    conflict = 0
+    failed = 0
+    normalized_results = []
+    for item in invoice_results:
+        action = str(item.get('action') or '').strip().lower()
+        ok = bool(item.get('ok'))
+        # Invoice updates are reported with the "matched" action; normalize to "updated"
+        # so downstream sample buckets and counters treat them consistently.
+        if action == 'matched':
+            action = 'updated'
+        if ok and action == 'created':
+            created += 1
+        elif ok and action == 'updated':
+            updated += 1
+        elif action == 'skipped':
+            skipped += 1
+        elif action == 'conflict':
+            conflict += 1
+        elif not ok:
+            failed += 1
+        normalized_item = dict(item)
+        normalized_item['action'] = action
+        normalized_results.append(normalized_item)
+
+    return {
+        'entity': 'Invoice',
+        'count': len(invoice_results),
+        'created_count': created,
+        'updated_count': updated,
+        'skipped_count': skipped,
+        'conflict_count': conflict,
+        'failed_count': failed,
+        'results': normalized_results,
+        'disabled': False,
     }
 
 
@@ -163,9 +235,10 @@ def _export_samples(batch_result, *, limit=8):
     return samples
 
 
-def build_alignment_sync_summary(*, pull_result, invoice_status_result, export_result, force_full=False, export_skipped=False):
+def build_alignment_sync_summary(*, pull_result, invoice_status_result, export_result, invoice_import_result=None, force_full=False, export_skipped=False):
     customers = pull_result.get('customers') or {}
     items = pull_result.get('items') or {}
+    invoice_import_result = invoice_import_result or _empty_invoice_import_result()
     export_customers = export_result.get('customers') or {}
     export_presentations = export_result.get('presentations') or {}
     return {
@@ -174,6 +247,8 @@ def build_alignment_sync_summary(*, pull_result, invoice_status_result, export_r
         'import': {
             'customers': _entity_import_summary(customers),
             'items': _entity_import_summary(items),
+            'invoices': _entity_import_summary(invoice_import_result),
+            'invoices_enabled': not bool(invoice_import_result.get('disabled')),
             'invoice_status': {
                 'linked': int(invoice_status_result.get('linked_count') or invoice_status_result.get('count') or 0),
                 'updated': int(invoice_status_result.get('updated_count') or 0),
@@ -215,6 +290,7 @@ def _resolve_alignment_status(*, summary, error_message=''):
     import_failed = (
         summary.get('import', {}).get('items', {}).get('failed', 0)
         + summary.get('import', {}).get('customers', {}).get('failed', 0)
+        + summary.get('import', {}).get('invoices', {}).get('failed', 0)
     )
     if export_failed or import_failed:
         return QuickBooksSyncRun.STATUS_PARTIAL
@@ -254,6 +330,7 @@ def run_quickbooks_alignment_sync(
             task_cache_key=task_cache_key,
             skip_images=skip_images,
         )
+        invoice_import_result = _invoice_import_result_from_pull(pull_result)
         invoice_status_result = refresh_linked_quickbooks_invoice_status(
             max_results=max_results,
             task_cache_key=task_cache_key,
@@ -268,12 +345,14 @@ def run_quickbooks_alignment_sync(
             pull_result=pull_result,
             invoice_status_result=invoice_status_result,
             export_result=export_result,
+            invoice_import_result=invoice_import_result,
             force_full=force_full,
             export_skipped=not include_export,
         )
         status = _resolve_alignment_status(summary=summary)
         result = {
             'pull': pull_result,
+            'invoice_import': invoice_import_result,
             'invoice_status': invoice_status_result,
             'export': export_result,
             'summary': summary,

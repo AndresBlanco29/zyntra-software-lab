@@ -54,7 +54,7 @@
     <h2 class="mb-1">{% trans "QuickBooks sync history" %}</h2>
     <p class="text-muted mb-0">
       {% blocktrans with timezone=quickbooks_alignment_timezone schedule=quickbooks_alignment_schedule_label %}
-      Automatic import runs every 6 hours at {{ schedule }} (US Eastern, {{ timezone }}). Inventory follows QuickBooks on each catalog import. Export to QuickBooks stays manual. Manual runs from QuickBooks Center are listed here too.
+      Automatic import runs every 6 hours at {{ schedule }} (US Eastern, {{ timezone }}). It imports new and modified customers, products, and invoices from QuickBooks, and inventory follows QuickBooks on each catalog import. Export to QuickBooks stays manual. Manual runs from QuickBooks Center are listed here too.
       {% endblocktrans %}
     </p>
   </div>
@@ -91,6 +91,9 @@
             <td class="small">
               <div>{% trans "Customers" %}: +{{ run.import_customers_created }} / ~{{ run.import_customers_updated }}</div>
               <div>{% trans "Catalog" %}: +{{ run.import_items_created }} / ~{{ run.import_items_updated }}</div>
+              {% if run.import_invoices_enabled %}
+              <div>{% trans "Invoices" %}: +{{ run.import_invoices_created }} / ~{{ run.import_invoices_updated }}</div>
+              {% endif %}
             </td>
             <td class="small">{{ run.invoice_status_updated }} {% trans "updated" %}</td>
             <td class="small">
@@ -117,6 +120,12 @@
                     <div class="fw-semibold mb-2">{% trans "Catalog items" %}</div>
                     {% include "backoffice/partials/quickbooks_sync_history_import_details.html" with details=run.import_items_details only %}
                   </div>
+                  {% if run.import_invoices_enabled %}
+                  <div class="mt-3">
+                    <div class="fw-semibold mb-2">{% trans "Invoices" %}</div>
+                    {% include "backoffice/partials/quickbooks_sync_history_import_details.html" with details=run.import_invoices_details only %}
+                  </div>
+                  {% endif %}
                 </details>
               </div>
             </td>

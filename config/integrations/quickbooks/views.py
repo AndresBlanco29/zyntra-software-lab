@@ -1160,11 +1160,13 @@ def _build_sync_history_row(sync_run):
     export_summary = summary.get('export') or {}
     customers = import_summary.get('customers') or {}
     items = import_summary.get('items') or {}
+    invoices = import_summary.get('invoices') or {}
     invoice_status = import_summary.get('invoice_status') or {}
     export_customers = export_summary.get('customers') or {}
     export_items = export_summary.get('presentations') or {}
     customers_details = _sync_history_import_details(customers)
     items_details = _sync_history_import_details(items)
+    invoices_details = _sync_history_import_details(invoices)
     status_class = {
         QuickBooksSyncRun.STATUS_SUCCESS: 'success',
         QuickBooksSyncRun.STATUS_PARTIAL: 'warning',
@@ -1192,6 +1194,9 @@ def _build_sync_history_row(sync_run):
         'import_customers_updated': customers.get('updated', 0),
         'import_items_created': items.get('created', 0),
         'import_items_updated': items.get('updated', 0),
+        'import_invoices_created': invoices.get('created', 0),
+        'import_invoices_updated': invoices.get('updated', 0),
+        'import_invoices_enabled': bool(import_summary.get('invoices_enabled')),
         'invoice_status_updated': invoice_status.get('updated', 0),
         'export_customers_success': export_customers.get('success', 0),
         'export_items_success': export_items.get('success', 0),
@@ -1200,7 +1205,12 @@ def _build_sync_history_row(sync_run):
         'export_skipped': bool(export_summary.get('skipped')),
         'import_customers_details': customers_details,
         'import_items_details': items_details,
-        'has_import_details': customers_details['has_samples'] or items_details['has_samples'],
+        'import_invoices_details': invoices_details,
+        'has_import_details': (
+            customers_details['has_samples']
+            or items_details['has_samples']
+            or invoices_details['has_samples']
+        ),
         'summary': summary,
         'force_full': sync_run.force_full,
     }

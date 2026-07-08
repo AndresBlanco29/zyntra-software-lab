@@ -86,6 +86,8 @@ class Command(BaseCommand):
         export_summary = summary.get('export') or {}
         customers = import_summary.get('customers') or {}
         items = import_summary.get('items') or {}
+        invoices = import_summary.get('invoices') or {}
+        invoices_enabled = bool(import_summary.get('invoices_enabled'))
         invoice_status = import_summary.get('invoice_status') or {}
         export_customers = export_summary.get('customers') or {}
         export_items = export_summary.get('presentations') or {}
@@ -97,6 +99,10 @@ class Command(BaseCommand):
         self.stdout.write(
             f"Import catalog -> created {items.get('created', 0)}, updated {items.get('updated', 0)}."
         )
+        if invoices_enabled:
+            self.stdout.write(
+                f"Import invoices -> created {invoices.get('created', 0)}, updated {invoices.get('updated', 0)}."
+            )
         self.stdout.write(
             f"Invoice payment status -> updated {invoice_status.get('updated', 0)} of {invoice_status.get('linked', 0)} linked."
         )

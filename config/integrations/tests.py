@@ -3175,6 +3175,37 @@ class QuickBooksAlignmentSyncTests(QuickBooksIntegrationTests):
         self.assertEqual(result['summary']['import']['items']['created'], 2)
         self.assertTrue(result['summary']['export']['skipped'])
 
+    @override_settings(QUICKBOOKS_IMPORT_ACCOUNTING_DOCUMENTS=True)
+    @patch('config.integrations.quickbooks.alignment_sync.refresh_linked_quickbooks_invoice_status')
+    @patch('config.integrations.quickbooks.alignment_sync.pull_quickbooks_to_local')
+    def test_run_quickbooks_alignment_sync_imports_invoices_and_records_counts(
+        self,
+        mock_pull,
+        mock_refresh,
+    ):
+        mock_pull.return_value = {
+            'customers': {'created_count': 0, 'updated_count': 0, 'conflict_count': 0},
+            'items': {'created_count': 0, 'updated_count': 0, 'conflict_count': 0},
+            'accounting_documents': {
+                'results': [
+                    {'ok': True, 'action': 'created', 'entity': 'Invoice', 'label': 'INV-1', 'quickbooks_id': 'QB-1'},
+                    {'ok': True, 'action': 'matched', 'entity': 'Invoice', 'label': 'INV-2', 'quickbooks_id': 'QB-2'},
+                    {'ok': True, 'action': 'created', 'entity': 'CreditMemo', 'label': 'CM-1', 'quickbooks_id': 'QB-9'},
+                ],
+            },
+            'incremental': True,
+        }
+        mock_refresh.return_value = {'linked_count': 2, 'updated_count': 1}
+
+        result = run_quickbooks_alignment_sync(save_history=True, scheduled_slot='2026-07-03T18:00')
+
+        invoices_summary = result['summary']['import']['invoices']
+        self.assertEqual(invoices_summary['created'], 1)
+        self.assertEqual(invoices_summary['updated'], 1)
+        self.assertTrue(result['summary']['import']['invoices_enabled'])
+        sync_run = QuickBooksSyncRun.objects.get()
+        self.assertEqual(sync_run.summary['import']['invoices']['created'], 1)
+
     @patch('config.integrations.quickbooks.alignment_sync.push_new_outbound_records_to_quickbooks')
     @patch('config.integrations.quickbooks.alignment_sync.refresh_linked_quickbooks_invoice_status')
     @patch('config.integrations.quickbooks.alignment_sync.pull_quickbooks_to_local')

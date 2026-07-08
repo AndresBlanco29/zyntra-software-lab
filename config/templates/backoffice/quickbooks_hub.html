@@ -1335,9 +1335,15 @@
           <div class="qb-strip mb-3">
             <div class="fw-semibold mb-1">{% trans "Automatic sync every 6 hours" %}</div>
             <div class="small text-muted">
+              {% if quickbooks_import_accounting_enabled %}
+              {% blocktrans with timezone=quickbooks_alignment_timezone schedule=quickbooks_alignment_schedule_label %}
+              Runs automatically at {{ schedule }} (US Eastern, {{ timezone }}) without anyone on this page. Imports new and modified customers, products, and invoices from QuickBooks, and updates local inventory from QuickBooks quantities. Nothing is exported automatically.
+              {% endblocktrans %}
+              {% else %}
               {% blocktrans with timezone=quickbooks_alignment_timezone schedule=quickbooks_alignment_schedule_label %}
               Runs automatically at {{ schedule }} (US Eastern, {{ timezone }}) without anyone on this page. Imports new customers and products from QuickBooks and updates local inventory from QuickBooks quantities. Nothing is exported automatically.
               {% endblocktrans %}
+              {% endif %}
               {% if quickbooks_alignment_last_run_label %}
               {% blocktrans with last_run=quickbooks_alignment_last_run_label %}Last scheduled run: {{ last_run }}.{% endblocktrans %}
               {% endif %}

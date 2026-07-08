@@ -762,7 +762,7 @@
           </div>
           <div class="row g-3">
             <div class="col-12 col-md-4">
-              <label class="form-label fw-semibold">{% trans "Payment status" %}</label>
+              <label class="form-label fw-semibold form-label-required">{% trans "Payment status" %}</label>
               <select name="estado_pago" id="paymentStatus" class="form-select" required>
                 <option value="">{% trans "Select..." %}</option>
                 <option value="PAGADO">{% trans "Paid" %}</option>
@@ -770,7 +770,7 @@
               </select>
             </div>
             <div class="col-12 col-md-4">
-              <label class="form-label fw-semibold">{% trans "Received by" %}</label>
+              <label class="form-label fw-semibold form-label-required">{% trans "Received by" %}</label>
               <input type="text" name="recibido_por" class="form-control" required>
             </div>
             <div class="col-12 col-md-4 paid-only d-none">
@@ -832,12 +832,12 @@
             </div>
 
             <div class="col-12 unpaid-only d-none">
-              <label class="form-label fw-semibold">{% trans "Reason for non-payment" %}</label>
+              <label class="form-label fw-semibold form-label-required">{% trans "Reason for non-payment" %}</label>
               <textarea name="motivo_no_pago" class="form-control" rows="3"></textarea>
             </div>
 
             <div class="col-12 unpaid-only d-none">
-              <label class="form-label fw-semibold">{% trans "Evidence photos" %}</label>
+              <label class="form-label fw-semibold form-label-required">{% trans "Evidence photos" %}</label>
               <div class="camera-upload-widget" data-camera-upload>
                 <input type="file" name="evidence_photos" class="form-control" accept="image/*" capture="environment" multiple data-camera-input>
                 <div class="d-flex flex-wrap gap-2 mt-2">
@@ -863,7 +863,7 @@
         <span class="badge text-bg-light border">3</span>
         <h6 class="mb-0">{% trans "Customer signature" %}</h6>
       </div>
-        <label class="form-label fw-semibold">{% trans "Customer signature" %}</label>
+        <label class="form-label fw-semibold form-label-required">{% trans "Customer signature" %}</label>
         <div class="border rounded p-2 bg-light">
           <canvas id="signatureCanvas" class="w-100" height="220" style="touch-action:none;background:#fff;"></canvas>
         </div>
@@ -1173,6 +1173,11 @@
       const status = paymentStatus.value;
       paidFields.forEach((element) => element.classList.toggle('d-none', status !== 'PAGADO'));
       unpaidFields.forEach((element) => element.classList.toggle('d-none', status !== 'NO_PAGADO'));
+      const motivoInput = document.querySelector('textarea[name="motivo_no_pago"]');
+      const evidenceInput = document.querySelector('input[name="evidence_photos"]');
+      const isUnpaid = status === 'NO_PAGADO';
+      if (motivoInput) motivoInput.required = isUnpaid;
+      if (evidenceInput) evidenceInput.required = isUnpaid;
       updatePaymentAmountSuggestion();
       togglePaymentEntryFields();
     }

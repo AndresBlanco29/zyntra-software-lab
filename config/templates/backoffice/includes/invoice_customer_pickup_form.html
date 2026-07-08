@@ -498,7 +498,7 @@
       </div>
       <div class="row g-3">
         <div class="col-12 col-md-4">
-          <label class="form-label fw-semibold">{% trans "Payment status" %}</label>
+          <label class="form-label fw-semibold form-label-required">{% trans "Payment status" %}</label>
           <select name="estado_pago" id="paymentStatus" class="form-select" required>
             <option value="">{% trans "Select..." %}</option>
             <option value="PAGADO">{% trans "Paid" %}</option>
@@ -506,7 +506,7 @@
           </select>
         </div>
         <div class="col-12 col-md-4">
-          <label class="form-label fw-semibold">{% trans "Received by / managed by" %}</label>
+          <label class="form-label fw-semibold form-label-required">{% trans "Received by / managed by" %}</label>
           <input type="text" name="recibido_por" class="form-control" required>
         </div>
         <div class="col-12 col-md-4 paid-only d-none">
@@ -568,12 +568,12 @@
         </div>
 
         <div class="col-12 unpaid-only d-none">
-          <label class="form-label fw-semibold">{% trans "Reason for non-payment" %}</label>
+          <label class="form-label fw-semibold form-label-required">{% trans "Reason for non-payment" %}</label>
           <textarea name="motivo_no_pago" class="form-control" rows="3"></textarea>
         </div>
 
         <div class="col-12 unpaid-only d-none">
-          <label class="form-label fw-semibold">{% trans "Evidence photos" %}</label>
+          <label class="form-label fw-semibold form-label-required">{% trans "Evidence photos" %}</label>
           <div class="camera-upload-widget" data-camera-upload>
             <input type="file" name="evidence_photos" class="form-control" accept="image/*" capture="environment" multiple data-camera-input>
             <div class="d-flex flex-wrap gap-2 mt-2">
@@ -602,7 +602,7 @@
     <div class="pickup-flow-signature pickup-flow-card pickup-signature-card">
       <div class="pickup-section-head">
         <span class="pickup-section-index">4</span>
-        <h6 class="mb-0">{% trans "Customer signature" %}</h6>
+        <h6 class="mb-0 form-label-required">{% trans "Customer signature" %}</h6>
       </div>
       <div class="border rounded p-2 bg-light">
         <canvas id="signatureCanvas" class="w-100" height="220" style="touch-action:none;background:#fff;"></canvas>

@@ -1502,3 +1502,59 @@ width:100%;
     font-size: 1.5rem;
   }
 }
+
+/* Visible form fields and required markers across backoffice/vendor screens */
+.content .form-control,
+.content .form-select,
+.content textarea.form-control,
+.pickup-completion-shell .form-control,
+.pickup-completion-shell .form-select,
+.pickup-completion-shell textarea.form-control,
+.driver-shell .form-control,
+.driver-shell .form-select,
+.driver-shell textarea.form-control {
+  background-color: #fff;
+  border: 1px solid #94a3b8;
+  color: #0f172a;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.content .form-control:disabled,
+.content .form-select:disabled,
+.pickup-completion-shell .form-control:disabled,
+.pickup-completion-shell .form-select:disabled,
+.driver-shell .form-control:disabled,
+.driver-shell .form-select:disabled {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+  opacity: 1;
+}
+
+.content .form-control:focus,
+.content .form-select:focus,
+.pickup-completion-shell .form-control:focus,
+.pickup-completion-shell .form-select:focus,
+.driver-shell .form-control:focus,
+.driver-shell .form-select:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+.content .input-group-text,
+.pickup-completion-shell .input-group-text,
+.driver-shell .input-group-text {
+  background-color: #f8fafc;
+  border: 1px solid #94a3b8;
+  color: #475569;
+}
+
+.content label.form-label.form-label-required::after,
+.pickup-completion-shell label.form-label.form-label-required::after,
+.driver-shell label.form-label.form-label-required::after,
+.content .pickup-section-head h6.form-label-required::after,
+.pickup-completion-shell .pickup-section-head h6.form-label-required::after,
+.driver-shell .pickup-section-head h6.form-label-required::after {
+  content: " *";
+  color: #dc3545;
+  font-weight: 700;
+}

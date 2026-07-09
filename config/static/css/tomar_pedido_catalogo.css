@@ -173,6 +173,24 @@ transform:scale(1.05);
     color: #1f2937;
 }
 
+.precio-modal-option__margin {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #15803d;
+}
+
+.precio-manual-wrap .form-control,
+.precio-manual-modal-section .form-control {
+    background-color: #fff;
+    border: 1px solid #94a3b8;
+}
+
+.precio-margin-hint {
+    line-height: 1.2;
+}
+
 .precio-modal-option__product {
     display: block;
     margin-top: 4px;

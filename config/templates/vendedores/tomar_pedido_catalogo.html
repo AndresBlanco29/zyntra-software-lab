@@ -53,6 +53,10 @@ data-csrf="{{ csrf_token }}"
 data-cliente-id="{{ cliente.id }}"
 data-msg-added="{% trans 'Added' %} ✔"
 data-msg-add-default="{% trans 'Add to Order' %}"
+data-price-margins="{{ price_margin_percentages|join:',' }}"
+data-label-margin="{% trans 'Margin' %}"
+data-label-manual-price="{% trans 'Manual price' %}"
+data-label-use-manual-price="{% trans 'Use manual price' %}"
 >
 
 <!-- NAVBAR -->
@@ -248,6 +252,7 @@ data-producto-id="{{ producto.id }}"
 data-nombre="{{ producto.nombre }}"
 data-categoria="{{ producto.categoria.id }}"
 data-marca="{{ producto.marca.id }}"
+data-costo="{{ producto.presentaciones.first.costo|default:'0' }}"
 >
 
 {% if producto.imagen %}
@@ -298,6 +303,7 @@ alt="{{ producto.nombre }}"
 value="{{ p.id }}"
 data-unidades="{{ p.unidades }}"
 data-tipo="{{ p.tipo_contenido_traducido }}"
+data-costo="{{ p.costo|default:'0' }}"
 data-precio1="{{ p.precio_1 }}"
 data-precio2="{{ p.precio_2 }}"
 data-precio3="{{ p.precio_3 }}"
@@ -382,25 +388,33 @@ data-summary="{{ p.descripcion_empaque_cliente }}"
 {% trans "Seleccionar precio" %}
 </option>
 
-<option value="{{ producto.presentaciones.first.precio_1 }}" data-price-key="precio_1">
-{% trans "Precio" %} 1 - ${{ producto.presentaciones.first.precio_1 }}
+{% with p=producto.presentaciones.first %}
+{% if p.precio_1 and p.precio_1 != "0.00" %}
+<option value="{{ p.precio_1 }}" data-price-key="precio_1" data-margin="{{ price_margin_percentages.0 }}">
+{% trans "Price" %} 1 - ${{ p.precio_1 }}
 </option>
-
-<option value="{{ producto.presentaciones.first.precio_2 }}" data-price-key="precio_2">
-{% trans "Precio" %} 2 - ${{ producto.presentaciones.first.precio_2 }}
+{% endif %}
+{% if p.precio_2 and p.precio_2 != "0.00" %}
+<option value="{{ p.precio_2 }}" data-price-key="precio_2" data-margin="{{ price_margin_percentages.1 }}">
+{% trans "Price" %} 2 - ${{ p.precio_2 }}
 </option>
-
-<option value="{{ producto.presentaciones.first.precio_3 }}" data-price-key="precio_3">
-{% trans "Precio" %} 3 - ${{ producto.presentaciones.first.precio_3 }}
+{% endif %}
+{% if p.precio_3 and p.precio_3 != "0.00" %}
+<option value="{{ p.precio_3 }}" data-price-key="precio_3" data-margin="{{ price_margin_percentages.2 }}">
+{% trans "Price" %} 3 - ${{ p.precio_3 }}
 </option>
-
-<option value="{{ producto.presentaciones.first.precio_4 }}" data-price-key="precio_4">
-{% trans "Precio" %} 4 - ${{ producto.presentaciones.first.precio_4 }}
+{% endif %}
+{% if p.precio_4 and p.precio_4 != "0.00" %}
+<option value="{{ p.precio_4 }}" data-price-key="precio_4" data-margin="{{ price_margin_percentages.3 }}">
+{% trans "Price" %} 4 - ${{ p.precio_4 }}
 </option>
-
-<option value="{{ producto.presentaciones.first.precio_5 }}" data-price-key="precio_5">
-{% trans "Precio" %} 5 - ${{ producto.presentaciones.first.precio_5 }}
+{% endif %}
+{% if p.precio_5 and p.precio_5 != "0.00" %}
+<option value="{{ p.precio_5 }}" data-price-key="precio_5" data-margin="{{ price_margin_percentages.4 }}">
+{% trans "Price" %} 5 - ${{ p.precio_5 }}
 </option>
+{% endif %}
+{% endwith %}
 
 </select>
 
@@ -409,6 +423,17 @@ data-summary="{{ p.descripcion_empaque_cliente }}"
 <span class="precio-select-mask" aria-hidden="true">{% trans "Mantén oprimido 1 segundo para elegir precio" %}</span>
 
 </div>
+
+<div class="precio-manual-wrap mt-2">
+<label class="small text-muted mb-1 d-block">{% trans "Manual price" %}</label>
+<div class="input-group input-group-sm">
+<span class="input-group-text">$</span>
+<input type="number" step="0.01" min="0.01" class="form-control precio-manual-input" placeholder="0.00" inputmode="decimal" aria-label="{% trans 'Manual price' %}">
+<button type="button" class="btn btn-outline-primary precio-manual-apply">{% trans "Apply" %}</button>
+</div>
+</div>
+
+<div class="precio-margin-hint small text-success fw-semibold mt-1 d-none" aria-live="polite"></div>
 
 </div>
 
@@ -495,6 +520,15 @@ $<span id="pedidoTotal">{{ total }}</span>
       <div class="modal-body py-3">
         <p class="text-muted small mb-3">{% trans "Elige el precio que se aplicará al producto para este cliente." %}</p>
         <div id="modalPrecioOpciones" class="precio-modal-options"></div>
+        <div class="precio-manual-modal-section border-top pt-3 mt-3">
+          <label class="fw-semibold small mb-1 d-block" for="modalPrecioManualInput">{% trans "Manual price" %}</label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text">$</span>
+            <input type="number" step="0.01" min="0.01" class="form-control" id="modalPrecioManualInput" placeholder="0.00" inputmode="decimal">
+          </div>
+          <div id="modalPrecioManualMargin" class="small text-success fw-semibold mt-2 d-none" aria-live="polite"></div>
+          <button type="button" class="btn btn-primary btn-sm w-100 mt-2" id="modalPrecioManualApply">{% trans "Use manual price" %}</button>
+        </div>
       </div>
     </div>
   </div>

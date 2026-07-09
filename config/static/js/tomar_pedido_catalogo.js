@@ -6,6 +6,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const precioSelectorModalElement = document.getElementById('modalPrecioSelector');
     const precioSelectorLabel = document.getElementById('modalPrecioSelectorLabel');
     const precioSelectorOptions = document.getElementById('modalPrecioOpciones');
+    const modalPrecioManualInput = document.getElementById('modalPrecioManualInput');
+    const modalPrecioManualMargin = document.getElementById('modalPrecioManualMargin');
+    const modalPrecioManualApply = document.getElementById('modalPrecioManualApply');
     const precioSelectorModal = precioSelectorModalElement ? new bootstrap.Modal(precioSelectorModalElement) : null;
     const longPressDelay = 1200;
     let activePrecioCard = null;
@@ -13,6 +16,173 @@ document.addEventListener('DOMContentLoaded', function() {
     const applyBulkPriceTierButton = document.getElementById('applyBulkPriceTierButton');
     const bulkPriceTierStorageKey = `vendedor_catalog_bulk_price_tier_${document.body.dataset.clienteId || 'default'}`;
     let activeBulkPriceTier = '';
+    const marginLabel = document.body.dataset.labelMargin || 'Margin';
+
+    function getPriceMarginTiers() {
+        const raw = document.body.dataset.priceMargins || '';
+        return raw.split(',').map(value => parseFloat(value)).filter(value => Number.isFinite(value));
+    }
+
+    function getCardCost(card) {
+        return parseFloat(card?.dataset.costo || '0') || 0;
+    }
+
+    function calculateMarginPercent(cost, price) {
+        const costValue = parseFloat(cost);
+        const priceValue = parseFloat(price);
+        if (!Number.isFinite(costValue) || !Number.isFinite(priceValue) || costValue <= 0 || priceValue <= 0) {
+            return null;
+        }
+        if (priceValue <= costValue) {
+            return 0;
+        }
+        return ((priceValue - costValue) / priceValue) * 100;
+    }
+
+    function formatMarginPercent(value) {
+        if (value === null || value === undefined || Number.isNaN(value)) {
+            return '';
+        }
+        return `${value.toFixed(1)}%`;
+    }
+
+    function resolveOptionMargin(option, cost) {
+        const configuredMargin = parseFloat(option?.dataset.margin || '');
+        if (Number.isFinite(configuredMargin)) {
+            return configuredMargin;
+        }
+        return calculateMarginPercent(cost, option?.value);
+    }
+
+    function buildMarginLabel(marginValue) {
+        const formatted = formatMarginPercent(marginValue);
+        return formatted ? `${marginLabel}: ${formatted}` : '';
+    }
+
+    function removeManualPriceOption(precioSelect) {
+        const manualOption = precioSelect?.querySelector('option[data-price-key="manual"]');
+        if (manualOption) {
+            manualOption.remove();
+        }
+    }
+
+    function setManualPriceOnCard(card, rawPrice, { closeModal = false } = {}) {
+        const precioSelect = card?.querySelector('.precio-select');
+        if (!precioSelect) {
+            return false;
+        }
+
+        const priceValue = parseFloat(rawPrice);
+        if (!Number.isFinite(priceValue) || priceValue <= 0) {
+            return false;
+        }
+
+        const normalizedPrice = priceValue.toFixed(2);
+        removeManualPriceOption(precioSelect);
+
+        const manualOption = document.createElement('option');
+        manualOption.value = normalizedPrice;
+        manualOption.dataset.priceKey = 'manual';
+        manualOption.textContent = `${document.body.dataset.labelManualPrice || 'Manual price'} - $${normalizedPrice}`;
+        precioSelect.appendChild(manualOption);
+        precioSelect.value = normalizedPrice;
+        precioSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+        const manualInput = card.querySelector('.precio-manual-input');
+        if (manualInput) {
+            manualInput.value = normalizedPrice;
+        }
+
+        syncPrecioMask(card);
+        updatePrecioMarginHint(card);
+
+        if (closeModal && precioSelectorModal) {
+            precioSelectorModal.hide();
+        }
+
+        return true;
+    }
+
+    function updatePrecioMarginHint(card) {
+        const precioSelect = card?.querySelector('.precio-select');
+        const hint = card?.querySelector('.precio-margin-hint');
+        if (!precioSelect || !hint) {
+            return;
+        }
+
+        const selectedOption = precioSelect.selectedOptions[0];
+        if (!selectedOption || !selectedOption.value) {
+            hint.textContent = '';
+            hint.classList.add('d-none');
+            return;
+        }
+
+        const marginValue = resolveOptionMargin(selectedOption, getCardCost(card));
+        const marginText = buildMarginLabel(marginValue);
+        if (!marginText) {
+            hint.textContent = '';
+            hint.classList.add('d-none');
+            return;
+        }
+
+        hint.textContent = marginText;
+        hint.classList.remove('d-none');
+    }
+
+    function updateModalManualMarginPreview() {
+        if (!modalPrecioManualMargin || !activePrecioCard) {
+            return;
+        }
+
+        const marginValue = calculateMarginPercent(getCardCost(activePrecioCard), modalPrecioManualInput?.value || '');
+        const marginText = buildMarginLabel(marginValue);
+        if (!marginText) {
+            modalPrecioManualMargin.textContent = '';
+            modalPrecioManualMargin.classList.add('d-none');
+            return;
+        }
+
+        modalPrecioManualMargin.textContent = marginText;
+        modalPrecioManualMargin.classList.remove('d-none');
+    }
+
+    function rebuildPrecioOptions(card, optionData) {
+        const precioSelect = card.querySelector('.precio-select');
+        const marginTiers = getPriceMarginTiers();
+        if (!precioSelect) {
+            return;
+        }
+
+        precioSelect.innerHTML = '<option value="">Seleccionar precio</option>';
+        precioSelect.value = '';
+
+        const precios = [
+            optionData.precio1,
+            optionData.precio2,
+            optionData.precio3,
+            optionData.precio4,
+            optionData.precio5,
+        ];
+
+        precios.forEach((precio, index) => {
+            if (precio && precio !== '0.00') {
+                const priceKey = `precio_${index + 1}`;
+                const margin = marginTiers[index];
+                const marginAttr = Number.isFinite(margin) ? ` data-margin="${margin}"` : '';
+                const marginSuffix = Number.isFinite(margin) ? ` (${formatMarginPercent(margin)})` : '';
+                precioSelect.innerHTML += `
+                    <option value="${precio}" data-price-key="${priceKey}"${marginAttr}>
+                    Precio ${index + 1} - $${precio}${marginSuffix}
+                    </option>
+                `;
+            }
+        });
+
+        const manualInput = card.querySelector('.precio-manual-input');
+        if (manualInput) {
+            manualInput.value = '';
+        }
+    }
 
     function getStoredBulkPriceTier() {
         try {
@@ -86,9 +256,19 @@ document.addEventListener('DOMContentLoaded', function() {
         const defaultLabel = shell.dataset.labelDefault || 'Presiona para elegir precio';
         const selectedLabel = shell.dataset.labelSelected || 'Precio seleccionado';
         const hasSelectedPrice = Boolean(precioSelect.value);
+        const selectedOption = precioSelect.selectedOptions[0];
+        const marginValue = hasSelectedPrice ? resolveOptionMargin(selectedOption, getCardCost(card)) : null;
+        const marginSuffix = buildMarginLabel(marginValue);
 
         shell.dataset.state = hasSelectedPrice ? 'selected' : 'empty';
-        mask.textContent = hasSelectedPrice ? selectedLabel : defaultLabel;
+        if (hasSelectedPrice) {
+            mask.textContent = marginSuffix
+                ? `$${precioSelect.value} · ${marginSuffix}`
+                : `${selectedLabel}: $${precioSelect.value}`;
+        } else {
+            mask.textContent = defaultLabel;
+        }
+        updatePrecioMarginHint(card);
     }
 
     function setPrecioMaskOpen(select, isOpen) {
@@ -145,15 +325,27 @@ document.addEventListener('DOMContentLoaded', function() {
 
         activePrecioCard = card;
         precioSelectorLabel.textContent = shell.dataset.pickerTitle || 'Seleccionar precio';
+        const cost = getCardCost(card);
         precioSelectorOptions.innerHTML = options.map(option => {
             const isSelected = option.value === precioSelect.value ? ' precio-modal-option--selected' : '';
+            const marginValue = resolveOptionMargin(option, cost);
+            const marginMarkup = marginValue === null
+                ? ''
+                : `<span class="precio-modal-option__margin">${buildMarginLabel(marginValue)}</span>`;
             return `
                 <button type="button" class="precio-modal-option${isSelected}" data-value="${option.value}">
                     <span class="precio-modal-option__title">${option.text}</span>
+                    ${marginMarkup}
                     <span class="precio-modal-option__product">${productName}</span>
                 </button>
             `;
         }).join('');
+
+        if (modalPrecioManualInput) {
+            const manualInput = card.querySelector('.precio-manual-input');
+            modalPrecioManualInput.value = manualInput?.value || '';
+        }
+        updateModalManualMarginPreview();
 
         precioSelectorModal.show();
     }
@@ -270,9 +462,30 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             precioSelect.addEventListener('change', function () {
+                const manualInput = card.querySelector('.precio-manual-input');
+                const selectedOption = precioSelect.selectedOptions[0];
+                if (manualInput && selectedOption?.dataset.priceKey !== 'manual') {
+                    manualInput.value = '';
+                }
                 syncPrecioMask(card);
             });
         }
+
+        const manualInput = card.querySelector('.precio-manual-input');
+        const manualApplyButton = card.querySelector('.precio-manual-apply');
+        if (manualApplyButton && manualInput) {
+            manualApplyButton.addEventListener('click', function () {
+                setManualPriceOnCard(card, manualInput.value);
+            });
+            manualInput.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    setManualPriceOnCard(card, manualInput.value);
+                }
+            });
+        }
+
+        updatePrecioMarginHint(card);
 
         if (precioHoldTrigger) {
             ['pointerdown', 'touchstart', 'mousedown'].forEach(eventName => {
@@ -410,49 +623,26 @@ document.addEventListener('DOMContentLoaded', function() {
         const infoTexto = card.querySelector(".info-presentacion");
 
         select.addEventListener("change", function () {
-            const option = this.options[this.selectedIndex];
+            const option = this.selectedOptions[0];
             const summary = (option.dataset.summary || '').trim();
 
             if (summary) {
                 infoTexto.textContent = summary;
             } else {
-                let unidades = option.dataset.unidades;
-                let tipo = option.dataset.tipo;
-                let nombre = option.text;
+                const unidades = option.dataset.unidades;
+                const tipo = option.dataset.tipo;
+                const nombre = option.text;
                 infoTexto.textContent = unidades + " " + tipo + " por " + nombre.toLowerCase();
             }
             syncOrderHistory(card, this);
-        });
 
-        syncOrderHistory(card, select);
-    });
-
-    document.querySelectorAll(".presentacion-select").forEach(select => {
-        select.addEventListener("change", function () {
-            const card = this.closest(".producto-card");
-            const option = this.selectedOptions[0];
-
-            const precios = [
-                option.dataset.precio1,
-                option.dataset.precio2,
-                option.dataset.precio3,
-                option.dataset.precio4,
-                option.dataset.precio5
-            ];
-
-            const precioSelect = card.querySelector(".precio-select");
-            precioSelect.innerHTML = '<option value="">Seleccionar precio</option>';
-            precioSelect.value = '';
-
-            precios.forEach((precio, index) => {
-                if (precio && precio !== "0.00") {
-                    const priceKey = `precio_${index + 1}`;
-                    precioSelect.innerHTML += `
-                    <option value="${precio}" data-price-key="${priceKey}">
-                    Precio ${index + 1} - $${precio}
-                    </option>
-                    `;
-                }
+            card.dataset.costo = option.dataset.costo || '0';
+            rebuildPrecioOptions(card, {
+                precio1: option.dataset.precio1,
+                precio2: option.dataset.precio2,
+                precio3: option.dataset.precio3,
+                precio4: option.dataset.precio4,
+                precio5: option.dataset.precio5,
             });
 
             if (activeBulkPriceTier) {
@@ -470,8 +660,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (mask) {
                     mask.textContent = shell?.dataset.labelDefault || 'Mantén oprimido 1 segundo para elegir precio';
                 }
+                updatePrecioMarginHint(card);
             }
         });
+
+        syncOrderHistory(card, select);
     });
 
     if (precioSelectorOptions) {
@@ -489,8 +682,26 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             precioSelect.value = optionButton.dataset.value || '';
+            const manualInput = activePrecioCard.querySelector('.precio-manual-input');
+            if (manualInput) {
+                manualInput.value = '';
+            }
+            removeManualPriceOption(precioSelect);
             precioSelect.dispatchEvent(new Event('change', { bubbles: true }));
             precioSelectorModal.hide();
+        });
+    }
+
+    if (modalPrecioManualInput) {
+        modalPrecioManualInput.addEventListener('input', updateModalManualMarginPreview);
+    }
+
+    if (modalPrecioManualApply) {
+        modalPrecioManualApply.addEventListener('click', function () {
+            if (!activePrecioCard || !modalPrecioManualInput) {
+                return;
+            }
+            setManualPriceOnCard(activePrecioCard, modalPrecioManualInput.value, { closeModal: true });
         });
     }
 
@@ -499,6 +710,13 @@ document.addEventListener('DOMContentLoaded', function() {
             activePrecioCard = null;
             if (precioSelectorOptions) {
                 precioSelectorOptions.innerHTML = '';
+            }
+            if (modalPrecioManualInput) {
+                modalPrecioManualInput.value = '';
+            }
+            if (modalPrecioManualMargin) {
+                modalPrecioManualMargin.textContent = '';
+                modalPrecioManualMargin.classList.add('d-none');
             }
         });
     }

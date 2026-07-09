@@ -294,6 +294,10 @@ def _build_catalog_bulk_price_options():
     ]
 
 
+def _catalog_price_margin_percentages():
+    return [float(value) for value in ConfiguracionPrecios.obtener_porcentajes()]
+
+
 def _build_order_summary_discount_preset_options():
     return ConfiguracionDescuentos.obtener().opciones_activas()
 
@@ -447,6 +451,7 @@ def catalogo_vendedor(request, cliente_id):
         'total_items': total_items,
         'total': total,
         'bulk_price_options': _build_catalog_bulk_price_options(),
+        'price_margin_percentages': _catalog_price_margin_percentages(),
     }
 
     return render(request, 'vendedores/tomar_pedido_catalogo.html', context)

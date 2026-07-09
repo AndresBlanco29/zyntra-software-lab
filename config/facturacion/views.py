@@ -985,13 +985,7 @@ def _invoice_pdf_response(invoice):
 
 	for index, chunk in enumerate(item_chunks):
 		if index > 0:
-			content.extend([
-				PageBreak(),
-				_build_invoice_pdf_compact_header(styles=styles, invoice_number=invoice.numero, total_width=content_width),
-				Spacer(1, 6),
-				Paragraph(_('Continued line items.'), note_style),
-				Spacer(1, 4),
-			])
+			content.append(PageBreak())
 
 		rows = [_build_invoice_pdf_item_table_header(table_header_style)]
 		barcode_column_width = item_column_widths[0] - 8

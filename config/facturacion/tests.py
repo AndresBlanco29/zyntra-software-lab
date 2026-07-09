@@ -20,7 +20,7 @@ from reportlab.platypus import SimpleDocTemplate
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, DeliveryNotificationLog, FacturacionRegistroAnulacion, Invoice, NotaAjuste, NotaAjusteAplicacion
 from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, attach_invoice_item_net_dispatched_quantities, build_google_maps_route_url, build_invoice_shipment_summary, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, invoice_delete_requires_confirmation_phrase, mark_delivery_unpaid_from_backoffice, resolve_customer_amount_owed, resolve_customer_overdue_balance, resolve_invoice_item_net_dispatched_quantity, resolve_invoice_payment_base_date, resolve_invoice_payment_due_date, start_delivery_route, unlock_client_from_delivery, validate_invoice_delete_confirmation_phrase
-from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_footer_layout, _build_invoice_pdf_item_data, _build_invoice_pdf_shipment_summary_table, _build_invoice_pdf_terms_paragraph, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_pdf_due_date_label, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
+from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_barcode_cell, _build_invoice_pdf_footer_layout, _build_invoice_pdf_item_data, _build_invoice_pdf_shipment_summary_table, _build_invoice_pdf_terms_paragraph, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_pdf_due_date_label, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_SYNCED
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
 from config.inventario.services import registrar_entrada_manual, reservar_stock_para_pedido_items
@@ -3164,11 +3164,18 @@ class InvoiceFlowTests(TestCase):
 	def test_invoice_pdf_barcode_uses_small_human_readable_font(self):
 		barcode = _build_invoice_pdf_barcode('123456789012')
 
-		self.assertEqual(barcode.__class__.__name__, 'Table')
-		inner_barcode = barcode._cellvalues[0][0]
-		self.assertEqual(inner_barcode.fontName, 'Helvetica')
-		self.assertEqual(inner_barcode.fontSize, 5.5)
-		self.assertEqual(inner_barcode.barHeight, 15)
+		self.assertEqual(barcode.__class__.__name__, 'Code128')
+		self.assertEqual(barcode.fontName, 'Helvetica')
+		self.assertEqual(barcode.fontSize, 7)
+		self.assertEqual(barcode.barHeight, 30)
+
+	def test_invoice_pdf_barcode_cell_uses_same_height_with_or_without_barcode(self):
+		styles = getSampleStyleSheet()
+		with_barcode = _build_invoice_pdf_barcode_cell('123456789012', max_width=66, placeholder_style=styles['BodyText'])
+		without_barcode = _build_invoice_pdf_barcode_cell('', max_width=66, placeholder_style=styles['BodyText'])
+
+		self.assertEqual(with_barcode._rowHeights, without_barcode._rowHeights)
+		self.assertEqual(with_barcode._colWidths, without_barcode._colWidths)
 
 	def test_invoice_pdf_terms_shows_client_due_balance_only(self):
 		self.cliente.balance = Decimal('20408.57')

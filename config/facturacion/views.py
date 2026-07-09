@@ -519,6 +519,9 @@ def _build_invoice_pdf_item_data(invoice):
 INVOICE_PDF_ITEMS_PER_PAGE = 20
 INVOICE_PDF_UNIT_OF_MEASURE = 'CS'
 INVOICE_PDF_SHOW_SUGGESTED_RETAIL = False
+INVOICE_PDF_BARCODE_BAR_HEIGHT = 30
+INVOICE_PDF_BARCODE_FONT_SIZE = 7
+INVOICE_PDF_BARCODE_CELL_HEIGHT = INVOICE_PDF_BARCODE_BAR_HEIGHT + INVOICE_PDF_BARCODE_FONT_SIZE + 4
 INVOICE_PDF_ITEM_COLUMN_WEIGHTS_BASE = (104, 108, 36, 26, 26, 46, 32, 46, 46)
 INVOICE_PDF_SUGGESTED_RETAIL_COLUMN_WEIGHT = 84
 
@@ -637,16 +640,37 @@ def _build_invoice_pdf_compact_header(*, styles, invoice_number, total_width):
 
 
 def _build_invoice_pdf_barcode(value, *, max_width=66):
-	bar_height = 30
 	default_bar_width = 0.6
-	barcode = code128.Code128(value, barHeight=bar_height, barWidth=default_bar_width, humanReadable=True)
+	barcode = code128.Code128(
+		value,
+		barHeight=INVOICE_PDF_BARCODE_BAR_HEIGHT,
+		barWidth=default_bar_width,
+		humanReadable=True,
+	)
 	if barcode.width > max_width:
 		scaled_bar_width = max(0.32, round(default_bar_width * (max_width / float(barcode.width)), 3))
-		barcode = code128.Code128(value, barHeight=bar_height, barWidth=scaled_bar_width, humanReadable=True)
+		barcode = code128.Code128(
+			value,
+			barHeight=INVOICE_PDF_BARCODE_BAR_HEIGHT,
+			barWidth=scaled_bar_width,
+			humanReadable=True,
+		)
 	barcode.fontName = 'Helvetica'
-	barcode.fontSize = 7
+	barcode.fontSize = INVOICE_PDF_BARCODE_FONT_SIZE
 	barcode.hAlign = 'CENTER'
-	barcode_wrapper = Table([[barcode]], colWidths=[max_width])
+	return barcode
+
+
+def _build_invoice_pdf_barcode_cell(value, *, max_width=66, placeholder_style):
+	if value:
+		cell_content = _build_invoice_pdf_barcode(value, max_width=max_width)
+	else:
+		cell_content = Paragraph('-', placeholder_style)
+	barcode_wrapper = Table(
+		[[cell_content]],
+		colWidths=[max_width],
+		rowHeights=[INVOICE_PDF_BARCODE_CELL_HEIGHT],
+	)
 	barcode_wrapper.setStyle(TableStyle([
 		('ALIGN', (0, 0), (-1, -1), 'CENTER'),
 		('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -972,9 +996,11 @@ def _invoice_pdf_response(invoice):
 		rows = [_build_invoice_pdf_item_table_header(table_header_style)]
 		barcode_column_width = item_column_widths[0] - 8
 		for item in chunk:
-			barcode_cell = Paragraph('-', body_style)
-			if item['barcode']:
-				barcode_cell = _build_invoice_pdf_barcode(item['barcode'], max_width=max(barcode_column_width, 58))
+			barcode_cell = _build_invoice_pdf_barcode_cell(
+				item['barcode'],
+				max_width=max(barcode_column_width, 58),
+				placeholder_style=body_style,
+			)
 			row = [
 				barcode_cell,
 				Paragraph(item['product_name'], body_style),

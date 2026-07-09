@@ -395,6 +395,15 @@ def resolve_customer_open_balance(*, cliente):
 	return build_customer_balance_summary(cliente=cliente).total_open_balance
 
 
+def _remaining_invoice_balance_before_payment(*, invoice):
+	return _clamp_non_negative_money(
+		Decimal(str(invoice.subtotal or '0.00'))
+		- Decimal(str(invoice.credito_cliente_aplicado or '0.00'))
+		- Decimal(str(invoice.total_creditos or '0.00'))
+		+ Decimal(str(invoice.total_debitos or '0.00'))
+	)
+
+
 def _calculate_invoice_totals(*, subtotal, credito_cliente_aplicado=Decimal('0.00'), total_creditos=Decimal('0.00'), total_debitos=Decimal('0.00'), total_pagado=Decimal('0.00')):
 	subtotal = _quantize_money(subtotal)
 	credito_cliente_aplicado = _clamp_non_negative_money(credito_cliente_aplicado)

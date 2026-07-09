@@ -146,3 +146,56 @@ class DispatchOrderClassificationTests(TestCase):
 		counts = get_dispatch_order_counts()
 		self.assertNotIn(imported_pedido.id, self._order_ids_for_view('pending'))
 		self.assertEqual(counts['in_progress_count'], len(self._order_ids_for_view('in-progress')))
+
+	def _order_row_for_pedido(self, pedido_id, view_mode='in-progress'):
+		_, page_obj = build_dispatch_order_page(view_mode=view_mode, page_number=1, page_size=50)
+		for row in page_obj:
+			if row.record_type == 'order' and row.source_id == pedido_id:
+				return row
+		return None
+
+	def test_dispatch_status_labels_follow_operational_flow(self):
+		picking_pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='VENDEDOR',
+			estado='PARA_VERIFICAR',
+			total=Decimal('50.00'),
+		)
+		verified_pedido = self._create_verified_pedido()
+		driver_pedido = self._create_verified_pedido()
+		driver_invoice = generar_invoice_desde_picking(
+			pedido=driver_pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		driver_delivery = ensure_delivery_for_invoice(driver_invoice)
+		driver_delivery.estado = 'ASIGNADA'
+		driver_delivery.save(update_fields=['estado', 'updated_at'])
+
+		picking_row = self._order_row_for_pedido(picking_pedido.id)
+		verified_row = self._order_row_for_pedido(verified_pedido.id)
+		driver_row = self._order_row_for_pedido(driver_pedido.id)
+
+		self.assertEqual(picking_row.status_label, 'Picking in progress')
+		self.assertEqual(verified_row.status_label, 'Verified')
+		self.assertEqual(driver_row.status_label, 'With driver')
+		self.assertEqual(driver_row.workflow_badge.label, self.driver.username)
+
+	def test_completed_dispatch_order_shows_delivered_status(self):
+		pedido = self._create_verified_pedido()
+		invoice = generar_invoice_desde_picking(
+			pedido=pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		delivery = ensure_delivery_for_invoice(invoice)
+		delivery.estado = 'ENTREGADA_PAGADA'
+		delivery.save(update_fields=['estado', 'updated_at'])
+		pedido.estado = 'DESPACHADO'
+		pedido.save(update_fields=['estado', 'actualizada_en'])
+
+		row = self._order_row_for_pedido(pedido.id, view_mode='completed')
+		self.assertEqual(row.status_label, 'Delivered')
+		self.assertEqual(row.workflow_badge.label, 'Delivered')

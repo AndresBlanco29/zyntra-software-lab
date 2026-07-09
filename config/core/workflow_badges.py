@@ -52,22 +52,38 @@ def _solid_badge(*, role, label=None):
 def build_order_workflow_badge(pedido):
     estado = getattr(pedido, 'estado', '') or ''
     origen = getattr(pedido, 'origen', '') or ''
-    has_invoice = bool(getattr(pedido, 'invoice', None))
+    invoice = getattr(pedido, 'invoice', None)
+    delivery = getattr(invoice, 'delivery', None) if invoice else None
 
     if estado == 'CANCELADO':
         return _solid_badge(role='backoffice', label=_('Cancelled'))
 
-    if estado in {'DESPACHADO', 'INVOICE_GENERADA'} or has_invoice:
-        return _split_badge(sender_role='backoffice', receiver_role='driver', label=_('Backoffice → Driver'))
+    if delivery and delivery.estado in {'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'}:
+        return _solid_badge(role='driver', label=_('Delivered'))
+
+    if delivery and delivery.estado == 'EN_RUTA':
+        return _split_badge(sender_role='driver', receiver_role='cliente', label=_('Out for delivery'))
+
+    if estado == 'INVOICE_GENERADA' or (invoice and invoice.estado == 'GENERADA'):
+        if delivery and getattr(delivery, 'is_customer_pickup', False):
+            return _solid_badge(role='backoffice', label=_('Customer pick up'))
+        if delivery and delivery.driver_id:
+            driver = delivery.driver
+            driver_label = (driver.get_full_name() or driver.username) if driver else ''
+            return _solid_badge(role='driver', label=driver_label or _('With driver'))
+        return _split_badge(sender_role='backoffice', receiver_role='driver', label=_('With driver'))
+
+    if estado == 'VERIFICADO_AJUSTADO':
+        return _solid_badge(role='backoffice', label=_('Ready for invoice'))
+
+    if estado in {'PARA_VERIFICAR', 'LISTO_PARA_PICKING'}:
+        return _split_badge(sender_role='backoffice', receiver_role='seleccionador', label=_('Picking'))
 
     if origen == 'VENDEDOR':
         return _split_badge(sender_role='vendedor', receiver_role='backoffice')
 
     if origen == 'CLIENTE':
         return _split_badge(sender_role='cliente', receiver_role='backoffice')
-
-    if estado in {'PARA_VERIFICAR', 'VERIFICADO_AJUSTADO', 'LISTO_PARA_PICKING'}:
-        return _split_badge(sender_role='backoffice', receiver_role='seleccionador')
 
     return _solid_badge(role='backoffice')
 

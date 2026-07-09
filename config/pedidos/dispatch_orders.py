@@ -162,12 +162,55 @@ def _classify_pedidos(pedido_queryset):
 	return buckets
 
 
+def _get_pedido_delivery(pedido):
+	invoice = getattr(pedido, 'invoice', None)
+	if not invoice:
+		return None
+	return getattr(invoice, 'delivery', None)
+
+
+def _resolve_pedido_operational_status(pedido):
+	estado = pedido.estado
+	delivery = _get_pedido_delivery(pedido)
+	invoice = getattr(pedido, 'invoice', None)
+
+	if estado == 'CANCELADO':
+		return _('Cancelled'), _pedido_status_badge_class('CANCELADO')
+
+	if delivery and delivery.estado in DELIVERED_DELIVERY_STATUSES:
+		return _('Delivered'), 'bg-success'
+
+	if estado == 'DESPACHADO':
+		return _('Delivered'), 'bg-success'
+
+	if delivery and delivery.estado == 'EN_RUTA':
+		return _('With driver'), 'bg-primary'
+
+	if estado == 'INVOICE_GENERADA' or (invoice and invoice.estado == 'GENERADA'):
+		if delivery and getattr(delivery, 'is_customer_pickup', False):
+			return _('Ready for pickup'), 'bg-info text-dark'
+		return _('With driver'), 'bg-primary'
+
+	if estado == 'VERIFICADO_AJUSTADO':
+		return _('Verified'), 'bg-info text-dark'
+
+	if estado in {'PARA_VERIFICAR', 'LISTO_PARA_PICKING'}:
+		return _('Picking in progress'), 'bg-warning text-dark'
+
+	if estado == 'EN_GESTION':
+		return _('In progress'), 'bg-warning text-dark'
+
+	if estado == 'RECIBIDO':
+		return _('Received'), 'bg-info text-dark'
+
+	return _pedido_state_label(estado), _pedido_status_badge_class(estado)
+
+
 def _pedido_status_display(pedido, *, bucket):
 	if bucket == 'cancelled':
-		return str(_pedido_state_label('CANCELADO')), _pedido_status_badge_class('CANCELADO')
-	if bucket == 'completed':
-		return str(_pedido_state_label('DESPACHADO')), _pedido_status_badge_class('DESPACHADO')
-	return str(_pedido_state_label(pedido.estado)), _pedido_status_badge_class(pedido.estado)
+		return str(_('Cancelled')), _pedido_status_badge_class('CANCELADO')
+	label, badge_class = _resolve_pedido_operational_status(pedido)
+	return str(label), badge_class
 
 
 def _quote_rows_for_statuses(*, statuses):

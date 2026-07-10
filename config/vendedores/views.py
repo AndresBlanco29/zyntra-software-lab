@@ -41,6 +41,12 @@ from config.pedidos.services import (
 )
 from config.usuarios.permissions import internal_permission_required
 from config.usuarios.us_locations import US_STATE_CITIES, match_state_name, match_city_for_state
+from config.vendedores.drafts import (
+    bind_take_order_cart,
+    clear_draft_cart,
+    draft_item_counts_for_clientes,
+    persist_session_take_order_cart,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -403,9 +409,16 @@ def tomar_pedido(request):
     filter_params = _tomar_pedido_clientes_filter_params(request)
     paginator = Paginator(_tomar_pedido_clientes_queryset(request), VENDEDOR_CLIENTES_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get('page'))
+    clientes = list(page_obj.object_list)
+    draft_counts = draft_item_counts_for_clientes(
+        vendedor=request.user,
+        cliente_ids=[cliente.id for cliente in clientes],
+    )
+    for cliente in clientes:
+        cliente.draft_item_count = draft_counts.get(cliente.id, 0)
 
     context = {
-        'clientes': page_obj.object_list,
+        'clientes': clientes,
         'page_obj': page_obj,
         'filter_q': filter_params.get('q', ''),
     }
@@ -416,11 +429,10 @@ def tomar_pedido(request):
 @internal_permission_required('vendor.orders.view', 'backoffice.orders.view')
 def catalogo_vendedor(request, cliente_id):
 
-    request.session["cliente_id"] = cliente_id
-
     cliente = get_object_or_404(
         filter_clientes_for_vendedor(Cliente.objects.filter(id=cliente_id), request.user)
     )
+    carrito = bind_take_order_cart(request, cliente_id)
 
     filter_params = _catalogo_vendedor_filter_params(request)
     paginator = Paginator(_catalogo_vendedor_queryset(request), VENDEDOR_CATALOGO_PAGE_SIZE)
@@ -430,8 +442,6 @@ def catalogo_vendedor(request, cliente_id):
 
     categorias = Categoria.objects.all()
     marcas = Marca.objects.filter(activo=True)
-
-    carrito = request.session.get("pedido", {})
 
     total_items = sum(item["cantidad"] for item in carrito.values())
 
@@ -505,6 +515,7 @@ def agregar_producto_pedido(request):
             carrito[presentacion_id] = carrito_item
 
         request.session["pedido"] = carrito
+        persist_session_take_order_cart(request)
 
         total_items = sum(item["cantidad"] for item in carrito.values())
     
@@ -523,9 +534,11 @@ def agregar_producto_pedido(request):
 @internal_permission_required('vendor.orders.view', 'backoffice.orders.view')
 def ver_pedido(request):
 
-    carrito = request.session.get("pedido", {})
-
     cliente_id = request.session.get("cliente_id")
+    if cliente_id:
+        carrito = bind_take_order_cart(request, cliente_id)
+    else:
+        carrito = request.session.get("pedido", {}) or {}
 
     cliente = None
     if cliente_id:
@@ -584,7 +597,7 @@ def ver_pedido(request):
 
     if carrito:
         request.session["pedido"] = carrito
-        request.session.modified = True
+        persist_session_take_order_cart(request)
 
     context = {
         "productos": productos,
@@ -614,6 +627,7 @@ def eliminar_producto_pedido(request):
         del carrito[producto_id]
 
     request.session["pedido"] = carrito
+    persist_session_take_order_cart(request)
 
     total_items = sum(item["cantidad"] for item in carrito.values())
 
@@ -705,8 +719,9 @@ def actualizar_cantidad_pedido(request):
             carrito[producto_id]["descuento_aplicado"] = aplicado
             carrito[producto_id]["descuento_monto"] = float(monto)
 
-    # Guardar sesión
+    # Guardar sesión + borrador persistente
     request.session["pedido"] = carrito
+    persist_session_take_order_cart(request)
 
     cantidad = carrito[producto_id]["cantidad"]
     pricing = _cart_item_pricing_payload(carrito[producto_id])
@@ -726,8 +741,11 @@ def actualizar_cantidad_pedido(request):
 @internal_permission_required('vendor.orders.manage')
 def enviar_pedido(request):
 
-    carrito = request.session.get("pedido", {})
     cliente_id = request.session.get("cliente_id")
+    carrito = request.session.get("pedido", {}) or {}
+    # Session may be empty after a reload/restart; recover the DB draft first.
+    if cliente_id and not carrito:
+        carrito = bind_take_order_cart(request, cliente_id)
     tipo_orden = request.POST.get("tipo_orden")
 
     if not tipo_orden:
@@ -788,6 +806,7 @@ def enviar_pedido(request):
     request.session["pedido"] = {}
     request.session.pop("cliente_id", None)
     request.session.modified = True
+    clear_draft_cart(vendedor=request.user, cliente_id=cliente_id)
 
     # Always send the vendor to the real order so the cart "reset" is not confused
     # with a lost order — the session cart is only a draft until this point.

@@ -79,6 +79,11 @@ data-empresa="{{ cliente.nombre_empresa }}"
 
 <td data-label="{% trans 'Empresa' %}">
 	<span class="vendor-order-company">{{ cliente.nombre_empresa }}</span>
+	{% if cliente.draft_item_count %}
+	<div class="small text-primary mt-1">
+		{% blocktrans with count=cliente.draft_item_count %}Saved draft · {{ count }} items{% endblocktrans %}
+	</div>
+	{% endif %}
 </td>
 
 <td data-label="{% trans 'Acción' %}" class="mobile-stack-table__action">
@@ -86,7 +91,11 @@ data-empresa="{{ cliente.nombre_empresa }}"
 <a href="{% url 'catalogo_vendedor' cliente.id %}"
 class="btn btn-primary btn-sm vendor-order-select-btn">
 
+{% if cliente.draft_item_count %}
+{% trans "Continue draft" %}
+{% else %}
 {% trans "Seleccionar" %}
+{% endif %}
 
 </a>
 

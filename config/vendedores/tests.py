@@ -738,3 +738,60 @@ class VendedorEditarClienteTests(TestCase):
 		self.customer.refresh_from_db()
 		self.assertEqual(self.customer.credit_limit, Decimal('2000.00'))
 		self.assertEqual(payload['remaining_limit'], '2000.00')
+
+
+class TakeOrderDraftPersistenceTests(TestCase):
+	def setUp(self):
+		self.vendor = Usuario.objects.create_user(
+			username='vendor-draft-test',
+			password='secret123',
+			role='vendedor',
+		)
+		self.customer_user = Usuario.objects.create_user(
+			username='customer-draft-test',
+			password='secret123',
+			role='cliente',
+		)
+		self.customer = Cliente.objects.create(
+			usuario=self.customer_user,
+			nombre_empresa='Cliente Draft Test',
+			telefono='5559876543',
+			direccion='456 Draft St',
+			ciudad='Atlanta',
+			estado='GA',
+			codigo_postal='30301',
+			pais='USA',
+			sales_tax_number='TX-DRAFT-1',
+			certificado_tax='certificados/test.pdf',
+		)
+
+	def test_draft_survives_save_and_reload(self):
+		from config.vendedores.drafts import load_draft_cart, save_draft_cart
+		from config.vendedores.models import TakeOrderDraft
+
+		cart = {
+			'12': {
+				'presentacion_id': '12',
+				'producto_id': 1,
+				'nombre': 'Tortilla',
+				'presentacion_nombre': 'Case',
+				'precio': 10.5,
+				'cantidad': 3,
+			}
+		}
+		save_draft_cart(vendedor=self.vendor, cliente_id=self.customer.id, cart=cart)
+		loaded = load_draft_cart(vendedor=self.vendor, cliente_id=self.customer.id)
+		self.assertEqual(loaded['12']['cantidad'], 3)
+		self.assertEqual(TakeOrderDraft.objects.filter(vendedor=self.vendor).count(), 1)
+
+	def test_empty_cart_clears_draft(self):
+		from config.vendedores.drafts import save_draft_cart
+		from config.vendedores.models import TakeOrderDraft
+
+		save_draft_cart(
+			vendedor=self.vendor,
+			cliente_id=self.customer.id,
+			cart={'1': {'cantidad': 1, 'precio': 1}},
+		)
+		save_draft_cart(vendedor=self.vendor, cliente_id=self.customer.id, cart={})
+		self.assertEqual(TakeOrderDraft.objects.filter(vendedor=self.vendor).count(), 0)

@@ -1,4 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -786,8 +787,15 @@ def enviar_pedido(request):
 
     request.session["pedido"] = {}
     request.session.pop("cliente_id", None)
+    request.session.modified = True
 
-    response = {"success": True, "pedido_id": pedido.id}
+    # Always send the vendor to the real order so the cart "reset" is not confused
+    # with a lost order — the session cart is only a draft until this point.
+    response = {
+        "success": True,
+        "pedido_id": pedido.id,
+        "redirect_url": reverse("backoffice_pedido_detalle", args=[pedido.id]),
+    }
     if warning:
         response["warning"] = warning
     return JsonResponse(response)

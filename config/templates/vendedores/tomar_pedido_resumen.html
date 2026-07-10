@@ -57,6 +57,7 @@ data-msg-order-type="{% trans 'You must indicate how the order was taken.' %}"
 data-msg-submit-error="{% trans 'The order could not be created.' %}"
 data-msg-remove-error="{% trans 'The product could not be removed from the order.' %}"
 data-msg-request-error="{% trans 'An error occurred while processing the request.'|escapejs %}"
+data-msg-order-sent="{% trans 'Order #{id} sent successfully'|escapejs %}"
 data-manual-price-label="{% trans 'Manual price'|escapejs %}"
 style="margin: 0; padding: 0;">
 
@@ -99,6 +100,10 @@ La Tortilla Grocery
 <h3 class="fw-bold mb-3">
 {% trans "Resumen del Pedido" %}
 </h3>
+
+<div class="alert alert-info mb-3" role="status">
+{% trans "This summary is a temporary draft in your session. The sales order is only created when you click Send Order. Changing quantities or prices does not create an order number yet." %}
+</div>
 
 <div id="pedidoFeedback" class="alert alert-danger d-none mb-3" role="alert"></div>
 
@@ -475,7 +480,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <div id="toastPedido" class="toast-pedido">
-{% trans "Pedido enviado correctamente" %} ✔
+{% trans "Order sent successfully" %} ✔
 </div>
 
 <script>

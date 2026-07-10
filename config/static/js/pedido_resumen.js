@@ -316,12 +316,23 @@ console.log(data)
 hideFeedback()
 
 const toast = document.getElementById("toastPedido")
+const pedidoId = data.pedido_id
+if (toast && pedidoId) {
+    const template = document.body.dataset.msgOrderSent || 'Order #{id} sent successfully'
+    toast.textContent = template.replace('{id}', String(pedidoId)) + ' ✔'
+}
 
-toast.classList.add("show")
+if (toast) {
+    toast.classList.add("show")
+}
+
+const redirectUrl = data.redirect_url || (
+    pedidoId ? `/pedidos/backoffice/${pedidoId}/` : "/vendedores/tomar-pedido/"
+)
 
 setTimeout(()=>{
 
-window.location.href = "/vendedores/tomar-pedido/"
+window.location.href = redirectUrl
 
 },1500)
 

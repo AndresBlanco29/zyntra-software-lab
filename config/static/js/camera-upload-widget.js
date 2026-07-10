@@ -73,6 +73,29 @@
       preview.classList.add('d-none');
     }
 
+    function setInputFiles(input, files) {
+      if (!input || typeof DataTransfer === 'undefined') {
+        return;
+      }
+      const dataTransfer = new DataTransfer();
+      Array.from(files || []).forEach((file) => dataTransfer.items.add(file));
+      input.files = dataTransfer.files;
+    }
+
+    function removeFileAtIndex(widget, removeIndex) {
+      const input = widget.querySelector('[data-camera-input]');
+      if (!input || typeof DataTransfer === 'undefined') {
+        return;
+      }
+      const remaining = Array.from(input.files || []).filter((_file, index) => index !== removeIndex);
+      setInputFiles(input, remaining);
+      renderFilePreview(widget, input.files);
+      setCameraStatus(
+        widget,
+        remaining.length ? strings.filesSelected : defaultStatusMessage(widget)
+      );
+    }
+
     function renderFilePreview(widget, files) {
       const preview = widget.querySelector('[data-file-preview]');
       if (!preview) {
@@ -87,20 +110,32 @@
         return;
       }
       widget._previewUrls = [];
+      const removeLabel = strings.removePhoto || 'Remove';
       imageFiles.forEach((file, index) => {
         const url = URL.createObjectURL(file);
         widget._previewUrls.push(url);
         const col = document.createElement('div');
         col.className = isSingle ? 'col-12' : 'col-6 col-md-4';
         col.innerHTML = `
-          <div class="border rounded p-2 h-100 bg-white">
-            <img src="${url}" alt="${strings.previewTitle} ${index + 1}" class="img-fluid rounded mb-2" style="max-height: 140px; width: 100%; object-fit: cover;">
+          <div class="border rounded p-2 h-100 bg-white position-relative">
+            <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 py-0 px-2" data-remove-preview="${index}" aria-label="${removeLabel}" title="${removeLabel}">&times;</button>
+            <img src="${url}" alt="${strings.previewTitle} ${index + 1}" class="img-fluid rounded mb-2" style="max-height: 160px; width: 100%; object-fit: contain; background: #0f172a;">
             <div class="small text-muted text-truncate">${file.name}</div>
           </div>
         `;
         preview.appendChild(col);
       });
       preview.classList.remove('d-none');
+      preview.querySelectorAll('[data-remove-preview]').forEach((button) => {
+        button.addEventListener('click', function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          const index = Number(button.getAttribute('data-remove-preview'));
+          if (Number.isFinite(index)) {
+            removeFileAtIndex(widget, index);
+          }
+        });
+      });
     }
 
     async function startCamera(widget) {
@@ -114,11 +149,26 @@
       stopCamera(widget, { silent: true });
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
           audio: false,
         });
         widget._cameraStream = stream;
         video.srcObject = stream;
+        // Wait for metadata so capture uses the real frame size.
+        if (video.readyState < 1) {
+          await new Promise((resolve) => {
+            video.onloadedmetadata = resolve;
+          });
+        }
+        try {
+          await video.play();
+        } catch (_playError) {
+          // Autoplay can fail; stream is still usable for capture.
+        }
         if (preview) {
           preview.classList.remove('d-none');
         }
@@ -136,8 +186,13 @@
       if (!input || !video || !cameraCanvas || typeof DataTransfer === 'undefined') {
         return;
       }
-      const width = video.videoWidth || 1280;
-      const height = video.videoHeight || 720;
+      const width = video.videoWidth || 0;
+      const height = video.videoHeight || 0;
+      if (!width || !height) {
+        setCameraStatus(widget, strings.denied);
+        return;
+      }
+      // Capture the full camera frame (matches object-fit: contain preview).
       cameraCanvas.width = width;
       cameraCanvas.height = height;
       const cameraContext = cameraCanvas.getContext('2d');
@@ -151,7 +206,8 @@
         if (!isSingle) {
           Array.from(input.files || []).forEach((file) => dataTransfer.items.add(file));
         }
-        dataTransfer.items.add(new File([blob], `cheque-${Date.now()}.jpg`, { type: 'image/jpeg' }));
+        const fileName = `evidence-${Date.now()}.jpg`;
+        dataTransfer.items.add(new File([blob], fileName, { type: 'image/jpeg' }));
         input.files = dataTransfer.files;
         input.dispatchEvent(new Event('change', { bubbles: true }));
         setCameraStatus(widget, strings.added);
@@ -190,6 +246,13 @@
       const captureButton = widget.querySelector('[data-camera-capture]');
       const stopButton = widget.querySelector('[data-camera-stop]');
       const galleryButton = widget.querySelector('[data-cheque-gallery-trigger]');
+      const video = widget.querySelector('[data-camera-video]');
+
+      // Show the full frame so capture matches what the driver sees.
+      if (video) {
+        video.style.objectFit = 'contain';
+        video.style.background = '#0f172a';
+      }
 
       toggleCameraButtons(widget, false);
       setCameraStatus(widget, defaultStatusMessage(widget));

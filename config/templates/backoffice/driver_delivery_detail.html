@@ -567,7 +567,7 @@
   </div>
 </div>
 
-<div class="card shadow-sm driver-step-card">
+<div class="card shadow-sm driver-step-card" id="driver-evidence">
   <div class="card-body">
     <div class="driver-step-head">
       <span class="driver-step-index">2</span>
@@ -577,7 +577,7 @@
       </div>
     </div>
     <div class="driver-evidence-toolbar">
-      <form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_upload_evidence' delivery.id %}" class="d-flex flex-wrap align-items-center gap-2">
+      <form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_upload_evidence' delivery.id %}#driver-evidence" class="d-flex flex-wrap align-items-center gap-2" id="driverEvidenceUploadForm">
             {% csrf_token %}
             <div class="camera-upload-widget" data-camera-upload>
               <input type="file" name="evidence_photos" class="form-control form-control-sm driver-mobile-file-input" accept="image/*" capture="environment" multiple data-camera-input>
@@ -588,7 +588,7 @@
               </div>
               <div class="form-text" data-camera-status>{% trans "Choose files or use the camera to attach photos." %}</div>
               <div class="mt-2 d-none" data-camera-preview>
-                <video class="w-100 rounded border bg-dark" style="max-height: 220px; object-fit: cover;" playsinline autoplay muted data-camera-video></video>
+                <video class="w-100 rounded border bg-dark" style="max-height: 260px; object-fit: contain; background:#0f172a;" playsinline autoplay muted data-camera-video></video>
                 <canvas class="d-none" data-camera-canvas></canvas>
               </div>
               <div class="row g-2 mt-2 d-none" data-file-preview></div>
@@ -693,7 +693,7 @@
                 </div>
                 <div class="form-text" data-camera-status>{% trans "Choose files or use the camera to attach photos." %}</div>
                 <div class="mt-2 d-none" data-camera-preview>
-                  <video class="w-100 rounded border bg-dark" style="max-height: 220px; object-fit: cover;" playsinline autoplay muted data-camera-video></video>
+                  <video class="w-100 rounded border bg-dark" style="max-height: 260px; object-fit: contain; background:#0f172a;" playsinline autoplay muted data-camera-video></video>
                   <canvas class="d-none" data-camera-canvas></canvas>
                 </div>
                 <div class="row g-2 mt-2 d-none" data-file-preview></div>
@@ -847,7 +847,7 @@
                 </div>
                 <div class="form-text" data-camera-status>{% trans "Choose files or use the camera to attach photos." %}</div>
                 <div class="mt-2 d-none" data-camera-preview>
-                  <video class="w-100 rounded border bg-dark" style="max-height: 220px; object-fit: cover;" playsinline autoplay muted data-camera-video></video>
+                  <video class="w-100 rounded border bg-dark" style="max-height: 260px; object-fit: contain; background:#0f172a;" playsinline autoplay muted data-camera-video></video>
                   <canvas class="d-none" data-camera-canvas></canvas>
                 </div>
                 <div class="row g-2 mt-2 d-none" data-file-preview></div>
@@ -946,7 +946,7 @@
             </div>
             <div class="form-text" data-camera-status>{% trans "Choose files or use the camera to attach photos." %}</div>
             <div class="mt-2 d-none" data-camera-preview>
-              <video class="w-100 rounded border bg-dark" style="max-height: 220px; object-fit: cover;" playsinline autoplay muted data-camera-video></video>
+              <video class="w-100 rounded border bg-dark" style="max-height: 260px; object-fit: contain; background:#0f172a;" playsinline autoplay muted data-camera-video></video>
               <canvas class="d-none" data-camera-canvas></canvas>
             </div>
             <div class="row g-2 mt-2 d-none" data-file-preview></div>
@@ -1104,9 +1104,19 @@
       denied: '{% trans "Camera permission was denied or is not available." %}',
       filesSelected: '{% trans "Files selected." %}',
       previewTitle: '{% trans "Selected photos" %}',
+      removePhoto: '{% trans "Remove photo" %}',
     };
     if (window.LTGCameraUpload) {
       window.LTGCameraUpload.init(document, cameraStrings);
+    }
+
+    if (window.location.hash === '#driver-evidence') {
+      const evidenceSection = document.getElementById('driver-evidence');
+      if (evidenceSection) {
+        window.setTimeout(function () {
+          evidenceSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 80);
+      }
     }
 
     const paymentStatus = document.getElementById('paymentStatus');

@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Case, Count, IntegerField, Q, Value, When
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.dateparse import parse_date, parse_datetime
@@ -1942,15 +1942,16 @@ def driver_delivery_upload_evidence(request, delivery_id):
 		return redirect('driver_delivery_detail', delivery_id=delivery.id)
 
 	evidence_files = request.FILES.getlist('evidence_photos')
+	detail_url = reverse('driver_delivery_detail', args=[delivery.id]) + '#driver-evidence'
 	if not evidence_files:
 		messages.error(request, _('Select at least one evidence photo to upload.'))
-		return redirect('driver_delivery_detail', delivery_id=delivery.id)
+		return HttpResponseRedirect(detail_url)
 
 	for uploaded_file in evidence_files:
 		DeliveryEvidencePhoto.objects.create(delivery=delivery, image=uploaded_file)
 
 	messages.success(request, _('Evidence photos uploaded successfully.'))
-	return redirect('driver_delivery_detail', delivery_id=delivery.id)
+	return HttpResponseRedirect(detail_url)
 
 
 @login_required

@@ -1069,6 +1069,33 @@ class PickingVerificationFlowTests(TestCase):
 		stock.refresh_from_db()
 		self.assertEqual((stock.stock_fisico, stock.stock_reservado, stock.stock_disponible), stock_before)
 
+	def test_pedido_detail_shows_send_quote_to_customer_controls(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Send quote to customer')
+		self.assertContains(response, 'Send email with prices')
+		self.assertContains(response, reverse('backoffice_enviar_pedido_cliente', args=[self.pedido.id]))
+
+	@patch('config.pedidos.views.notificar_cliente_pedido')
+	def test_backoffice_can_send_order_quote_email_with_and_without_prices(self, mock_notify):
+		mock_notify.return_value = True
+		self.client.force_login(self.backoffice)
+
+		with_prices = self.client.post(
+			reverse('backoffice_enviar_pedido_cliente', args=[self.pedido.id]),
+			{'enviar_correo_con_precios': '1'},
+		)
+		self.assertEqual(with_prices.status_code, 302)
+		mock_notify.assert_called_with(self.pedido, include_prices=True)
+
+		without_prices = self.client.post(
+			reverse('backoffice_enviar_pedido_cliente', args=[self.pedido.id]),
+			{'enviar_correo_con_precios': '0'},
+		)
+		self.assertEqual(without_prices.status_code, 302)
+		mock_notify.assert_called_with(self.pedido, include_prices=False)
+
 	def test_delete_pedido_removes_record_without_changing_stock(self):
 		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
 		stock_before = (stock.stock_fisico, stock.stock_reservado, stock.stock_disponible)

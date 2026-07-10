@@ -10,6 +10,8 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.db import transaction
 from django.utils.translation import gettext as _
+from django.views.decorators.http import require_POST
+import logging
 
 from config.core.product_ordering import order_pedido_items_for_display
 from config.core.shipment_summary import build_shipment_summary_from_pedido_items
@@ -74,8 +76,11 @@ from .services import (
 	resolver_bloqueo_picking_desde_backoffice,
 	resolve_picking_send_ui_state,
 	validar_estado_backoffice_con_bloqueo,
+	notificar_cliente_pedido,
 )
 
+
+logger = logging.getLogger(__name__)
 
 BACKOFFICE_PEDIDOS_PAGE_SIZE = 50
 
@@ -589,6 +594,10 @@ def backoffice_pedido_detalle(request, pedido_id):
 		),
 		'can_void_pedido': puede_anular_pedido_desde_backoffice(pedido) and can_manage_pedido,
 		'can_delete_pedido': puede_eliminar_pedido_desde_backoffice(pedido) and can_manage_pedido,
+		'can_send_customer_order_email': request.user.has_internal_permission('backoffice.orders.manage'),
+		'cliente_tiene_email': bool(
+			(getattr(getattr(pedido.cliente, 'usuario', None), 'email', '') or '').strip()
+		),
 		'invoice_suggested_price_rows': [
 			_build_invoice_suggested_price_row(item)
 			for item in pedido.items.select_related('presentacion__producto')
@@ -787,6 +796,59 @@ def backoffice_buscar_presentaciones(request):
 		})
 
 	return JsonResponse({'results': results})
+
+
+@login_required
+@require_POST
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_enviar_pedido_cliente(request, pedido_id):
+	pedido = get_object_or_404(
+		Pedido.objects.select_related('cliente__usuario').prefetch_related('items__presentacion__producto'),
+		id=pedido_id,
+	)
+
+	if not pedido.items.exists():
+		messages.error(request, _('The sales order has no products to send to the customer.'))
+		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+	include_prices = request.POST.get('enviar_correo_con_precios', '0') == '1'
+	cliente_tiene_email = bool(
+		(getattr(getattr(pedido.cliente, 'usuario', None), 'email', '') or '').strip()
+	)
+
+	if not cliente_tiene_email:
+		messages.warning(
+			request,
+			_('This customer does not have an email on file. Email notifications cannot be sent until an email is added to the customer profile.'),
+		)
+		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+	try:
+		enviado = notificar_cliente_pedido(pedido, include_prices=include_prices)
+	except Exception as exc:
+		logger.exception('Error enviando cotizacion/email del pedido %s al cliente: %s', pedido.id, exc)
+		messages.error(request, _('The customer email could not be sent.'))
+		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+	if enviado:
+		if include_prices:
+			messages.success(
+				request,
+				_('Quotation email for sales order #%(id)s was sent to the customer with prices.') % {
+					'id': pedido.id,
+				},
+			)
+		else:
+			messages.success(
+				request,
+				_('Quotation email for sales order #%(id)s was sent to the customer without prices.') % {
+					'id': pedido.id,
+				},
+			)
+	else:
+		messages.warning(request, _('The customer email could not be sent.'))
+
+	return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
 
 @login_required

@@ -526,6 +526,37 @@
 </div>
 {% endif %}
 
+{% if can_send_customer_order_email %}
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <h6 class="fw-bold mb-2">{% trans "Send quotation to customer" %}</h6>
+    <p class="small text-muted mb-3 mb-lg-2">
+      {% trans "Email the customer a summary of this sales order at any time, with or without prices — same option used on customer quote requests." %}
+    </p>
+
+    {% if not cliente_tiene_email %}
+    <div class="alert alert-warning py-2 mb-3" role="alert">
+      {% trans "This customer does not have an email on file. Email notifications cannot be sent until an email is added to the customer profile." %}
+    </div>
+    {% endif %}
+
+    <div class="form-check mb-3">
+      <input class="form-check-input" type="checkbox" id="emailIncludePrices" {% if not cliente_tiene_email %}disabled{% endif %}>
+      <label class="form-check-label" for="emailIncludePrices">{% trans "Send email with prices" %}</label>
+      <div class="form-text">{% trans "Uncheck to send the customer notification without unit prices or totals." %}</div>
+    </div>
+
+    <form method="post" action="{% url 'backoffice_enviar_pedido_cliente' pedido.id %}" id="sendOrderQuoteEmailForm">
+      {% csrf_token %}
+      <input type="hidden" name="enviar_correo_con_precios" value="0" class="email-include-prices-field">
+      <button type="submit" class="btn btn-warning" {% if not cliente_tiene_email %}disabled{% endif %}>
+        {% trans "Send quote to customer" %}
+      </button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
 {% if can_void_pedido or can_delete_pedido %}
 <div class="card shadow-sm mb-3">
   <div class="card-body">
@@ -849,6 +880,24 @@ document.addEventListener('DOMContentLoaded', function () {
   if (invoiceDeliveryMethod) {
     invoiceDeliveryMethod.addEventListener('change', syncInvoiceDeliveryFields);
     syncInvoiceDeliveryFields();
+  }
+
+  const includePricesToggle = document.getElementById('emailIncludePrices');
+  const includePricesFields = document.querySelectorAll('.email-include-prices-field');
+
+  function syncEmailIncludePrices() {
+    if (!includePricesToggle) {
+      return;
+    }
+    const value = includePricesToggle.checked ? '1' : '0';
+    includePricesFields.forEach(function (field) {
+      field.value = value;
+    });
+  }
+
+  if (includePricesToggle) {
+    includePricesToggle.addEventListener('change', syncEmailIncludePrices);
+    syncEmailIncludePrices();
   }
 
   const useCustomerCredit = document.getElementById('useCustomerCredit');

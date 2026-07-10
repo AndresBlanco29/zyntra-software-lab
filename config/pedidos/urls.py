@@ -8,6 +8,7 @@ urlpatterns = [
     path('backoffice/ordenes/', views.backoffice_pedidos, name='backoffice_pedidos'),
     path('backoffice/pipeline/', views.backoffice_crm_pipeline, name='backoffice_crm_pipeline'),
     path('backoffice/<int:pedido_id>/', views.backoffice_pedido_detalle, name='backoffice_pedido_detalle'),
+    path('backoffice/<int:pedido_id>/enviar-cliente/', views.backoffice_enviar_pedido_cliente, name='backoffice_enviar_pedido_cliente'),
     path('backoffice/<int:pedido_id>/void/', views.backoffice_pedido_void, name='backoffice_pedido_void'),
     path('backoffice/<int:pedido_id>/delete/', views.backoffice_pedido_delete, name='backoffice_pedido_delete'),
     path('backoffice/<int:pedido_id>/edit-lock/ping/', views.backoffice_pedido_edit_lock_ping, name='backoffice_pedido_edit_lock_ping'),

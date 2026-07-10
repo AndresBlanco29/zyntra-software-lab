@@ -1,15 +1,17 @@
-"""Helpers for branded transactional emails (logo URL / inline CID)."""
+"""Helpers for branded transactional emails (absolute logo URL).
+
+Resend/Anymail does not support inline content-id attachments, so logos must
+be referenced by a public HTTPS URL rather than cid: embeds.
+"""
 
 from __future__ import annotations
 
-from email.mime.image import MIMEImage
 from pathlib import Path
 
 from django.conf import settings
 from django.contrib.staticfiles import finders
 
 
-EMAIL_LOGO_CID = 'ltg_brand_logo'
 EMAIL_LOGO_STATIC_CANDIDATES = (
 	'img/email_logo.jpg',
 	'img/logo.png',
@@ -28,15 +30,15 @@ def get_app_base_url():
 	return ''
 
 
-def resolve_email_logo_path():
+def resolve_email_logo_static_path():
 	for relative in EMAIL_LOGO_STATIC_CANDIDATES:
 		found = finders.find(relative)
 		if found:
-			return Path(found)
+			return relative
 		fallback = Path(settings.BASE_DIR) / 'static' / relative
 		if fallback.exists():
-			return fallback
-	return None
+			return relative
+	return 'img/email_logo.jpg'
 
 
 def build_absolute_static_url(path):
@@ -59,27 +61,6 @@ def build_absolute_static_url(path):
 
 
 def brand_email_context():
-	logo_path = resolve_email_logo_path()
-	logo_static = 'img/email_logo.jpg' if logo_path and logo_path.name.startswith('email_logo') else 'img/logo.png'
 	return {
-		'brand_logo_cid': EMAIL_LOGO_CID,
-		'brand_logo_url': build_absolute_static_url(logo_static),
+		'brand_logo_url': build_absolute_static_url(resolve_email_logo_static_path()),
 	}
-
-
-def attach_inline_brand_logo(email_message):
-	"""Embed the brand logo so email clients do not depend on remote image loading."""
-	logo_path = resolve_email_logo_path()
-	if logo_path is None or not logo_path.exists():
-		return False
-
-	payload = logo_path.read_bytes()
-	subtype = 'jpeg' if logo_path.suffix.lower() in {'.jpg', '.jpeg'} else 'png'
-	mime_image = MIMEImage(payload, _subtype=subtype)
-	mime_image.add_header('Content-ID', f'<{EMAIL_LOGO_CID}>')
-	mime_image.add_header('Content-Disposition', 'inline', filename=logo_path.name)
-	email_message.attach(mime_image)
-	# Keep HTML + logo in one related container for better client support.
-	if getattr(email_message, 'mixed_subtype', None) != 'related':
-		email_message.mixed_subtype = 'related'
-	return True

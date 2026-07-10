@@ -693,7 +693,8 @@ class BackofficeQuotePricingTests(TestCase):
 		self.assertIn('Discount', html)
 		self.assertIn('You pay', html)
 		self.assertIn('-$3.50', html)
-		self.assertIn('cid:ltg_brand_logo', html)
+		self.assertIn('/static/img/email_logo', html)
+		self.assertNotIn('cid:ltg_brand_logo', html)
 
 	def test_backoffice_can_send_quote_email_without_prices_when_requested(self):
 		self.client.force_login(self.backoffice)

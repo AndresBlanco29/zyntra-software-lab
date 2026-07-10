@@ -641,7 +641,7 @@ def resolver_bloqueo_picking_desde_backoffice(*, pedido, usuario):
 
 
 def notificar_backoffice_pedido(pedido):
-    from config.core.email_branding import attach_inline_brand_logo, brand_email_context
+    from config.core.email_branding import brand_email_context
 
     if pedido.origen == 'VENDEDOR':
         vendor_name = ''
@@ -691,12 +691,11 @@ def notificar_backoffice_pedido(pedido):
         to=backoffice_emails,
     )
     email.attach_alternative(html_content, 'text/html')
-    attach_inline_brand_logo(email)
     email.send(fail_silently=False)
 
 
 def notificar_cliente_pedido(pedido, *, include_prices=True):
-    from config.core.email_branding import attach_inline_brand_logo, brand_email_context
+    from config.core.email_branding import brand_email_context
 
     cliente_email = (getattr(getattr(pedido.cliente, 'usuario', None), 'email', '') or '').strip()
     if not cliente_email:
@@ -723,6 +722,5 @@ def notificar_cliente_pedido(pedido, *, include_prices=True):
         to=[cliente_email],
     )
     email.attach_alternative(html_content, 'text/html')
-    attach_inline_brand_logo(email)
     email.send(fail_silently=False)
     return True

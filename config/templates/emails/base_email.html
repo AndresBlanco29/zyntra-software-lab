@@ -20,9 +20,7 @@
               <table width="100%" cellspacing="0" cellpadding="0" role="presentation">
                 <tr>
                   <td align="left" style="vertical-align:middle; width:140px;">
-                    {% if brand_logo_cid %}
-                    <img src="cid:{{ brand_logo_cid }}" alt="La Tortilla Grocery" width="120" style="display:block; max-width:120px; width:120px; height:auto; border:0;">
-                    {% elif brand_logo_url %}
+                    {% if brand_logo_url %}
                     <img src="{{ brand_logo_url }}" alt="La Tortilla Grocery" width="120" style="display:block; max-width:120px; width:120px; height:auto; border:0;">
                     {% elif brand_logo_fallback_url %}
                     <img src="{{ brand_logo_fallback_url }}" alt="La Tortilla Grocery" width="120" style="display:block; max-width:120px; width:120px; height:auto; border:0;">

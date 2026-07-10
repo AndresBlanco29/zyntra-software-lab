@@ -1443,7 +1443,7 @@ class InvoiceFlowTests(TestCase):
 			invoice.saldo_cliente,
 		)
 
-	def test_driver_non_payment_blocks_customer_and_requires_photo(self):
+	def test_driver_non_payment_blocks_customer_without_photo_or_received_by(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
 			metodo_entrega='RUTA_DRIVER',
@@ -1452,36 +1452,23 @@ class InvoiceFlowTests(TestCase):
 		)
 		delivery = invoice.delivery
 
-		with self.assertRaises(ValidationError):
-			complete_driver_delivery(
-				delivery=delivery,
-				driver_user=self.driver,
-				payload={
-					'estado_pago': 'NO_PAGADO',
-					'recibido_por': 'Maria',
-					'motivo_no_pago': 'Caja cerrada',
-					'firma_cliente_data': self.signature_data,
-				},
-				evidence_files=[],
-			)
-
 		complete_driver_delivery(
 			delivery=delivery,
 			driver_user=self.driver,
 			payload={
 				'estado_pago': 'NO_PAGADO',
-				'recibido_por': 'Maria',
 				'motivo_no_pago': 'Caja cerrada',
 				'firma_cliente_data': self.signature_data,
 			},
-			evidence_files=[self.photo_file],
+			evidence_files=[],
 		)
 
 		delivery.refresh_from_db()
 		delivery.invoice.cliente.refresh_from_db()
 		self.assertEqual(delivery.estado, 'ENTREGADA_SIN_PAGO')
+		self.assertEqual(delivery.recibido_por, '')
 		self.assertTrue(delivery.invoice.cliente.credit_hold)
-		self.assertEqual(delivery.evidence_photos.count(), 1)
+		self.assertEqual(delivery.evidence_photos.count(), 0)
 
 	def test_driver_can_complete_delivery_with_cash_and_cheque_split_payment(self):
 		invoice = generar_invoice_desde_picking(

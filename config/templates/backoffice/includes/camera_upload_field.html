@@ -1,0 +1,36 @@
+{% load i18n %}
+{# input_name required. Optional: single (bool), required (bool), status_text #}
+<div class="camera-upload-widget" data-camera-upload{% if single %} data-camera-single{% endif %}>
+  <input
+    type="file"
+    name="{{ input_name }}"
+    class="visually-hidden"
+    accept="image/*"
+    {% if not single %}multiple{% endif %}
+    {% if required %}required{% endif %}
+    data-camera-input
+  >
+  <div class="camera-upload-actions">
+    <button type="button" class="btn camera-btn-camera" data-camera-start>
+      <i class="bi bi-camera-fill" aria-hidden="true"></i>
+      <span>{% trans "Take photo" %}</span>
+    </button>
+    <button type="button" class="btn camera-btn-gallery" data-gallery-trigger>
+      <i class="bi bi-images" aria-hidden="true"></i>
+      <span>{% trans "Choose from gallery" %}</span>
+    </button>
+    <button type="button" class="btn btn-success camera-btn-capture d-none" data-camera-capture>
+      <i class="bi bi-record-circle" aria-hidden="true"></i>
+      <span>{% trans "Capture now" %}</span>
+    </button>
+    <button type="button" class="btn btn-outline-secondary camera-btn-stop d-none" data-camera-stop>
+      {% trans "Cancel camera" %}
+    </button>
+  </div>
+  <div class="form-text mt-2" data-camera-status>{% if status_text %}{{ status_text }}{% else %}{% trans "Take a photo with the camera or choose one from the gallery." %}{% endif %}</div>
+  <div class="mt-2 d-none" data-camera-preview>
+    <video class="w-100 rounded border bg-dark" style="max-height: 260px; object-fit: contain; background:#0f172a;" playsinline autoplay muted data-camera-video></video>
+    <canvas class="d-none" data-camera-canvas></canvas>
+  </div>
+  <div class="row g-2 mt-2 d-none" data-file-preview></div>
+</div>

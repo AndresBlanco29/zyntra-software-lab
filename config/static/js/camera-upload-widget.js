@@ -20,17 +20,22 @@
       }
     }
 
+    function galleryButtons(widget) {
+      return Array.from(
+        widget.querySelectorAll('[data-gallery-trigger], [data-cheque-gallery-trigger]')
+      );
+    }
+
     function toggleCameraButtons(widget, active) {
       const startButton = widget.querySelector('[data-camera-start]');
       const captureButton = widget.querySelector('[data-camera-capture]');
       const stopButton = widget.querySelector('[data-camera-stop]');
-      const galleryButton = widget.querySelector('[data-cheque-gallery-trigger]');
       if (startButton) {
         startButton.classList.toggle('d-none', active || !supportsInlineCamera);
       }
-      if (galleryButton) {
+      galleryButtons(widget).forEach((galleryButton) => {
         galleryButton.classList.toggle('d-none', active);
-      }
+      });
       if (captureButton) {
         captureButton.classList.toggle('d-none', !active);
       }
@@ -220,15 +225,24 @@
       if (!input || input.disabled) {
         return;
       }
+      const isSingle = widget.hasAttribute('data-camera-single') || !input.multiple;
       const galleryInput = document.createElement('input');
       galleryInput.type = 'file';
       galleryInput.accept = 'image/*';
+      if (!isSingle) {
+        galleryInput.multiple = true;
+      }
       galleryInput.addEventListener('change', function () {
         if (!galleryInput.files || !galleryInput.files.length || typeof DataTransfer === 'undefined') {
           return;
         }
         const dataTransfer = new DataTransfer();
-        dataTransfer.items.add(galleryInput.files[0]);
+        if (isSingle) {
+          dataTransfer.items.add(galleryInput.files[0]);
+        } else {
+          Array.from(input.files || []).forEach((file) => dataTransfer.items.add(file));
+          Array.from(galleryInput.files).forEach((file) => dataTransfer.items.add(file));
+        }
         input.files = dataTransfer.files;
         input.dispatchEvent(new Event('change', { bubbles: true }));
       });
@@ -245,7 +259,6 @@
       const startButton = widget.querySelector('[data-camera-start]');
       const captureButton = widget.querySelector('[data-camera-capture]');
       const stopButton = widget.querySelector('[data-camera-stop]');
-      const galleryButton = widget.querySelector('[data-cheque-gallery-trigger]');
       const video = widget.querySelector('[data-camera-video]');
 
       // Show the full frame so capture matches what the driver sees.
@@ -288,11 +301,11 @@
           stopCamera(widget);
         });
       }
-      if (galleryButton) {
+      galleryButtons(widget).forEach((galleryButton) => {
         galleryButton.addEventListener('click', function () {
           openGalleryPicker(widget);
         });
-      }
+      });
     });
 
     document.addEventListener('visibilitychange', function () {

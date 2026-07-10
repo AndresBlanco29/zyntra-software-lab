@@ -211,10 +211,16 @@
     paidFields.forEach((element) => element.classList.toggle('d-none', status !== 'PAGADO'));
     unpaidFields.forEach((element) => element.classList.toggle('d-none', status !== 'NO_PAGADO'));
     const motivoInput = root.querySelector('textarea[name="motivo_no_pago"]');
-    const evidenceInput = root.querySelector('input[name="evidence_photos"]');
+    const receivedByInput = root.querySelector('input[name="recibido_por"]');
+    const isPaid = status === 'PAGADO';
     const isUnpaid = status === 'NO_PAGADO';
     if (motivoInput) motivoInput.required = isUnpaid;
-    if (evidenceInput) evidenceInput.required = isUnpaid;
+    if (receivedByInput) {
+      receivedByInput.required = isPaid;
+      if (!isPaid) {
+        receivedByInput.value = '';
+      }
+    }
     updatePaymentAmountSuggestion();
     togglePaymentEntryFields();
   }

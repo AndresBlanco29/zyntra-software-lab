@@ -505,9 +505,9 @@
             <option value="NO_PAGADO">{% trans "Unpaid" %}</option>
           </select>
         </div>
-        <div class="col-12 col-md-4">
+        <div class="col-12 col-md-4 paid-only d-none">
           <label class="form-label fw-semibold form-label-required">{% trans "Received by / managed by" %}</label>
-          <input type="text" name="recibido_por" class="form-control" required>
+          <input type="text" name="recibido_por" class="form-control">
         </div>
         <div class="col-12 col-md-4 paid-only d-none">
           <label class="form-label fw-semibold">{% trans "Total payment amount" %}</label>
@@ -570,25 +570,6 @@
         <div class="col-12 unpaid-only d-none">
           <label class="form-label fw-semibold form-label-required">{% trans "Reason for non-payment" %}</label>
           <textarea name="motivo_no_pago" class="form-control" rows="3"></textarea>
-        </div>
-
-        <div class="col-12 unpaid-only d-none">
-          <label class="form-label fw-semibold form-label-required">{% trans "Evidence photos" %}</label>
-          <div class="camera-upload-widget" data-camera-upload>
-            <input type="file" name="evidence_photos" class="form-control" accept="image/*" capture="environment" multiple data-camera-input>
-            <div class="d-flex flex-wrap gap-2 mt-2">
-              <button type="button" class="btn btn-sm btn-outline-secondary" data-camera-start>{% trans "Use camera" %}</button>
-              <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-capture>{% trans "Take photo" %}</button>
-              <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-stop>{% trans "Stop camera" %}</button>
-            </div>
-            <div class="form-text" data-camera-status>{% trans "Choose files or use the camera to attach photos." %}</div>
-            <div class="mt-2 d-none" data-camera-preview>
-              <video class="w-100 rounded border bg-dark" style="max-height: 220px; object-fit: cover;" playsinline autoplay muted data-camera-video></video>
-              <canvas class="d-none" data-camera-canvas></canvas>
-            </div>
-            <div class="row g-2 mt-2 d-none" data-file-preview></div>
-          </div>
-          <div class="form-text">{% trans "At least one photo is required when the customer does not pay." %}</div>
         </div>
 
         <div class="col-12">

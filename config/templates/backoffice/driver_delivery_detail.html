@@ -281,6 +281,99 @@
     margin: 0;
   }
 
+  .driver-maps-card {
+    border: 1px solid rgba(13, 110, 253, 0.18);
+    border-radius: 1rem;
+    background: linear-gradient(180deg, #f0f7ff 0%, #ffffff 70%);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  }
+
+  .driver-maps-actions {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .driver-maps-actions .btn {
+    min-height: 3rem;
+    font-weight: 700;
+  }
+
+  .driver-collapse-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    text-align: left;
+  }
+
+  .driver-collapse-toggle .bi {
+    font-size: 1.1rem;
+    transition: transform 0.15s ease;
+  }
+
+  .driver-collapse-toggle[aria-expanded="true"] .bi {
+    transform: rotate(180deg);
+  }
+
+  .camera-upload-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+  }
+
+  .camera-btn-camera,
+  .camera-btn-gallery,
+  .camera-btn-capture,
+  .camera-btn-stop {
+    min-height: 3.1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    font-weight: 700;
+    border-radius: 0.85rem;
+  }
+
+  .camera-btn-camera {
+    background: #0b3d91;
+    border-color: #0b3d91;
+    color: #fff;
+  }
+
+  .camera-btn-camera:hover,
+  .camera-btn-camera:focus {
+    background: #093278;
+    border-color: #093278;
+    color: #fff;
+  }
+
+  .camera-btn-gallery {
+    background: #fff;
+    border: 2px solid #0b3d91;
+    color: #0b3d91;
+  }
+
+  .camera-btn-gallery:hover,
+  .camera-btn-gallery:focus {
+    background: #eef4ff;
+    color: #0b3d91;
+  }
+
+  .camera-btn-capture {
+    grid-column: 1 / -1;
+  }
+
+  .camera-btn-stop {
+    grid-column: 1 / -1;
+  }
+
+  @media (max-width: 575.98px) {
+    .camera-upload-actions {
+      grid-template-columns: 1fr;
+    }
+  }
+
   @media (max-width: 991.98px) {
     .driver-guide-grid,
     .driver-summary-grid,
@@ -466,31 +559,72 @@
   {% endfor %}
 {% endif %}
 
+<div class="card shadow-sm driver-maps-card">
+  <div class="card-body">
+    <div class="row g-3 align-items-start">
+      <div class="col-12 col-lg-7">
+        <div class="text-muted small">{% trans "Delivery address" %}</div>
+        <div class="fw-semibold mb-2">{{ delivery.route_address }}</div>
+        <div class="text-muted small">{% trans "Google Maps query" %}</div>
+        <div class="mb-0">{{ delivery.route_query_address }}</div>
+      </div>
+      <div class="col-12 col-lg-5">
+        <div class="driver-maps-actions">
+          <a href="{{ delivery.google_maps_url }}" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
+            <i class="bi bi-geo-alt-fill me-1" aria-hidden="true"></i>{% trans "Open Google Maps" %}
+          </a>
+          {% if not delivery.is_completed %}
+          <form method="post" action="{% url 'driver_delivery_start_route' delivery.id %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-primary w-100">{% trans "Start route" %}</button>
+          </form>
+          {% endif %}
+          {% if delivery.estado == 'EN_RUTA' %}
+          <a href="{% url 'driver_delivery_tracking' delivery.id %}" class="btn btn-outline-primary">{% trans "Live tracking" %}</a>
+          {% endif %}
+          <a href="{% url 'driver_invoice_pdf' delivery.id %}" class="btn btn-outline-dark">{% trans "Download PDF" %}</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm driver-step-card">
+  <div class="card-body py-3">
+    <button type="button" class="btn btn-outline-primary driver-collapse-toggle" id="toggleDriverSteps" aria-expanded="false" aria-controls="driverStepsPanel" data-collapse-target="driverStepsPanel" data-label-show="{% trans 'See steps' %}" data-label-hide="{% trans 'Hide steps' %}">
+      <span data-collapse-label>{% trans "See steps" %}</span>
+      <i class="bi bi-chevron-down" aria-hidden="true"></i>
+    </button>
+    <div id="driverStepsPanel" class="d-none mt-3">
+      <div class="driver-guide-grid">
+        <div class="driver-guide-item">
+          <strong>{% trans "Review stop" %}</strong>
+          <span>{% trans "Confirm the customer, address and invoice lines before moving." %}</span>
+        </div>
+        <div class="driver-guide-item">
+          <strong>{% trans "Start route" %}</strong>
+          <span>{% trans "Use the route button once you are ready to leave for this stop." %}</span>
+        </div>
+        <div class="driver-guide-item">
+          <strong>{% trans "Add evidence" %}</strong>
+          <span>{% trans "Upload photos before or after closing if you need delivery proof." %}</span>
+        </div>
+        <div class="driver-guide-item">
+          <strong>{% trans "Close delivery" %}</strong>
+          <span>{% trans "Create a credit note here if the customer returns products or reports damage." %}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="card shadow-sm driver-step-card">
   <div class="card-body">
     <div class="driver-step-head">
       <span class="driver-step-index">1</span>
       <div>
-        <h5 class="mb-0">{% trans "Delivery summary" %}</h5>
-        <p class="driver-step-copy">{% trans "Review the stop details first, then start the route and keep this screen open while using Maps." %}</p>
-      </div>
-    </div>
-    <div class="driver-guide-grid mb-3">
-      <div class="driver-guide-item">
-        <strong>{% trans "Review stop" %}</strong>
-        <span>{% trans "Confirm the customer, address and invoice lines before moving." %}</span>
-      </div>
-      <div class="driver-guide-item">
-        <strong>{% trans "Start route" %}</strong>
-        <span>{% trans "Use the route button once you are ready to leave for this stop." %}</span>
-      </div>
-      <div class="driver-guide-item">
-        <strong>{% trans "Add evidence" %}</strong>
-        <span>{% trans "Upload photos before or after closing if you need delivery proof." %}</span>
-      </div>
-      <div class="driver-guide-item">
-        <strong>{% trans "Close delivery" %}</strong>
-        <span>{% trans "Create a credit note here if the customer returns products or reports damage." %}</span>
+        <h5 class="mb-0">{% trans "Invoice details" %}</h5>
+        <p class="driver-step-copy">{% trans "Review the invoice status and product lines for this stop." %}</p>
       </div>
     </div>
     <div class="driver-summary-grid">
@@ -514,31 +648,10 @@
         <div class="driver-summary-value">${{ delivery.invoice.saldo_cliente }}</div>
       </div>
     </div>
-    <div class="row g-3 align-items-start mb-3">
-      <div class="col-12 col-lg-8">
-        <div class="text-muted small">{% trans "Google Maps query" %}</div>
-        <div class="mb-3">{{ delivery.route_query_address }}</div>
-        <div class="row g-3">
-          <div class="col-12 col-md-4"><div class="text-muted small">{% trans "Estimated delivery" %}</div><div>{% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</div></div>
-          <div class="col-12 col-md-4"><div class="text-muted small">{% trans "Started" %}</div><div>{% if delivery.route_started_at %}{{ delivery.route_started_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</div></div>
-          <div class="col-12 col-md-4"><div class="text-muted small">{% trans "Delivered" %}</div><div>{% if delivery.delivered_at %}{{ delivery.delivered_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</div></div>
-        </div>
-      </div>
-      <div class="col-12 col-lg-4">
-        <div class="driver-hero-actions">
-          {% if not delivery.is_completed %}
-          <form method="post" action="{% url 'driver_delivery_start_route' delivery.id %}">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-primary">{% trans "Start route" %}</button>
-          </form>
-          {% endif %}
-          <a href="{{ delivery.google_maps_url }}" target="_blank" rel="noopener" class="btn btn-outline-primary">{% trans "Google Maps" %}</a>
-          {% if delivery.estado == 'EN_RUTA' %}
-          <a href="{% url 'driver_delivery_tracking' delivery.id %}" class="btn btn-outline-primary">{% trans "Live tracking" %}</a>
-          {% endif %}
-          <a href="{% url 'driver_invoice_pdf' delivery.id %}" class="btn btn-outline-dark">{% trans "Download PDF" %}</a>
-        </div>
-      </div>
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-md-4"><div class="text-muted small">{% trans "Estimated delivery" %}</div><div>{% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</div></div>
+      <div class="col-12 col-md-4"><div class="text-muted small">{% trans "Started" %}</div><div>{% if delivery.route_started_at %}{{ delivery.route_started_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</div></div>
+      <div class="col-12 col-md-4"><div class="text-muted small">{% trans "Delivered" %}</div><div>{% if delivery.delivered_at %}{{ delivery.delivered_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</div></div>
     </div>
     <div class="driver-stack-table">
       <table class="table table-sm align-middle mb-0 driver-data-table">
@@ -579,21 +692,8 @@
     <div class="driver-evidence-toolbar">
       <form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_upload_evidence' delivery.id %}#driver-evidence" class="d-flex flex-wrap align-items-center gap-2" id="driverEvidenceUploadForm">
             {% csrf_token %}
-            <div class="camera-upload-widget" data-camera-upload>
-              <input type="file" name="evidence_photos" class="form-control form-control-sm driver-mobile-file-input" accept="image/*" capture="environment" multiple data-camera-input>
-              <div class="d-flex flex-wrap gap-2 mt-2">
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-camera-start>{% trans "Use camera" %}</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-capture>{% trans "Take photo" %}</button>
-                <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-stop>{% trans "Stop camera" %}</button>
-              </div>
-              <div class="form-text" data-camera-status>{% trans "Choose files or use the camera to attach photos." %}</div>
-              <div class="mt-2 d-none" data-camera-preview>
-                <video class="w-100 rounded border bg-dark" style="max-height: 260px; object-fit: contain; background:#0f172a;" playsinline autoplay muted data-camera-video></video>
-                <canvas class="d-none" data-camera-canvas></canvas>
-              </div>
-              <div class="row g-2 mt-2 d-none" data-file-preview></div>
-            </div>
-        <button type="submit" class="btn btn-sm btn-outline-primary">{% trans "Upload evidence" %}</button>
+            {% include "backoffice/includes/camera_upload_field.html" with input_name="evidence_photos" %}
+        <button type="submit" class="btn btn-primary w-100 mt-2">{% trans "Upload evidence" %}</button>
       </form>
     </div>
     <div class="row g-2">
@@ -644,10 +744,13 @@
               <h5 class="driver-adjustment-callout-title mb-0">{% trans "Adjustment note during delivery" %}</h5>
               <span class="badge driver-adjustment-callout-pill">{% trans "Credit notes" %}</span>
             </div>
-            <p class="driver-adjustment-callout-lead mb-0">{% trans "Use this section when the customer returns products, reports damage, or needs a credit note before closing the delivery." %}</p>
+            <p class="driver-adjustment-callout-lead mb-2">{% trans "Only open this if the customer returns products, reports damage, or needs a credit note." %}</p>
+            <button type="button" class="btn btn-primary" id="toggleCreateNote" aria-expanded="false" aria-controls="driverNoteFormBody" data-label-show="{% trans 'Create note' %}" data-label-hide="{% trans 'Hide note' %}">
+              {% trans "Create note" %}
+            </button>
           </div>
         </div>
-        <div class="driver-adjustment-callout-body">
+        <div class="driver-adjustment-callout-body d-none" id="driverNoteFormBody">
           <div class="row g-3">
             <div class="col-12 col-md-4">
               <div class="driver-adjustment-type-highlight h-100">
@@ -684,20 +787,7 @@
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
-              <div class="camera-upload-widget" data-camera-upload>
-                <input type="file" name="driver_note_evidence_photos" class="form-control" accept="image/*" capture="environment" multiple data-camera-input>
-                <div class="d-flex flex-wrap gap-2 mt-2">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" data-camera-start>{% trans "Use camera" %}</button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-capture>{% trans "Take photo" %}</button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-stop>{% trans "Stop camera" %}</button>
-                </div>
-                <div class="form-text" data-camera-status>{% trans "Choose files or use the camera to attach photos." %}</div>
-                <div class="mt-2 d-none" data-camera-preview>
-                  <video class="w-100 rounded border bg-dark" style="max-height: 260px; object-fit: contain; background:#0f172a;" playsinline autoplay muted data-camera-video></video>
-                  <canvas class="d-none" data-camera-canvas></canvas>
-                </div>
-                <div class="row g-2 mt-2 d-none" data-file-preview></div>
-              </div>
+              {% include "backoffice/includes/camera_upload_field.html" with input_name="driver_note_evidence_photos" %}
               <div class="form-text">{% trans "Optional photos that support the credit note created during delivery." %}</div>
             </div>
             <div class="col-12">
@@ -769,9 +859,9 @@
                 <option value="NO_PAGADO">{% trans "Unpaid" %}</option>
               </select>
             </div>
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-md-4 paid-only d-none">
               <label class="form-label fw-semibold form-label-required">{% trans "Received by" %}</label>
-              <input type="text" name="recibido_por" class="form-control" required>
+              <input type="text" name="recibido_por" class="form-control">
             </div>
             <div class="col-12 col-md-4 paid-only d-none">
               <label class="form-label fw-semibold" data-debit-label="{% trans 'Amount to charge' %}">{% trans "Total payment amount" %}</label>
@@ -835,25 +925,6 @@
               <label class="form-label fw-semibold form-label-required">{% trans "Reason for non-payment" %}</label>
               <textarea name="motivo_no_pago" class="form-control" rows="3"></textarea>
             </div>
-
-            <div class="col-12 unpaid-only d-none">
-              <label class="form-label fw-semibold form-label-required">{% trans "Evidence photos" %}</label>
-              <div class="camera-upload-widget" data-camera-upload>
-                <input type="file" name="evidence_photos" class="form-control" accept="image/*" capture="environment" multiple data-camera-input>
-                <div class="d-flex flex-wrap gap-2 mt-2">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" data-camera-start>{% trans "Use camera" %}</button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-capture>{% trans "Take photo" %}</button>
-                  <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-stop>{% trans "Stop camera" %}</button>
-                </div>
-                <div class="form-text" data-camera-status>{% trans "Choose files or use the camera to attach photos." %}</div>
-                <div class="mt-2 d-none" data-camera-preview>
-                  <video class="w-100 rounded border bg-dark" style="max-height: 260px; object-fit: contain; background:#0f172a;" playsinline autoplay muted data-camera-video></video>
-                  <canvas class="d-none" data-camera-canvas></canvas>
-                </div>
-                <div class="row g-2 mt-2 d-none" data-file-preview></div>
-              </div>
-              <div class="form-text">{% trans "At least one photo is required when the customer does not pay." %}</div>
-            </div>
           </div>
         </div>
       </div>
@@ -887,9 +958,13 @@
       </div>
       <div class="flex-grow-1">
         <h5 class="driver-adjustment-callout-title mb-1">{% trans "Create adjustment note" %}</h5>
-        <p class="driver-adjustment-callout-lead mb-0">{% trans "Use this form to register a credit note after the delivery has been closed." %}</p>
+        <p class="driver-adjustment-callout-lead mb-2">{% trans "Use this form to register a credit note after the delivery has been closed." %}</p>
+        <button type="button" class="btn btn-primary" id="toggleCreateNotePost" aria-expanded="false" aria-controls="driverNoteFormBodyPost" data-label-show="{% trans 'Create note' %}" data-label-hide="{% trans 'Hide note' %}">
+          {% trans "Create note" %}
+        </button>
       </div>
     </div>
+    <div id="driverNoteFormBodyPost" class="d-none">
     <form method="post" enctype="multipart/form-data" action="{% url 'driver_delivery_create_note' delivery.id %}" id="driverDeliveryNoteForm">
       {% csrf_token %}
       {% if delivery_note_form_draft %}
@@ -937,20 +1012,7 @@
         </div>
         <div class="col-12">
           <label class="form-label fw-semibold">{% trans "Adjustment evidence photos" %}</label>
-          <div class="camera-upload-widget" data-camera-upload>
-            <input type="file" name="driver_note_evidence_photos" class="form-control" accept="image/*" capture="environment" multiple data-camera-input>
-            <div class="d-flex flex-wrap gap-2 mt-2">
-              <button type="button" class="btn btn-sm btn-outline-secondary" data-camera-start>{% trans "Use camera" %}</button>
-              <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-capture>{% trans "Take photo" %}</button>
-              <button type="button" class="btn btn-sm btn-outline-secondary d-none" data-camera-stop>{% trans "Stop camera" %}</button>
-            </div>
-            <div class="form-text" data-camera-status>{% trans "Choose files or use the camera to attach photos." %}</div>
-            <div class="mt-2 d-none" data-camera-preview>
-              <video class="w-100 rounded border bg-dark" style="max-height: 260px; object-fit: contain; background:#0f172a;" playsinline autoplay muted data-camera-video></video>
-              <canvas class="d-none" data-camera-canvas></canvas>
-            </div>
-            <div class="row g-2 mt-2 d-none" data-file-preview></div>
-          </div>
+          {% include "backoffice/includes/camera_upload_field.html" with input_name="driver_note_evidence_photos" %}
           <div class="form-text">{% trans "Optional photos that support the credit note created during delivery." %}</div>
         </div>
         <div class="col-12">
@@ -1006,6 +1068,7 @@
         <button type="submit" class="btn btn-primary">{% trans "Save draft note" %}</button>
       </div>
     </form>
+    </div>
   </div>
 </div>
 <div class="card shadow-sm mb-3">
@@ -1095,11 +1158,11 @@
   (function () {
     const cameraStrings = {
       notSupported: '{% trans "Your browser does not support camera access." %}',
-      chooseFilesOnly: '{% trans "Choose files to attach photos." %}',
-      ready: '{% trans "Camera ready. Take a photo to attach it to the form." %}',
+      chooseFilesOnly: '{% trans "Choose photos from the gallery." %}',
+      ready: '{% trans "Camera ready. Tap Capture now to attach the photo." %}',
       added: '{% trans "Photo added to the form." %}',
       stopped: '{% trans "Camera stopped." %}',
-      selectOrCamera: '{% trans "Choose files or use the camera to attach photos." %}',
+      selectOrCamera: '{% trans "Take a photo with the camera or choose one from the gallery." %}',
       chequeSelectOrCamera: '{% trans "Use the camera or choose an existing photo of the cheque." %}',
       denied: '{% trans "Camera permission was denied or is not available." %}',
       filesSelected: '{% trans "Files selected." %}',
@@ -1108,6 +1171,62 @@
     };
     if (window.LTGCameraUpload) {
       window.LTGCameraUpload.init(document, cameraStrings);
+    }
+
+    function bindCollapseToggle(button) {
+      if (!button) {
+        return;
+      }
+      const targetId = button.getAttribute('aria-controls') || button.getAttribute('data-collapse-target');
+      const panel = targetId ? document.getElementById(targetId) : null;
+      if (!panel) {
+        return;
+      }
+      const labelNode = button.querySelector('[data-collapse-label]') || button;
+      const showLabel = button.getAttribute('data-label-show') || button.textContent.trim();
+      const hideLabel = button.getAttribute('data-label-hide') || showLabel;
+      button.addEventListener('click', function () {
+        const willOpen = panel.classList.contains('d-none');
+        panel.classList.toggle('d-none', !willOpen);
+        button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        if (labelNode === button) {
+          button.textContent = willOpen ? hideLabel : showLabel;
+        } else {
+          labelNode.textContent = willOpen ? hideLabel : showLabel;
+        }
+      });
+      return {
+        open: function () {
+          if (!panel.classList.contains('d-none')) {
+            return;
+          }
+          panel.classList.remove('d-none');
+          button.setAttribute('aria-expanded', 'true');
+          if (labelNode === button) {
+            button.textContent = hideLabel;
+          } else {
+            labelNode.textContent = hideLabel;
+          }
+        },
+      };
+    }
+
+    const stepsToggle = bindCollapseToggle(document.getElementById('toggleDriverSteps'));
+    const createNoteToggle = bindCollapseToggle(document.getElementById('toggleCreateNote'));
+    const createNotePostToggle = bindCollapseToggle(document.getElementById('toggleCreateNotePost'));
+    if (document.getElementById('delivery-note-form-draft-data') && createNotePostToggle) {
+      createNotePostToggle.open();
+    }
+    if (document.getElementById('delivery-complete-form-draft-data') && createNoteToggle) {
+      const draftNode = document.getElementById('delivery-complete-form-draft-data');
+      try {
+        const draft = JSON.parse(draftNode.textContent || '{}');
+        if (draft.driver_note_tipo_documento === 'CREDITO') {
+          createNoteToggle.open();
+        }
+      } catch (_error) {
+        // Ignore invalid draft payloads.
+      }
     }
 
     if (window.location.hash === '#driver-evidence') {
@@ -1184,10 +1303,16 @@
       paidFields.forEach((element) => element.classList.toggle('d-none', status !== 'PAGADO'));
       unpaidFields.forEach((element) => element.classList.toggle('d-none', status !== 'NO_PAGADO'));
       const motivoInput = document.querySelector('textarea[name="motivo_no_pago"]');
-      const evidenceInput = document.querySelector('input[name="evidence_photos"]');
+      const receivedByInput = document.querySelector('input[name="recibido_por"]');
+      const isPaid = status === 'PAGADO';
       const isUnpaid = status === 'NO_PAGADO';
       if (motivoInput) motivoInput.required = isUnpaid;
-      if (evidenceInput) evidenceInput.required = isUnpaid;
+      if (receivedByInput) {
+        receivedByInput.required = isPaid;
+        if (!isPaid) {
+          receivedByInput.value = '';
+        }
+      }
       updatePaymentAmountSuggestion();
       togglePaymentEntryFields();
     }

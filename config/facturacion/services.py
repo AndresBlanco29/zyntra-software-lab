@@ -1165,9 +1165,9 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 
 	if estado_pago not in {'PAGADO', 'NO_PAGADO'}:
 		raise ValidationError(_('Select a valid payment status.'))
-	if not recibido_por:
-		raise ValidationError(_('Recipient name is required for delivered orders.'))
 	if estado_pago == 'PAGADO':
+		if not recibido_por:
+			raise ValidationError(_('Recipient name is required for delivered orders.'))
 		payment_details = _resolve_driver_delivery_payment(
 			payload=payload,
 			collectible_balance=collectible_balance,
@@ -1176,10 +1176,9 @@ def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, 
 			cheque_image_file=cheque_image_file,
 		)
 	else:
+		recibido_por = ''
 		if not motivo_no_pago:
 			raise ValidationError(_('A reason is required when the customer does not pay.'))
-		if not evidence_files:
-			raise ValidationError(_('Upload at least one evidence photo when the customer does not pay.'))
 
 	if delivery.estado != 'EN_RUTA':
 		start_delivery_route(delivery=delivery, driver_user=driver_user)
@@ -1216,9 +1215,9 @@ def complete_customer_pickup_from_backoffice(*, invoice, backoffice_user, payloa
 
 	if estado_pago not in {'PAGADO', 'NO_PAGADO'}:
 		raise ValidationError(_('Select a valid payment status.'))
-	if not recibido_por:
-		raise ValidationError(_('Recipient name is required for delivered orders.'))
 	if estado_pago == 'PAGADO':
+		if not recibido_por:
+			raise ValidationError(_('Recipient name is required for delivered orders.'))
 		payment_details = _resolve_driver_delivery_payment(
 			payload=payload,
 			collectible_balance=collectible_balance,
@@ -1227,10 +1226,9 @@ def complete_customer_pickup_from_backoffice(*, invoice, backoffice_user, payloa
 			cheque_image_file=cheque_image_file,
 		)
 	else:
+		recibido_por = ''
 		if not motivo_no_pago:
 			raise ValidationError(_('A reason is required when the customer does not pay.'))
-		if not evidence_files:
-			raise ValidationError(_('Upload at least one evidence photo when the customer does not pay.'))
 
 	return _finalize_delivery_completion(
 		delivery=delivery,

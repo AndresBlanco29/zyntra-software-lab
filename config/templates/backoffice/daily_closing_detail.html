@@ -18,12 +18,45 @@
   }
   .dc-kpi-label { color: #64748b; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
   .dc-kpi-value { font-size: 1.25rem; font-weight: 800; color: #0f172a; }
+  .dc-steps {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+  .dc-step {
+    border: 1px solid rgba(13, 110, 253, 0.18);
+    border-radius: 0.9rem;
+    background: #fff;
+    padding: 0.85rem 1rem;
+  }
+  .dc-step strong { display: block; color: #0b3d91; margin-bottom: 0.2rem; }
+  .dc-step span { display: block; color: #64748b; font-size: 0.88rem; line-height: 1.35; }
+  .dc-step-num {
+    display: inline-flex;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 999px;
+    align-items: center;
+    justify-content: center;
+    background: #0d6efd;
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    margin-right: 0.35rem;
+  }
   .dc-status-LISTA { background: #d1e7dd; color: #0f5132; }
   .dc-status-BLOQUEADA { background: #f8d7da; color: #842029; }
   .dc-status-PENDIENTE { background: #e2e3e5; color: #41464b; }
   .dc-status-EN_REVISION { background: #fff3cd; color: #664d03; }
   .dc-status-LIBERADA { background: #cfe2ff; color: #084298; }
   .dc-status-EXCLUIDA { background: #f1f3f5; color: #6c757d; }
+  @media (max-width: 991.98px) {
+    .dc-steps { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 575.98px) {
+    .dc-steps { grid-template-columns: 1fr; }
+  }
 </style>
 
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
@@ -45,8 +78,8 @@
     <form method="post" action="{% url 'backoffice_daily_closing_release' cierre.id %}">
       {% csrf_token %}
       <input type="hidden" name="liberar_todas_listas" value="1">
-      <button type="submit" class="btn btn-primary" {% if not cierre.items_listos %}disabled{% endif %}>
-        {% trans "Release all ready" %} ({{ cierre.items_listos }})
+      <button type="submit" class="btn btn-primary" {% if not cierre.items_listos %}disabled{% endif %} title="{% trans 'Only invoices marked Ready can be released' %}">
+        {% trans "3. Release ready to QuickBooks" %} ({{ cierre.items_listos }})
       </button>
     </form>
     <form method="post" action="{% url 'backoffice_daily_closing_close' cierre.id %}" onsubmit="return confirm('{% trans "Close this daily closing? All invoices must be released or excluded." %}');">
@@ -57,73 +90,39 @@
   </div>
 </div>
 
-<div class="dc-kpi-grid mb-4">
-  <div class="dc-kpi"><div class="dc-kpi-label">{% trans "Documents" %}</div><div class="dc-kpi-value">{{ cierre.total_documentos }}</div></div>
+<div class="alert alert-info mb-3">
+  <strong>{% trans "How this works" %}:</strong>
+  {% blocktrans %}
+  The numbers above stay at zero until you add invoices to this closing.
+  First select invoices and click Add. Then open each one with Review, complete the checklist, and Save.
+  When status is Ready, release them — only then they appear in QuickBooks Center to export.
+  {% endblocktrans %}
+</div>
+
+<div class="dc-steps">
+  <div class="dc-step"><strong><span class="dc-step-num">1</span>{% trans "Add" %}</strong><span>{% trans "Select invoices below and add them to this closing." %}</span></div>
+  <div class="dc-step"><strong><span class="dc-step-num">2</span>{% trans "Review" %}</strong><span>{% trans "In the board, click Review on each invoice and mark the checklist." %}</span></div>
+  <div class="dc-step"><strong><span class="dc-step-num">3</span>{% trans "Release" %}</strong><span>{% trans "Release ready invoices so QuickBooks Center can see them." %}</span></div>
+  <div class="dc-step"><strong><span class="dc-step-num">4</span>{% trans "Export" %}</strong><span>{% trans "Open QuickBooks Center and Send selected / Send all pending." %}</span></div>
+</div>
+
+<div class="dc-kpi-grid mb-2">
+  <div class="dc-kpi"><div class="dc-kpi-label">{% trans "Documents in closing" %}</div><div class="dc-kpi-value">{{ cierre.total_documentos }}</div></div>
   <div class="dc-kpi"><div class="dc-kpi-label">{% trans "Total amount" %}</div><div class="dc-kpi-value">${{ cierre.monto_total }}</div></div>
   <div class="dc-kpi"><div class="dc-kpi-label">{% trans "Paid" %}</div><div class="dc-kpi-value">${{ cierre.monto_pagado }}</div></div>
   <div class="dc-kpi"><div class="dc-kpi-label">{% trans "Open balance" %}</div><div class="dc-kpi-value">${{ cierre.balance_abierto }}</div></div>
   <div class="dc-kpi"><div class="dc-kpi-label">{% trans "Credits" %}</div><div class="dc-kpi-value">${{ cierre.total_creditos }}</div></div>
   <div class="dc-kpi"><div class="dc-kpi-label">{% trans "Ready / Released / Blocked" %}</div><div class="dc-kpi-value">{{ cierre.items_listos }} / {{ cierre.items_liberados }} / {{ cierre.items_bloqueados }}</div></div>
 </div>
+<p class="small text-muted mb-4">{% trans "These totals only count invoices already added to this closing (not the candidate list below)." %}</p>
 
-{% if can_manage and cierre.is_editable %}
-<div class="card shadow-sm mb-4">
-  <div class="card-body">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-      <div>
-        <h5 class="mb-0">{% trans "Add invoices to this closing" %}</h5>
-        <div class="small text-muted">{% trans "Select invoices that are not synced and not already in an open closing." %}</div>
-      </div>
-      <form method="get" class="d-flex gap-2">
-        <input type="search" name="q" value="{{ search_query }}" class="form-control form-control-sm" placeholder="{% trans 'Search invoice or customer' %}" style="min-width: 220px;">
-        <button type="submit" class="btn btn-sm btn-outline-primary">{% trans "Search" %}</button>
-      </form>
+<div class="card shadow-sm mb-4 border-primary" id="closing-board">
+  <div class="card-header bg-primary text-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div>
+      <strong>{% trans "Step 2 — Invoices in this closing (review here)" %}</strong>
+      <div class="small opacity-75">{% trans "Click Review to verify each invoice. Totals above update from this list." %}</div>
     </div>
-    <form method="post" action="{% url 'backoffice_daily_closing_add_invoices' cierre.id %}">
-      {% csrf_token %}
-      <div class="table-responsive" style="max-height: 280px; overflow: auto;">
-        <table class="table table-sm align-middle mb-0">
-          <thead>
-            <tr>
-              <th style="width: 2.5rem;"></th>
-              <th>{% trans "Invoice" %}</th>
-              <th>{% trans "Customer" %}</th>
-              <th>{% trans "Total" %}</th>
-              <th>{% trans "Delivery" %}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for invoice in elegibles %}
-            <tr>
-              <td><input type="checkbox" class="form-check-input" name="invoice_ids" value="{{ invoice.id }}"></td>
-              <td>
-                <span class="badge text-bg-primary">#{{ invoice.id }}</span>
-                <span class="ms-1">{{ invoice.numero }}</span>
-              </td>
-              <td>{{ invoice.cliente.nombre_empresa }}</td>
-              <td>${{ invoice.total_neto }}</td>
-              <td class="small">
-                {% if invoice.delivery %}{{ invoice.delivery.get_estado_display }} · {{ invoice.delivery.get_estado_pago_display }}{% else %}<span class="text-muted">-</span>{% endif %}
-              </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="5" class="text-muted">{% trans "No eligible invoices found." %}</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      <div class="d-flex justify-content-end mt-3">
-        <button type="submit" class="btn btn-primary" {% if not elegibles %}disabled{% endif %}>{% trans "Add selected to closing" %}</button>
-      </div>
-    </form>
-  </div>
-</div>
-{% endif %}
-
-<div class="card shadow-sm">
-  <div class="card-header bg-white d-flex justify-content-between align-items-center">
-    <strong>{% trans "Invoices in this closing" %}</strong>
-    <span class="small text-muted">{{ items|length }} {% trans "documents" %}</span>
+    <span class="badge text-bg-light text-dark">{{ items|length }} {% trans "documents" %}</span>
   </div>
   <div class="table-responsive">
     <table class="table align-middle mb-0">
@@ -142,7 +141,7 @@
         {% for item in items %}
         <tr>
           <td>
-            <div class="fw-semibold">{{ item.invoice.numero }}</div>
+            <a href="{% url 'backoffice_daily_closing_item_review' cierre.id item.id %}" class="fw-semibold text-decoration-none">{{ item.invoice.numero }}</a>
             <div class="small text-muted">#{{ item.invoice.id }}</div>
           </td>
           <td>{{ item.invoice.cliente.nombre_empresa }}</td>
@@ -163,17 +162,87 @@
             {% if item.entrega_confirmada %}<span class="text-success">✓</span>{% else %}<span class="text-muted">○</span>{% endif %} {% trans "Delivery" %}
             {% if item.devolucion_detectada %}<span class="badge text-bg-warning text-dark ms-1">{% trans "Return" %}</span>{% endif %}
           </td>
-          <td class="text-end">
-            <a href="{% url 'backoffice_daily_closing_item_review' cierre.id item.id %}" class="btn btn-sm btn-outline-primary">{% trans "Review" %}</a>
+          <td class="text-end text-nowrap">
+            <a href="{% url 'backoffice_invoice_detail' item.invoice.id %}" class="btn btn-sm btn-outline-secondary" target="_blank">{% trans "Open invoice" %}</a>
+            <a href="{% url 'backoffice_daily_closing_item_review' cierre.id item.id %}" class="btn btn-sm btn-primary">{% trans "Review & verify" %}</a>
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="7" class="text-muted text-center py-4">{% trans "No invoices in this closing yet. Add invoices above." %}</td>
+          <td colspan="7" class="text-center py-4">
+            <div class="fw-semibold mb-1">{% trans "Nothing in this closing yet" %}</div>
+            <div class="text-muted">{% trans "Go to Step 1 below, check the invoices you want, and click Add selected to closing. Then come back here to Review each one." %}</div>
+          </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+
+{% if can_manage and cierre.is_editable %}
+<div class="card shadow-sm mb-4" id="add-invoices">
+  <div class="card-body">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+      <div>
+        <h5 class="mb-0">{% trans "Step 1 — Add invoices to this closing" %}</h5>
+        <div class="small text-muted">{% trans "This list is only candidates. Checking a row does nothing until you click Add selected to closing." %}</div>
+      </div>
+      <form method="get" class="d-flex gap-2">
+        <input type="search" name="q" value="{{ search_query }}" class="form-control form-control-sm" placeholder="{% trans 'Search invoice or customer' %}" style="min-width: 220px;">
+        <button type="submit" class="btn btn-sm btn-outline-primary">{% trans "Search" %}</button>
+      </form>
+    </div>
+    <form method="post" action="{% url 'backoffice_daily_closing_add_invoices' cierre.id %}#closing-board">
+      {% csrf_token %}
+      <div class="table-responsive" style="max-height: 320px; overflow: auto;">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width: 2.5rem;"></th>
+              <th>{% trans "Invoice" %}</th>
+              <th>{% trans "Customer" %}</th>
+              <th>{% trans "Total" %}</th>
+              <th>{% trans "Delivery" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for invoice in elegibles %}
+            <tr>
+              <td><input type="checkbox" class="form-check-input" name="invoice_ids" value="{{ invoice.id }}"></td>
+              <td>
+                <a href="{% url 'backoffice_invoice_detail' invoice.id %}" class="badge text-bg-primary text-decoration-none" target="_blank">#{{ invoice.id }}</a>
+                <span class="ms-1">{{ invoice.numero }}</span>
+              </td>
+              <td>{{ invoice.cliente.nombre_empresa }}</td>
+              <td>${{ invoice.total_neto }}</td>
+              <td class="small">
+                {% if invoice.delivery %}{{ invoice.delivery.get_estado_display }} · {{ invoice.delivery.get_estado_pago_display }}{% else %}<span class="text-muted">-</span>{% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-muted">{% trans "No eligible invoices found." %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+        <div class="small text-muted">{% trans "Tip: use Open invoice (new tab) only to look up details. Verification is done with Review after adding." %}</div>
+        <button type="submit" class="btn btn-primary btn-lg" {% if not elegibles %}disabled{% endif %}>{% trans "1. Add selected to closing" %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% if items %}
+<div class="alert alert-secondary">
+  <strong>{% trans "Next" %}:</strong>
+  {% if cierre.items_listos %}
+  {% blocktrans count counter=cierre.items_listos %}{{ counter }} invoice is Ready — click “Release ready to QuickBooks”, then open QuickBooks Center and Send.{% plural %}{{ counter }} invoices are Ready — click “Release ready to QuickBooks”, then open QuickBooks Center and Send.{% endblocktrans %}
+  {% else %}
+  {% trans "Open each invoice with Review & verify, mark the checklist, Save. When they show Ready, use Release." %}
+  {% endif %}
+</div>
+{% endif %}
 {% endblock %}

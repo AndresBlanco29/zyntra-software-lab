@@ -95,11 +95,12 @@ def backoffice_daily_closing_add_invoices(request, cierre_id):
 		)
 		messages.success(
 			request,
-			_('%(count)s invoice(s) added to the daily closing.') % {'count': len(created)},
+			_('%(count)s invoice(s) added. Now open each one with “Review & verify”, complete the checklist, then Release when Ready.')
+			% {'count': len(created)},
 		)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
-	return redirect('backoffice_daily_closing_detail', cierre_id=cierre.id)
+	return redirect(reverse('backoffice_daily_closing_detail', args=[cierre.id]) + '#closing-board')
 
 
 @login_required
@@ -182,7 +183,8 @@ def backoffice_daily_closing_release(request, cierre_id):
 		)
 		messages.success(
 			request,
-			_('%(count)s invoice(s) released to QuickBooks Center.') % {'count': len(released)},
+			_('%(count)s invoice(s) released. Open QuickBooks Center and use Send selected / Send all pending.')
+			% {'count': len(released)},
 		)
 	except ValidationError as exc:
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))

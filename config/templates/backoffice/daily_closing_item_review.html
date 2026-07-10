@@ -107,9 +107,20 @@
           </fieldset>
         </form>
         {% if item.estado == 'LISTA' %}
-        <div class="alert alert-success mt-3 mb-0">{% trans "This invoice is ready. Release it from the closing board to make it available in QuickBooks Center." %}</div>
+        <div class="alert alert-success mt-3 mb-0">
+          <strong>{% trans "Ready." %}</strong>
+          {% trans "Go back to the closing board and click “Release ready to QuickBooks”. After that, open QuickBooks Center and Send." %}
+          <div class="mt-2">
+            <a href="{% url 'backoffice_daily_closing_detail' cierre.id %}#closing-board" class="btn btn-sm btn-success">{% trans "Back to closing board" %}</a>
+          </div>
+        </div>
         {% elif item.estado == 'LIBERADA' %}
-        <div class="alert alert-info mt-3 mb-0">{% trans "Already released to QuickBooks Center." %}</div>
+        <div class="alert alert-info mt-3 mb-0">
+          {% trans "Already released. Open QuickBooks Center to export this invoice." %}
+          <div class="mt-2">
+            <a href="{% url 'quickbooks_center' %}" class="btn btn-sm btn-primary">{% trans "Open QuickBooks Center" %}</a>
+          </div>
+        </div>
         {% endif %}
       </div>
     </div>

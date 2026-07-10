@@ -1,4 +1,5 @@
 import uuid
+from decimal import Decimal
 
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -91,3 +92,19 @@ class CotizacionItem(models.Model):
 
     def __str__(self):
         return f"{self.presentacion.producto.nombre} x {self.cantidad}"
+
+    @property
+    def precio_unitario_neto(self):
+        from config.pedidos.services import calcular_precio_unitario_neto_item
+
+        return calcular_precio_unitario_neto_item(
+            precio=self.precio,
+            descuento_aplicado=self.descuento_aplicado,
+            descuento_monto=self.descuento_monto,
+        )
+
+    @property
+    def descuento_linea_total(self):
+        if not self.descuento_aplicado:
+            return Decimal('0.00')
+        return (self.descuento_monto or Decimal('0.00')) * Decimal(str(self.cantidad or 0))

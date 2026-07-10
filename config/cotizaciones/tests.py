@@ -676,6 +676,8 @@ class BackofficeQuotePricingTests(TestCase):
 		self.client.post(reverse('backoffice_cotizacion_detalle', args=[self.cotizacion.id]), {
 			f'cantidad_{item.id}': '2',
 			f'precio_{item.id}': str(self.presentacion.precio_1),
+			f'descuento_aplicado_{item.id}': 'on',
+			f'descuento_monto_{item.id}': '3.50',
 			'nota_backoffice': 'Precio confirmado',
 		})
 
@@ -686,7 +688,12 @@ class BackofficeQuotePricingTests(TestCase):
 
 		self.assertEqual(response.status_code, 302)
 		self.assertEqual(len(mail.outbox), 1)
-		self.assertIn('Subtotal', mail.outbox[0].alternatives[0][0])
+		html = mail.outbox[0].alternatives[0][0]
+		self.assertIn('Subtotal', html)
+		self.assertIn('Discount', html)
+		self.assertIn('You pay', html)
+		self.assertIn('-$3.50', html)
+		self.assertIn('cid:ltg_brand_logo', html)
 
 	def test_backoffice_can_send_quote_email_without_prices_when_requested(self):
 		self.client.force_login(self.backoffice)
@@ -705,7 +712,9 @@ class BackofficeQuotePricingTests(TestCase):
 
 		self.assertEqual(response.status_code, 302)
 		self.assertEqual(len(mail.outbox), 1)
-		self.assertNotIn('Subtotal', mail.outbox[0].alternatives[0][0])
+		html = mail.outbox[0].alternatives[0][0]
+		self.assertNotIn('Subtotal', html)
+		self.assertNotIn('Discount', html)
 
 	def test_backoffice_quote_detail_warns_when_customer_has_no_email(self):
 		self.customer_user.email = ''

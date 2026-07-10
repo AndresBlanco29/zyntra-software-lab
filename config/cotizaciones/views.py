@@ -789,6 +789,8 @@ def enviar_cotizacion_cliente(request, cotizacion_id):
 
     if cliente_tiene_email:
         try:
+            from config.core.email_branding import attach_inline_brand_logo, brand_email_context
+
             html_content = render_to_string(
                 'emails/cotizacion_lista_cliente.html',
                 {
@@ -797,6 +799,7 @@ def enviar_cotizacion_cliente(request, cotizacion_id):
                     'confirm_url': confirm_url,
                     'include_prices': include_prices_in_email,
                     'items': cotizacion.items.select_related('presentacion__producto'),
+                    **brand_email_context(),
                 },
             )
 
@@ -807,6 +810,7 @@ def enviar_cotizacion_cliente(request, cotizacion_id):
                 to=[cotizacion.cliente.usuario.email.strip()],
             )
             email.attach_alternative(html_content, 'text/html')
+            attach_inline_brand_logo(email)
             email.send(fail_silently=False)
             cotizacion.correo_enviado = True
             cotizacion.correo_enviado_en = now

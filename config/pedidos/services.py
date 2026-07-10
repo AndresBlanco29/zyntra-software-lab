@@ -641,6 +641,8 @@ def resolver_bloqueo_picking_desde_backoffice(*, pedido, usuario):
 
 
 def notificar_backoffice_pedido(pedido):
+    from config.core.email_branding import attach_inline_brand_logo, brand_email_context
+
     if pedido.origen == 'VENDEDOR':
         vendor_name = ''
         if pedido.vendedor_id:
@@ -675,6 +677,7 @@ def notificar_backoffice_pedido(pedido):
             'pedido': pedido,
             'cliente': pedido.cliente,
             'items': pedido.items.select_related('presentacion__producto').all(),
+            **brand_email_context(),
         },
     )
     text_content = _('A new order #%(id)s was created for %(client)s.') % {
@@ -688,10 +691,13 @@ def notificar_backoffice_pedido(pedido):
         to=backoffice_emails,
     )
     email.attach_alternative(html_content, 'text/html')
+    attach_inline_brand_logo(email)
     email.send(fail_silently=False)
 
 
 def notificar_cliente_pedido(pedido, *, include_prices=True):
+    from config.core.email_branding import attach_inline_brand_logo, brand_email_context
+
     cliente_email = (getattr(getattr(pedido.cliente, 'usuario', None), 'email', '') or '').strip()
     if not cliente_email:
         return False
@@ -704,6 +710,7 @@ def notificar_cliente_pedido(pedido, *, include_prices=True):
             'items': pedido.items.select_related('presentacion__producto').all(),
             'include_prices': include_prices,
             'total': pedido.total,
+            **brand_email_context(),
         },
     )
     text_content = _('Your sales order #%(id)s was generated successfully and is now being prepared for dispatch.') % {
@@ -716,5 +723,6 @@ def notificar_cliente_pedido(pedido, *, include_prices=True):
         to=[cliente_email],
     )
     email.attach_alternative(html_content, 'text/html')
+    attach_inline_brand_logo(email)
     email.send(fail_silently=False)
     return True

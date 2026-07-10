@@ -1,5 +1,5 @@
 {% load i18n safe_static %}
-{% absolute_safe_static 'img/logo.png' as brand_logo_url %}
+{% absolute_safe_static 'img/email_logo.jpg' as brand_logo_fallback_url %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -16,19 +16,23 @@
       <td align="center">
         <table width="720" cellspacing="0" cellpadding="0" role="presentation" style="width:100%; max-width:720px; background:#ffffff; border-radius:18px; overflow:hidden; box-shadow:0 14px 38px rgba(15, 23, 42, 0.10);">
           <tr>
-            <td style="padding:22px 26px; background:linear-gradient(90deg, #0b3d91 0%, #0c64cf 100%); color:#ffffff;">
+            <td style="padding:22px 26px; background:#0b3d91; color:#ffffff;">
               <table width="100%" cellspacing="0" cellpadding="0" role="presentation">
                 <tr>
-                  <td align="left" style="vertical-align:middle;">
-                    {% if brand_logo_url %}
-                    <img src="{{ brand_logo_url }}" alt="La Tortilla Grocery" style="display:block; max-width:120px; height:auto; border:0;">
+                  <td align="left" style="vertical-align:middle; width:140px;">
+                    {% if brand_logo_cid %}
+                    <img src="cid:{{ brand_logo_cid }}" alt="La Tortilla Grocery" width="120" style="display:block; max-width:120px; width:120px; height:auto; border:0;">
+                    {% elif brand_logo_url %}
+                    <img src="{{ brand_logo_url }}" alt="La Tortilla Grocery" width="120" style="display:block; max-width:120px; width:120px; height:auto; border:0;">
+                    {% elif brand_logo_fallback_url %}
+                    <img src="{{ brand_logo_fallback_url }}" alt="La Tortilla Grocery" width="120" style="display:block; max-width:120px; width:120px; height:auto; border:0;">
                     {% else %}
-                    <div style="font-size:18px; font-weight:700; letter-spacing:0.04em;">LTG</div>
+                    <div style="font-size:18px; font-weight:700; letter-spacing:0.04em; color:#ffffff;">LTG</div>
                     {% endif %}
                   </td>
                   <td align="right" style="vertical-align:middle; text-align:right;">
                     <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#ffd400; margin-bottom:6px;">La Tortilla Grocery</div>
-                    <div style="font-size:26px; font-weight:700; line-height:1.2; margin-bottom:4px;">{% block header_title %}{% endblock %}</div>
+                    <div style="font-size:26px; font-weight:700; line-height:1.2; margin-bottom:4px; color:#ffffff;">{% block header_title %}{% endblock %}</div>
                     <div style="font-size:13px; line-height:1.5; color:#dbeafe;">{% block header_subtitle %}{% endblock %}</div>
                   </td>
                 </tr>

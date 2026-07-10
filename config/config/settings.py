@@ -436,6 +436,9 @@ ANYMAIL = {
 ORDERS_NOTIFICATION_EMAIL = os.environ.get('ORDERS_NOTIFICATION_EMAIL', 'ltgordersapp@gmail.com')
 
 APP_BASE_URL = os.environ.get('APP_BASE_URL', '').rstrip('/')
+if not APP_BASE_URL:
+    # Emails need an absolute site URL for logo/images when APP_BASE_URL is unset.
+    APP_BASE_URL = 'http://127.0.0.1:8000' if DEBUG else f'https://{CANONICAL_DOMAIN}'
 
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
 TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')

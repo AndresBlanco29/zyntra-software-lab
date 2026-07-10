@@ -4,24 +4,40 @@
     <th align="left">{% trans "Product" %}</th>
     <th align="center">{% trans "Qty." %}</th>
     {% if include_prices %}
-    <th align="center">{% trans "Price" %}</th>
+    <th align="center">{% trans "List price" %}</th>
+    <th align="center">{% trans "Discount" %}</th>
+    <th align="center">{% trans "You pay" %}</th>
     <th align="center">{% trans "Subtotal" %}</th>
     {% endif %}
   </tr>
   {% for item in items %}
   <tr style="border-bottom:1px solid #e2e8f0; background:{% cycle '#ffffff' '#f8fafc' %};">
-    <td>{{ item.presentacion.producto.nombre }} ({{ item.presentacion.nombre_traducido }})</td>
-    <td align="center">{{ item.cantidad }}</td>
+    <td style="color:#1e293b;">{{ item.presentacion.producto.nombre }} ({{ item.presentacion.nombre_traducido }})</td>
+    <td align="center" style="color:#1e293b;">{{ item.cantidad }}</td>
     {% if include_prices %}
-    <td align="center">${{ item.precio }}</td>
-    <td align="center">${{ item.subtotal }}</td>
+    <td align="center" style="color:#1e293b;">${{ item.precio|floatformat:2 }}</td>
+    <td align="center" style="color:#1e293b;">
+      {% if item.descuento_aplicado and item.descuento_monto %}
+      -${{ item.descuento_monto|floatformat:2 }}
+      {% else %}
+      —
+      {% endif %}
+    </td>
+    <td align="center" style="color:#1e293b;">
+      {% if item.descuento_aplicado and item.descuento_monto %}
+      <strong>${{ item.precio_unitario_neto|floatformat:2 }}</strong>
+      {% else %}
+      ${{ item.precio|floatformat:2 }}
+      {% endif %}
+    </td>
+    <td align="center" style="color:#1e293b;">${{ item.subtotal|floatformat:2 }}</td>
     {% endif %}
   </tr>
   {% endfor %}
   {% if include_prices %}
   <tr style="background:#dbeafe;">
-    <td colspan="3" align="right" style="padding-top:12px;"><strong>{% trans "Total:" %}</strong></td>
-    <td align="center" style="padding-top:12px;"><strong>${{ total }}</strong></td>
+    <td colspan="5" align="right" style="padding-top:12px; color:#1e293b;"><strong>{% trans "Total:" %}</strong></td>
+    <td align="center" style="padding-top:12px; color:#1e293b;"><strong>${{ total|floatformat:2 }}</strong></td>
   </tr>
   {% endif %}
 </table>

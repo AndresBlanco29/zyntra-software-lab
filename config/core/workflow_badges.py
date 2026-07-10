@@ -49,43 +49,81 @@ def _solid_badge(*, role, label=None):
     }
 
 
+def build_quote_workflow_badge(cotizacion):
+    estado = getattr(cotizacion, 'estado', '') or ''
+
+    if estado == 'ENVIADA':
+        if getattr(cotizacion, 'vendedor_id', None):
+            return _split_badge(sender_role='vendedor', receiver_role='backoffice', label=_('Awaiting BackOffice review'))
+        return _split_badge(sender_role='cliente', receiver_role='backoffice', label=_('Awaiting BackOffice review'))
+
+    if estado == 'LISTA_PARA_CONFIRMACION':
+        return _split_badge(sender_role='backoffice', receiver_role='cliente', label=_('Awaiting client confirmation'))
+
+    if estado == 'CONFIRMADA_CLIENTE':
+        return _split_badge(sender_role='cliente', receiver_role='backoffice', label=_('Ready to convert to order'))
+
+    if estado == 'CANCELADA_CLIENTE':
+        return _solid_badge(role='cliente', label=_('Cancelled by client'))
+
+    if estado == 'APROBADA':
+        return _solid_badge(role='backoffice', label=_('Approved'))
+
+    if estado == 'RECHAZADA':
+        return _solid_badge(role='backoffice', label=_('Rejected'))
+
+    return _solid_badge(role='backoffice')
+
+
 def build_order_workflow_badge(pedido):
     estado = getattr(pedido, 'estado', '') or ''
     origen = getattr(pedido, 'origen', '') or ''
     invoice = getattr(pedido, 'invoice', None)
     delivery = getattr(invoice, 'delivery', None) if invoice else None
+    selector = getattr(pedido, 'seleccionador', None)
+    selector_label = (selector.get_full_name() or selector.username) if selector else ''
 
     if estado == 'CANCELADO':
         return _solid_badge(role='backoffice', label=_('Cancelled'))
 
     if delivery and delivery.estado in {'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'}:
-        return _solid_badge(role='driver', label=_('Delivered'))
+        return _solid_badge(role='driver', label=_('Delivery completed'))
 
     if delivery and delivery.estado == 'EN_RUTA':
-        return _split_badge(sender_role='driver', receiver_role='cliente', label=_('Out for delivery'))
+        driver = delivery.driver
+        driver_label = (driver.get_full_name() or driver.username) if driver else ''
+        return _solid_badge(role='driver', label=driver_label or _('On the way'))
 
     if estado == 'INVOICE_GENERADA' or (invoice and invoice.estado == 'GENERADA'):
         if delivery and getattr(delivery, 'is_customer_pickup', False):
-            return _solid_badge(role='backoffice', label=_('Customer pick up'))
+            return _solid_badge(role='cliente', label=_('Waiting for customer pickup'))
         if delivery and delivery.driver_id:
             driver = delivery.driver
             driver_label = (driver.get_full_name() or driver.username) if driver else ''
-            return _solid_badge(role='driver', label=driver_label or _('With driver'))
-        return _split_badge(sender_role='backoffice', receiver_role='driver', label=_('With driver'))
+            return _solid_badge(role='driver', label=driver_label or _('Assigned to driver'))
+        return _split_badge(sender_role='backoffice', receiver_role='driver', label=_('Awaiting driver assignment'))
 
     if estado == 'VERIFICADO_AJUSTADO':
-        return _solid_badge(role='backoffice', label=_('Ready for invoice'))
+        return _solid_badge(role='backoffice', label=_('Ready to generate invoice'))
 
-    if estado in {'PARA_VERIFICAR', 'LISTO_PARA_PICKING'}:
-        return _split_badge(sender_role='backoffice', receiver_role='seleccionador', label=_('Picking'))
+    if estado == 'PARA_VERIFICAR':
+        if selector_label:
+            return _solid_badge(role='seleccionador', label=selector_label)
+        return _split_badge(sender_role='backoffice', receiver_role='seleccionador', label=_('With picker'))
+
+    if estado == 'LISTO_PARA_PICKING':
+        return _solid_badge(role='backoffice', label=_('Ready to send to picking'))
+
+    if estado == 'EN_GESTION':
+        return _solid_badge(role='backoffice', label=_('Being managed by BackOffice'))
 
     if origen == 'VENDEDOR':
-        return _split_badge(sender_role='vendedor', receiver_role='backoffice')
+        return _split_badge(sender_role='vendedor', receiver_role='backoffice', label=_('Sales rep → BackOffice'))
 
     if origen == 'CLIENTE':
-        return _split_badge(sender_role='cliente', receiver_role='backoffice')
+        return _split_badge(sender_role='cliente', receiver_role='backoffice', label=_('Customer → BackOffice'))
 
-    return _solid_badge(role='backoffice')
+    return _solid_badge(role='backoffice', label=_('Awaiting BackOffice review'))
 
 
 def build_delivery_workflow_badge(delivery):

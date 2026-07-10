@@ -7,7 +7,7 @@ from django.core.paginator import Paginator
 from django.urls import reverse
 from django.utils.translation import gettext as _
 
-from config.core.workflow_badges import build_order_workflow_badge
+from config.core.workflow_badges import build_order_workflow_badge, build_quote_workflow_badge
 from config.cotizaciones.models import Cotizacion
 from config.pedidos.models import Pedido
 
@@ -16,8 +16,8 @@ QUOTE_PENDING_STATUSES = ('ENVIADA', 'LISTA_PARA_CONFIRMACION', 'CONFIRMADA_CLIE
 QUOTE_CANCELLED_STATUSES = ('CANCELADA_CLIENTE',)
 QUOTE_COMPLETED_STATUSES = ('APROBADA', 'RECHAZADA', 'BORRADOR')
 
-PEDIDO_PENDING_STATUSES = {'RECIBIDO', 'LISTO_PARA_PICKING'}
-PEDIDO_IN_PROGRESS_STATUSES = {'EN_GESTION', 'PARA_VERIFICAR', 'VERIFICADO_AJUSTADO', 'INVOICE_GENERADA'}
+PEDIDO_PENDING_STATUSES = {'RECIBIDO', 'EN_GESTION', 'LISTO_PARA_PICKING'}
+PEDIDO_IN_PROGRESS_STATUSES = {'PARA_VERIFICAR', 'VERIFICADO_AJUSTADO', 'INVOICE_GENERADA'}
 PEDIDO_COMPLETED_STATUSES = {'DESPACHADO'}
 PEDIDO_CANCELLED_STATUSES = {'CANCELADO'}
 DELIVERED_DELIVERY_STATUSES = {'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'}
@@ -169,6 +169,18 @@ def _get_pedido_delivery(pedido):
 	return getattr(invoice, 'delivery', None)
 
 
+def _resolve_quote_operational_status(cotizacion):
+	return {
+		'ENVIADA': (_('Customer request received'), 'bg-primary'),
+		'LISTA_PARA_CONFIRMACION': (_('Quotation sent to client'), 'bg-info text-dark'),
+		'CONFIRMADA_CLIENTE': (_('Confirmed by client'), 'bg-success'),
+		'CANCELADA_CLIENTE': (_('Cancelled by client'), 'bg-secondary'),
+		'APROBADA': (_('Approved'), 'bg-dark'),
+		'RECHAZADA': (_('Rejected'), 'bg-danger'),
+		'BORRADOR': (_('Draft'), 'bg-secondary'),
+	}.get(cotizacion.estado, (str(cotizacion.get_estado_display()), _quote_status_badge_class(cotizacion.estado)))
+
+
 def _resolve_pedido_operational_status(pedido):
 	estado = pedido.estado
 	delivery = _get_pedido_delivery(pedido)
@@ -178,30 +190,33 @@ def _resolve_pedido_operational_status(pedido):
 		return _('Cancelled'), _pedido_status_badge_class('CANCELADO')
 
 	if delivery and delivery.estado in DELIVERED_DELIVERY_STATUSES:
-		return _('Delivered'), 'bg-success'
+		return _('Completed'), 'bg-success'
 
 	if estado == 'DESPACHADO':
-		return _('Delivered'), 'bg-success'
+		return _('Completed'), 'bg-success'
 
 	if delivery and delivery.estado == 'EN_RUTA':
-		return _('With driver'), 'bg-primary'
+		return _('Out for delivery'), 'bg-primary'
 
 	if estado == 'INVOICE_GENERADA' or (invoice and invoice.estado == 'GENERADA'):
 		if delivery and getattr(delivery, 'is_customer_pickup', False):
-			return _('Ready for pickup'), 'bg-info text-dark'
-		return _('With driver'), 'bg-primary'
+			return _('Customer pick up'), 'bg-info text-dark'
+		return _('Sent to driver'), 'bg-primary'
 
 	if estado == 'VERIFICADO_AJUSTADO':
-		return _('Verified'), 'bg-info text-dark'
+		return _('Picking adjusted and returned'), 'bg-info text-dark'
 
-	if estado in {'PARA_VERIFICAR', 'LISTO_PARA_PICKING'}:
-		return _('Picking in progress'), 'bg-warning text-dark'
+	if estado == 'PARA_VERIFICAR':
+		return _('Sent to picking'), 'bg-warning text-dark'
+
+	if estado == 'LISTO_PARA_PICKING':
+		return _('Ready for picking'), 'bg-warning text-dark'
 
 	if estado == 'EN_GESTION':
-		return _('In progress'), 'bg-warning text-dark'
+		return _('Purchase order · BackOffice'), 'bg-warning text-dark'
 
 	if estado == 'RECIBIDO':
-		return _('Received'), 'bg-info text-dark'
+		return _('Pending order'), 'bg-info text-dark'
 
 	return _pedido_state_label(estado), _pedido_status_badge_class(estado)
 
@@ -221,6 +236,7 @@ def _quote_rows_for_statuses(*, statuses):
 		.order_by('-fecha')
 	)
 	for cotizacion in queryset:
+		status_label, status_badge_class = _resolve_quote_operational_status(cotizacion)
 		rows.append(
 			DispatchOrderRow(
 				row_key=f'quote-{cotizacion.id}',
@@ -229,11 +245,12 @@ def _quote_rows_for_statuses(*, statuses):
 				customer_name=cotizacion.cliente.nombre_empresa,
 				selector_name='',
 				origin_label=str(_quote_origin_label(cotizacion)),
-				status_label=str(cotizacion.get_estado_display()),
-				status_badge_class=_quote_status_badge_class(cotizacion.estado),
+				status_label=str(status_label),
+				status_badge_class=status_badge_class,
 				total=cotizacion.total,
 				date=cotizacion.fecha,
 				detail_url=reverse('backoffice_cotizacion_detalle', args=[cotizacion.id]),
+				workflow_badge=build_quote_workflow_badge(cotizacion),
 			)
 		)
 	return rows
@@ -325,6 +342,7 @@ def _matches_dispatch_search(row, search_term):
 		row.selector_name or '',
 		str(row.origin_label or ''),
 		str(row.status_label or ''),
+		(row.workflow_badge or {}).get('label', '') if isinstance(row.workflow_badge, dict) else '',
 	]).lower()
 	return query in haystack
 

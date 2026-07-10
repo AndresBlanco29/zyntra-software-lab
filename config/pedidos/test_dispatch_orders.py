@@ -177,12 +177,12 @@ class DispatchOrderClassificationTests(TestCase):
 		verified_row = self._order_row_for_pedido(verified_pedido.id)
 		driver_row = self._order_row_for_pedido(driver_pedido.id)
 
-		self.assertEqual(picking_row.status_label, 'Picking in progress')
-		self.assertEqual(verified_row.status_label, 'Verified')
-		self.assertEqual(driver_row.status_label, 'With driver')
-		self.assertEqual(driver_row.workflow_badge.label, self.driver.username)
+		self.assertEqual(picking_row.status_label, 'Sent to picking')
+		self.assertEqual(verified_row.status_label, 'Picking adjusted and returned')
+		self.assertEqual(driver_row.status_label, 'Sent to driver')
+		self.assertEqual(driver_row.workflow_badge['label'], self.driver.username)
 
-	def test_completed_dispatch_order_shows_delivered_status(self):
+	def test_completed_dispatch_order_shows_completed_status(self):
 		pedido = self._create_verified_pedido()
 		invoice = generar_invoice_desde_picking(
 			pedido=pedido,
@@ -197,5 +197,17 @@ class DispatchOrderClassificationTests(TestCase):
 		pedido.save(update_fields=['estado', 'actualizada_en'])
 
 		row = self._order_row_for_pedido(pedido.id, view_mode='completed')
-		self.assertEqual(row.status_label, 'Delivered')
-		self.assertEqual(row.workflow_badge.label, 'Delivered')
+		self.assertEqual(row.status_label, 'Completed')
+		self.assertEqual(row.workflow_badge['label'], 'Delivery completed')
+
+	def test_backoffice_managed_orders_stay_in_pending_tab(self):
+		managed_pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='VENDEDOR',
+			estado='EN_GESTION',
+			total=Decimal('75.00'),
+		)
+
+		self.assertIn(managed_pedido.id, self._order_ids_for_view('pending'))
+		row = self._order_row_for_pedido(managed_pedido.id, view_mode='pending')
+		self.assertEqual(row.status_label, 'Purchase order · BackOffice')

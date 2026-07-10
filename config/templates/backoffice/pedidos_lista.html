@@ -5,7 +5,10 @@
 
 {% block content %}
 <h2 class="mb-4">{% trans "Orders for dispatch" %}</h2>
-<p class="text-muted">{% trans "Customer requests and sales orders ready to manage, pick, and ship." %}</p>
+<p class="text-muted mb-2">{% trans "Customer requests and sales orders ready to manage, pick, and ship." %}</p>
+<p class="text-muted small mb-3">
+  {% trans "Pending: new requests and orders with BackOffice. In progress: picking, invoice, and delivery. Completed: delivered and closed." %}
+</p>
 
 <div class="btn-group mb-3" role="group" aria-label="{% trans 'Order views' %}">
   <a href="{% url 'backoffice_pedidos' %}{% if search_query %}?q={{ search_query|urlencode }}{% endif %}" class="btn {% if view_mode == 'pending' %}btn-primary{% else %}btn-outline-primary{% endif %}">

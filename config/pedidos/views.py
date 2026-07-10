@@ -373,10 +373,38 @@ def backoffice_crm_pipeline(request):
 @login_required
 @internal_permission_required('backoffice.orders.view')
 def backoffice_pedido_detalle(request, pedido_id):
-	pedido = get_object_or_404(
-		Pedido.objects.select_related('cliente__usuario', 'vendedor', 'seleccionador', 'invoice', 'invoice__driver').prefetch_related('items__presentacion__producto', 'items__presentacion__stock_operativo', 'items__selector_original_presentacion'),
-		id=pedido_id,
+	pedido = (
+		Pedido.objects.select_related(
+			'cliente__usuario',
+			'vendedor',
+			'seleccionador',
+			'invoice',
+			'invoice__driver',
+			'invoice__delivery',
+		)
+		.prefetch_related(
+			'items__presentacion__producto',
+			'items__presentacion__stock_operativo',
+			'items__selector_original_presentacion',
+		)
+		.filter(id=pedido_id)
+		.first()
 	)
+	if pedido is None:
+		from config.cotizaciones.models import Cotizacion
+
+		cotizacion = Cotizacion.objects.filter(id=pedido_id, pedido_generado__isnull=True).first()
+		if cotizacion is not None:
+			messages.info(
+				request,
+				_('Opening quote #%(id)s. That reference belongs to a quotation, not a sales order.') % {
+					'id': cotizacion.id,
+				},
+			)
+			return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
+		messages.error(request, _('Sales order #%(id)s was not found.') % {'id': pedido_id})
+		return redirect('backoffice_pedidos')
+
 	pedido_items = list(pedido.items.select_related('presentacion__producto', 'presentacion__stock_operativo'))
 	pedido.workflow_badge = build_order_workflow_badge(pedido)
 	picker_stock_evaluation = evaluar_stock_fisico_verificacion_picking(

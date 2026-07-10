@@ -152,10 +152,19 @@ def _pedido_is_cancelled(pedido, *, reversed_invoice_pedido_ids=None):
 
 
 def _get_pedido_delivery(pedido):
-	invoice = getattr(pedido, 'invoice', None)
-	if not invoice:
-		return None
-	return getattr(invoice, 'delivery', None)
+	from config.core.workflow_badges import _safe_related
+
+	invoice = _safe_related(pedido, 'invoice')
+	return _safe_related(invoice, 'delivery')
+
+
+def _pedido_manage_url(pedido):
+	from config.core.workflow_badges import _safe_related
+
+	invoice = _safe_related(pedido, 'invoice')
+	if invoice is not None and getattr(invoice, 'estado', '') != 'ANULADA':
+		return reverse('backoffice_invoice_detail', args=[invoice.id])
+	return reverse('backoffice_pedido_detalle', args=[pedido.id])
 
 
 def _empty_process_stage_buckets():
@@ -349,7 +358,7 @@ def _pedido_rows_from_pedidos(*, pedidos, bucket):
 				status_badge_class=status_badge_class,
 				total=pedido.total,
 				date=pedido.creada_en,
-				detail_url=reverse('backoffice_pedido_detalle', args=[pedido.id]),
+				detail_url=_pedido_manage_url(pedido),
 				workflow_badge=build_order_workflow_badge(pedido),
 			)
 		)

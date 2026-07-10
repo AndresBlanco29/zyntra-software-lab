@@ -22,6 +22,16 @@ def _role_style(role):
     return ROLE_STYLES.get(role, ROLE_STYLES['backoffice'])
 
 
+def _safe_related(obj, attr_name):
+    """Safely read reverse OneToOne / FK relations that may raise DoesNotExist."""
+    if obj is None:
+        return None
+    try:
+        return getattr(obj, attr_name)
+    except Exception:
+        return None
+
+
 def _split_badge(*, sender_role, receiver_role, label=None):
     sender_style = _role_style(sender_role)
     receiver_style = _role_style(receiver_role)
@@ -78,8 +88,8 @@ def build_quote_workflow_badge(cotizacion):
 def build_order_workflow_badge(pedido):
     estado = getattr(pedido, 'estado', '') or ''
     origen = getattr(pedido, 'origen', '') or ''
-    invoice = getattr(pedido, 'invoice', None)
-    delivery = getattr(invoice, 'delivery', None) if invoice else None
+    invoice = _safe_related(pedido, 'invoice')
+    delivery = _safe_related(invoice, 'delivery')
     selector = getattr(pedido, 'seleccionador', None)
     selector_label = (selector.get_full_name() or selector.username) if selector else ''
 

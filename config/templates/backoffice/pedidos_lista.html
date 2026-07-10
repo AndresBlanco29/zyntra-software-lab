@@ -5,28 +5,18 @@
 
 {% block content %}
 <h2 class="mb-4">{% trans "Orders for dispatch" %}</h2>
-<p class="text-muted mb-2">{% trans "Customer requests and sales orders ready to manage, pick, and ship." %}</p>
-<p class="text-muted small mb-3">
-  {% trans "Pending: new requests and orders with BackOffice. In progress: picking, invoice, and delivery. Completed: delivered and closed." %}
-</p>
+<p class="text-muted mb-3">{% trans "Customer requests and sales orders ready to manage, pick, and ship." %}</p>
 
-<div class="btn-group mb-3" role="group" aria-label="{% trans 'Order views' %}">
-  <a href="{% url 'backoffice_pedidos' %}{% if search_query %}?q={{ search_query|urlencode }}{% endif %}" class="btn {% if view_mode == 'pending' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-    {% trans "Pending orders" %}
-    <span class="badge {% if view_mode == 'pending' %}bg-light text-primary{% else %}bg-primary{% endif %} ms-1">{{ pending_count }}</span>
+<div class="dispatch-process-tabs d-flex flex-wrap gap-2 mb-4" role="group" aria-label="{% trans 'Order process stages' %}">
+  {% for stage in process_stages %}
+  <a
+    href="{% url 'backoffice_pedidos' %}?view={{ stage.key }}{% if search_query %}&q={{ search_query|urlencode }}{% endif %}"
+    class="btn btn-sm {% if view_mode == stage.key %}btn-{{ stage.button_style }}{% else %}btn-outline-{{ stage.button_style }}{% endif %}"
+  >
+    {{ stage.label }}
+    <span class="badge {% if view_mode == stage.key %}bg-light text-dark{% else %}bg-{{ stage.button_style }}{% if stage.button_style == 'warning' %} text-dark{% endif %}{% endif %} ms-1">{{ stage.count }}</span>
   </a>
-  <a href="{% url 'backoffice_pedidos' %}?view=in-progress{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn {% if view_mode == 'in-progress' %}btn-warning{% else %}btn-outline-warning{% endif %}">
-    {% trans "Orders in progress" %}
-    <span class="badge {% if view_mode == 'in-progress' %}bg-light text-dark{% else %}bg-warning text-dark{% endif %} ms-1">{{ in_progress_count }}</span>
-  </a>
-  <a href="{% url 'backoffice_pedidos' %}?view=completed{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn {% if view_mode == 'completed' %}btn-success{% else %}btn-outline-success{% endif %}">
-    {% trans "Completed orders" %}
-    <span class="badge {% if view_mode == 'completed' %}bg-light text-success{% else %}bg-success{% endif %} ms-1">{{ completed_count }}</span>
-  </a>
-  <a href="{% url 'backoffice_pedidos' %}?view=cancelled{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn {% if view_mode == 'cancelled' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-    {% trans "Cancelled orders" %}
-    <span class="badge {% if view_mode == 'cancelled' %}bg-light text-secondary{% else %}bg-secondary{% endif %} ms-1">{{ cancelled_count }}</span>
-  </a>
+  {% endfor %}
 </div>
 
 <form method="get" class="d-flex flex-wrap gap-2 mb-4 align-items-center">
@@ -111,4 +101,12 @@
 
   {% pagination_controls page_obj aria_label=_('Order pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0 px-3 pb-3" view=view_mode q=search_query %}
 </div>
+
+<style>
+  .dispatch-process-tabs .btn {
+    white-space: normal;
+    text-align: left;
+    max-width: 100%;
+  }
+</style>
 {% endblock %}

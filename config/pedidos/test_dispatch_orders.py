@@ -75,7 +75,7 @@ class DispatchOrderClassificationTests(TestCase):
 		pedido.refresh_from_db()
 
 		self.assertEqual(pedido.estado, 'CANCELADO')
-		self.assertNotIn(pedido.id, self._order_ids_for_view('in-progress'))
+		self.assertNotIn(pedido.id, self._order_ids_for_view('sent-to-picking'))
 		self.assertIn(pedido.id, self._order_ids_for_view('cancelled'))
 
 	def test_driver_completed_delivery_moves_order_to_completed_tab(self):
@@ -92,7 +92,7 @@ class DispatchOrderClassificationTests(TestCase):
 		pedido.estado = 'INVOICE_GENERADA'
 		pedido.save(update_fields=['estado', 'actualizada_en'])
 
-		self.assertNotIn(pedido.id, self._order_ids_for_view('in-progress'))
+		self.assertNotIn(pedido.id, self._order_ids_for_view('sent-to-driver'))
 		self.assertIn(pedido.id, self._order_ids_for_view('completed'))
 
 	def test_dispatch_counts_reflect_cancelled_and_completed_buckets(self):
@@ -142,12 +142,13 @@ class DispatchOrderClassificationTests(TestCase):
 			total=Decimal('99.00'),
 		)
 
-		self.assertNotIn(imported_pedido.id, self._order_ids_for_view('in-progress'))
+		self.assertNotIn(imported_pedido.id, self._order_ids_for_view('sent-to-driver'))
 		counts = get_dispatch_order_counts()
 		self.assertNotIn(imported_pedido.id, self._order_ids_for_view('pending'))
-		self.assertEqual(counts['in_progress_count'], len(self._order_ids_for_view('in-progress')))
+		self.assertIn('process_stages', counts)
+		self.assertEqual(len(counts['process_stages']), 9)
 
-	def _order_row_for_pedido(self, pedido_id, view_mode='in-progress'):
+	def _order_row_for_pedido(self, pedido_id, view_mode='sent-to-picking'):
 		_, page_obj = build_dispatch_order_page(view_mode=view_mode, page_number=1, page_size=50)
 		for row in page_obj:
 			if row.record_type == 'order' and row.source_id == pedido_id:
@@ -200,7 +201,7 @@ class DispatchOrderClassificationTests(TestCase):
 		self.assertEqual(row.status_label, 'Completed')
 		self.assertEqual(row.workflow_badge['label'], 'Delivery completed')
 
-	def test_backoffice_managed_orders_stay_in_pending_tab(self):
+	def test_backoffice_managed_orders_stay_in_purchase_order_tab(self):
 		managed_pedido = Pedido.objects.create(
 			cliente=self.cliente,
 			origen='VENDEDOR',
@@ -208,6 +209,6 @@ class DispatchOrderClassificationTests(TestCase):
 			total=Decimal('75.00'),
 		)
 
-		self.assertIn(managed_pedido.id, self._order_ids_for_view('pending'))
-		row = self._order_row_for_pedido(managed_pedido.id, view_mode='pending')
+		self.assertIn(managed_pedido.id, self._order_ids_for_view('purchase-order'))
+		row = self._order_row_for_pedido(managed_pedido.id, view_mode='purchase-order')
 		self.assertEqual(row.status_label, 'Purchase order · BackOffice')

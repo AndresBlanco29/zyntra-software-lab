@@ -22,6 +22,25 @@ PEDIDO_COMPLETED_STATUSES = {'DESPACHADO'}
 PEDIDO_CANCELLED_STATUSES = {'CANCELADO'}
 DELIVERED_DELIVERY_STATUSES = {'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'}
 
+DISPATCH_PROCESS_STAGES = (
+	('pending', _('Pending orders'), 'primary'),
+	('quotation-sent', _('Quotation sent to client'), 'info'),
+	('purchase-order', _('Purchase order · BackOffice'), 'warning'),
+	('sent-to-picking', _('Sent to picking'), 'warning'),
+	('picking-returned', _('Picking adjusted and returned'), 'info'),
+	('sent-to-driver', _('Sent to driver'), 'primary'),
+	('customer-pickup', _('Customer pick up'), 'info'),
+	('completed', _('Completed orders'), 'success'),
+	('cancelled', _('Cancelled orders'), 'secondary'),
+)
+
+LEGACY_IN_PROGRESS_STAGE_KEYS = (
+	'sent-to-picking',
+	'picking-returned',
+	'sent-to-driver',
+	'customer-pickup',
+)
+
 
 @dataclass
 class DispatchOrderRow:
@@ -132,41 +151,95 @@ def _pedido_is_cancelled(pedido, *, reversed_invoice_pedido_ids=None):
 	return pedido.id in _load_reversed_invoice_pedido_ids([pedido.id])
 
 
-def _pedido_dispatch_bucket(pedido, *, reversed_invoice_pedido_ids=None):
-	if _pedido_is_cancelled(pedido, reversed_invoice_pedido_ids=reversed_invoice_pedido_ids):
-		return 'cancelled'
-	if _pedido_is_completed(pedido):
-		return 'completed'
-	if pedido.estado in PEDIDO_PENDING_STATUSES:
-		return 'pending'
-	if pedido.estado in PEDIDO_IN_PROGRESS_STATUSES:
-		return 'in-progress'
-	return None
-
-
-def _classify_pedidos(pedido_queryset):
-	pedidos = list(pedido_queryset)
-	reversed_invoice_pedido_ids = _load_reversed_invoice_pedido_ids([pedido.id for pedido in pedidos])
-	buckets = {
-		'pending': [],
-		'in-progress': [],
-		'completed': [],
-		'cancelled': [],
-	}
-	for pedido in pedidos:
-		bucket = _pedido_dispatch_bucket(pedido, reversed_invoice_pedido_ids=reversed_invoice_pedido_ids)
-		if bucket:
-			buckets[bucket].append(pedido)
-	for bucket_name in buckets:
-		buckets[bucket_name].sort(key=lambda pedido: pedido.creada_en, reverse=True)
-	return buckets
-
-
 def _get_pedido_delivery(pedido):
 	invoice = getattr(pedido, 'invoice', None)
 	if not invoice:
 		return None
 	return getattr(invoice, 'delivery', None)
+
+
+def _empty_process_stage_buckets():
+	return {stage_key: {'pedidos': [], 'quotes': []} for stage_key, _label, _style in DISPATCH_PROCESS_STAGES}
+
+
+def _resolve_quote_process_stage(cotizacion):
+	return {
+		'ENVIADA': 'pending',
+		'LISTA_PARA_CONFIRMACION': 'quotation-sent',
+		'CONFIRMADA_CLIENTE': 'purchase-order',
+		'CANCELADA_CLIENTE': 'cancelled',
+		'APROBADA': 'completed',
+		'RECHAZADA': 'completed',
+		'BORRADOR': 'completed',
+	}.get(cotizacion.estado)
+
+
+def _resolve_pedido_process_stage(pedido, *, reversed_invoice_pedido_ids=None):
+	if _pedido_is_cancelled(pedido, reversed_invoice_pedido_ids=reversed_invoice_pedido_ids):
+		return 'cancelled'
+	if _pedido_is_completed(pedido):
+		return 'completed'
+
+	estado = pedido.estado
+	delivery = _get_pedido_delivery(pedido)
+	invoice = getattr(pedido, 'invoice', None)
+
+	if estado == 'RECIBIDO':
+		return 'pending'
+	if estado in {'EN_GESTION', 'LISTO_PARA_PICKING'}:
+		return 'purchase-order'
+	if estado == 'PARA_VERIFICAR':
+		return 'sent-to-picking'
+	if estado == 'VERIFICADO_AJUSTADO':
+		return 'picking-returned'
+	if estado == 'INVOICE_GENERADA' or (invoice and invoice.estado == 'GENERADA'):
+		if delivery and getattr(delivery, 'is_customer_pickup', False):
+			return 'customer-pickup'
+		return 'sent-to-driver'
+	return None
+
+
+def _classify_dispatch_records(*, pedidos, quotes):
+	reversed_invoice_pedido_ids = _load_reversed_invoice_pedido_ids([pedido.id for pedido in pedidos])
+	buckets = _empty_process_stage_buckets()
+
+	for pedido in pedidos:
+		stage = _resolve_pedido_process_stage(pedido, reversed_invoice_pedido_ids=reversed_invoice_pedido_ids)
+		if stage:
+			buckets[stage]['pedidos'].append(pedido)
+
+	for cotizacion in quotes:
+		stage = _resolve_quote_process_stage(cotizacion)
+		if stage:
+			buckets[stage]['quotes'].append(cotizacion)
+
+	for stage_key in buckets:
+		buckets[stage_key]['pedidos'].sort(key=lambda pedido: pedido.creada_en, reverse=True)
+		buckets[stage_key]['quotes'].sort(key=lambda cotizacion: cotizacion.fecha, reverse=True)
+	return buckets
+
+
+def _normalize_dispatch_view_mode(view_mode):
+	view_mode = (view_mode or 'pending').strip()
+	valid_stage_keys = {stage_key for stage_key, _label, _style in DISPATCH_PROCESS_STAGES}
+	if view_mode in valid_stage_keys:
+		return view_mode
+	if view_mode == 'in-progress':
+		return 'sent-to-picking'
+	return 'pending'
+
+
+def get_dispatch_process_stages(*, stage_counts=None):
+	counts = stage_counts or {}
+	return [
+		{
+			'key': stage_key,
+			'label': str(label),
+			'button_style': button_style,
+			'count': counts.get(stage_key, 0),
+		}
+		for stage_key, label, button_style in DISPATCH_PROCESS_STAGES
+	]
 
 
 def _resolve_quote_operational_status(cotizacion):
@@ -228,14 +301,9 @@ def _pedido_status_display(pedido, *, bucket):
 	return str(label), badge_class
 
 
-def _quote_rows_for_statuses(*, statuses):
+def _quote_rows_from_quotes(*, quotes, bucket):
 	rows = []
-	queryset = (
-		Cotizacion.objects.select_related('cliente__usuario', 'vendedor', 'pedido_generado')
-		.filter(estado__in=statuses, pedido_generado__isnull=True)
-		.order_by('-fecha')
-	)
-	for cotizacion in queryset:
+	for cotizacion in quotes:
 		status_label, status_badge_class = _resolve_quote_operational_status(cotizacion)
 		rows.append(
 			DispatchOrderRow(
@@ -254,6 +322,15 @@ def _quote_rows_for_statuses(*, statuses):
 			)
 		)
 	return rows
+
+
+def _quote_rows_for_statuses(*, statuses):
+	queryset = (
+		Cotizacion.objects.select_related('cliente__usuario', 'vendedor', 'pedido_generado')
+		.filter(estado__in=statuses, pedido_generado__isnull=True)
+		.order_by('-fecha')
+	)
+	return _quote_rows_from_quotes(quotes=list(queryset), bucket='')
 
 
 def _pedido_rows_from_pedidos(*, pedidos, bucket):
@@ -294,41 +371,36 @@ def _pedido_base_queryset():
 	).prefetch_related('items')
 
 
-def _count_pedido_buckets():
+def _load_open_quotes():
+	return list(
+		_open_quote_queryset()
+		.select_related('cliente__usuario', 'vendedor', 'pedido_generado')
+		.order_by('-fecha')
+	)
+
+
+def _count_process_stage_buckets():
 	pedidos = list(_pedido_base_queryset())
-	reversed_invoice_pedido_ids = _load_reversed_invoice_pedido_ids([pedido.id for pedido in pedidos])
-	buckets = {
-		'pending': 0,
-		'in-progress': 0,
-		'completed': 0,
-		'cancelled': 0,
+	quotes = _load_open_quotes()
+	stage_buckets = _classify_dispatch_records(pedidos=pedidos, quotes=quotes)
+	return {
+		stage_key: len(stage_buckets[stage_key]['pedidos']) + len(stage_buckets[stage_key]['quotes'])
+		for stage_key, _label, _style in DISPATCH_PROCESS_STAGES
 	}
-	for pedido in pedidos:
-		bucket = _pedido_dispatch_bucket(pedido, reversed_invoice_pedido_ids=reversed_invoice_pedido_ids)
-		if bucket:
-			buckets[bucket] += 1
-	return buckets
 
 
 def get_dispatch_order_counts():
-	open_quotes = _open_quote_queryset()
-	pedido_buckets = _count_pedido_buckets()
+	stage_counts = _count_process_stage_buckets()
+	process_stages = get_dispatch_process_stages(stage_counts=stage_counts)
 	return {
-		'pending_count': (
-			open_quotes.filter(estado__in=QUOTE_PENDING_STATUSES).count()
-			+ pedido_buckets['pending']
-		),
-		'in_progress_count': pedido_buckets['in-progress'],
-		'completed_count': (
-			pedido_buckets['completed']
-			+ open_quotes.filter(estado__in=QUOTE_COMPLETED_STATUSES).count()
-		),
-		'cancelled_count': (
-			pedido_buckets['cancelled']
-			+ open_quotes.filter(estado__in=QUOTE_CANCELLED_STATUSES).count()
-		),
-		'pending_requests_count': open_quotes.filter(estado__in=QUOTE_PENDING_STATUSES).count(),
-		'pending_dispatch_count': pedido_buckets['pending'],
+		'stage_counts': stage_counts,
+		'process_stages': process_stages,
+		'pending_count': stage_counts.get('pending', 0),
+		'in_progress_count': sum(stage_counts.get(stage_key, 0) for stage_key in LEGACY_IN_PROGRESS_STAGE_KEYS),
+		'completed_count': stage_counts.get('completed', 0),
+		'cancelled_count': stage_counts.get('cancelled', 0),
+		'pending_requests_count': stage_counts.get('pending', 0),
+		'pending_dispatch_count': stage_counts.get('pending', 0) + stage_counts.get('purchase-order', 0),
 	}
 
 
@@ -354,20 +426,13 @@ def _filter_dispatch_rows(rows, *, search_term):
 
 
 def build_dispatch_order_page(*, view_mode, page_number, page_size, search_term=''):
-	pedido_buckets = _classify_pedidos(_pedido_base_queryset())
-
-	if view_mode == 'in-progress':
-		rows = _pedido_rows_from_pedidos(pedidos=pedido_buckets['in-progress'], bucket='in-progress')
-	elif view_mode == 'completed':
-		rows = _pedido_rows_from_pedidos(pedidos=pedido_buckets['completed'], bucket='completed')
-		rows.extend(_quote_rows_for_statuses(statuses=QUOTE_COMPLETED_STATUSES))
-	elif view_mode == 'cancelled':
-		rows = _pedido_rows_from_pedidos(pedidos=pedido_buckets['cancelled'], bucket='cancelled')
-		rows.extend(_quote_rows_for_statuses(statuses=QUOTE_CANCELLED_STATUSES))
-	else:
-		view_mode = 'pending'
-		rows = _quote_rows_for_statuses(statuses=QUOTE_PENDING_STATUSES)
-		rows.extend(_pedido_rows_from_pedidos(pedidos=pedido_buckets['pending'], bucket='pending'))
+	view_mode = _normalize_dispatch_view_mode(view_mode)
+	pedidos = list(_pedido_base_queryset())
+	quotes = _load_open_quotes()
+	stage_buckets = _classify_dispatch_records(pedidos=pedidos, quotes=quotes)
+	selected_bucket = stage_buckets[view_mode]
+	rows = _pedido_rows_from_pedidos(pedidos=selected_bucket['pedidos'], bucket=view_mode)
+	rows.extend(_quote_rows_from_quotes(quotes=selected_bucket['quotes'], bucket=view_mode))
 
 	rows = _filter_dispatch_rows(rows, search_term=search_term)
 	rows.sort(key=lambda row: row.date, reverse=True)

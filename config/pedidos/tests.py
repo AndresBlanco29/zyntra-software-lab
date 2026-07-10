@@ -1279,8 +1279,8 @@ class PickingVerificationFlowTests(TestCase):
 
 		self.client.force_login(self.backoffice)
 
-		in_progress_response = self.client.get(reverse('backoffice_pedidos'), {'view': 'in-progress'})
-		self.assertContains(in_progress_response, 'Orders in progress')
+		in_progress_response = self.client.get(reverse('backoffice_pedidos'), {'view': 'sent-to-picking'})
+		self.assertContains(in_progress_response, 'Sent to picking')
 		self.assertEqual(
 			[row.source_id for row in in_progress_response.context['dispatch_orders'] if row.record_type == 'order'],
 			[in_progress_order.id],
@@ -1311,8 +1311,8 @@ class PickingVerificationFlowTests(TestCase):
 			)
 
 		self.client.force_login(self.backoffice)
-		first_page = self.client.get(reverse('backoffice_pedidos'), {'view': 'in-progress'})
-		second_page = self.client.get(reverse('backoffice_pedidos'), {'view': 'in-progress', 'page': 2})
+		first_page = self.client.get(reverse('backoffice_pedidos'), {'view': 'purchase-order'})
+		second_page = self.client.get(reverse('backoffice_pedidos'), {'view': 'purchase-order', 'page': 2})
 
 		self.assertEqual(len(list(first_page.context['dispatch_orders'])), 2)
 		self.assertContains(first_page, 'Page 1 of')
@@ -1335,12 +1335,12 @@ class PickingVerificationFlowTests(TestCase):
 		)
 
 		self.client.force_login(self.backoffice)
-		response = self.client.get(reverse('backoffice_pedidos'), {'view': 'in-progress'})
+		response = self.client.get(reverse('backoffice_pedidos'), {'view': 'purchase-order'})
 		visible_ids = [row.source_id for row in response.context['dispatch_orders'] if row.record_type == 'order']
 
 		self.assertEqual(visible_ids, [in_progress_order.id])
 		self.assertNotIn(imported_pedido.id, visible_ids)
-		self.assertEqual(response.context['in_progress_count'], 1)
+		self.assertEqual(response.context['stage_counts']['purchase-order'], 1)
 
 	def test_backoffice_order_list_can_search_within_active_tab(self):
 		target_order = Pedido.objects.create(
@@ -1358,7 +1358,7 @@ class PickingVerificationFlowTests(TestCase):
 
 		self.client.force_login(self.backoffice)
 		response = self.client.get(reverse('backoffice_pedidos'), {
-			'view': 'in-progress',
+			'view': 'purchase-order',
 			'q': str(target_order.id),
 		})
 

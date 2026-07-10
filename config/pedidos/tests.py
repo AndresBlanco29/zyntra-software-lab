@@ -1715,3 +1715,193 @@ class PedidoItemDiscountTests(TestCase):
 		self.assertEqual(item.descuento_monto_unitario, Decimal('2.00'))
 		self.assertEqual(item.precio_unitario, Decimal('10.00'))
 		self.assertEqual(item.subtotal, Decimal('20.00'))
+
+
+class PartialOrderFlowTests(TestCase):
+	def setUp(self):
+		self.backoffice = Usuario.objects.create_user(username='bo-partial', password='secret123', role='backoffice')
+		self.selector = Usuario.objects.create_user(username='sel-partial', password='secret123', role='seleccionador')
+		self.customer_user = Usuario.objects.create_user(
+			username='cust-partial',
+			password='secret123',
+			role='cliente',
+			email='partial@example.com',
+		)
+		self.cliente = Cliente.objects.create(
+			usuario=self.customer_user,
+			nombre_empresa='Partial Customer',
+			telefono='5550001111',
+			direccion='1 Test St',
+			ciudad='Marietta',
+			estado='GA',
+			codigo_postal='30062',
+			pais='USA',
+			sales_tax_number='TAX-P',
+			certificado_tax=SimpleUploadedFile('certificado.txt', b'certificado'),
+			aprobado=True,
+		)
+		categoria = Categoria.objects.create(nombre='Cat partial')
+		marca = Marca.objects.create(nombre='Marca partial')
+		producto_a = Producto.objects.create(nombre='Coca Cola', categoria=categoria, marca=marca, activo=True)
+		producto_b = Producto.objects.create(nombre='Jarritos', categoria=categoria, marca=marca, activo=True)
+		self.presentacion_a = Presentacion.objects.create(
+			producto=producto_a,
+			nombre='Caja',
+			unidades=1,
+			tipo_contenido='caja',
+			costo=Decimal('10.00'),
+			precio_1=Decimal('30.00'),
+		)
+		self.presentacion_b = Presentacion.objects.create(
+			producto=producto_b,
+			nombre='Caja',
+			unidades=1,
+			tipo_contenido='caja',
+			costo=Decimal('8.00'),
+			precio_1=Decimal('20.00'),
+		)
+		registrar_entrada_manual(presentacion=self.presentacion_a, cantidad=200, observacion='Stock A')
+		registrar_entrada_manual(presentacion=self.presentacion_b, cantidad=200, observacion='Stock B')
+
+		from config.pedidos.services import crear_pedido_desde_items
+
+		self.pedido = crear_pedido_desde_items(
+			cliente=self.cliente,
+			origen='BACKOFFICE',
+			vendedor=None,
+			reservar_inventario=True,
+			items_payload=[
+				{'presentacion': self.presentacion_a, 'cantidad': 60, 'precio': Decimal('30.00')},
+				{'presentacion': self.presentacion_b, 'cantidad': 120, 'precio': Decimal('20.00')},
+			],
+		)
+		self.item_a = self.pedido.items.get(presentacion=self.presentacion_a)
+		self.item_b = self.pedido.items.get(presentacion=self.presentacion_b)
+
+	def test_create_partial_order_reduces_root_and_sets_display(self):
+		from config.pedidos.services import crear_pedido_parcial
+
+		parcial = crear_pedido_parcial(
+			pedido=self.pedido,
+			lineas_payload=[{'item_id': self.item_a.id, 'cantidad': 30}],
+			usuario=self.backoffice,
+		)
+
+		self.pedido.refresh_from_db()
+		self.item_a.refresh_from_db()
+		self.item_b.refresh_from_db()
+
+		self.assertTrue(parcial.es_parcial)
+		self.assertEqual(parcial.pedido_raiz_id, self.pedido.id)
+		self.assertEqual(parcial.indice_parcial, 1)
+		self.assertEqual(parcial.numero_display, f'{self.pedido.id}-P1')
+		self.assertEqual(self.pedido.numero_display, str(self.pedido.id))
+		self.assertEqual(self.item_a.cantidad, 30)
+		self.assertEqual(self.item_a.cantidad_solicitada, 60)
+		self.assertEqual(self.item_b.cantidad, 120)
+		self.assertEqual(parcial.items.count(), 1)
+		child = parcial.items.get()
+		self.assertEqual(child.cantidad, 30)
+		self.assertEqual(child.cantidad_solicitada, 30)
+		self.assertEqual(child.item_origen_id, self.item_a.id)
+
+	def test_second_partial_uses_p2_index(self):
+		from config.pedidos.services import crear_pedido_parcial
+
+		crear_pedido_parcial(
+			pedido=self.pedido,
+			lineas_payload=[{'item_id': self.item_a.id, 'cantidad': 20}],
+			usuario=self.backoffice,
+		)
+		parcial_2 = crear_pedido_parcial(
+			pedido=self.pedido,
+			lineas_payload=[{'item_id': self.item_a.id, 'cantidad': 10}],
+			usuario=self.backoffice,
+		)
+
+		self.assertEqual(parcial_2.indice_parcial, 2)
+		self.assertEqual(parcial_2.numero_display, f'{self.pedido.id}-P2')
+		self.item_a.refresh_from_db()
+		self.assertEqual(self.item_a.cantidad, 30)
+
+	def test_rejects_quantity_above_pending(self):
+		from config.pedidos.services import crear_pedido_parcial
+
+		with self.assertRaises(ValidationError):
+			crear_pedido_parcial(
+				pedido=self.pedido,
+				lineas_payload=[{'item_id': self.item_a.id, 'cantidad': 61}],
+				usuario=self.backoffice,
+			)
+
+	def test_rejects_empty_partial(self):
+		from config.pedidos.services import crear_pedido_parcial
+
+		with self.assertRaises(ValidationError):
+			crear_pedido_parcial(pedido=self.pedido, lineas_payload=[], usuario=self.backoffice)
+
+	def test_rejects_partial_when_invoice_exists(self):
+		from config.pedidos.services import crear_pedido_parcial
+
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item_a.id: 60, self.item_b.id: 120},
+			nota='OK',
+			nota_resuelta=True,
+		)
+		generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		self.pedido.refresh_from_db()
+
+		with self.assertRaises(ValidationError):
+			crear_pedido_parcial(
+				pedido=self.pedido,
+				lineas_payload=[{'item_id': self.item_a.id, 'cantidad': 10}],
+				usuario=self.backoffice,
+			)
+
+	def test_partial_can_be_assigned_to_picker(self):
+		from config.pedidos.services import crear_pedido_parcial
+
+		parcial = crear_pedido_parcial(
+			pedido=self.pedido,
+			lineas_payload=[{'item_id': self.item_a.id, 'cantidad': 30}],
+			usuario=self.backoffice,
+		)
+		asignar_picking_a_seleccionador(pedido=parcial, seleccionador=self.selector)
+		parcial.refresh_from_db()
+		self.assertEqual(parcial.estado, 'PARA_VERIFICAR')
+		self.assertEqual(parcial.seleccionador_id, self.selector.id)
+
+	def test_backoffice_partial_confirm_flow(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedido_partial', args=[self.pedido.id]))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Create Partial Order')
+
+		response = self.client.post(
+			reverse('backoffice_pedido_partial', args=[self.pedido.id]),
+			{
+				f'select_{self.item_a.id}': '1',
+				f'qty_{self.item_a.id}': '30',
+			},
+		)
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Confirm Partial Order')
+
+		response = self.client.post(
+			reverse('backoffice_pedido_partial_confirm', args=[self.pedido.id]),
+			{
+				f'select_{self.item_a.id}': '1',
+				f'qty_{self.item_a.id}': '30',
+			},
+		)
+		parcial = Pedido.objects.filter(pedido_raiz=self.pedido).get()
+		self.assertRedirects(response, reverse('backoffice_pedido_detalle', args=[parcial.id]))
+		self.assertEqual(parcial.numero_display, f'{self.pedido.id}-P1')

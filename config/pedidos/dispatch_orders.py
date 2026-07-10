@@ -56,6 +56,7 @@ class DispatchOrderRow:
 	date: datetime
 	detail_url: str
 	workflow_badge: Optional[object] = None
+	display_ref: str = ''
 
 
 def _quote_status_badge_class(estado):
@@ -328,6 +329,7 @@ def _quote_rows_from_quotes(*, quotes, bucket):
 				date=cotizacion.fecha,
 				detail_url=reverse('backoffice_cotizacion_detalle', args=[cotizacion.id]),
 				workflow_badge=build_quote_workflow_badge(cotizacion),
+				display_ref=str(cotizacion.id),
 			)
 		)
 	return rows
@@ -360,6 +362,7 @@ def _pedido_rows_from_pedidos(*, pedidos, bucket):
 				date=pedido.creada_en,
 				detail_url=_pedido_manage_url(pedido),
 				workflow_badge=build_order_workflow_badge(pedido),
+				display_ref=pedido.numero_display,
 			)
 		)
 	return rows

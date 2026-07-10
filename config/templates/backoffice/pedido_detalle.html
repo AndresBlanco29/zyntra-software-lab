@@ -1,7 +1,7 @@
 {% extends "bases/base_vendedor.html" %}
 {% load static i18n l10n permissions_tags shipment_summary_tags %}
 
-{% block title %}{% trans "Order" %} #{{ pedido.id }}{% endblock %}
+{% block title %}{% trans "Order" %} #{{ pedido.numero_display }}{% endblock %}
 
 {% block content %}
 <link rel="stylesheet" href="{% static 'css/pedido-product-search.css' %}">
@@ -28,8 +28,35 @@
     50% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
   }
 </style>
-<h2 class="mb-3">{% trans "Sales Order" %} #{{ pedido.id }}</h2>
-<p class="text-muted">{% trans "Customer" %}: {{ pedido.cliente.nombre_empresa }} | {% trans "Origin" %}: {{ pedido_origen_label }}</p>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <h2 class="mb-1">{% trans "Sales Order" %} #{{ pedido.numero_display }}</h2>
+    <p class="text-muted mb-0">{% trans "Customer" %}: {{ pedido.cliente.nombre_empresa }} | {% trans "Origin" %}: {{ pedido_origen_label }}</p>
+  </div>
+  {% if can_create_partial_order %}
+  <a href="{% url 'backoffice_pedido_partial' pedido.id %}" class="btn btn-outline-primary">
+    {% trans "Create Partial Order" %}
+  </a>
+  {% endif %}
+</div>
+{% if pedido.es_parcial and pedido_raiz %}
+<div class="alert alert-secondary mb-3">
+  {% trans "This is a partial order from" %}
+  <a href="{% url 'backoffice_pedido_detalle' pedido_raiz.id %}" class="fw-semibold">#{{ pedido_raiz.numero_display }}</a>.
+</div>
+{% endif %}
+{% if parciales_relacionadas %}
+<div class="alert alert-light border mb-3">
+  <div class="fw-semibold mb-1">{% trans "Related partial orders" %}</div>
+  <div class="d-flex flex-wrap gap-2">
+    {% for parcial in parciales_relacionadas %}
+    <a href="{% url 'backoffice_pedido_detalle' parcial.id %}" class="badge text-bg-{% if parcial.id == pedido.id %}primary{% else %}secondary{% endif %} text-decoration-none">
+      #{{ parcial.numero_display }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 {% if pedido.workflow_badge %}
 <div class="mb-3">
   <span class="workflow-role-badge {% if pedido.workflow_badge.kind == 'split' %}workflow-role-badge--split{% endif %}" style="--workflow-start: {{ pedido.workflow_badge.color_start }}; --workflow-end: {{ pedido.workflow_badge.color_end }}; --workflow-text: {{ pedido.workflow_badge.text_color }};">

@@ -1,0 +1,67 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Confirm Partial Order" %} #{{ pedido.numero_display }}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <h2 class="mb-1">{% trans "Confirm Partial Order" %}</h2>
+  <p class="text-muted mb-0">
+    {% trans "Review the split before creating the new order from" %}
+    <strong>#{{ pedido.numero_display }}</strong>.
+  </p>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100 border-primary">
+      <div class="card-header bg-primary text-white fw-semibold">{% trans "Goes to the new partial order" %}</div>
+      <div class="card-body">
+        <ul class="list-group list-group-flush">
+          {% for row in partial_rows %}
+          <li class="list-group-item d-flex justify-content-between gap-2">
+            <span>
+              <strong>{{ row.item.presentacion.producto.nombre }}</strong>
+              <span class="small text-muted d-block">{{ row.item.presentacion.nombre }}</span>
+            </span>
+            <span class="fw-semibold">{{ row.cantidad }}</span>
+          </li>
+          {% empty %}
+          <li class="list-group-item text-muted">{% trans "No products selected." %}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header fw-semibold">{% trans "Remains pending on the original order" %}</div>
+      <div class="card-body">
+        <ul class="list-group list-group-flush">
+          {% for row in remaining_rows %}
+          <li class="list-group-item d-flex justify-content-between gap-2">
+            <span>
+              <strong>{{ row.item.presentacion.producto.nombre }}</strong>
+              <span class="small text-muted d-block">{{ row.item.presentacion.nombre }}</span>
+            </span>
+            <span class="fw-semibold">{{ row.cantidad }}</span>
+          </li>
+          {% empty %}
+          <li class="list-group-item text-muted">{% trans "Nothing pending — all selected quantities will move to the partial order." %}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<form method="post" action="{% url 'backoffice_pedido_partial_confirm' pedido.id %}" class="d-flex flex-wrap gap-2 justify-content-end">
+  {% csrf_token %}
+  {% for line in lineas_payload %}
+  <input type="hidden" name="select_{{ line.item_id }}" value="1">
+  <input type="hidden" name="qty_{{ line.item_id }}" value="{{ line.cantidad }}">
+  {% endfor %}
+  <button type="submit" name="action" value="back" class="btn btn-outline-secondary">{% trans "Back" %}</button>
+  <button type="submit" class="btn btn-primary">{% trans "Confirm and create partial order" %}</button>
+</form>
+{% endblock %}

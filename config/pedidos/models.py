@@ -67,6 +67,14 @@ class Pedido(models.Model):
 	credit_limit_bloqueado = models.BooleanField(default=False)
 	acepta_terminos = models.BooleanField(default=False)
 	acepta_terminos_en = models.DateTimeField(blank=True, null=True)
+	pedido_raiz = models.ForeignKey(
+		'self',
+		on_delete=models.CASCADE,
+		null=True,
+		blank=True,
+		related_name='parciales',
+	)
+	indice_parcial = models.PositiveIntegerField(null=True, blank=True)
 	total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 	creada_en = models.DateTimeField(auto_now_add=True)
 	actualizada_en = models.DateTimeField(auto_now=True)
@@ -74,9 +82,29 @@ class Pedido(models.Model):
 	class Meta:
 		ordering = ('-creada_en',)
 		db_table = 'pedidos_pedidocompra'
+		constraints = [
+			models.UniqueConstraint(
+				fields=('pedido_raiz', 'indice_parcial'),
+				name='pedidos_pedido_raiz_indice_parcial_uniq',
+			),
+		]
 
 	def __str__(self):
-		return f"Pedido #{self.id} - {self.cliente.nombre_empresa}"
+		return f"Pedido #{self.numero_display} - {self.cliente.nombre_empresa}"
+
+	@property
+	def es_parcial(self):
+		return self.pedido_raiz_id is not None
+
+	@property
+	def pedido_raiz_efectivo(self):
+		return self.pedido_raiz if self.pedido_raiz_id else self
+
+	@property
+	def numero_display(self):
+		if self.pedido_raiz_id and self.indice_parcial:
+			return f'{self.pedido_raiz_id}-P{self.indice_parcial}'
+		return str(self.id or '')
 
 	@property
 	def tiene_nota_picking_pendiente(self):
@@ -97,6 +125,13 @@ class PedidoItem(models.Model):
 
 	pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE, related_name='items')
 	presentacion = models.ForeignKey(Presentacion, on_delete=models.CASCADE)
+	item_origen = models.ForeignKey(
+		'self',
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='items_parciales',
+	)
 	selector_original_presentacion = models.ForeignKey(
 		Presentacion,
 		on_delete=models.SET_NULL,

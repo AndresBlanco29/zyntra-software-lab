@@ -1,0 +1,103 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Create Partial Order" %} #{{ pedido.numero_display }}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <div>
+    <h2 class="mb-1">{% trans "Create Partial Order" %}</h2>
+    <p class="text-muted mb-0">
+      {% trans "From sales order" %}
+      <a href="{% url 'backoffice_pedido_detalle' pedido.id %}">#{{ pedido.numero_display }}</a>
+      — {{ pedido.cliente.nombre_empresa }}
+    </p>
+  </div>
+  <a href="{% url 'backoffice_pedido_detalle' pedido.id %}" class="btn btn-outline-secondary">{% trans "Cancel" %}</a>
+</div>
+
+<div class="alert alert-info">
+  {% trans "Select the products and quantities for this shipment. The original order will keep only the pending quantities." %}
+</div>
+
+<form method="post" id="partialOrderForm">
+  {% csrf_token %}
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width: 3rem;">{% trans "Include" %}</th>
+              <th>{% trans "Product" %}</th>
+              <th>{% trans "Pending qty" %}</th>
+              <th style="min-width: 8rem;">{% trans "Qty for this partial" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in pedido_items %}
+            <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  class="form-check-input js-partial-select"
+                  name="select_{{ item.id }}"
+                  value="1"
+                  data-item-id="{{ item.id }}"
+                  {% if item.partial_selected %}checked{% endif %}
+                >
+              </td>
+              <td>
+                <div class="fw-semibold">{{ item.presentacion.producto.nombre }}</div>
+                <div class="small text-muted">{{ item.presentacion.nombre }}</div>
+              </td>
+              <td>{{ item.cantidad }}</td>
+              <td>
+                <input
+                  type="number"
+                  min="1"
+                  max="{{ item.cantidad }}"
+                  class="form-control js-partial-qty"
+                  name="qty_{{ item.id }}"
+                  value="{{ item.partial_qty }}"
+                  data-item-id="{{ item.id }}"
+                  data-max="{{ item.cantidad }}"
+                >
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="text-muted">{% trans "No pending products on this order." %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="d-flex flex-wrap gap-2 justify-content-end">
+    <a href="{% url 'backoffice_pedido_detalle' pedido.id %}" class="btn btn-outline-secondary">{% trans "Cancel" %}</a>
+    <button type="submit" class="btn btn-primary">{% trans "Review partial order" %}</button>
+  </div>
+</form>
+
+<script>
+(function () {
+  const form = document.getElementById('partialOrderForm');
+  if (!form) return;
+  form.querySelectorAll('.js-partial-select').forEach(function (checkbox) {
+    const itemId = checkbox.getAttribute('data-item-id');
+    const qtyInput = form.querySelector('.js-partial-qty[data-item-id="' + itemId + '"]');
+    function sync() {
+      if (!qtyInput) return;
+      qtyInput.disabled = !checkbox.checked;
+      if (checkbox.checked && (!qtyInput.value || Number(qtyInput.value) < 1)) {
+        qtyInput.value = qtyInput.getAttribute('data-max') || '1';
+      }
+    }
+    checkbox.addEventListener('change', sync);
+    sync();
+  });
+})();
+</script>
+{% endblock %}

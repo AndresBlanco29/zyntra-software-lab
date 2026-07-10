@@ -63,7 +63,7 @@
       <tbody>
         {% for row in dispatch_orders %}
         <tr>
-          <td data-label="{% trans 'Ref.' %}">#{{ row.source_id }}</td>
+          <td data-label="{% trans 'Ref.' %}">#{{ row.display_ref|default:row.source_id }}</td>
           <td data-label="{% trans 'Type' %}">
             {% if row.record_type == 'quote' %}
               <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle">{% trans "Request" %}</span>

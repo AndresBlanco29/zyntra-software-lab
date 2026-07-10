@@ -28,7 +28,13 @@ def bind_field_remote_model(field, apps):
 
 
 def rebuild_field(name, field, apps):
-    path, args, kwargs = field.deconstruct()
+    deconstructed = field.deconstruct()
+    # Django historically returned (path, args, kwargs); newer versions may
+    # include the field name as a leading element: (name, path, args, kwargs).
+    if len(deconstructed) == 4:
+        _field_name, path, args, kwargs = deconstructed
+    else:
+        path, args, kwargs = deconstructed
     module_path, class_name = path.rsplit('.', 1)
     field_class = getattr(importlib.import_module(module_path), class_name)
     rebuilt = field_class(*args, **kwargs)

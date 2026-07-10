@@ -12,6 +12,8 @@ from django.utils.translation import gettext as _
 from datetime import timedelta
 
 from config.inventario.services import (
+    ajustar_cantidad_item_pedido_despues_picking,
+    ajustar_reserva_item_pedido,
     aplicar_verificacion_picking_inventario,
     eliminar_item_pedido_con_inventario,
     reemplazar_presentacion_item_pedido,
@@ -88,6 +90,203 @@ def recalcular_pedido(pedido):
     pedido.total = _quantize_money(total)
     pedido.save(update_fields=['total', 'actualizada_en'])
     return pedido
+
+
+def pedido_puede_crear_parcial(pedido):
+    if pedido is None:
+        return False
+    if pedido.estado in {'CANCELADO', 'DESPACHADO', 'INVOICE_GENERADA'}:
+        return False
+    if hasattr(pedido, 'invoice'):
+        return False
+    return PedidoItem.objects.filter(pedido=pedido, cantidad__gt=0).exists()
+
+
+def _siguiente_indice_parcial(pedido_raiz):
+    ultimo = (
+        Pedido.objects.filter(pedido_raiz=pedido_raiz)
+        .order_by('-indice_parcial')
+        .values_list('indice_parcial', flat=True)
+        .first()
+    )
+    return int(ultimo or 0) + 1
+
+
+def _reducir_cantidad_item_fuente(*, item, nueva_cantidad, usuario):
+    objetivo = max(int(nueva_cantidad), 0)
+    if int(item.cantidad_inventario_aplicada or 0) > 0:
+        return ajustar_cantidad_item_pedido_despues_picking(
+            item=item,
+            nueva_cantidad=objetivo,
+            creado_por=usuario,
+        )
+    if int(item.cantidad_reservada_inventario or 0) > 0:
+        return ajustar_reserva_item_pedido(
+            item=item,
+            nueva_cantidad=objetivo,
+            creado_por=usuario,
+        )
+    return actualizar_cantidad_linea_pedido_sin_aplicar_inventario(item=item, nueva_cantidad=objetivo)
+
+
+def parse_lineas_parcial_desde_payload(*, pedido, lineas_payload):
+    """
+    lineas_payload: iterable of {'item_id': int, 'cantidad': int}
+    Returns list of (PedidoItem, qty).
+    """
+    if not lineas_payload:
+        raise ValidationError(_('Select at least one product for the partial order.'))
+
+    items_by_id = {
+        item.id: item
+        for item in PedidoItem.objects.select_related('presentacion__producto').filter(pedido=pedido)
+    }
+    parsed = []
+    seen = set()
+    for raw in lineas_payload:
+        try:
+            item_id = int(raw.get('item_id'))
+            cantidad = int(raw.get('cantidad'))
+        except (TypeError, ValueError, AttributeError):
+            raise ValidationError(_('Invalid partial order line quantities.'))
+        if item_id in seen:
+            raise ValidationError(_('Duplicate product lines are not allowed in the partial order.'))
+        seen.add(item_id)
+        item = items_by_id.get(item_id)
+        if item is None:
+            raise ValidationError(_('One of the selected products does not belong to this sales order.'))
+        pendiente = int(item.cantidad or 0)
+        if cantidad <= 0:
+            raise ValidationError(
+                _('Partial quantity for %(product)s must be greater than zero.')
+                % {'product': item.presentacion.producto.nombre}
+            )
+        if cantidad > pendiente:
+            raise ValidationError(
+                _('Partial quantity for %(product)s cannot exceed the pending quantity (%(pending)s).')
+                % {
+                    'product': item.presentacion.producto.nombre,
+                    'pending': pendiente,
+                }
+            )
+        parsed.append((item, cantidad))
+
+    if not parsed:
+        raise ValidationError(_('Select at least one product for the partial order.'))
+    return parsed
+
+
+@transaction.atomic
+def crear_pedido_parcial(*, pedido, lineas_payload, usuario=None, request=None):
+    locked_pedido = Pedido.objects.select_for_update().select_related('cliente', 'vendedor').get(pk=pedido.pk)
+    if not pedido_puede_crear_parcial(locked_pedido):
+        raise ValidationError(_('This sales order cannot be split into a partial order.'))
+
+    lineas = parse_lineas_parcial_desde_payload(pedido=locked_pedido, lineas_payload=lineas_payload)
+    item_ids = [item.id for item, _qty in lineas]
+    locked_items = {
+        item.id: item
+        for item in PedidoItem.objects.select_for_update().select_related('presentacion__producto').filter(
+            id__in=item_ids,
+            pedido=locked_pedido,
+        )
+    }
+    # Re-validate against locked quantities.
+    refreshed_payload = []
+    for item, qty in lineas:
+        locked_item = locked_items[item.id]
+        refreshed_payload.append({'item_id': locked_item.id, 'cantidad': qty})
+    lineas = parse_lineas_parcial_desde_payload(pedido=locked_pedido, lineas_payload=refreshed_payload)
+
+    raiz = locked_pedido.pedido_raiz_efectivo
+    if raiz.pk != locked_pedido.pk:
+        raiz = Pedido.objects.select_for_update().get(pk=raiz.pk)
+    indice = _siguiente_indice_parcial(raiz)
+
+    parcial = Pedido.objects.create(
+        cliente=locked_pedido.cliente,
+        vendedor=locked_pedido.vendedor,
+        origen=locked_pedido.origen or 'BACKOFFICE',
+        canal_toma=locked_pedido.canal_toma or '',
+        estado='RECIBIDO',
+        nota_cliente=locked_pedido.nota_cliente or '',
+        nota_backoffice=(
+            _('Partial order created from sales order #%(numero)s.')
+            % {'numero': locked_pedido.numero_display}
+        ),
+        acepta_terminos=locked_pedido.acepta_terminos,
+        acepta_terminos_en=locked_pedido.acepta_terminos_en,
+        pedido_raiz=raiz,
+        indice_parcial=indice,
+        total=Decimal('0.00'),
+    )
+
+    created_items = []
+    items_to_reserve = []
+    for source_item, qty in lineas:
+        locked_source = locked_items[source_item.id]
+        had_reservation = int(locked_source.cantidad_reservada_inventario or 0) > 0
+        remaining = int(locked_source.cantidad or 0) - int(qty)
+        subtotal = calcular_subtotal_item_pedido(
+            precio=locked_source.precio,
+            cantidad=qty,
+            descuento_aplicado=locked_source.descuento_aplicado,
+            descuento_monto=locked_source.descuento_monto,
+        )
+        child_item = PedidoItem.objects.create(
+            pedido=parcial,
+            presentacion=locked_source.presentacion,
+            item_origen=locked_source,
+            cantidad_solicitada=qty,
+            cantidad=qty,
+            precio=locked_source.precio,
+            descuento_aplicado=locked_source.descuento_aplicado,
+            descuento_monto=locked_source.descuento_monto,
+            subtotal=subtotal,
+        )
+        created_items.append(child_item)
+        if had_reservation:
+            items_to_reserve.append(child_item)
+        _reducir_cantidad_item_fuente(item=locked_source, nueva_cantidad=remaining, usuario=usuario)
+
+    recalcular_pedido(locked_pedido)
+    recalcular_pedido(parcial)
+
+    if items_to_reserve:
+        reservar_stock_para_pedido_items(pedido=parcial, pedido_items=items_to_reserve, creado_por=usuario)
+
+    from config.auditoria.business_events import log_business_event
+    from config.auditoria.models import AuditLog
+
+    log_business_event(
+        usuario,
+        action_label=_('Created partial order #%(partial)s from #%(source)s') % {
+            'partial': parcial.numero_display,
+            'source': locked_pedido.numero_display,
+        },
+        action_category=AuditLog.CATEGORY_CREATE,
+        entity_type='Pedido',
+        entity_id=str(parcial.id),
+        entity_label=_('Order #%(id)s - %(client)s') % {
+            'id': parcial.numero_display,
+            'client': parcial.cliente.nombre_empresa,
+        },
+        metadata={
+            'pedido_fuente_id': locked_pedido.id,
+            'pedido_raiz_id': raiz.id,
+            'indice_parcial': indice,
+            'lineas': [
+                {
+                    'item_origen_id': item.item_origen_id,
+                    'presentacion_id': item.presentacion_id,
+                    'cantidad': item.cantidad,
+                }
+                for item in created_items
+            ],
+        },
+        request=request,
+    )
+    return parcial
 
 
 def actualizar_cantidad_linea_pedido_sin_aplicar_inventario(*, item, nueva_cantidad):

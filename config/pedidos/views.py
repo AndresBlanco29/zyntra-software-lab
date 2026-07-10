@@ -61,12 +61,15 @@ from .services import (
 	build_pedido_edit_lock_context,
 	calcular_precio_unitario_neto_item,
 	calcular_subtotal_item_pedido,
+	crear_pedido_parcial,
 	eliminar_linea_pedido_desde_backoffice,
 	eliminar_pedido_desde_backoffice,
 	ensure_pedido_edit_lock_owner,
 	evaluar_stock_fisico_verificacion_picking,
 	guardar_verificacion_picking,
 	normalizar_descuento_item_pedido,
+	parse_lineas_parcial_desde_payload,
+	pedido_puede_crear_parcial,
 	puede_anular_pedido_desde_backoffice,
 	puede_eliminar_pedido_desde_backoffice,
 	recalcular_pedido,
@@ -568,6 +571,11 @@ def backoffice_pedido_detalle(request, pedido_id):
 		and not pedido_form_disabled
 	)
 	can_send_picking, picking_send_button_label = resolve_picking_send_ui_state(pedido)
+	pedido_raiz = pedido.pedido_raiz_efectivo
+	parciales_relacionadas = list(
+		Pedido.objects.filter(pedido_raiz=pedido_raiz)
+		.order_by('indice_parcial', 'id')
+	)
 
 	context = {
 		'pending_customer_notes_summary': summarize_pending_customer_notes(cliente=pedido.cliente),
@@ -587,6 +595,9 @@ def backoffice_pedido_detalle(request, pedido_id):
 		'can_manage_pedido': can_manage_pedido,
 		'can_send_picking': can_send_picking,
 		'picking_send_button_label': picking_send_button_label,
+		'can_create_partial_order': can_manage_pedido and pedido_puede_crear_parcial(pedido),
+		'pedido_raiz': pedido_raiz if pedido.es_parcial else None,
+		'parciales_relacionadas': parciales_relacionadas,
 		'can_unlock_pedido': (
 			pedido.picking_bloqueado
 			and pedido.estado == 'VERIFICADO_AJUSTADO'
@@ -618,6 +629,134 @@ def backoffice_pedido_detalle(request, pedido_id):
 		**edit_lock_context,
 	}
 	return render(request, 'backoffice/pedido_detalle.html', context)
+
+
+def _extract_partial_lineas_from_post(request, pedido):
+	lineas = []
+	for item in pedido.items.all():
+		selected = request.POST.get(f'select_{item.id}')
+		if not selected:
+			continue
+		raw_qty = request.POST.get(f'qty_{item.id}')
+		try:
+			cantidad = int(raw_qty)
+		except (TypeError, ValueError):
+			cantidad = 0
+		lineas.append({'item_id': item.id, 'cantidad': cantidad})
+	return lineas
+
+
+def _build_partial_preview_rows(*, pedido, lineas):
+	selected_map = {item.id: qty for item, qty in lineas}
+	partial_rows = []
+	remaining_rows = []
+	for item in pedido.items.select_related('presentacion__producto'):
+		pending = int(item.cantidad or 0)
+		partial_qty = int(selected_map.get(item.id, 0) or 0)
+		if partial_qty > 0:
+			partial_rows.append({
+				'item': item,
+				'cantidad': partial_qty,
+			})
+		remaining_qty = pending - partial_qty
+		if remaining_qty > 0:
+			remaining_rows.append({
+				'item': item,
+				'cantidad': remaining_qty,
+			})
+	return partial_rows, remaining_rows
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_pedido_partial(request, pedido_id):
+	pedido = get_object_or_404(
+		Pedido.objects.select_related('cliente', 'vendedor').prefetch_related('items__presentacion__producto'),
+		id=pedido_id,
+	)
+	if not pedido_puede_crear_parcial(pedido):
+		messages.error(request, _('This sales order cannot be split into a partial order.'))
+		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+	pedido_items = [
+		item
+		for item in order_pedido_items_for_display(pedido)
+		if int(item.cantidad or 0) > 0
+	]
+	selected_map = {}
+	form_error = None
+
+	if request.method == 'POST':
+		lineas_payload = _extract_partial_lineas_from_post(request, pedido)
+		selected_map = {row['item_id']: row['cantidad'] for row in lineas_payload}
+		if request.POST.get('action') != 'edit':
+			try:
+				lineas = parse_lineas_parcial_desde_payload(pedido=pedido, lineas_payload=lineas_payload)
+				preview_rows, remaining_rows = _build_partial_preview_rows(pedido=pedido, lineas=lineas)
+				return render(request, 'backoffice/pedido_parcial_confirmar.html', {
+					'pedido': pedido,
+					'partial_rows': preview_rows,
+					'remaining_rows': remaining_rows,
+					'lineas_payload': lineas_payload,
+				})
+			except ValidationError as exc:
+				form_error = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
+				messages.error(request, form_error)
+
+	for item in pedido_items:
+		item.partial_selected = item.id in selected_map
+		item.partial_qty = selected_map.get(item.id, item.cantidad)
+
+	return render(request, 'backoffice/pedido_parcial_crear.html', {
+		'pedido': pedido,
+		'pedido_items': pedido_items,
+		'form_error': form_error,
+	})
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+@require_POST
+def backoffice_pedido_partial_confirm(request, pedido_id):
+	pedido = get_object_or_404(
+		Pedido.objects.select_related('cliente', 'vendedor').prefetch_related('items__presentacion__producto'),
+		id=pedido_id,
+	)
+	if request.POST.get('action') == 'back':
+		# Re-open selection with the same posted quantities.
+		pedido_items = [
+			item
+			for item in order_pedido_items_for_display(pedido)
+			if int(item.cantidad or 0) > 0
+		]
+		lineas_payload = _extract_partial_lineas_from_post(request, pedido)
+		selected_map = {row['item_id']: row['cantidad'] for row in lineas_payload}
+		for item in pedido_items:
+			item.partial_selected = item.id in selected_map
+			item.partial_qty = selected_map.get(item.id, item.cantidad)
+		return render(request, 'backoffice/pedido_parcial_crear.html', {
+			'pedido': pedido,
+			'pedido_items': pedido_items,
+			'form_error': None,
+		})
+
+	try:
+		lineas_payload = _extract_partial_lineas_from_post(request, pedido)
+		parcial = crear_pedido_parcial(
+			pedido=pedido,
+			lineas_payload=lineas_payload,
+			usuario=request.user,
+			request=request,
+		)
+	except ValidationError as exc:
+		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+		return redirect('backoffice_pedido_partial', pedido_id=pedido.id)
+
+	messages.success(
+		request,
+		_('Partial order #%(numero)s was created successfully.') % {'numero': parcial.numero_display},
+	)
+	return redirect('backoffice_pedido_detalle', pedido_id=parcial.id)
 
 
 def _default_presentacion_price_for_pedido(*, presentacion, pedido):
@@ -1008,7 +1147,7 @@ def backoffice_picking_pdf(request, pedido_id):
 	summary_value_style = ParagraphStyle('PickingSummaryValue', parent=styles['BodyText'], fontSize=10, textColor=BRAND_TEXT, leading=12)
 
 	content = [
-		build_pdf_brand_banner(styles=styles, title=_("Picking Ticket"), subtitle=f'PO #{pedido.id}', total_width=540),
+		build_pdf_brand_banner(styles=styles, title=_("Picking Ticket"), subtitle=f'PO #{pedido.numero_display}', total_width=540),
 		Spacer(1, 12),
 		Table([
 			[Paragraph(_("Customer"), summary_label_style), Paragraph(pedido.cliente.nombre_empresa, summary_value_style)],

@@ -201,6 +201,26 @@
     margin-top: 0.35rem;
   }
 
+  .driver-list-stack-table .mobile-stack-table--driver tbody tr {
+    background: #ffffff;
+  }
+
+  .driver-list-stack-table .mobile-stack-table--driver tbody tr:nth-child(even) {
+    background: #f8fbff;
+  }
+
+  .driver-delivery-actions .btn-primary,
+  .driver-delivery-actions .btn-success {
+    font-weight: 700;
+    min-height: 2.5rem;
+  }
+
+  .driver-delivery-actions .btn-outline-dark {
+    font-weight: 600;
+    min-height: 2.5rem;
+    background: #fff;
+  }
+
   @media (max-width: 991.98px) {
     .driver-list-guide,
     .driver-list-metrics {
@@ -222,10 +242,70 @@
       padding: 1rem;
     }
 
+    .driver-list-stack-table .mobile-stack-table--driver,
+    .driver-list-stack-table .mobile-stack-table--driver tbody {
+      display: block;
+      width: 100%;
+    }
+
+    .driver-list-stack-table .mobile-stack-table--driver thead {
+      display: none;
+    }
+
+    .driver-list-stack-table .mobile-stack-table--driver tbody tr {
+      display: block;
+      width: 100%;
+      margin: 0 0 1rem;
+      padding: 1rem;
+      border: 1px solid #c5d4eb;
+      border-radius: 1rem;
+      background: #f4f8ff;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    .driver-list-stack-table .mobile-stack-table--driver tbody tr:nth-child(even) {
+      background: #eef5ff;
+    }
+
+    .driver-list-stack-table .mobile-stack-table--driver tbody tr:last-child {
+      margin-bottom: 0;
+    }
+
+    .driver-list-stack-table .mobile-stack-table--driver tbody td {
+      display: block;
+      width: 100%;
+      border: 0;
+      padding: 0.45rem 0;
+    }
+
+    .driver-list-stack-table .mobile-stack-table--driver tbody td[data-label]::before {
+      content: attr(data-label);
+      display: block;
+      margin-bottom: 0.2rem;
+      color: #64748b;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .driver-list-stack-table .mobile-stack-table--driver tbody td.mobile-stack-table__action {
+      margin-top: 0.65rem;
+      padding-top: 0.85rem;
+      border-top: 1px solid #d7e3f4;
+    }
+
+    .driver-list-stack-table .mobile-stack-table--driver tbody td.mobile-stack-table__empty,
+    .driver-list-stack-table .mobile-stack-table--driver tbody td.mobile-stack-table__empty::before {
+      content: none;
+      text-align: center;
+    }
+
     .driver-delivery-actions {
       justify-content: flex-start;
       flex-direction: column;
       width: 100%;
+      gap: 0.65rem;
     }
 
     .driver-delivery-actions .btn {
@@ -245,6 +325,8 @@
 
     .driver-action-help {
       text-align: left;
+      color: #334155;
+      font-weight: 500;
     }
   }
 </style>
@@ -406,8 +488,8 @@
             <td data-label="{% trans 'Payment' %}"><span class="badge {% if delivery.estado_pago == 'NO_PAGADO' %}bg-danger{% elif delivery.estado_pago == 'PAGADO' %}bg-success{% else %}bg-secondary{% endif %}">{{ delivery.get_estado_pago_display }}</span></td>
             <td data-label="{% trans 'Actions' %}" class="mobile-stack-table__action">
               <div class="driver-delivery-actions">
-                <a class="btn btn-sm btn-outline-dark" href="{% url 'driver_invoice_pdf' delivery.id %}">{% trans "Download" %}</a>
-                <a class="btn btn-sm btn-primary" href="{% url 'driver_delivery_detail' delivery.id %}">{% trans "Open" %}</a>
+                <a class="btn btn-sm btn-outline-dark" href="{% url 'driver_invoice_pdf' delivery.id %}">{% trans "Download PDF" %}</a>
+                <a class="btn btn-sm btn-primary" href="{% url 'driver_delivery_detail' delivery.id %}">{% trans "Open stop" %}</a>
               </div>
               <div class="driver-action-help">{% trans "Open the stop to register payment, evidence and signature." %}</div>
             </td>
@@ -476,7 +558,7 @@
             <td data-label="{% trans 'Payment' %}"><span class="badge {% if delivery.estado_pago == 'NO_PAGADO' %}bg-danger{% elif delivery.estado_pago == 'PAGADO' %}bg-success{% else %}bg-secondary{% endif %}">{{ delivery.get_estado_pago_display }}</span></td>
             <td data-label="{% trans 'Actions' %}" class="mobile-stack-table__action">
               <div class="driver-delivery-actions">
-                <a class="btn btn-sm btn-outline-dark" href="{% url 'driver_invoice_pdf' delivery.id %}">{% trans "Download" %}</a>
+                <a class="btn btn-sm btn-outline-dark" href="{% url 'driver_invoice_pdf' delivery.id %}">{% trans "Download PDF" %}</a>
                 <a class="btn btn-sm btn-success" href="{% url 'driver_delivery_detail' delivery.id %}">{% trans "View summary" %}</a>
               </div>
             </td>

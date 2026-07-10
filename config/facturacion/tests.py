@@ -1613,7 +1613,7 @@ class InvoiceFlowTests(TestCase):
 
 		invoice.refresh_from_db()
 		nota = invoice.notas_ajuste.get()
-		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertRedirects(response, reverse('driver_delivery_list'))
 		self.assertEqual(invoice.delivery.estado, 'ENTREGADA_PAGADA')
 		self.assertEqual(nota.estado, 'BORRADOR')
 		self.assertEqual(nota.tipo_documento, 'CREDITO')
@@ -1813,7 +1813,7 @@ class InvoiceFlowTests(TestCase):
 
 		invoice.refresh_from_db()
 		nota = invoice.notas_ajuste.get()
-		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertRedirects(response, reverse('driver_delivery_list'))
 		self.assertEqual(invoice.delivery.estado, 'ENTREGADA_PAGADA')
 		self.assertEqual(nota.tipo_credito, 'CREDIT_DUMP')
 		self.assertEqual(nota.evidence_photos.count(), 1)
@@ -1911,7 +1911,7 @@ class InvoiceFlowTests(TestCase):
 
 		invoice.refresh_from_db()
 		nota = invoice.notas_ajuste.get()
-		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertRedirects(response, reverse('driver_delivery_list'))
 		self.assertEqual(nota.tipo_credito, 'CREDIT_RETURN')
 		self.assertEqual(nota.motivo, 'DEFECT')
 		self.assertEqual(nota.inventario_estado, 'PENDIENTE')
@@ -1945,7 +1945,7 @@ class InvoiceFlowTests(TestCase):
 
 		invoice.refresh_from_db()
 		nota = invoice.notas_ajuste.get()
-		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertRedirects(response, reverse('driver_delivery_list'))
 		self.assertEqual(nota.tipo_credito, 'CREDIT_DUMP')
 		self.assertEqual(nota.motivo, 'DAMAGE')
 		self.assertEqual(nota.inventario_estado, 'NO_APLICA')
@@ -3910,7 +3910,11 @@ class InvoiceFlowTests(TestCase):
 		)
 
 		invoice.delivery.refresh_from_db()
-		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertRedirects(
+			response,
+			reverse('driver_delivery_detail', args=[invoice.delivery.id]) + '#driver-evidence',
+			fetch_redirect_response=False,
+		)
 		self.assertEqual(invoice.delivery.evidence_photos.count(), 1)
 
 	def test_driver_evidence_upload_requires_photo(self):
@@ -3924,7 +3928,11 @@ class InvoiceFlowTests(TestCase):
 
 		response = self.client.post(reverse('driver_delivery_upload_evidence', args=[invoice.delivery.id]), {})
 
-		self.assertRedirects(response, reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertRedirects(
+			response,
+			reverse('driver_delivery_detail', args=[invoice.delivery.id]) + '#driver-evidence',
+			fetch_redirect_response=False,
+		)
 		self.assertEqual(invoice.delivery.evidence_photos.count(), 0)
 
 	def test_start_route_redirects_driver_to_tracking_page(self):

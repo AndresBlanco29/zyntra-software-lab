@@ -2097,10 +2097,11 @@ def driver_delivery_complete(request, delivery_id):
 			request.POST,
 		)
 	else:
-		messages.success(request, _('Delivery saved successfully.'))
+		messages.success(request, _('Delivery saved successfully. You can continue with the next stop.'))
 		if nota is not None:
 			messages.success(request, _('Adjustment note %(note)s saved as draft for BackOffice review.') % {'note': nota.numero})
 		clear_workflow_draft(request.session, DELIVERY_COMPLETE_DRAFT_SCOPE, delivery.id)
+		return redirect('driver_delivery_list')
 	return redirect('driver_delivery_detail', delivery_id=delivery.id)
 
 

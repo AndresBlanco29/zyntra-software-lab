@@ -1,0 +1,86 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Daily Closing" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+  <div>
+    <h2 class="mb-1">{% trans "Daily Closing" %}</h2>
+    <p class="text-muted mb-0">{% trans "Review and release invoices before sending them to QuickBooks." %}</p>
+  </div>
+  {% if can_manage %}
+  <form method="post" action="{% url 'backoffice_daily_closing_create' %}" class="d-flex flex-wrap gap-2 align-items-end">
+    {% csrf_token %}
+    <div>
+      <label class="form-label small mb-1">{% trans "Closing date" %}</label>
+      <input type="date" name="fecha" class="form-control" value="{{ today|date:'Y-m-d' }}" required>
+    </div>
+    <button type="submit" class="btn btn-primary">{% trans "Open new closing" %}</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>{% trans "Date" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th>{% trans "Documents" %}</th>
+          <th>{% trans "Total" %}</th>
+          <th>{% trans "Ready" %}</th>
+          <th>{% trans "Released" %}</th>
+          <th>{% trans "Blocked" %}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cierre in cierres %}
+        <tr>
+          <td class="fw-semibold">{{ cierre.fecha|date:"m/d/Y" }}</td>
+          <td>
+            {% if cierre.estado == 'CERRADO' %}
+            <span class="badge text-bg-secondary">{{ cierre.get_estado_display }}</span>
+            {% elif cierre.estado == 'LISTO' %}
+            <span class="badge text-bg-success">{{ cierre.get_estado_display }}</span>
+            {% elif cierre.estado == 'EN_REVISION' %}
+            <span class="badge text-bg-warning text-dark">{{ cierre.get_estado_display }}</span>
+            {% else %}
+            <span class="badge text-bg-primary">{{ cierre.get_estado_display }}</span>
+            {% endif %}
+          </td>
+          <td>{{ cierre.total_documentos }}</td>
+          <td>${{ cierre.monto_total }}</td>
+          <td>{{ cierre.items_listos }}</td>
+          <td>{{ cierre.items_liberados }}</td>
+          <td>{{ cierre.items_bloqueados }}</td>
+          <td class="text-end">
+            <a href="{% url 'backoffice_daily_closing_detail' cierre.id %}" class="btn btn-sm btn-outline-primary">{% trans "Open" %}</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" class="text-muted text-center py-4">{% trans "No daily closings yet. Open one to start reviewing invoices." %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if page_obj.paginator.num_pages > 1 %}
+<nav class="mt-3">
+  <ul class="pagination">
+    {% if page_obj.has_previous %}
+    <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">{% trans "Previous" %}</a></li>
+    {% endif %}
+    <li class="page-item disabled"><span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+    {% if page_obj.has_next %}
+    <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">{% trans "Next" %}</a></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+{% endblock %}

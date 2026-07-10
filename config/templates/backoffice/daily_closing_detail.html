@@ -1,0 +1,179 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Daily Closing" %} {{ cierre.fecha|date:"m/d/Y" }}{% endblock %}
+
+{% block content %}
+<style>
+  .dc-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+  }
+  .dc-kpi {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 0.9rem;
+    background: #f8fafc;
+    padding: 0.9rem 1rem;
+  }
+  .dc-kpi-label { color: #64748b; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  .dc-kpi-value { font-size: 1.25rem; font-weight: 800; color: #0f172a; }
+  .dc-status-LISTA { background: #d1e7dd; color: #0f5132; }
+  .dc-status-BLOQUEADA { background: #f8d7da; color: #842029; }
+  .dc-status-PENDIENTE { background: #e2e3e5; color: #41464b; }
+  .dc-status-EN_REVISION { background: #fff3cd; color: #664d03; }
+  .dc-status-LIBERADA { background: #cfe2ff; color: #084298; }
+  .dc-status-EXCLUIDA { background: #f1f3f5; color: #6c757d; }
+</style>
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <a href="{% url 'backoffice_daily_closing_list' %}" class="small text-decoration-none">&larr; {% trans "All closings" %}</a>
+    <h2 class="mb-1">{% trans "Daily Closing" %} · {{ cierre.fecha|date:"m/d/Y" }}</h2>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <span class="badge text-bg-{% if cierre.estado == 'CERRADO' %}secondary{% elif cierre.estado == 'LISTO' %}success{% elif cierre.estado == 'EN_REVISION' %}warning{% else %}primary{% endif %}{% if cierre.estado == 'EN_REVISION' or cierre.estado == 'LISTO' %} text-dark{% endif %}">
+        {{ cierre.get_estado_display }}
+      </span>
+      {% if cierre.creado_por %}
+      <span class="small text-muted">{% trans "Opened by" %} {% firstof cierre.creado_por.get_full_name cierre.creado_por.username %}</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{{ quickbooks_center_url }}" class="btn btn-outline-primary">{% trans "Open QuickBooks Center" %}</a>
+    {% if can_manage and cierre.is_editable %}
+    <form method="post" action="{% url 'backoffice_daily_closing_release' cierre.id %}">
+      {% csrf_token %}
+      <input type="hidden" name="liberar_todas_listas" value="1">
+      <button type="submit" class="btn btn-primary" {% if not cierre.items_listos %}disabled{% endif %}>
+        {% trans "Release all ready" %} ({{ cierre.items_listos }})
+      </button>
+    </form>
+    <form method="post" action="{% url 'backoffice_daily_closing_close' cierre.id %}" onsubmit="return confirm('{% trans "Close this daily closing? All invoices must be released or excluded." %}');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-secondary">{% trans "Close closing" %}</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="dc-kpi-grid mb-4">
+  <div class="dc-kpi"><div class="dc-kpi-label">{% trans "Documents" %}</div><div class="dc-kpi-value">{{ cierre.total_documentos }}</div></div>
+  <div class="dc-kpi"><div class="dc-kpi-label">{% trans "Total amount" %}</div><div class="dc-kpi-value">${{ cierre.monto_total }}</div></div>
+  <div class="dc-kpi"><div class="dc-kpi-label">{% trans "Paid" %}</div><div class="dc-kpi-value">${{ cierre.monto_pagado }}</div></div>
+  <div class="dc-kpi"><div class="dc-kpi-label">{% trans "Open balance" %}</div><div class="dc-kpi-value">${{ cierre.balance_abierto }}</div></div>
+  <div class="dc-kpi"><div class="dc-kpi-label">{% trans "Credits" %}</div><div class="dc-kpi-value">${{ cierre.total_creditos }}</div></div>
+  <div class="dc-kpi"><div class="dc-kpi-label">{% trans "Ready / Released / Blocked" %}</div><div class="dc-kpi-value">{{ cierre.items_listos }} / {{ cierre.items_liberados }} / {{ cierre.items_bloqueados }}</div></div>
+</div>
+
+{% if can_manage and cierre.is_editable %}
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+      <div>
+        <h5 class="mb-0">{% trans "Add invoices to this closing" %}</h5>
+        <div class="small text-muted">{% trans "Select invoices that are not synced and not already in an open closing." %}</div>
+      </div>
+      <form method="get" class="d-flex gap-2">
+        <input type="search" name="q" value="{{ search_query }}" class="form-control form-control-sm" placeholder="{% trans 'Search invoice or customer' %}" style="min-width: 220px;">
+        <button type="submit" class="btn btn-sm btn-outline-primary">{% trans "Search" %}</button>
+      </form>
+    </div>
+    <form method="post" action="{% url 'backoffice_daily_closing_add_invoices' cierre.id %}">
+      {% csrf_token %}
+      <div class="table-responsive" style="max-height: 280px; overflow: auto;">
+        <table class="table table-sm align-middle mb-0">
+          <thead>
+            <tr>
+              <th style="width: 2.5rem;"></th>
+              <th>{% trans "Invoice" %}</th>
+              <th>{% trans "Customer" %}</th>
+              <th>{% trans "Total" %}</th>
+              <th>{% trans "Delivery" %}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for invoice in elegibles %}
+            <tr>
+              <td><input type="checkbox" class="form-check-input" name="invoice_ids" value="{{ invoice.id }}"></td>
+              <td>
+                <span class="badge text-bg-primary">#{{ invoice.id }}</span>
+                <span class="ms-1">{{ invoice.numero }}</span>
+              </td>
+              <td>{{ invoice.cliente.nombre_empresa }}</td>
+              <td>${{ invoice.total_neto }}</td>
+              <td class="small">
+                {% if invoice.delivery %}{{ invoice.delivery.get_estado_display }} · {{ invoice.delivery.get_estado_pago_display }}{% else %}<span class="text-muted">-</span>{% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-muted">{% trans "No eligible invoices found." %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="d-flex justify-content-end mt-3">
+        <button type="submit" class="btn btn-primary" {% if not elegibles %}disabled{% endif %}>{% trans "Add selected to closing" %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<div class="card shadow-sm">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <strong>{% trans "Invoices in this closing" %}</strong>
+    <span class="small text-muted">{{ items|length }} {% trans "documents" %}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th>{% trans "Invoice" %}</th>
+          <th>{% trans "Customer" %}</th>
+          <th>{% trans "Total" %}</th>
+          <th>{% trans "Payment" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th>{% trans "Checks" %}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>
+            <div class="fw-semibold">{{ item.invoice.numero }}</div>
+            <div class="small text-muted">#{{ item.invoice.id }}</div>
+          </td>
+          <td>{{ item.invoice.cliente.nombre_empresa }}</td>
+          <td>${{ item.invoice.total_neto }}</td>
+          <td class="small">
+            {% if item.invoice.delivery %}
+              {{ item.invoice.delivery.get_estado_pago_display }}
+            {% else %}
+              <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          <td><span class="badge dc-status-{{ item.estado }}">{{ item.get_estado_display }}</span></td>
+          <td class="small">
+            {% if item.factura_revisada %}<span class="text-success">✓</span>{% else %}<span class="text-muted">○</span>{% endif %} {% trans "Invoice" %}
+            ·
+            {% if item.pago_verificado %}<span class="text-success">✓</span>{% else %}<span class="text-muted">○</span>{% endif %} {% trans "Payment" %}
+            ·
+            {% if item.entrega_confirmada %}<span class="text-success">✓</span>{% else %}<span class="text-muted">○</span>{% endif %} {% trans "Delivery" %}
+            {% if item.devolucion_detectada %}<span class="badge text-bg-warning text-dark ms-1">{% trans "Return" %}</span>{% endif %}
+          </td>
+          <td class="text-end">
+            <a href="{% url 'backoffice_daily_closing_item_review' cierre.id item.id %}" class="btn btn-sm btn-outline-primary">{% trans "Review" %}</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-muted text-center py-4">{% trans "No invoices in this closing yet. Add invoices above." %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -24,6 +24,11 @@ def bind_field_remote_model(field, apps):
     if isinstance(remote_model, str) and '.' in remote_model:
         related_app_label, related_model_name = remote_model.split('.', 1)
         remote_field.model = apps.get_model(related_app_label, related_model_name)
+    # Historical FK rebuilds often leave field_name=None; schema_editor.add_field
+    # then calls get_field(None) and crashes.
+    if getattr(remote_field, 'field_name', None) is None and remote_field.model is not None:
+        if not isinstance(remote_field.model, str):
+            remote_field.field_name = remote_field.model._meta.pk.name
     return field
 
 

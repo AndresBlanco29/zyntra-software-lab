@@ -84,6 +84,15 @@ class Invoice(models.Model):
 		related_name='invoices_anuladas',
 	)
 	motivo_anulacion = models.TextField(blank=True)
+	cierre_liberada = models.BooleanField(default=False, db_index=True)
+	cierre_liberada_en = models.DateTimeField(blank=True, null=True)
+	cierre_liberada_por = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='invoices_liberadas_cierre',
+	)
 
 	class Meta:
 		ordering = ('-creada_en',)
@@ -771,3 +780,104 @@ class FacturacionRegistroAnulacion(models.Model):
 
 	def __str__(self):
 		return f'{self.get_tipo_documento_display()} {self.numero_documento}'
+
+
+class CierreDiario(models.Model):
+	ESTADO_CHOICES = (
+		('ABIERTO', _('Open')),
+		('EN_REVISION', _('In review')),
+		('LISTO', _('Ready to release')),
+		('CERRADO', _('Closed')),
+	)
+
+	fecha = models.DateField(db_index=True)
+	estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='ABIERTO', db_index=True)
+	notas = models.TextField(blank=True)
+	creado_por = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='cierres_diarios_creados',
+	)
+	cerrado_por = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='cierres_diarios_cerrados',
+	)
+	creado_en = models.DateTimeField(auto_now_add=True)
+	actualizado_en = models.DateTimeField(auto_now=True)
+	cerrado_en = models.DateTimeField(blank=True, null=True)
+
+	# Snapshot totals (recalculated when items change / release)
+	total_documentos = models.PositiveIntegerField(default=0)
+	total_invoices = models.PositiveIntegerField(default=0)
+	monto_total = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
+	monto_pagado = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
+	balance_abierto = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
+	total_creditos = models.DecimalField(max_digits=14, decimal_places=2, default=Decimal('0.00'))
+	items_listos = models.PositiveIntegerField(default=0)
+	items_bloqueados = models.PositiveIntegerField(default=0)
+	items_liberados = models.PositiveIntegerField(default=0)
+
+	class Meta:
+		ordering = ('-fecha', '-id')
+		verbose_name = _('Daily closing')
+		verbose_name_plural = _('Daily closings')
+
+	def __str__(self):
+		return f'Daily closing {self.fecha} ({self.get_estado_display()})'
+
+	@property
+	def is_editable(self):
+		return self.estado in {'ABIERTO', 'EN_REVISION', 'LISTO'}
+
+
+class CierreDiarioItem(models.Model):
+	ESTADO_CHOICES = (
+		('PENDIENTE', _('Pending review')),
+		('EN_REVISION', _('In review')),
+		('BLOQUEADA', _('Blocked')),
+		('LISTA', _('Ready')),
+		('EXCLUIDA', _('Excluded')),
+		('LIBERADA', _('Released to QuickBooks')),
+	)
+
+	cierre = models.ForeignKey(CierreDiario, on_delete=models.CASCADE, related_name='items')
+	invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT, related_name='cierres_diarios_items')
+	estado = models.CharField(max_length=20, choices=ESTADO_CHOICES, default='PENDIENTE', db_index=True)
+
+	factura_revisada = models.BooleanField(default=False)
+	pago_verificado = models.BooleanField(default=False)
+	entrega_confirmada = models.BooleanField(default=False)
+	devolucion_detectada = models.BooleanField(default=False)
+	credit_memo_requerida = models.BooleanField(default=False)
+	credit_memo_ok = models.BooleanField(default=False)
+	lista_para_exportar = models.BooleanField(default=False)
+
+	notas = models.TextField(blank=True)
+	alertas = models.JSONField(default=list, blank=True)
+	revisado_por = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='cierres_diarios_items_revisados',
+	)
+	revisado_en = models.DateTimeField(blank=True, null=True)
+	liberado_en = models.DateTimeField(blank=True, null=True)
+	creado_en = models.DateTimeField(auto_now_add=True)
+	actualizado_en = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		ordering = ('invoice_id',)
+		verbose_name = _('Daily closing item')
+		verbose_name_plural = _('Daily closing items')
+		constraints = [
+			models.UniqueConstraint(fields=('cierre', 'invoice'), name='facturacion_cierrediarioitem_cierre_invoice_uniq'),
+		]
+
+	def __str__(self):
+		return f'{self.cierre_id} · {self.invoice.numero}'

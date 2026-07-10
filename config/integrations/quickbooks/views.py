@@ -931,7 +931,12 @@ def _outbound_pending_querysets():
     return {
         'customers': Cliente.objects.filter(quickbooks_id__isnull=True).order_by('-id'),
         'presentations': Presentacion.objects.filter(quickbooks_id__isnull=True).select_related('producto').order_by('-id'),
-        'invoices': Invoice.objects.filter(quickbooks_id__isnull=True).select_related('cliente').order_by('-id'),
+        # Hard gate: only invoices released via Daily Closing can be sent to QuickBooks.
+        'invoices': Invoice.objects.filter(
+            quickbooks_id__isnull=True,
+            estado='GENERADA',
+            cierre_liberada=True,
+        ).select_related('cliente').order_by('-id'),
         'notes': NotaAjuste.objects.filter(quickbooks_id__isnull=True, estado='APROBADA').select_related('cliente', 'invoice').order_by('-id'),
     }
 
@@ -2091,6 +2096,14 @@ def quickbooks_sync_product(request, presentacion_id):
 @quickbooks_requires_full_mode
 def quickbooks_sync_invoice(request, invoice_id):
     try:
+        invoice = Invoice.objects.get(pk=invoice_id)
+        if not invoice.quickbooks_id and not invoice.cierre_liberada:
+            return _response_or_redirect(
+                request,
+                operation='sync_invoice',
+                error='This invoice must be released from Daily Closing before it can be sent to QuickBooks.',
+                status_code=400,
+            )
         result = sync_invoice_by_id(invoice_id)
     except ObjectDoesNotExist:
         return _response_or_redirect(request, operation='sync_invoice', error='Invoice not found.', status_code=404)

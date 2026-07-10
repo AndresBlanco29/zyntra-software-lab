@@ -1,10 +1,18 @@
 from django.urls import path
 
+from . import daily_closing_views
 from . import views
 
 
 urlpatterns = [
 	path('backoffice/invoices/', views.backoffice_invoices_list, name='backoffice_invoices_list'),
+	path('backoffice/daily-closing/', daily_closing_views.backoffice_daily_closing_list, name='backoffice_daily_closing_list'),
+	path('backoffice/daily-closing/create/', daily_closing_views.backoffice_daily_closing_create, name='backoffice_daily_closing_create'),
+	path('backoffice/daily-closing/<int:cierre_id>/', daily_closing_views.backoffice_daily_closing_detail, name='backoffice_daily_closing_detail'),
+	path('backoffice/daily-closing/<int:cierre_id>/add/', daily_closing_views.backoffice_daily_closing_add_invoices, name='backoffice_daily_closing_add_invoices'),
+	path('backoffice/daily-closing/<int:cierre_id>/items/<int:item_id>/', daily_closing_views.backoffice_daily_closing_item_review, name='backoffice_daily_closing_item_review'),
+	path('backoffice/daily-closing/<int:cierre_id>/release/', daily_closing_views.backoffice_daily_closing_release, name='backoffice_daily_closing_release'),
+	path('backoffice/daily-closing/<int:cierre_id>/close/', daily_closing_views.backoffice_daily_closing_close, name='backoffice_daily_closing_close'),
 	path('backoffice/notes/', views.backoffice_adjustment_notes_list, name='backoffice_adjustment_notes_list'),
 	path('backoffice/notes/create/', views.backoffice_adjustment_note_create, name='backoffice_adjustment_note_create'),
 	path('backoffice/invoices/live-drivers/', views.backoffice_live_drivers, name='backoffice_live_drivers'),

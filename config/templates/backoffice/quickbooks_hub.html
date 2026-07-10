@@ -1424,7 +1424,7 @@
   <section class="qb-section-card p-4 p-xl-5 mb-4">
     <div class="qb-outbound-section-head">
       <h3 class="mb-2">{% trans "Send local records to QuickBooks" %}</h3>
-      <p class="qb-soft-copy mb-0">{% trans "Use this area when the record was created in your system first and still needs to be sent to QuickBooks." %}</p>
+      <p class="qb-soft-copy mb-0">{% blocktrans %}Use this area when the record was created in your system first and still needs to be sent to QuickBooks. Invoices appear only after they are released from Daily Closing.{% endblocktrans %}</p>
     </div>
 
     <div class="qb-outbound-stat-grid">
@@ -1488,7 +1488,7 @@
       </div>
 
       {% url 'quickbooks_sync_invoices_batch' as invoices_batch_url %}
-      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Invoices") form_action=invoices_batch_url records=quickbooks_pending_invoices record_mode="invoice" outbound_scope="invoices" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_pending_invoice_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") empty_message=_("No pending invoices match your search.") panel_note=_("QuickBooks will also create or link the customer and catalog items used by the invoice.") only %}
+      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Invoices") form_action=invoices_batch_url records=quickbooks_pending_invoices record_mode="invoice" outbound_scope="invoices" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_pending_invoice_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") empty_message=_("No released invoices pending. Complete Daily Closing first.") panel_note=_("Only invoices released from Daily Closing can be sent. QuickBooks will also create or link the customer and catalog items.") only %}
 
       {% url 'quickbooks_sync_adjustment_notes_batch' as notes_batch_url %}
       {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Adjustment notes") form_action=notes_batch_url records=quickbooks_pending_notes record_mode="note" outbound_scope="notes" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_pending_note_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") empty_message=_("No pending approved notes match your search.") panel_note=_("Only approved credit or debit notes can be sent to QuickBooks.") only %}

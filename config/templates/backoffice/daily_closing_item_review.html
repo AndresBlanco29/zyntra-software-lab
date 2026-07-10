@@ -1,0 +1,118 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Review" %} {{ invoice.numero }}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="{% url 'backoffice_daily_closing_detail' cierre.id %}" class="small text-decoration-none">&larr; {% trans "Back to closing" %}</a>
+  <h2 class="mb-1">{% trans "Review invoice" %} {{ invoice.numero }}</h2>
+  <p class="text-muted mb-0">{{ invoice.cliente.nombre_empresa }} · {% trans "Closing" %} {{ cierre.fecha|date:"m/d/Y" }}</p>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h6 class="text-uppercase text-muted small">{% trans "Summary" %}</h6>
+        <dl class="row mb-0 small">
+          <dt class="col-5">{% trans "Total" %}</dt><dd class="col-7 fw-semibold">${{ invoice.total_neto }}</dd>
+          <dt class="col-5">{% trans "Balance" %}</dt><dd class="col-7">${{ invoice.saldo_cliente }}</dd>
+          <dt class="col-5">{% trans "Credits" %}</dt><dd class="col-7">${{ invoice.total_creditos }}</dd>
+          <dt class="col-5">{% trans "Delivery" %}</dt>
+          <dd class="col-7">{% if delivery %}{{ delivery.get_estado_display }}{% else %}-{% endif %}</dd>
+          <dt class="col-5">{% trans "Payment" %}</dt>
+          <dd class="col-7">{% if delivery %}{{ delivery.get_estado_pago_display }}{% else %}-{% endif %}</dd>
+          {% if delivery and delivery.recibido_por %}
+          <dt class="col-5">{% trans "Received by" %}</dt><dd class="col-7">{{ delivery.recibido_por }}</dd>
+          {% endif %}
+        </dl>
+        <div class="d-grid gap-2 mt-3">
+          <a href="{{ invoice_detail_url }}" class="btn btn-outline-secondary btn-sm" target="_blank">{% trans "Open invoice detail" %}</a>
+          <a href="{% url 'backoffice_adjustment_note_create' %}?invoice_id={{ invoice.id }}&cliente_id={{ invoice.cliente_id }}" class="btn btn-outline-primary btn-sm">{% trans "Create credit / debit note" %}</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-8">
+    {% if item.alertas %}
+    <div class="mb-3">
+      {% for alert in item.alertas %}
+      <div class="alert alert-{% if alert.level == 'block' %}danger{% else %}warning{% endif %} py-2 mb-2">{{ alert.message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if notas_credito %}
+    <div class="card shadow-sm mb-3">
+      <div class="card-body py-3">
+        <h6 class="mb-2">{% trans "Linked credit / debit notes" %}</h6>
+        <ul class="mb-0 small">
+          {% for nota in notas_credito %}
+          <li>{{ nota.numero }} · {{ nota.get_tipo_documento_display }} · {{ nota.get_estado_display }} · ${{ nota.total }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="mb-3">{% trans "Validation checklist" %}</h5>
+        <form method="post">
+          {% csrf_token %}
+          <fieldset {% if not can_manage %}disabled{% endif %}>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="factura_revisada" id="chkInvoice" value="1" {% if item.factura_revisada %}checked{% endif %}>
+              <label class="form-check-label fw-semibold" for="chkInvoice">{% trans "Invoice reviewed" %}</label>
+              <div class="form-text">{% trans "Totals, customer, and lines look correct." %}</div>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="pago_verificado" id="chkPayment" value="1" {% if item.pago_verificado %}checked{% endif %}>
+              <label class="form-check-label fw-semibold" for="chkPayment">{% trans "Payment verified" %}</label>
+              <div class="form-text">{% trans "Payment received or non-payment documented." %}</div>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="entrega_confirmada" id="chkDelivery" value="1" {% if item.entrega_confirmada %}checked{% endif %}>
+              <label class="form-check-label fw-semibold" for="chkDelivery">{% trans "Delivery confirmed" %}</label>
+              <div class="form-text">{% trans "Delivery or pickup was completed as expected." %}</div>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="devolucion_detectada" id="chkReturn" value="1" {% if item.devolucion_detectada %}checked{% endif %}>
+              <label class="form-check-label fw-semibold" for="chkReturn">{% trans "Return / shortage detected" %}</label>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="credit_memo_requerida" id="chkCreditReq" value="1" {% if item.credit_memo_requerida %}checked{% endif %}>
+              <label class="form-check-label fw-semibold" for="chkCreditReq">{% trans "Credit memo required" %}</label>
+            </div>
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" name="credit_memo_ok" id="chkCreditOk" value="1" {% if item.credit_memo_ok %}checked{% endif %}>
+              <label class="form-check-label fw-semibold" for="chkCreditOk">{% trans "Credit memo resolved / approved" %}</label>
+              <div class="form-text">{% trans "Required only when a credit memo is needed." %}</div>
+            </div>
+            <label class="form-label fw-semibold">{% trans "Review notes" %}</label>
+            <textarea name="notas" class="form-control mb-3" rows="3">{{ item.notas }}</textarea>
+
+            <div class="d-flex flex-wrap gap-2 justify-content-between">
+              <div class="d-flex flex-wrap gap-2">
+                {% if item.estado == 'EXCLUIDA' %}
+                <button type="submit" name="include_again" value="1" class="btn btn-outline-primary">{% trans "Include again" %}</button>
+                {% else %}
+                <button type="submit" name="exclude" value="1" class="btn btn-outline-secondary" onclick="return confirm('{% trans "Exclude this invoice from the closing?" %}');">{% trans "Exclude from closing" %}</button>
+                {% endif %}
+              </div>
+              <button type="submit" class="btn btn-primary">{% trans "Save review" %}</button>
+            </div>
+          </fieldset>
+        </form>
+        {% if item.estado == 'LISTA' %}
+        <div class="alert alert-success mt-3 mb-0">{% trans "This invoice is ready. Release it from the closing board to make it available in QuickBooks Center." %}</div>
+        {% elif item.estado == 'LIBERADA' %}
+        <div class="alert alert-info mt-3 mb-0">{% trans "Already released to QuickBooks Center." %}</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

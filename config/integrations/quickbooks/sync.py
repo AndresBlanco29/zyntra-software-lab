@@ -614,9 +614,10 @@ def _sync_result(*, entity, action, payload, **extra):
     return result
 
 
-def _batch_sync_result(*, record_ids, sync_callable):
+def _batch_sync_result(*, record_ids, sync_callable, task_cache_key=None, operation='outbound_batch'):
     results = []
-    for record_id in record_ids:
+    total = len(record_ids)
+    for index, record_id in enumerate(record_ids, start=1):
         try:
             result = sync_callable(record_id)
         except QuickBooksSyncError as exc:
@@ -637,8 +638,29 @@ def _batch_sync_result(*, record_ids, sync_callable):
                 'ok': True,
                 'result': result,
             })
+        if task_cache_key:
+            success_count = sum(1 for item in results if item['ok'])
+            failed_count = sum(1 for item in results if not item['ok'])
+            progress = int((index / max(total, 1)) * 100)
+            cache.set(
+                task_cache_key,
+                _qb_task_progress_payload(
+                    status='running',
+                    progress=min(max(progress, 1), 99),
+                    operation=operation,
+                    result={
+                        'processed': index,
+                        'total': total,
+                        'success_count': success_count,
+                        'failed_count': failed_count,
+                    },
+                ),
+                timeout=QB_TASK_PROGRESS_CACHE_TIMEOUT,
+            )
     return {
         'requested_ids': [int(record_id) for record_id in record_ids],
+        'processed': total,
+        'total': total,
         'success_count': sum(1 for item in results if item['ok']),
         'failed_count': sum(1 for item in results if not item['ok']),
         'results': results,
@@ -4444,11 +4466,18 @@ def _resolve_or_create_sales_term_ref(client, terminos_pago):
     names = LOCAL_PAYMENT_TERM_QB_NAMES.get(code)
     if not names:
         return None
+    term_cache = getattr(client, '_ltg_sales_term_cache', None)
+    if term_cache is None:
+        term_cache = {}
+        setattr(client, '_ltg_sales_term_cache', term_cache)
+    if code in term_cache:
+        return term_cache[code]
     try:
         term = _find_term_by_names(client, names)
         if term is None:
             due_days = LOCAL_PAYMENT_TERM_DUE_DAYS.get(code)
             if due_days is None:
+                term_cache[code] = None
                 return None
             term = client.create_entity('Term', {
                 'Name': names[0],
@@ -4456,10 +4485,14 @@ def _resolve_or_create_sales_term_ref(client, terminos_pago):
             })
         term_id = str(term.get('Id') or '').strip()
         if not term_id:
+            term_cache[code] = None
             return None
-        return {'value': term_id, 'name': term.get('Name') or names[0]}
+        ref = {'value': term_id, 'name': term.get('Name') or names[0]}
+        term_cache[code] = ref
+        return ref
     except (QuickBooksAPIError, QuickBooksSyncError, TypeError, ValueError, RuntimeError) as exc:
         logger.warning('Could not resolve QuickBooks sales term for %s: %s', code, exc)
+        term_cache[code] = None
         return None
 
 
@@ -4490,16 +4523,22 @@ def _build_invoice_payment_terms_payload(*, invoice, client):
 
 
 def _get_undeposited_funds_account_ref(client):
+    cached = getattr(client, '_ltg_undeposited_funds_ref', None)
+    if cached is not None or hasattr(client, '_ltg_undeposited_funds_ref'):
+        return cached
     account_ref = _account_ref_from_setting(client, 'QUICKBOOKS_UNDEPOSITED_FUNDS_ACCOUNT_ID')
     if account_ref:
+        setattr(client, '_ltg_undeposited_funds_ref', account_ref)
         return account_ref
-    return _first_account_ref_from_queries(
+    account_ref = _first_account_ref_from_queries(
         client,
         (
             "select Id, Name from Account where AccountSubType = 'UndepositedFunds' maxresults 1",
             "select Id, Name from Account where Name = 'Undeposited Funds' maxresults 1",
         ),
     )
+    setattr(client, '_ltg_undeposited_funds_ref', account_ref)
+    return account_ref
 
 
 def _local_invoice_paid_amount(invoice):
@@ -5232,21 +5271,46 @@ def sync_supplier_purchase_by_id(compra_id):
     )
 
 
-def sync_customer_batch_by_ids(customer_ids):
-    return _batch_sync_result(record_ids=customer_ids, sync_callable=sync_customer_by_id)
+def sync_customer_batch_by_ids(customer_ids, task_cache_key=None):
+    return _batch_sync_result(
+        record_ids=customer_ids,
+        sync_callable=sync_customer_by_id,
+        task_cache_key=task_cache_key,
+        operation='sync_customers_batch',
+    )
 
 
-def sync_product_batch_by_ids(presentation_ids):
-    return _batch_sync_result(record_ids=presentation_ids, sync_callable=sync_product_by_id)
+def sync_product_batch_by_ids(presentation_ids, task_cache_key=None):
+    return _batch_sync_result(
+        record_ids=presentation_ids,
+        sync_callable=sync_product_by_id,
+        task_cache_key=task_cache_key,
+        operation='sync_products_batch',
+    )
 
 
-def sync_invoice_batch_by_ids(invoice_ids):
-    return _batch_sync_result(record_ids=invoice_ids, sync_callable=sync_invoice_by_id)
+def sync_invoice_batch_by_ids(invoice_ids, task_cache_key=None):
+    return _batch_sync_result(
+        record_ids=invoice_ids,
+        sync_callable=sync_invoice_by_id,
+        task_cache_key=task_cache_key,
+        operation='sync_invoices_batch',
+    )
 
 
-def sync_adjustment_note_batch_by_ids(note_ids):
-    return _batch_sync_result(record_ids=note_ids, sync_callable=sync_adjustment_note_by_id)
+def sync_adjustment_note_batch_by_ids(note_ids, task_cache_key=None):
+    return _batch_sync_result(
+        record_ids=note_ids,
+        sync_callable=sync_adjustment_note_by_id,
+        task_cache_key=task_cache_key,
+        operation='sync_adjustment_notes_batch',
+    )
 
 
-def sync_supplier_purchase_batch_by_ids(compra_ids):
-    return _batch_sync_result(record_ids=compra_ids, sync_callable=sync_supplier_purchase_by_id)
+def sync_supplier_purchase_batch_by_ids(compra_ids, task_cache_key=None):
+    return _batch_sync_result(
+        record_ids=compra_ids,
+        sync_callable=sync_supplier_purchase_by_id,
+        task_cache_key=task_cache_key,
+        operation='sync_supplier_purchases_batch',
+    )

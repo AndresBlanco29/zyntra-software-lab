@@ -2147,6 +2147,57 @@ def quickbooks_outbound_search(request):
     })
 
 
+def _start_outbound_batch_background_task(*, operation, record_ids, sync_callable):
+    """Run outbound batch sync off the request thread to avoid Gunicorn worker timeouts."""
+    task_id = uuid.uuid4().hex
+    cache_key = f'quickbooks_task_{task_id}'
+    total = len(record_ids)
+    cache.set(
+        cache_key,
+        _qb_task_progress_payload(
+            status='running',
+            progress=1,
+            operation=operation,
+            result={'processed': 0, 'total': total, 'success_count': 0, 'failed_count': 0},
+        ),
+        timeout=60 * 60,
+    )
+
+    def _runner():
+        from django.db import close_old_connections
+
+        close_old_connections()
+        try:
+            result = sync_callable(record_ids, task_cache_key=cache_key)
+            cache.set(
+                cache_key,
+                _qb_task_progress_payload(
+                    status='completed',
+                    progress=100,
+                    operation=operation,
+                    result=result,
+                ),
+                timeout=60 * 60,
+            )
+        except Exception as exc:
+            logger.exception('QuickBooks outbound batch task failed (%s)', operation)
+            cache.set(
+                cache_key,
+                _qb_task_progress_payload(
+                    status='failed',
+                    progress=100,
+                    operation=operation,
+                    error=str(exc),
+                ),
+                timeout=60 * 60,
+            )
+        finally:
+            close_old_connections()
+
+    threading.Thread(target=_runner, daemon=True).start()
+    return JsonResponse({'task_id': task_id, 'operation': operation, 'total': total})
+
+
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 @quickbooks_requires_full_mode
@@ -2157,10 +2208,13 @@ def quickbooks_sync_customers_batch(request):
             _parse_outbound_sync_ids(request, pending_queryset=pending),
             pending,
         )
-        result = sync_customer_batch_by_ids(record_ids)
     except ValueError as exc:
         return _response_or_redirect(request, operation='sync_customers_batch', error=str(exc), status_code=400)
-    return _response_or_redirect(request, operation='sync_customers_batch', result=result)
+    return _start_outbound_batch_background_task(
+        operation='sync_customers_batch',
+        record_ids=record_ids,
+        sync_callable=sync_customer_batch_by_ids,
+    )
 
 
 @require_POST
@@ -2173,10 +2227,13 @@ def quickbooks_sync_products_batch(request):
             _parse_outbound_sync_ids(request, pending_queryset=pending),
             pending,
         )
-        result = sync_product_batch_by_ids(record_ids)
     except ValueError as exc:
         return _response_or_redirect(request, operation='sync_products_batch', error=str(exc), status_code=400)
-    return _response_or_redirect(request, operation='sync_products_batch', result=result)
+    return _start_outbound_batch_background_task(
+        operation='sync_products_batch',
+        record_ids=record_ids,
+        sync_callable=sync_product_batch_by_ids,
+    )
 
 
 @require_POST
@@ -2206,10 +2263,13 @@ def quickbooks_push_linked_products_batch(request):
             _parse_outbound_sync_ids(request, pending_queryset=target_queryset),
             target_queryset,
         )
-        result = sync_product_batch_by_ids(record_ids)
     except ValueError as exc:
         return _response_or_redirect(request, operation='push_linked_products_batch', error=str(exc), status_code=400)
-    return _response_or_redirect(request, operation='push_linked_products_batch', result=result)
+    return _start_outbound_batch_background_task(
+        operation='push_linked_products_batch',
+        record_ids=record_ids,
+        sync_callable=sync_product_batch_by_ids,
+    )
 
 
 @require_POST
@@ -2222,10 +2282,13 @@ def quickbooks_sync_invoices_batch(request):
             _parse_outbound_sync_ids(request, pending_queryset=pending),
             pending,
         )
-        result = sync_invoice_batch_by_ids(record_ids)
     except ValueError as exc:
         return _response_or_redirect(request, operation='sync_invoices_batch', error=str(exc), status_code=400)
-    return _response_or_redirect(request, operation='sync_invoices_batch', result=result)
+    return _start_outbound_batch_background_task(
+        operation='sync_invoices_batch',
+        record_ids=record_ids,
+        sync_callable=sync_invoice_batch_by_ids,
+    )
 
 
 @require_POST
@@ -2238,7 +2301,10 @@ def quickbooks_sync_adjustment_notes_batch(request):
             _parse_outbound_sync_ids(request, pending_queryset=pending),
             pending,
         )
-        result = sync_adjustment_note_batch_by_ids(record_ids)
     except ValueError as exc:
         return _response_or_redirect(request, operation='sync_adjustment_notes_batch', error=str(exc), status_code=400)
-    return _response_or_redirect(request, operation='sync_adjustment_notes_batch', result=result)
+    return _start_outbound_batch_background_task(
+        operation='sync_adjustment_notes_batch',
+        record_ids=record_ids,
+        sync_callable=sync_adjustment_note_batch_by_ids,
+    )

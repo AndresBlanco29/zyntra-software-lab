@@ -1899,15 +1899,29 @@
           headers: { 'X-CSRFToken': csrfToken },
           body: formData,
         }).then(function (response) {
-          if (response.redirected) {
-            window.location.href = response.url;
+          return response.json().then(function (json) {
+            return { ok: response.ok, status: response.status, redirected: response.redirected, url: response.url, json: json };
+          }).catch(function () {
+            return { ok: response.ok, status: response.status, redirected: response.redirected, url: response.url, json: null };
+          });
+        }).then(function (res) {
+          if (res.redirected && res.url) {
+            window.location.href = res.url;
             return;
           }
-          if (response.ok) {
+          if (res.ok && res.json && res.json.task_id && window.qbTaskUI) {
+            window.qbTaskUI.showOverlay();
+            window.qbTaskUI.setTaskDescription(res.json.operation || 'sync_invoices_batch');
+            window.qbTaskUI.setProgress(4);
+            window.qbTaskUI.setMessage('{% filter escapejs %}{% trans "Sending records to QuickBooks..." %}{% endfilter %}');
+            window.qbTaskUI.startPolling(res.json.task_id, res.json.operation || 'sync_invoices_batch');
+            return;
+          }
+          if (res.ok) {
             window.location.reload();
             return;
           }
-          throw new Error('{% filter escapejs %}{% trans "Update failed" %}{% endfilter %} (' + response.status + ')');
+          throw new Error('{% filter escapejs %}{% trans "Update failed" %}{% endfilter %} (' + res.status + ')');
         }).catch(function (error) {
           form.querySelectorAll('button[type="submit"]').forEach(function (button) { button.disabled = false; });
           updateSelectionState();
@@ -1958,10 +1972,27 @@
       if (operation === 'alignment_sync_to_local') {
         return 'Estamos alineando Tortilla y QuickBooks: importación, estado de facturas y exportación de registros nuevos.';
       }
+      if (operation === 'sync_invoices_batch') {
+        return 'Estamos enviando facturas a QuickBooks (cliente, líneas, términos y pago si aplica).';
+      }
+      if (operation === 'sync_customers_batch') {
+        return 'Estamos enviando clientes a QuickBooks.';
+      }
+      if (operation === 'sync_products_batch' || operation === 'push_linked_products_batch') {
+        return 'Estamos enviando productos a QuickBooks.';
+      }
+      if (operation === 'sync_adjustment_notes_batch') {
+        return 'Estamos enviando notas de ajuste a QuickBooks.';
+      }
       return 'Estamos importando datos desde QuickBooks.';
     }
 
     function operationProgressLabel(operation, processed, total){
+      if (String(operation || '').indexOf('_batch') !== -1) {
+        return processed && total
+          ? `Enviando ${processed} de ${total}...`
+          : 'Enviando a QuickBooks — por favor espera.';
+      }
       if (operation === 'import_customers_to_local') {
         return processed && total
           ? `Importando ${processed} de ${total} clientes...`
@@ -2062,8 +2093,9 @@
             let details = '';
             try{
               const res = data.result || {};
-              if (res.created_count || res.updated_count || res.deactivated_count || res.conflict_count || res.failed_count){
+              if (res.created_count || res.updated_count || res.deactivated_count || res.conflict_count || res.failed_count || res.success_count){
                 const parts = [];
+                if (typeof res.success_count !== 'undefined') parts.push('Enviados: ' + (res.success_count||0));
                 if (typeof res.created_count !== 'undefined') parts.push('Creados: ' + (res.created_count||0));
                 if (typeof res.updated_count !== 'undefined') parts.push('Actualizados: ' + (res.updated_count||0));
                 if (typeof res.deactivated_count !== 'undefined' && res.deactivated_count) parts.push('Inactivados: ' + (res.deactivated_count||0));
@@ -2139,6 +2171,15 @@
 
     cancelBtn.addEventListener('click', function(){ hideOverlay(); });
     document.getElementById('qb-task-reload').addEventListener('click', function(){ location.reload(); });
+
+    window.qbTaskUI = {
+      showOverlay: showOverlay,
+      hideOverlay: hideOverlay,
+      setTaskDescription: setTaskDescription,
+      setProgress: setProgress,
+      setMessage: function(textValue){ if (message) message.textContent = textValue; },
+      startPolling: startPolling,
+    };
 
     // intercept forms with data-qb-operation
     document.querySelectorAll('form[data-qb-operation]').forEach(function(form){

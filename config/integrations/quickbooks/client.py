@@ -315,6 +315,9 @@ class QuickBooksAPIClient:
     def update_invoice(self, payload):
         return self.update_entity('Invoice', payload)
 
+    def create_payment(self, payload):
+        return self.create_entity('Payment', payload)
+
     def create_credit_memo(self, payload):
         return self.create_entity('CreditMemo', payload)
 

@@ -602,13 +602,16 @@ def _mark_failed(instance):
     instance.save(update_fields=['sync_status'])
 
 
-def _sync_result(*, entity, action, payload):
-    return {
+def _sync_result(*, entity, action, payload, **extra):
+    result = {
         'entity': entity,
         'action': action,
         'quickbooks_id': str(payload.get('Id', '')),
         'payload': payload,
     }
+    if extra:
+        result.update(extra)
+    return result
 
 
 def _batch_sync_result(*, record_ids, sync_callable):
@@ -4397,6 +4400,220 @@ def _build_sales_line(*, item_ref, amount, description, quantity=1, unit_price=N
     }
 
 
+LOCAL_PAYMENT_TERM_QB_NAMES = {
+    'PREPAY': ('Prepay', 'Due on receipt', 'Due upon receipt'),
+    'COD': ('COD', 'Due on receipt', 'Due upon receipt'),
+    'NET7': ('Net 7', 'NET7', 'Net7'),
+    'NET14': ('Net 14', 'NET14', 'Net14'),
+    'NET21': ('Net 21', 'NET21', 'Net21'),
+}
+
+LOCAL_PAYMENT_TERM_DUE_DAYS = {
+    'PREPAY': 0,
+    'COD': 0,
+    'NET7': 7,
+    'NET14': 14,
+    'NET21': 21,
+}
+
+
+def _preferred_term_name_for_local(terminos_pago):
+    code = _normalize_text(terminos_pago).upper()
+    names = LOCAL_PAYMENT_TERM_QB_NAMES.get(code) or ()
+    return names[0] if names else ''
+
+
+def _find_term_by_names(client, names):
+    for name in names:
+        cleaned = _normalize_text(name)
+        if not cleaned:
+            continue
+        escaped = client._escape_query_value(cleaned)
+        terms = client.query(
+            f"select Id, Name, DueDays from Term where Name = '{escaped}' maxresults 1"
+        ).get('Term', [])
+        if terms:
+            return terms[0]
+    return None
+
+
+def _resolve_or_create_sales_term_ref(client, terminos_pago):
+    code = _normalize_text(terminos_pago).upper()
+    if not code:
+        return None
+    names = LOCAL_PAYMENT_TERM_QB_NAMES.get(code)
+    if not names:
+        return None
+    try:
+        term = _find_term_by_names(client, names)
+        if term is None:
+            due_days = LOCAL_PAYMENT_TERM_DUE_DAYS.get(code)
+            if due_days is None:
+                return None
+            term = client.create_entity('Term', {
+                'Name': names[0],
+                'DueDays': int(due_days),
+            })
+        term_id = str(term.get('Id') or '').strip()
+        if not term_id:
+            return None
+        return {'value': term_id, 'name': term.get('Name') or names[0]}
+    except (QuickBooksAPIError, QuickBooksSyncError, TypeError, ValueError, RuntimeError) as exc:
+        logger.warning('Could not resolve QuickBooks sales term for %s: %s', code, exc)
+        return None
+
+
+def _build_invoice_payment_terms_payload(*, invoice, client):
+    """Return optional DueDate / SalesTermRef for QB Invoice create. Never raises."""
+    payload = {}
+    try:
+        from config.facturacion.services import resolve_invoice_payment_due_date
+
+        due_date = resolve_invoice_payment_due_date(invoice)
+        if due_date:
+            payload['DueDate'] = due_date.isoformat()
+    except Exception as exc:  # noqa: BLE001 - keep invoice export resilient
+        logger.warning('Could not resolve invoice due date for %s: %s', getattr(invoice, 'numero', invoice.pk), exc)
+
+    terminos = getattr(getattr(invoice, 'cliente', None), 'terminos_pago', '') or ''
+    try:
+        term_ref = _resolve_or_create_sales_term_ref(client, terminos)
+        if term_ref:
+            payload['SalesTermRef'] = term_ref
+    except Exception as exc:  # noqa: BLE001 - keep invoice export resilient
+        logger.warning(
+            'Could not attach QuickBooks sales term for invoice %s: %s',
+            getattr(invoice, 'numero', getattr(invoice, 'pk', '')),
+            exc,
+        )
+    return payload
+
+
+def _get_undeposited_funds_account_ref(client):
+    account_ref = _account_ref_from_setting(client, 'QUICKBOOKS_UNDEPOSITED_FUNDS_ACCOUNT_ID')
+    if account_ref:
+        return account_ref
+    return _first_account_ref_from_queries(
+        client,
+        (
+            "select Id, Name from Account where AccountSubType = 'UndepositedFunds' maxresults 1",
+            "select Id, Name from Account where Name = 'Undeposited Funds' maxresults 1",
+        ),
+    )
+
+
+def _local_invoice_paid_amount(invoice):
+    delivery = getattr(invoice, 'delivery', None)
+    if delivery is None:
+        return Decimal('0.00')
+    if getattr(delivery, 'estado_pago', '') != 'PAGADO':
+        return Decimal('0.00')
+    return _quantize_money(getattr(delivery, 'monto_pagado', 0) or 0)
+
+
+def _remote_invoice_open_balance(remote_invoice):
+    if remote_invoice is None:
+        return Decimal('0.00')
+    if remote_invoice.get('Balance') is not None:
+        return _quantize_money(remote_invoice.get('Balance'))
+    if remote_invoice.get('TotalAmt') is not None:
+        return _quantize_money(remote_invoice.get('TotalAmt'))
+    return Decimal('0.00')
+
+
+def _payment_txn_date_for_invoice(invoice):
+    delivery = getattr(invoice, 'delivery', None)
+    if delivery is not None and getattr(delivery, 'delivered_at', None):
+        return timezone.localtime(delivery.delivered_at).date()
+    if getattr(invoice, 'creada_en', None):
+        return timezone.localtime(invoice.creada_en).date()
+    return timezone.localdate()
+
+
+def _sync_invoice_payment_if_needed(*, client, invoice, remote_invoice, customer_quickbooks_id):
+    """
+    Create a QB Payment when the local delivery is paid.
+    Soft-fails: never raises; returns a result dict or None.
+    """
+    paid_amount = _local_invoice_paid_amount(invoice)
+    if paid_amount <= 0:
+        return None
+
+    invoice_qb_id = str((remote_invoice or {}).get('Id') or getattr(invoice, 'quickbooks_id', '') or '').strip()
+    customer_qb_id = str(customer_quickbooks_id or '').strip()
+    if not invoice_qb_id or not customer_qb_id:
+        return {'action': 'skipped', 'error': 'Missing QuickBooks invoice or customer id for payment.'}
+
+    open_balance = _remote_invoice_open_balance(remote_invoice)
+    if open_balance <= 0:
+        return {'action': 'skipped', 'reason': 'Invoice already has zero open balance in QuickBooks.'}
+
+    pay_amount = min(paid_amount, open_balance)
+    payment_payload = {
+        'CustomerRef': {'value': customer_qb_id},
+        'TotalAmt': _as_float(pay_amount),
+        'TxnDate': _payment_txn_date_for_invoice(invoice).isoformat(),
+        'PrivateNote': _truncate(
+            f'La Tortilla delivery payment for {invoice.numero}',
+            limit=4000,
+        ),
+        'Line': [
+            {
+                'Amount': _as_float(pay_amount),
+                'LinkedTxn': [
+                    {
+                        'TxnId': invoice_qb_id,
+                        'TxnType': 'Invoice',
+                    }
+                ],
+            }
+        ],
+    }
+    delivery = getattr(invoice, 'delivery', None)
+    if delivery is not None and getattr(delivery, 'metodo_pago', ''):
+        payment_payload['PrivateNote'] = _truncate(
+            f"{payment_payload['PrivateNote']} | Method: {delivery.get_metodo_pago_display()}",
+            limit=4000,
+        )
+
+    try:
+        deposit_ref = _get_undeposited_funds_account_ref(client)
+        if deposit_ref:
+            payment_payload['DepositToAccountRef'] = deposit_ref
+        created_payment = client.create_payment(payment_payload)
+    except (QuickBooksAPIError, QuickBooksSyncError, TypeError, ValueError, AttributeError) as exc:
+        logger.warning(
+            'QuickBooks payment sync failed for invoice %s: %s',
+            getattr(invoice, 'numero', invoice.pk),
+            exc,
+        )
+        return {'action': 'failed', 'error': str(exc)}
+
+    update_fields = []
+    if invoice.qb_payment_status != 'PAID':
+        invoice.qb_payment_status = 'PAID'
+        update_fields.append('qb_payment_status')
+    if update_fields:
+        invoice.save(update_fields=update_fields)
+
+    return {
+        'action': 'created',
+        'quickbooks_id': str(created_payment.get('Id') or ''),
+        'amount': _as_float(pay_amount),
+        'payload': created_payment,
+    }
+
+
+def _apply_local_due_date_from_payload(invoice, terms_payload):
+    due_raw = (terms_payload or {}).get('DueDate')
+    if not due_raw:
+        return
+    due_date = parse_date(str(due_raw))
+    if due_date and invoice.qb_due_date != due_date:
+        invoice.qb_due_date = due_date
+        invoice.save(update_fields=['qb_due_date'])
+
+
 def _build_adjustment_item_ref(client):
     item = _ensure_adjustment_item(client)
     return {'value': str(item.get('Id')), 'name': item.get('Name', '')}
@@ -4666,10 +4883,26 @@ def sync_invoice(*, invoice, client=None):
             existing = client.find_by_id('Invoice', invoice.quickbooks_id)
             if existing:
                 _mark_synced(invoice, existing.get('Id'))
-                return _sync_result(entity='Invoice', action='existing', payload=existing)
+                customer_qb_id = str(
+                    ((existing.get('CustomerRef') or {}).get('value'))
+                    or getattr(invoice.cliente, 'quickbooks_id', '')
+                    or ''
+                )
+                payment_result = _sync_invoice_payment_if_needed(
+                    client=client,
+                    invoice=invoice,
+                    remote_invoice=existing,
+                    customer_quickbooks_id=customer_qb_id,
+                )
+                return _sync_result(
+                    entity='Invoice',
+                    action='existing',
+                    payload=existing,
+                    payment=payment_result,
+                )
 
         customer_result = sync_customer(cliente=invoice.cliente, client=client)
-        txn_date = invoice.creada_en.date()
+        txn_date = timezone.localtime(invoice.creada_en).date() if invoice.creada_en else timezone.localdate()
         lines = []
         adjustment_item_ref = None
         inventory_presentaciones = []
@@ -4712,7 +4945,18 @@ def sync_invoice(*, invoice, client=None):
         existing = _find_transaction_by_doc_number(client, 'Invoice', invoice.numero)
         if existing:
             _mark_synced(invoice, existing.get('Id'))
-            return _sync_result(entity='Invoice', action='linked', payload=existing)
+            payment_result = _sync_invoice_payment_if_needed(
+                client=client,
+                invoice=invoice,
+                remote_invoice=existing,
+                customer_quickbooks_id=customer_result['quickbooks_id'],
+            )
+            return _sync_result(
+                entity='Invoice',
+                action='linked',
+                payload=existing,
+                payment=payment_result,
+            )
 
         resolved_txn_date = _resolve_txn_date_for_inventory_items(
             client=client,
@@ -4725,15 +4969,31 @@ def sync_invoice(*, invoice, client=None):
                 f'{private_note} | Original ERP date: {txn_date.isoformat()}',
                 limit=4000,
             )
-        created = client.create_invoice({
+        terms_payload = _build_invoice_payment_terms_payload(invoice=invoice, client=client)
+        invoice_payload = {
             'CustomerRef': {'value': customer_result['quickbooks_id']},
             'DocNumber': invoice.numero,
             'TxnDate': resolved_txn_date.isoformat(),
             'PrivateNote': private_note,
             'Line': lines,
-        })
+        }
+        invoice_payload.update(terms_payload)
+        created = client.create_invoice(invoice_payload)
         _mark_synced(invoice, created.get('Id'))
-        return _sync_result(entity='Invoice', action='created', payload=created)
+        _apply_local_due_date_from_payload(invoice, terms_payload)
+        payment_result = _sync_invoice_payment_if_needed(
+            client=client,
+            invoice=invoice,
+            remote_invoice=created,
+            customer_quickbooks_id=customer_result['quickbooks_id'],
+        )
+        return _sync_result(
+            entity='Invoice',
+            action='created',
+            payload=created,
+            payment=payment_result,
+            terms=terms_payload or None,
+        )
     except (QuickBooksAPIError, QuickBooksSyncError) as exc:
         _mark_failed(invoice)
         raise QuickBooksSyncError(str(exc)) from exc
@@ -4955,7 +5215,7 @@ def sync_product_by_id(presentacion_id):
 
 def sync_invoice_by_id(invoice_id):
     return sync_invoice(
-        invoice=Invoice.objects.select_related('cliente__usuario').prefetch_related(
+        invoice=Invoice.objects.select_related('cliente__usuario', 'delivery').prefetch_related(
             'items__presentacion__producto',
             'items__presentacion__stock_operativo',
         ).get(pk=invoice_id)

@@ -4846,7 +4846,7 @@ msgid "Driver Deliveries"
 msgstr "Conductor Entregas"
 
 msgid "Delivered Invoices"
-msgstr "Delivered Facturas"
+msgstr "Facturas entregadas"
 
 msgid "Review all invoices already completed by the driver."
 msgstr "Review todos invoices already completado por el driver."
@@ -5208,7 +5208,7 @@ msgid "Ready for dispatch"
 msgstr "Ready para dispatch"
 
 msgid "Pending dispatch"
-msgstr "Pendiente de despacho"
+msgstr "Pendientes de despacho"
 
 msgid "Total paid"
 msgstr "Total paid"
@@ -5438,10 +5438,19 @@ msgid "Invoice views"
 msgstr ""
 
 msgid "Ready Invoices"
-msgstr "Ready Facturas"
+msgstr "Facturas listas"
 
 msgid "Cancelled Invoices"
-msgstr "Cancelarled Facturas"
+msgstr "Facturas anuladas"
+
+msgid "Voided invoices stay registered here for reference."
+msgstr "Las facturas anuladas quedan registradas aquí como referencia."
+
+msgid "View all"
+msgstr "Ver todas"
+
+msgid "Cannot void an invoice that is already on route."
+msgstr "No se puede anular una factura que ya está en ruta."
 
 msgid "QuickBooks payment status"
 msgstr "QuickBooks payment status"

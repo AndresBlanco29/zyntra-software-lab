@@ -4538,7 +4538,7 @@ class InvoiceVoidDeleteTests(TestCase):
 		delivery.save(update_fields=['estado', 'updated_at'])
 		self.invoice.refresh_from_db()
 		self.assertTrue(self.invoice.delivery_blocks_void_delete())
-		self.assertFalse(self.invoice.can_void_from_backoffice())
+		self.assertTrue(self.invoice.can_void_from_backoffice())
 		self.assertTrue(self.invoice.can_delete_from_backoffice())
 
 		invoice_id = self.invoice.id
@@ -4547,6 +4547,63 @@ class InvoiceVoidDeleteTests(TestCase):
 
 		self.assertFalse(Invoice.objects.filter(id=invoice_id).exists())
 		self.assertFalse(Delivery.objects.filter(id=delivery_id).exists())
+
+	def test_void_delivered_unpaid_invoice_creates_record_and_clears_hold(self):
+		driver = Usuario.objects.create_user(username='void-delivered-driver', password='secret123', role='driver')
+		self.invoice.metodo_entrega = 'RUTA_DRIVER'
+		self.invoice.driver = driver
+		self.invoice.save(update_fields=['metodo_entrega', 'driver', 'actualizada_en'])
+		delivery = ensure_delivery_for_invoice(self.invoice)
+		delivery.estado = 'ENTREGADA_SIN_PAGO'
+		delivery.estado_pago = 'NO_PAGADO'
+		delivery.client_blocked_on_delivery = True
+		delivery.monto_pagado = Decimal('0.00')
+		delivery.save(update_fields=[
+			'estado',
+			'estado_pago',
+			'client_blocked_on_delivery',
+			'monto_pagado',
+			'updated_at',
+		])
+		self.cliente.credit_hold = True
+		self.cliente.save(update_fields=['credit_hold'])
+		stock_before = StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico
+
+		anular_invoice(invoice=self.invoice, usuario=self.backoffice, motivo='Cliente rechazo entrega')
+
+		self.invoice.refresh_from_db()
+		self.cliente.refresh_from_db()
+		delivery.refresh_from_db()
+		registro = FacturacionRegistroAnulacion.objects.get(invoice=self.invoice, tipo_documento='INVOICE')
+		self.assertEqual(self.invoice.estado, 'ANULADA')
+		self.assertFalse(self.cliente.credit_hold)
+		self.assertFalse(delivery.client_blocked_on_delivery)
+		self.assertEqual(delivery.monto_pagado, Decimal('0.00'))
+		self.assertEqual(StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico, stock_before + 3)
+		self.assertEqual(registro.snapshot.get('delivery', {}).get('estado'), 'ENTREGADA_SIN_PAGO')
+		self.assertFalse(
+			Invoice.objects.filter(
+				id=self.invoice.id,
+				estado='GENERADA',
+				delivery__estado__in=['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'],
+			).exists()
+		)
+		self.assertTrue(Invoice.objects.filter(id=self.invoice.id, estado='ANULADA').exists())
+
+	def test_void_blocked_while_delivery_on_route(self):
+		driver = Usuario.objects.create_user(username='void-onroute-driver', password='secret123', role='driver')
+		self.invoice.metodo_entrega = 'RUTA_DRIVER'
+		self.invoice.driver = driver
+		self.invoice.save(update_fields=['metodo_entrega', 'driver', 'actualizada_en'])
+		delivery = ensure_delivery_for_invoice(self.invoice)
+		delivery.estado = 'EN_RUTA'
+		delivery.save(update_fields=['estado', 'updated_at'])
+		self.invoice.refresh_from_db()
+
+		self.assertTrue(self.invoice.delivery_is_on_route())
+		self.assertFalse(self.invoice.can_void_from_backoffice())
+		with self.assertRaises(ValidationError):
+			anular_invoice(invoice=self.invoice, usuario=self.backoffice, motivo='No permitido en ruta')
 
 	def test_delete_delivered_invoice_allowed_when_synced_to_quickbooks(self):
 		driver = Usuario.objects.create_user(username='void-driver-synced', password='secret123', role='driver')

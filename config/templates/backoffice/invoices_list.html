@@ -21,6 +21,53 @@
   </div>
 </div>
 
+<div class="card shadow-sm mb-3 border-secondary-subtle">
+  <div class="card-body">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+      <div>
+        <h5 class="mb-1">{% trans "Cancelled Invoices" %}</h5>
+        <p class="text-muted small mb-0">{% trans "Voided invoices stay registered here for reference." %}</p>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge text-bg-secondary fs-6">{{ cancelled_count }}</span>
+        <a href="?view=cancelled{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_customer_id %}&cliente_id={{ selected_customer_id|urlencode }}{% endif %}{% if selected_delivery_method %}&metodo_entrega={{ selected_delivery_method|urlencode }}{% endif %}{% if selected_driver_id %}&driver_id={{ selected_driver_id|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from|urlencode }}{% endif %}{% if date_to %}&date_to={{ date_to|urlencode }}{% endif %}" class="btn btn-sm btn-outline-secondary">
+          {% trans "View all" %}
+        </a>
+      </div>
+    </div>
+    {% if recent_cancelled_invoices %}
+    <div class="table-responsive">
+      <table class="table table-sm mb-0 align-middle">
+        <thead>
+          <tr>
+            <th>{% trans "Invoice" %}</th>
+            <th>{% trans "Customer" %}</th>
+            <th>{% trans "Voided on" %}</th>
+            <th class="text-end">{% trans "Total" %}</th>
+            <th class="text-end"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for invoice in recent_cancelled_invoices %}
+          <tr>
+            <td><span class="badge text-bg-danger">{{ invoice.numero }}</span></td>
+            <td>{{ invoice.cliente.nombre_empresa }}</td>
+            <td>{% if invoice.anulada_en %}{{ invoice.anulada_en|date:"m/d/Y H:i" }}{% else %}-{% endif %}</td>
+            <td class="text-end">${{ invoice.total_neto }}</td>
+            <td class="text-end">
+              <a href="{% url 'backoffice_invoice_detail' invoice.id %}" class="btn btn-sm btn-outline-primary">{% trans "Open" %}</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="text-muted small mb-0">{% trans "No cancelled invoices are registered yet." %}</p>
+    {% endif %}
+  </div>
+</div>
+
 <div class="card shadow-sm mb-3 border-0">
   <div class="card-body">
     <div class="d-flex flex-wrap gap-2 mb-3" aria-label="{% trans 'Invoice views' %}">

@@ -193,6 +193,7 @@
     {% if can_void_invoice %}
     <form method="post" action="{% url 'backoffice_invoice_void' invoice.id %}" class="d-flex gap-2 align-items-center" onsubmit="return confirm('{% trans "Void this invoice? Products will return to inventory and a void record will be saved." %}');">
       {% csrf_token %}
+      <input type="hidden" name="next" value="{% url 'backoffice_invoices_list' %}?view=cancelled">
       <input type="text" name="motivo" class="form-control form-control-sm" placeholder="{% trans "Void reason" %}" maxlength="500">
       <button type="submit" class="btn btn-outline-warning">{% trans "Void" %}</button>
     </form>

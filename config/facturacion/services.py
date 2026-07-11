@@ -1716,7 +1716,7 @@ def _build_nota_void_snapshot(nota):
 
 
 def _build_invoice_void_snapshot(invoice):
-	return {
+	snapshot = {
 		'numero': invoice.numero,
 		'subtotal': str(invoice.subtotal),
 		'total_neto': str(invoice.total_neto),
@@ -1733,6 +1733,75 @@ def _build_invoice_void_snapshot(invoice):
 			for item in invoice.items.all()
 		],
 	}
+	delivery = getattr(invoice, 'delivery', None)
+	if delivery is not None:
+		snapshot['delivery'] = {
+			'estado': delivery.estado,
+			'estado_pago': delivery.estado_pago,
+			'monto_pagado': str(delivery.monto_pagado or '0.00'),
+			'metodo_pago': delivery.metodo_pago or '',
+			'client_blocked_on_delivery': bool(delivery.client_blocked_on_delivery),
+			'delivered_at': delivery.delivered_at.isoformat() if delivery.delivered_at else None,
+			'recibido_por': delivery.recibido_por or '',
+			'motivo_no_pago': delivery.motivo_no_pago or '',
+		}
+	return snapshot
+
+
+def _cleanup_delivery_on_invoice_void(*, invoice):
+	delivery = getattr(invoice, 'delivery', None)
+	if delivery is None:
+		return
+
+	if delivery.client_blocked_on_delivery or delivery.estado == 'ENTREGADA_SIN_PAGO':
+		cliente = invoice.cliente
+		cliente.credit_hold = False
+		cliente.save(update_fields=['credit_hold'])
+
+	delivery.payments.all().delete()
+	delivery.monto_pagado = Decimal('0.00')
+	delivery.monto_pagado_cash = Decimal('0.00')
+	delivery.monto_pagado_cheque = Decimal('0.00')
+	delivery.metodo_pago = ''
+	if delivery.is_completed:
+		delivery.estado = 'ENTREGADA_SIN_PAGO'
+		delivery.estado_pago = 'NO_PAGADO'
+	else:
+		delivery.estado_pago = 'PENDIENTE'
+	delivery.client_blocked_on_delivery = False
+	delivery.client_unlocked_by = None
+	delivery.client_unlocked_at = None
+	delivery.transferencia_referencia = ''
+	delivery.tarjeta_ultimos_4 = ''
+	delivery.tarjeta_autorizacion = ''
+	delivery.zelle_referencia = ''
+	delivery.zelle_remitente = ''
+	delivery.ach_referencia = ''
+	delivery.ach_cuenta_ultimos_4 = ''
+	delivery.cheque_numero = ''
+	delivery.cheque_banco = ''
+	delivery.save(update_fields=[
+		'estado',
+		'monto_pagado',
+		'monto_pagado_cash',
+		'monto_pagado_cheque',
+		'metodo_pago',
+		'estado_pago',
+		'client_blocked_on_delivery',
+		'client_unlocked_by',
+		'client_unlocked_at',
+		'transferencia_referencia',
+		'tarjeta_ultimos_4',
+		'tarjeta_autorizacion',
+		'zelle_referencia',
+		'zelle_remitente',
+		'ach_referencia',
+		'ach_cuenta_ultimos_4',
+		'cheque_numero',
+		'cheque_banco',
+		'updated_at',
+	])
+	_recalculate_invoice_balances(invoice)
 
 
 def _create_void_registro(*, tipo_documento, numero_documento, documento_id, cliente, invoice=None, nota=None, motivo='', usuario=None, snapshot=None):
@@ -1770,12 +1839,16 @@ def validate_invoice_delete_confirmation_phrase(*, invoice, confirmation_phrase)
 		)
 
 
-def _validate_invoice_void_delete_allowed(invoice):
+def _validate_invoice_void_allowed(invoice):
 	if invoice.estado == 'ANULADA':
 		raise ValidationError(_('This invoice is already voided.'))
-	delivery = getattr(invoice, 'delivery', None)
-	if delivery and delivery.estado in {'EN_RUTA', 'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'}:
-		raise ValidationError(_('Cannot void or delete an invoice that is already on route or delivered.'))
+	if invoice.delivery_is_on_route():
+		raise ValidationError(_('Cannot void an invoice that is already on route.'))
+
+
+def _validate_invoice_void_delete_allowed(invoice):
+	"""Legacy name used by delete path for non-delivered invoices."""
+	_validate_invoice_void_allowed(invoice)
 
 
 def _invoice_allows_quickbooks_bypass_on_delete(invoice):
@@ -1789,7 +1862,7 @@ def _validate_invoice_delete_allowed(invoice):
 		return
 	if invoice.delivery_blocks_void_delete():
 		return
-	_validate_invoice_void_delete_allowed(invoice)
+	_validate_invoice_void_allowed(invoice)
 
 
 def _reverse_invoice_customer_note_applications(*, invoice):
@@ -1828,12 +1901,14 @@ def _void_linked_invoice_notes(*, invoice, usuario, motivo=''):
 @transaction.atomic
 def anular_invoice(*, invoice, usuario, motivo=''):
 	_ensure_quickbooks_not_locked(invoice=invoice)
-	_validate_invoice_void_delete_allowed(invoice)
+	_validate_invoice_void_allowed(invoice)
 	motivo = (motivo or '').strip()
+	void_snapshot = _build_invoice_void_snapshot(invoice)
 
 	_void_linked_invoice_notes(invoice=invoice, usuario=usuario, motivo=motivo)
 	_reverse_invoice_customer_note_applications(invoice=invoice)
 	_reverse_invoice_customer_credit(invoice=invoice)
+	_cleanup_delivery_on_invoice_void(invoice=invoice)
 	restaurar_inventario_por_anulacion_factura(pedido=invoice.pedido, invoice=invoice, creado_por=usuario)
 
 	pedido = invoice.pedido
@@ -1864,7 +1939,7 @@ def anular_invoice(*, invoice, usuario, motivo=''):
 		invoice=invoice,
 		motivo=motivo,
 		usuario=usuario,
-		snapshot=_build_invoice_void_snapshot(invoice),
+		snapshot=void_snapshot,
 	)
 	from config.auditoria.business_events import log_business_event
 	from config.auditoria.models import AuditLog

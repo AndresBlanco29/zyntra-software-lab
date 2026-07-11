@@ -1272,6 +1272,11 @@ def backoffice_invoices_list(request):
 	customers = Cliente.objects.filter(invoices__isnull=False).distinct().order_by('nombre_empresa')
 	drivers = Usuario.objects.filter(role='driver').order_by('first_name', 'username')
 	qb_status_counts = _invoice_qb_status_counts(count_querysets[view_mode])
+	recent_cancelled_invoices = list(
+		count_querysets['cancelled']
+		.select_related('cliente', 'anulada_por')
+		.order_by('-anulada_en', '-id')[:5]
+	)
 
 	return render(request, 'backoffice/invoices_list.html', {
 		'page_obj': page_obj,
@@ -1281,6 +1286,7 @@ def backoffice_invoices_list(request):
 		'ready_count': count_querysets['ready'].count(),
 		'delivered_count': count_querysets['delivered'].count(),
 		'cancelled_count': count_querysets['cancelled'].count(),
+		'recent_cancelled_invoices': recent_cancelled_invoices,
 		'qb_status_counts': qb_status_counts,
 		'customers': customers,
 		'drivers': drivers,
@@ -1807,6 +1813,8 @@ def backoffice_invoice_void(request, invoice_id):
 		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 	else:
 		messages.success(request, _('Invoice voided successfully. Products were returned to inventory and a void record was saved.'))
+		if 'view=delivered' in next_url:
+			next_url = f"{reverse('backoffice_invoices_list')}?view=cancelled"
 	return redirect(next_url)
 
 

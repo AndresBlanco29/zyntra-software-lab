@@ -104,6 +104,10 @@ class Invoice(models.Model):
 	def is_voided(self):
 		return self.estado == 'ANULADA'
 
+	def delivery_is_on_route(self):
+		delivery = getattr(self, 'delivery', None)
+		return bool(delivery and delivery.estado == 'EN_RUTA')
+
 	def delivery_blocks_void_delete(self):
 		delivery = getattr(self, 'delivery', None)
 		return bool(delivery and delivery.estado in {'EN_RUTA', 'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'})
@@ -114,7 +118,7 @@ class Invoice(models.Model):
 		return (
 			not is_sync_locked(self)
 			and self.estado == 'GENERADA'
-			and not self.delivery_blocks_void_delete()
+			and not self.delivery_is_on_route()
 		)
 
 	def can_delete_from_backoffice(self):

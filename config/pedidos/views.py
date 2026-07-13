@@ -49,7 +49,7 @@ from config.facturacion.services import (
 from config.integrations.quickbooks.services import get_connection_status
 from config.integrations.quickbooks.views import get_dashboard_sync_context
 from config.notificaciones.models import Notificacion
-from config.productos.models import Presentacion, ConfiguracionDescuentos
+from config.productos.models import Presentacion, ConfiguracionDescuentos, ConfiguracionPrecios
 from config.inventario.models import StockPresentacion
 
 from .models import Pedido, PedidoItem
@@ -817,6 +817,14 @@ def _build_catalog_presentacion_price_options(*, presentacion, pedido=None):
 			'label': f'{_("Price")} {index} - ${format(value, ".2f")}',
 		})
 
+	if getattr(presentacion, 'qb_price', None) is not None:
+		qb_value = _quantize_money(presentacion.qb_price)
+		prices.append({
+			'key': 'qb_price',
+			'value': format(qb_value, '.2f'),
+			'label': f'QB-PRICE - ${format(qb_value, ".2f")}',
+		})
+
 	if pedido is not None:
 		default_price = _default_presentacion_price_for_pedido(presentacion=presentacion, pedido=pedido)
 		default_key = _default_catalog_presentacion_price_key_for_pedido(pedido=pedido, presentacion=presentacion)
@@ -829,14 +837,11 @@ def _build_catalog_presentacion_price_options(*, presentacion, pedido=None):
 
 def _build_presentacion_price_options(*, presentacion, pedido=None):
 	cliente = getattr(pedido, 'cliente', None) if pedido is not None else None
-	if cliente is not None:
-		prices = build_customer_invoice_sale_price_options(cliente=cliente, presentacion=presentacion, limit=2)
-		if prices:
-			return prices, prices[0]['key'], prices[0]['value']
-		default_price = _default_presentacion_price_for_pedido(presentacion=presentacion, pedido=pedido)
-		return [], '', format(default_price, '.2f')
-
 	prices = []
+
+	if cliente is not None:
+		prices.extend(build_customer_invoice_sale_price_options(cliente=cliente, presentacion=presentacion, limit=2))
+
 	for index in range(1, 6):
 		key = f'precio_{index}'
 		value = _quantize_money(getattr(presentacion, key, 0) or 0)
@@ -846,9 +851,31 @@ def _build_presentacion_price_options(*, presentacion, pedido=None):
 			'label': f'{_("Price")} {index} - ${format(value, ".2f")}',
 		})
 
-	default_key = _default_presentacion_price_key_for_pedido(pedido=pedido) if pedido else 'precio_1'
-	default_price = _default_presentacion_price_for_pedido(presentacion=presentacion, pedido=pedido) if pedido else _quantize_money(presentacion.precio_1 or 0)
-	return prices, default_key, format(default_price, '.2f')
+	if getattr(presentacion, 'qb_price', None) is not None:
+		qb_value = _quantize_money(presentacion.qb_price)
+		prices.append({
+			'key': 'qb_price',
+			'value': format(qb_value, '.2f'),
+			'label': f'QB-PRICE - ${format(qb_value, ".2f")}',
+		})
+
+	if prices:
+		if cliente is not None and prices[0]['key'].startswith('invoice_sale'):
+			return prices, prices[0]['key'], prices[0]['value']
+		default_price = (
+			_default_presentacion_price_for_pedido(presentacion=presentacion, pedido=pedido)
+			if pedido is not None
+			else _quantize_money(presentacion.precio_1 or 0)
+		)
+		default_key = _match_presentacion_price_key(prices, default_price) or 'precio_1'
+		return prices, default_key, format(default_price, '.2f')
+
+	default_price = (
+		_default_presentacion_price_for_pedido(presentacion=presentacion, pedido=pedido)
+		if pedido is not None
+		else _quantize_money(presentacion.precio_1 or 0)
+	)
+	return [], '', format(default_price, '.2f')
 
 
 def _match_presentacion_price_key(price_options, current_price):
@@ -860,7 +887,7 @@ def _match_presentacion_price_key(price_options, current_price):
 
 
 def _build_bulk_pedido_price_options():
-	return [
+	options = [
 		{
 			'key': 'invoice_sale_1',
 			'label': _('Most recent sale price'),
@@ -870,6 +897,19 @@ def _build_bulk_pedido_price_options():
 			'label': _('Second most recent sale price'),
 		},
 	]
+	for index, margin in enumerate(ConfiguracionPrecios.obtener().porcentajes_lista(), start=1):
+		options.append({
+			'key': f'precio_{index}',
+			'label': _('Price %(number)s (%(percentage)s%%)') % {
+				'number': index,
+				'percentage': margin,
+			},
+		})
+	options.append({
+		'key': 'qb_price',
+		'label': 'QB-PRICE',
+	})
+	return options
 
 
 def _build_pedido_discount_preset_options():

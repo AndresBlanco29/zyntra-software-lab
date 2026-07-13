@@ -1028,6 +1028,8 @@ class PickingVerificationFlowTests(TestCase):
 		self._create_pedido_customer_invoice(created_at=now - timedelta(days=1), quantity=5, price='37.00')
 		self._create_pedido_customer_invoice(created_at=now - timedelta(days=8), quantity=2, price='36.50')
 		self._create_pedido_customer_invoice(created_at=now - timedelta(days=15), quantity=4, price='35.75')
+		self.presentacion.qb_price = Decimal('42.99')
+		self.presentacion.save(update_fields=['qb_price'])
 
 		self.client.force_login(self.backoffice)
 		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
@@ -1039,6 +1041,11 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'data-price-key="invoice_sale_1"', html=False)
 		self.assertContains(response, 'data-price-key="invoice_sale_2"', html=False)
 		self.assertContains(response, 'Most recent sale price')
+		self.assertContains(response, 'data-price-key="precio_1"', html=False)
+		self.assertContains(response, 'data-price-key="precio_5"', html=False)
+		self.assertContains(response, 'data-price-key="qb_price"', html=False)
+		self.assertContains(response, 'QB-PRICE')
+		self.assertContains(response, 'Assign one price to all products')
 
 	def test_resolve_invoice_sale_reference_date_uses_fecha_documento(self):
 		sale_date = timezone.localdate() - timedelta(days=3)
@@ -1057,11 +1064,23 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertTrue(any(result['id'] == self.presentacion.id for result in payload['results']))
 		self.assertTrue(any('Producto test' in result['label'] for result in payload['results']))
 		matched = next(result for result in payload['results'] if result['id'] == self.presentacion.id)
+		self.presentacion.refresh_from_db()
 		self.assertEqual(len(matched['prices']), 5)
 		self.assertEqual(matched['prices'][0]['key'], 'precio_1')
-		self.assertEqual(matched['prices'][0]['value'], '12.00')
+		self.assertEqual(matched['prices'][0]['value'], format(self.presentacion.precio_1, '.2f'))
 		self.assertIn('default_price_key', matched)
 		self.assertEqual(matched['default_price_key'], 'precio_1')
+
+		self.presentacion.qb_price = Decimal('42.99')
+		self.presentacion.save(update_fields=['qb_price'])
+		response = self.client.get(reverse('backoffice_buscar_presentaciones'), {
+			'q': 'Producto test',
+			'pedido_id': self.pedido.id,
+		})
+		matched = next(result for result in response.json()['results'] if result['id'] == self.presentacion.id)
+		self.assertEqual(len(matched['prices']), 6)
+		self.assertEqual(matched['prices'][-1]['key'], 'qb_price')
+		self.assertEqual(matched['prices'][-1]['value'], '42.99')
 
 	def test_searchable_selects_script_uses_dropdown_input_plugin(self):
 		from pathlib import Path

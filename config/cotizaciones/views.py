@@ -200,6 +200,17 @@ def _build_quote_item_rows(cotizacion):
                 'margin': margin,
             })
 
+        if item.presentacion.qb_price is not None:
+            qb_value = _parse_decimal(item.presentacion.qb_price, 0)
+            if qb_value == current_price:
+                selected_option = 'qb_price'
+            price_options.append({
+                'key': 'qb_price',
+                'label': 'QB-PRICE',
+                'value': qb_value,
+                'margin': None,
+            })
+
         rows.append({
             'item': item,
             'price_options': price_options,
@@ -227,7 +238,7 @@ def _build_quote_item_rows(cotizacion):
 
 
 def _build_bulk_quote_price_options():
-    return [
+    options = [
         {
             'key': f'precio_{index}',
             'label': _('Price %(number)s (%(percentage)s%%)') % {
@@ -237,6 +248,11 @@ def _build_bulk_quote_price_options():
         }
         for index, margin in enumerate(ConfiguracionPrecios.obtener().porcentajes_lista(), start=1)
     ]
+    options.append({
+        'key': 'qb_price',
+        'label': 'QB-PRICE',
+    })
+    return options
 
 
 def _get_generated_order_from_quote(cotizacion):

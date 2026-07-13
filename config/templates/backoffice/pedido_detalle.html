@@ -669,14 +669,14 @@
     {% if not lineas_bloqueadas_para_picking %}
     <div class="row g-2 align-items-end mb-3">
       <div class="col-md-8 col-lg-7">
-        <label for="bulkPriceTierSelect" class="form-label fw-semibold mb-1">{% trans "Assign one recent sale price to all products" %}</label>
+        <label for="bulkPriceTierSelect" class="form-label fw-semibold mb-1">{% trans "Assign one price to all products" %}</label>
         <select id="bulkPriceTierSelect" class="form-select form-select-sm">
-          <option value="">{% trans "Select a recent sale price" %}</option>
+          <option value="">{% trans "Select a price" %}</option>
           {% for option in bulk_price_options %}
           <option value="{{ option.key }}">{{ option.label }}</option>
           {% endfor %}
         </select>
-        <div class="form-text">{% trans "This applies the selected price tier to every product so you do not have to change them one by one." %}</div>
+        <div class="form-text">{% trans "This applies the selected price to every product so you do not have to change them one by one." %}</div>
       </div>
       <div class="col-md-4 col-lg-5 d-grid d-md-flex justify-content-md-end">
         <button type="button" class="btn btn-outline-primary btn-sm" id="applyBulkPriceTierButton">{% trans "Apply to all products" %}</button>

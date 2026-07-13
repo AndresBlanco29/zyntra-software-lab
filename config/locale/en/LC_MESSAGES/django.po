@@ -9164,3 +9164,7 @@ msgstr ""
 
 #~ msgid "en un mercado competitivo."
 #~ msgstr "and thrive in a competitive market."
+
+msgid "They authorize a withdrawal from their account"
+msgstr ""
+

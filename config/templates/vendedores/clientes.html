@@ -478,6 +478,11 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
               <span class="payment-terms-option-copy">{% trans "Pay within 7 calendar days after the estimated delivery date" %}</span>
             </label>
             <label class="payment-terms-option">
+              <input type="radio" name="terminos_pago" value="ACH_NET7">
+              <span class="payment-terms-option-label">ACH NET 7</span>
+              <span class="payment-terms-option-copy">{% trans "They authorize a withdrawal from their account" %}</span>
+            </label>
+            <label class="payment-terms-option">
               <input type="radio" name="terminos_pago" value="NET14">
               <span class="payment-terms-option-label">NET14</span>
               <span class="payment-terms-option-copy">{% trans "Pay within 14 calendar days after the estimated delivery date" %}</span>

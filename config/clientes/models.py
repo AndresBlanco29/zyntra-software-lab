@@ -34,6 +34,7 @@ class Cliente(models.Model):
     PAYMENT_TERMS_PREPAY = 'PREPAY'
     PAYMENT_TERMS_COD = 'COD'
     PAYMENT_TERMS_NET7 = 'NET7'
+    PAYMENT_TERMS_ACH_NET7 = 'ACH_NET7'
     PAYMENT_TERMS_NET14 = 'NET14'
     PAYMENT_TERMS_NET21 = 'NET21'
 
@@ -41,6 +42,7 @@ class Cliente(models.Model):
         (PAYMENT_TERMS_PREPAY, 'prepay'),
         (PAYMENT_TERMS_COD, 'COD'),
         (PAYMENT_TERMS_NET7, 'NET7'),
+        (PAYMENT_TERMS_ACH_NET7, 'ACH NET 7'),
         (PAYMENT_TERMS_NET14, 'NET14'),
         (PAYMENT_TERMS_NET21, 'NET21'),
     )
@@ -49,6 +51,7 @@ class Cliente(models.Model):
         PAYMENT_TERMS_PREPAY: 0,
         PAYMENT_TERMS_COD: 0,
         PAYMENT_TERMS_NET7: 7,
+        PAYMENT_TERMS_ACH_NET7: 7,
         PAYMENT_TERMS_NET14: 14,
         PAYMENT_TERMS_NET21: 21,
     }
@@ -212,7 +215,7 @@ class Cliente(models.Model):
     )
 
     terminos_pago = models.CharField(
-        max_length=10,
+        max_length=16,
         choices=PAYMENT_TERMS_CHOICES,
         blank=True,
         default='',

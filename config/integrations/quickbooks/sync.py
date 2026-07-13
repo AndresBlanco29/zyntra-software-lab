@@ -4426,6 +4426,7 @@ LOCAL_PAYMENT_TERM_QB_NAMES = {
     'PREPAY': ('Prepay', 'Due on receipt', 'Due upon receipt'),
     'COD': ('COD', 'Due on receipt', 'Due upon receipt'),
     'NET7': ('Net 7', 'NET7', 'Net7'),
+    'ACH_NET7': ('ACH Net 7', 'ACH NET 7', 'ACH_NET7'),
     'NET14': ('Net 14', 'NET14', 'Net14'),
     'NET21': ('Net 21', 'NET21', 'Net21'),
 }
@@ -4434,6 +4435,7 @@ LOCAL_PAYMENT_TERM_DUE_DAYS = {
     'PREPAY': 0,
     'COD': 0,
     'NET7': 7,
+    'ACH_NET7': 7,
     'NET14': 14,
     'NET21': 21,
 }

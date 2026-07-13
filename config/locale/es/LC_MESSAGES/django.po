@@ -8636,3 +8636,7 @@ msgstr "This customer already has web access configured."
 
 msgid "Web access configured successfully."
 msgstr "Web access configured correctamente."
+
+msgid "They authorize a withdrawal from their account"
+msgstr "Dan autorizacion de hacer retiro de la cuenta de el"
+

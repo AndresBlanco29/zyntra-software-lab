@@ -22,6 +22,7 @@ from config.integrations.quickbooks.sync import (
 class InvoiceExportTermsHelpersTests(SimpleTestCase):
 	def test_preferred_term_names(self):
 		self.assertEqual(_preferred_term_name_for_local('NET7'), 'Net 7')
+		self.assertEqual(_preferred_term_name_for_local('ACH_NET7'), 'ACH Net 7')
 		self.assertEqual(_preferred_term_name_for_local('COD'), 'COD')
 		self.assertEqual(_preferred_term_name_for_local(''), '')
 

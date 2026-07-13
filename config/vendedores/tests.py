@@ -873,6 +873,27 @@ class VendedorEditarClienteTests(TestCase):
 		self.customer.refresh_from_db()
 		self.assertEqual(self.customer.terminos_pago, Cliente.PAYMENT_TERMS_NET14)
 
+	def test_vendor_can_configure_ach_net7_payment_terms(self):
+		self.client.force_login(self.vendor)
+
+		response = self.client.post(
+			reverse('configurar_terminos_cliente'),
+			data=json.dumps({
+				'cliente_id': self.customer.id,
+				'terminos_pago': 'ACH_NET7',
+			}),
+			content_type='application/json',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(payload['success'])
+		self.assertEqual(payload['terminos_pago'], 'ACH_NET7')
+		self.assertEqual(payload['terminos_pago_label'], 'ACH NET 7')
+		self.customer.refresh_from_db()
+		self.assertEqual(self.customer.terminos_pago, Cliente.PAYMENT_TERMS_ACH_NET7)
+		self.assertEqual(self.customer.get_payment_terms_due_days(), 7)
+
 	def test_configure_payment_terms_rejects_invalid_value(self):
 		self.client.force_login(self.vendor)
 

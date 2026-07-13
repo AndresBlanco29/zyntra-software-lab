@@ -426,6 +426,56 @@ def _normalize_customer_login_username(raw_username):
     return username
 
 
+def _find_username_conflict(username, *, exclude_user_id):
+    return (
+        Usuario.objects.filter(username__iexact=username)
+        .exclude(pk=exclude_user_id)
+        .select_related('cliente')
+        .first()
+    )
+
+
+def _release_placeholder_username(conflict_user, desired_username):
+    """Free a username held by an imported/placeholder account that cannot sign in."""
+    if conflict_user is None or conflict_user.has_usable_password():
+        return False
+
+    base = f'released-{conflict_user.pk}-{desired_username}'[:140]
+    candidate = base
+    suffix = 2
+    while Usuario.objects.filter(username__iexact=candidate).exclude(pk=conflict_user.pk).exists():
+        candidate = f'{base}-{suffix}'[:150]
+        suffix += 1
+
+    conflict_user.username = candidate
+    conflict_user.save(update_fields=['username'])
+    return True
+
+
+def _username_already_in_use_message(conflict_user):
+    if conflict_user is None:
+        return _('This username is already in use.')
+
+    owner = getattr(conflict_user, 'cliente', None)
+    owner_label = ''
+    if owner is not None:
+        owner_label = (owner.nombre_empresa or '').strip()
+    if not owner_label:
+        owner_label = (
+            conflict_user.get_full_name()
+            or conflict_user.username
+            or f'#{conflict_user.pk}'
+        )
+
+    return _(
+        'This username is already in use by %(owner)s (login: %(username)s). '
+        'Search that customer and change its username first, or pick a different username.'
+    ) % {
+        'owner': owner_label,
+        'username': conflict_user.username,
+    }
+
+
 @login_required
 @internal_permission_required('vendor.orders.view', 'backoffice.orders.view')
 def tomar_pedido(request):
@@ -882,8 +932,13 @@ def editar_cliente(request):
         username_update = None
         if can_change_username and raw_username is not None:
             username_update = _normalize_customer_login_username(raw_username)
-            if Usuario.objects.filter(username=username_update).exclude(pk=usuario.pk).exists():
-                return JsonResponse({'success': False, 'message': _('This username is already in use.')}, status=400)
+            conflict = _find_username_conflict(username_update, exclude_user_id=usuario.pk)
+            if conflict is not None:
+                if not _release_placeholder_username(conflict, username_update):
+                    return JsonResponse(
+                        {'success': False, 'message': _username_already_in_use_message(conflict)},
+                        status=400,
+                    )
 
         cliente.nombre_empresa = empresa
         cliente.telefono = telefono
@@ -896,7 +951,7 @@ def editar_cliente(request):
 
         usuario_update_fields = ['email']
         usuario.email = correo
-        if username_update is not None and username_update != usuario.username:
+        if username_update is not None and username_update.lower() != (usuario.username or '').lower():
             usuario.username = username_update
             usuario_update_fields.append('username')
         usuario.save(update_fields=usuario_update_fields)
@@ -1113,8 +1168,12 @@ def configurar_acceso_cliente(request):
             status=400,
         )
 
-    if Usuario.objects.filter(username=username).exclude(pk=usuario.pk).exists():
-        return JsonResponse({'success': False, 'message': _('This username is already in use.')}, status=400)
+    conflict = _find_username_conflict(username, exclude_user_id=usuario.pk)
+    if conflict is not None and not _release_placeholder_username(conflict, username):
+        return JsonResponse(
+            {'success': False, 'message': _username_already_in_use_message(conflict)},
+            status=400,
+        )
 
     try:
         validate_password(password, usuario)

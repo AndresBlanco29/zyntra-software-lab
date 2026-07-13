@@ -671,6 +671,100 @@ class VendedorEditarClienteTests(TestCase):
 		self.customer_user.refresh_from_db()
 		self.assertEqual(self.customer_user.username, original_username)
 
+	def test_username_conflict_message_names_other_customer(self):
+		other_user = Usuario.objects.create_user(
+			username='quikstop',
+			password='secret123',
+			role='cliente',
+			email='other@test.com',
+		)
+		Cliente.objects.create(
+			usuario=other_user,
+			nombre_empresa='Other Quik Stop',
+			telefono='5559998888',
+			direccion='999 Other St',
+			ciudad='Atlanta',
+			estado='Georgia',
+			codigo_postal='30301',
+			pais='USA',
+			sales_tax_number='TX-OTHER-1',
+			certificado_tax='certificados/test.pdf',
+		)
+		self.client.force_login(self.admin)
+
+		response = self.client.post(
+			reverse('editar_cliente'),
+			data=json.dumps({
+				'cliente_id': self.customer.id,
+				'empresa': self.customer.nombre_empresa,
+				'correo': self.customer_user.email or 'cliente@test.com',
+				'telefono': '5551234567',
+				'direccion': self.customer.direccion,
+				'ciudad': self.customer.ciudad,
+				'estado': self.customer.estado,
+				'codigo_postal': self.customer.codigo_postal,
+				'pais': self.customer.pais or 'USA',
+				'manual_location': True,
+				'username': 'quikstop',
+			}),
+			content_type='application/json',
+		)
+
+		self.assertEqual(response.status_code, 400)
+		payload = response.json()
+		self.assertFalse(payload['success'])
+		self.assertIn('Other Quik Stop', payload['message'])
+		self.assertIn('quikstop', payload['message'])
+		self.customer_user.refresh_from_db()
+		self.assertEqual(self.customer_user.username, 'customer-edit-client')
+
+	def test_username_conflict_releases_placeholder_account(self):
+		placeholder = Usuario.objects.create_user(
+			username='quikstop',
+			password='secret123',
+			role='cliente',
+			email='placeholder@test.com',
+		)
+		placeholder.set_unusable_password()
+		placeholder.save(update_fields=['password'])
+		Cliente.objects.create(
+			usuario=placeholder,
+			nombre_empresa='Placeholder Quik',
+			telefono='5557776666',
+			direccion='111 Place St',
+			ciudad='Atlanta',
+			estado='Georgia',
+			codigo_postal='30301',
+			pais='USA',
+			sales_tax_number='TX-PLACE-1',
+			certificado_tax='certificados/test.pdf',
+		)
+		self.client.force_login(self.admin)
+
+		response = self.client.post(
+			reverse('editar_cliente'),
+			data=json.dumps({
+				'cliente_id': self.customer.id,
+				'empresa': self.customer.nombre_empresa,
+				'correo': self.customer_user.email or 'cliente@test.com',
+				'telefono': '5551234567',
+				'direccion': self.customer.direccion,
+				'ciudad': self.customer.ciudad,
+				'estado': self.customer.estado,
+				'codigo_postal': self.customer.codigo_postal,
+				'pais': self.customer.pais or 'USA',
+				'manual_location': True,
+				'username': 'quikstop',
+			}),
+			content_type='application/json',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.customer_user.refresh_from_db()
+		placeholder.refresh_from_db()
+		self.assertEqual(self.customer_user.username, 'quikstop')
+		self.assertTrue(placeholder.username.startswith(f'released-{placeholder.pk}-'))
+
 	def test_vendor_can_edit_customer_with_valid_usa_selector_location(self):
 		self.client.force_login(self.vendor)
 

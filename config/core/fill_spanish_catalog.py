@@ -25,6 +25,10 @@ MANUAL_EN_TO_ES = {
     'Origin': 'Origen',
     'Warehouse check': 'Verificación en bodega',
     'Received date': 'Fecha de recibo',
+    'This username is already in use by %(owner)s (login: %(username)s). Search that customer and change its username first, or pick a different username.': (
+        'Este usuario ya está en uso por %(owner)s (login: %(username)s). '
+        'Busca ese cliente y cámbiale el usuario primero, o elige otro usuario.'
+    ),
     'Picking Ticket': 'Ticket de picking',
     'Export PDF': 'Exportar PDF',
     'Generate Picking Ticket': 'Generar ticket de picking',

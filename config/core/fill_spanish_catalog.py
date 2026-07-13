@@ -77,6 +77,32 @@ MANUAL_EN_TO_ES = {
     'Search shortcuts, modules, or pages': 'Buscar accesos directos, módulos o páginas',
     'Log out': 'Cerrar sesión',
     'My Profile': 'Mi perfil',
+    'Vendor menu': 'Menú del vendedor',
+    'What do you want to do?': '¿Qué quieres hacer?',
+    'Choose an action. Everything for your sales route is here.': (
+        'Elige una acción. Aquí está todo lo de tu ruta de ventas.'
+    ),
+    'Credit Memo': 'Nota de crédito',
+    'Return': 'Devolución',
+    'My Notes': 'Mis notas',
+    'Credit the customer without returning stock to inventory.': (
+        'Acredita al cliente sin devolver stock al inventario.'
+    ),
+    'Credit the customer and return product to inventory after approval.': (
+        'Acredita al cliente y devuelve producto al inventario después de la aprobación.'
+    ),
+    'Review credit memos and returns you already submitted.': (
+        'Revisa las notas de crédito y devoluciones que ya enviaste.'
+    ),
+    'Build and submit an order for an assigned customer.': (
+        'Arma y envía un pedido para un cliente asignado.'
+    ),
+    'See your assigned customers, balances, and account details.': (
+        'Mira tus clientes asignados, saldos y detalles de cuenta.'
+    ),
+    'Register a new customer for your route.': 'Registra un cliente nuevo para tu ruta.',
+    'Submit credit memo draft': 'Enviar borrador de nota de crédito',
+    'Submit return draft': 'Enviar borrador de devolución',
     'Name': 'Nombre',
     'Company Name': 'Nombre de empresa',
     'Email': 'Correo electrónico',

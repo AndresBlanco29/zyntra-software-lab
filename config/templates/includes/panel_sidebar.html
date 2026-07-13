@@ -97,10 +97,17 @@
 </details>
 {% endif %}
 
-{% if request.user|has_internal_permission:'vendor.customers.manage' or request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'admin.customer_requests.view' or request.user|has_internal_permission:'admin.customers.assign' or request.user|has_internal_permission:'backoffice.customers.assign' %}
-<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'vendedores_clientes' or request.resolver_match.url_name == 'crear_cliente' or request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'catalogo_vendedor' or request.resolver_match.url_name == 'ver_pedido' or request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' or request.resolver_match.url_name == 'ver_certificado_cliente' or request.resolver_match.url_name == 'lista_asignacion_clientes_vendedores' or request.resolver_match.url_name == 'asignar_clientes_vendedor' %}open{% endif %}>
+{% if request.user|has_internal_permission:'vendor.customers.manage' or request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'vendor.notes.view' or request.user|has_internal_permission:'vendor.notes.manage' or request.user|has_internal_permission:'admin.customer_requests.view' or request.user|has_internal_permission:'admin.customers.assign' or request.user|has_internal_permission:'backoffice.customers.assign' %}
+<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'vendedor_home' or request.resolver_match.url_name == 'vendedores_clientes' or request.resolver_match.url_name == 'crear_cliente' or request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'catalogo_vendedor' or request.resolver_match.url_name == 'ver_pedido' or request.resolver_match.url_name == 'vendedor_notes_list' or request.resolver_match.url_name == 'vendedor_credit_memo_create' or request.resolver_match.url_name == 'vendedor_return_create' or request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' or request.resolver_match.url_name == 'ver_certificado_cliente' or request.resolver_match.url_name == 'lista_asignacion_clientes_vendedores' or request.resolver_match.url_name == 'asignar_clientes_vendedor' %}open{% endif %}>
   <summary class="sidebar-collapsible-summary">{% trans "Customers & Sales" %}</summary>
   <div class="sidebar-collapsible-links">
+    {% if request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'vendor.notes.view' %}
+    <a href="{% url 'vendedor_home' %}"
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'vendedor_home' %}active{% endif %}">
+      {% trans "Vendor menu" %}
+    </a>
+    {% endif %}
+
     {% if request.user|has_internal_permission:'vendor.customers.view' %}
     <a href="{% url 'vendedores_clientes' %}"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'vendedores_clientes' %}active{% endif %}">
@@ -119,6 +126,24 @@
     <a href="{% url 'tomar_pedido' %}"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'catalogo_vendedor' or request.resolver_match.url_name == 'ver_pedido' %}active{% endif %}">
       {% trans "Take Order" %}
+    </a>
+    {% endif %}
+
+    {% if request.user|has_internal_permission:'vendor.notes.manage' %}
+    <a href="{% url 'vendedor_credit_memo_create' %}"
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'vendedor_credit_memo_create' %}active{% endif %}">
+      {% trans "Credit Memo" %}
+    </a>
+    <a href="{% url 'vendedor_return_create' %}"
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'vendedor_return_create' %}active{% endif %}">
+      {% trans "Return" %}
+    </a>
+    {% endif %}
+
+    {% if request.user|has_internal_permission:'vendor.notes.view' %}
+    <a href="{% url 'vendedor_notes_list' %}"
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'vendedor_notes_list' %}active{% endif %}">
+      {% trans "My Notes" %}
     </a>
     {% endif %}
 

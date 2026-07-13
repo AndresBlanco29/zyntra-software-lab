@@ -1,0 +1,28 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Vendor menu" %}{% endblock %}
+
+{% block content %}
+<div class="vendor-home">
+  <div class="vendor-home__intro">
+    <h1 class="vendor-home__title">{% trans "What do you want to do?" %}</h1>
+    <p class="vendor-home__subtitle">{% trans "Choose an action. Everything for your sales route is here." %}</p>
+  </div>
+
+  {% if vendor_tiles %}
+  <div class="vendor-home__tiles">
+    {% for tile in vendor_tiles %}
+    <a href="{{ tile.url }}" class="vendor-home__tile vendor-home__tile--{{ tile.tone }}">
+      <span class="vendor-home__tile-title">{{ tile.title }}</span>
+      <span class="vendor-home__tile-desc">{{ tile.description }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="alert alert-warning mb-0">
+    {% trans "No vendor actions are available for your account. Ask an administrator to review your permissions." %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

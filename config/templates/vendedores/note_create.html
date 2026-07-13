@@ -1,0 +1,258 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n shipment_summary_tags %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 gap-2 flex-wrap">
+  <div>
+    <h2 class="mb-1">{{ page_title }}</h2>
+    <p class="text-muted mb-0">{{ page_help }}</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{% url 'vendedor_home' %}" class="btn btn-outline-secondary">{% trans "Vendor menu" %}</a>
+    <a href="{% url 'vendedor_notes_list' %}" class="btn btn-outline-primary">{% trans "My Notes" %}</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <h5 class="mb-3">{% trans "1. Choose customer and invoice" %}</h5>
+        <form method="get" class="row g-3">
+          <div class="col-12">
+            <label class="form-label fw-semibold" for="vendorNoteCustomerSearch">{% trans "Search customer" %}</label>
+            <input
+              type="search"
+              name="q"
+              id="vendorNoteCustomerSearch"
+              class="form-control"
+              value="{{ customer_search_query }}"
+              placeholder="{% trans 'Search by company name...' %}"
+              autocomplete="off"
+            >
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold" for="vendorNoteCustomerSelect">{% trans "Customer" %}</label>
+            <select name="cliente_id" id="vendorNoteCustomerSelect" class="form-select search-select-enhanced">
+              <option value="">{% trans "Select customer..." %}</option>
+              {% for customer in customers %}
+              <option value="{{ customer.id }}" {% if selected_client and customer.id == selected_client.id %}selected{% endif %}>{{ customer.nombre_empresa }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label fw-semibold">{% trans "Invoice" %}</label>
+            <select name="invoice_id" class="form-select" {% if not selected_client and not selected_invoice %}disabled{% endif %}>
+              <option value="">{% trans "Select invoice..." %}</option>
+              {% for invoice in available_invoices %}
+              <option value="{{ invoice.id }}" {% if selected_invoice and invoice.id == selected_invoice.id %}selected{% endif %}>{{ invoice.numero }} | {{ invoice.creada_en|date:"m/d/Y" }} | ${{ invoice.saldo_cliente }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 d-grid">
+            <button type="submit" class="btn btn-primary">{% trans "Load invoice lines" %}</button>
+          </div>
+        </form>
+
+        {% if selected_client %}
+        <hr>
+        <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Selected customer" %}</div>
+        <div class="fw-semibold">{{ selected_client.nombre_empresa }}</div>
+        {% if selected_invoice %}
+        <div class="small mt-2"><span class="text-muted">{% trans "Invoice" %}:</span> {{ selected_invoice.numero }}</div>
+        <div class="small"><span class="text-muted">{% trans "Note type" %}:</span> {{ credit_type_label }}</div>
+        {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h5 class="mb-3">{% trans "2. Mark lines and submit draft" %}</h5>
+
+        {% if not selected_invoice %}
+        <div class="alert alert-info mb-0">
+          {% trans "Select a customer and invoice first. Invoice lines are required so quantities and prices stay correct." %}
+        </div>
+        {% elif selected_invoice_quickbooks_locked %}
+        <div class="alert alert-warning mb-0">
+          {% trans "This invoice is locked because it is already synced with QuickBooks. Choose another invoice." %}
+        </div>
+        {% else %}
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <input type="hidden" name="cliente_id" value="{{ selected_client.id }}">
+          <input type="hidden" name="invoice_id" value="{{ selected_invoice.id }}">
+          <input type="hidden" name="note_tipo_documento" value="CREDITO">
+          <input type="hidden" name="note_tipo_ajuste" value="PRODUCTO">
+          <input type="hidden" name="note_tipo_credito" value="{{ credit_type }}">
+
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">{% trans "Reason" %}</label>
+              <select name="note_motivo" class="form-select" required>
+                <option value="">{% trans "Select..." %}</option>
+                {% for value, label in reason_choices %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">{% trans "Photos (optional)" %}</label>
+              <input type="file" name="note_evidence_photos" class="form-control" accept="image/*" capture="environment" multiple>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">{% trans "Description" %}</label>
+              <textarea name="note_descripcion" rows="3" class="form-control" placeholder="{% trans 'Short comment for BackOffice...' %}"></textarea>
+            </div>
+          </div>
+
+          <div class="table-responsive mb-3">
+            <table class="table table-sm align-middle mobile-stack-table">
+              <thead>
+                <tr>
+                  <th>{% trans "Product" %}</th>
+                  <th>{% trans "Dispatched" %}</th>
+                  <th>{% trans "CS / packages" %}</th>
+                  <th>{% trans "Partial" %}</th>
+                  <th>{% trans "Amount" %}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in selected_invoice_items %}
+                <tr>
+                  <td data-label="{% trans 'Product' %}">
+                    {{ item.producto_nombre }}
+                    <div class="small text-muted">{{ item.presentacion_nombre }}</div>
+                  </td>
+                  <td data-label="{% trans 'Dispatched' %}">{{ item.cantidad_despachada_neta }}</td>
+                  <td data-label="{% trans 'CS / packages' %}">
+                    <input type="number" min="0" max="{{ item.cantidad_despachada_neta }}" name="note_qty_{{ item.id }}" class="form-control form-control-sm js-adjustment-package-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades|default:1 }}">
+                  </td>
+                  <td data-label="{% trans 'Partial' %}">
+                    {% if item.presentacion and item.presentacion.unidades > 1 %}
+                    <input type="number" min="0" name="note_unit_qty_{{ item.id }}" class="form-control form-control-sm js-adjustment-unit-qty" value="0" data-line-kind="invoice" data-line-id="{{ item.id }}" data-amount-target="note_amount_{{ item.id }}" data-package-price="{{ item.precio_unitario }}" data-units-per-package="{{ item.presentacion.unidades }}">
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td data-label="{% trans 'Amount' %}">
+                    <input type="number" min="0" step="0.01" name="note_amount_{{ item.id }}" class="form-control form-control-sm js-adjustment-amount" placeholder="0.00" inputmode="decimal">
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="5" class="text-muted">{% trans "This invoice has no product lines." %}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% product_shipment_summary source='invoice' value=selected_invoice %}
+          </div>
+
+          <button type="submit" class="btn btn-success btn-lg w-100 w-md-auto">{{ submit_label }}</button>
+        </form>
+        {% if form_draft %}
+        {{ form_draft|json_script:"vendor-note-create-form-draft-data" }}
+        {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ customer_search_options|json_script:"vendor-note-customer-options" }}
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const searchInput = document.getElementById('vendorNoteCustomerSearch');
+  const customerSelect = document.getElementById('vendorNoteCustomerSelect');
+  const optionsNode = document.getElementById('vendor-note-customer-options');
+  if (searchInput && customerSelect && optionsNode) {
+    let allOptions = [];
+    try {
+      allOptions = JSON.parse(optionsNode.textContent).map(function (customer) {
+        return { value: String(customer.id), text: customer.nombre_empresa };
+      });
+    } catch (error) {
+      allOptions = [];
+    }
+
+    function filterCustomerOptions(query) {
+      const normalized = String(query || '').trim().toLowerCase();
+      const selectedValue = customerSelect.value;
+      customerSelect.innerHTML = '';
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = "{% trans 'Select customer...'|escapejs %}";
+      customerSelect.appendChild(placeholder);
+      allOptions.forEach(function (optionData) {
+        const matches = !normalized || optionData.text.toLowerCase().includes(normalized);
+        if (!matches && optionData.value !== selectedValue) {
+          return;
+        }
+        const option = document.createElement('option');
+        option.value = optionData.value;
+        option.textContent = optionData.text;
+        if (optionData.value === selectedValue) {
+          option.selected = true;
+        }
+        customerSelect.appendChild(option);
+      });
+    }
+
+    searchInput.addEventListener('input', function () {
+      filterCustomerOptions(searchInput.value);
+    });
+  }
+
+  function recalculateAmount(lineId) {
+    const packageInput = document.querySelector('.js-adjustment-package-qty[data-line-id="' + lineId + '"]');
+    const unitInput = document.querySelector('.js-adjustment-unit-qty[data-line-id="' + lineId + '"]');
+    const amountTargetName = packageInput ? packageInput.getAttribute('data-amount-target') : null;
+    const amountInput = amountTargetName ? document.querySelector('[name="' + amountTargetName + '"]') : null;
+    if (!packageInput || !amountInput) {
+      return;
+    }
+    const packagePrice = Number(packageInput.getAttribute('data-package-price') || 0);
+    const unitsPerPackage = Number(packageInput.getAttribute('data-units-per-package') || 1) || 1;
+    const packages = Number(packageInput.value || 0);
+    const units = unitInput ? Number(unitInput.value || 0) : 0;
+    const total = (packages * packagePrice) + ((units / unitsPerPackage) * packagePrice);
+    amountInput.value = total > 0 ? total.toFixed(2) : '';
+  }
+
+  document.querySelectorAll('.js-adjustment-package-qty, .js-adjustment-unit-qty').forEach(function (input) {
+    input.addEventListener('input', function () {
+      recalculateAmount(input.getAttribute('data-line-id'));
+    });
+  });
+
+  const draftNode = document.getElementById('vendor-note-create-form-draft-data');
+  if (draftNode) {
+    try {
+      const draft = JSON.parse(draftNode.textContent);
+      Object.keys(draft).forEach(function (name) {
+        const fields = document.querySelectorAll('[name="' + name + '"]');
+        if (!fields.length) {
+          return;
+        }
+        const values = Array.isArray(draft[name]) ? draft[name] : [draft[name]];
+        fields.forEach(function (field, index) {
+          if (field.type === 'file') {
+            return;
+          }
+          field.value = values[Math.min(index, values.length - 1)] || '';
+        });
+      });
+    } catch (error) {
+      // Ignore draft restore errors.
+    }
+  }
+});
+</script>
+{% endblock %}

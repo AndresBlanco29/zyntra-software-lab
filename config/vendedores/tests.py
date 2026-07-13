@@ -6,10 +6,13 @@ from django.urls import reverse
 from django.utils import timezone
 
 from config.clientes.models import Cliente
-from config.facturacion.models import Invoice, InvoiceItem
+from config.facturacion.models import Invoice, InvoiceItem, NotaAjuste
+from config.facturacion.services import crear_nota_ajuste, generar_invoice_desde_picking
+from config.inventario.services import registrar_entrada_manual
 from config.pedidos.models import Pedido, PedidoItem
-from config.productos.models import Categoria, Marca, Presentacion, Producto
+from config.productos.models import Categoria, ConfiguracionDescuentos, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
+from config.usuarios.permissions import get_redirect_url_for_user
 
 
 class VendedorPedidoTests(TestCase):
@@ -970,3 +973,259 @@ class TakeOrderDraftPersistenceTests(TestCase):
 		)
 		save_draft_cart(vendedor=self.vendor, cliente_id=self.customer.id, cart={})
 		self.assertEqual(TakeOrderDraft.objects.filter(vendedor=self.vendor).count(), 0)
+
+
+class VendorHomeAndNotesTests(TestCase):
+	def setUp(self):
+		self.vendor = Usuario.objects.create_user(
+			username='vendor-home-notes',
+			password='secret123',
+			role='vendedor',
+		)
+		self.other_vendor = Usuario.objects.create_user(
+			username='vendor-other-notes',
+			password='secret123',
+			role='vendedor',
+		)
+		self.backoffice = Usuario.objects.create_user(
+			username='backoffice-vendor-notes',
+			password='secret123',
+			role='backoffice',
+		)
+		self.customer_user = Usuario.objects.create_user(
+			username='customer-vendor-notes',
+			password='secret123',
+			role='cliente',
+			email='vendor-notes@test.com',
+		)
+		self.customer = Cliente.objects.create(
+			usuario=self.customer_user,
+			nombre_empresa='Cliente Vendor Notes',
+			telefono='5552223333',
+			direccion='100 Vendor St',
+			ciudad='Atlanta',
+			estado='Georgia',
+			codigo_postal='30301',
+			pais='USA',
+			sales_tax_number='TX-VENDOR-NOTES',
+			certificado_tax='certificados/test.pdf',
+			aprobado=True,
+			vendedor_asignado=self.vendor,
+			vendedor_asignado_en=timezone.now(),
+		)
+		other_user = Usuario.objects.create_user(
+			username='customer-other-vendor-notes',
+			password='secret123',
+			role='cliente',
+			email='other-vendor-notes@test.com',
+		)
+		self.other_customer = Cliente.objects.create(
+			usuario=other_user,
+			nombre_empresa='Cliente Otro Vendor',
+			telefono='5554445555',
+			direccion='200 Other St',
+			ciudad='Atlanta',
+			estado='Georgia',
+			codigo_postal='30301',
+			pais='USA',
+			sales_tax_number='TX-OTHER-VENDOR',
+			certificado_tax='certificados/test.pdf',
+			aprobado=True,
+			vendedor_asignado=self.other_vendor,
+			vendedor_asignado_en=timezone.now(),
+		)
+
+		categoria = Categoria.objects.create(nombre='Cat Vendor Notes')
+		marca = Marca.objects.create(nombre='Marca Vendor Notes')
+		producto = Producto.objects.create(nombre='Producto Vendor Notes', categoria=categoria, marca=marca, activo=True)
+		self.presentacion = Presentacion.objects.create(
+			producto=producto,
+			nombre='Caja',
+			unidades=12,
+			tipo_contenido='unidades',
+			costo=Decimal('10.00'),
+			precio_1=Decimal('17.00'),
+		)
+		registrar_entrada_manual(presentacion=self.presentacion, cantidad=50, observacion='Vendor notes stock')
+
+		self.pedido = Pedido.objects.create(
+			cliente=self.customer,
+			origen='VENDEDOR',
+			vendedor=self.vendor,
+			estado='VERIFICADO_AJUSTADO',
+			total=Decimal('34.00'),
+		)
+		PedidoItem.objects.create(
+			pedido=self.pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=2,
+			cantidad=2,
+			cantidad_inventario_aplicada=2,
+			precio=Decimal('17.00'),
+			subtotal=Decimal('34.00'),
+		)
+		self.invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		self.invoice_item = self.invoice.items.first()
+
+	def test_vendor_login_redirects_to_home(self):
+		self.assertTrue(get_redirect_url_for_user(self.vendor).endswith('/vendedores/'))
+
+	def test_vendor_home_shows_expected_tiles(self):
+		self.client.force_login(self.vendor)
+		response = self.client.get(reverse('vendedor_home'))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Take Order')
+		self.assertContains(response, 'Customers')
+		self.assertContains(response, 'Create Customer')
+		self.assertContains(response, 'Credit Memo')
+		self.assertContains(response, 'Return')
+		self.assertContains(response, 'My Notes')
+
+	def test_vendor_can_create_credit_memo_for_assigned_customer(self):
+		self.client.force_login(self.vendor)
+		response = self.client.post(
+			reverse('vendedor_credit_memo_create') + f'?cliente_id={self.customer.id}&invoice_id={self.invoice.id}',
+			data={
+				'cliente_id': self.customer.id,
+				'invoice_id': self.invoice.id,
+				'note_tipo_documento': 'CREDITO',
+				'note_tipo_ajuste': 'PRODUCTO',
+				'note_tipo_credito': 'CREDIT_DUMP',
+				'note_motivo': 'DAMAGE',
+				'note_descripcion': 'Vendor credit memo',
+				f'note_qty_{self.invoice_item.id}': '1',
+				f'note_amount_{self.invoice_item.id}': '17.00',
+			},
+		)
+		self.assertEqual(response.status_code, 302)
+		nota = NotaAjuste.objects.get(creada_por=self.vendor, descripcion='Vendor credit memo')
+		self.assertEqual(nota.tipo_credito, 'CREDIT_DUMP')
+		self.assertEqual(nota.estado, 'BORRADOR')
+		self.assertEqual(nota.cliente_id, self.customer.id)
+
+	def test_vendor_can_create_return_for_assigned_customer(self):
+		self.client.force_login(self.vendor)
+		response = self.client.post(
+			reverse('vendedor_return_create') + f'?cliente_id={self.customer.id}&invoice_id={self.invoice.id}',
+			data={
+				'cliente_id': self.customer.id,
+				'invoice_id': self.invoice.id,
+				'note_tipo_documento': 'CREDITO',
+				'note_tipo_ajuste': 'PRODUCTO',
+				'note_tipo_credito': 'CREDIT_RETURN',
+				'note_motivo': 'DEFECT',
+				'note_descripcion': 'Vendor return',
+				f'note_qty_{self.invoice_item.id}': '1',
+				f'note_amount_{self.invoice_item.id}': '17.00',
+			},
+		)
+		self.assertEqual(response.status_code, 302)
+		nota = NotaAjuste.objects.get(creada_por=self.vendor, descripcion='Vendor return')
+		self.assertEqual(nota.tipo_credito, 'CREDIT_RETURN')
+		self.assertEqual(nota.estado, 'BORRADOR')
+
+	def test_vendor_cannot_create_note_for_unassigned_customer(self):
+		other_pedido = Pedido.objects.create(
+			cliente=self.other_customer,
+			origen='VENDEDOR',
+			vendedor=self.other_vendor,
+			estado='VERIFICADO_AJUSTADO',
+			total=Decimal('17.00'),
+		)
+		PedidoItem.objects.create(
+			pedido=other_pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=1,
+			cantidad=1,
+			cantidad_inventario_aplicada=1,
+			precio=Decimal('17.00'),
+			subtotal=Decimal('17.00'),
+		)
+		other_invoice = generar_invoice_desde_picking(
+			pedido=other_pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		other_item = other_invoice.items.first()
+
+		self.client.force_login(self.vendor)
+		response = self.client.post(
+			reverse('vendedor_credit_memo_create') + f'?cliente_id={self.other_customer.id}&invoice_id={other_invoice.id}',
+			data={
+				'cliente_id': self.other_customer.id,
+				'invoice_id': other_invoice.id,
+				'note_tipo_documento': 'CREDITO',
+				'note_tipo_ajuste': 'PRODUCTO',
+				'note_tipo_credito': 'CREDIT_DUMP',
+				'note_motivo': 'DAMAGE',
+				'note_descripcion': 'Should fail',
+				f'note_qty_{other_item.id}': '1',
+				f'note_amount_{other_item.id}': '17.00',
+			},
+		)
+		self.assertEqual(response.status_code, 404)
+		self.assertFalse(NotaAjuste.objects.filter(descripcion='Should fail').exists())
+
+	def test_vendor_notes_list_only_shows_own_notes(self):
+		own = crear_nota_ajuste(
+			cliente=self.customer,
+			invoice=self.invoice,
+			tipo_ajuste='PRODUCTO',
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_DUMP',
+			descripcion='Own note',
+			usuario=self.vendor,
+			items_payload=[{
+				'invoice_item': self.invoice_item,
+				'cantidad': 1,
+				'monto_unitario': Decimal('17.00'),
+			}],
+		)
+		crear_nota_ajuste(
+			cliente=self.other_customer,
+			invoice=None,
+			tipo_ajuste='FINANCIERO',
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_DUMP',
+			descripcion='Other vendor note',
+			usuario=self.other_vendor,
+			items_payload=[],
+			monto=Decimal('10.00'),
+		)
+
+		self.client.force_login(self.vendor)
+		response = self.client.get(reverse('vendedor_notes_list'))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Own note')
+		self.assertNotContains(response, 'Other vendor note')
+		self.assertEqual(own.estado, 'BORRADOR')
+
+	def test_vendor_cannot_approve_note(self):
+		nota = crear_nota_ajuste(
+			cliente=self.customer,
+			invoice=self.invoice,
+			tipo_ajuste='PRODUCTO',
+			tipo_documento='CREDITO',
+			motivo='DAMAGE',
+			tipo_credito='CREDIT_DUMP',
+			descripcion='Pending approval',
+			usuario=self.vendor,
+			items_payload=[{
+				'invoice_item': self.invoice_item,
+				'cantidad': 1,
+				'monto_unitario': Decimal('17.00'),
+			}],
+		)
+		self.client.force_login(self.vendor)
+		response = self.client.post(reverse('backoffice_invoice_approve_note', args=[nota.id]))
+		self.assertIn(response.status_code, {302, 403})
+		nota.refresh_from_db()
+		self.assertEqual(nota.estado, 'BORRADOR')

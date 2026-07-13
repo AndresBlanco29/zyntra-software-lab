@@ -1,6 +1,7 @@
-import importlib
+﻿import importlib
 
 from django.db import migrations
+from django.db.models.fields.related import ManyToManyField
 
 
 def existing_table_columns(schema_editor, table_name):
@@ -16,12 +17,12 @@ def table_exists(schema_editor, table_name):
         return table_name in schema_editor.connection.introspection.table_names(cursor)
 
 
-def bind_field_remote_model(field, apps):
+def bind_field_remote_model(field, apps=None):
     remote_field = getattr(field, 'remote_field', None)
     if remote_field is None:
         return field
     remote_model = remote_field.model
-    if isinstance(remote_model, str) and '.' in remote_model:
+    if apps is not None and isinstance(remote_model, str) and '.' in remote_model:
         related_app_label, related_model_name = remote_model.split('.', 1)
         remote_field.model = apps.get_model(related_app_label, related_model_name)
     # Historical FK rebuilds often leave field_name=None; schema_editor.add_field
@@ -32,7 +33,7 @@ def bind_field_remote_model(field, apps):
     return field
 
 
-def rebuild_field(name, field, apps):
+def rebuild_field(name, field, apps=None):
     deconstructed = field.deconstruct()
     # Django historically returned (path, args, kwargs); newer versions may
     # include the field name as a leading element: (name, path, args, kwargs).
@@ -52,12 +53,18 @@ def add_model_fields_if_missing(apps, schema_editor, app_label, model_name, fiel
     table_name = model._meta.db_table
     existing_columns = existing_table_columns(schema_editor, table_name)
     for field in fields:
-        if field.column in existing_columns:
+        # ManyToMany has no column on the parent table; through is only wired when
+        # the field is contributed via normal AddField. Skip here — wrap leaves M2M unwrapped.
+        if getattr(field, 'many_to_many', False):
+            continue
+        field = bind_field_remote_model(field, apps)
+        column = getattr(field, 'column', None)
+        if column is None or column in existing_columns:
             continue
         schema_editor.add_field(model, field)
 
 
-def build_field(name, field, apps):
+def build_field(name, field, apps=None):
     return rebuild_field(name, field, apps)
 
 
@@ -82,6 +89,13 @@ def separate_add_fields(app_label, model_name, field_specs):
     )
 
 
+def _is_many_to_many_add(operation):
+    if not isinstance(operation, migrations.AddField):
+        return False
+    field = operation.field
+    return isinstance(field, ManyToManyField) or getattr(field, 'many_to_many', False)
+
+
 def wrap_add_field_operations(app_label, operations):
     wrapped = []
     pending_by_model = {}
@@ -93,7 +107,12 @@ def wrap_add_field_operations(app_label, operations):
         pending_by_model = {}
 
     for operation in operations:
-        if isinstance(operation, migrations.AddField):
+        if _is_many_to_many_add(operation):
+            # Rebuilt M2M fields have through=None; schema_editor.add_field then
+            # crashes. Keep Django's normal AddField so the through table is created.
+            flush()
+            wrapped.append(operation)
+        elif isinstance(operation, migrations.AddField):
             pending_by_model.setdefault(operation.model_name, []).append(
                 (operation.name, operation.field),
             )
@@ -108,7 +127,21 @@ def create_model_if_missing(model_class, schema_editor):
     table_name = model_class._meta.db_table
     if table_exists(schema_editor, table_name):
         return
-    schema_editor.create_model(model_class)
+    # Live models may already include FKs added in later migrations (e.g.
+    # CompraProveedor.proveedor before inventario_proveedor exists). Disable
+    # referential checks briefly so create_model can succeed on fresh DBs.
+    connection = schema_editor.connection
+    disabled_fk = False
+    try:
+        if connection.vendor == 'mysql':
+            with connection.cursor() as cursor:
+                cursor.execute('SET FOREIGN_KEY_CHECKS=0')
+            disabled_fk = True
+        schema_editor.create_model(model_class)
+    finally:
+        if disabled_fk:
+            with connection.cursor() as cursor:
+                cursor.execute('SET FOREIGN_KEY_CHECKS=1')
 
 
 def separate_create_model(model_class, create_model_operation):
@@ -121,3 +154,12 @@ def separate_create_model(model_class, create_model_operation):
         ],
         state_operations=[create_model_operation],
     )
+
+class CreateModelIfMissing(migrations.CreateModel):
+    """CreateModel that no-ops when the table already exists."""
+
+    def database_forwards(self, app_label, schema_editor, from_state, to_state):
+        model = to_state.apps.get_model(app_label, self.name)
+        if table_exists(schema_editor, model._meta.db_table):
+            return
+        super().database_forwards(app_label, schema_editor, from_state, to_state)

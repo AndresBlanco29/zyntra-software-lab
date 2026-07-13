@@ -1,0 +1,129 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "My Notes" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start mb-3 gap-2 flex-wrap">
+  <div>
+    <h2 class="mb-1">{% trans "My Notes" %}</h2>
+    <p class="text-muted mb-0">{% trans "Credit memos and returns you submitted. BackOffice approves them before they affect the customer balance." %}</p>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{% url 'vendedor_home' %}" class="btn btn-outline-secondary">{% trans "Vendor menu" %}</a>
+    {% if can_create_notes %}
+    <a href="{% url 'vendedor_credit_memo_create' %}" class="btn btn-primary">{% trans "Credit Memo" %}</a>
+    <a href="{% url 'vendedor_return_create' %}" class="btn btn-success">{% trans "Return" %}</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Total" %}</div>
+        <div class="fs-3 fw-semibold mb-0">{{ summary.total }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Drafts" %}</div>
+        <div class="fs-3 fw-semibold text-warning mb-0">{{ summary.drafts }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Credit memos" %}</div>
+        <div class="fs-3 fw-semibold mb-0">{{ summary.credit_memos }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <div class="small text-muted text-uppercase fw-semibold mb-1">{% trans "Returns" %}</div>
+        <div class="fs-3 fw-semibold mb-0">{{ summary.returns }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3 border-0">
+  <div class="card-body">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label fw-semibold">{% trans "Search" %}</label>
+        <input type="search" name="q" class="form-control" value="{{ query }}" placeholder="{% trans 'Note, customer, or invoice...' %}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">{% trans "Status" %}</label>
+        <select name="estado" class="form-select">
+          <option value="">{% trans "All statuses" %}</option>
+          <option value="BORRADOR" {% if selected_status == 'BORRADOR' %}selected{% endif %}>{% trans "Draft" %}</option>
+          <option value="APROBADA" {% if selected_status == 'APROBADA' %}selected{% endif %}>{% trans "Approved" %}</option>
+          <option value="ANULADA" {% if selected_status == 'ANULADA' %}selected{% endif %}>{% trans "Cancelled" %}</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold">{% trans "Type" %}</label>
+        <select name="tipo_credito" class="form-select">
+          <option value="">{% trans "All types" %}</option>
+          <option value="CREDIT_DUMP" {% if selected_credit_type == 'CREDIT_DUMP' %}selected{% endif %}>{% trans "Credit Memo" %}</option>
+          <option value="CREDIT_RETURN" {% if selected_credit_type == 'CREDIT_RETURN' %}selected{% endif %}>{% trans "Return" %}</option>
+        </select>
+      </div>
+      <div class="col-md-1 d-grid">
+        <button type="submit" class="btn btn-outline-primary">{% trans "Filter" %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0 mobile-stack-table">
+      <thead>
+        <tr>
+          <th>{% trans "Note" %}</th>
+          <th>{% trans "Description" %}</th>
+          <th>{% trans "Customer" %}</th>
+          <th>{% trans "Invoice" %}</th>
+          <th>{% trans "Type" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th>{% trans "Total" %}</th>
+          <th>{% trans "Date" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for note in notes %}
+        <tr>
+          <td data-label="{% trans 'Note' %}" class="fw-semibold">{{ note.numero }}</td>
+          <td data-label="{% trans 'Description' %}">{{ note.descripcion|default:"—" }}</td>
+          <td data-label="{% trans 'Customer' %}">{{ note.cliente.nombre_empresa }}</td>
+          <td data-label="{% trans 'Invoice' %}">{% if note.invoice %}{{ note.invoice.numero }}{% else %}—{% endif %}</td>
+          <td data-label="{% trans 'Type' %}">
+            {% if note.tipo_credito == 'CREDIT_RETURN' %}
+              {% trans "Return" %}
+            {% else %}
+              {% trans "Credit Memo" %}
+            {% endif %}
+          </td>
+          <td data-label="{% trans 'Status' %}">{{ note.get_estado_display }}</td>
+          <td data-label="{% trans 'Total' %}">${{ note.total }}</td>
+          <td data-label="{% trans 'Date' %}">{{ note.creada_en|date:"m/d/Y H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" class="text-muted text-center py-4">{% trans "You have not submitted any credit memos or returns yet." %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

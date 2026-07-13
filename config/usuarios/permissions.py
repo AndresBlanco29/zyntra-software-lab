@@ -132,6 +132,16 @@ PERMISSION_SECTIONS = (
                 'label': _('Manage order taking'),
                 'description': _('Build and submit orders on behalf of customers.'),
             },
+            {
+                'code': 'vendor.notes.view',
+                'label': _('Credit memos and returns'),
+                'description': _('View credit memos and returns created for assigned customers.'),
+            },
+            {
+                'code': 'vendor.notes.manage',
+                'label': _('Create credit memos and returns'),
+                'description': _('Create credit memo and return drafts for BackOffice approval.'),
+            },
         ),
     },
     {
@@ -193,6 +203,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         'vendor.customers.manage',
         'vendor.orders.view',
         'vendor.orders.manage',
+        'vendor.notes.view',
+        'vendor.notes.manage',
     },
     'backoffice': {
         'backoffice.dashboard.view',
@@ -333,8 +345,9 @@ def get_redirect_url_for_user(user):
         ('admin.products.view', 'lista_productos'),
         ('admin.customer_requests.view', 'clientes_pendientes'),
         ('admin.content.view', 'contenido_home'),
-        ('vendor.customers.view', 'vendedores_clientes'),
-        ('vendor.orders.view', 'tomar_pedido'),
+        ('vendor.customers.view', 'vendedor_home'),
+        ('vendor.orders.view', 'vendedor_home'),
+        ('vendor.notes.view', 'vendedor_home'),
     )
     for permission_code, route_name in candidates:
         if user_has_permission(user, permission_code):

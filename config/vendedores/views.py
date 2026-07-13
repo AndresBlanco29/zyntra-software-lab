@@ -31,7 +31,21 @@ from config.clientes.balance_summary import (
     attach_customer_balance_summaries,
     build_customer_balance_summary,
 )
-from config.facturacion.services import annotate_clientes_open_invoice_balance, get_recent_customer_invoice_items_by_presentation
+from config.core.product_ordering import order_invoice_items_for_display
+from config.facturacion.form_drafts import serialize_post_data
+from config.facturacion.models import Invoice, NotaAjuste
+from config.facturacion.services import (
+    annotate_clientes_open_invoice_balance,
+    attach_invoice_item_net_dispatched_quantities,
+    crear_nota_ajuste,
+    get_recent_customer_invoice_items_by_presentation,
+)
+from config.facturacion.views import (
+    _extract_adjustment_note_request,
+    _save_adjustment_note_evidence_files,
+    _validate_invoice_is_not_quickbooks_locked,
+)
+from config.integrations.quickbooks.sync import is_sync_locked
 from config.pedidos.services import (
     calcular_precio_unitario_neto_item,
     calcular_subtotal_item_pedido,
@@ -39,7 +53,7 @@ from config.pedidos.services import (
     normalizar_descuento_item_pedido,
     notificar_backoffice_pedido,
 )
-from config.usuarios.permissions import internal_permission_required
+from config.usuarios.permissions import internal_permission_required, user_has_permission
 from config.usuarios.us_locations import US_STATE_CITIES, match_state_name, match_city_for_state
 from config.vendedores.drafts import (
     bind_take_order_cart,
@@ -381,6 +395,57 @@ def _catalogo_vendedor_queryset(request):
     if filters.get('marca'):
         queryset = queryset.filter(marca_id=filters['marca'])
     return queryset
+
+
+@login_required
+@internal_permission_required('vendor.customers.view', 'vendor.orders.view', 'vendor.notes.view')
+def vendedor_home(request):
+    tiles = []
+    if user_has_permission(request.user, 'vendor.orders.view'):
+        tiles.append({
+            'title': _('Take Order'),
+            'description': _('Build and submit an order for an assigned customer.'),
+            'url': reverse('tomar_pedido'),
+            'tone': 'primary',
+        })
+    if user_has_permission(request.user, 'vendor.customers.view'):
+        tiles.append({
+            'title': _('Customers'),
+            'description': _('See your assigned customers, balances, and account details.'),
+            'url': reverse('vendedores_clientes'),
+            'tone': 'navy',
+        })
+    if user_has_permission(request.user, 'vendor.customers.manage'):
+        tiles.append({
+            'title': _('Create Customer'),
+            'description': _('Register a new customer for your route.'),
+            'url': reverse('crear_cliente'),
+            'tone': 'slate',
+        })
+    if user_has_permission(request.user, 'vendor.notes.manage'):
+        tiles.append({
+            'title': _('Credit Memo'),
+            'description': _('Credit the customer without returning stock to inventory.'),
+            'url': reverse('vendedor_credit_memo_create'),
+            'tone': 'amber',
+        })
+        tiles.append({
+            'title': _('Return'),
+            'description': _('Credit the customer and return product to inventory after approval.'),
+            'url': reverse('vendedor_return_create'),
+            'tone': 'green',
+        })
+    if user_has_permission(request.user, 'vendor.notes.view'):
+        tiles.append({
+            'title': _('My Notes'),
+            'description': _('Review credit memos and returns you already submitted.'),
+            'url': reverse('vendedor_notes_list'),
+            'tone': 'soft',
+        })
+
+    return render(request, 'vendedores/home.html', {
+        'vendor_tiles': tiles,
+    })
 
 
 @login_required
@@ -1196,3 +1261,205 @@ def configurar_acceso_cliente(request):
             cliente.save(update_fields=update_fields)
 
     return JsonResponse({'success': True, 'message': _('Web access configured successfully.')})
+
+VENDOR_NOTE_MODE_CREDIT_MEMO = 'credit_memo'
+VENDOR_NOTE_MODE_RETURN = 'return'
+
+
+def _vendor_assigned_clientes_queryset(user):
+    return filter_clientes_for_vendedor(
+        Cliente.objects.filter(aprobado=True).order_by('nombre_empresa'),
+        user,
+    )
+
+
+def _build_vendor_note_creation_context(request, *, note_mode):
+    customers = _vendor_assigned_clientes_queryset(request.user)
+    query = str(request.GET.get('q') or '').strip()
+    filtered_customers = customers
+    if query:
+        filtered_customers = customers.filter(nombre_empresa__icontains=query)
+
+    selected_client_id = request.GET.get('cliente_id') or request.POST.get('cliente_id') or ''
+    selected_invoice_id = request.GET.get('invoice_id') or request.POST.get('invoice_id') or ''
+
+    invoice_queryset = (
+        Invoice.objects
+        .select_related('cliente', 'pedido', 'driver')
+        .prefetch_related('items__presentacion__producto')
+        .filter(estado='GENERADA', cliente__in=customers)
+        .order_by('-creada_en')
+    )
+
+    selected_invoice = None
+    selected_client = None
+    available_invoices = Invoice.objects.none()
+
+    if selected_invoice_id:
+        selected_invoice = get_object_or_404(invoice_queryset, id=selected_invoice_id)
+        selected_client = selected_invoice.cliente
+        available_invoices = invoice_queryset.filter(cliente=selected_client)
+    elif selected_client_id:
+        selected_client = get_object_or_404(customers, id=selected_client_id)
+        available_invoices = invoice_queryset.filter(cliente=selected_client)
+        if query and not filtered_customers.filter(pk=selected_client.pk).exists():
+            filtered_customers = (
+                customers.filter(pk=selected_client.pk) | filtered_customers
+            ).distinct().order_by('nombre_empresa')
+
+    selected_invoice_items = []
+    if selected_invoice is not None:
+        selected_invoice_items = order_invoice_items_for_display(selected_invoice)
+        attach_invoice_item_net_dispatched_quantities(selected_invoice, selected_invoice_items)
+
+    if note_mode == VENDOR_NOTE_MODE_RETURN:
+        page_title = _('Return')
+        page_help = _(
+            'Select an assigned customer and invoice, mark the returned lines, and submit a draft for BackOffice approval. Approved returns restock inventory.'
+        )
+        credit_type = 'CREDIT_RETURN'
+        credit_type_label = _('Credit Return')
+        submit_label = _('Submit return draft')
+    else:
+        page_title = _('Credit Memo')
+        page_help = _(
+            'Select an assigned customer and invoice, mark the credited lines, and submit a draft for BackOffice approval. Credit memos do not restock inventory.'
+        )
+        credit_type = 'CREDIT_DUMP'
+        credit_type_label = _('Credit Dump')
+        submit_label = _('Submit credit memo draft')
+
+    return {
+        'note_mode': note_mode,
+        'page_title': page_title,
+        'page_help': page_help,
+        'credit_type': credit_type,
+        'credit_type_label': credit_type_label,
+        'submit_label': submit_label,
+        'customers': filtered_customers,
+        'customer_search_query': query,
+        'customer_search_options': list(customers.values('id', 'nombre_empresa')),
+        'available_invoices': available_invoices,
+        'selected_client': selected_client,
+        'selected_invoice': selected_invoice,
+        'selected_invoice_items': selected_invoice_items,
+        'selected_invoice_quickbooks_locked': bool(selected_invoice and is_sync_locked(selected_invoice)),
+        'reason_choices': NotaAjuste.REASON_CHOICES,
+    }
+
+
+def _vendedor_note_create(request, *, note_mode):
+    context = _build_vendor_note_creation_context(request, note_mode=note_mode)
+
+    if request.method == 'POST':
+        selected_client = context.get('selected_client')
+        selected_invoice = context.get('selected_invoice')
+        if selected_client is None:
+            messages.error(request, _('Select a customer before saving the note.'))
+            return render(request, 'vendedores/note_create.html', context)
+        if selected_invoice is None:
+            messages.error(request, _('Select an invoice before saving the note.'))
+            return render(request, 'vendedores/note_create.html', context)
+
+        try:
+            _validate_invoice_is_not_quickbooks_locked(selected_invoice)
+            note_request = _extract_adjustment_note_request(selected_invoice, request.POST, field_prefix='note_')
+            if note_request is None:
+                raise ValidationError(_('Add product quantities before saving the note.'))
+
+            note_request['tipo_documento'] = 'CREDITO'
+            note_request['tipo_ajuste'] = 'PRODUCTO'
+            note_request['tipo_credito'] = context['credit_type']
+            if not note_request.get('motivo'):
+                raise ValidationError(_('Select a reason to save the note.'))
+
+            nota = crear_nota_ajuste(
+                cliente=selected_client,
+                invoice=selected_invoice,
+                tipo_ajuste=note_request['tipo_ajuste'],
+                tipo_documento=note_request['tipo_documento'],
+                motivo=note_request['motivo'],
+                tipo_credito=note_request['tipo_credito'],
+                descripcion=note_request['descripcion'],
+                usuario=request.user,
+                items_payload=note_request['items_payload'],
+                monto=note_request['monto'],
+            )
+            _save_adjustment_note_evidence_files(nota, request.FILES.getlist('note_evidence_photos'))
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+            context['form_draft'] = serialize_post_data(request.POST)
+            return render(request, 'vendedores/note_create.html', context)
+
+        messages.success(
+            request,
+            _('Note %(note)s saved as draft for BackOffice approval.') % {'note': nota.numero},
+        )
+        return redirect('vendedor_notes_list')
+
+    return render(request, 'vendedores/note_create.html', context)
+
+
+@login_required
+@internal_permission_required('vendor.notes.manage')
+def vendedor_credit_memo_create(request):
+    return _vendedor_note_create(request, note_mode=VENDOR_NOTE_MODE_CREDIT_MEMO)
+
+
+@login_required
+@internal_permission_required('vendor.notes.manage')
+def vendedor_return_create(request):
+    return _vendedor_note_create(request, note_mode=VENDOR_NOTE_MODE_RETURN)
+
+
+@login_required
+@internal_permission_required('vendor.notes.view')
+def vendedor_notes_list(request):
+    customers = _vendor_assigned_clientes_queryset(request.user)
+    query = (request.GET.get('q') or '').strip()
+    selected_status = (request.GET.get('estado') or '').strip().upper()
+    selected_credit_type = (request.GET.get('tipo_credito') or '').strip().upper()
+
+    valid_statuses = {'BORRADOR', 'APROBADA', 'ANULADA'}
+    valid_credit_types = {'CREDIT_DUMP', 'CREDIT_RETURN'}
+    if selected_status not in valid_statuses:
+        selected_status = ''
+    if selected_credit_type not in valid_credit_types:
+        selected_credit_type = ''
+
+    notes_queryset = (
+        NotaAjuste.objects
+        .select_related('cliente', 'invoice', 'creada_por', 'aprobada_por')
+        .prefetch_related('items__presentacion__producto', 'evidence_photos')
+        .filter(creada_por=request.user, cliente__in=customers, tipo_documento='CREDITO')
+        .order_by('-creada_en')
+    )
+    if query:
+        notes_queryset = notes_queryset.filter(
+            Q(numero__icontains=query)
+            | Q(cliente__nombre_empresa__icontains=query)
+            | Q(invoice__numero__icontains=query)
+            | Q(descripcion__icontains=query)
+        )
+    if selected_status:
+        notes_queryset = notes_queryset.filter(estado=selected_status)
+    if selected_credit_type:
+        notes_queryset = notes_queryset.filter(tipo_credito=selected_credit_type)
+
+    notes = list(notes_queryset[:200])
+    summary = {
+        'total': len(notes),
+        'drafts': sum(1 for note in notes if note.estado == 'BORRADOR'),
+        'approved': sum(1 for note in notes if note.estado == 'APROBADA'),
+        'returns': sum(1 for note in notes if note.tipo_credito == 'CREDIT_RETURN'),
+        'credit_memos': sum(1 for note in notes if note.tipo_credito == 'CREDIT_DUMP'),
+    }
+
+    return render(request, 'vendedores/notes_list.html', {
+        'notes': notes,
+        'query': query,
+        'selected_status': selected_status,
+        'selected_credit_type': selected_credit_type,
+        'summary': summary,
+        'can_create_notes': user_has_permission(request.user, 'vendor.notes.manage'),
+    })

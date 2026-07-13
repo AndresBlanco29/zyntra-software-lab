@@ -399,9 +399,32 @@ def clientes(request):
         'filter_estado': filter_params.get('estado', ''),
         'us_locations_json': json.dumps(US_STATE_CITIES),
         'us_states': sorted(US_STATE_CITIES.keys()),
+        'can_change_customer_username': _can_change_customer_username(request.user),
     }
 
     return render(request, 'vendedores/clientes.html', context)
+
+
+def _can_change_customer_username(user):
+    if not user or not getattr(user, 'is_authenticated', False):
+        return False
+    if user.is_superuser:
+        return True
+    return getattr(user, 'role', '') in {'admin', 'backoffice'}
+
+
+def _normalize_customer_login_username(raw_username):
+    username = str(raw_username or '').strip().lower()
+    if not username:
+        raise ValidationError(_('Username is required.'))
+    if len(username) < 3:
+        raise ValidationError(_('Username must have at least 3 characters.'))
+    if not re.fullmatch(r'[a-z0-9._-]+', username):
+        raise ValidationError(
+            _('Username can only use letters, numbers, dots, underscores and hyphens.')
+        )
+    return username
+
 
 @login_required
 @internal_permission_required('vendor.orders.view', 'backoffice.orders.view')
@@ -821,6 +844,7 @@ def enviar_pedido(request):
 
 
 @login_required
+@internal_permission_required('vendor.customers.manage')
 @require_POST
 def editar_cliente(request):
     """Vista para editar los datos del cliente"""
@@ -834,6 +858,8 @@ def editar_cliente(request):
     empresa = (data.get('empresa') or '').strip()
     correo = (data.get('correo') or '').strip()
     telefono = normalize_stored_phone_number(data.get('telefono'))
+    can_change_username = _can_change_customer_username(request.user)
+    raw_username = data.get('username')
 
     if not cliente_id:
         return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
@@ -852,6 +878,13 @@ def editar_cliente(request):
         except Cliente.DoesNotExist:
             return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
 
+        usuario = cliente.usuario
+        username_update = None
+        if can_change_username and raw_username is not None:
+            username_update = _normalize_customer_login_username(raw_username)
+            if Usuario.objects.filter(username=username_update).exclude(pk=usuario.pk).exists():
+                return JsonResponse({'success': False, 'message': _('This username is already in use.')}, status=400)
+
         cliente.nombre_empresa = empresa
         cliente.telefono = telefono
         cliente.direccion = location_payload['direccion']
@@ -861,8 +894,12 @@ def editar_cliente(request):
         cliente.pais = location_payload['pais']
         cliente.save(update_fields=['nombre_empresa', 'telefono', 'direccion', 'ciudad', 'estado', 'codigo_postal', 'pais'])
 
-        cliente.usuario.email = correo
-        cliente.usuario.save(update_fields=['email'])
+        usuario_update_fields = ['email']
+        usuario.email = correo
+        if username_update is not None and username_update != usuario.username:
+            usuario.username = username_update
+            usuario_update_fields.append('username')
+        usuario.save(update_fields=usuario_update_fields)
 
         return JsonResponse({'success': True, 'message': _('Customer updated successfully.')})
 

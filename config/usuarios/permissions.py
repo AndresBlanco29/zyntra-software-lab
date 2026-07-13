@@ -202,6 +202,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         'backoffice.orders.manage',
         'backoffice.reports.view',
         'backoffice.customers.assign',
+        'vendor.customers.view',
+        'vendor.customers.manage',
     },
     'seleccionador': {
         'selector.picking.view',

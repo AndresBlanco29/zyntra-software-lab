@@ -45,6 +45,9 @@
   data-msg-credit-limit-success-title="{% trans 'Credit limit updated' %}"
   data-msg-credit-limit-success-body="{% trans 'The customer credit limit was saved successfully.' %}"
   data-msg-credit-limit-invalid="{% trans 'Enter a valid credit limit amount.' %}"
+  data-msg-username-required="{% trans 'Username is required.' %}"
+  data-msg-username-invalid="{% trans 'Username can only use letters, numbers, dots, underscores and hyphens (min 3 characters).' %}"
+  data-can-change-username="{% if can_change_customer_username %}1{% else %}0{% endif %}"
 >
 
 <section class="vendor-hero vendor-hero--customers mb-4">
@@ -250,6 +253,7 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
   data-cliente-id="{{ cliente.id }}"
   data-cliente-nombre="{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa }}"
   data-cliente-empresa="{{ cliente.nombre_empresa }}"
+  data-cliente-username="{{ cliente.usuario.username }}"
   data-cliente-correo="{{ cliente.usuario.email }}"
   data-cliente-telefono="{{ cliente.telefono }}"
   data-cliente-direccion="{{ cliente.direccion }}"
@@ -348,6 +352,23 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
           <div class="mb-3">
             <label class="form-label fw-bold">{% trans "Nombre" %}</label>
             <input type="text" class="form-control" id="nombreCliente" disabled style="background: #f5f5f5;">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">{% trans "Username" %}</label>
+            <input
+              type="text"
+              class="form-control"
+              id="usernameCliente"
+              name="username"
+              autocomplete="off"
+              {% if not can_change_customer_username %}disabled style="background: #f5f5f5;"{% endif %}
+            >
+            {% if can_change_customer_username %}
+            <small class="text-muted">{% trans "Admin and BackOffice can correct the login username if it was typed wrong." %}</small>
+            {% else %}
+            <small class="text-muted">{% trans "Only Admin and BackOffice can change the login username." %}</small>
+            {% endif %}
           </div>
 
           <div class="mb-3">

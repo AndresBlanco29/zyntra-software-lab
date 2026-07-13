@@ -59,7 +59,10 @@ function getCustomerPageMessages() {
         creditLimitErrorPrefix: dataset.msgCreditLimitErrorPrefix || 'Error saving credit limit:',
         creditLimitSuccessTitle: dataset.msgCreditLimitSuccessTitle || 'Credit limit updated',
         creditLimitSuccessBody: dataset.msgCreditLimitSuccessBody || 'The customer credit limit was saved successfully.',
-        creditLimitInvalid: dataset.msgCreditLimitInvalid || 'Enter a valid credit limit amount.'
+        creditLimitInvalid: dataset.msgCreditLimitInvalid || 'Enter a valid credit limit amount.',
+        usernameRequired: dataset.msgUsernameRequired || 'Username is required.',
+        usernameInvalid: dataset.msgUsernameInvalid || 'Username can only use letters, numbers, dots, underscores and hyphens (min 3 characters).',
+        canChangeUsername: dataset.canChangeUsername === '1'
     };
 }
 
@@ -145,6 +148,10 @@ function abrirEditarCliente(button) {
     document.getElementById('clienteId').value = button.dataset.clienteId;
     document.getElementById('nombreCliente').value = button.dataset.clienteNombre;
     document.getElementById('empresaCliente').value = button.dataset.clienteEmpresa;
+    const usernameInput = document.getElementById('usernameCliente');
+    if (usernameInput) {
+        usernameInput.value = button.dataset.clienteUsername || '';
+    }
     document.getElementById('correoCliente').value = button.dataset.clienteCorreo;
     document.getElementById('telefonoCliente').value = sanitizePhoneDigits(button.dataset.clienteTelefono);
     document.getElementById('direccionCliente').value = button.dataset.clienteDireccion || '';
@@ -164,11 +171,27 @@ function guardarEditarCliente() {
     const direccion = document.getElementById('direccionCliente').value;
     const codigoPostal = document.getElementById('codigoPostalCliente').value;
     const locationValues = collectLocationValues();
+    const usernameInput = document.getElementById('usernameCliente');
+    const username = usernameInput ? String(usernameInput.value || '').trim().toLowerCase() : '';
+    if (usernameInput) {
+        usernameInput.value = username;
+    }
 
     // Validaciones básicas
     if (!empresa || !correo || !telefono || !direccion || !locationValues.estado || !locationValues.ciudad || !locationValues.pais) {
         alert(customerMessages.fillAllFields);
         return;
+    }
+
+    if (customerMessages.canChangeUsername) {
+        if (!username) {
+            alert(customerMessages.usernameRequired);
+            return;
+        }
+        if (!/^[a-z0-9._-]{3,}$/.test(username)) {
+            alert(customerMessages.usernameInvalid);
+            return;
+        }
     }
 
     // Validar email
@@ -184,6 +207,22 @@ function guardarEditarCliente() {
         return;
     }
 
+    const payload = {
+        cliente_id: clienteId,
+        empresa: empresa,
+        correo: correo,
+        telefono: telefono,
+        direccion: direccion,
+        codigo_postal: codigoPostal,
+        pais: locationValues.pais,
+        estado: locationValues.estado,
+        ciudad: locationValues.ciudad,
+        manual_location: locationValues.manual_location
+    };
+    if (customerMessages.canChangeUsername) {
+        payload.username = username;
+    }
+
     // Enviar cambios al servidor
     fetch('/vendedores/editar-cliente/', {
         method: 'POST',
@@ -191,18 +230,7 @@ function guardarEditarCliente() {
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-            cliente_id: clienteId,
-            empresa: empresa,
-            correo: correo,
-            telefono: telefono,
-            direccion: direccion,
-            codigo_postal: codigoPostal,
-            pais: locationValues.pais,
-            estado: locationValues.estado,
-            ciudad: locationValues.ciudad,
-            manual_location: locationValues.manual_location
-        })
+        body: JSON.stringify(payload)
     })
     .then(response => response.json())
     .then(data => {

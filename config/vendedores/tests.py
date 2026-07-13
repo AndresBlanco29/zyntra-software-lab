@@ -406,6 +406,11 @@ class VendedorEditarClienteTests(TestCase):
 			password='secret123',
 			role='admin',
 		)
+		self.backoffice = Usuario.objects.create_user(
+			username='backoffice-edit-client',
+			password='secret123',
+			role='backoffice',
+		)
 		self.customer_user = Usuario.objects.create_user(
 			username='customer-edit-client',
 			password='secret123',
@@ -589,6 +594,82 @@ class VendedorEditarClienteTests(TestCase):
 		self.assertEqual(self.customer.codigo_postal, '050021')
 		self.assertEqual(self.customer.pais, 'Colombia')
 		self.assertEqual(self.customer_user.email, 'rutas@cliente.com')
+
+	def test_admin_can_change_customer_username(self):
+		self.client.force_login(self.admin)
+
+		response = self.client.post(
+			reverse('editar_cliente'),
+			data=json.dumps({
+				'cliente_id': self.customer.id,
+				'empresa': self.customer.nombre_empresa,
+				'correo': self.customer_user.email or 'cliente@test.com',
+				'telefono': '5551234567',
+				'direccion': self.customer.direccion,
+				'ciudad': self.customer.ciudad,
+				'estado': self.customer.estado,
+				'codigo_postal': self.customer.codigo_postal,
+				'pais': self.customer.pais or 'USA',
+				'manual_location': True,
+				'username': 'quikstop',
+			}),
+			content_type='application/json',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.customer_user.refresh_from_db()
+		self.assertEqual(self.customer_user.username, 'quikstop')
+
+	def test_backoffice_can_change_customer_username(self):
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(
+			reverse('editar_cliente'),
+			data=json.dumps({
+				'cliente_id': self.customer.id,
+				'empresa': self.customer.nombre_empresa,
+				'correo': self.customer_user.email or 'cliente@test.com',
+				'telefono': '5551234567',
+				'direccion': self.customer.direccion,
+				'ciudad': self.customer.ciudad,
+				'estado': self.customer.estado,
+				'codigo_postal': self.customer.codigo_postal,
+				'pais': self.customer.pais or 'USA',
+				'manual_location': True,
+				'username': 'quikstop',
+			}),
+			content_type='application/json',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.customer_user.refresh_from_db()
+		self.assertEqual(self.customer_user.username, 'quikstop')
+
+	def test_vendor_cannot_change_customer_username_via_edit(self):
+		original_username = self.customer_user.username
+		self.client.force_login(self.vendor)
+
+		response = self.client.post(
+			reverse('editar_cliente'),
+			data=json.dumps({
+				'cliente_id': self.customer.id,
+				'empresa': self.customer.nombre_empresa,
+				'correo': self.customer_user.email or 'cliente@test.com',
+				'telefono': '5551234567',
+				'direccion': self.customer.direccion,
+				'ciudad': self.customer.ciudad,
+				'estado': self.customer.estado,
+				'codigo_postal': self.customer.codigo_postal,
+				'pais': self.customer.pais or 'USA',
+				'manual_location': True,
+				'username': 'quikstop',
+			}),
+			content_type='application/json',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.customer_user.refresh_from_db()
+		self.assertEqual(self.customer_user.username, original_username)
 
 	def test_vendor_can_edit_customer_with_valid_usa_selector_location(self):
 		self.client.force_login(self.vendor)

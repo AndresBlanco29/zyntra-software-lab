@@ -711,6 +711,7 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, f'name="cantidad_real_{self.item.id}" value="0"', html=False)
 		self.assertContains(response, f'name="linea_revisada_{self.item.id}"', html=False)
+		self.assertContains(response, 'Search products by full name', html=False)
 		self.assertContains(response, 'Reviewed')
 		self.assertContains(response, 'data-requested-quantity="2"', html=False)
 		self.assertContains(response, 'Available stock: 10 CS')

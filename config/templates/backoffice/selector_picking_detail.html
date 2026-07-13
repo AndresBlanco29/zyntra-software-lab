@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n shipment_summary_tags %}
+{% load i18n static shipment_summary_tags %}
 
 {% block title %}{% trans "Picking Verification" %} #{{ pedido.id }}{% endblock %}
 
@@ -67,7 +67,7 @@
               </div>
             </td>
             <td data-label="U/M">
-              <select class="form-select form-select-sm" name="presentacion_{{ item.id }}" data-picker-presentation-select>
+              <select class="form-select form-select-sm search-select-enhanced" name="presentacion_{{ item.id }}" data-picker-presentation-select>
                 {% for option in item.presentation_options %}
                 <option value="{{ option.id }}" data-stock-physical="{{ option.stock_fisico }}" {% if option.id == item.presentation_id %}selected{% endif %}>{{ option.label }}</option>
                 {% endfor %}
@@ -97,12 +97,21 @@
           {% for row in additional_item_rows %}
           <tr data-added-product-row>
             <td data-label="{% trans 'Product' %}">
-              <select class="form-select form-select-sm" name="presentacion_nueva[]" data-added-product-select>
-                <option value="">{% trans "Select a product..." %}</option>
-                {% for presentacion in available_presentations %}
-                <option value="{{ presentacion.id }}" data-stock-physical="{{ presentacion.stock_operativo.stock_fisico|default:0 }}" {% if row.presentacion_id == presentacion.id|stringformat:'s' %}selected{% endif %}>{{ presentacion.producto.nombre }} - {{ presentacion.nombre_traducido }}</option>
-                {% endfor %}
-              </select>
+              <div class="picker-product-search" data-picker-product-search-root>
+                <label class="form-label small fw-semibold mb-1">{% trans "Search product" %}</label>
+                <div class="position-relative">
+                  <input
+                    type="search"
+                    class="form-control form-control-sm"
+                    data-picker-product-search
+                    placeholder="{% trans 'Search products by full name...' %}"
+                    autocomplete="off"
+                    value="{% for presentacion in available_presentations %}{% if row.presentacion_id == presentacion.id|stringformat:'s' %}{{ presentacion.producto.nombre }} - {{ presentacion.nombre_traducido }}{% endif %}{% endfor %}"
+                  >
+                  <input type="hidden" name="presentacion_nueva[]" data-added-product-select value="{{ row.presentacion_id|default:'' }}">
+                  <div class="list-group product-search-results shadow-sm" data-picker-product-results hidden></div>
+                </div>
+              </div>
               <div class="small mt-1 picker-stock-label text-muted" data-picker-stock-label>{% trans "Available stock: - CS" %}</div>
             </td>
             <td data-label="U/M"><span class="badge text-bg-danger">{% trans "New" %}</span></td>
@@ -183,324 +192,58 @@
   </div>
 </form>
 
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    var form = document.getElementById('pickerVerificationForm');
-    var lockBadge = document.getElementById('pickerLockBadge');
-    var noteInput = document.getElementById('pickerNoteInput');
-    var noteHelp = document.getElementById('pickerNoteHelp');
-    var stockAlert = document.getElementById('pickerStockAlert');
-    var approvedCheckbox = document.getElementById('notaResuelta');
-    var addProductRowButton = document.getElementById('addProductRowButton');
-    var pickerItemsTableBody = document.getElementById('pickerItemsTableBody');
-    var availablePresentationOptionsHtml = '{% for presentacion in available_presentations %}<option value="{{ presentacion.id }}" data-stock-physical="{{ presentacion.stock_operativo.stock_fisico|default:0 }}">{{ presentacion.producto.nombre|escapejs }} - {{ presentacion.nombre_traducido|escapejs }}</option>{% endfor %}';
-    var reviewValidationMessage = '{% trans "Check every product line in the Reviewed column before saving."|escapejs %}';
-    var stockAvailableLabelPrefix = '{% trans "Available stock:"|escapejs %}';
+<link rel="stylesheet" href="{% static 'css/pedido-product-search.css' %}">
+<style>
+  .picker-product-search .product-search-results {
+    position: absolute;
+    top: calc(100% + 0.25rem);
+    left: 0;
+    right: 0;
+    z-index: 2200;
+    max-height: 260px;
+    overflow-y: auto;
+  }
 
-    function formatAvailableStockLabel(amount) {
-      return stockAvailableLabelPrefix + ' ' + amount + ' CS';
-    }
+  .picker-product-search .product-search-results[hidden] {
+    display: none !important;
+  }
 
-    function applyStockLabelStyles(label, amount) {
-      if (!label) {
-        return;
-      }
-      label.textContent = formatAvailableStockLabel(amount);
-      label.classList.remove('text-success', 'text-danger', 'text-muted', 'fw-semibold');
-      if (amount <= 0) {
-        label.classList.add('text-danger', 'fw-semibold');
-      } else {
-        label.classList.add('text-success', 'fw-semibold');
-      }
-    }
+  .mobile-stack-table td .picker-product-search {
+    width: 100%;
+  }
+</style>
 
-    function selectedOptionStock(select) {
-      if (!select || !select.value) {
-        return null;
-      }
-      var selectedOption = Array.from(select.options).find(function (option) {
-        return option.value === select.value;
-      });
-      return selectedOption ? Number(selectedOption.dataset.stockPhysical || 0) : null;
-    }
-
-    function syncOrderLinePresentationStock(row) {
-      var select = row.querySelector('[data-picker-presentation-select]');
-      var stepper = row.querySelector('[data-quantity-stepper]');
-      var stockLabel = row.querySelector('[data-picker-stock-label]');
-      var stockPhysical = selectedOptionStock(select);
-      if (stockPhysical === null) {
-        return;
-      }
-      if (stepper) {
-        stepper.dataset.stockPhysical = String(stockPhysical);
-      }
-      applyStockLabelStyles(stockLabel, stockPhysical);
-    }
-
-    function getRequiredReviewCheckboxes() {
-      var checkboxes = Array.from(document.querySelectorAll('[data-picker-order-line] .picker-line-reviewed'));
-      document.querySelectorAll('[data-added-product-row]').forEach(function (row) {
-        var select = row.querySelector('[data-added-product-select]');
-        var reviewCheckbox = row.querySelector('.picker-line-reviewed');
-        if (select && select.value && reviewCheckbox) {
-          checkboxes.push(reviewCheckbox);
-        }
-      });
-      return checkboxes;
-    }
-
-    function syncReviewRowHighlights() {
-      getRequiredReviewCheckboxes().forEach(function (checkbox) {
-        var row = checkbox.closest('tr');
-        if (!row) {
-          return;
-        }
-        row.classList.toggle('table-warning', !checkbox.checked);
-      });
-    }
-
-    function syncAddedProductRow(row) {
-      var select = row.querySelector('[data-added-product-select]');
-      var stepper = row.querySelector('[data-quantity-stepper]');
-      var stockLabel = row.querySelector('[data-picker-stock-label]');
-      if (!select || !stepper) {
-        return;
-      }
-
-      var stockPhysical = selectedOptionStock(select);
-      if (stockPhysical === null) {
-        stepper.dataset.stockPhysical = '0';
-        if (stockLabel) {
-          stockLabel.textContent = '{% trans "Available stock: - CS"|escapejs %}';
-          stockLabel.classList.remove('text-success', 'text-danger', 'fw-semibold');
-          stockLabel.classList.add('text-muted');
-        }
-        return;
-      }
-
-      stepper.dataset.stockPhysical = String(stockPhysical);
-      applyStockLabelStyles(stockLabel, stockPhysical);
-    }
-
-    function initQuantityStepper(stepper) {
-      if (!stepper || stepper.dataset.stepperReady === 'true') {
-        return;
-      }
-
-      var input = stepper.querySelector('.quantity-stepper__input');
-      stepper.querySelectorAll('[data-step]').forEach(function (button) {
-        button.addEventListener('click', function () {
-          var currentValue = Number(input.value || 0);
-          var minValue = Number(input.min || 0);
-          var nextValue = button.dataset.step === 'down' ? currentValue - 1 : currentValue + 1;
-
-          input.value = Math.max(minValue, nextValue);
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
-        });
-      });
-
-      input.addEventListener('input', updateFormState);
-      input.addEventListener('change', updateFormState);
-      stepper.dataset.stepperReady = 'true';
-    }
-
-    function buildAddedProductRow() {
-      var row = document.createElement('tr');
-      row.setAttribute('data-added-product-row', 'true');
-      row.innerHTML = '' +
-        '<td data-label="{% trans "Product" %}">' +
-          '<select class="form-select form-select-sm" name="presentacion_nueva[]" data-added-product-select>' +
-            '<option value="">{% trans "Select a product..." %}</option>' +
-            availablePresentationOptionsHtml +
-          '</select>' +
-          '<div class="small mt-1 picker-stock-label text-muted" data-picker-stock-label>{% trans "Available stock: - CS"|escapejs %}</div>' +
-        '</td>' +
-        '<td data-label="U/M"><span class="badge text-bg-danger">{% trans "New" %}</span></td>' +
-        '<td data-label="QTY ORD">-</td>' +
-        '<td data-label="QTY PICK" class="mobile-stack-table__input-cell">' +
-          '<div class="d-flex gap-2 align-items-center">' +
-            '<div class="input-group quantity-stepper flex-grow-1" data-quantity-stepper data-stock-physical="0" data-applied-quantity="0">' +
-              '<button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="down" aria-label="{% trans "Decrease real quantity" %}">-</button>' +
-              '<input type="number" min="0" class="form-control quantity-stepper__input" name="cantidad_nueva[]" value="0">' +
-              '<button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="up" aria-label="{% trans "Increase real quantity" %}">+</button>' +
-            '</div>' +
-            '<button type="button" class="btn btn-outline-danger btn-sm" data-remove-product-row>{% trans "Remove" %}</button>' +
-          '</div>' +
-        '</td>' +
-        '<td data-label="{% trans "Reviewed" %}" class="text-center">' +
-          '<div class="form-check d-inline-flex justify-content-center mb-0">' +
-            '<input type="checkbox" class="form-check-input picker-line-reviewed" name="linea_revisada_adicional[]" value="on" aria-label="{% trans "I reviewed this added product"|escapejs %}">' +
-          '</div>' +
-        '</td>';
-      return row;
-    }
-
-    function validateRequiredLineReviews() {
-      var missing = getRequiredReviewCheckboxes().filter(function (checkbox) {
-        return !checkbox.checked;
-      });
-      syncReviewRowHighlights();
-      if (missing.length) {
-        window.alert(reviewValidationMessage);
-        if (missing[0]) {
-          missing[0].focus();
-        }
-        return false;
-      }
-      return true;
-    }
-
-    function updateDispatchSummary() {
-      var orderedTotal = 0;
-      var dispatchedTotal = 0;
-      var notSentTotal = 0;
-
-      document.querySelectorAll('[data-picker-order-line]').forEach(function (row) {
-        var orderedCell = row.querySelector('[data-requested-quantity]');
-        var pickInput = row.querySelector('.quantity-stepper__input');
-        var ordered = Number(orderedCell ? orderedCell.dataset.requestedQuantity : 0) || 0;
-        var picked = Number(pickInput ? pickInput.value : 0) || 0;
-
-        orderedTotal += ordered;
-        dispatchedTotal += picked;
-        notSentTotal += Math.max(ordered - picked, 0);
-      });
-
-      document.querySelectorAll('[data-added-product-row]').forEach(function (row) {
-        var select = row.querySelector('[data-added-product-select]');
-        var pickInput = row.querySelector('.quantity-stepper__input');
-        if (!select || !select.value || !pickInput) {
-          return;
-        }
-        dispatchedTotal += Number(pickInput.value || 0) || 0;
-      });
-
-      document.getElementById('pickerSummaryOrdered').textContent = orderedTotal;
-      document.getElementById('pickerSummaryDispatched').textContent = dispatchedTotal;
-      document.getElementById('pickerSummaryNotSent').textContent = notSentTotal;
-    }
-
-    function updateFormState() {
-      var hasShortage = false;
-
-      document.querySelectorAll('[data-quantity-stepper]').forEach(function (stepper) {
-        var input = stepper.querySelector('.quantity-stepper__input');
-        var stockPhysical = Number(stepper.dataset.stockPhysical || 0);
-        var appliedQuantity = Number(stepper.dataset.appliedQuantity || 0);
-        var currentValue = Number(input.value || 0);
-        var pendingToApply = Math.max(currentValue - appliedQuantity, 0);
-
-        if (pendingToApply > stockPhysical) {
-          hasShortage = true;
-        }
-      });
-
-      noteInput.required = hasShortage;
-      approvedCheckbox.required = !hasShortage;
-      approvedCheckbox.disabled = hasShortage;
-
-      if (hasShortage) {
-        approvedCheckbox.checked = false;
-        stockAlert.classList.remove('d-none');
-        noteHelp.textContent = noteHelp.dataset.shortageText;
-        lockBadge.className = 'badge bg-danger';
-        lockBadge.textContent = '{% trans "Blocked" %}';
-      } else {
-        stockAlert.classList.add('d-none');
-        noteHelp.textContent = noteHelp.dataset.normalText;
-        lockBadge.className = 'badge bg-success';
-        lockBadge.textContent = '{% trans "Unlocked" %}';
-      }
-
-      form.dataset.hasShortage = hasShortage ? 'true' : 'false';
-      updateDispatchSummary();
-    }
-
-    document.querySelectorAll('[data-quantity-stepper]').forEach(function (stepper) {
-      initQuantityStepper(stepper);
-    });
-
-    document.querySelectorAll('.picker-line-reviewed').forEach(function (checkbox) {
-      checkbox.addEventListener('change', syncReviewRowHighlights);
-    });
-
-    form.addEventListener('submit', function (event) {
-      if (!validateRequiredLineReviews()) {
-        event.preventDefault();
-      }
-    });
-
-    document.querySelectorAll('[data-picker-order-line]').forEach(function (row) {
-      var presentationSelect = row.querySelector('[data-picker-presentation-select]');
-      syncOrderLinePresentationStock(row);
-      if (presentationSelect) {
-        presentationSelect.addEventListener('change', function () {
-          syncOrderLinePresentationStock(row);
-          updateFormState();
-        });
-      }
-    });
-
-    document.querySelectorAll('[data-added-product-row]').forEach(function (row) {
-      syncAddedProductRow(row);
-      row.querySelector('[data-added-product-select]').addEventListener('change', function () {
-        syncAddedProductRow(row);
-        syncReviewRowHighlights();
-        updateFormState();
-      });
-    });
-
-    pickerItemsTableBody.addEventListener('click', function (event) {
-      var removeButton = event.target.closest('[data-remove-product-row]');
-      if (!removeButton) {
-        return;
-      }
-
-      var row = removeButton.closest('[data-added-product-row]');
-      if (row) {
-        row.remove();
-        updateFormState();
-      }
-    });
-
-    pickerItemsTableBody.addEventListener('change', function (event) {
-      var select = event.target.closest('[data-added-product-select]');
-      if (!select) {
-        return;
-      }
-
-      var row = select.closest('[data-added-product-row]');
-      if (row) {
-        syncAddedProductRow(row);
-        syncReviewRowHighlights();
-        updateFormState();
-      }
-    });
-
-    addProductRowButton.addEventListener('click', function () {
-      var row = buildAddedProductRow();
-      pickerItemsTableBody.appendChild(row);
-      var addedSelect = row.querySelector('[data-added-product-select]');
-      if (window.LTGSearchableSelect && addedSelect) {
-        window.LTGSearchableSelect.init(addedSelect);
-      }
-      initQuantityStepper(row.querySelector('[data-quantity-stepper]'));
-      var addedReviewCheckbox = row.querySelector('.picker-line-reviewed');
-      if (addedReviewCheckbox) {
-        addedReviewCheckbox.addEventListener('change', syncReviewRowHighlights);
-      }
-      addedSelect.addEventListener('change', function () {
-        syncAddedProductRow(row);
-        syncReviewRowHighlights();
-        updateFormState();
-      });
-      syncAddedProductRow(row);
-      updateFormState();
-    });
-
-    updateFormState();
-  });
+<script type="application/json" id="pickerAvailablePresentationsJson">
+[
+{% for presentacion in available_presentations %}
+  {
+    "id": "{{ presentacion.id }}",
+    "label": "{{ presentacion.producto.nombre|escapejs }} - {{ presentacion.nombre_traducido|escapejs }}",
+    "stock_physical": {{ presentacion.stock_operativo.stock_fisico|default:0 }}
+  }{% if not forloop.last %},{% endif %}
+{% endfor %}
+]
 </script>
+
+<script>
+  window.LTG_PICKER_PRODUCT_SEARCH = {
+    reviewValidationMessage: "{% trans 'Check every product line in the Reviewed column before saving.'|escapejs %}",
+    stockAvailableLabelPrefix: "{% trans 'Available stock:'|escapejs %}",
+    searchPlaceholder: "{% trans 'Search products by full name...'|escapejs %}",
+    searchLabel: "{% trans 'Search product'|escapejs %}",
+    minCharsMessage: "{% trans 'Type at least 2 characters to search.'|escapejs %}",
+    emptyMessage: "{% trans 'No products found.'|escapejs %}",
+    stockDashLabel: "{% trans 'Available stock: - CS'|escapejs %}",
+    labelBlocked: "{% trans 'Blocked'|escapejs %}",
+    labelUnlocked: "{% trans 'Unlocked'|escapejs %}",
+    labelNew: "{% trans 'New'|escapejs %}",
+    labelDecrease: "{% trans 'Decrease real quantity'|escapejs %}",
+    labelIncrease: "{% trans 'Increase real quantity'|escapejs %}",
+    labelRemove: "{% trans 'Remove'|escapejs %}",
+    labelReviewed: "{% trans 'I reviewed this added product'|escapejs %}",
+    labelProduct: "{% trans 'Product'|escapejs %}",
+    labelReviewedCol: "{% trans 'Reviewed'|escapejs %}"
+  };
+</script>
+<script src="{% static 'js/selector_picking_product_search.js' %}"></script>
 {% endblock %}

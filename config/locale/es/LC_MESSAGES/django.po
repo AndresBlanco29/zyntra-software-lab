@@ -4603,8 +4603,8 @@ msgstr "Estimated delivery"
 msgid "Started"
 msgstr "Started"
 
-msgid "Evidence"
-msgstr "Evidence"
+msgid "Evidence invoice picture"
+msgstr "Evidence invoice picture"
 
 msgid ""
 "Add delivery proof here if you need photos before or after closing the stop."

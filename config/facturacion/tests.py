@@ -3751,7 +3751,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(response, 'QTY ORD')
 		self.assertContains(response, 'QTY DSP')
 		self.assertContains(response, 'Consulta de Google Maps')
-		self.assertContains(response, 'Evidencia')
+		self.assertContains(response, 'Evidence invoice picture')
 		self.assertContains(response, 'Subir evidencia')
 		self.assertContains(response, 'Usar camara')
 		self.assertContains(response, 'Tomar foto')

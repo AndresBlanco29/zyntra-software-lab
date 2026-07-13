@@ -323,6 +323,43 @@ class Cliente(models.Model):
         return self.nombre_empresa
 
 
+class ClienteVendedorAsignacion(models.Model):
+    """Many-to-many style assignment: one customer can belong to several vendors."""
+
+    cliente = models.ForeignKey(
+        Cliente,
+        on_delete=models.CASCADE,
+        related_name='asignaciones_vendedores',
+    )
+    vendedor = models.ForeignKey(
+        Usuario,
+        on_delete=models.CASCADE,
+        related_name='asignaciones_clientes',
+        limit_choices_to={'role': 'vendedor'},
+    )
+    asignado_en = models.DateTimeField(auto_now_add=True)
+    asignado_por = models.ForeignKey(
+        Usuario,
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name='asignaciones_clientes_realizadas',
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['cliente', 'vendedor'],
+                name='uniq_cliente_vendedor_asignacion',
+            ),
+        ]
+        verbose_name = 'Customer vendor assignment'
+        verbose_name_plural = 'Customer vendor assignments'
+
+    def __str__(self):
+        return f'{self.cliente_id} → {self.vendedor_id}'
+
+
 class ClienteCreditoLimiteAlerta(models.Model):
     ESTADO_PENDIENTE = 'PENDIENTE'
     ESTADO_LIBERADO = 'LIBERADO'

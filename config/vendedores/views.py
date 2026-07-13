@@ -256,7 +256,14 @@ def crear_cliente(request):
             cliente_kwargs['vendedor_asignado'] = request.user
             cliente_kwargs['vendedor_asignado_en'] = timezone.now()
             cliente_kwargs['vendedor_asignado_por'] = request.user
-        Cliente.objects.create(**cliente_kwargs)
+        cliente = Cliente.objects.create(**cliente_kwargs)
+        if getattr(request.user, 'role', '') == 'vendedor':
+            from config.clientes.assignment import ensure_cliente_assigned_to_vendedor
+            ensure_cliente_assigned_to_vendedor(
+                cliente=cliente,
+                vendedor=request.user,
+                assigned_by=request.user,
+            )
 
         return redirect("vendedores_clientes")
 

@@ -47,6 +47,7 @@
           <button type="submit" class="btn btn-outline-primary w-100">
             {% trans "Assign all customers" %}
           </button>
+          <div class="form-text mt-2">{% trans "Adds every approved customer to this vendor without removing them from other vendors." %}</div>
         </form>
       </div>
     </div>
@@ -90,7 +91,7 @@
           <th style="width: 48px;"></th>
           <th>{% trans "Company" %}</th>
           <th>{% trans "Contact" %}</th>
-          <th>{% trans "Current vendor" %}</th>
+          <th>{% trans "Assigned vendors" %}</th>
         </tr>
       </thead>
       <tbody>
@@ -111,14 +112,16 @@
             <div class="text-muted small">{{ cliente.usuario.email }}</div>
           </td>
           <td>
-            {% if cliente.vendedor_asignado %}
-              {% if cliente.vendedor_asignado_id == vendedor.id %}
-                <span class="badge bg-success">{% trans "This vendor" %}</span>
-              {% else %}
-                <span class="badge bg-warning text-dark">
-                  {{ cliente.vendedor_asignado.first_name }} {{ cliente.vendedor_asignado.last_name }}
-                </span>
-              {% endif %}
+            {% if cliente.asignaciones_vendedores.all %}
+              {% for assignment in cliente.asignaciones_vendedores.all %}
+                {% if assignment.vendedor_id == vendedor.id %}
+                  <span class="badge bg-success">{% trans "This vendor" %}</span>
+                {% else %}
+                  <span class="badge bg-secondary">
+                    {{ assignment.vendedor.first_name }} {{ assignment.vendedor.last_name }}
+                  </span>
+                {% endif %}
+              {% endfor %}
             {% else %}
               <span class="text-muted">{% trans "Unassigned" %}</span>
             {% endif %}

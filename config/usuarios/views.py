@@ -1132,7 +1132,7 @@ def lista_asignacion_clientes_vendedores(request):
     query = str(request.GET.get('q') or '').strip()
     vendedores = (
         get_active_vendedores_queryset()
-        .annotate(assigned_count=Count('clientes_asignados'))
+        .annotate(assigned_count=Count('asignaciones_clientes', distinct=True))
     )
     if query:
         vendedores = vendedores.filter(
@@ -1196,9 +1196,12 @@ def asignar_clientes_vendedor(request, vendedor_id):
             | Q(telefono__icontains=query)
         )
 
+    from config.clientes.models import ClienteVendedorAsignacion
+
     assigned_ids = set(
-        Cliente.objects.filter(vendedor_asignado=vendedor).values_list('id', flat=True)
+        ClienteVendedorAsignacion.objects.filter(vendedor=vendedor).values_list('cliente_id', flat=True)
     )
+    clientes = clientes.prefetch_related('asignaciones_vendedores__vendedor')
 
     context = {
         'vendedor': vendedor,

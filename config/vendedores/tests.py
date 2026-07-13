@@ -5,7 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from config.clientes.models import Cliente
+from config.clientes.models import Cliente, ClienteVendedorAsignacion
 from config.facturacion.models import Invoice, InvoiceItem, NotaAjuste
 from config.facturacion.services import crear_nota_ajuste, generar_invoice_desde_picking
 from config.inventario.services import registrar_entrada_manual
@@ -1034,6 +1034,7 @@ class VendorHomeAndNotesTests(TestCase):
 			vendedor_asignado=self.vendor,
 			vendedor_asignado_en=timezone.now(),
 		)
+		ClienteVendedorAsignacion.objects.get_or_create(cliente=self.customer, vendedor=self.vendor)
 		other_user = Usuario.objects.create_user(
 			username='customer-other-vendor-notes',
 			password='secret123',
@@ -1055,6 +1056,7 @@ class VendorHomeAndNotesTests(TestCase):
 			vendedor_asignado=self.other_vendor,
 			vendedor_asignado_en=timezone.now(),
 		)
+		ClienteVendedorAsignacion.objects.get_or_create(cliente=self.other_customer, vendedor=self.other_vendor)
 
 		categoria = Categoria.objects.create(nombre='Cat Vendor Notes')
 		marca = Marca.objects.create(nombre='Marca Vendor Notes')

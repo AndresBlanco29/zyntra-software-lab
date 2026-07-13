@@ -204,7 +204,17 @@
     overflow-y: auto;
   }
 
-  .picker-product-search .product-search-results[hidden] {
+  .picker-product-search-results--floating {
+    position: fixed !important;
+    right: auto !important;
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 0.75rem;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+  }
+
+  .picker-product-search .product-search-results[hidden],
+  .picker-product-search-results--floating[hidden] {
     display: none !important;
   }
 

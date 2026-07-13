@@ -156,6 +156,56 @@
       }
       resultsBox.hidden = true;
       resultsBox.innerHTML = '';
+      resultsBox.classList.remove('picker-product-search-results--floating');
+      resultsBox.style.top = '';
+      resultsBox.style.left = '';
+      resultsBox.style.width = '';
+      resultsBox.style.maxHeight = '';
+      if (resultsBox.dataset.floated === 'true' && resultsBox.parentElement === document.body) {
+        var ownerId = resultsBox.dataset.ownerRootId;
+        var ownerRoot = ownerId ? document.getElementById(ownerId) : null;
+        var host = ownerRoot ? ownerRoot.querySelector('.position-relative') : null;
+        if (host) {
+          host.appendChild(resultsBox);
+        }
+        delete resultsBox.dataset.floated;
+      }
+    }
+
+    function positionFloatingResults(searchInput, resultsBox) {
+      if (!searchInput || !resultsBox || resultsBox.hidden) {
+        return;
+      }
+      var rect = searchInput.getBoundingClientRect();
+      var viewportPadding = 12;
+      var availableBelow = window.innerHeight - rect.bottom - viewportPadding;
+      var availableAbove = rect.top - viewportPadding;
+      var maxHeight = Math.min(280, Math.max(availableBelow, availableAbove, 140));
+      var openUpward = availableBelow < 160 && availableAbove > availableBelow;
+      var top = openUpward
+        ? Math.max(viewportPadding, rect.top - maxHeight - 6)
+        : Math.min(window.innerHeight - viewportPadding - 40, rect.bottom + 6);
+
+      resultsBox.classList.add('picker-product-search-results--floating');
+      resultsBox.style.position = 'fixed';
+      resultsBox.style.left = Math.max(viewportPadding, Math.round(rect.left)) + 'px';
+      resultsBox.style.width = Math.round(Math.min(rect.width, window.innerWidth - (viewportPadding * 2))) + 'px';
+      resultsBox.style.top = Math.round(top) + 'px';
+      resultsBox.style.maxHeight = Math.round(maxHeight) + 'px';
+      resultsBox.style.zIndex = '4000';
+      resultsBox.style.overflowY = 'auto';
+    }
+
+    function ensureFloatingResults(root, resultsBox, searchInput) {
+      if (!root.id) {
+        root.id = 'pickerProductSearchRoot-' + String(Date.now()) + '-' + String(Math.floor(Math.random() * 1000));
+      }
+      resultsBox.dataset.ownerRootId = root.id;
+      if (resultsBox.parentElement !== document.body) {
+        document.body.appendChild(resultsBox);
+        resultsBox.dataset.floated = 'true';
+      }
+      positionFloatingResults(searchInput, resultsBox);
     }
 
     function filterPresentations(query) {
@@ -172,8 +222,10 @@
     }
 
     function renderProductResults(root, query) {
-      var resultsBox = root.querySelector('[data-picker-product-results]');
-      if (!resultsBox) {
+      var resultsBox = root.querySelector('[data-picker-product-results]')
+        || document.querySelector('[data-picker-product-results][data-owner-root-id="' + root.id + '"]');
+      var searchInput = root.querySelector('[data-picker-product-search]');
+      if (!resultsBox || !searchInput) {
         return;
       }
 
@@ -181,6 +233,7 @@
       if (trimmed.length < 2) {
         resultsBox.innerHTML = '<div class="list-group-item text-muted small">' + escapeHtml(minCharsMessage) + '</div>';
         resultsBox.hidden = false;
+        ensureFloatingResults(root, resultsBox, searchInput);
         return;
       }
 
@@ -188,6 +241,7 @@
       if (!matches.length) {
         resultsBox.innerHTML = '<div class="list-group-item text-muted small">' + escapeHtml(emptyMessage) + '</div>';
         resultsBox.hidden = false;
+        ensureFloatingResults(root, resultsBox, searchInput);
         return;
       }
 
@@ -201,12 +255,14 @@
           '</button>';
       }).join('');
       resultsBox.hidden = false;
+      ensureFloatingResults(root, resultsBox, searchInput);
     }
 
     function selectPresentation(root, presentationId, presentationLabel) {
       var searchInput = root.querySelector('[data-picker-product-search]');
       var hiddenInput = root.querySelector('[data-added-product-select]');
-      var resultsBox = root.querySelector('[data-picker-product-results]');
+      var resultsBox = root.querySelector('[data-picker-product-results]')
+        || document.querySelector('[data-picker-product-results][data-owner-root-id="' + root.id + '"]');
       if (!hiddenInput) {
         return;
       }
@@ -231,6 +287,12 @@
       }
 
       var debounceTimer = null;
+
+      function repositionIfOpen() {
+        if (!resultsBox.hidden) {
+          positionFloatingResults(searchInput, resultsBox);
+        }
+      }
 
       searchInput.addEventListener('input', function () {
         if (hiddenInput.value) {
@@ -258,10 +320,14 @@
       });
 
       document.addEventListener('click', function (event) {
-        if (!root.contains(event.target)) {
-          hideProductResults(resultsBox);
+        if (root.contains(event.target) || resultsBox.contains(event.target)) {
+          return;
         }
+        hideProductResults(resultsBox);
       });
+
+      window.addEventListener('resize', repositionIfOpen);
+      window.addEventListener('scroll', repositionIfOpen, true);
 
       root.dataset.searchReady = 'true';
     }

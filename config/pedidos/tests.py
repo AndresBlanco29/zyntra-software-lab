@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from config.clientes.models import Cliente
+from config.core.datetime_formats import format_local_datetime
 from config.facturacion.models import Invoice, InvoiceItem
 from config.facturacion.services import generar_invoice_desde_picking, resolve_invoice_sale_reference_date
 from config.inventario.models import StockPresentacion
@@ -823,6 +824,8 @@ class PickingVerificationFlowTests(TestCase):
 		content = response.content.decode()
 
 		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Received date')
+		self.assertContains(response, format_local_datetime(self.pedido.creada_en))
 		self.assertLess(content.index('Alpha Product'), content.index('Producto test'))
 		self.assertLess(content.index('Producto test'), content.index('Zulu Product'))
 

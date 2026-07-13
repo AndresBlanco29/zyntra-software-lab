@@ -60,6 +60,7 @@
       <p class="mb-1"><strong>{% trans "Customer" %}:</strong> {{ pedido.cliente.nombre_empresa }}</p>
       <p class="mb-1"><strong>{% trans "Contact" %}:</strong> {{ pedido.cliente.usuario.get_full_name }}</p>
       <p class="mb-1"><strong>{% trans "Selector" %}:</strong> {% if pedido.seleccionador %}{% firstof pedido.seleccionador.get_full_name pedido.seleccionador.username %}{% else %}-{% endif %}</p>
+      <p class="mb-1"><strong>{% trans "Received date" %}:</strong> {{ pedido.creada_en|date:"m/d/Y H:i" }}</p>
       <p class="mb-1"><strong>{% trans "Status" %}:</strong> {{ pedido_estado_label }}</p>
       <p class="mb-0"><strong>{% trans "Customer note" %}:</strong> {{ pedido.nota_cliente|default:'-' }}</p>
     </div>

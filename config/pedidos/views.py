@@ -13,6 +13,7 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 import logging
 
+from config.core.datetime_formats import format_local_datetime
 from config.core.product_ordering import order_pedido_items_for_display
 from config.core.shipment_summary import build_shipment_summary_from_pedido_items
 from config.core.pdf_branding import (
@@ -1152,6 +1153,7 @@ def backoffice_picking_pdf(request, pedido_id):
 		Table([
 			[Paragraph(_("Customer"), summary_label_style), Paragraph(pedido.cliente.nombre_empresa, summary_value_style)],
 			[Paragraph(_("Contact"), summary_label_style), Paragraph(pedido.cliente.usuario.get_full_name() or pedido.cliente.usuario.username, summary_value_style)],
+			[Paragraph(_("Received date"), summary_label_style), Paragraph(format_local_datetime(pedido.creada_en) or '-', summary_value_style)],
 			[Paragraph(_("Status"), summary_label_style), Paragraph(_pedido_state_label(pedido.estado), summary_value_style)],
 			[Paragraph(_("Customer note"), summary_label_style), Paragraph(pedido.nota_cliente or '-', summary_value_style)],
 		], colWidths=[120, 384]),

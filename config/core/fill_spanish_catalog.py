@@ -24,6 +24,7 @@ MANUAL_EN_TO_ES = {
     'Selector': 'Seleccionador',
     'Origin': 'Origen',
     'Warehouse check': 'Verificación en bodega',
+    'Received date': 'Fecha de recibo',
     'Picking Ticket': 'Ticket de picking',
     'Export PDF': 'Exportar PDF',
     'Generate Picking Ticket': 'Generar ticket de picking',

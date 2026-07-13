@@ -71,7 +71,13 @@ overflow-x: hidden;
     color: white;
     font-weight: 500;
     margin-left: 25px;
-    margin-top: -20px;
+    margin-top: 0;
+}
+
+@media (min-width: 992px) {
+    .navbar-home .nav-link {
+        margin-top: -20px;
+    }
 }
 
 .navbar-home .nav-link:hover {
@@ -177,7 +183,7 @@ overflow-x: hidden;
 
     .navbar-home .navbar-nav {
         flex-direction: column !important;
-        gap: 0 !important;
+        gap: 10px !important;
     }
 
     .navbar-home .nav-link {
@@ -186,21 +192,22 @@ overflow-x: hidden;
         font-size: 0.95rem !important;
         color: white !important;
         border: none !important;
-        background: transparent !important;
+        background: rgba(255, 255, 255, 0.06) !important;
+        border-radius: 10px !important;
         text-align: left;
         pointer-events: auto !important;
         cursor: pointer !important;
     }
 
     .navbar-home .nav-link:hover {
-        background: rgba(255, 255, 255, 0.1) !important;
+        background: rgba(255, 255, 255, 0.12) !important;
     }
 
     .navbar-home .login-btn {
         background: linear-gradient(to right, #ffe600, #c7c700) !important;
         color: #1e293b !important;
-        border-radius: 6px !important;
-        margin: 8px 12px !important;
+        border-radius: 10px !important;
+        margin: 0 !important;
         padding: 10px 12px !important;
         font-weight: 600 !important;
         pointer-events: auto !important;
@@ -3476,34 +3483,44 @@ background:rgba(255,255,255,.25);
 
     .navbar-home .navbar-nav {
         width: 100%;
-        flex-direction: column !important;
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px !important;
         align-items: stretch;
-        gap: 2px;
     }
 
     .navbar-home .nav-item {
         width: 100%;
+        margin: 0;
     }
 
     .navbar-home .nav-link {
-        display: block;
+        display: flex;
+        align-items: center;
         width: 100%;
+        min-height: 44px;
         margin: 0 !important;
         padding: 11px 12px !important;
         font-size: 0.98rem !important;
         line-height: 1.2;
         text-align: left;
         border-radius: 10px;
+        background: rgba(255, 255, 255, 0.06);
     }
 
     .navbar-home .nav-link:hover {
         background: rgba(255, 255, 255, 0.12) !important;
     }
 
+    .navbar-home .nav-item:last-child {
+        grid-column: 1 / -1;
+    }
+
     .navbar-home .login-btn {
         width: 100%;
-        margin: 6px 0 0 0 !important;
-        text-align: left;
+        margin: 0 !important;
+        justify-content: center;
+        text-align: center;
     }
 
     .navbar-divider {
@@ -3786,7 +3803,7 @@ background:rgba(255,255,255,.25);
     .navbar-home .navbar-nav {
         display: grid !important;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 6px;
+        gap: 10px;
         width: 100%;
         align-items: stretch;
     }
@@ -4385,5 +4402,98 @@ background:rgba(255,255,255,.25);
 
     #ofertas #carouselOfertas .carousel-control-next {
         right: 2px !important;
+    }
+}
+
+/* Final: hamburger menu always shows separated buttons (2-column grid) like landscape phones */
+@media (max-width: 991.98px) {
+    .navbar-home .collapse.navbar-collapse {
+        flex-basis: 100%;
+        width: 100%;
+        margin-top: 10px;
+    }
+
+    .navbar-home .navbar-collapse.show {
+        display: block !important;
+        background: rgba(3, 49, 107, 0.94);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 16px;
+        padding: 12px;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.22);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        max-height: min(70vh, 520px);
+        overflow-y: auto;
+    }
+
+    .navbar-home .navbar-nav {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px !important;
+        width: 100%;
+        align-items: stretch;
+        margin: 0;
+        padding: 0;
+    }
+
+    .navbar-home .nav-item {
+        width: 100%;
+        margin: 0 !important;
+        padding: 0 !important;
+        list-style: none;
+    }
+
+    .navbar-home .nav-link {
+        display: flex !important;
+        align-items: center;
+        justify-content: flex-start;
+        width: 100% !important;
+        min-height: 44px;
+        margin: 0 !important;
+        padding: 11px 12px !important;
+        font-size: 0.95rem !important;
+        line-height: 1.2;
+        color: #fff !important;
+        text-align: left;
+        border: none !important;
+        border-radius: 10px !important;
+        background: rgba(255, 255, 255, 0.07) !important;
+        box-shadow: none;
+    }
+
+    .navbar-home .nav-link:hover,
+    .navbar-home .nav-link:focus {
+        background: rgba(255, 255, 255, 0.14) !important;
+        color: #ffd400 !important;
+    }
+
+    .navbar-home .nav-item:last-child {
+        grid-column: 1 / -1;
+    }
+
+    .navbar-home .login-btn {
+        width: 100% !important;
+        justify-content: center !important;
+        text-align: center !important;
+        margin: 0 !important;
+        background: linear-gradient(to right, #ffe600, #c7c700) !important;
+        color: #1e293b !important;
+        font-weight: 700 !important;
+        border: none !important;
+    }
+
+    .navbar-home .login-btn:hover,
+    .navbar-home .login-btn:focus {
+        color: #1e293b !important;
+        background: linear-gradient(to right, #ffc700, #b3a600) !important;
+    }
+
+    .language-widget {
+        left: 16px !important;
+        bottom: 16px !important;
+    }
+
+    .hero-home {
+        padding-bottom: 72px;
     }
 }

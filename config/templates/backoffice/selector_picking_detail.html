@@ -39,7 +39,7 @@
   </div>
 </div>
 
-<form method="post" class="card shadow-sm" id="pickerVerificationForm" data-initial-shortage="{% if form_has_stock_shortage %}true{% else %}false{% endif %}">
+<form method="post" class="card shadow-sm" id="pickerVerificationForm" data-initial-shortage="{% if form_has_stock_shortage %}true{% else %}false{% endif %}" data-require-full-line-review="{% if picker_requires_full_line_review %}1{% else %}0{% endif %}">
   {% csrf_token %}
   <div class="card-body">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
@@ -59,7 +59,7 @@
         </thead>
         <tbody id="pickerItemsTableBody">
           {% for item in item_rows %}
-          <tr data-picker-order-line>
+          <tr data-picker-order-line data-baseline-quantity="{{ item.baseline_quantity }}" data-baseline-presentation="{{ item.baseline_presentation_id }}">
             <td data-label="{% trans 'Product' %}">
               {{ item.product }}
               <div class="small mt-1 picker-stock-label {% if item.stock_physical <= 0 %}text-danger fw-semibold{% else %}text-success fw-semibold{% endif %}" data-picker-stock-label>
@@ -139,7 +139,11 @@
 
     {% product_shipment_summary source='pedido' value=pedido quantity='cantidad_solicitada' %}
 
+    {% if picker_requires_full_line_review %}
     <div class="form-text mt-2">{% trans "Check each line in the Reviewed column to confirm you verified every product before saving." %}</div>
+    {% else %}
+    <div class="form-text mt-2">{% trans "When editing a saved ticket, check Reviewed only for the lines you change or add." %}</div>
+    {% endif %}
     <div class="form-text">{% trans "Products added here will be marked in red for BackOffice review." %}</div>
 
     <div class="row g-3 mt-1">
@@ -237,7 +241,7 @@
 
 <script>
   window.LTG_PICKER_PRODUCT_SEARCH = {
-    reviewValidationMessage: "{% trans 'Check every product line in the Reviewed column before saving.'|escapejs %}",
+    reviewValidationMessage: "{% if picker_requires_full_line_review %}{% trans 'Check every product line in the Reviewed column before saving.'|escapejs %}{% else %}{% trans 'Check Reviewed only for each line you changed or added before saving.'|escapejs %}{% endif %}",
     stockAvailableLabelPrefix: "{% trans 'Available stock:'|escapejs %}",
     searchPlaceholder: "{% trans 'Search products by full name...'|escapejs %}",
     searchLabel: "{% trans 'Search product'|escapejs %}",

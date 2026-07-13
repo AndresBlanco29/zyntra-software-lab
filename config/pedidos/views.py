@@ -129,19 +129,42 @@ def _parse_non_negative_quantity(value, default=0):
 	return max(quantity, 0)
 
 
-def _validate_selector_line_reviews(request, *, pedido, posted_new_presentations):
+def _validate_selector_line_reviews(
+	request,
+	*,
+	pedido,
+	posted_new_presentations,
+	cantidades_reales,
+	presentacion_updates,
+):
+	requires_full_review = not pedido.picking_verificado_en
+	full_review_message = _(
+		'Check every product line in the Reviewed column to confirm you verified the full picking list before saving.'
+	)
+	changed_review_message = _(
+		'Check Reviewed only for each line you changed or added before saving.'
+	)
+	baseline_quantities = _saved_selector_picking_quantities(pedido)
+
 	for item in pedido.items.all():
-		if request.POST.get(f'linea_revisada_{item.id}') != 'on':
-			raise ValidationError(
-				_('Check every product line in the Reviewed column to confirm you verified the full picking list before saving.')
+		if requires_full_review:
+			needs_review = True
+		else:
+			baseline_qty = baseline_quantities.get(
+				item.id,
+				int(item.cantidad_inventario_aplicada or item.cantidad or 0),
 			)
+			posted_qty = int(cantidades_reales.get(item.id, baseline_qty))
+			posted_presentation = int(presentacion_updates.get(item.id, item.presentacion_id))
+			needs_review = posted_qty != baseline_qty or posted_presentation != int(item.presentacion_id)
+
+		if needs_review and request.POST.get(f'linea_revisada_{item.id}') != 'on':
+			raise ValidationError(full_review_message if requires_full_review else changed_review_message)
 
 	additional_rows_with_product = sum(1 for presentacion_id in posted_new_presentations if (presentacion_id or '').strip())
 	reviewed_additional_rows = len(request.POST.getlist('linea_revisada_adicional[]'))
 	if reviewed_additional_rows < additional_rows_with_product:
-		raise ValidationError(
-			_('Check every product line in the Reviewed column to confirm you verified the full picking list before saving.')
-		)
+		raise ValidationError(full_review_message if requires_full_review else changed_review_message)
 
 
 def _quantize_money(value):
@@ -273,6 +296,7 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 			'product': item.presentacion.producto.nombre,
 			'presentation': item.presentacion.nombre_empaque_cliente,
 			'presentation_id': selected_presentation_id,
+			'baseline_presentation_id': item.presentacion_id,
 			'presentation_options': [
 				{
 					'id': presentation.id,
@@ -283,6 +307,9 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 			],
 			'requested_quantity': item.cantidad_solicitada_documentada,
 			'actual_quantity': actual_quantity,
+			'baseline_quantity': (
+				int(item.cantidad_inventario_aplicada or item.cantidad or 0) if picking_verified else 0
+			),
 			'stock_physical': selected_stock,
 			'applied_quantity': int(item.cantidad_inventario_aplicada or 0),
 		})
@@ -1319,7 +1346,13 @@ def selector_picking_detail(request, pedido_id):
 		form_note_resolved = nota_resuelta
 
 		try:
-			_validate_selector_line_reviews(request, pedido=pedido, posted_new_presentations=posted_new_presentations)
+			_validate_selector_line_reviews(
+				request,
+				pedido=pedido,
+				posted_new_presentations=posted_new_presentations,
+				cantidades_reales=cantidades_reales,
+				presentacion_updates=posted_presentations,
+			)
 			guardar_verificacion_picking(
 				pedido=pedido,
 				seleccionador=request.user,
@@ -1343,6 +1376,7 @@ def selector_picking_detail(request, pedido_id):
 		'pedido_estado_label': _pedido_state_label(pedido.estado),
 		'pedido_lock_preview': form_has_stock_shortage or pedido.picking_bloqueado,
 		'item_rows': _build_selector_item_rows(pedido, posted_quantities, posted_presentations),
+		'picker_requires_full_line_review': not bool(pedido.picking_verificado_en),
 		'form_note': form_note,
 		'form_note_resolved': form_note_resolved,
 		'form_has_stock_shortage': form_has_stock_shortage,

@@ -105,8 +105,30 @@
       applyStockLabelStyles(stockLabel, stockPhysical);
     }
 
+    function orderLineNeedsReview(row) {
+      if (form.dataset.requireFullLineReview === '1') {
+        return true;
+      }
+      var pickInput = row.querySelector('.quantity-stepper__input');
+      var select = row.querySelector('[data-picker-presentation-select]');
+      var baselineQty = Number(row.dataset.baselineQuantity || 0);
+      var baselinePres = String(row.dataset.baselinePresentation || '');
+      var currentQty = Number(pickInput ? pickInput.value : 0) || 0;
+      var currentPres = String(select ? select.value : '');
+      return currentQty !== baselineQty || currentPres !== baselinePres;
+    }
+
     function getRequiredReviewCheckboxes() {
-      var checkboxes = Array.from(document.querySelectorAll('[data-picker-order-line] .picker-line-reviewed'));
+      var checkboxes = [];
+      document.querySelectorAll('[data-picker-order-line]').forEach(function (row) {
+        if (!orderLineNeedsReview(row)) {
+          return;
+        }
+        var reviewCheckbox = row.querySelector('.picker-line-reviewed');
+        if (reviewCheckbox) {
+          checkboxes.push(reviewCheckbox);
+        }
+      });
       document.querySelectorAll('[data-added-product-row]').forEach(function (row) {
         var select = row.querySelector('[data-added-product-select]');
         var reviewCheckbox = row.querySelector('.picker-line-reviewed');
@@ -118,6 +140,9 @@
     }
 
     function syncReviewRowHighlights() {
+      document.querySelectorAll('[data-picker-order-line], [data-added-product-row]').forEach(function (row) {
+        row.classList.remove('table-warning');
+      });
       getRequiredReviewCheckboxes().forEach(function (checkbox) {
         var row = checkbox.closest('tr');
         if (!row) {
@@ -469,6 +494,7 @@
 
       form.dataset.hasShortage = hasShortage ? 'true' : 'false';
       updateDispatchSummary();
+      syncReviewRowHighlights();
     }
 
     document.querySelectorAll('[data-quantity-stepper]').forEach(function (stepper) {
@@ -492,6 +518,7 @@
         presentationSelect.addEventListener('change', function () {
           syncOrderLinePresentationStock(row);
           updateFormState();
+          syncReviewRowHighlights();
         });
       }
     });

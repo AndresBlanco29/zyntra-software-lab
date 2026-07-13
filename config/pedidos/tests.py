@@ -734,6 +734,64 @@ class PickingVerificationFlowTests(TestCase):
 		self.pedido.refresh_from_db()
 		self.assertNotEqual(self.pedido.estado, 'VERIFICADO_AJUSTADO')
 
+	def test_selector_reedit_only_requires_review_for_changed_lines(self):
+		second_item = PedidoItem.objects.create(
+			pedido=self.pedido,
+			presentacion=self.presentacion_extra,
+			cantidad_solicitada=1,
+			cantidad_reservada_inventario=1,
+			cantidad=1,
+			precio=Decimal('6.00'),
+			subtotal=Decimal('6.00'),
+		)
+		extra_stock = StockPresentacion.objects.get(presentacion=self.presentacion_extra)
+		extra_stock.stock_reservado += 1
+		extra_stock.stock_disponible = extra_stock.stock_fisico - extra_stock.stock_reservado
+		extra_stock.save(update_fields=['stock_reservado', 'stock_disponible', 'actualizado_en'])
+		self.pedido.total = Decimal('30.00')
+		self.pedido.save(update_fields=['total'])
+
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 2, second_item.id: 1},
+			nota='Primera verifica',
+			nota_resuelta=True,
+		)
+		self.client.force_login(self.selector)
+
+		missing_changed_review = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			f'presentacion_{self.item.id}': str(self.presentacion.id),
+			f'cantidad_real_{self.item.id}': '1',
+			f'presentacion_{second_item.id}': str(self.presentacion_extra.id),
+			f'cantidad_real_{second_item.id}': '1',
+			'nota_seleccionador': 'Ajuste un item',
+			'nota_seleccionador_resuelta': 'on',
+		})
+		self.assertEqual(missing_changed_review.status_code, 200)
+		self.assertContains(
+			missing_changed_review,
+			'Check Reviewed only for each line you changed or added before saving.',
+			html=False,
+		)
+
+		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			f'presentacion_{self.item.id}': str(self.presentacion.id),
+			f'cantidad_real_{self.item.id}': '1',
+			f'presentacion_{second_item.id}': str(self.presentacion_extra.id),
+			f'cantidad_real_{second_item.id}': '1',
+			'nota_seleccionador': 'Ajuste un item',
+			'nota_seleccionador_resuelta': 'on',
+			f'linea_revisada_{self.item.id}': 'on',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.item.refresh_from_db()
+		second_item.refresh_from_db()
+		self.assertEqual(self.item.cantidad, 1)
+		self.assertEqual(second_item.cantidad, 1)
+
 	def test_selector_detail_disables_picker_approval_when_physical_stock_is_insufficient(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		self.client.force_login(self.selector)

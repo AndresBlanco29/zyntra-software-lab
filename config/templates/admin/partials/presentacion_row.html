@@ -76,6 +76,15 @@
 {% endif %}
 <small class="text-muted">{% trans "Used on invoices for Total WGT." %}</small>
 </div>
+<div class="col-md-3 mb-3">
+<label class="form-label">QB-PRICE</label>
+{% if presentacion %}
+<input type="number" step="0.01" class="form-control" value="{% if presentacion.qb_price is not None %}{{ presentacion.qb_price|stringformat:'f' }}{% endif %}" readonly>
+{% else %}
+<input type="number" step="0.01" class="form-control" value="" readonly placeholder="-">
+{% endif %}
+<small class="text-muted">{% trans "Sales Price from QuickBooks." %}</small>
+</div>
 </div>
 
 <div class="row">

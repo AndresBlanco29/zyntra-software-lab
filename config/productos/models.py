@@ -231,6 +231,15 @@ class Presentacion(models.Model):
 
     costo = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
 
+    qb_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        verbose_name=_('QB-PRICE'),
+        help_text=_('Sales price imported from QuickBooks (Sales Price / UnitPrice).'),
+    )
+
     peso_por_caja = models.DecimalField(
         max_digits=10,
         decimal_places=3,

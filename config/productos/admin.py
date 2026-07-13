@@ -6,7 +6,8 @@ from .models import Producto, Presentacion, Categoria, Marca, ConfiguracionPreci
 class PresentacionInline(admin.TabularInline):
     model = Presentacion
     extra = 1
-    fields = ('nombre', 'unidades', 'tipo_contenido', 'costo', 'peso_por_caja', 'precio_1')
+    fields = ('nombre', 'unidades', 'tipo_contenido', 'costo', 'qb_price', 'peso_por_caja', 'precio_1')
+    readonly_fields = ('qb_price',)
 
 
 @admin.register(Producto)

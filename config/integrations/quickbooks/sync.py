@@ -1759,6 +1759,18 @@ def _extract_quickbooks_item_cost(payload):
     return None
 
 
+def _extract_quickbooks_item_sales_price(payload):
+    """Return QuickBooks Sales Price (API field UnitPrice) when present."""
+    for key in ('UnitPrice', 'SalesPrice', 'SalesPriceValue'):
+        if key not in (payload or {}):
+            continue
+        raw_price = payload.get(key)
+        if raw_price in (None, ''):
+            continue
+        return _quantize_money(raw_price)
+    return None
+
+
 def _fetch_quickbooks_item_payload(*, item_id, client=None):
     client = client or QuickBooksAPIClient()
     item_id = str(item_id or '').strip()
@@ -1910,7 +1922,16 @@ def _sync_stock_from_quickbooks_item(presentacion, payload):
     return True
 
 
-def _update_presentacion_from_quickbooks(presentacion, *, quickbooks_id, item_cost, presentation_name=None, tipo_contenido=None, unidades=None):
+def _update_presentacion_from_quickbooks(
+    presentacion,
+    *,
+    quickbooks_id,
+    item_cost,
+    sales_price=None,
+    presentation_name=None,
+    tipo_contenido=None,
+    unidades=None,
+):
     presentacion.quickbooks_id = quickbooks_id
     presentacion.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
     presentacion.last_synced_at = timezone.now()
@@ -1918,6 +1939,9 @@ def _update_presentacion_from_quickbooks(presentacion, *, quickbooks_id, item_co
     if item_cost is not None:
         presentacion.costo = item_cost
         update_fields.append('costo')
+    if sales_price is not None:
+        presentacion.qb_price = sales_price
+        update_fields.append('qb_price')
     if presentation_name is not None:
         presentacion.nombre = presentation_name
         update_fields.append('nombre')
@@ -1954,6 +1978,7 @@ def _apply_quickbooks_item_to_local_record(
     description = _truncate(payload.get('Description') or payload.get('FullyQualifiedName') or '', limit=4000)
     sku = _truncate(payload.get('Sku') or '', limit=100)
     item_cost = _extract_quickbooks_item_cost(payload)
+    sales_price = _extract_quickbooks_item_sales_price(payload)
     category, brand = _resolve_quickbooks_item_category_and_brand(payload, lookup_cache=lookup_cache)
     producto = presentacion.producto
     image_saved = _save_quickbooks_item_image(producto=producto, payload=payload, client=client, skip=skip_images)
@@ -2001,6 +2026,7 @@ def _apply_quickbooks_item_to_local_record(
         presentacion,
         quickbooks_id=quickbooks_id,
         item_cost=item_cost,
+        sales_price=sales_price,
         presentation_name=presentation_name,
         tipo_contenido=tipo_contenido,
         unidades=unidades,
@@ -2055,7 +2081,7 @@ def import_quickbooks_item_record(
     product_name, presentation_name, tipo_contenido, unidades = _parse_quickbooks_presentation(payload)
     description = _truncate(payload.get('Description') or payload.get('FullyQualifiedName') or '', limit=4000)
     sku = _truncate(payload.get('Sku') or '', limit=100)
-    unit_price = _quantize_money(payload.get('UnitPrice') or 0)
+    unit_price = _extract_quickbooks_item_sales_price(payload)
     item_cost = _extract_quickbooks_item_cost(payload)
     category, brand = _resolve_quickbooks_item_category_and_brand(payload, lookup_cache=lookup_cache)
     existing = _find_local_presentacion_for_quickbooks_item(
@@ -2136,6 +2162,7 @@ def import_quickbooks_item_record(
                 sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
                 last_synced_at=timezone.now(),
                 costo=item_cost,
+                qb_price=unit_price,
             )
             try:
                 _sync_stock_from_quickbooks_item(presentacion, payload)
@@ -2179,6 +2206,7 @@ def import_quickbooks_item_record(
                     sync_status=QUICKBOOKS_SYNC_STATUS_SYNCED,
                     last_synced_at=timezone.now(),
                     costo=item_cost,
+                    qb_price=unit_price,
                 )
                 try:
                     _sync_stock_from_quickbooks_item(presentacion, payload)

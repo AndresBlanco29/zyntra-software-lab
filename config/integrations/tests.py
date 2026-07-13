@@ -2448,6 +2448,7 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
         self.assertEqual(presentacion.producto.marca.nombre, 'La Mexicana')
         self.assertEqual(presentacion.precio_1, Decimal('4.72'))
         self.assertEqual(presentacion.costo, Decimal('4.25'))
+        self.assertEqual(presentacion.qb_price, Decimal('7.50'))
         self.assertEqual(presentacion.sync_status, 'SYNCED')
         self.assertTrue(bool(presentacion.producto.imagen.name))
         self.assertTrue(default_storage.exists(presentacion.producto.imagen.name))

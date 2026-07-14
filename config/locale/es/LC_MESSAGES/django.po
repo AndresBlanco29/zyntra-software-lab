@@ -14084,3 +14084,66 @@ msgstr "Comentario del pedido resuelto para el pedido #%(id)s"
 
 msgid "BackOffice action required: review the order comment and resolve it before continuing."
 msgstr "Acción de BackOffice requerida: revisa el comentario del pedido y resuélvelo antes de continuar."
+
+msgid "Create Quote"
+msgstr "Crear cotización"
+
+msgid "Build a quotation with prices and discounts, then send it to the customer."
+msgstr "Arma una cotización con precios y descuentos, y luego envíala al cliente."
+
+msgid "New quotation"
+msgstr "Nueva cotización"
+
+msgid "Create quotation"
+msgstr "Crear cotización"
+
+msgid "Quote summary"
+msgstr "Resumen de cotización"
+
+msgid "Start with the right customer and build a quotation with prices and discounts."
+msgstr "Empieza con el cliente correcto y arma una cotización con precios y descuentos."
+
+msgid "Choose the customer before building the quotation."
+msgstr "Elige al cliente antes de armar la cotización."
+
+msgid "Select one customer to open the catalog and prepare the quotation with the correct prices."
+msgstr "Selecciona un cliente para abrir el catálogo y preparar la cotización con los precios correctos."
+
+msgid "The quotation could not be created."
+msgstr "No se pudo crear la cotización."
+
+msgid "The product could not be removed from the quotation."
+msgstr "No se pudo quitar el producto de la cotización."
+
+msgid "Quote #{id} created successfully"
+msgstr "Cotización #{id} creada correctamente"
+
+msgid "This comment is auto-saved with your draft. You can go back to add more products and it will still be here when you create the quotation."
+msgstr "Este comentario se guarda automáticamente con tu borrador. Puedes volver a agregar productos y seguirá aquí cuando crees la cotización."
+
+msgid "Your products are auto-saved as a draft for this customer. Reloading the page will not lose them. The quotation is only created when you click Create quotation."
+msgstr "Tus productos se guardan automáticamente como borrador para este cliente. Recargar la página no los pierde. La cotización solo se crea cuando haces clic en Crear cotización."
+
+msgid "You must add at least one item to create the quotation."
+msgstr "Debes agregar al menos un producto para crear la cotización."
+
+msgid "There are no selected products or customer to create the quotation."
+msgstr "No hay productos ni cliente seleccionados para crear la cotización."
+
+msgid "Open Create Quote before submitting a quotation."
+msgstr "Abre Crear cotización antes de enviar una cotización."
+
+msgid "This draft is a quotation. Use Create quotation instead of Send Order."
+msgstr "Este borrador es una cotización. Usa Crear cotización en lugar de Enviar pedido."
+
+msgid "Quote taking"
+msgstr "Toma de cotizaciones"
+
+msgid "View the create-quote flow and quote drafts for assigned customers."
+msgstr "Ver el flujo de creación de cotizaciones y los borradores de clientes asignados."
+
+msgid "Manage quote taking"
+msgstr "Gestionar toma de cotizaciones"
+
+msgid "Build quotations, set prices and discounts, and send them to customers."
+msgstr "Crear cotizaciones, definir precios y descuentos, y enviarlas a los clientes."

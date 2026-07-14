@@ -133,6 +133,16 @@ PERMISSION_SECTIONS = (
                 'description': _('Build and submit orders on behalf of customers.'),
             },
             {
+                'code': 'vendor.quotes.view',
+                'label': _('Quote taking'),
+                'description': _('View the create-quote flow and quote drafts for assigned customers.'),
+            },
+            {
+                'code': 'vendor.quotes.manage',
+                'label': _('Manage quote taking'),
+                'description': _('Build quotations, set prices and discounts, and send them to customers.'),
+            },
+            {
                 'code': 'vendor.notes.view',
                 'label': _('Credit memos and returns'),
                 'description': _('View credit memos and returns created for assigned customers.'),
@@ -203,6 +213,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         'vendor.customers.manage',
         'vendor.orders.view',
         'vendor.orders.manage',
+        'vendor.quotes.view',
+        'vendor.quotes.manage',
         'vendor.notes.view',
         'vendor.notes.manage',
     },

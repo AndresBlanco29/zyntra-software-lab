@@ -154,6 +154,120 @@ class VendedorPedidoTests(TestCase):
 		self.assertEqual(item.cantidad_reservada_inventario, 0)
 		self.assertEqual(item.cantidad_inventario_aplicada, 0)
 
+	def test_vendor_can_create_quotation_from_take_quote_flow(self):
+		from config.cotizaciones.models import Cotizacion
+
+		self.client.force_login(self.vendor)
+		self.client.get(reverse('tomar_cotizacion'))
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session['pedido'] = {
+			'1': {
+				'presentacion_id': str(self.presentacion.id),
+				'producto_id': self.presentacion.producto_id,
+				'nombre': self.presentacion.producto.nombre,
+				'presentacion_nombre': self.presentacion.nombre,
+				'precio': 233.0,
+				'cantidad': 2,
+				'descuento_aplicado': True,
+				'descuento_monto': 10.0,
+			}
+		}
+		session.save()
+
+		response = self.client.post(
+			reverse('crear_cotizacion_desde_toma'),
+			{'nota': 'Quote for weekend'},
+		)
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(payload['success'])
+		cotizacion = Cotizacion.objects.get(id=payload['cotizacion_id'])
+		self.assertEqual(cotizacion.estado, 'BORRADOR')
+		self.assertTrue(cotizacion.backoffice_pricing_confirmed)
+		self.assertEqual(cotizacion.vendedor_id, self.vendor.id)
+		self.assertEqual(cotizacion.nota_cliente, 'Quote for weekend')
+		item = cotizacion.items.get()
+		self.assertEqual(item.cantidad, 2)
+		self.assertTrue(item.descuento_aplicado)
+		self.assertIn(str(cotizacion.id), payload['redirect_url'])
+		self.assertIn('saved=1', payload['redirect_url'])
+
+		detail = self.client.get(payload['redirect_url'])
+		self.assertEqual(detail.status_code, 200)
+		self.assertTrue(detail.context['can_send_customer_quote'])
+		self.assertFalse(detail.context['can_generate_backoffice_order'])
+
+	def test_backoffice_can_create_quotation_from_take_quote_flow(self):
+		from config.cotizaciones.models import Cotizacion
+
+		self.client.force_login(self.backoffice)
+		self.client.get(reverse('tomar_cotizacion'))
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session['pedido'] = {
+			'1': {
+				'presentacion_id': str(self.presentacion.id),
+				'producto_id': self.presentacion.producto_id,
+				'nombre': self.presentacion.producto.nombre,
+				'presentacion_nombre': self.presentacion.nombre,
+				'precio': 200.0,
+				'cantidad': 1,
+			}
+		}
+		session.save()
+
+		response = self.client.post(reverse('crear_cotizacion_desde_toma'))
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		cotizacion = Cotizacion.objects.get(id=payload['cotizacion_id'])
+		self.assertIsNone(cotizacion.vendedor_id)
+		detail = self.client.get(payload['redirect_url'])
+		self.assertEqual(detail.status_code, 200)
+		self.assertTrue(detail.context['can_generate_backoffice_order'])
+
+	def test_vendor_cannot_view_unassigned_customer_quote(self):
+		from config.cotizaciones.models import Cotizacion
+		from config.cotizaciones.services import crear_cotizacion_desde_items
+
+		other_vendor = Usuario.objects.create_user(
+			username='vendor-other-quote',
+			password='secret123',
+			role='vendedor',
+		)
+		other_user = Usuario.objects.create_user(
+			username='customer-other-quote',
+			password='secret123',
+			role='cliente',
+		)
+		other_customer = Cliente.objects.create(
+			usuario=other_user,
+			nombre_empresa='Other Quote Customer',
+			telefono='5559998888',
+			direccion='9 Other St',
+			ciudad='Atlanta',
+			estado='GA',
+			codigo_postal='30301',
+			pais='USA',
+			sales_tax_number='TX-OTHER-QUOTE',
+			certificado_tax='certificados/test.pdf',
+			aprobado=True,
+			vendedor_asignado=other_vendor,
+		)
+		ClienteVendedorAsignacion.objects.create(cliente=other_customer, vendedor=other_vendor)
+		cotizacion = crear_cotizacion_desde_items(
+			cliente=other_customer,
+			creado_por=other_vendor,
+			items_payload=[
+				{'presentacion': self.presentacion, 'cantidad': 1, 'precio': Decimal('10.00')},
+			],
+		)
+
+		self.client.force_login(self.vendor)
+		response = self.client.get(reverse('backoffice_cotizacion_detalle', args=[cotizacion.id]))
+		self.assertEqual(response.status_code, 302)
+		self.assertEqual(Cotizacion.objects.filter(id=cotizacion.id).count(), 1)
+
 	def test_enviar_pedido_saves_order_comment(self):
 		self.client.force_login(self.vendor)
 		session = self.client.session
@@ -1254,6 +1368,7 @@ class VendorHomeAndNotesTests(TestCase):
 		response = self.client.get(reverse('vendedor_home'))
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, 'Take Order')
+		self.assertContains(response, 'Create Quote')
 		self.assertContains(response, 'Customers')
 		self.assertContains(response, 'Create Customer')
 		self.assertContains(response, 'Credit Memo')

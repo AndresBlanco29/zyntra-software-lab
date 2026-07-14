@@ -349,9 +349,10 @@ document.querySelector(".btn-yellow").addEventListener("click",function(e){
 
 e.preventDefault()
 
+const isQuoteFlow = String(document.body.dataset.isQuoteFlow || '') === '1'
 let tipoOrden = document.querySelector('input[name="tipo_orden"]:checked')
 
-if(!tipoOrden){
+if(!isQuoteFlow && !tipoOrden){
 
 showFeedback(orderTypeMessage)
 return
@@ -361,6 +362,10 @@ return
 hideFeedback()
 
 const nota = notaField ? String(notaField.value || '').trim() : ''
+const bodyParts = [`nota=${encodeURIComponent(nota)}`]
+if (!isQuoteFlow && tipoOrden) {
+    bodyParts.unshift(`tipo_orden=${encodeURIComponent(tipoOrden.value)}`)
+}
 
 fetch(enviarURL,{
 
@@ -371,7 +376,7 @@ headers:{
 "Content-Type":"application/x-www-form-urlencoded"
 },
 
-body:`tipo_orden=${encodeURIComponent(tipoOrden.value)}&nota=${encodeURIComponent(nota)}`
+body: bodyParts.join('&')
 
 })
 .then(async res => {
@@ -390,10 +395,12 @@ console.log(data)
 hideFeedback()
 
 const toast = document.getElementById("toastPedido")
-const pedidoId = data.pedido_id
-if (toast && pedidoId) {
-    const template = document.body.dataset.msgOrderSent || 'Order #{id} sent successfully'
-    toast.textContent = template.replace('{id}', String(pedidoId)) + ' ✔'
+const entityId = data.cotizacion_id || data.pedido_id
+if (toast && entityId) {
+    const template = document.body.dataset.msgOrderSent || (
+        isQuoteFlow ? 'Quote #{id} created successfully' : 'Order #{id} sent successfully'
+    )
+    toast.textContent = template.replace('{id}', String(entityId)) + ' ✔'
 }
 
 if (toast) {

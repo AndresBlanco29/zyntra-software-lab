@@ -11,7 +11,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf-token" content="{{ csrf_token }}">
 
-<title>{% trans "Order summary" %}</title>
+<title>{% if is_quote_flow %}{% trans "Quote summary" %}{% else %}{% trans "Order summary" %}{% endif %}</title>
 
 <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
 <link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
@@ -51,14 +51,15 @@
 
 <body data-actualizar-url="{% url 'actualizar_cantidad_pedido' %}"
 data-eliminar-url="{% url 'eliminar_producto_pedido' %}"
-data-enviar-url="{% url 'enviar_pedido' %}"
+data-enviar-url="{% if is_quote_flow %}{% url 'crear_cotizacion_desde_toma' %}{% else %}{% url 'enviar_pedido' %}{% endif %}"
 data-guardar-nota-url="{% url 'guardar_nota_pedido' %}"
 data-csrf="{{ csrf_token }}"
+data-is-quote-flow="{% if is_quote_flow %}1{% else %}0{% endif %}"
 data-msg-order-type="{% trans 'You must indicate how the order was taken.' %}"
-data-msg-submit-error="{% trans 'The order could not be created.' %}"
-data-msg-remove-error="{% trans 'The product could not be removed from the order.' %}"
+data-msg-submit-error="{% if is_quote_flow %}{% trans 'The quotation could not be created.' %}{% else %}{% trans 'The order could not be created.' %}{% endif %}"
+data-msg-remove-error="{% if is_quote_flow %}{% trans 'The product could not be removed from the quotation.' %}{% else %}{% trans 'The product could not be removed from the order.' %}{% endif %}"
 data-msg-request-error="{% trans 'An error occurred while processing the request.'|escapejs %}"
-data-msg-order-sent="{% trans 'Order #{id} sent successfully'|escapejs %}"
+data-msg-order-sent="{% if is_quote_flow %}{% trans 'Quote #{id} created successfully'|escapejs %}{% else %}{% trans 'Order #{id} sent successfully'|escapejs %}{% endif %}"
 data-manual-price-label="{% trans 'Manual price'|escapejs %}"
 style="margin: 0; padding: 0;">
 
@@ -134,11 +135,21 @@ La Tortilla Grocery
     maxlength="4000"
     placeholder="{% trans 'Add a comment for this order…' %}"
   >{{ pedido_nota }}</textarea>
-  <div class="form-text mb-0">{% trans "This comment is auto-saved with your draft. You can go back to add more products and it will still be here when you send the order." %}</div>
+  <div class="form-text mb-0">
+    {% if is_quote_flow %}
+    {% trans "This comment is auto-saved with your draft. You can go back to add more products and it will still be here when you create the quotation." %}
+    {% else %}
+    {% trans "This comment is auto-saved with your draft. You can go back to add more products and it will still be here when you send the order." %}
+    {% endif %}
+  </div>
 </div>
 
 <div class="alert alert-info mb-3" role="status">
+{% if is_quote_flow %}
+{% trans "Your products are auto-saved as a draft for this customer. Reloading the page will not lose them. The quotation is only created when you click Create quotation." %}
+{% else %}
 {% trans "Your products are auto-saved as a draft for this customer. Reloading the page will not lose them. The sales order is only created when you click Send Order." %}
+{% endif %}
 </div>
 
 <div id="pedidoFeedback" class="alert alert-danger d-none mb-3" role="alert"></div>
@@ -154,7 +165,7 @@ La Tortilla Grocery
 {{ cliente.nombre_empresa }}
 </div>
 
-<a href="{% url 'tomar_pedido' %}" class="btn btn-sm btn-outline-primary">
+<a href="{% if is_quote_flow %}{% url 'tomar_cotizacion' %}{% else %}{% url 'tomar_pedido' %}{% endif %}" class="btn btn-sm btn-outline-primary">
 {% trans "Cambiar Cliente" %}
 </a>
 
@@ -394,6 +405,7 @@ ${{ item.subtotal|floatformat:2 }}
 
 <hr>
 
+{% if not is_quote_flow %}
 <div class="order-type-panel">
 <p class="order-type-panel__title mb-3">{% trans "How was this order taken?" %}</p>
 
@@ -418,6 +430,7 @@ ${{ item.subtotal|floatformat:2 }}
 </div>
 
 </div>
+{% endif %}
 
 </div>
 
@@ -470,7 +483,11 @@ ${{ item.subtotal|floatformat:2 }}
 </a>
 
 <button type="button" class="btn btn-yellow">
+{% if is_quote_flow %}
+{% trans "Create quotation" %}
+{% else %}
 {% trans "Enviar Pedido" %}
+{% endif %}
 </button>
 
 </div>

@@ -2,7 +2,7 @@
 {% load static i18n pagination_tags %}
 
 {% block title %}
-{% trans "Tomar Pedido" %}
+{% if is_quote_flow %}{% trans "Create Quote" %}{% else %}{% trans "Tomar Pedido" %}{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -14,8 +14,14 @@
 <section class="vendor-order-hero mb-4">
 	<div>
 		<span class="vendor-order-eyebrow">{% trans "Sales" %}</span>
-		<h3 class="vendor-order-title mb-1">{% trans "Tomar Pedido" %}</h3>
-		<p class="vendor-order-copy mb-0">{% trans "Start with the right customer and move into the catalog with a cleaner, faster flow." %}</p>
+		<h3 class="vendor-order-title mb-1">{% if is_quote_flow %}{% trans "Create Quote" %}{% else %}{% trans "Tomar Pedido" %}{% endif %}</h3>
+		<p class="vendor-order-copy mb-0">
+			{% if is_quote_flow %}
+			{% trans "Start with the right customer and build a quotation with prices and discounts." %}
+			{% else %}
+			{% trans "Start with the right customer and move into the catalog with a cleaner, faster flow." %}
+			{% endif %}
+		</p>
 	</div>
 	<div class="vendor-order-hero-stat">
 		<span class="vendor-order-hero-value">{{ page_obj.paginator.count }}</span>
@@ -28,7 +34,13 @@
 <div class="vendor-order-card-head mb-3">
 	<div>
 		<h5 class="mb-1">{% trans "Paso 1: Seleccionar Cliente" %}</h5>
-		<p class="mb-0">{% trans "Choose the customer you are visiting before building the order." %}</p>
+		<p class="mb-0">
+			{% if is_quote_flow %}
+			{% trans "Choose the customer before building the quotation." %}
+			{% else %}
+			{% trans "Choose the customer you are visiting before building the order." %}
+			{% endif %}
+		</p>
 		{% if page_obj.paginator.count %}
 		<small class="text-muted">
 			{% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
@@ -130,7 +142,13 @@ class="btn btn-primary btn-sm vendor-order-select-btn">
 
 <div class="vendor-order-summary-label">{% trans "Cliente:" %}</div>
 <div class="vendor-order-summary-value">{% trans "Sin Seleccionar" %}</div>
-<p class="vendor-order-summary-copy mb-0">{% trans "Select one customer to open the catalog and prepare the order with the correct prices." %}</p>
+<p class="vendor-order-summary-copy mb-0">
+	{% if is_quote_flow %}
+	{% trans "Select one customer to open the catalog and prepare the quotation with the correct prices." %}
+	{% else %}
+	{% trans "Select one customer to open the catalog and prepare the order with the correct prices." %}
+	{% endif %}
+</p>
 
 </div>
 

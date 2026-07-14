@@ -53,23 +53,50 @@ from config.pedidos.services import (
     normalizar_descuento_item_pedido,
     notificar_backoffice_pedido,
 )
-from config.usuarios.permissions import internal_permission_required, user_has_permission
+from config.usuarios.permissions import (
+    _forbidden_response,
+    internal_permission_required,
+    user_has_permission,
+)
 from config.usuarios.us_locations import US_STATE_CITIES, match_state_name, match_city_for_state
 from config.vendedores.drafts import (
+    FLOW_QUOTE,
     bind_take_order_cart,
     clear_draft_cart,
     clear_session_pedido_nota,
     draft_item_counts_for_clientes,
     get_session_pedido_nota,
+    get_take_order_flow,
     persist_session_pedido_nota,
     persist_session_take_order_cart,
+    set_take_order_flow,
 )
+from config.cotizaciones.services import crear_cotizacion_desde_items
 
 
 logger = logging.getLogger(__name__)
 
 
 USA_COUNTRY_ALIASES = {'usa', 'us', 'eeuu', 'estados unidos', 'united states'}
+
+
+def _ensure_take_flow_access(request, *, manage=False):
+    flow = get_take_order_flow(request)
+    if flow == FLOW_QUOTE:
+        codes = (
+            ('vendor.quotes.manage', 'backoffice.quotes.manage')
+            if manage
+            else ('vendor.quotes.view', 'backoffice.quotes.view')
+        )
+    else:
+        codes = (
+            ('vendor.orders.manage', 'backoffice.orders.manage')
+            if manage
+            else ('vendor.orders.view', 'backoffice.orders.view')
+        )
+    if any(user_has_permission(request.user, code) for code in codes):
+        return None
+    return _forbidden_response(request)
 
 
 def _money_decimal(value):
@@ -418,6 +445,13 @@ def vendedor_home(request):
             'url': reverse('tomar_pedido'),
             'tone': 'primary',
         })
+    if user_has_permission(request.user, 'vendor.quotes.view'):
+        tiles.append({
+            'title': _('Create Quote'),
+            'description': _('Build a quotation with prices and discounts, then send it to the customer.'),
+            'url': reverse('tomar_cotizacion'),
+            'tone': 'navy',
+        })
     if user_has_permission(request.user, 'vendor.customers.view'):
         tiles.append({
             'title': _('Customers'),
@@ -552,15 +586,45 @@ def _username_already_in_use_message(conflict_user):
 
 
 @login_required
-@internal_permission_required('vendor.orders.view', 'backoffice.orders.view')
+@internal_permission_required(
+    'vendor.orders.view',
+    'backoffice.orders.view',
+    'vendor.quotes.view',
+    'backoffice.quotes.view',
+)
 def tomar_pedido(request):
+    set_take_order_flow(request, 'order')
+    denied = _ensure_take_flow_access(request, manage=False)
+    if denied:
+        return denied
+    return _render_tomar_cliente_list(request)
+
+
+@login_required
+@internal_permission_required(
+    'vendor.quotes.view',
+    'backoffice.quotes.view',
+    'vendor.orders.view',
+    'backoffice.orders.view',
+)
+def tomar_cotizacion(request):
+    set_take_order_flow(request, FLOW_QUOTE)
+    denied = _ensure_take_flow_access(request, manage=False)
+    if denied:
+        return denied
+    return _render_tomar_cliente_list(request)
+
+
+def _render_tomar_cliente_list(request):
     filter_params = _tomar_pedido_clientes_filter_params(request)
     paginator = Paginator(_tomar_pedido_clientes_queryset(request), VENDEDOR_CLIENTES_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get('page'))
     clientes = list(page_obj.object_list)
+    flow = get_take_order_flow(request)
     draft_counts = draft_item_counts_for_clientes(
         vendedor=request.user,
         cliente_ids=[cliente.id for cliente in clientes],
+        flow=flow,
     )
     for cliente in clientes:
         cliente.draft_item_count = draft_counts.get(cliente.id, 0)
@@ -569,13 +633,23 @@ def tomar_pedido(request):
         'clientes': clientes,
         'page_obj': page_obj,
         'filter_q': filter_params.get('q', ''),
+        'take_order_flow': flow,
+        'is_quote_flow': flow == FLOW_QUOTE,
     }
 
     return render(request, 'vendedores/tomar_pedido.html', context)
 
 @login_required
-@internal_permission_required('vendor.orders.view', 'backoffice.orders.view')
+@internal_permission_required(
+    'vendor.orders.view',
+    'backoffice.orders.view',
+    'vendor.quotes.view',
+    'backoffice.quotes.view',
+)
 def catalogo_vendedor(request, cliente_id):
+    denied = _ensure_take_flow_access(request, manage=False)
+    if denied:
+        return denied
 
     cliente = get_object_or_404(
         filter_clientes_for_vendedor(Cliente.objects.filter(id=cliente_id), request.user)
@@ -597,6 +671,7 @@ def catalogo_vendedor(request, cliente_id):
         item["precio"] * item["cantidad"]
         for item in carrito.values()
     )
+    flow = get_take_order_flow(request)
 
     context = {
         'cliente': cliente,
@@ -611,13 +686,23 @@ def catalogo_vendedor(request, cliente_id):
         'total': total,
         'bulk_price_options': _build_catalog_bulk_price_options(),
         'price_margin_percentages': _catalog_price_margin_percentages(),
+        'take_order_flow': flow,
+        'is_quote_flow': flow == FLOW_QUOTE,
     }
 
     return render(request, 'vendedores/tomar_pedido_catalogo.html', context)
 
 @login_required
-@internal_permission_required('vendor.orders.manage', 'backoffice.orders.manage')
+@internal_permission_required(
+    'vendor.orders.manage',
+    'backoffice.orders.manage',
+    'vendor.quotes.manage',
+    'backoffice.quotes.manage',
+)
 def agregar_producto_pedido(request):
+    denied = _ensure_take_flow_access(request, manage=True)
+    if denied:
+        return denied
 
     if request.method == "POST":
 
@@ -679,8 +764,16 @@ def agregar_producto_pedido(request):
         })
 
 @login_required
-@internal_permission_required('vendor.orders.view', 'backoffice.orders.view')
+@internal_permission_required(
+    'vendor.orders.view',
+    'backoffice.orders.view',
+    'vendor.quotes.view',
+    'backoffice.quotes.view',
+)
 def ver_pedido(request):
+    denied = _ensure_take_flow_access(request, manage=False)
+    if denied:
+        return denied
 
     cliente_id = request.session.get("cliente_id")
     if cliente_id:
@@ -755,6 +848,8 @@ def ver_pedido(request):
         "pedido_nota": get_session_pedido_nota(request),
         "bulk_price_options": _build_catalog_bulk_price_options(),
         "discount_preset_options": _build_order_summary_discount_preset_options(),
+        "take_order_flow": get_take_order_flow(request),
+        "is_quote_flow": get_take_order_flow(request) == FLOW_QUOTE,
     }
 
     return render(
@@ -766,8 +861,16 @@ def ver_pedido(request):
 
 @require_POST
 @login_required
-@internal_permission_required('vendor.orders.manage', 'backoffice.orders.manage')
+@internal_permission_required(
+    'vendor.orders.manage',
+    'backoffice.orders.manage',
+    'vendor.quotes.manage',
+    'backoffice.quotes.manage',
+)
 def guardar_nota_pedido(request):
+    denied = _ensure_take_flow_access(request, manage=True)
+    if denied:
+        return denied
     nota = persist_session_pedido_nota(request, request.POST.get('nota') or '')
     return JsonResponse({
         'success': True,
@@ -777,8 +880,16 @@ def guardar_nota_pedido(request):
 
 @require_POST
 @login_required
-@internal_permission_required('vendor.orders.manage', 'backoffice.orders.manage')
+@internal_permission_required(
+    'vendor.orders.manage',
+    'backoffice.orders.manage',
+    'vendor.quotes.manage',
+    'backoffice.quotes.manage',
+)
 def eliminar_producto_pedido(request):
+    denied = _ensure_take_flow_access(request, manage=True)
+    if denied:
+        return denied
 
     producto_id = request.POST.get("producto_id")
 
@@ -799,10 +910,17 @@ def eliminar_producto_pedido(request):
 
 
 @require_POST
-@require_POST
 @login_required
-@internal_permission_required('vendor.orders.manage', 'backoffice.orders.manage')
+@internal_permission_required(
+    'vendor.orders.manage',
+    'backoffice.orders.manage',
+    'vendor.quotes.manage',
+    'backoffice.quotes.manage',
+)
 def actualizar_cantidad_pedido(request):
+    denied = _ensure_take_flow_access(request, manage=True)
+    if denied:
+        return denied
 
     producto_id = request.POST.get("producto_id")
     accion = request.POST.get("accion")
@@ -901,6 +1019,11 @@ def actualizar_cantidad_pedido(request):
 @login_required
 @internal_permission_required('vendor.orders.manage')
 def enviar_pedido(request):
+    if get_take_order_flow(request) == FLOW_QUOTE:
+        return JsonResponse({
+            "success": False,
+            "error": str(_('This draft is a quotation. Use Create quotation instead of Send Order.')),
+        }, status=400)
 
     cliente_id = request.session.get("cliente_id")
     carrito = request.session.get("pedido", {}) or {}
@@ -971,7 +1094,7 @@ def enviar_pedido(request):
     request.session.pop("cliente_id", None)
     clear_session_pedido_nota(request)
     request.session.modified = True
-    clear_draft_cart(vendedor=request.user, cliente_id=cliente_id)
+    clear_draft_cart(vendedor=request.user, cliente_id=cliente_id, flow='order')
 
     # Keep the vendor in their workspace. Redirecting to BackOffice detail
     # triggers a permission error flash even though the order was created.
@@ -983,6 +1106,78 @@ def enviar_pedido(request):
     if warning:
         response["warning"] = warning
     return JsonResponse(response)
+
+
+@login_required
+@require_POST
+@internal_permission_required(
+    'vendor.quotes.manage',
+    'backoffice.quotes.manage',
+)
+def crear_cotizacion_desde_toma(request):
+    denied = _ensure_take_flow_access(request, manage=True)
+    if denied:
+        return denied
+    if get_take_order_flow(request) != FLOW_QUOTE:
+        return JsonResponse({
+            "success": False,
+            "error": str(_('Open Create Quote before submitting a quotation.')),
+        }, status=400)
+
+    cliente_id = request.session.get("cliente_id")
+    carrito = request.session.get("pedido", {}) or {}
+    if cliente_id and not carrito:
+        carrito = bind_take_order_cart(request, cliente_id)
+
+    if not carrito or not cliente_id:
+        return JsonResponse({
+            "success": False,
+            "error": str(_('There are no selected products or customer to create the quotation.')),
+        }, status=400)
+
+    cliente = get_object_or_404(
+        filter_clientes_for_vendedor(Cliente.objects.filter(id=cliente_id), request.user)
+    )
+
+    items_payload = []
+    for item in carrito.values():
+        presentacion = Presentacion.objects.get(id=item["presentacion_id"])
+        items_payload.append({
+            "presentacion": presentacion,
+            "cantidad": item["cantidad"],
+            "precio": item["precio"],
+            "descuento_aplicado": item.get("descuento_aplicado", False),
+            "descuento_monto": item.get("descuento_monto", 0),
+        })
+
+    try:
+        nota_cliente = (request.POST.get('nota') or '').strip()
+        if not nota_cliente:
+            nota_cliente = get_session_pedido_nota(request).strip()
+        cotizacion = crear_cotizacion_desde_items(
+            cliente=cliente,
+            items_payload=items_payload,
+            creado_por=request.user,
+            nota_cliente=nota_cliente,
+        )
+    except ValidationError as exc:
+        error_message = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
+        return JsonResponse({
+            "success": False,
+            "error": error_message,
+        }, status=409)
+
+    request.session["pedido"] = {}
+    request.session.pop("cliente_id", None)
+    clear_session_pedido_nota(request)
+    request.session.modified = True
+    clear_draft_cart(vendedor=request.user, cliente_id=cliente_id, flow=FLOW_QUOTE)
+
+    return JsonResponse({
+        "success": True,
+        "cotizacion_id": cotizacion.id,
+        "redirect_url": f"{reverse('backoffice_cotizacion_detalle', args=[cotizacion.id])}?saved=1",
+    })
 
 
 @login_required

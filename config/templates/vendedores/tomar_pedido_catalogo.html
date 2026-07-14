@@ -120,7 +120,7 @@ La Tortilla Grocery
 
 </h5>
 
-<a href="{% url 'tomar_pedido' %}" class="btn btn-sm btn-outline-primary flex-shrink-0">
+<a href="{% if is_quote_flow %}{% url 'tomar_cotizacion' %}{% else %}{% url 'tomar_pedido' %}{% endif %}" class="btn btn-sm btn-outline-primary flex-shrink-0">
 
 {% trans "Cambiar Cliente" %}
 

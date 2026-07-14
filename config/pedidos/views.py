@@ -363,6 +363,7 @@ def backoffice_pedidos(request):
 		'page_obj': page_obj,
 		'view_mode': view_mode,
 		'search_query': search_query,
+		'can_create_quotation': request.user.has_internal_permission('backoffice.quotes.manage'),
 		**counts,
 	})
 

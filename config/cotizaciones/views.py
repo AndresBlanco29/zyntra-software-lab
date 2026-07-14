@@ -29,9 +29,10 @@ from config.pedidos.services import (
     notificar_cliente_pedido,
 )
 from config.productos.models import ConfiguracionDescuentos, ConfiguracionPrecios, Presentacion
-from config.usuarios.permissions import internal_permission_required
+from config.usuarios.permissions import internal_permission_required, user_has_permission
 
 from .models import Cotizacion, CotizacionItem
+from .services import user_can_manage_cotizacion, user_can_view_cotizacion
 from django.utils.translation import gettext as _
 
 
@@ -594,16 +595,21 @@ def backoffice_cotizaciones(request):
 
 
 @login_required
-@internal_permission_required('backoffice.quotes.view')
+@internal_permission_required('backoffice.quotes.view', 'vendor.quotes.view')
 def backoffice_cotizacion_detalle(request, cotizacion_id):
     cotizacion = get_object_or_404(
         Cotizacion.objects.select_related('cliente__usuario').prefetch_related('items__presentacion__producto'),
         id=cotizacion_id,
     )
+    if not user_can_view_cotizacion(request.user, cotizacion):
+        messages.error(request, _('You do not have permission to access this section.'))
+        return redirect('vendedor_home' if getattr(request.user, 'role', '') == 'vendedor' else 'backoffice_pedidos')
+
     pedido_existente = _get_generated_order_from_quote(cotizacion)
+    can_manage = user_can_manage_cotizacion(request.user, cotizacion)
 
     if request.method == 'POST':
-        if not request.user.has_internal_permission('backoffice.quotes.manage'):
+        if not can_manage:
             messages.error(request, _('You do not have permission to update this quote.'))
             return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
@@ -723,23 +729,32 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
 
     confirm_url, telefono_contacto, whatsapp_link, outbound_message = _get_whatsapp_contact_data(cotizacion, request)
     cotizacion_item_rows, display_total = _build_quote_item_rows(cotizacion)
-    can_send_customer_quote = _is_quote_send_ready(request.session, cotizacion.id)
+    can_send_customer_quote = _is_quote_send_ready(request.session, cotizacion.id) and can_manage
     can_generate_backoffice_order = bool(
-        cotizacion.backoffice_pricing_confirmed and cotizacion.items.exists() and pedido_existente is None
+        user_has_permission(request.user, 'backoffice.orders.manage')
+        and cotizacion.backoffice_pricing_confirmed
+        and cotizacion.items.exists()
+        and pedido_existente is None
     )
 
     context = {
         'cotizacion': cotizacion,
         'pedido_existente': pedido_existente,
-        'can_manage_quote_lines': pedido_existente is None,
+        'can_manage_quote_lines': pedido_existente is None and can_manage,
         'cotizacion_item_rows': cotizacion_item_rows,
         'bulk_price_options': _build_bulk_quote_price_options(),
         'discount_preset_options': _build_quote_discount_preset_options(),
         'display_total': display_total,
         'can_send_customer_quote': can_send_customer_quote,
         'can_generate_backoffice_order': can_generate_backoffice_order,
-        'can_void_cotizacion': _puede_anular_cotizacion_desde_backoffice(cotizacion),
-        'can_delete_cotizacion': _puede_eliminar_cotizacion_desde_backoffice(cotizacion),
+        'can_void_cotizacion': (
+            user_has_permission(request.user, 'backoffice.quotes.manage')
+            and _puede_anular_cotizacion_desde_backoffice(cotizacion)
+        ),
+        'can_delete_cotizacion': (
+            user_has_permission(request.user, 'backoffice.quotes.manage')
+            and _puede_eliminar_cotizacion_desde_backoffice(cotizacion)
+        ),
         'confirm_url': confirm_url,
         'telefono_contacto': telefono_contacto,
         'whatsapp_link': whatsapp_link,
@@ -781,12 +796,15 @@ def backoffice_cotizacion_delete(request, cotizacion_id):
 
 @login_required
 @require_POST
-@internal_permission_required('backoffice.quotes.manage')
+@internal_permission_required('backoffice.quotes.manage', 'vendor.quotes.manage')
 def enviar_cotizacion_cliente(request, cotizacion_id):
     cotizacion = get_object_or_404(
         Cotizacion.objects.select_related('cliente__usuario').prefetch_related('items__presentacion__producto'),
         id=cotizacion_id,
     )
+    if not user_can_manage_cotizacion(request.user, cotizacion):
+        messages.error(request, _('You do not have permission to access this section.'))
+        return redirect('vendedor_home' if getattr(request.user, 'role', '') == 'vendedor' else 'backoffice_pedidos')
 
     if not cotizacion.items.exists():
         messages.error(request, _('The order has no products to send to the customer.'))
@@ -882,9 +900,12 @@ def enviar_cotizacion_cliente(request, cotizacion_id):
 
 
 @login_required
-@internal_permission_required('backoffice.quotes.manage')
+@internal_permission_required('backoffice.quotes.manage', 'vendor.quotes.manage')
 def abrir_whatsapp_manual_cotizacion(request, cotizacion_id):
     cotizacion = get_object_or_404(Cotizacion.objects.select_related('cliente__usuario'), id=cotizacion_id)
+    if not user_can_manage_cotizacion(request.user, cotizacion):
+        messages.error(request, _('You do not have permission to access this section.'))
+        return redirect('vendedor_home' if getattr(request.user, 'role', '') == 'vendedor' else 'backoffice_pedidos')
     confirm_url, phone_number, whatsapp_link, outbound_message = _get_whatsapp_contact_data(cotizacion, request)
 
     if not _is_quote_send_ready(request.session, cotizacion.id):

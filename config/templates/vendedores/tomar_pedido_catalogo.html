@@ -76,42 +76,15 @@ La Tortilla Grocery
     }
     const height = Math.max(Math.ceil(navbar.getBoundingClientRect().height), 56);
     const isMobile = window.matchMedia('(max-width: 767.98px)').matches;
-    // Keep sticky filters tight under the single-row catalog navbar.
     const buffer = isMobile ? 4 : 6;
     const stickyTop = height + buffer;
     root.style.setProperty('--panel-navbar-offset', stickyTop + 'px');
     root.style.setProperty('--panel-content-top-gap', '0px');
     root.style.setProperty('--catalog-sticky-top', stickyTop + 'px');
   }
-
-  function syncCatalogFilterSpacer() {
-    const sticky = document.querySelector('.catalog-filter-sticky');
-    const spacer = document.querySelector('.catalog-filter-sticky-spacer');
-    if (!sticky || !spacer) {
-      return;
-    }
-    const isMobile = window.matchMedia('(max-width: 767.98px)').matches;
-    if (!isMobile) {
-      spacer.style.height = '0px';
-      root.style.setProperty('--catalog-filter-height', '0px');
-      return;
-    }
-    const height = Math.ceil(sticky.getBoundingClientRect().height);
-    root.style.setProperty('--catalog-filter-height', height + 'px');
-    spacer.style.height = height + 'px';
-  }
-
-  function syncCatalogChrome() {
-    syncPanelNavbarOffset();
-    syncCatalogFilterSpacer();
-  }
-
-  syncCatalogChrome();
-  window.addEventListener('load', syncCatalogChrome);
-  window.addEventListener('resize', syncCatalogChrome);
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', syncCatalogChrome);
-  }
+  syncPanelNavbarOffset();
+  window.addEventListener('load', syncPanelNavbarOffset);
+  window.addEventListener('resize', syncPanelNavbarOffset);
 })();
 </script>
 
@@ -160,7 +133,7 @@ La Tortilla Grocery
 
 <!-- HEADER CATALOGO -->
 
-<div class="catalog-header mb-2 d-none d-md-block">
+<div class="catalog-header mb-3">
 
 <div class="top-row d-flex w-100 justify-content-between align-items-center">
 
@@ -187,7 +160,7 @@ Showing {{ start }}-{{ end }} of {{ total }} products
 
 </div>
 
-<div class="catalog-filter-sticky">
+<div class="catalog-filter-bar mb-3">
 <form method="get" id="catalogo-vendedor-filter-form" class="catalog-filter-form">
 
 <div class="catalog-search-row">
@@ -197,7 +170,7 @@ Showing {{ start }}-{{ end }} of {{ total }} products
       id="buscador"
       name="q"
       value="{{ filter_q }}"
-      class="form-control form-control-sm catalog-search-input"
+      class="form-control catalog-search-input"
       placeholder="{% trans 'Buscar Productos' %}"
       autocomplete="off"
       enterkeyhint="search"
@@ -210,13 +183,13 @@ Showing {{ start }}-{{ end }} of {{ total }} products
       title="{% trans 'Clear search' %}"
     >&times;</button>
   </div>
-  <button type="submit" class="btn btn-primary btn-sm catalog-search-submit" id="catalogoSearchButton">
+  <button type="submit" class="btn btn-primary catalog-search-submit" id="catalogoSearchButton">
     {% trans "Search" %}
   </button>
 </div>
 
 <div class="catalog-filter-selects">
-<select class="form-select form-select-sm" id="filtroCategoria" name="categoria">
+<select class="form-select" id="filtroCategoria" name="categoria">
 
 <option value="">
 {% trans "Categoría" %}
@@ -233,7 +206,7 @@ Showing {{ start }}-{{ end }} of {{ total }} products
 </select>
 
 
-<select class="form-select form-select-sm" id="filtroMarca" name="marca">
+<select class="form-select" id="filtroMarca" name="marca">
 
 <option value="">
 {% trans "Marca" %}
@@ -258,7 +231,6 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 
 </form>
 </div>
-<div class="catalog-filter-sticky-spacer d-md-none" aria-hidden="true"></div>
 
 <div class="card shadow-sm mb-3 bulk-price-tier-panel">
 <div class="card-body py-2 px-3">

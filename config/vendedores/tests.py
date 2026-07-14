@@ -147,6 +147,56 @@ class VendedorPedidoTests(TestCase):
 		self.assertEqual(item.cantidad_reservada_inventario, 0)
 		self.assertEqual(item.cantidad_inventario_aplicada, 0)
 
+	def test_enviar_pedido_saves_order_comment(self):
+		self.client.force_login(self.vendor)
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session['pedido'] = {
+			'1': {
+				'presentacion_id': str(self.presentacion.id),
+				'producto_id': self.presentacion.producto_id,
+				'nombre': self.presentacion.producto.nombre,
+				'presentacion_nombre': self.presentacion.nombre,
+				'precio': 233.0,
+				'cantidad': 1,
+			}
+		}
+		session.save()
+
+		response = self.client.post(
+			reverse('enviar_pedido'),
+			{'tipo_orden': 'telefono', 'nota': 'Leave at back door'},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertTrue(response.json()['success'])
+		pedido = Pedido.objects.get()
+		self.assertEqual(pedido.nota_cliente, 'Leave at back door')
+
+	def test_order_summary_shows_comment_field_first(self):
+		self.client.force_login(self.vendor)
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session['pedido'] = {
+			'1': {
+				'presentacion_id': str(self.presentacion.id),
+				'producto_id': self.presentacion.producto_id,
+				'nombre': self.presentacion.producto.nombre,
+				'presentacion_nombre': self.presentacion.nombre,
+				'precio': 233.0,
+				'cantidad': 1,
+			}
+		}
+		session.save()
+
+		response = self.client.get(reverse('ver_pedido'))
+		self.assertEqual(response.status_code, 200)
+		content = response.content.decode()
+		comment_pos = content.find('id="pedidoNotaCliente"')
+		customer_pos = content.find('class="cliente-box')
+		self.assertGreater(comment_pos, 0)
+		self.assertGreater(customer_pos, comment_pos)
+
 	def test_agregar_producto_pedido_preserves_selected_price_tier_in_order_summary(self):
 		self.client.force_login(self.vendor)
 		session = self.client.session

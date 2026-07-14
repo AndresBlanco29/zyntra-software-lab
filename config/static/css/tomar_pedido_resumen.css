@@ -92,6 +92,18 @@ body::-webkit-scrollbar,
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 
+.order-comment-panel {
+    background: #f8fafc;
+    border: 1px solid #d7dee8;
+    border-radius: 12px;
+    padding: 14px 16px;
+}
+
+.order-comment-panel__input {
+    min-height: 5.5rem;
+    resize: vertical;
+}
+
 .cliente-box {
     background: #f2f4f7;
     padding: 15px 20px;

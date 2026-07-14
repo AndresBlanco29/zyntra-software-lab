@@ -288,6 +288,9 @@ return
 
 hideFeedback()
 
+const notaField = document.getElementById('pedidoNotaCliente')
+const nota = notaField ? String(notaField.value || '').trim() : ''
+
 fetch(enviarURL,{
 
 method:"POST",
@@ -297,7 +300,7 @@ headers:{
 "Content-Type":"application/x-www-form-urlencoded"
 },
 
-body:`tipo_orden=${tipoOrden.value}`
+body:`tipo_orden=${encodeURIComponent(tipoOrden.value)}&nota=${encodeURIComponent(nota)}`
 
 })
 .then(async res => {

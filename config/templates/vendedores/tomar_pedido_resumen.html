@@ -101,6 +101,19 @@ La Tortilla Grocery
 {% trans "Resumen del Pedido" %}
 </h3>
 
+<div class="order-comment-panel mb-3">
+  <label for="pedidoNotaCliente" class="form-label fw-semibold mb-1">{% trans "Comment" %}</label>
+  <textarea
+    id="pedidoNotaCliente"
+    name="nota"
+    class="form-control order-comment-panel__input"
+    rows="3"
+    maxlength="4000"
+    placeholder="{% trans 'Add a comment for this order…' %}"
+  ></textarea>
+  <div class="form-text mb-0">{% trans "This comment is saved on the sales order when you send it." %}</div>
+</div>
+
 <div class="alert alert-info mb-3" role="status">
 {% trans "Your products are auto-saved as a draft for this customer. Reloading the page will not lose them. The sales order is only created when you click Send Order." %}
 </div>

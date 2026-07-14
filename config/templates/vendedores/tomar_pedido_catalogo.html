@@ -19,28 +19,6 @@
 {% include "includes/searchable_selects_assets.html" %}
 
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
-<script>
-(function () {
-  const navbar = document.querySelector('.navbar-custom');
-  if (!navbar) {
-    return;
-  }
-  const root = document.documentElement;
-  function syncPanelNavbarOffset() {
-    const height = Math.max(Math.ceil(navbar.getBoundingClientRect().height), 56);
-    const isMobile = window.matchMedia('(max-width: 767.98px)').matches;
-    const isSmallPhone = window.matchMedia('(max-width: 576px)').matches;
-    const buffer = isSmallPhone ? 28 : (isMobile ? 20 : 6);
-    const topGap = isSmallPhone ? 18 : (isMobile ? 12 : 0);
-    root.style.setProperty('--panel-navbar-offset', (height + buffer) + 'px');
-    root.style.setProperty('--panel-content-top-gap', topGap + 'px');
-  }
-  syncPanelNavbarOffset();
-  window.addEventListener('load', syncPanelNavbarOffset);
-  document.addEventListener('DOMContentLoaded', syncPanelNavbarOffset);
-  window.addEventListener('resize', syncPanelNavbarOffset);
-})();
-</script>
 <script src="{% static 'js/preserve-search-focus.js' %}"></script>
 <script defer src="{% static 'js/language-session.js' %}"></script>
 
@@ -57,6 +35,7 @@ data-price-margins="{{ price_margin_percentages|join:',' }}"
 data-label-margin="{% trans 'Margin' %}"
 data-label-manual-price="{% trans 'Manual price' %}"
 data-label-use-manual-price="{% trans 'Use manual price' %}"
+class="vendedor-catalogo-page"
 >
 
 <!-- NAVBAR -->
@@ -87,6 +66,28 @@ La Tortilla Grocery
 
 </nav>
 
+<script>
+(function () {
+  const root = document.documentElement;
+  function syncPanelNavbarOffset() {
+    const navbar = document.querySelector('.navbar-custom');
+    if (!navbar) {
+      return;
+    }
+    const height = Math.max(Math.ceil(navbar.getBoundingClientRect().height), 56);
+    const isMobile = window.matchMedia('(max-width: 767.98px)').matches;
+    // Keep sticky filters tight under the single-row catalog navbar.
+    const buffer = isMobile ? 4 : 6;
+    root.style.setProperty('--panel-navbar-offset', (height + buffer) + 'px');
+    root.style.setProperty('--panel-content-top-gap', '0px');
+    root.style.setProperty('--catalog-sticky-top', (height + buffer) + 'px');
+  }
+  syncPanelNavbarOffset();
+  window.addEventListener('load', syncPanelNavbarOffset);
+  window.addEventListener('resize', syncPanelNavbarOffset);
+})();
+</script>
+
 
 <div class="container-fluid">
 
@@ -107,11 +108,11 @@ La Tortilla Grocery
 
 <!-- CLIENTE -->
 
-<div class="card mb-4 shadow-sm">
+<div class="card mb-3 shadow-sm catalog-customer-card">
 
-<div class="card-body d-flex justify-content-between align-items-center">
+<div class="card-body d-flex justify-content-between align-items-center py-2 px-3 gap-2">
 
-<h5 class="mb-0">
+<h5 class="mb-0 catalog-customer-card__title">
 
 {% trans "Cliente Seleccionado:" %}
 
@@ -119,7 +120,7 @@ La Tortilla Grocery
 
 </h5>
 
-<a href="{% url 'tomar_pedido' %}" class="btn btn-sm btn-outline-primary">
+<a href="{% url 'tomar_pedido' %}" class="btn btn-sm btn-outline-primary flex-shrink-0">
 
 {% trans "Cambiar Cliente" %}
 
@@ -132,7 +133,7 @@ La Tortilla Grocery
 
 <!-- HEADER CATALOGO -->
 
-<div class="catalog-header mb-3">
+<div class="catalog-header mb-2 d-none d-md-block">
 
 <div class="top-row d-flex w-100 justify-content-between align-items-center">
 
@@ -169,7 +170,7 @@ Showing {{ start }}-{{ end }} of {{ total }} products
       id="buscador"
       name="q"
       value="{{ filter_q }}"
-      class="form-control catalog-search-input"
+      class="form-control form-control-sm catalog-search-input"
       placeholder="{% trans 'Buscar Productos' %}"
       autocomplete="off"
       enterkeyhint="search"
@@ -182,13 +183,13 @@ Showing {{ start }}-{{ end }} of {{ total }} products
       title="{% trans 'Clear search' %}"
     >&times;</button>
   </div>
-  <button type="submit" class="btn btn-primary catalog-search-submit" id="catalogoSearchButton">
+  <button type="submit" class="btn btn-primary btn-sm catalog-search-submit" id="catalogoSearchButton">
     {% trans "Search" %}
   </button>
 </div>
 
 <div class="catalog-filter-selects">
-<select class="form-select" id="filtroCategoria" name="categoria">
+<select class="form-select form-select-sm" id="filtroCategoria" name="categoria">
 
 <option value="">
 {% trans "Categoría" %}
@@ -205,7 +206,7 @@ Showing {{ start }}-{{ end }} of {{ total }} products
 </select>
 
 
-<select class="form-select" id="filtroMarca" name="marca">
+<select class="form-select form-select-sm" id="filtroMarca" name="marca">
 
 <option value="">
 {% trans "Marca" %}
@@ -231,8 +232,8 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 </form>
 </div>
 
-<div class="card shadow-sm mb-4 bulk-price-tier-panel">
-<div class="card-body py-3">
+<div class="card shadow-sm mb-3 bulk-price-tier-panel">
+<div class="card-body py-2 px-3">
 <div class="row g-2 align-items-end">
 <div class="col-md-8 col-lg-7">
 <label for="bulkPriceTierSelect" class="form-label fw-semibold mb-1">{% trans "Assign one price tier to all products" %}</label>
@@ -242,7 +243,7 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 <option value="{{ option.key }}">{{ option.label }}</option>
 {% endfor %}
 </select>
-<div class="form-text mb-0">{% trans "Apply a price tier to every product in the catalog so you can add items faster without choosing the price on each card." %}</div>
+<div class="form-text mb-0 d-none d-md-block">{% trans "Apply a price tier to every product in the catalog so you can add items faster without choosing the price on each card." %}</div>
 </div>
 <div class="col-md-4 col-lg-5 d-grid d-md-flex justify-content-md-end">
 <button type="button" class="btn btn-outline-primary btn-sm" id="applyBulkPriceTierButton">{% trans "Apply to all products" %}</button>

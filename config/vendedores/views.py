@@ -973,12 +973,12 @@ def enviar_pedido(request):
     request.session.modified = True
     clear_draft_cart(vendedor=request.user, cliente_id=cliente_id)
 
-    # Always send the vendor to the real order so the cart "reset" is not confused
-    # with a lost order — the session cart is only a draft until this point.
+    # Keep the vendor in their workspace. Redirecting to BackOffice detail
+    # triggers a permission error flash even though the order was created.
     response = {
         "success": True,
         "pedido_id": pedido.id,
-        "redirect_url": reverse("backoffice_pedido_detalle", args=[pedido.id]),
+        "redirect_url": reverse("vendedor_home"),
     }
     if warning:
         response["warning"] = warning

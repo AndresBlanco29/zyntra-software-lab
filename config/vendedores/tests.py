@@ -147,6 +147,7 @@ class VendedorPedidoTests(TestCase):
 			{
 				'success': True,
 				'pedido_id': pedido.id,
+				'redirect_url': reverse('vendedor_home'),
 			},
 		)
 		item = pedido.items.get()

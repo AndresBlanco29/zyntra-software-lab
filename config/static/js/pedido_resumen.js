@@ -400,9 +400,7 @@ if (toast) {
     toast.classList.add("show")
 }
 
-const redirectUrl = data.redirect_url || (
-    pedidoId ? `/pedidos/backoffice/${pedidoId}/` : "/vendedores/tomar-pedido/"
-)
+const redirectUrl = data.redirect_url || "/vendedores/"
 
 setTimeout(()=>{
 

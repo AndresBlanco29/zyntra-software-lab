@@ -28,12 +28,83 @@ const csrf = (
 const actualizarURL = document.body.dataset.actualizarUrl
 const eliminarURL = document.body.dataset.eliminarUrl
 const enviarURL = document.body.dataset.enviarUrl
+const guardarNotaURL = document.body.dataset.guardarNotaUrl
 const orderTypeMessage = document.body.dataset.msgOrderType || 'You must indicate how the order was taken.'
 const submitErrorMessage = document.body.dataset.msgSubmitError || 'The order could not be created.'
 const removeErrorMessage = document.body.dataset.msgRemoveError || 'The product could not be removed from the order.'
 const requestErrorMessage = document.body.dataset.msgRequestError || 'An error occurred while processing the request.'
 const manualPriceLabel = document.body.dataset.manualPriceLabel || 'Manual price'
 const feedbackBox = document.getElementById('pedidoFeedback')
+const notaField = document.getElementById('pedidoNotaCliente')
+let notaSaveTimer = null
+let lastSavedNota = notaField ? String(notaField.value || '') : ''
+
+function persistOrderNote(options) {
+    const force = Boolean(options && options.force)
+    const nota = notaField ? String(notaField.value || '') : ''
+    if (!guardarNotaURL) {
+        return Promise.resolve(nota)
+    }
+    if (!force && nota === lastSavedNota) {
+        return Promise.resolve(nota)
+    }
+    return fetch(guardarNotaURL, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrf,
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `nota=${encodeURIComponent(nota)}`
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data && data.success) {
+            lastSavedNota = String(data.nota || '')
+            if (notaField) {
+                notaField.value = lastSavedNota
+            }
+            return lastSavedNota
+        }
+        throw new Error((data && data.error) || requestErrorMessage)
+    })
+}
+
+function schedulePersistOrderNote() {
+    if (!notaField) {
+        return
+    }
+    if (notaSaveTimer) {
+        clearTimeout(notaSaveTimer)
+    }
+    notaSaveTimer = setTimeout(function () {
+        persistOrderNote({ force: true }).catch(function (error) {
+            console.error('Error saving order note:', error)
+        })
+    }, 400)
+}
+
+if (notaField) {
+    notaField.addEventListener('input', schedulePersistOrderNote)
+    notaField.addEventListener('blur', function () {
+        persistOrderNote({ force: true }).catch(function (error) {
+            console.error('Error saving order note:', error)
+        })
+    })
+}
+
+document.querySelectorAll('.pedido-back-to-catalog').forEach(function (link) {
+    link.addEventListener('click', function (event) {
+        event.preventDefault()
+        const targetUrl = link.getAttribute('href')
+        persistOrderNote({ force: true })
+            .catch(function (error) {
+                console.error('Error saving order note:', error)
+            })
+            .finally(function () {
+                window.location.href = targetUrl
+            })
+    })
+})
 
 function formatMoney(value) {
     const numericValue = Number(value)
@@ -288,7 +359,6 @@ return
 
 hideFeedback()
 
-const notaField = document.getElementById('pedidoNotaCliente')
 const nota = notaField ? String(notaField.value || '').trim() : ''
 
 fetch(enviarURL,{

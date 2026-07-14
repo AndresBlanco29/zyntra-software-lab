@@ -14042,3 +14042,12 @@ msgstr "Este comentario se guarda en el pedido al enviarlo."
 
 msgid "Order comment"
 msgstr "Comentario del pedido"
+
+msgid "Back to catalog"
+msgstr "Volver al catálogo"
+
+msgid "Save & keep adding"
+msgstr "Guardar y seguir agregando"
+
+msgid "This comment is auto-saved with your draft. You can go back to add more products and it will still be here when you send the order."
+msgstr "Este comentario se guarda automáticamente con tu borrador. Puedes volver a agregar productos y seguirá aquí cuando envíes el pedido."

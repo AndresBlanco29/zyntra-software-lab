@@ -58,7 +58,10 @@ from config.usuarios.us_locations import US_STATE_CITIES, match_state_name, matc
 from config.vendedores.drafts import (
     bind_take_order_cart,
     clear_draft_cart,
+    clear_session_pedido_nota,
     draft_item_counts_for_clientes,
+    get_session_pedido_nota,
+    persist_session_pedido_nota,
     persist_session_take_order_cart,
 )
 
@@ -749,6 +752,7 @@ def ver_pedido(request):
         "total": _money_decimal(total),
         "cliente": cliente,
         "cliente_id": cliente_id,
+        "pedido_nota": get_session_pedido_nota(request),
         "bulk_price_options": _build_catalog_bulk_price_options(),
         "discount_preset_options": _build_order_summary_discount_preset_options(),
     }
@@ -758,6 +762,18 @@ def ver_pedido(request):
         "vendedores/tomar_pedido_resumen.html",
         context
     )
+
+
+@require_POST
+@login_required
+@internal_permission_required('vendor.orders.manage', 'backoffice.orders.manage')
+def guardar_nota_pedido(request):
+    nota = persist_session_pedido_nota(request, request.POST.get('nota') or '')
+    return JsonResponse({
+        'success': True,
+        'nota': nota,
+    })
+
 
 @require_POST
 @login_required
@@ -921,12 +937,15 @@ def enviar_pedido(request):
         })
 
     try:
+        nota_cliente = (request.POST.get('nota') or '').strip()
+        if not nota_cliente:
+            nota_cliente = get_session_pedido_nota(request)
         pedido = crear_pedido_desde_items(
             cliente=cliente,
             items_payload=items_payload,
             origen='VENDEDOR',
             vendedor=request.user,
-            nota_cliente=(request.POST.get('nota') or '').strip(),
+            nota_cliente=nota_cliente,
             acepta_terminos=False,
             canal_toma=tipo_orden,
             bypass_stock_check=True,
@@ -950,6 +969,7 @@ def enviar_pedido(request):
 
     request.session["pedido"] = {}
     request.session.pop("cliente_id", None)
+    clear_session_pedido_nota(request)
     request.session.modified = True
     clear_draft_cart(vendedor=request.user, cliente_id=cliente_id)
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from config.vendedores.models import TakeOrderDraft
 
+SESSION_PEDIDO_NOTA_KEY = 'pedido_nota'
+
 
 def _normalize_cart(cart):
 	if not isinstance(cart, dict):
@@ -17,6 +19,10 @@ def _normalize_cart(cart):
 	return normalized
 
 
+def _normalize_nota(nota):
+	return str(nota or '').strip()
+
+
 def load_draft_cart(*, vendedor, cliente_id):
 	draft = (
 		TakeOrderDraft.objects.filter(vendedor=vendedor, cliente_id=cliente_id)
@@ -28,23 +34,59 @@ def load_draft_cart(*, vendedor, cliente_id):
 	return _normalize_cart(draft.cart_data)
 
 
-def save_draft_cart(*, vendedor, cliente_id, cart):
+def load_draft_nota(*, vendedor, cliente_id):
+	draft = (
+		TakeOrderDraft.objects.filter(vendedor=vendedor, cliente_id=cliente_id)
+		.only('nota')
+		.first()
+	)
+	if draft is None:
+		return ''
+	return _normalize_nota(draft.nota)
+
+
+def save_draft_cart(*, vendedor, cliente_id, cart, nota=None):
 	cliente_id = int(cliente_id)
 	cart = _normalize_cart(cart)
-	if not cart:
+	existing = (
+		TakeOrderDraft.objects.filter(vendedor=vendedor, cliente_id=cliente_id)
+		.only('id', 'nota')
+		.first()
+	)
+	if nota is None:
+		nota_value = _normalize_nota(existing.nota if existing else '')
+	else:
+		nota_value = _normalize_nota(nota)
+
+	if not cart and not nota_value:
 		TakeOrderDraft.objects.filter(vendedor=vendedor, cliente_id=cliente_id).delete()
 		return None
 
 	draft, _created = TakeOrderDraft.objects.update_or_create(
 		vendedor=vendedor,
 		cliente_id=cliente_id,
-		defaults={'cart_data': cart},
+		defaults={'cart_data': cart, 'nota': nota_value},
 	)
 	return draft
 
 
 def clear_draft_cart(*, vendedor, cliente_id):
 	TakeOrderDraft.objects.filter(vendedor=vendedor, cliente_id=int(cliente_id)).delete()
+
+
+def get_session_pedido_nota(request):
+	return _normalize_nota(request.session.get(SESSION_PEDIDO_NOTA_KEY))
+
+
+def set_session_pedido_nota(request, nota):
+	request.session[SESSION_PEDIDO_NOTA_KEY] = _normalize_nota(nota)
+	request.session.modified = True
+	return request.session[SESSION_PEDIDO_NOTA_KEY]
+
+
+def clear_session_pedido_nota(request):
+	request.session.pop(SESSION_PEDIDO_NOTA_KEY, None)
+	request.session.modified = True
 
 
 def bind_take_order_cart(request, cliente_id):
@@ -58,17 +100,39 @@ def bind_take_order_cart(request, cliente_id):
 	cliente_id = int(cliente_id)
 	prev_id = request.session.get('cliente_id')
 	carrito = _normalize_cart(request.session.get('pedido') or {})
+	session_nota = get_session_pedido_nota(request)
 
 	if prev_id is not None and int(prev_id) != cliente_id:
-		save_draft_cart(vendedor=request.user, cliente_id=int(prev_id), cart=carrito)
+		save_draft_cart(
+			vendedor=request.user,
+			cliente_id=int(prev_id),
+			cart=carrito,
+			nota=session_nota,
+		)
 		carrito = load_draft_cart(vendedor=request.user, cliente_id=cliente_id)
+		session_nota = load_draft_nota(vendedor=request.user, cliente_id=cliente_id)
 	elif not carrito:
 		carrito = load_draft_cart(vendedor=request.user, cliente_id=cliente_id)
+		if not session_nota:
+			session_nota = load_draft_nota(vendedor=request.user, cliente_id=cliente_id)
+		elif carrito or session_nota:
+			save_draft_cart(
+				vendedor=request.user,
+				cliente_id=cliente_id,
+				cart=carrito,
+				nota=session_nota,
+			)
 	else:
-		save_draft_cart(vendedor=request.user, cliente_id=cliente_id, cart=carrito)
+		save_draft_cart(
+			vendedor=request.user,
+			cliente_id=cliente_id,
+			cart=carrito,
+			nota=session_nota,
+		)
 
 	request.session['pedido'] = carrito
 	request.session['cliente_id'] = cliente_id
+	set_session_pedido_nota(request, session_nota)
 	request.session.modified = True
 	return carrito
 
@@ -80,7 +144,27 @@ def persist_session_take_order_cart(request):
 	carrito = _normalize_cart(request.session.get('pedido') or {})
 	request.session['pedido'] = carrito
 	request.session.modified = True
-	return save_draft_cart(vendedor=request.user, cliente_id=cliente_id, cart=carrito)
+	return save_draft_cart(
+		vendedor=request.user,
+		cliente_id=cliente_id,
+		cart=carrito,
+		nota=get_session_pedido_nota(request),
+	)
+
+
+def persist_session_pedido_nota(request, nota):
+	cliente_id = request.session.get('cliente_id')
+	nota_value = set_session_pedido_nota(request, nota)
+	if not cliente_id:
+		return nota_value
+	carrito = _normalize_cart(request.session.get('pedido') or {})
+	save_draft_cart(
+		vendedor=request.user,
+		cliente_id=cliente_id,
+		cart=carrito,
+		nota=nota_value,
+	)
+	return nota_value
 
 
 def draft_item_counts_for_clientes(*, vendedor, cliente_ids):

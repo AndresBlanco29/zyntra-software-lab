@@ -52,6 +52,7 @@
 <body data-actualizar-url="{% url 'actualizar_cantidad_pedido' %}"
 data-eliminar-url="{% url 'eliminar_producto_pedido' %}"
 data-enviar-url="{% url 'enviar_pedido' %}"
+data-guardar-nota-url="{% url 'guardar_nota_pedido' %}"
 data-csrf="{{ csrf_token }}"
 data-msg-order-type="{% trans 'You must indicate how the order was taken.' %}"
 data-msg-submit-error="{% trans 'The order could not be created.' %}"
@@ -97,12 +98,34 @@ La Tortilla Grocery
 
 <div class="card custom-card p-4">
 
-<h3 class="fw-bold mb-3">
-{% trans "Resumen del Pedido" %}
-</h3>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <h3 class="fw-bold mb-0">
+  {% trans "Resumen del Pedido" %}
+  </h3>
+  {% if cliente_id %}
+  <a
+    href="{% url 'catalogo_vendedor' cliente_id %}"
+    class="btn btn-outline-secondary pedido-back-to-catalog"
+    id="pedidoVolverCatalogoBtn"
+  >
+    ← {% trans "Back to catalog" %}
+  </a>
+  {% endif %}
+</div>
 
 <div class="order-comment-panel mb-3">
-  <label for="pedidoNotaCliente" class="form-label fw-semibold mb-1">{% trans "Comment" %}</label>
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+    <label for="pedidoNotaCliente" class="form-label fw-semibold mb-0">{% trans "Comment" %}</label>
+    {% if cliente_id %}
+    <a
+      href="{% url 'catalogo_vendedor' cliente_id %}"
+      class="btn btn-sm btn-primary pedido-back-to-catalog"
+      id="pedidoVolverCatalogoDesdeNotaBtn"
+    >
+      ← {% trans "Save & keep adding" %}
+    </a>
+    {% endif %}
+  </div>
   <textarea
     id="pedidoNotaCliente"
     name="nota"
@@ -110,8 +133,8 @@ La Tortilla Grocery
     rows="3"
     maxlength="4000"
     placeholder="{% trans 'Add a comment for this order…' %}"
-  ></textarea>
-  <div class="form-text mb-0">{% trans "This comment is saved on the sales order when you send it." %}</div>
+  >{{ pedido_nota }}</textarea>
+  <div class="form-text mb-0">{% trans "This comment is auto-saved with your draft. You can go back to add more products and it will still be here when you send the order." %}</div>
 </div>
 
 <div class="alert alert-info mb-3" role="status">
@@ -442,7 +465,7 @@ ${{ item.subtotal|floatformat:2 }}
 
 <div class="d-flex justify-content-between mt-4">
 
-<a href="{% url 'catalogo_vendedor' cliente_id %}" class="btn-seguir">
+<a href="{% url 'catalogo_vendedor' cliente_id %}" class="btn-seguir pedido-back-to-catalog" id="pedidoSeguirAgregandoBtn">
 {% trans "Seguir Agregando Productos" %}
 </a>
 

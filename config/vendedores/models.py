@@ -18,6 +18,7 @@ class TakeOrderDraft(models.Model):
 		related_name='take_order_drafts',
 	)
 	cart_data = models.JSONField(default=dict, blank=True)
+	nota = models.TextField(blank=True, default='')
 	actualizada_en = models.DateTimeField(auto_now=True)
 	creada_en = models.DateTimeField(auto_now_add=True)
 

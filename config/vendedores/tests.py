@@ -196,6 +196,44 @@ class VendedorPedidoTests(TestCase):
 		customer_pos = content.find('class="cliente-box')
 		self.assertGreater(comment_pos, 0)
 		self.assertGreater(customer_pos, comment_pos)
+		self.assertContains(response, 'pedidoVolverCatalogoBtn')
+		self.assertContains(response, 'pedidoVolverCatalogoDesdeNotaBtn')
+		self.assertContains(response, 'keep adding')
+
+	def test_guardar_nota_pedido_persists_until_send(self):
+		self.client.force_login(self.vendor)
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session['pedido'] = {
+			'1': {
+				'presentacion_id': str(self.presentacion.id),
+				'producto_id': self.presentacion.producto_id,
+				'nombre': self.presentacion.producto.nombre,
+				'presentacion_nombre': self.presentacion.nombre,
+				'precio': 233.0,
+				'cantidad': 1,
+			}
+		}
+		session.save()
+
+		save_response = self.client.post(
+			reverse('guardar_nota_pedido'),
+			{'nota': 'Call before delivery'},
+		)
+		self.assertEqual(save_response.status_code, 200)
+		self.assertTrue(save_response.json()['success'])
+
+		summary = self.client.get(reverse('ver_pedido'))
+		self.assertContains(summary, 'Call before delivery')
+
+		send_response = self.client.post(
+			reverse('enviar_pedido'),
+			{'tipo_orden': 'telefono'},
+		)
+		self.assertEqual(send_response.status_code, 200)
+		self.assertTrue(send_response.json()['success'])
+		pedido = Pedido.objects.get()
+		self.assertEqual(pedido.nota_cliente, 'Call before delivery')
 
 	def test_agregar_producto_pedido_preserves_selected_price_tier_in_order_summary(self):
 		self.client.force_login(self.vendor)
@@ -1044,6 +1082,22 @@ class TakeOrderDraftPersistenceTests(TestCase):
 		)
 		save_draft_cart(vendedor=self.vendor, cliente_id=self.customer.id, cart={})
 		self.assertEqual(TakeOrderDraft.objects.filter(vendedor=self.vendor).count(), 0)
+
+	def test_note_keeps_draft_when_cart_empty(self):
+		from config.vendedores.drafts import load_draft_nota, save_draft_cart
+		from config.vendedores.models import TakeOrderDraft
+
+		save_draft_cart(
+			vendedor=self.vendor,
+			cliente_id=self.customer.id,
+			cart={},
+			nota='Hold the order comment',
+		)
+		self.assertEqual(TakeOrderDraft.objects.filter(vendedor=self.vendor).count(), 1)
+		self.assertEqual(
+			load_draft_nota(vendedor=self.vendor, cliente_id=self.customer.id),
+			'Hold the order comment',
+		)
 
 
 class VendorHomeAndNotesTests(TestCase):

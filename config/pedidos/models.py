@@ -57,6 +57,7 @@ class Pedido(models.Model):
 	canal_toma = models.CharField(max_length=20, blank=True, default='')
 	estado = models.CharField(max_length=30, choices=ESTADO_CHOICES, default='RECIBIDO')
 	nota_cliente = models.TextField(blank=True)
+	nota_cliente_resuelta = models.BooleanField(default=True)
 	nota_backoffice = models.TextField(blank=True)
 	nota_seleccionador = models.TextField(blank=True)
 	nota_seleccionador_resuelta = models.BooleanField(default=False)
@@ -109,6 +110,10 @@ class Pedido(models.Model):
 	@property
 	def tiene_nota_picking_pendiente(self):
 		return bool(self.nota_seleccionador.strip()) and not self.nota_seleccionador_resuelta
+
+	@property
+	def tiene_nota_cliente_pendiente(self):
+		return bool((self.nota_cliente or '').strip()) and not self.nota_cliente_resuelta
 
 	def clean(self):
 		if self.seleccionador_id and getattr(self.seleccionador, 'role', '') != 'seleccionador':

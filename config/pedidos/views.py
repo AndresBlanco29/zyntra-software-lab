@@ -78,6 +78,7 @@ from .services import (
 	reemplazar_presentacion_linea_pedido_sin_aplicar_inventario,
 	release_pedido_edit_lock,
 	resolver_bloqueo_picking_desde_backoffice,
+	resolver_nota_cliente_desde_backoffice,
 	resolve_picking_send_ui_state,
 	validar_estado_backoffice_con_bloqueo,
 	notificar_cliente_pedido,
@@ -631,6 +632,11 @@ def backoffice_pedido_detalle(request, pedido_id):
 			and pedido.estado == 'VERIFICADO_AJUSTADO'
 			and not hasattr(pedido, 'invoice')
 		),
+		'can_resolve_nota_cliente': (
+			pedido.tiene_nota_cliente_pendiente
+			and not hasattr(pedido, 'invoice')
+			and can_manage_pedido
+		),
 		'can_void_pedido': puede_anular_pedido_desde_backoffice(pedido) and can_manage_pedido,
 		'can_delete_pedido': puede_eliminar_pedido_desde_backoffice(pedido) and can_manage_pedido,
 		'can_send_customer_order_email': request.user.has_internal_permission('backoffice.orders.manage'),
@@ -1131,6 +1137,25 @@ def backoffice_resolver_bloqueo_picking(request, pedido_id):
 	else:
 		release_pedido_edit_lock(pedido=pedido, user=request.user)
 		messages.success(request, _('Order unlocked successfully. You can now generate the invoice.'))
+
+	return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_resolver_nota_cliente(request, pedido_id):
+	pedido = get_object_or_404(Pedido.objects.select_related('invoice'), id=pedido_id)
+	if request.method != 'POST':
+		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+	try:
+		ensure_pedido_edit_lock_owner(pedido=pedido, user=request.user)
+		resolver_nota_cliente_desde_backoffice(pedido=pedido, usuario=request.user)
+	except ValidationError as exc:
+		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+	else:
+		release_pedido_edit_lock(pedido=pedido, user=request.user)
+		messages.success(request, _('Order comment resolved. You can continue with this sales order.'))
 
 	return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 

@@ -14054,3 +14054,33 @@ msgstr "Este comentario se guarda automáticamente con tu borrador. Puedes volve
 
 msgid "Clear search"
 msgstr "Borrar búsqueda"
+
+msgid "Resolve order comment"
+msgstr "Resolver comentario del pedido"
+
+msgid "This sales order is blocked until BackOffice resolves the order comment."
+msgstr "Este pedido está bloqueado hasta que BackOffice resuelva el comentario del pedido."
+
+msgid "Confirm you reviewed the order comment. Resolve it and continue?"
+msgstr "¿Confirmas que revisaste el comentario del pedido? ¿Resolverlo y continuar?"
+
+msgid "Order comment resolved. You can continue with this sales order."
+msgstr "Comentario del pedido resuelto. Puedes continuar con este pedido."
+
+msgid "This sales order is blocked by an unresolved order comment. Resolve it before continuing."
+msgstr "Este pedido está bloqueado por un comentario sin resolver. Resuélvelo antes de continuar."
+
+msgid "Orders with a generated invoice cannot change order comment resolution."
+msgstr "Los pedidos con factura generada no pueden cambiar la resolución del comentario."
+
+msgid "This order does not have an order comment to resolve."
+msgstr "Este pedido no tiene un comentario para resolver."
+
+msgid "This order comment is already resolved."
+msgstr "Este comentario del pedido ya está resuelto."
+
+msgid "Resolved order comment for order #%(id)s"
+msgstr "Comentario del pedido resuelto para el pedido #%(id)s"
+
+msgid "BackOffice action required: review the order comment and resolve it before continuing."
+msgstr "Acción de BackOffice requerida: revisa el comentario del pedido y resuélvelo antes de continuar."

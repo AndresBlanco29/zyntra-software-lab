@@ -40,13 +40,29 @@
   {% endif %}
 </div>
 
-<div class="card shadow-sm mb-3 border-info-subtle">
+<div class="card shadow-sm mb-3 {% if pedido.tiene_nota_cliente_pendiente %}border-warning{% else %}border-info-subtle{% endif %}">
   <div class="card-body py-3">
-    <div class="fw-semibold mb-1">{% trans "Order comment" %}</div>
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
+      <div class="fw-semibold">{% trans "Order comment" %}</div>
+      {% if pedido.nota_cliente %}
+      <span class="badge {% if pedido.tiene_nota_cliente_pendiente %}text-bg-warning{% else %}text-bg-success{% endif %}">
+        {% if pedido.tiene_nota_cliente_pendiente %}{% trans "Pending review" %}{% else %}{% trans "Resolved" %}{% endif %}
+      </span>
+      {% endif %}
+    </div>
     {% if pedido.nota_cliente %}
     <div class="mb-0" id="pedidoNotaClienteDisplay">{{ pedido.nota_cliente|linebreaksbr }}</div>
     {% else %}
     <div class="text-muted mb-0" id="pedidoNotaClienteDisplay">-</div>
+    {% endif %}
+    {% if can_resolve_nota_cliente %}
+    <div class="alert alert-warning mt-3 mb-0 d-flex flex-wrap gap-2 align-items-center justify-content-between">
+      <span>{% trans "This sales order is blocked until BackOffice resolves the order comment." %}</span>
+      <form method="post" action="{% url 'backoffice_resolver_nota_cliente' pedido.id %}" onsubmit="return confirm('{% trans "Confirm you reviewed the order comment. Resolve it and continue?" %}');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-success btn-sm">{% trans "Resolve order comment" %}</button>
+      </form>
+    </div>
     {% endif %}
   </div>
 </div>
@@ -258,7 +274,7 @@
             <a href="{% url 'backoffice_invoice_detail' invoice.id %}" class="btn btn-outline-primary">{% trans "View invoice" %}</a>
             <a href="{% url 'backoffice_invoice_pdf' invoice.id %}" class="btn btn-success">{% trans "Export invoice PDF" %}</a>
           </div>
-        {% elif pedido.estado == 'VERIFICADO_AJUSTADO' and not pedido.picking_bloqueado and not pedido.credit_limit_bloqueado %}
+        {% elif pedido.estado == 'VERIFICADO_AJUSTADO' and not pedido.picking_bloqueado and not pedido.credit_limit_bloqueado and not pedido.tiene_nota_cliente_pendiente %}
           <form method="post" action="{% url 'backoffice_generate_invoice' pedido.id %}" class="row g-2">
             {% csrf_token %}
             <div class="col-md-4">
@@ -537,7 +553,9 @@
         {% else %}
           <div class="alert alert-warning mb-0">
             {% trans "The order must be verified and unlocked before generating the invoice." %}
-            {% if picker_stock_shortage_blocked %}
+            {% if pedido.tiene_nota_cliente_pendiente %}
+            <div class="small mt-2">{% trans "BackOffice action required: review the order comment and resolve it before continuing." %}</div>
+            {% elif picker_stock_shortage_blocked %}
             <div class="small mt-2">{% trans "BackOffice action required: review the shortage, adjust quantities if needed, then use Unlock order above." %}</div>
             {% elif can_unlock_pedido %}
             <div class="small mt-2">{% trans "BackOffice action required: review the picker note and use Unlock order to continue." %}</div>

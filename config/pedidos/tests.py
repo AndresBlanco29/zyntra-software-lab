@@ -24,6 +24,7 @@ from config.pedidos.services import (
 	evaluar_stock_fisico_verificacion_picking,
 	guardar_verificacion_picking,
 	resolver_bloqueo_picking_desde_backoffice,
+	resolver_nota_cliente_desde_backoffice,
 	resolve_picking_send_ui_state,
 )
 from config.productos.models import Categoria, ConfiguracionDescuentos, Marca, Presentacion, Producto
@@ -122,6 +123,74 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'Order comment')
 		self.assertContains(response, 'pedidoNotaClienteDisplay')
 		self.assertContains(response, 'Leave at back door')
+
+	def test_order_with_comment_blocks_picking_until_resolved(self):
+		from config.pedidos.services import crear_pedido_desde_items
+
+		pedido = crear_pedido_desde_items(
+			cliente=self.cliente,
+			origen='VENDEDOR',
+			vendedor=self.backoffice,
+			nota_cliente='Call before delivery',
+			reservar_inventario=False,
+			items_payload=[
+				{'presentacion': self.presentacion, 'cantidad': 1, 'precio': Decimal('12.00')},
+			],
+		)
+		self.assertTrue(pedido.tiene_nota_cliente_pendiente)
+		self.assertFalse(pedido.nota_cliente_resuelta)
+
+		with self.assertRaises(ValidationError):
+			asignar_picking_a_seleccionador(pedido=pedido, seleccionador=self.selector)
+
+		can_send, label = resolve_picking_send_ui_state(pedido)
+		self.assertFalse(can_send)
+		self.assertEqual(str(label), 'Resolve order comment')
+
+		self.client.force_login(self.backoffice)
+		detail = self.client.get(reverse('backoffice_pedido_detalle', args=[pedido.id]))
+		self.assertTrue(detail.context['can_resolve_nota_cliente'])
+		self.assertContains(detail, 'Resolve order comment')
+
+		response = self.client.post(reverse('backoffice_resolver_nota_cliente', args=[pedido.id]))
+		self.assertEqual(response.status_code, 302)
+		pedido.refresh_from_db()
+		self.assertTrue(pedido.nota_cliente_resuelta)
+		self.assertFalse(pedido.tiene_nota_cliente_pendiente)
+
+		asignar_picking_a_seleccionador(pedido=pedido, seleccionador=self.selector)
+		pedido.refresh_from_db()
+		self.assertEqual(pedido.estado, 'PARA_VERIFICAR')
+
+	def test_unresolved_order_comment_blocks_invoice_generation(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 2},
+			nota='OK',
+			nota_resuelta=True,
+		)
+		self.pedido.nota_cliente = 'Urgent special packing'
+		self.pedido.nota_cliente_resuelta = False
+		self.pedido.save(update_fields=['nota_cliente', 'nota_cliente_resuelta', 'actualizada_en'])
+
+		with self.assertRaises(ValidationError):
+			generar_invoice_desde_picking(
+				pedido=self.pedido,
+				metodo_entrega='CUSTOMER_PICK_UP',
+				driver=None,
+				usuario=self.backoffice,
+			)
+
+		resolver_nota_cliente_desde_backoffice(pedido=self.pedido, usuario=self.backoffice)
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		self.assertIsNotNone(invoice.id)
 
 	def test_assigning_picking_sets_selector_and_notifies(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)

@@ -234,6 +234,8 @@ ALLOWED_DIRECT_INVOICE_DELIVERY_METHODS = frozenset({'CUSTOMER_PICK_UP', 'RUTA_D
 def _validate_invoice_generation(pedido, metodo_entrega, driver):
 	if pedido.estado != 'VERIFICADO_AJUSTADO':
 		raise ValidationError(_('The invoice can only be generated from a verified and adjusted picking order.'))
+	if pedido.tiene_nota_cliente_pendiente:
+		raise ValidationError(_('This sales order is blocked by an unresolved order comment. Resolve it before continuing.'))
 	if pedido.picking_bloqueado:
 		raise ValidationError(_('The order is blocked by an unresolved selector note.'))
 	if hasattr(pedido, 'invoice'):

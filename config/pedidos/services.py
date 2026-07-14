@@ -99,6 +99,8 @@ def pedido_puede_crear_parcial(pedido):
         return False
     if hasattr(pedido, 'invoice'):
         return False
+    if pedido.tiene_nota_cliente_pendiente:
+        return False
     return PedidoItem.objects.filter(pedido=pedido, cantidad__gt=0).exists()
 
 
@@ -181,6 +183,7 @@ def crear_pedido_parcial(*, pedido, lineas_payload, usuario=None, request=None):
     locked_pedido = Pedido.objects.select_for_update().select_related('cliente', 'vendedor').get(pk=pedido.pk)
     if not pedido_puede_crear_parcial(locked_pedido):
         raise ValidationError(_('This sales order cannot be split into a partial order.'))
+    validar_pedido_sin_nota_cliente_pendiente(locked_pedido)
 
     lineas = parse_lineas_parcial_desde_payload(pedido=locked_pedido, lineas_payload=lineas_payload)
     item_ids = [item.id for item, _qty in lineas]
@@ -210,6 +213,7 @@ def crear_pedido_parcial(*, pedido, lineas_payload, usuario=None, request=None):
         canal_toma=locked_pedido.canal_toma or '',
         estado='RECIBIDO',
         nota_cliente=locked_pedido.nota_cliente or '',
+        nota_cliente_resuelta=bool(locked_pedido.nota_cliente_resuelta),
         nota_backoffice=(
             _('Partial order created from sales order #%(numero)s.')
             % {'numero': locked_pedido.numero_display}
@@ -325,6 +329,7 @@ def crear_pedido_desde_items(
     if reservar_inventario:
         validar_disponibilidad_para_items(items_payload, bypass_stock_check=bypass_stock_check)
 
+    nota_texto = (nota_cliente or '').strip()
     pedido = Pedido.objects.create(
         cliente=cliente,
         vendedor=vendedor,
@@ -332,7 +337,8 @@ def crear_pedido_desde_items(
         origen=origen,
         canal_toma=(canal_toma or '').strip(),
         estado='RECIBIDO',
-        nota_cliente=(nota_cliente or '').strip(),
+        nota_cliente=nota_texto,
+        nota_cliente_resuelta=not bool(nota_texto),
         acepta_terminos=bool(acepta_terminos),
         acepta_terminos_en=timezone.now() if acepta_terminos else None,
         total=Decimal('0.00'),
@@ -415,8 +421,15 @@ def crear_pedido_desde_items(
 
 
 def validar_estado_backoffice_con_bloqueo(pedido, nuevo_estado):
+    if pedido.tiene_nota_cliente_pendiente and nuevo_estado != pedido.estado:
+        raise ValidationError(_('This sales order is blocked by an unresolved order comment. Resolve it before continuing.'))
     if pedido.picking_bloqueado and nuevo_estado != pedido.estado:
         raise ValidationError(_('This sales order is blocked by an unresolved picking note.'))
+
+
+def validar_pedido_sin_nota_cliente_pendiente(pedido):
+    if pedido.tiene_nota_cliente_pendiente:
+        raise ValidationError(_('This sales order is blocked by an unresolved order comment. Resolve it before continuing.'))
 
 
 def _pedido_edit_lock_display_name(user):
@@ -629,6 +642,7 @@ def asignar_picking_a_seleccionador(*, pedido, seleccionador, asignado_por=None)
         raise ValidationError(_('Only selector users can be assigned to a picking ticket.'))
     if pedido.estado not in {'RECIBIDO', 'EN_GESTION', 'LISTO_PARA_PICKING', 'PARA_VERIFICAR'}:
         raise ValidationError(_('This sales order cannot be assigned to picking in its current status.'))
+    validar_pedido_sin_nota_cliente_pendiente(pedido)
 
     pedido.seleccionador = seleccionador
     pedido.estado = 'PARA_VERIFICAR'
@@ -665,6 +679,8 @@ def asignar_picking_a_seleccionador(*, pedido, seleccionador, asignado_por=None)
 def resolve_picking_send_ui_state(pedido):
     if hasattr(pedido, 'invoice') or pedido.estado in {'INVOICE_GENERADA', 'DESPACHADO', 'CANCELADO'}:
         return False, _('Sent')
+    if pedido.tiene_nota_cliente_pendiente:
+        return False, _('Resolve order comment')
     if pedido.estado == 'VERIFICADO_AJUSTADO':
         return False, _('Picking completed')
     if pedido.estado == 'PARA_VERIFICAR' and pedido.seleccionador_id:
@@ -834,6 +850,34 @@ def resolver_bloqueo_picking_desde_backoffice(*, pedido, usuario):
         entity_id=str(pedido.id),
         entity_label=_('Order #%(id)s') % {'id': pedido.id},
         metadata={'inventory_applied_on_unlock': False},
+    )
+
+    return pedido
+
+
+@transaction.atomic
+def resolver_nota_cliente_desde_backoffice(*, pedido, usuario):
+    if hasattr(pedido, 'invoice'):
+        raise ValidationError(_('Orders with a generated invoice cannot change order comment resolution.'))
+    if not (pedido.nota_cliente or '').strip():
+        raise ValidationError(_('This order does not have an order comment to resolve.'))
+    if pedido.nota_cliente_resuelta:
+        raise ValidationError(_('This order comment is already resolved.'))
+
+    pedido.nota_cliente_resuelta = True
+    pedido.save(update_fields=['nota_cliente_resuelta', 'actualizada_en'])
+
+    from config.auditoria.business_events import log_business_event
+    from config.auditoria.models import AuditLog
+
+    log_business_event(
+        usuario,
+        action_label=_('Resolved order comment for order #%(id)s') % {'id': pedido.id},
+        action_category=AuditLog.CATEGORY_UPDATE,
+        entity_type='Pedido',
+        entity_id=str(pedido.id),
+        entity_label=_('Order #%(id)s') % {'id': pedido.id},
+        metadata={'nota_cliente_resuelta': True},
     )
 
     return pedido

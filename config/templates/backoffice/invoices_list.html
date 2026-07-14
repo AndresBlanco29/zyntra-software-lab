@@ -18,6 +18,9 @@
       <p class="text-muted mb-0">{% trans "Generated from verified picking quantities." %}</p>
     {% endif %}
     </div>
+    {% if can_create_direct_invoice %}
+    <a href="{% url 'backoffice_create_direct_invoice' %}" class="btn btn-primary">{% trans "Create direct invoice" %}</a>
+    {% endif %}
   </div>
 </div>
 

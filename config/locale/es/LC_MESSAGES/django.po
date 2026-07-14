@@ -2237,7 +2237,7 @@ msgstr "Direct backoffice invoices only support LTG o customer pickup delivery m
 
 
 msgid "Add at least one item before creating the direct invoice."
-msgstr "Agregar en least one item antes de creating el direct invoice."
+msgstr "Agrega al menos un producto antes de crear la factura directa."
 
 
 
@@ -2432,12 +2432,12 @@ msgstr "El requested customer crédito exceeds el customer disponible balance."
 
 
 msgid "Each direct invoice line needs product, quantity, and unit price."
-msgstr "Each direct invoice line needs product, quantity, y unit price."
+msgstr "Cada línea de la factura directa necesita producto, cantidad y precio unitario."
 
 
 
 msgid "One or more direct invoice lines contain invalid values."
-msgstr "One o more direct invoice lines contain invalid values."
+msgstr "Una o más líneas de la factura directa tienen valores no válidos."
 
 
 
@@ -2452,7 +2452,7 @@ msgstr "Unit price debe be greater than zero."
 
 
 msgid "Add at least one direct invoice line before saving."
-msgstr "Agregar en least one direct invoice line antes de saving."
+msgstr "Agrega al menos una línea de factura directa antes de guardar."
 
 
 
@@ -2700,7 +2700,7 @@ msgstr "%(field)s es above el allowed range."
 
 
 msgid "Select a customer before creating the direct invoice."
-msgstr "Select un customer antes de creating el direct invoice."
+msgstr "Selecciona un cliente antes de crear la factura directa."
 
 
 
@@ -7192,27 +7192,27 @@ msgstr "Crear factura directa"
 msgid ""
 "Use this flow when a customer buys directly at the warehouse and BackOffice "
 "must invoice immediately without picking or driver workflow."
-msgstr "Use this flow when un customer buys directly en el bodega yVolverOffice debe invoice immediately sin picking o driver workflow."
+msgstr "Usa este flujo cuando el cliente compra directamente en bodega y BackOffice debe facturar de inmediato, sin picking ni flujo de conductor."
 
 
 
 msgid "Inventory is discounted immediately when the invoice is created."
-msgstr "Inventario es discounted immediately when el invoice es created."
+msgstr "El inventario se descuenta inmediatamente al crear la factura."
 
 
 
 msgid "Select a customer"
-msgstr "Select un customer"
+msgstr "Seleccionar un cliente"
 
 
 
 msgid "Invoice lines"
-msgstr "Factura lines"
+msgstr "Líneas de la factura"
 
 
 
 msgid "Select a price"
-msgstr "Select a price"
+msgstr "Seleccionar un precio"
 
 
 
@@ -14147,3 +14147,21 @@ msgstr "Gestionar toma de cotizaciones"
 
 msgid "Build quotations, set prices and discounts, and send them to customers."
 msgstr "Crear cotizaciones, definir precios y descuentos, y enviarlas a los clientes."
+
+msgid "Back to invoices"
+msgstr "Volver a facturas"
+
+msgid "Search a product, choose quantity and price, then add the line."
+msgstr "Busca un producto, elige cantidad y precio, y luego agrega la línea."
+
+msgid "Optional internal note"
+msgstr "Nota interna opcional"
+
+msgid "Direct invoice created successfully."
+msgstr "Factura directa creada correctamente."
+
+msgid "This customer is on credit hold. The direct invoice cannot be created."
+msgstr "Este cliente está en retención de crédito. No se puede crear la factura directa."
+
+msgid "This customer would exceed the credit limit with this invoice. Remaining limit: $%(remaining)s. Exceeded by: $%(excess)s."
+msgstr "Este cliente excedería el límite de crédito con esta factura. Límite restante: $%(remaining)s. Excede por: $%(excess)s."

@@ -1,0 +1,341 @@
+{% extends "bases/base_vendedor.html" %}
+{% load static i18n l10n permissions_tags %}
+
+{% block title %}{% trans "Create direct invoice" %}{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/pedido-product-search.css' %}">
+
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <h2 class="mb-1">{% trans "Create direct invoice" %}</h2>
+    <p class="text-muted mb-0">{% trans "Use this flow when a customer buys directly at the warehouse and BackOffice must invoice immediately without picking or driver workflow." %}</p>
+    <p class="small text-muted mb-0 mt-1">{% trans "Inventory is discounted immediately when the invoice is created." %}</p>
+  </div>
+  <a href="{% url 'backoffice_invoices_list' %}" class="btn btn-outline-secondary">{% trans "Back to invoices" %}</a>
+</div>
+
+{% if messages %}
+  {% for message in messages %}
+  <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+  {% endfor %}
+{% endif %}
+
+<form method="post" id="directInvoiceForm" class="card shadow-sm">
+  {% csrf_token %}
+  <div class="card-body">
+    <div class="row g-3 mb-4">
+      <div class="col-lg-6">
+        <label class="form-label fw-semibold" for="directInvoiceCustomer">{% trans "Customer" %}</label>
+        <select name="cliente_id" id="directInvoiceCustomer" class="form-select" required>
+          <option value="">{% trans "Select a customer" %}</option>
+          {% for customer in customers %}
+          <option value="{{ customer.id }}" {% if form_state.cliente_id == customer.id|stringformat:"s" %}selected{% endif %}>{{ customer.nombre_empresa }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-lg-6">
+        <label class="form-label fw-semibold" for="directInvoiceNote">{% trans "BackOffice note" %}</label>
+        <input type="text" name="nota_backoffice" id="directInvoiceNote" class="form-control" value="{{ form_state.nota_backoffice }}" maxlength="500" placeholder="{% trans 'Optional internal note' %}">
+      </div>
+    </div>
+
+    <div class="border rounded-3 p-3 mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h5 class="mb-0">{% trans "Invoice lines" %}</h5>
+        <span class="small text-muted">{% trans "Search a product, choose quantity and price, then add the line." %}</span>
+      </div>
+      <div class="row g-2 align-items-end mb-3">
+        <div class="col-lg-5">
+          <label class="form-label fw-semibold" for="directInvoiceProductSearch">{% trans "Search product" %}</label>
+          <div
+            class="product-search-field position-relative"
+            id="directInvoiceSearchRoot"
+            data-search-url="{% url 'backoffice_buscar_presentaciones' %}"
+            data-empty-message="{% trans 'No products found.'|escapejs %}"
+            data-min-chars-message="{% trans 'Type at least 2 characters to search.'|escapejs %}">
+            <input type="search" id="directInvoiceProductSearch" class="form-control" placeholder="{% trans 'Search products by full name...' %}" autocomplete="off">
+            <input type="hidden" id="directInvoicePresentacionId" value="">
+            <div id="directInvoiceSearchResults" class="product-search-results list-group shadow-sm" hidden></div>
+            <div id="directInvoiceSelectedLabel" class="small text-success fw-semibold mt-1" hidden></div>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold" for="directInvoiceQty">{% trans "Qty." %}</label>
+          <input type="number" min="1" step="1" id="directInvoiceQty" class="form-control" value="1">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold" for="directInvoicePricePreset">{% trans "Price" %}</label>
+          <select id="directInvoicePricePreset" class="form-select form-select-sm mb-2" disabled>
+            <option value="">{% trans "Select a price" %}</option>
+          </select>
+          <input type="number" min="0.01" step="0.01" id="directInvoicePrice" class="form-control form-control-sm" placeholder="{% trans 'Price' %}" disabled>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold" for="directInvoiceDiscount">{% trans "Discount %" %}</label>
+          <input type="number" min="0" max="99.99" step="0.01" id="directInvoiceDiscount" class="form-control" value="0">
+        </div>
+        <div class="col-md-1 d-grid">
+          <button type="button" class="btn btn-outline-primary" id="directInvoiceAddLine">{% trans "Add" %}</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table align-middle mb-0" id="directInvoiceLinesTable">
+          <thead>
+            <tr>
+              <th>{% trans "Product" %}</th>
+              <th style="width: 100px;">{% trans "Qty." %}</th>
+              <th style="width: 130px;">{% trans "Unit price" %}</th>
+              <th style="width: 120px;">{% trans "Discount %" %}</th>
+              <th style="width: 80px;"></th>
+            </tr>
+          </thead>
+          <tbody id="directInvoiceLinesBody">
+            {% for line in posted_lines %}
+            <tr data-line-index="{{ forloop.counter0 }}">
+              <td>
+                <input type="hidden" name="line_presentacion_id_{{ forloop.counter0 }}" value="{{ line.presentacion_id }}">
+                <input type="hidden" name="line_label_{{ forloop.counter0 }}" value="{{ line.label }}">
+                <span class="fw-semibold">{{ line.label|default:line.presentacion_id }}</span>
+              </td>
+              <td><input type="number" min="1" class="form-control form-control-sm" name="line_cantidad_{{ forloop.counter0 }}" value="{{ line.cantidad }}" required></td>
+              <td><input type="number" min="0.01" step="0.01" class="form-control form-control-sm" name="line_precio_{{ forloop.counter0 }}" value="{{ line.precio }}" required></td>
+              <td><input type="number" min="0" max="99.99" step="0.01" class="form-control form-control-sm" name="line_descuento_porcentaje_{{ forloop.counter0 }}" value="{{ line.descuento_porcentaje }}"></td>
+              <td><button type="button" class="btn btn-sm btn-outline-danger direct-invoice-remove-line">{% trans "Remove" %}</button></td>
+            </tr>
+            {% empty %}
+            <tr class="direct-invoice-empty-row">
+              <td colspan="5" class="text-muted text-center py-3">{% trans "Add at least one direct invoice line before saving." %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold" for="directInvoiceDeliveryMethod">{% trans "Delivery method" %}</label>
+        <select name="metodo_entrega" id="directInvoiceDeliveryMethod" class="form-select" required>
+          <option value="">{% trans "Select a delivery method..." %}</option>
+          <option value="CUSTOMER_PICK_UP" {% if form_state.metodo_entrega == 'CUSTOMER_PICK_UP' %}selected{% endif %}>{% trans "Customer pick up at warehouse" %}</option>
+          <option value="RUTA_DRIVER" {% if form_state.metodo_entrega == 'RUTA_DRIVER' %}selected{% endif %}>{% trans "Route with driver" %}</option>
+        </select>
+      </div>
+      <div class="col-md-4" id="directInvoiceDriverField" hidden>
+        <label class="form-label fw-semibold" for="directInvoiceDriver">{% trans "Driver" %}</label>
+        <select name="driver_id" id="directInvoiceDriver" class="form-select">
+          <option value="">{% trans "Select a driver..." %}</option>
+          {% for driver in drivers %}
+          <option value="{{ driver.id }}" {% if form_state.driver_id == driver.id|stringformat:"s" %}selected{% endif %}>{% firstof driver.get_full_name driver.username %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4" id="directInvoiceEstimatedField" hidden>
+        <label class="form-label fw-semibold" for="directInvoiceEstimated">{% trans "Estimated delivery" %}</label>
+        <input type="datetime-local" name="estimated_delivery_at" id="directInvoiceEstimated" class="form-control" value="{{ form_state.estimated_delivery_at }}">
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2 justify-content-end">
+      <a href="{% url 'backoffice_invoices_list' %}" class="btn btn-outline-secondary">{% trans "Cancel" %}</a>
+      <button type="submit" class="btn btn-primary">{% trans "Create direct invoice" %}</button>
+    </div>
+  </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const customerSelect = document.getElementById('directInvoiceCustomer');
+  const searchInput = document.getElementById('directInvoiceProductSearch');
+  const searchRoot = document.getElementById('directInvoiceSearchRoot');
+  const resultsBox = document.getElementById('directInvoiceSearchResults');
+  const selectedLabel = document.getElementById('directInvoiceSelectedLabel');
+  const presentacionInput = document.getElementById('directInvoicePresentacionId');
+  const pricePreset = document.getElementById('directInvoicePricePreset');
+  const priceInput = document.getElementById('directInvoicePrice');
+  const qtyInput = document.getElementById('directInvoiceQty');
+  const discountInput = document.getElementById('directInvoiceDiscount');
+  const addButton = document.getElementById('directInvoiceAddLine');
+  const linesBody = document.getElementById('directInvoiceLinesBody');
+  const deliveryMethod = document.getElementById('directInvoiceDeliveryMethod');
+  const driverField = document.getElementById('directInvoiceDriverField');
+  const estimatedField = document.getElementById('directInvoiceEstimatedField');
+  const driverSelect = document.getElementById('directInvoiceDriver');
+  const emptyMessage = searchRoot.dataset.emptyMessage || 'No products found.';
+  const minCharsMessage = searchRoot.dataset.minCharsMessage || 'Type at least 2 characters to search.';
+  const searchUrl = searchRoot.dataset.searchUrl;
+  let searchTimer = null;
+  let selectedProductLabel = '';
+  let lineIndex = linesBody.querySelectorAll('tr[data-line-index]').length;
+
+  function syncDeliveryFields() {
+    const isRoute = deliveryMethod.value === 'RUTA_DRIVER';
+    driverField.hidden = !isRoute;
+    estimatedField.hidden = !isRoute;
+    driverSelect.required = isRoute;
+    if (!isRoute) {
+      driverSelect.value = '';
+      estimatedField.querySelector('input').value = '';
+    }
+  }
+  deliveryMethod.addEventListener('change', syncDeliveryFields);
+  syncDeliveryFields();
+
+  function clearSelection() {
+    presentacionInput.value = '';
+    selectedProductLabel = '';
+    selectedLabel.hidden = true;
+    selectedLabel.textContent = '';
+    pricePreset.innerHTML = '<option value="">{% trans "Select a price"|escapejs %}</option>';
+    pricePreset.disabled = true;
+    priceInput.value = '';
+    priceInput.disabled = true;
+  }
+
+  function renderResults(items) {
+    resultsBox.innerHTML = '';
+    if (!items.length) {
+      resultsBox.innerHTML = '<div class="list-group-item text-muted">' + emptyMessage + '</div>';
+      resultsBox.hidden = false;
+      return;
+    }
+    items.forEach(function (item) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'list-group-item list-group-item-action';
+      button.textContent = item.label + ' · $' + item.price;
+      button.addEventListener('click', function () {
+        presentacionInput.value = String(item.id);
+        selectedProductLabel = item.label;
+        selectedLabel.textContent = item.label;
+        selectedLabel.hidden = false;
+        searchInput.value = item.label;
+        resultsBox.hidden = true;
+        pricePreset.innerHTML = '';
+        (item.prices || []).forEach(function (priceOption) {
+          const option = document.createElement('option');
+          option.value = priceOption.value;
+          option.textContent = priceOption.label;
+          if (priceOption.key === item.default_price_key) {
+            option.selected = true;
+          }
+          pricePreset.appendChild(option);
+        });
+        const manual = document.createElement('option');
+        manual.value = '__manual__';
+        manual.textContent = '{% trans "Manual price"|escapejs %}';
+        pricePreset.appendChild(manual);
+        pricePreset.disabled = false;
+        priceInput.disabled = false;
+        priceInput.value = item.price;
+      });
+      resultsBox.appendChild(button);
+    });
+    resultsBox.hidden = false;
+  }
+
+  function runSearch() {
+    const query = (searchInput.value || '').trim();
+    if (query.length < 2) {
+      resultsBox.innerHTML = '<div class="list-group-item text-muted">' + minCharsMessage + '</div>';
+      resultsBox.hidden = false;
+      return;
+    }
+    const params = new URLSearchParams({ q: query });
+    if (customerSelect.value) {
+      params.set('cliente_id', customerSelect.value);
+    }
+    fetch(searchUrl + '?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (response) { return response.json(); })
+      .then(function (data) { renderResults(data.results || []); })
+      .catch(function () {
+        resultsBox.innerHTML = '<div class="list-group-item text-danger">{% trans "An error occurred while processing the request."|escapejs %}</div>';
+        resultsBox.hidden = false;
+      });
+  }
+
+  searchInput.addEventListener('input', function () {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(runSearch, 220);
+  });
+  searchInput.addEventListener('focus', function () {
+    if ((searchInput.value || '').trim().length >= 2) {
+      runSearch();
+    }
+  });
+  document.addEventListener('click', function (event) {
+    if (!searchRoot.contains(event.target)) {
+      resultsBox.hidden = true;
+    }
+  });
+
+  pricePreset.addEventListener('change', function () {
+    if (pricePreset.value && pricePreset.value !== '__manual__') {
+      priceInput.value = pricePreset.value;
+    }
+  });
+
+  function removeEmptyRow() {
+    const emptyRow = linesBody.querySelector('.direct-invoice-empty-row');
+    if (emptyRow) {
+      emptyRow.remove();
+    }
+  }
+
+  function bindRemove(button) {
+    button.addEventListener('click', function () {
+      button.closest('tr').remove();
+      if (!linesBody.querySelector('tr[data-line-index]')) {
+        const empty = document.createElement('tr');
+        empty.className = 'direct-invoice-empty-row';
+        empty.innerHTML = '<td colspan="5" class="text-muted text-center py-3">{% trans "Add at least one direct invoice line before saving."|escapejs %}</td>';
+        linesBody.appendChild(empty);
+      }
+    });
+  }
+
+  linesBody.querySelectorAll('.direct-invoice-remove-line').forEach(bindRemove);
+
+  addButton.addEventListener('click', function () {
+    const presentacionId = presentacionInput.value;
+    const qty = parseInt(qtyInput.value || '0', 10);
+    const price = parseFloat(priceInput.value || '0');
+    const discount = parseFloat(discountInput.value || '0');
+    if (!presentacionId || !selectedProductLabel || !(qty > 0) || !(price > 0)) {
+      alert('{% trans "Each direct invoice line needs product, quantity, and unit price."|escapejs %}');
+      return;
+    }
+    removeEmptyRow();
+    const index = lineIndex++;
+    const row = document.createElement('tr');
+    row.setAttribute('data-line-index', String(index));
+    row.innerHTML =
+      '<td>' +
+        '<input type="hidden" name="line_presentacion_id_' + index + '" value="' + presentacionId + '">' +
+        '<input type="hidden" name="line_label_' + index + '" value="' + selectedProductLabel.replace(/"/g, '&quot;') + '">' +
+        '<span class="fw-semibold"></span>' +
+      '</td>' +
+      '<td><input type="number" min="1" class="form-control form-control-sm" name="line_cantidad_' + index + '" value="' + qty + '" required></td>' +
+      '<td><input type="number" min="0.01" step="0.01" class="form-control form-control-sm" name="line_precio_' + index + '" value="' + price.toFixed(2) + '" required></td>' +
+      '<td><input type="number" min="0" max="99.99" step="0.01" class="form-control form-control-sm" name="line_descuento_porcentaje_' + index + '" value="' + (isNaN(discount) ? '0' : discount) + '"></td>' +
+      '<td><button type="button" class="btn btn-sm btn-outline-danger direct-invoice-remove-line">{% trans "Remove"|escapejs %}</button></td>';
+    row.querySelector('span.fw-semibold').textContent = selectedProductLabel;
+    linesBody.appendChild(row);
+    bindRemove(row.querySelector('.direct-invoice-remove-line'));
+    clearSelection();
+    searchInput.value = '';
+    qtyInput.value = '1';
+    discountInput.value = '0';
+  });
+
+  document.getElementById('directInvoiceForm').addEventListener('submit', function (event) {
+    if (!linesBody.querySelector('tr[data-line-index]')) {
+      event.preventDefault();
+      alert('{% trans "Add at least one item before creating the direct invoice."|escapejs %}');
+    }
+  });
+});
+</script>
+{% endblock %}

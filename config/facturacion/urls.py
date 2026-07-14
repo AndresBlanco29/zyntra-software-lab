@@ -6,6 +6,7 @@ from . import views
 
 urlpatterns = [
 	path('backoffice/invoices/', views.backoffice_invoices_list, name='backoffice_invoices_list'),
+	path('backoffice/invoices/create-direct/', views.backoffice_create_direct_invoice, name='backoffice_create_direct_invoice'),
 	path('backoffice/daily-closing/', daily_closing_views.backoffice_daily_closing_list, name='backoffice_daily_closing_list'),
 	path('backoffice/daily-closing/create/', daily_closing_views.backoffice_daily_closing_create, name='backoffice_daily_closing_create'),
 	path('backoffice/daily-closing/<int:cierre_id>/', daily_closing_views.backoffice_daily_closing_detail, name='backoffice_daily_closing_detail'),

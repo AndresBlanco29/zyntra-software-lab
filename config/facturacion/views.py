@@ -85,6 +85,7 @@ from .services import (
 	ensure_delivery_for_invoice,
 	ensure_customer_pickup_delivery_for_invoice,
 	generar_invoice_desde_picking,
+	generar_invoice_directa_backoffice,
 	list_pending_customer_notes,
 	resolve_invoice_payment_due_date,
 	resolve_presentacion_suggested_unit_price,
@@ -1291,6 +1292,7 @@ def backoffice_invoices_list(request):
 		'customers': customers,
 		'drivers': drivers,
 		'delivery_method_choices': Invoice.DELIVERY_METHOD_CHOICES,
+		'can_create_direct_invoice': request.user.has_internal_permission('backoffice.orders.manage'),
 		**filter_context,
 	})
 
@@ -1423,6 +1425,148 @@ def backoffice_adjustment_note_create(request):
 		return redirect(f"{reverse('backoffice_adjustment_note_create')}?cliente_id={selected_client.id}")
 
 	return render(request, 'backoffice/adjustment_note_create.html', context)
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+def backoffice_create_direct_invoice(request):
+	customers = Cliente.objects.filter(aprobado=True).order_by('nombre_empresa')
+	drivers = Usuario.objects.filter(role='driver', is_active=True).order_by('first_name', 'last_name', 'username')
+	form_state = {
+		'cliente_id': (request.POST.get('cliente_id') if request.method == 'POST' else request.GET.get('cliente_id')) or '',
+		'metodo_entrega': (request.POST.get('metodo_entrega') if request.method == 'POST' else '') or '',
+		'driver_id': (request.POST.get('driver_id') if request.method == 'POST' else '') or '',
+		'estimated_delivery_at': (request.POST.get('estimated_delivery_at') if request.method == 'POST' else '') or '',
+		'nota_backoffice': (request.POST.get('nota_backoffice') if request.method == 'POST' else '') or '',
+	}
+
+	if request.method == 'POST':
+		try:
+			cliente_id = (request.POST.get('cliente_id') or '').strip()
+			if not cliente_id.isdigit():
+				raise ValidationError(_('Select a customer before creating the direct invoice.'))
+			cliente = get_object_or_404(Cliente, id=int(cliente_id), aprobado=True)
+			if getattr(cliente, 'credit_hold', False):
+				raise ValidationError(_('This customer is on credit hold. The direct invoice cannot be created.'))
+
+			items_payload = _parse_direct_invoice_items_payload(request.POST)
+			estimated_total = sum(
+				(
+					Decimal(str(item['precio']))
+					* Decimal(str(item['cantidad']))
+					* (Decimal('1') - (Decimal(str(item.get('descuento_porcentaje') or 0)) / Decimal('100')))
+				).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+				for item in items_payload
+			)
+			evaluation = evaluate_customer_credit_limit(cliente=cliente, additional_amount=estimated_total)
+			if evaluation.exceeds_limit:
+				raise ValidationError(
+					_(
+						'This customer would exceed the credit limit with this invoice. '
+						'Remaining limit: $%(remaining)s. Exceeded by: $%(excess)s.'
+					) % {
+						'remaining': evaluation.remaining_limit,
+						'excess': evaluation.excess_amount,
+					}
+				)
+
+			metodo_entrega = (request.POST.get('metodo_entrega') or '').strip()
+			driver = None
+			estimated_delivery_at = None
+			if metodo_entrega == 'RUTA_DRIVER':
+				driver_id = (request.POST.get('driver_id') or '').strip()
+				if not driver_id.isdigit():
+					raise ValidationError(_('A driver is required for route deliveries.'))
+				driver = get_object_or_404(Usuario, id=int(driver_id), role='driver', is_active=True)
+				estimated_delivery_at = _parse_estimated_delivery_at(request.POST.get('estimated_delivery_at'))
+
+			invoice = generar_invoice_directa_backoffice(
+				cliente=cliente,
+				items_payload=items_payload,
+				metodo_entrega=metodo_entrega,
+				usuario=request.user,
+				nota_backoffice=(request.POST.get('nota_backoffice') or '').strip(),
+				driver=driver,
+				estimated_delivery_at=estimated_delivery_at,
+			)
+		except ValidationError as exc:
+			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+		else:
+			messages.success(request, _('Direct invoice created successfully.'))
+			return redirect(f"{reverse('backoffice_invoice_detail', args=[invoice.id])}?focus_adjustment_note=1")
+
+	return render(request, 'backoffice/invoice_create_direct.html', {
+		'customers': customers,
+		'drivers': drivers,
+		'form_state': form_state,
+		'posted_lines': _direct_invoice_posted_lines(request.POST) if request.method == 'POST' else [],
+	})
+
+
+def _direct_invoice_money(value, *, default='0'):
+	try:
+		return Decimal(str(value if value not in (None, '') else default)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+	except (InvalidOperation, TypeError, ValueError):
+		raise ValidationError(_('One or more direct invoice lines contain invalid values.'))
+
+
+def _direct_invoice_posted_lines(post_data):
+	indices = []
+	for key in post_data.keys():
+		if not key.startswith('line_presentacion_id_'):
+			continue
+		suffix = key[len('line_presentacion_id_'):]
+		if suffix.isdigit():
+			indices.append(int(suffix))
+	lines = []
+	for index in sorted(set(indices)):
+		presentacion_id = (post_data.get(f'line_presentacion_id_{index}') or '').strip()
+		label = (post_data.get(f'line_label_{index}') or '').strip()
+		qty = (post_data.get(f'line_cantidad_{index}') or '').strip()
+		price = (post_data.get(f'line_precio_{index}') or '').strip()
+		discount = (post_data.get(f'line_descuento_porcentaje_{index}') or '').strip()
+		if not presentacion_id and not qty and not price:
+			continue
+		lines.append({
+			'presentacion_id': presentacion_id,
+			'label': label,
+			'cantidad': qty,
+			'precio': price,
+			'descuento_porcentaje': discount or '0',
+		})
+	return lines
+
+
+def _parse_direct_invoice_items_payload(post_data):
+	posted_lines = _direct_invoice_posted_lines(post_data)
+	if not posted_lines:
+		raise ValidationError(_('Add at least one item before creating the direct invoice.'))
+
+	items_payload = []
+	for line in posted_lines:
+		presentacion_id = (line.get('presentacion_id') or '').strip()
+		if not presentacion_id.isdigit():
+			raise ValidationError(_('Each direct invoice line needs product, quantity, and unit price.'))
+		try:
+			cantidad = int(line.get('cantidad') or 0)
+		except (TypeError, ValueError):
+			raise ValidationError(_('One or more direct invoice lines contain invalid values.'))
+		if cantidad < 1:
+			raise ValidationError(_('Each direct invoice line needs product, quantity, and unit price.'))
+		precio = _direct_invoice_money(line.get('precio'))
+		if precio <= 0:
+			raise ValidationError(_('Each direct invoice line needs product, quantity, and unit price.'))
+		descuento_porcentaje = _direct_invoice_money(line.get('descuento_porcentaje') or 0)
+		if descuento_porcentaje < 0 or descuento_porcentaje >= 100:
+			raise ValidationError(_('One or more direct invoice lines contain invalid values.'))
+		presentacion = get_object_or_404(Presentacion.objects.select_related('producto'), id=int(presentacion_id))
+		items_payload.append({
+			'presentacion': presentacion,
+			'cantidad': cantidad,
+			'precio': precio,
+			'descuento_porcentaje': descuento_porcentaje,
+		})
+	return items_payload
 
 
 @login_required

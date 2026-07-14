@@ -2804,7 +2804,95 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(list_response, reverse('backoffice_adjustment_notes_list'))
 		self.assertContains(list_response, 'Credit / Debit Notes')
 		self.assertNotContains(list_response, 'Create note')
-		self.assertNotContains(list_response, 'Create direct invoice')
+		self.assertContains(list_response, 'Create direct invoice')
+		self.assertContains(list_response, reverse('backoffice_create_direct_invoice'))
+
+	def test_backoffice_create_direct_invoice_view_pickup_and_stock(self):
+		self.cliente.aprobado = True
+		self.cliente.save(update_fields=['aprobado'])
+		starting_stock = StockPresentacion.objects.get(presentacion=self.presentacion).stock_fisico
+		self.client.force_login(self.backoffice)
+
+		get_response = self.client.get(reverse('backoffice_create_direct_invoice'))
+		self.assertEqual(get_response.status_code, 200)
+		self.assertContains(get_response, 'Create direct invoice')
+
+		response = self.client.post(reverse('backoffice_create_direct_invoice'), {
+			'cliente_id': str(self.cliente.id),
+			'metodo_entrega': 'CUSTOMER_PICK_UP',
+			'nota_backoffice': 'Counter sale',
+			'line_presentacion_id_0': str(self.presentacion.id),
+			'line_label_0': 'Tortilla 12 - Caja',
+			'line_cantidad_0': '2',
+			'line_precio_0': '18.00',
+			'line_descuento_porcentaje_0': '0',
+		})
+		invoice = Invoice.objects.latest('id')
+		self.assertRedirects(
+			response,
+			f"{reverse('backoffice_invoice_detail', args=[invoice.id])}?focus_adjustment_note=1",
+		)
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		self.assertEqual(invoice.metodo_entrega, 'CUSTOMER_PICK_UP')
+		self.assertEqual(invoice.pedido.canal_toma, 'BACKOFFICE_DIRECT')
+		self.assertEqual(invoice.pedido.nota_backoffice, 'Counter sale')
+		self.assertEqual(stock.stock_fisico, starting_stock - 2)
+
+	def test_backoffice_create_direct_invoice_view_route_with_driver(self):
+		self.cliente.aprobado = True
+		self.cliente.save(update_fields=['aprobado'])
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_create_direct_invoice'), {
+			'cliente_id': str(self.cliente.id),
+			'metodo_entrega': 'RUTA_DRIVER',
+			'driver_id': str(self.driver.id),
+			'estimated_delivery_at': '2026-07-14T10:00',
+			'line_presentacion_id_0': str(self.presentacion.id),
+			'line_label_0': 'Tortilla 12 - Caja',
+			'line_cantidad_0': '1',
+			'line_precio_0': '15.00',
+			'line_descuento_porcentaje_0': '0',
+		})
+		invoice = Invoice.objects.latest('id')
+		self.assertEqual(response.status_code, 302)
+		self.assertEqual(invoice.metodo_entrega, 'RUTA_DRIVER')
+		self.assertEqual(invoice.driver_id, self.driver.id)
+		self.assertTrue(hasattr(invoice, 'delivery'))
+
+	def test_backoffice_create_direct_invoice_rejects_without_stock(self):
+		self.cliente.aprobado = True
+		self.cliente.save(update_fields=['aprobado'])
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(
+			stock_fisico=0,
+			stock_disponible=0,
+			stock_reservado=0,
+		)
+		self.client.force_login(self.backoffice)
+		before = Invoice.objects.count()
+		response = self.client.post(reverse('backoffice_create_direct_invoice'), {
+			'cliente_id': str(self.cliente.id),
+			'metodo_entrega': 'CUSTOMER_PICK_UP',
+			'line_presentacion_id_0': str(self.presentacion.id),
+			'line_label_0': 'Tortilla 12 - Caja',
+			'line_cantidad_0': '2',
+			'line_precio_0': '18.00',
+			'line_descuento_porcentaje_0': '0',
+		})
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(Invoice.objects.count(), before)
+		messages = [str(item) for item in get_messages(response.wsgi_request)]
+		self.assertTrue(messages)
+
+	def test_backoffice_create_direct_invoice_requires_manage_permission(self):
+		viewer = Usuario.objects.create_user(
+			username='bo-view-only',
+			password='secret123',
+			role='backoffice',
+			permission_overrides={'backoffice.orders.manage': False},
+		)
+		self.client.force_login(viewer)
+		response = self.client.get(reverse('backoffice_create_direct_invoice'))
+		self.assertEqual(response.status_code, 302)
 
 	def test_backoffice_adjustment_notes_list_can_filter_by_customer_creator_and_invoice_query(self):
 		invoice = generar_invoice_desde_picking(

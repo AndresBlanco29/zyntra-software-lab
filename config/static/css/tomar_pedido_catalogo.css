@@ -264,6 +264,19 @@ transform:scale(1.05);
 
 body.vendedor-catalogo-page {
     --catalog-sticky-top: 60px;
+    --catalog-filter-height: 0px;
+    overflow-x: hidden;
+    max-width: 100vw;
+}
+
+body.vendedor-catalogo-page .container-fluid,
+body.vendedor-catalogo-page .row {
+    max-width: 100%;
+}
+
+body.vendedor-catalogo-page .col-md-10 {
+    max-width: 100%;
+    overflow-x: clip;
 }
 
 @media (max-width: 992px) {
@@ -300,23 +313,31 @@ body.vendedor-catalogo-page {
         margin-top: 70px;
         padding: 20px !important;
         width: 100%;
+        max-width: 100%;
     }
 
-    .pedido-bar {
-        left: 16px;
-        right: 16px;
+    body.vendedor-catalogo-page .pedido-bar {
+        left: 12px;
+        right: 12px;
         bottom: 12px;
+        width: auto;
+        max-width: calc(100vw - 24px);
+        box-sizing: border-box;
         padding: 12px 14px;
-        gap: 10px;
+        gap: 8px 12px;
         flex-wrap: wrap;
+        align-items: center;
     }
 
     .pedido-info {
-        font-size: 16px;
+        font-size: 15px;
+        min-width: 0;
+        flex: 1 1 140px;
     }
 
     .pedido-total {
         font-size: 18px;
+        flex: 0 0 auto;
     }
 }
 
@@ -329,6 +350,7 @@ body.vendedor-catalogo-page {
         --panel-navbar-offset: 60px;
         --panel-content-top-gap: 0px;
         --catalog-sticky-top: 60px;
+        overflow-x: hidden;
     }
 
     .catalog-customer-card__title {
@@ -337,20 +359,32 @@ body.vendedor-catalogo-page {
     }
 
     .catalog-filter-sticky {
-        position: sticky;
+        position: fixed;
         top: var(--catalog-sticky-top, 60px);
-        z-index: 40;
+        left: 0;
+        right: 0;
+        width: 100%;
+        max-width: 100vw;
+        box-sizing: border-box;
+        z-index: 980;
         background: #f4f6f9;
-        margin-left: -10px;
-        margin-right: -10px;
-        margin-bottom: 0.55rem;
-        padding: 0.35rem 10px 0.45rem;
+        margin: 0;
+        padding: 0.4rem 10px 0.5rem;
         border-bottom: 1px solid #d7dee8;
-        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05);
+        box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+    }
+
+    .catalog-filter-sticky-spacer {
+        display: block;
+        width: 100%;
+        height: var(--catalog-filter-height, 88px);
+        flex: 0 0 auto;
+        pointer-events: none;
     }
 
     .catalog-filter-form {
         gap: 0.35rem;
+        max-width: 100%;
     }
 
     .catalog-search-submit {
@@ -361,6 +395,15 @@ body.vendedor-catalogo-page {
 
     .catalog-filter-selects {
         flex-direction: row;
+        max-width: 100%;
+    }
+
+    .bulk-price-tier-panel,
+    .bulk-price-tier-panel .card-body,
+    .bulk-price-tier-panel .row,
+    .bulk-price-tier-panel .col-md-8,
+    .bulk-price-tier-panel .col-md-4 {
+        max-width: 100%;
     }
 
     .bulk-price-tier-panel .form-label {
@@ -414,15 +457,44 @@ body.vendedor-catalogo-page {
         font-weight: 700;
     }
 
-    .pedido-bar {
+    body.vendedor-catalogo-page .pedido-bar {
         left: 10px;
         right: 10px;
         bottom: 10px;
+        width: auto;
+        max-width: calc(100vw - 20px);
+        box-sizing: border-box;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-areas:
+            "info total"
+            "action action";
+        gap: 8px 10px;
+        align-items: center;
     }
 
-    .pedido-bar .btn {
+    body.vendedor-catalogo-page .pedido-bar .pedido-info {
+        grid-area: info;
+        font-size: 14px;
+        line-height: 1.25;
+        min-width: 0;
+    }
+
+    body.vendedor-catalogo-page .pedido-bar .pedido-total {
+        grid-area: total;
+        font-size: 17px;
+        justify-self: end;
+    }
+
+    body.vendedor-catalogo-page .pedido-bar > div:last-child {
+        grid-area: action;
+    }
+
+    body.vendedor-catalogo-page .pedido-bar .btn {
         width: 100%;
         padding: 10px 14px;
+        display: block;
+        text-align: center;
     }
 
     body {

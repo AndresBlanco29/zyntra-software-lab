@@ -78,13 +78,40 @@ La Tortilla Grocery
     const isMobile = window.matchMedia('(max-width: 767.98px)').matches;
     // Keep sticky filters tight under the single-row catalog navbar.
     const buffer = isMobile ? 4 : 6;
-    root.style.setProperty('--panel-navbar-offset', (height + buffer) + 'px');
+    const stickyTop = height + buffer;
+    root.style.setProperty('--panel-navbar-offset', stickyTop + 'px');
     root.style.setProperty('--panel-content-top-gap', '0px');
-    root.style.setProperty('--catalog-sticky-top', (height + buffer) + 'px');
+    root.style.setProperty('--catalog-sticky-top', stickyTop + 'px');
   }
-  syncPanelNavbarOffset();
-  window.addEventListener('load', syncPanelNavbarOffset);
-  window.addEventListener('resize', syncPanelNavbarOffset);
+
+  function syncCatalogFilterSpacer() {
+    const sticky = document.querySelector('.catalog-filter-sticky');
+    const spacer = document.querySelector('.catalog-filter-sticky-spacer');
+    if (!sticky || !spacer) {
+      return;
+    }
+    const isMobile = window.matchMedia('(max-width: 767.98px)').matches;
+    if (!isMobile) {
+      spacer.style.height = '0px';
+      root.style.setProperty('--catalog-filter-height', '0px');
+      return;
+    }
+    const height = Math.ceil(sticky.getBoundingClientRect().height);
+    root.style.setProperty('--catalog-filter-height', height + 'px');
+    spacer.style.height = height + 'px';
+  }
+
+  function syncCatalogChrome() {
+    syncPanelNavbarOffset();
+    syncCatalogFilterSpacer();
+  }
+
+  syncCatalogChrome();
+  window.addEventListener('load', syncCatalogChrome);
+  window.addEventListener('resize', syncCatalogChrome);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncCatalogChrome);
+  }
 })();
 </script>
 
@@ -231,6 +258,7 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 
 </form>
 </div>
+<div class="catalog-filter-sticky-spacer d-md-none" aria-hidden="true"></div>
 
 <div class="card shadow-sm mb-3 bulk-price-tier-panel">
 <div class="card-body py-2 px-3">

@@ -56,16 +56,25 @@ function persistOrderNote(options) {
         },
         body: `nota=${encodeURIComponent(nota)}`
     })
-    .then(res => res.json())
-    .then(data => {
-        if (data && data.success) {
-            lastSavedNota = String(data.nota || '')
-            if (notaField) {
-                notaField.value = lastSavedNota
-            }
-            return lastSavedNota
+    .then(async res => {
+        let data = {}
+        try {
+            data = await res.json()
+        } catch (error) {
+            data = {}
         }
-        throw new Error((data && data.error) || requestErrorMessage)
+        if (!res.ok || !(data && data.success)) {
+            // Never surface draft-note save issues in the order UI.
+            console.error('Order note autosave failed', data)
+            return nota
+        }
+        // Keep the typed value as-is (including spaces). Do not rewrite the textarea.
+        lastSavedNota = nota
+        return lastSavedNota
+    })
+    .catch(function (error) {
+        console.error('Order note autosave failed:', error)
+        return nota
     })
 }
 
@@ -77,18 +86,14 @@ function schedulePersistOrderNote() {
         clearTimeout(notaSaveTimer)
     }
     notaSaveTimer = setTimeout(function () {
-        persistOrderNote({ force: true }).catch(function (error) {
-            console.error('Error saving order note:', error)
-        })
+        persistOrderNote({ force: true })
     }, 400)
 }
 
 if (notaField) {
     notaField.addEventListener('input', schedulePersistOrderNote)
     notaField.addEventListener('blur', function () {
-        persistOrderNote({ force: true }).catch(function (error) {
-            console.error('Error saving order note:', error)
-        })
+        persistOrderNote({ force: true })
     })
 }
 
@@ -96,13 +101,9 @@ document.querySelectorAll('.pedido-back-to-catalog').forEach(function (link) {
     link.addEventListener('click', function (event) {
         event.preventDefault()
         const targetUrl = link.getAttribute('href')
-        persistOrderNote({ force: true })
-            .catch(function (error) {
-                console.error('Error saving order note:', error)
-            })
-            .finally(function () {
-                window.location.href = targetUrl
-            })
+        persistOrderNote({ force: true }).finally(function () {
+            window.location.href = targetUrl
+        })
     })
 })
 

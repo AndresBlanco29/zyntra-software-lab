@@ -359,6 +359,45 @@ body.vendedor-catalogo-page .col-md-10 {
         overflow-x: hidden;
     }
 
+    #vendedorCatalogSidebarColumn {
+        flex: 0 0 0 !important;
+        width: 0 !important;
+        max-width: 0 !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible;
+        border: 0 !important;
+    }
+
+    body.vendedor-catalogo-page .col-md-10 {
+        flex: 0 0 100% !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin-left: 0 !important;
+    }
+
+    .catalog-products-row {
+        justify-content: center;
+        margin-left: 0;
+        margin-right: 0;
+        width: 100%;
+    }
+
+    .catalog-product-col {
+        display: flex;
+        justify-content: center;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    .catalog-product-col .producto-card {
+        width: 100%;
+        max-width: 420px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
     .catalog-customer-card__title {
         font-size: 0.92rem;
         line-height: 1.25;

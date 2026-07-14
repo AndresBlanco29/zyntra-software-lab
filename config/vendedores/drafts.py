@@ -20,7 +20,12 @@ def _normalize_cart(cart):
 
 
 def _normalize_nota(nota):
-	return str(nota or '').strip()
+	# Keep spaces while drafting so typing multi-word comments does not fight the UI.
+	return str(nota or '')
+
+
+def _nota_is_empty(nota):
+	return not str(nota or '').strip()
 
 
 def load_draft_cart(*, vendedor, cliente_id):
@@ -58,7 +63,7 @@ def save_draft_cart(*, vendedor, cliente_id, cart, nota=None):
 	else:
 		nota_value = _normalize_nota(nota)
 
-	if not cart and not nota_value:
+	if not cart and _nota_is_empty(nota_value):
 		TakeOrderDraft.objects.filter(vendedor=vendedor, cliente_id=cliente_id).delete()
 		return None
 

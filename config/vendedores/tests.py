@@ -206,6 +206,43 @@ class VendedorPedidoTests(TestCase):
 		self.assertContains(response, 'pedidoVolverCatalogoDesdeNotaBtn')
 		self.assertContains(response, 'keep adding')
 
+	def test_guardar_nota_pedido_preserves_spaces_while_typing(self):
+		self.client.force_login(self.vendor)
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session['pedido'] = {
+			'1': {
+				'presentacion_id': str(self.presentacion.id),
+				'producto_id': self.presentacion.producto_id,
+				'nombre': self.presentacion.producto.nombre,
+				'presentacion_nombre': self.presentacion.nombre,
+				'precio': 233.0,
+				'cantidad': 1,
+			}
+		}
+		session.save()
+
+		save_response = self.client.post(
+			reverse('guardar_nota_pedido'),
+			{'nota': 'Leave at  back door '},
+		)
+		self.assertEqual(save_response.status_code, 200)
+		self.assertTrue(save_response.json()['success'])
+		self.assertEqual(save_response.json()['nota'], 'Leave at  back door ')
+
+		summary = self.client.get(reverse('ver_pedido'))
+		self.assertContains(summary, 'Leave at  back door ', html=False)
+
+		send_response = self.client.post(
+			reverse('enviar_pedido'),
+			{'tipo_orden': 'telefono', 'nota': 'Leave at  back door '},
+		)
+		self.assertEqual(send_response.status_code, 200)
+		self.assertTrue(send_response.json()['success'])
+		pedido = Pedido.objects.get()
+		self.assertEqual(pedido.nota_cliente, 'Leave at  back door')
+		self.assertNotIn('pedido_nota', self.client.session)
+
 	def test_guardar_nota_pedido_persists_until_send(self):
 		self.client.force_login(self.vendor)
 		session = self.client.session

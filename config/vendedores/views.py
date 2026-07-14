@@ -939,7 +939,7 @@ def enviar_pedido(request):
     try:
         nota_cliente = (request.POST.get('nota') or '').strip()
         if not nota_cliente:
-            nota_cliente = get_session_pedido_nota(request)
+            nota_cliente = get_session_pedido_nota(request).strip()
         pedido = crear_pedido_desde_items(
             cliente=cliente,
             items_payload=items_payload,

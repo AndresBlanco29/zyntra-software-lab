@@ -39,6 +39,18 @@
   </a>
   {% endif %}
 </div>
+
+<div class="card shadow-sm mb-3 border-info-subtle">
+  <div class="card-body py-3">
+    <div class="fw-semibold mb-1">{% trans "Order comment" %}</div>
+    {% if pedido.nota_cliente %}
+    <div class="mb-0" id="pedidoNotaClienteDisplay">{{ pedido.nota_cliente|linebreaksbr }}</div>
+    {% else %}
+    <div class="text-muted mb-0" id="pedidoNotaClienteDisplay">-</div>
+    {% endif %}
+  </div>
+</div>
+
 {% if pedido.es_parcial and pedido_raiz %}
 <div class="alert alert-secondary mb-3">
   {% trans "This is a partial order from" %}
@@ -628,7 +640,11 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-8">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">{% trans "Order comment" %}</label>
+        <textarea class="form-control" rows="2" readonly aria-label="{% trans 'Order comment' %}">{{ pedido.nota_cliente }}</textarea>
+      </div>
+      <div class="col-md-4">
         <label class="form-label fw-semibold">{% trans "BackOffice note" %}</label>
         <input name="nota_backoffice" class="form-control" value="{{ pedido.nota_backoffice }}">
       </div>

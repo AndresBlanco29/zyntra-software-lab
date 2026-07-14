@@ -111,6 +111,18 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'text-success fw-semibold')
 		self.assertNotContains(response, 'Physical:')
 
+	def test_backoffice_detail_shows_order_comment(self):
+		self.pedido.nota_cliente = 'Leave at back door'
+		self.pedido.save(update_fields=['nota_cliente'])
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Order comment')
+		self.assertContains(response, 'pedidoNotaClienteDisplay')
+		self.assertContains(response, 'Leave at back door')
+
 	def test_assigning_picking_sets_selector_and_notifies(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 

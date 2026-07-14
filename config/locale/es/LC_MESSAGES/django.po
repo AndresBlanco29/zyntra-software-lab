@@ -14039,3 +14039,6 @@ msgstr "Agrega un comentario para este pedido…"
 
 msgid "This comment is saved on the sales order when you send it."
 msgstr "Este comentario se guarda en el pedido al enviarlo."
+
+msgid "Order comment"
+msgstr "Comentario del pedido"

@@ -14051,3 +14051,6 @@ msgstr "Guardar y seguir agregando"
 
 msgid "This comment is auto-saved with your draft. You can go back to add more products and it will still be here when you send the order."
 msgstr "Este comentario se guarda automáticamente con tu borrador. Puedes volver a agregar productos y seguirá aquí cuando envíes el pedido."
+
+msgid "Clear search"
+msgstr "Borrar búsqueda"

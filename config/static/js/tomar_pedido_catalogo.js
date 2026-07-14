@@ -377,6 +377,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function submitCatalogFilters() {
         const form = document.getElementById('catalogo-vendedor-filter-form');
         if (form) {
+            if (buscador && window.PreserveSearchFocus) {
+                window.PreserveSearchFocus.remember(buscador);
+            }
             form.submit();
         }
     }
@@ -384,10 +387,44 @@ document.addEventListener('DOMContentLoaded', function() {
     const buscador = document.getElementById('buscador');
     const filtroCategoria = document.getElementById('filtroCategoria');
     const filtroMarca = document.getElementById('filtroMarca');
+    const clearSearchButton = document.getElementById('catalogoSearchClear');
+    const filterForm = document.getElementById('catalogo-vendedor-filter-form');
 
-    if (buscador && window.PreserveSearchFocus) {
-        window.PreserveSearchFocus.bindDebouncedSearch(buscador, submitCatalogFilters);
+    function syncClearSearchVisibility() {
+        if (!buscador || !clearSearchButton) {
+            return;
+        }
+        clearSearchButton.classList.toggle('d-none', !(buscador.value || '').length);
     }
+
+    if (buscador) {
+        buscador.addEventListener('input', syncClearSearchVisibility);
+        buscador.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                submitCatalogFilters();
+            }
+        });
+    }
+
+    if (clearSearchButton && buscador) {
+        clearSearchButton.addEventListener('click', function () {
+            buscador.value = '';
+            syncClearSearchVisibility();
+            buscador.focus({ preventScroll: true });
+            submitCatalogFilters();
+        });
+    }
+
+    if (filterForm) {
+        filterForm.addEventListener('submit', function () {
+            if (buscador && window.PreserveSearchFocus) {
+                window.PreserveSearchFocus.remember(buscador);
+            }
+        });
+    }
+
+    syncClearSearchVisibility();
 
     if (filtroCategoria) {
         filtroCategoria.addEventListener('change', function () {

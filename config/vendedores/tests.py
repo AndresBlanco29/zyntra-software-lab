@@ -38,6 +38,12 @@ class VendedorPedidoTests(TestCase):
 			pais='USA',
 			sales_tax_number='TX-VENDOR-1',
 			certificado_tax='certificados/test.pdf',
+			aprobado=True,
+			vendedor_asignado=self.vendor,
+		)
+		ClienteVendedorAsignacion.objects.get_or_create(
+			cliente=self.customer,
+			vendedor=self.vendor,
 		)
 		categoria = Categoria.objects.create(nombre='Bebidas')
 		marca = Marca.objects.create(nombre='Marca Vendor Test')
@@ -408,6 +414,9 @@ class VendedorPedidoTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(len(response.context['productos']), 1)
 		self.assertContains(response, 'Unique Catalog Search Product')
+		self.assertContains(response, 'catalogoSearchButton')
+		self.assertContains(response, 'catalogoSearchClear')
+		self.assertContains(response, 'catalog-filter-sticky')
 
 	def test_catalogo_vendedor_search_preserves_trailing_space_in_input(self):
 		self.client.force_login(self.vendor)

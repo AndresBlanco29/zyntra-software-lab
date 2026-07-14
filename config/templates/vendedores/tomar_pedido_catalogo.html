@@ -157,20 +157,37 @@ Showing {{ start }}-{{ end }} of {{ total }} products
 
 </div>
 
+</div>
 
-<form method="get" id="catalogo-vendedor-filter-form" class="d-flex gap-2 mt-2">
+<div class="catalog-filter-sticky">
+<form method="get" id="catalogo-vendedor-filter-form" class="catalog-filter-form">
 
-<input
-type="search"
-id="buscador"
-name="q"
-value="{{ filter_q }}"
-class="form-control"
-placeholder="{% trans 'Buscar Productos' %}"
-autocomplete="off"
->
+<div class="catalog-search-row">
+  <div class="catalog-search-field">
+    <input
+      type="text"
+      id="buscador"
+      name="q"
+      value="{{ filter_q }}"
+      class="form-control catalog-search-input"
+      placeholder="{% trans 'Buscar Productos' %}"
+      autocomplete="off"
+      enterkeyhint="search"
+    >
+    <button
+      type="button"
+      class="catalog-search-clear{% if not filter_q %} d-none{% endif %}"
+      id="catalogoSearchClear"
+      aria-label="{% trans 'Clear search' %}"
+      title="{% trans 'Clear search' %}"
+    >&times;</button>
+  </div>
+  <button type="submit" class="btn btn-primary catalog-search-submit" id="catalogoSearchButton">
+    {% trans "Search" %}
+  </button>
+</div>
 
-
+<div class="catalog-filter-selects">
 <select class="form-select" id="filtroCategoria" name="categoria">
 
 <option value="">
@@ -209,9 +226,9 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 {% endfor %}
 
 </select>
+</div>
 
 </form>
-
 </div>
 
 <div class="card shadow-sm mb-4 bulk-price-tier-panel">

@@ -198,6 +198,70 @@ transform:scale(1.05);
     color: #6b7280;
 }
 
+.catalog-filter-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.catalog-search-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+}
+
+.catalog-search-field {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.catalog-search-input {
+    padding-right: 2.4rem;
+}
+
+.catalog-search-clear {
+    position: absolute;
+    top: 50%;
+    right: 0.35rem;
+    transform: translateY(-50%);
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: #64748b;
+    font-size: 1.35rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.catalog-search-clear:hover,
+.catalog-search-clear:focus {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.catalog-search-submit {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    font-weight: 700;
+    min-height: 38px;
+}
+
+.catalog-filter-selects {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.catalog-filter-selects .form-select {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
 @media (max-width: 992px) {
     .sidebar {
         display: block !important;
@@ -255,6 +319,29 @@ transform:scale(1.05);
 @media (max-width: 767.98px) {
     .col-md-10 {
         padding: 14px !important;
+    }
+
+    .catalog-filter-sticky {
+        position: sticky;
+        top: var(--panel-navbar-offset, 70px);
+        z-index: 40;
+        background: #f4f6f9;
+        margin-left: -14px;
+        margin-right: -14px;
+        margin-bottom: 0.85rem;
+        padding: 0.55rem 14px 0.75rem;
+        border-bottom: 1px solid #d7dee8;
+        box-shadow: 0 8px 16px rgba(15, 23, 42, 0.06);
+    }
+
+    .catalog-search-submit {
+        min-width: 5.5rem;
+        padding-left: 0.85rem;
+        padding-right: 0.85rem;
+    }
+
+    .catalog-filter-selects {
+        flex-direction: column;
     }
 
     .precio-select-shell .precio-select {

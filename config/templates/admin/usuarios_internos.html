@@ -22,7 +22,7 @@
     <div class="col-12 col-md-6">
       <select id="filtroRol" class="form-select">
         <option value="">{% trans "All roles" %}</option>
-        <option value="vendedor">{% trans "Vendor" %}</option>
+        <option value="vendedor">{% trans "Sales" %}</option>
         <option value="backoffice">{% trans "BackOffice" %}</option>
         <option value="seleccionador">{% trans "Selector" %}</option>
         <option value="driver">{% trans "Driver" %}</option>
@@ -62,7 +62,7 @@
       <td>{{ usuario.telefono }}</td>
       <td>
         {% if usuario.role == 'vendedor' %}
-          <span class="badge bg-primary">{% trans "Vendor" %}</span>
+          <span class="badge bg-primary">{% trans "Sales" %}</span>
         {% elif usuario.role == 'seleccionador' %}
           <span class="badge bg-secondary">{% trans "Selector" %}</span>
         {% elif usuario.role == 'driver' %}

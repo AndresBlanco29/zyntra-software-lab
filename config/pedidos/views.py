@@ -248,7 +248,7 @@ def _pedido_state_label(state):
 def _pedido_origin_label(origin):
 	return {
 		'CLIENTE': _('Customer'),
-		'VENDEDOR': _('Vendor'),
+		'VENDEDOR': _('Sales'),
 	}.get(origin, origin)
 
 

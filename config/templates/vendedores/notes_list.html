@@ -10,7 +10,7 @@
     <p class="text-muted mb-0">{% trans "Credit memos and returns you submitted. BackOffice approves them before they affect the customer balance." %}</p>
   </div>
   <div class="d-flex gap-2 flex-wrap">
-    <a href="{% url 'vendedor_home' %}" class="btn btn-outline-secondary">{% trans "Vendor menu" %}</a>
+    <a href="{% url 'vendedor_home' %}" class="btn btn-outline-secondary">{% trans "Sales menu" %}</a>
     {% if can_create_notes %}
     <a href="{% url 'vendedor_credit_memo_create' %}" class="btn btn-primary">{% trans "Credit Memo" %}</a>
     <a href="{% url 'vendedor_return_create' %}" class="btn btn-success">{% trans "Return" %}</a>

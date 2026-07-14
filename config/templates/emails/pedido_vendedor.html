@@ -13,7 +13,7 @@
 		<tr><td style="padding:5px 0;"><strong>{% trans "Contact:" %}</strong></td><td>{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}</td></tr>
 		<tr><td style="padding:5px 0;"><strong>{% trans "Phone:" %}</strong></td><td>{{ cliente.telefono }}</td></tr>
 		<tr><td style="padding:5px 0;"><strong>{% trans "Email:" %}</strong></td><td>{{ cliente.usuario.email }}</td></tr>
-		<tr><td style="padding:5px 0;"><strong>{% trans "Vendor:" %}</strong></td><td>{{ vendedor }}</td></tr>
+		<tr><td style="padding:5px 0;"><strong>{% trans "Sales:" %}</strong></td><td>{{ vendedor }}</td></tr>
 		<tr>
 			<td style="padding:5px 0;"><strong>{% trans "Order type:" %}</strong></td>
 			<td>{% if tipo_orden == "telefono" %}{% trans "Phone order" %}{% elif tipo_orden == "personal" %}{% trans "In-person order" %}{% else %}-{% endif %}</td>

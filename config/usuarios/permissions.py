@@ -40,8 +40,8 @@ PERMISSION_SECTIONS = (
             },
             {
                 'code': 'admin.customers.assign',
-                'label': _('Assign customers to vendors'),
-                'description': _('Assign one, several or all customers to specific vendors.'),
+                'label': _('Assign customers to sales'),
+                'description': _('Assign one, several or all customers to specific sales users.'),
             },
             {
                 'code': 'admin.products.view',
@@ -102,15 +102,15 @@ PERMISSION_SECTIONS = (
             },
             {
                 'code': 'backoffice.customers.assign',
-                'label': _('Assign customers to vendors'),
-                'description': _('Assign one, several or all customers to specific vendors.'),
+                'label': _('Assign customers to sales'),
+                'description': _('Assign one, several or all customers to specific sales users.'),
             },
         ),
     },
     {
         'key': 'sales_access',
         'title': _('Sales'),
-        'description': _('Customer management and vendor order-taking tools.'),
+        'description': _('Customer management and sales order-taking tools.'),
         'permissions': (
             {
                 'code': 'vendor.customers.view',
@@ -125,7 +125,7 @@ PERMISSION_SECTIONS = (
             {
                 'code': 'vendor.orders.view',
                 'label': _('Order taking'),
-                'description': _('View the vendor order-taking flow and order summary.'),
+                'description': _('View the sales order-taking flow and order summary.'),
             },
             {
                 'code': 'vendor.orders.manage',

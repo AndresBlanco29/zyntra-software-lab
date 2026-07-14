@@ -75,7 +75,7 @@
 </div>
 
 <div class="col-md-6 mb-3">
-<strong>{% trans "Assigned vendor:" %}</strong><br>
+<strong>{% trans "Assigned sales:" %}</strong><br>
 {% if cliente.vendedor_asignado %}
   {{ cliente.vendedor_asignado.first_name }} {{ cliente.vendedor_asignado.last_name }}
   <span class="text-muted">({{ cliente.vendedor_asignado.email }})</span>
@@ -86,7 +86,7 @@
   {% if cliente.vendedor_asignado %}
   <div class="mt-2">
     <a href="{% url 'asignar_clientes_vendedor' cliente.vendedor_asignado.id %}" class="btn btn-sm btn-outline-primary">
-      {% trans "Manage vendor assignments" %}
+      {% trans "Manage sales assignments" %}
     </a>
   </div>
   {% endif %}

@@ -85,7 +85,7 @@ def _pedido_status_badge_class(estado):
 
 def _quote_origin_label(cotizacion):
 	if cotizacion.vendedor_id:
-		return _('Vendor')
+		return _('Sales')
 	return _('Customer')
 
 
@@ -105,7 +105,7 @@ def _pedido_state_label(state):
 def _pedido_origin_label(origin):
 	return {
 		'CLIENTE': _('Customer'),
-		'VENDEDOR': _('Vendor'),
+		'VENDEDOR': _('Sales'),
 		'BACKOFFICE': _('BackOffice'),
 	}.get(origin, origin)
 

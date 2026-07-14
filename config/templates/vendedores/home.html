@@ -1,7 +1,7 @@
 {% extends "bases/base_vendedor.html" %}
 {% load i18n %}
 
-{% block title %}{% trans "Vendor menu" %}{% endblock %}
+{% block title %}{% trans "Sales menu" %}{% endblock %}
 
 {% block content %}
 <div class="vendor-home">
@@ -21,7 +21,7 @@
   </div>
   {% else %}
   <div class="alert alert-warning mb-0">
-    {% trans "No vendor actions are available for your account. Ask an administrator to review your permissions." %}
+    {% trans "No sales actions are available for your account. Ask an administrator to review your permissions." %}
   </div>
   {% endif %}
 </div>

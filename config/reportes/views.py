@@ -54,7 +54,7 @@ EXPORTABLE_SECTIONS = {
 	'categories': _('Categories'),
 	'payments': _('Payment methods'),
 	'products': _('Products'),
-	'vendors': _('Vendors'),
+	'vendors': _('Sales'),
 	'users': _('Internal users'),
 }
 DONUT_CHART_COLORS = (
@@ -600,7 +600,7 @@ def _build_export_sections(report_data, section='all'):
 		{
 			'key': 'customers',
 			'title': _('Top customers'),
-			'headers': [_('Customer'), _('Invoices'), _('Sales'), _('Collected'), _('Pending')],
+			'headers': [_('Customer'), _('Invoices'), _('Revenue'), _('Collected'), _('Pending')],
 			'rows': [[row['name'], row['invoices_count'], _format_money(row['sales_amount']), _format_money(row['collected_amount']), _format_money(row['pending_amount'])] for row in report_data['customer_rows']],
 		},
 		{
@@ -623,8 +623,8 @@ def _build_export_sections(report_data, section='all'):
 		},
 		{
 			'key': 'vendors',
-			'title': _('Vendors'),
-			'headers': [_('Vendor'), _('Orders'), _('Invoices'), _('Sales'), _('Pending')],
+			'title': _('Sales'),
+			'headers': [_('Sales'), _('Orders'), _('Invoices'), _('Amount'), _('Pending')],
 			'rows': [[row['name'], row['orders_count'], row['invoices_count'], _format_money(row['sales_amount']), _format_money(row['pending_amount'])] for row in report_data['vendor_rows']],
 		},
 		{

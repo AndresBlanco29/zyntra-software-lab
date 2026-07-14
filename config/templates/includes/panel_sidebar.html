@@ -5,7 +5,7 @@
 
 <div class="sidebar-user">
 {% if request.user.role == "vendedor" %}
-  {% trans "Vendedor" %}: {{ request.user.username }}
+  {% trans "Sales" %}: {{ request.user.username }}
 {% else %}
   {% if request.user.is_superuser or request.user.role == "admin" %}
     {% trans "Administrador" %}: {% firstof request.user.get_full_name request.user.username %}
@@ -104,7 +104,7 @@
     {% if request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'vendor.notes.view' %}
     <a href="{% url 'vendedor_home' %}"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'vendedor_home' %}active{% endif %}">
-      {% trans "Vendor menu" %}
+      {% trans "Sales menu" %}
     </a>
     {% endif %}
 
@@ -157,7 +157,7 @@
     {% if request.user|has_internal_permission:'admin.customers.assign' or request.user|has_internal_permission:'backoffice.customers.assign' %}
     <a href="{% url 'lista_asignacion_clientes_vendedores' %}"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_asignacion_clientes_vendedores' or request.resolver_match.url_name == 'asignar_clientes_vendedor' %}active{% endif %}">
-      {% trans "Assign Customers to Vendors" %}
+      {% trans "Assign Customers to Sales" %}
     </a>
     {% endif %}
   </div>

@@ -25,7 +25,7 @@ class Pedido(models.Model):
 
 	ORIGEN_CHOICES = (
 		('CLIENTE', 'Cliente'),
-		('VENDEDOR', 'Vendedor'),
+		('VENDEDOR', 'Sales'),
 		('BACKOFFICE', 'BackOffice'),
 	)
 

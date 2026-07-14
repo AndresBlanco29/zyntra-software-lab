@@ -112,7 +112,7 @@ class CrmPipelineColumn:
 def _pedido_origin_label(origin):
 	return {
 		'CLIENTE': _('Customer'),
-		'VENDEDOR': _('Vendor'),
+		'VENDEDOR': _('Sales'),
 		'BACKOFFICE': _('BackOffice'),
 	}.get(origin, origin)
 

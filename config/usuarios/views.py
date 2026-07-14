@@ -256,7 +256,7 @@ def _get_allowed_internal_roles():
 
 def _get_internal_role_label(role):
     return {
-        'vendedor': _('Vendor'),
+        'vendedor': _('Sales'),
         'backoffice': _('BackOffice'),
         'seleccionador': _('Selector'),
         'driver': _('Driver'),

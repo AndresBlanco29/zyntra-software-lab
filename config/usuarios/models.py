@@ -5,7 +5,7 @@ class Usuario(AbstractUser):
 
     ROLE_CHOICES = (
         ('admin', 'Administrador'),
-        ('vendedor', 'Vendedor'),
+        ('vendedor', 'Sales'),
         ('backoffice', 'BackOffice'),
         ('seleccionador', 'Seleccionador'),
         ('driver', 'Driver'),

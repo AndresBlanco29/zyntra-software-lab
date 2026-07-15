@@ -1457,10 +1457,10 @@
 
     <div class="qb-outbound-grid">
       {% url 'quickbooks_sync_customers_batch' as customers_batch_url %}
-      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Customers") form_action=customers_batch_url records=quickbooks_pending_customers record_mode="customer" outbound_scope="customers" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_pending_customer_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") empty_message=_("No pending customers match your search.") panel_note=_("Creates or links the customer in QuickBooks before invoices can be sent.") only %}
+      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Customers") form_action=customers_batch_url records=quickbooks_pending_customers record_mode="customer" outbound_scope="customers" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_pending_customer_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") empty_message=_("No pending customers match your search.") panel_note=_("Creates or links the customer in QuickBooks before invoices can be sent.") batch_operation="sync_customers_batch" only %}
 
       {% url 'quickbooks_sync_products_batch' as products_batch_url %}
-      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Catalog items") form_action=products_batch_url records=quickbooks_pending_presentations record_mode="presentation" outbound_scope="presentations" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_pending_presentation_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") empty_message=_("No pending items match your search.") panel_note=_("For products not yet in QuickBooks. Already linked products are updated in the section below.") only %}
+      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Catalog items") form_action=products_batch_url records=quickbooks_pending_presentations record_mode="presentation" outbound_scope="presentations" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_pending_presentation_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") empty_message=_("No pending items match your search.") panel_note=_("For products not yet in QuickBooks. Already linked products are updated in the section below.") batch_operation="sync_products_batch" only %}
 
       <div class="qb-outbound-grid__full" id="qb-push-linked-catalog">
         <div class="qb-outbound-panel qb-outbound-panel--wide">
@@ -1473,7 +1473,7 @@
           </div>
           <div class="qb-outbound-linked-layout">
             {% url 'quickbooks_push_linked_products_batch' as linked_products_batch_url %}
-            {% include "backoffice/partials/quickbooks_outbound_panel.html" with title="" form_action=linked_products_batch_url records=quickbooks_linked_presentations record_mode="linked_presentation" outbound_scope="linked_presentations" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_catalog_presentation_count send_all_count=quickbooks_linked_presentation_count send_selected_label=_("Update selected") send_all_label=_("Update all linked") empty_message=_("No products match your search.") panel_class="qb-outbound-panel--embedded" only %}
+            {% include "backoffice/partials/quickbooks_outbound_panel.html" with title="" form_action=linked_products_batch_url records=quickbooks_linked_presentations record_mode="linked_presentation" outbound_scope="linked_presentations" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_catalog_presentation_count send_all_count=quickbooks_linked_presentation_count send_selected_label=_("Update selected") send_all_label=_("Update all linked") empty_message=_("No products match your search.") panel_class="qb-outbound-panel--embedded" batch_operation="push_linked_products_batch" only %}
             <div class="qb-outbound-quick-action">
               <form method="post" action="{% url 'quickbooks_push_linked_products_to_quickbooks' %}" data-qb-operation="push_linked_products_to_quickbooks">
                 {% csrf_token %}
@@ -1488,10 +1488,10 @@
       </div>
 
       {% url 'quickbooks_sync_invoices_batch' as invoices_batch_url %}
-      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Invoices") form_action=invoices_batch_url records=quickbooks_pending_invoices record_mode="invoice" outbound_scope="invoices" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_pending_invoice_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") empty_message=_("No released invoices pending. Complete Daily Closing first.") panel_note=_("Only invoices released from Daily Closing can be sent. QuickBooks will also create or link the customer and catalog items.") only %}
+      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Invoices") form_action=invoices_batch_url records=quickbooks_pending_invoices record_mode="invoice" outbound_scope="invoices" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_pending_invoice_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") empty_message=_("No released invoices pending. Complete Daily Closing first.") panel_note=_("Only invoices released from Daily Closing can be sent. QuickBooks will also create or link the customer and catalog items.") batch_operation="sync_invoices_batch" only %}
 
       {% url 'quickbooks_sync_adjustment_notes_batch' as notes_batch_url %}
-      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Adjustment notes") form_action=notes_batch_url records=quickbooks_pending_notes record_mode="note" outbound_scope="notes" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_pending_note_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") empty_message=_("No pending approved notes match your search.") panel_note=_("Only approved credit or debit notes can be sent to QuickBooks.") only %}
+      {% include "backoffice/partials/quickbooks_outbound_panel.html" with title=_("Adjustment notes") form_action=notes_batch_url records=quickbooks_pending_notes record_mode="note" outbound_scope="notes" outbound_search_url=quickbooks_outbound_search_url pending_count=quickbooks_pending_note_count send_selected_label=_("Send selected") send_all_label=_("Send all pending") empty_message=_("No pending approved notes match your search.") panel_note=_("Only approved credit or debit notes can be sent to QuickBooks.") batch_operation="sync_adjustment_notes_batch" only %}
     </div>
   </section>
 
@@ -1893,6 +1893,14 @@
         actionButtons.forEach(function (button) { button.disabled = true; });
         if (listEl) listEl.classList.add('is-loading');
 
+        const batchOperation = form.getAttribute('data-qb-batch-operation') || 'sync_invoices_batch';
+        if (window.qbTaskUI) {
+          window.qbTaskUI.showOverlay();
+          window.qbTaskUI.setTaskDescription(batchOperation);
+          window.qbTaskUI.setProgress(4);
+          window.qbTaskUI.setMessage('{% filter escapejs %}{% trans "Sending records to QuickBooks..." %}{% endfilter %}');
+        }
+
         fetch(form.action, {
           method: 'POST',
           credentials: 'same-origin',
@@ -1910,12 +1918,14 @@
             return;
           }
           if (res.ok && res.json && res.json.task_id && window.qbTaskUI) {
-            window.qbTaskUI.showOverlay();
-            window.qbTaskUI.setTaskDescription(res.json.operation || 'sync_invoices_batch');
+            window.qbTaskUI.setTaskDescription(res.json.operation || batchOperation);
             window.qbTaskUI.setProgress(4);
             window.qbTaskUI.setMessage('{% filter escapejs %}{% trans "Sending records to QuickBooks..." %}{% endfilter %}');
-            window.qbTaskUI.startPolling(res.json.task_id, res.json.operation || 'sync_invoices_batch');
+            window.qbTaskUI.startPolling(res.json.task_id, res.json.operation || batchOperation);
             return;
+          }
+          if (window.qbTaskUI) {
+            window.qbTaskUI.hideOverlay();
           }
           if (res.ok) {
             window.location.reload();
@@ -1923,6 +1933,9 @@
           }
           throw new Error('{% filter escapejs %}{% trans "Update failed" %}{% endfilter %} (' + res.status + ')');
         }).catch(function (error) {
+          if (window.qbTaskUI) {
+            window.qbTaskUI.hideOverlay();
+          }
           form.querySelectorAll('button[type="submit"]').forEach(function (button) { button.disabled = false; });
           updateSelectionState();
           if (listEl) listEl.classList.remove('is-loading');

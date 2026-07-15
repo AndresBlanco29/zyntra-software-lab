@@ -19,7 +19,7 @@
   </div>
   {% endif %}
 
-  <form method="post" action="{{ form_action }}" class="qb-outbound-form d-flex flex-column flex-grow-1"{% if form_data_operation %} data-qb-operation="{{ form_data_operation }}"{% endif %}>
+  <form method="post" action="{{ form_action }}" class="qb-outbound-form d-flex flex-column flex-grow-1"{% if form_data_operation %} data-qb-operation="{{ form_data_operation }}"{% endif %}{% if batch_operation %} data-qb-batch-operation="{{ batch_operation }}"{% endif %}>
     {% csrf_token %}
     <input type="hidden" name="redirect_to" value="{{ request.path }}">
 

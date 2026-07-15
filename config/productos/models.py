@@ -8,6 +8,27 @@ from django.utils.translation import get_language, gettext_lazy as _
 from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_CHOICES, QUICKBOOKS_SYNC_STATUS_PENDING
 
 
+PLACEHOLDER_CODIGO_BARRAS_VALUES = frozenset({
+    '',
+    'none',
+    'null',
+    'n/a',
+    'na',
+    '-',
+    'undefined',
+})
+
+
+def normalize_codigo_barras(value):
+    """Return a real barcode or None. Empty / placeholder text must not hit the unique index."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text or text.casefold() in PLACEHOLDER_CODIGO_BARRAS_VALUES:
+        return None
+    return text
+
+
 def _normalize_translation_term(value):
     normalized = unicodedata.normalize("NFKD", (value or "").strip().lower())
     return "".join(char for char in normalized if not unicodedata.combining(char))
@@ -209,6 +230,14 @@ class Producto(models.Model):
         if get_language() == "en" and self.nombre_en:
             return self.nombre_en
         return self.nombre
+
+    def save(self, *args, **kwargs):
+        self.codigo_barras = normalize_codigo_barras(self.codigo_barras)
+        if self.nombre_en is None:
+            self.nombre_en = ''
+        if self.descripcion_en is None:
+            self.descripcion_en = ''
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.nombre

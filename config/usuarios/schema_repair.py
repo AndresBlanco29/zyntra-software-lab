@@ -229,6 +229,28 @@ def _create_missing_tables(connection, table_names):
         pending_models = remaining_models
 
 
+def _clear_placeholder_product_barcodes(connection, table_names):
+    """Convert literal placeholder barcodes like 'None' to NULL so edits do not hit unique collisions."""
+    table_name = 'productos_producto'
+    if table_name not in table_names:
+        return
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            f"""
+            UPDATE `{table_name}`
+            SET `codigo_barras` = NULL
+            WHERE `codigo_barras` IS NOT NULL
+              AND LOWER(TRIM(`codigo_barras`)) IN ('none', 'null', 'n/a', 'na', '-', 'undefined', '')
+            """
+        )
+        if cursor.rowcount:
+            logger.warning(
+                "Runtime schema repair cleared %s placeholder codigo_barras value(s)",
+                cursor.rowcount,
+            )
+
+
 def ensure_runtime_schema():
     global _schema_repair_completed, _schema_repair_running
 
@@ -276,6 +298,8 @@ def ensure_runtime_schema():
                     table_name,
                     new_field.column,
                 )
+
+        _clear_placeholder_product_barcodes(connection, table_names)
 
         with _schema_repair_lock:
             _schema_repair_completed = True

@@ -2,9 +2,18 @@ from django.core.cache import cache
 from django.core.paginator import Paginator
 import json
 from django.db.models import Prefetch, Q
+from django.db.utils import IntegrityError
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from .models import Producto, Categoria, Marca, Presentacion, ConfiguracionPrecios, ConfiguracionDescuentos
+from .models import (
+    Producto,
+    Categoria,
+    Marca,
+    Presentacion,
+    ConfiguracionPrecios,
+    ConfiguracionDescuentos,
+    normalize_codigo_barras,
+)
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
@@ -549,11 +558,11 @@ def crear_producto(request):
 
     if request.method == "POST":
 
-        nombre = request.POST.get("nombre")
-        nombre_en = request.POST.get("nombre_en")
-        codigo_barras = request.POST.get("codigo_barras")
-        descripcion = request.POST.get("descripcion")
-        descripcion_en = request.POST.get("descripcion_en")
+        nombre = (request.POST.get("nombre") or "").strip()
+        nombre_en = (request.POST.get("nombre_en") or "").strip()
+        codigo_barras = normalize_codigo_barras(request.POST.get("codigo_barras"))
+        descripcion = request.POST.get("descripcion") or ""
+        descripcion_en = (request.POST.get("descripcion_en") or "").strip()
 
         categoria_id = request.POST.get("categoria")
         marca_id = request.POST.get("marca")
@@ -574,19 +583,26 @@ def crear_producto(request):
         if marca_id:
             marca = Marca.objects.get(id=marca_id)
 
-        producto = Producto.objects.create(
-            nombre=nombre,
-            nombre_en=nombre_en,
-            codigo_barras=codigo_barras,
-            descripcion=descripcion,
-            descripcion_en=descripcion_en,
-            categoria=categoria,
-            marca=marca,
-            imagen=imagen,
-            activo=activo,
-            destacado=destacado,
-            descuento=descuento
-        )
+        try:
+            producto = Producto.objects.create(
+                nombre=nombre,
+                nombre_en=nombre_en,
+                codigo_barras=codigo_barras,
+                descripcion=descripcion,
+                descripcion_en=descripcion_en,
+                categoria=categoria,
+                marca=marca,
+                imagen=imagen,
+                activo=activo,
+                destacado=destacado,
+                descuento=descuento
+            )
+        except IntegrityError:
+            messages.error(
+                request,
+                _("Could not create the product because the barcode is already used by another product."),
+            )
+            return redirect("crear_producto")
 
         _create_presentaciones_for_producto(
             producto,
@@ -908,11 +924,11 @@ def editar_producto(request, producto_id):
 
         # -------- PRODUCTO --------
 
-        producto.nombre = request.POST.get("nombre")
-        producto.nombre_en = request.POST.get("nombre_en")
-        producto.codigo_barras = request.POST.get("codigo_barras")
-        producto.descripcion = request.POST.get("descripcion")
-        producto.descripcion_en = request.POST.get("descripcion_en")
+        producto.nombre = (request.POST.get("nombre") or "").strip()
+        producto.nombre_en = (request.POST.get("nombre_en") or "").strip()
+        producto.codigo_barras = normalize_codigo_barras(request.POST.get("codigo_barras"))
+        producto.descripcion = request.POST.get("descripcion") or ""
+        producto.descripcion_en = (request.POST.get("descripcion_en") or "").strip()
 
         categoria_id = request.POST.get("categoria")
         marca_id = request.POST.get("marca")
@@ -933,7 +949,14 @@ def editar_producto(request, producto_id):
 
         producto.descuento = request.POST.get("descuento") or 0
 
-        producto.save()
+        try:
+            producto.save()
+        except IntegrityError:
+            messages.error(
+                request,
+                _("Could not save the product because the barcode is already used by another product."),
+            )
+            return redirect("editar_producto", producto_id=producto.id)
 
         # -------- PRESENTACIONES --------
 

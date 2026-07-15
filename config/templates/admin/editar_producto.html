@@ -32,7 +32,7 @@
 
 <div class="mb-3">
 <label class="form-label">{% trans "Codigo de Barras" %} <span class="text-danger">*</span></label>
-<input type="text" name="codigo_barras" class="form-control" value="{{ producto.codigo_barras }}" placeholder="{% trans 'Ej: 7501234567890' %}" required>
+<input type="text" name="codigo_barras" class="form-control" value="{% if producto.codigo_barras %}{{ producto.codigo_barras }}{% endif %}" placeholder="{% trans 'Ej: 7501234567890' %}">
 </div>
 
 <!-- DESCRIPCION -->

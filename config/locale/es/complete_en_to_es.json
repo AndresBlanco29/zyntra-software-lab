@@ -438,6 +438,8 @@
   "Correo contacto": "Correo contacto",
   "Costo": "Costo",
   "Could not open the certificate.": "Could not abierto el certificate.",
+  "Could not create the product because the barcode is already used by another product.": "No se pudo crear el producto porque el código de barras ya lo usa otro producto.",
+  "Could not save the product because the barcode is already used by another product.": "No se pudo guardar el producto porque el código de barras ya lo usa otro producto.",
   "Country": "País",
   "Country is required.": "Country es obligatorio.",
   "Country:": "Pais",

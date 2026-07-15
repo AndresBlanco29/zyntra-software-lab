@@ -14221,3 +14221,9 @@ msgstr "Ver pedido"
 
 msgid "Quote pagination"
 msgstr "Paginación de cotizaciones"
+
+msgid "Could not create the product because the barcode is already used by another product."
+msgstr "No se pudo crear el producto porque el código de barras ya lo usa otro producto."
+
+msgid "Could not save the product because the barcode is already used by another product."
+msgstr "No se pudo guardar el producto porque el código de barras ya lo usa otro producto."

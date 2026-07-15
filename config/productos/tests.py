@@ -474,3 +474,44 @@ class ProductPresentationFormTests(TestCase):
 		self.assertContains(get_response, 'value="5"')
 		self.assertContains(get_response, 'value="50"')
 
+	def test_editar_producto_normalizes_placeholder_barcode_to_null(self):
+		producto = Producto.objects.create(
+			nombre='Editable Product',
+			nombre_en='',
+			categoria=self.categoria,
+			marca=self.marca,
+			codigo_barras='TEMP-EDIT',
+			activo=True,
+		)
+		Producto.objects.filter(pk=producto.pk).update(codigo_barras='None')
+		producto.refresh_from_db()
+		self.assertEqual(producto.codigo_barras, 'None')
+
+		presentacion = Presentacion.objects.create(
+			producto=producto,
+			nombre='Caja',
+			unidades=12,
+			tipo_contenido='unidades',
+			costo=Decimal('10.00'),
+		)
+		self.client.force_login(self.admin)
+		response = self.client.post(reverse('editar_producto', args=[producto.id]), {
+			'nombre': 'Editable Product Updated',
+			'nombre_en': '',
+			'codigo_barras': 'None',
+			'categoria': str(self.categoria.id),
+			'marca': str(self.marca.id),
+			'activo': 'on',
+			f'presentacion_nombre_{presentacion.id}': 'Caja',
+			f'tipo_contenido_{presentacion.id}': 'unidades',
+			f'unidades_{presentacion.id}': '12',
+			f'costo_{presentacion.id}': '10.00',
+			f'pallet_tie_{presentacion.id}': '8',
+			f'pallet_high_{presentacion.id}': '5',
+		})
+		self.assertEqual(response.status_code, 302)
+		producto.refresh_from_db()
+		self.assertEqual(producto.nombre, 'Editable Product Updated')
+		self.assertIsNone(producto.codigo_barras)
+		self.assertEqual(producto.presentaciones.get().pallet_quantity, 40)
+

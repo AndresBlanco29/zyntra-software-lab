@@ -1125,7 +1125,7 @@ def cliente_cotizacion_recibida_detalle(request, token):
     def build_cliente_quote_rows(post_data=None):
         rows = []
         items_payload = []
-        total = Decimal('0')
+        total = Decimal('0.00')
 
         for item in list(cotizacion.items.select_related('presentacion__producto')):
             marked_delete = bool(post_data and post_data.get(f'eliminar_{item.id}'))
@@ -1133,11 +1133,34 @@ def cliente_cotizacion_recibida_detalle(request, token):
                 post_data.get(f'cantidad_{item.id}') if post_data else item.cantidad,
                 item.cantidad,
             )
-            subtotal = _parse_decimal(item.precio) * quantity
+            list_price = _parse_decimal(item.precio)
+            discount_applied = bool(item.descuento_aplicado)
+            discount_amount = _parse_decimal(item.descuento_monto, 0) if discount_applied else Decimal('0.00')
+            net_unit_price = calcular_precio_unitario_neto_item(
+                precio=list_price,
+                descuento_aplicado=discount_applied,
+                descuento_monto=discount_amount,
+            )
+            subtotal = calcular_subtotal_item_pedido(
+                precio=list_price,
+                cantidad=quantity,
+                descuento_aplicado=discount_applied,
+                descuento_monto=discount_amount,
+            )
+            discount_line_total = (
+                (discount_amount * Decimal(str(quantity or 0))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                if discount_applied
+                else Decimal('0.00')
+            )
 
             rows.append({
                 'item': item,
                 'quantity': quantity,
+                'list_price': list_price,
+                'descuento_aplicado': discount_applied,
+                'descuento_monto': discount_amount,
+                'descuento_linea_total': discount_line_total,
+                'precio_unitario_neto': net_unit_price,
                 'subtotal': subtotal,
                 'marked_delete': marked_delete,
             })
@@ -1149,10 +1172,12 @@ def cliente_cotizacion_recibida_detalle(request, token):
             items_payload.append({
                 'presentacion': item.presentacion,
                 'cantidad': quantity,
-                'precio': item.precio,
+                'precio': list_price,
+                'descuento_aplicado': discount_applied,
+                'descuento_monto': discount_amount,
             })
 
-        return rows, items_payload, total
+        return rows, items_payload, total.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
     if request.method == 'POST':
         if not puede_editar:
@@ -1196,6 +1221,7 @@ def cliente_cotizacion_recibida_detalle(request, token):
                 'puede_editar': puede_editar,
                 'pendientes_cotizaciones': _cotizaciones_pendientes_cliente(cliente),
                 'quote_rows': quote_rows,
+                'current_total': total,
                 'pending_nota_cliente': nota_cliente,
                 'pending_acepta_terminos': bool(request.POST.get('acepta_terminos')),
             }
@@ -1209,6 +1235,7 @@ def cliente_cotizacion_recibida_detalle(request, token):
                 'puede_editar': puede_editar,
                 'pendientes_cotizaciones': _cotizaciones_pendientes_cliente(cliente),
                 'quote_rows': quote_rows,
+                'current_total': total,
                 'pending_nota_cliente': nota_cliente,
                 'pending_acepta_terminos': False,
             }

@@ -94,7 +94,7 @@
             </div>
             <div class="col-md-4">
               <small class="text-muted d-block">{% trans "Total" %}</small>
-              <strong>${{ cotizacion.total }}</strong>
+              <strong>${{ current_total|default:cotizacion.total|floatformat:2 }}</strong>
             </div>
             <div class="col-12">
               <small class="text-muted d-block">{% trans "BackOffice note" %}</small>
@@ -119,15 +119,17 @@
             <div class="alert alert-info">{% trans "This order already has an order generated or finished. You can only review the summary." %}</div>
           {% endif %}
 
-          <div class="table-responsive mb-3">
-            <table class="table align-middle mb-0">
+          <div class="table-responsive mb-3 mobile-stack-responsive">
+            <table class="table align-middle mb-0 mobile-stack-table">
               <thead>
                 <tr>
                   <th>{% trans "Product" %}</th>
                   <th>{% trans "Presentation" %}</th>
-                  <th>{% trans "Price" %}</th>
+                  <th class="text-end">{% trans "List price" %}</th>
+                  <th class="text-end">{% trans "Discount" %}</th>
+                  <th class="text-end">{% trans "You pay" %}</th>
                   <th>{% trans "Quantity" %}</th>
-                  <th>{% trans "Subtotal" %}</th>
+                  <th class="text-end">{% trans "Subtotal" %}</th>
                   {% if puede_editar %}
                     <th>{% trans "Remove" %}</th>
                   {% endif %}
@@ -136,10 +138,24 @@
               <tbody>
                 {% for row in quote_rows %}
                   <tr>
-                    <td>{{ row.item.presentacion.producto.nombre }}</td>
-                    <td>{{ row.item.presentacion.nombre }}</td>
-                    <td>${{ row.item.precio }}</td>
-                    <td>
+                    <td data-label="{% trans 'Product' %}">{{ row.item.presentacion.producto.nombre }}</td>
+                    <td data-label="{% trans 'Presentation' %}">{{ row.item.presentacion.nombre_traducido }}</td>
+                    <td data-label="{% trans 'List price' %}" class="text-end">${{ row.list_price|floatformat:2 }}</td>
+                    <td data-label="{% trans 'Discount' %}" class="text-end">
+                      {% if row.descuento_aplicado and row.descuento_monto %}
+                      -${{ row.descuento_monto|floatformat:2 }}
+                      {% else %}
+                      —
+                      {% endif %}
+                    </td>
+                    <td data-label="{% trans 'You pay' %}" class="text-end">
+                      {% if row.descuento_aplicado and row.descuento_monto %}
+                      <strong>${{ row.precio_unitario_neto|floatformat:2 }}</strong>
+                      {% else %}
+                      ${{ row.list_price|floatformat:2 }}
+                      {% endif %}
+                    </td>
+                    <td data-label="{% trans 'Quantity' %}">
                       {% if puede_editar %}
                         <div class="input-group quantity-stepper" data-quantity-stepper>
                           <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="down" aria-label="{% trans 'Decrease quantity' %}">-</button>
@@ -150,16 +166,16 @@
                         <span class="fw-semibold">{{ row.quantity }}</span>
                       {% endif %}
                     </td>
-                    <td>${{ row.subtotal }}</td>
+                    <td data-label="{% trans 'Subtotal' %}" class="text-end">${{ row.subtotal|floatformat:2 }}</td>
                     {% if puede_editar %}
-                      <td>
+                      <td data-label="{% trans 'Remove' %}">
                         <input type="checkbox" name="eliminar_{{ row.item.id }}" class="form-check-input" {% if row.marked_delete %}checked{% endif %}>
                       </td>
                     {% endif %}
                   </tr>
                 {% empty %}
                   <tr>
-                    <td colspan="{% if puede_editar %}6{% else %}5{% endif %}" class="text-center text-muted">{% trans "No products." %}</td>
+                    <td colspan="{% if puede_editar %}8{% else %}7{% endif %}" class="text-center text-muted">{% trans "No products." %}</td>
                   </tr>
                 {% endfor %}
               </tbody>

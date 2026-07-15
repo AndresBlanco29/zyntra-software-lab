@@ -249,6 +249,25 @@ class Presentacion(models.Model):
         help_text=_('Case weight in pounds used on invoices for Total WGT.'),
     )
 
+    pallet_tie = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        verbose_name=_('Pallet tie'),
+        help_text=_('How many cases go on one pallet layer (bed).'),
+    )
+    pallet_high = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        verbose_name=_('Pallet high'),
+        help_text=_('How many layers go on one pallet.'),
+    )
+    pallet_quantity = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        verbose_name=_('Pallet quantity'),
+        help_text=_('Total cases per pallet (pallet tie × pallet high).'),
+    )
+
     quickbooks_id = models.CharField(max_length=100, blank=True, null=True, db_index=True)
 
     sync_status = models.CharField(
@@ -301,6 +320,12 @@ class Presentacion(models.Model):
 
         self.precio_1, self.precio_2, self.precio_3, self.precio_4, self.precio_5 = precios
 
+    def recalcular_pallet_quantity(self):
+        if self.pallet_tie and self.pallet_high:
+            self.pallet_quantity = int(self.pallet_tie) * int(self.pallet_high)
+        else:
+            self.pallet_quantity = None
+
     def get_price_for_tier(self, tier=None):
         normalized_tier = normalize_price_tier(tier, default=None)
         if normalized_tier is None:
@@ -312,6 +337,7 @@ class Presentacion(models.Model):
 
     def save(self, *args, **kwargs):
         self.recalcular_precios()
+        self.recalcular_pallet_quantity()
         super().save(*args, **kwargs)
 
 

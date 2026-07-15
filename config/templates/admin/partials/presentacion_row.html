@@ -67,7 +67,7 @@
 </div>
 
 <div class="row">
-<div class="col-md-3 mb-3">
+<div class="col-md-2 mb-3">
 <label class="form-label">{% trans "Weight per case (LB)" %}</label>
 {% if presentacion %}
 <input type="number" step="0.001" min="0" name="peso_por_caja_{{ presentacion.id }}" class="form-control" value="{% if presentacion.peso_por_caja is not None %}{{ presentacion.peso_por_caja|stringformat:'f' }}{% endif %}" placeholder="{% trans 'e.g. 33.827' %}">
@@ -76,7 +76,34 @@
 {% endif %}
 <small class="text-muted">{% trans "Used on invoices for Total WGT." %}</small>
 </div>
-<div class="col-md-3 mb-3">
+<div class="col-md-2 mb-3">
+<label class="form-label">{% trans "Pallet tie" %}</label>
+{% if presentacion %}
+<input type="number" min="1" step="1" name="pallet_tie_{{ presentacion.id }}" class="form-control" value="{% if presentacion.pallet_tie %}{{ presentacion.pallet_tie }}{% endif %}" data-pallet-tie placeholder="{% trans 'e.g. 8' %}">
+{% else %}
+<input type="number" min="1" step="1" name="presentacion_nueva_pallet_tie" class="form-control" value="{{ default_pallet_tie|default:'' }}" data-pallet-tie placeholder="{% trans 'e.g. 8' %}">
+{% endif %}
+<small class="text-muted">{% trans "Cases per pallet layer (bed)." %}</small>
+</div>
+<div class="col-md-2 mb-3">
+<label class="form-label">{% trans "Pallet high" %}</label>
+{% if presentacion %}
+<input type="number" min="1" step="1" name="pallet_high_{{ presentacion.id }}" class="form-control" value="{% if presentacion.pallet_high %}{{ presentacion.pallet_high }}{% endif %}" data-pallet-high placeholder="{% trans 'e.g. 6' %}">
+{% else %}
+<input type="number" min="1" step="1" name="presentacion_nueva_pallet_high" class="form-control" value="{{ default_pallet_high|default:'' }}" data-pallet-high placeholder="{% trans 'e.g. 6' %}">
+{% endif %}
+<small class="text-muted">{% trans "Layers per pallet." %}</small>
+</div>
+<div class="col-md-2 mb-3">
+<label class="form-label">{% trans "Pallet quantity" %}</label>
+{% if presentacion %}
+<input type="number" class="form-control" value="{% if presentacion.pallet_quantity %}{{ presentacion.pallet_quantity }}{% endif %}" readonly data-pallet-quantity placeholder="-">
+{% else %}
+<input type="number" class="form-control" value="" readonly data-pallet-quantity placeholder="-">
+{% endif %}
+<small class="text-muted">{% trans "Pallet tie × pallet high." %}</small>
+</div>
+<div class="col-md-2 mb-3">
 <label class="form-label">QB-PRICE</label>
 {% if presentacion %}
 <input type="number" step="0.01" class="form-control" value="{% if presentacion.qb_price is not None %}{{ presentacion.qb_price|stringformat:'f' }}{% endif %}" readonly>

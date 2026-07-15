@@ -8,6 +8,41 @@
     });
   }
 
+  function parsePositiveInt(value) {
+    var parsed = parseInt(String(value || '').trim(), 10);
+    return Number.isFinite(parsed) && parsed >= 1 ? parsed : null;
+  }
+
+  function syncPalletQuantity(row) {
+    if (!row) {
+      return;
+    }
+    var tieInput = row.querySelector('[data-pallet-tie]');
+    var highInput = row.querySelector('[data-pallet-high]');
+    var quantityInput = row.querySelector('[data-pallet-quantity]');
+    if (!quantityInput) {
+      return;
+    }
+    var tie = parsePositiveInt(tieInput && tieInput.value);
+    var high = parsePositiveInt(highInput && highInput.value);
+    quantityInput.value = tie && high ? String(tie * high) : '';
+  }
+
+  function bindPalletQuantityInputs(container) {
+    container.querySelectorAll('[data-presentation-row]').forEach(function (row) {
+      if (row.dataset.boundPallet === '1') {
+        return;
+      }
+      row.dataset.boundPallet = '1';
+      row.querySelectorAll('[data-pallet-tie], [data-pallet-high]').forEach(function (input) {
+        input.addEventListener('input', function () {
+          syncPalletQuantity(row);
+        });
+      });
+      syncPalletQuantity(row);
+    });
+  }
+
   function ensureDeleteInput(form, presentationId) {
     var inputName = 'presentacion_eliminar';
     var existing = form.querySelector('input[name="' + inputName + '"][value="' + presentationId + '"]');
@@ -153,6 +188,7 @@
       }
 
       bindRemoveButtons(container, form);
+      bindPalletQuantityInputs(container);
 
       addButton.addEventListener('click', function () {
         var clone = template.content.firstElementChild.cloneNode(true);
@@ -167,6 +203,7 @@
         }
 
         bindRemoveButtons(container, form);
+        bindPalletQuantityInputs(container);
       });
     });
   }

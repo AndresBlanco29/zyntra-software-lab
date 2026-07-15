@@ -67,6 +67,17 @@ def _parse_non_negative_int(value, *, default=0):
     return parsed if parsed >= 0 else default
 
 
+def _parse_optional_positive_int(value):
+    text = str(value or '').strip()
+    if not text:
+        return None
+    try:
+        parsed = int(text)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 1 else None
+
+
 def _post_list(request, base_name):
     values = request.POST.getlist(base_name)
     if values:
@@ -81,6 +92,8 @@ def _parse_new_presentacion_rows_from_post(request):
     costos = _post_list(request, "presentacion_nueva_costo")
     stocks = _post_list(request, "presentacion_nueva_stock")
     pesos = _post_list(request, "presentacion_nueva_peso_por_caja")
+    pallet_ties = _post_list(request, "presentacion_nueva_pallet_tie")
+    pallet_highs = _post_list(request, "presentacion_nueva_pallet_high")
 
     rows = []
     for index, raw_nombre in enumerate(nombres):
@@ -90,8 +103,10 @@ def _parse_new_presentacion_rows_from_post(request):
         costo_raw = (costos[index] if index < len(costos) else "").strip()
         stock_raw = (stocks[index] if index < len(stocks) else "").strip()
         peso_raw = (pesos[index] if index < len(pesos) else "").strip()
+        pallet_tie_raw = (pallet_ties[index] if index < len(pallet_ties) else "").strip()
+        pallet_high_raw = (pallet_highs[index] if index < len(pallet_highs) else "").strip()
 
-        if not any([nombre, unidades_raw, costo_raw, stock_raw, peso_raw]):
+        if not any([nombre, unidades_raw, costo_raw, stock_raw, peso_raw, pallet_tie_raw, pallet_high_raw]):
             continue
 
         rows.append({
@@ -100,6 +115,8 @@ def _parse_new_presentacion_rows_from_post(request):
             "unidades": _parse_positive_int(unidades_raw, default=1),
             "costo": _parse_optional_decimal(costo_raw),
             "peso_por_caja": _parse_optional_decimal(peso_raw),
+            "pallet_tie": _parse_optional_positive_int(pallet_tie_raw),
+            "pallet_high": _parse_optional_positive_int(pallet_high_raw),
             "stock_inicial": _parse_non_negative_int(stock_raw, default=0),
         })
     return rows
@@ -938,6 +955,12 @@ def editar_producto(request, producto_id):
 
             if f"peso_por_caja_{presentacion.id}" in request.POST:
                 presentacion.peso_por_caja = _parse_optional_decimal(request.POST.get(f"peso_por_caja_{presentacion.id}"))
+
+            if f"pallet_tie_{presentacion.id}" in request.POST:
+                presentacion.pallet_tie = _parse_optional_positive_int(request.POST.get(f"pallet_tie_{presentacion.id}"))
+
+            if f"pallet_high_{presentacion.id}" in request.POST:
+                presentacion.pallet_high = _parse_optional_positive_int(request.POST.get(f"pallet_high_{presentacion.id}"))
 
             presentacion.save()
 

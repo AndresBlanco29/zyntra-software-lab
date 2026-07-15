@@ -401,6 +401,7 @@ class ProductPresentationFormTests(TestCase):
 		self.client.force_login(self.admin)
 		response = self.client.post(reverse('crear_producto'), {
 			'nombre': 'VELA 6 CT',
+			'nombre_en': '',
 			'codigo_barras': '7500000000001',
 			'categoria': str(self.categoria.id),
 			'marca': str(self.marca.id),
@@ -418,4 +419,58 @@ class ProductPresentationFormTests(TestCase):
 		self.assertEqual(presentacion.nombre, 'Caja')
 		self.assertEqual(presentacion.unidades, 6)
 		self.assertEqual(presentacion.stock_operativo.stock_fisico, 25)
+
+	def test_crear_and_editar_producto_save_pallet_fields(self):
+		self.client.force_login(self.admin)
+		create_response = self.client.post(reverse('crear_producto'), {
+			'nombre': 'TORTILLA 12 CT',
+			'nombre_en': '',
+			'codigo_barras': '7500000000099',
+			'categoria': str(self.categoria.id),
+			'marca': str(self.marca.id),
+			'activo': 'on',
+			'presentacion_nueva_nombre[]': ['Caja'],
+			'presentacion_nueva_tipo_contenido[]': ['piezas'],
+			'presentacion_nueva_unidades[]': ['12'],
+			'presentacion_nueva_costo[]': ['20.00'],
+			'presentacion_nueva_stock[]': ['0'],
+			'presentacion_nueva_pallet_tie[]': ['8'],
+			'presentacion_nueva_pallet_high[]': ['6'],
+		})
+		self.assertEqual(create_response.status_code, 302)
+		producto = Producto.objects.get(codigo_barras='7500000000099')
+		presentacion = producto.presentaciones.get()
+		self.assertEqual(presentacion.pallet_tie, 8)
+		self.assertEqual(presentacion.pallet_high, 6)
+		self.assertEqual(presentacion.pallet_quantity, 48)
+
+		edit_response = self.client.post(reverse('editar_producto', args=[producto.id]), {
+			'nombre': producto.nombre,
+			'nombre_en': '',
+			'codigo_barras': producto.codigo_barras,
+			'categoria': str(self.categoria.id),
+			'marca': str(self.marca.id),
+			'activo': 'on',
+			f'presentacion_nombre_{presentacion.id}': 'Caja',
+			f'tipo_contenido_{presentacion.id}': 'piezas',
+			f'unidades_{presentacion.id}': '12',
+			f'costo_{presentacion.id}': '20.00',
+			f'pallet_tie_{presentacion.id}': '10',
+			f'pallet_high_{presentacion.id}': '5',
+		})
+		self.assertEqual(edit_response.status_code, 302)
+		presentacion.refresh_from_db()
+		self.assertEqual(presentacion.pallet_tie, 10)
+		self.assertEqual(presentacion.pallet_high, 5)
+		self.assertEqual(presentacion.pallet_quantity, 50)
+
+		get_response = self.client.get(reverse('editar_producto', args=[producto.id]))
+		self.assertEqual(get_response.status_code, 200)
+		self.assertContains(get_response, 'Pallet tie')
+		self.assertContains(get_response, 'Pallet high')
+		self.assertContains(get_response, 'Pallet quantity')
+		self.assertContains(get_response, 'name="pallet_tie_%s"' % presentacion.id)
+		self.assertContains(get_response, 'value="10"')
+		self.assertContains(get_response, 'value="5"')
+		self.assertContains(get_response, 'value="50"')
 

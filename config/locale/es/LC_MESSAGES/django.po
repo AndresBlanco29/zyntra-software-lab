@@ -14167,3 +14167,27 @@ msgstr "Este cliente está en retención de crédito. No se puede crear la factu
 
 msgid "This customer would exceed the credit limit with this invoice. Remaining limit: $%(remaining)s. Exceeded by: $%(excess)s."
 msgstr "Este cliente excedería el límite de crédito con esta factura. Límite restante: $%(remaining)s. Excede por: $%(excess)s."
+
+msgid "Pallet tie"
+msgstr "Pallet tie"
+
+msgid "Pallet high"
+msgstr "Pallet high"
+
+msgid "Pallet quantity"
+msgstr "Cantidad por pallet"
+
+msgid "Cases per pallet layer (bed)."
+msgstr "Cajas por cama del pallet."
+
+msgid "Layers per pallet."
+msgstr "Capas por pallet."
+
+msgid "Pallet tie × pallet high."
+msgstr "Pallet tie × pallet high."
+
+msgid "e.g. 8"
+msgstr "ej. 8"
+
+msgid "e.g. 6"
+msgstr "ej. 6"

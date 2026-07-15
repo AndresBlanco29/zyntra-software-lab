@@ -20,6 +20,28 @@ from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, De
 DEFAULT_SUGGESTED_PROFIT_PERCENTAGE = Decimal('30.00')
 
 
+def user_can_oversee_driver_deliveries(user):
+	"""Admin/BackOffice can see and operate all driver-assigned deliveries."""
+	from config.usuarios.permissions import user_has_permission
+
+	if not user or not getattr(user, 'is_authenticated', False):
+		return False
+	return user_has_permission(user, 'backoffice.orders.manage')
+
+
+def user_can_operate_driver_delivery(*, delivery, user):
+	if not user or not getattr(user, 'is_authenticated', False):
+		return False
+	if delivery.driver_id and delivery.driver_id == user.id:
+		return True
+	return user_can_oversee_driver_deliveries(user)
+
+
+def _assert_user_can_operate_driver_delivery(*, delivery, user):
+	if not user_can_operate_driver_delivery(delivery=delivery, user=user):
+		raise PermissionDenied(_('You are not assigned to this delivery.'))
+
+
 def _ensure_quickbooks_not_locked(*, invoice=None, nota=None):
 	from config.integrations.quickbooks.sync import is_sync_locked
 
@@ -899,8 +921,7 @@ def _create_delivery_notification_logs(delivery, status):
 
 @transaction.atomic
 def start_delivery_route(*, delivery, driver_user):
-	if delivery.driver_id != driver_user.id:
-		raise PermissionDenied(_('You are not assigned to this delivery.'))
+	_assert_user_can_operate_driver_delivery(delivery=delivery, user=driver_user)
 	if delivery.is_completed:
 		raise ValidationError(_('Completed deliveries cannot start a new route.'))
 	if delivery.estado != 'EN_RUTA':
@@ -1151,8 +1172,7 @@ def _resolve_driver_delivery_payment(*, payload, collectible_balance, payment_de
 
 @transaction.atomic
 def complete_driver_delivery(*, delivery, driver_user, payload, evidence_files, adjustment_note=None, cheque_image_file=None, payment_files=None):
-	if delivery.driver_id != driver_user.id:
-		raise PermissionDenied(_('You are not assigned to this delivery.'))
+	_assert_user_can_operate_driver_delivery(delivery=delivery, user=driver_user)
 	if delivery.is_completed:
 		raise ValidationError(_('This delivery was already completed.'))
 	evidence_files = _normalize_uploaded_files(evidence_files)

@@ -443,6 +443,9 @@
             </th>
             <th>{% trans "Invoice" %}</th>
             <th>{% trans "Customer" %}</th>
+            {% if can_oversee_driver_deliveries %}
+            <th>{% trans "Driver" %}</th>
+            {% endif %}
             <th>{% trans "Address" %}</th>
             <th>{% trans "Delivery" %}</th>
             <th>{% trans "Payment" %}</th>
@@ -469,6 +472,15 @@
               </div>
             </td>
             <td data-label="{% trans 'Customer' %}">{{ delivery.invoice.cliente.nombre_empresa }}</td>
+            {% if can_oversee_driver_deliveries %}
+            <td data-label="{% trans 'Driver' %}">
+              {% if delivery.driver %}
+              {{ delivery.driver.get_full_name|default:delivery.driver.username }}
+              {% else %}
+              <span class="text-muted">-</span>
+              {% endif %}
+            </td>
+            {% endif %}
             <td data-label="{% trans 'Address' %}">
               <div class="driver-delivery-address">
                 <div>{{ delivery.route_address }}</div>
@@ -496,7 +508,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="7" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No deliveries are currently assigned to you." %}</td>
+            <td colspan="{% if can_oversee_driver_deliveries %}8{% else %}7{% endif %}" class="text-center text-muted py-4 mobile-stack-table__empty">{% if can_oversee_driver_deliveries %}{% trans "No deliveries are currently assigned to drivers." %}{% else %}{% trans "No deliveries are currently assigned to you." %}{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -520,6 +532,9 @@
           <tr>
             <th>{% trans "Invoice" %}</th>
             <th>{% trans "Customer" %}</th>
+            {% if can_oversee_driver_deliveries %}
+            <th>{% trans "Driver" %}</th>
+            {% endif %}
             <th>{% trans "Address" %}</th>
             <th>{% trans "Delivery" %}</th>
             <th>{% trans "Payment" %}</th>
@@ -539,6 +554,15 @@
               </div>
             </td>
             <td data-label="{% trans 'Customer' %}">{{ delivery.invoice.cliente.nombre_empresa }}</td>
+            {% if can_oversee_driver_deliveries %}
+            <td data-label="{% trans 'Driver' %}">
+              {% if delivery.driver %}
+              {{ delivery.driver.get_full_name|default:delivery.driver.username }}
+              {% else %}
+              <span class="text-muted">-</span>
+              {% endif %}
+            </td>
+            {% endif %}
             <td data-label="{% trans 'Address' %}">
               <div class="driver-delivery-address">
                 <div>{{ delivery.route_address }}</div>
@@ -565,7 +589,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="6" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No delivered invoices are available yet." %}</td>
+            <td colspan="{% if can_oversee_driver_deliveries %}7{% else %}6{% endif %}" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No delivered invoices are available yet." %}</td>
           </tr>
           {% endfor %}
         </tbody>

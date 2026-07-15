@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Case, Count, IntegerField, Q, Value, When
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.dateparse import parse_date, parse_datetime
@@ -97,6 +97,8 @@ from .services import (
 	resolve_customer_amount_owed,
 	resolve_customer_open_balance,
 	resolve_customer_overdue_balance,
+	user_can_operate_driver_delivery,
+	user_can_oversee_driver_deliveries,
 )
 
 
@@ -1139,6 +1141,28 @@ def _ordered_driver_deliveries(queryset):
 	).order_by('estimated_delivery_sort', 'estimated_delivery_at', 'created_at')
 
 
+def _driver_deliveries_base_queryset_for_user(user):
+	queryset = Delivery.objects.select_related(
+		'invoice__cliente__usuario',
+		'driver',
+	).prefetch_related('invoice__items')
+	if user_can_oversee_driver_deliveries(user):
+		return queryset.filter(driver__isnull=False)
+	return queryset.filter(driver=user)
+
+
+def _get_operable_delivery_or_404(delivery_id, user, *, select_related=None, prefetch_related=None):
+	queryset = Delivery.objects.all()
+	if select_related:
+		queryset = queryset.select_related(*select_related)
+	if prefetch_related:
+		queryset = queryset.prefetch_related(*prefetch_related)
+	delivery = get_object_or_404(queryset, id=delivery_id)
+	if not user_can_operate_driver_delivery(delivery=delivery, user=user):
+		raise Http404('No Delivery matches the given query.')
+	return delivery
+
+
 INVOICES_LIST_PAGE_SIZE = 50
 
 QUICKBOOKS_IMPORTED_PEDIDO = Q(pedido__canal_toma='QUICKBOOKS_IMPORT')
@@ -2047,7 +2071,12 @@ def backoffice_mark_delivery_unpaid(request, delivery_id):
 def driver_delivery_list(request):
 	view_mode = request.GET.get('view')
 	completed_statuses = {'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'}
-	base_queryset = Delivery.objects.select_related('invoice__cliente__usuario', 'driver').prefetch_related('invoice__items').filter(driver=request.user)
+	can_oversee = user_can_oversee_driver_deliveries(request.user)
+	base_queryset = _driver_deliveries_base_queryset_for_user(request.user)
+	if can_oversee:
+		driver_filter = (request.GET.get('driver_id') or '').strip()
+		if driver_filter.isdigit():
+			base_queryset = base_queryset.filter(driver_id=int(driver_filter))
 	if view_mode == 'completed':
 		deliveries = base_queryset.filter(estado__in=completed_statuses).order_by('-delivered_at', '-updated_at', '-created_at')
 	else:
@@ -2060,16 +2089,24 @@ def driver_delivery_list(request):
 		'view_mode': view_mode,
 		'active_count': base_queryset.exclude(estado__in=completed_statuses).count(),
 		'completed_count': base_queryset.filter(estado__in=completed_statuses).count(),
+		'can_oversee_driver_deliveries': can_oversee,
 	})
 
 
 @login_required
 @internal_permission_required('driver.delivery.view')
 def driver_delivery_detail(request, delivery_id):
-	delivery = get_object_or_404(
-		Delivery.objects.select_related('invoice__cliente__usuario', 'driver').prefetch_related('invoice__items__pedido_item__movimientos_inventario', 'invoice__items__pedido_item', 'invoice__notas_ajuste__evidence_photos', 'evidence_photos', 'notification_logs'),
-		id=delivery_id,
-		driver=request.user,
+	delivery = _get_operable_delivery_or_404(
+		delivery_id,
+		request.user,
+		select_related=('invoice__cliente__usuario', 'driver'),
+		prefetch_related=(
+			'invoice__items__pedido_item__movimientos_inventario',
+			'invoice__items__pedido_item',
+			'invoice__notas_ajuste__evidence_photos',
+			'evidence_photos',
+			'notification_logs',
+		),
 	)
 	delivery.workflow_badge = build_delivery_workflow_badge(delivery)
 	attach_invoice_item_net_dispatched_quantities(delivery.invoice, list(delivery.invoice.items.all()))
@@ -2079,16 +2116,17 @@ def driver_delivery_detail(request, delivery_id):
 		'delivery_collectible_balance': calculate_delivery_collectible_balance(delivery=delivery),
 		'delivery_complete_form_draft': get_workflow_draft(request.session, DELIVERY_COMPLETE_DRAFT_SCOPE, delivery.id),
 		'delivery_note_form_draft': get_workflow_draft(request.session, DELIVERY_NOTE_DRAFT_SCOPE, delivery.id),
+		'can_oversee_driver_deliveries': user_can_oversee_driver_deliveries(request.user),
 	})
 
 
 @login_required
 @internal_permission_required('driver.delivery.manage')
 def driver_delivery_upload_evidence(request, delivery_id):
-	delivery = get_object_or_404(
-		Delivery.objects.select_related('invoice__cliente__usuario', 'driver'),
-		id=delivery_id,
-		driver=request.user,
+	delivery = _get_operable_delivery_or_404(
+		delivery_id,
+		request.user,
+		select_related=('invoice__cliente__usuario', 'driver'),
 	)
 	if request.method != 'POST':
 		return redirect('driver_delivery_detail', delivery_id=delivery.id)
@@ -2109,10 +2147,10 @@ def driver_delivery_upload_evidence(request, delivery_id):
 @login_required
 @internal_permission_required('driver.delivery.manage')
 def driver_delivery_tracking(request, delivery_id):
-	delivery = get_object_or_404(
-		Delivery.objects.select_related('invoice__cliente__usuario', 'driver'),
-		id=delivery_id,
-		driver=request.user,
+	delivery = _get_operable_delivery_or_404(
+		delivery_id,
+		request.user,
+		select_related=('invoice__cliente__usuario', 'driver'),
 	)
 	return render(request, 'backoffice/driver_delivery_tracking.html', {
 		'delivery': delivery,
@@ -2127,7 +2165,11 @@ def driver_delivery_update_location(request, delivery_id):
 	if request.method != 'POST':
 		return JsonResponse({'success': False, 'message': str(_('Only POST requests are allowed.'))}, status=405)
 
-	delivery = get_object_or_404(Delivery.objects.select_related('invoice', 'driver'), id=delivery_id, driver=request.user)
+	delivery = _get_operable_delivery_or_404(
+		delivery_id,
+		request.user,
+		select_related=('invoice', 'driver'),
+	)
 	if delivery.is_completed:
 		return JsonResponse({'success': False, 'message': str(_('Completed deliveries no longer accept live tracking updates.'))}, status=400)
 
@@ -2161,7 +2203,11 @@ def driver_delivery_update_location(request, delivery_id):
 @login_required
 @internal_permission_required('driver.delivery.manage')
 def driver_delivery_start_route(request, delivery_id):
-	delivery = get_object_or_404(Delivery.objects.select_related('invoice__cliente'), id=delivery_id, driver=request.user)
+	delivery = _get_operable_delivery_or_404(
+		delivery_id,
+		request.user,
+		select_related=('invoice__cliente', 'driver'),
+	)
 	if request.method != 'POST':
 		return redirect('driver_delivery_detail', delivery_id=delivery.id)
 	try:
@@ -2180,11 +2226,11 @@ def driver_delivery_route(request):
 		messages.error(request, _('Select at least one assigned invoice to generate the route.'))
 		return redirect('driver_delivery_list')
 
-	deliveries = _ordered_driver_deliveries(Delivery.objects.filter(
-		driver=request.user,
+	route_qs = _driver_deliveries_base_queryset_for_user(request.user).filter(
 		estado__in={'ASIGNADA', 'EN_RUTA'},
 		id__in=selected_delivery_ids,
-	))
+	)
+	deliveries = _ordered_driver_deliveries(route_qs)
 	if not deliveries.exists():
 		messages.error(request, _('The selected invoices are no longer available for route generation.'))
 		return redirect('driver_delivery_list')
@@ -2201,10 +2247,11 @@ def driver_delivery_route(request):
 @internal_permission_required('driver.delivery.manage')
 @transaction.atomic
 def driver_delivery_complete(request, delivery_id):
-	delivery = get_object_or_404(
-		Delivery.objects.select_related('invoice__cliente__usuario').prefetch_related('invoice__items__presentacion__producto', 'invoice__notas_ajuste__items'),
-		id=delivery_id,
-		driver=request.user,
+	delivery = _get_operable_delivery_or_404(
+		delivery_id,
+		request.user,
+		select_related=('invoice__cliente__usuario', 'driver'),
+		prefetch_related=('invoice__items__presentacion__producto', 'invoice__notas_ajuste__items'),
 	)
 	if request.method != 'POST':
 		return redirect('driver_delivery_detail', delivery_id=delivery.id)
@@ -2261,10 +2308,15 @@ def driver_delivery_complete(request, delivery_id):
 @internal_permission_required('driver.delivery.manage')
 @transaction.atomic
 def driver_delivery_create_note(request, delivery_id):
-	delivery = get_object_or_404(
-		Delivery.objects.select_related('invoice__cliente__usuario').prefetch_related('invoice__items__presentacion__producto', 'invoice__notas_ajuste__items', 'invoice__notas_ajuste__evidence_photos'),
-		id=delivery_id,
-		driver=request.user,
+	delivery = _get_operable_delivery_or_404(
+		delivery_id,
+		request.user,
+		select_related=('invoice__cliente__usuario', 'driver'),
+		prefetch_related=(
+			'invoice__items__presentacion__producto',
+			'invoice__notas_ajuste__items',
+			'invoice__notas_ajuste__evidence_photos',
+		),
 	)
 	if request.method != 'POST':
 		return redirect('driver_delivery_detail', delivery_id=delivery.id)
@@ -2308,6 +2360,10 @@ def driver_delivery_create_note(request, delivery_id):
 @login_required
 @internal_permission_required('driver.delivery.view')
 def driver_invoice_pdf(request, delivery_id):
-	delivery = get_object_or_404(Delivery.objects.select_related('invoice__cliente', 'invoice__driver'), id=delivery_id, driver=request.user)
+	delivery = _get_operable_delivery_or_404(
+		delivery_id,
+		request.user,
+		select_related=('invoice__cliente', 'invoice__driver', 'driver'),
+	)
 	invoice = Invoice.objects.select_related('pedido__cliente', 'driver').prefetch_related('items__presentacion__producto', 'items__pedido_item__movimientos_inventario', 'items__pedido_item', 'notas_ajuste').get(id=delivery.invoice_id)
 	return _invoice_pdf_response(invoice)

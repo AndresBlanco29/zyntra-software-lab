@@ -228,6 +228,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         'backoffice.customers.assign',
         'vendor.customers.view',
         'vendor.customers.manage',
+        'driver.delivery.view',
+        'driver.delivery.manage',
     },
     'seleccionador': {
         'selector.picking.view',

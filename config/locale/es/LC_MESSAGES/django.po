@@ -6043,7 +6043,7 @@ msgstr "Assign el note a un customer, optionally apply it a un invoice, y keep f
 
 
 msgid "Back to invoices"
-msgstr "Back a invoices"
+msgstr "Volver a facturas"
 
 
 
@@ -7951,8 +7951,13 @@ msgstr "Open el stop a registrarse payment, evidencia y signature."
 
 
 
+msgid "No deliveries are currently assigned to drivers."
+msgstr "No hay entregas asignadas a conductores actualmente."
+
+
+
 msgid "No deliveries are currently assigned to you."
-msgstr "No deliveries son currently asignado a you."
+msgstr "No hay entregas asignadas a usted actualmente."
 
 
 
@@ -14147,9 +14152,6 @@ msgstr "Gestionar toma de cotizaciones"
 
 msgid "Build quotations, set prices and discounts, and send them to customers."
 msgstr "Crear cotizaciones, definir precios y descuentos, y enviarlas a los clientes."
-
-msgid "Back to invoices"
-msgstr "Volver a facturas"
 
 msgid "Search a product, choose quantity and price, then add the line."
 msgstr "Busca un producto, elige cantidad y precio, y luego agrega la línea."

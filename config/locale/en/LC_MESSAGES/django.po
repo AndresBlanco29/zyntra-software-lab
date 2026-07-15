@@ -6446,6 +6446,11 @@ msgid "Open the stop to register payment, evidence and signature."
 msgstr ""
 
 
+msgid "No deliveries are currently assigned to drivers."
+msgstr ""
+
+
+
 msgid "No deliveries are currently assigned to you."
 msgstr ""
 

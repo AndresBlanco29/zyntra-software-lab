@@ -3795,6 +3795,83 @@ class InvoiceFlowTests(TestCase):
 		self.assertContains(detail_response, f'<td>{self.pedido_item.cantidad_solicitada}</td>', html=False)
 		self.assertContains(detail_response, f'<td>{invoice.items.first().cantidad_facturada}</td>', html=False)
 
+	def test_admin_and_backoffice_see_all_assigned_driver_deliveries(self):
+		other_driver = Usuario.objects.create_user(username='driver-other-fact', password='secret123', role='driver')
+		admin_user = Usuario.objects.create_user(username='admin-driver-oversee', password='secret123', role='admin')
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		other_invoice = self._create_invoice(metodo_entrega='RUTA_DRIVER', driver=other_driver)
+
+		self.client.force_login(admin_user)
+		admin_list = self.client.get(reverse('driver_delivery_list'))
+		admin_detail = self.client.get(reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertEqual(admin_list.status_code, 200)
+		self.assertEqual(admin_detail.status_code, 200)
+		self.assertContains(admin_list, invoice.numero)
+		self.assertContains(admin_list, other_invoice.numero)
+		self.assertContains(admin_list, self.driver.username)
+		self.assertContains(admin_list, other_driver.username)
+		self.assertEqual(admin_list.context['active_count'], 2)
+		self.assertTrue(admin_list.context['can_oversee_driver_deliveries'])
+
+		self.client.force_login(self.backoffice)
+		bo_list = self.client.get(reverse('driver_delivery_list'))
+		bo_detail = self.client.get(reverse('driver_delivery_detail', args=[other_invoice.delivery.id]))
+		self.assertEqual(bo_list.status_code, 200)
+		self.assertEqual(bo_detail.status_code, 200)
+		self.assertContains(bo_list, invoice.numero)
+		self.assertContains(bo_list, other_invoice.numero)
+		self.assertEqual(bo_list.context['active_count'], 2)
+
+		self.client.force_login(self.driver)
+		driver_list = self.client.get(reverse('driver_delivery_list'))
+		self.assertEqual(driver_list.status_code, 200)
+		self.assertContains(driver_list, invoice.numero)
+		self.assertNotContains(driver_list, other_invoice.numero)
+		self.assertEqual(driver_list.context['active_count'], 1)
+		self.assertFalse(driver_list.context['can_oversee_driver_deliveries'])
+
+		self.client.force_login(other_driver)
+		other_list = self.client.get(reverse('driver_delivery_list'))
+		self.assertContains(other_list, other_invoice.numero)
+		self.assertNotContains(other_list, invoice.numero)
+		forbidden_detail = self.client.get(reverse('driver_delivery_detail', args=[invoice.delivery.id]))
+		self.assertEqual(forbidden_detail.status_code, 404)
+
+	def test_backoffice_can_complete_delivery_assigned_to_driver(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		delivery = invoice.delivery
+		self.client.force_login(self.backoffice)
+		start_response = self.client.post(reverse('driver_delivery_start_route', args=[delivery.id]))
+		self.assertRedirects(start_response, reverse('driver_delivery_tracking', args=[delivery.id]))
+		delivery.refresh_from_db()
+		self.assertEqual(delivery.estado, 'EN_RUTA')
+		self.assertEqual(delivery.driver_id, self.driver.id)
+
+		complete_response = self.client.post(
+			reverse('driver_delivery_complete', args=[delivery.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'payment_method_1': 'CASH',
+				'payment_amount_1': str(invoice.saldo_cliente),
+				'recibido_por': 'BackOffice User',
+				'firma_cliente_data': self.signature_data,
+			},
+		)
+		self.assertRedirects(complete_response, reverse('driver_delivery_list'))
+		delivery.refresh_from_db()
+		self.assertEqual(delivery.estado, 'ENTREGADA_PAGADA')
+		self.assertEqual(delivery.driver_id, self.driver.id)
+
 	def test_driver_delivery_list_renders_in_spanish_when_selected(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,

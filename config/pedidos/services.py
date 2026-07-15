@@ -251,7 +251,12 @@ def crear_pedido_parcial(*, pedido, lineas_payload, usuario=None, request=None):
         created_items.append(child_item)
         if had_reservation:
             items_to_reserve.append(child_item)
-        _reducir_cantidad_item_fuente(item=locked_source, nueva_cantidad=remaining, usuario=usuario)
+        if remaining > 0:
+            _reducir_cantidad_item_fuente(item=locked_source, nueva_cantidad=remaining, usuario=usuario)
+        else:
+            # Full line moved to the partial: remove it from the source order
+            # (do not leave a zero-quantity row).
+            eliminar_item_pedido_con_inventario(item=locked_source, creado_por=usuario)
 
     recalcular_pedido(locked_pedido)
     recalcular_pedido(parcial)

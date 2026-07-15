@@ -1967,6 +1967,28 @@ class PartialOrderFlowTests(TestCase):
 		self.assertEqual(child.cantidad_solicitada, 30)
 		self.assertEqual(child.item_origen_id, self.item_a.id)
 
+	def test_create_partial_with_full_line_quantity_deletes_source_item(self):
+		from config.pedidos.services import crear_pedido_parcial
+
+		item_a_id = self.item_a.id
+		parcial = crear_pedido_parcial(
+			pedido=self.pedido,
+			lineas_payload=[{'item_id': item_a_id, 'cantidad': 60}],
+			usuario=self.backoffice,
+		)
+
+		self.pedido.refresh_from_db()
+		self.item_b.refresh_from_db()
+
+		self.assertFalse(PedidoItem.objects.filter(pk=item_a_id).exists())
+		self.assertEqual(self.pedido.items.count(), 1)
+		self.assertEqual(self.item_b.cantidad, 120)
+		self.assertEqual(parcial.items.count(), 1)
+		child = parcial.items.get()
+		self.assertEqual(child.cantidad, 60)
+		self.assertEqual(child.cantidad_solicitada, 60)
+		self.assertIsNone(child.item_origen_id)
+
 	def test_second_partial_uses_p2_index(self):
 		from config.pedidos.services import crear_pedido_parcial
 

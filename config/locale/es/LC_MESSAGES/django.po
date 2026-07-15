@@ -10644,7 +10644,7 @@ msgstr "Commercial"
 
 
 msgid "Quotes"
-msgstr "Quotes"
+msgstr "Cotizaciones"
 
 
 
@@ -14191,3 +14191,33 @@ msgstr "ej. 8"
 
 msgid "e.g. 6"
 msgstr "ej. 6"
+
+msgid "Create quote"
+msgstr "Crear cotización"
+
+msgid "Create quotations, send them to customers, and turn confirmed quotes into orders."
+msgstr "Crea cotizaciones, envíalas a los clientes y convierte las confirmadas en pedidos."
+
+msgid "Create quotes for customers, send them for confirmation, and turn confirmed quotes into pending orders."
+msgstr "Crea cotizaciones para clientes, envíalas para confirmación y convierte las confirmadas en pedidos pendientes."
+
+msgid "Converted to order"
+msgstr "Convertidas a pedido"
+
+msgid "Search by quote #, customer, or status"
+msgstr "Buscar por # de cotización, cliente o estado"
+
+msgid "Search quotes"
+msgstr "Buscar cotizaciones"
+
+msgid "No quotes match your search."
+msgstr "Ninguna cotización coincide con la búsqueda."
+
+msgid "Generate order"
+msgstr "Generar pedido"
+
+msgid "View order"
+msgstr "Ver pedido"
+
+msgid "Quote pagination"
+msgstr "Paginación de cotizaciones"

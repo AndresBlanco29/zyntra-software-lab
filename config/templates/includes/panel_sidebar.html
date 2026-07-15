@@ -98,7 +98,7 @@
 {% endif %}
 
 {% if request.user|has_internal_permission:'vendor.customers.manage' or request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'vendor.notes.view' or request.user|has_internal_permission:'vendor.notes.manage' or request.user|has_internal_permission:'admin.customer_requests.view' or request.user|has_internal_permission:'admin.customers.assign' or request.user|has_internal_permission:'backoffice.customers.assign' %}
-<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'vendedor_home' or request.resolver_match.url_name == 'vendedores_clientes' or request.resolver_match.url_name == 'crear_cliente' or request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'tomar_cotizacion' or request.resolver_match.url_name == 'catalogo_vendedor' or request.resolver_match.url_name == 'ver_pedido' or request.resolver_match.url_name == 'vendedor_notes_list' or request.resolver_match.url_name == 'vendedor_credit_memo_create' or request.resolver_match.url_name == 'vendedor_return_create' or request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' or request.resolver_match.url_name == 'ver_certificado_cliente' or request.resolver_match.url_name == 'lista_asignacion_clientes_vendedores' or request.resolver_match.url_name == 'asignar_clientes_vendedor' %}open{% endif %}>
+<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'vendedor_home' or request.resolver_match.url_name == 'vendedores_clientes' or request.resolver_match.url_name == 'crear_cliente' or request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'catalogo_vendedor' and request.session.take_order_flow != 'quote' or request.resolver_match.url_name == 'ver_pedido' and request.session.take_order_flow != 'quote' or request.resolver_match.url_name == 'vendedor_notes_list' or request.resolver_match.url_name == 'vendedor_credit_memo_create' or request.resolver_match.url_name == 'vendedor_return_create' or request.resolver_match.url_name == 'clientes_pendientes' or request.resolver_match.url_name == 'ver_cliente' or request.resolver_match.url_name == 'ver_certificado_cliente' or request.resolver_match.url_name == 'lista_asignacion_clientes_vendedores' or request.resolver_match.url_name == 'asignar_clientes_vendedor' %}open{% endif %}>
   <summary class="sidebar-collapsible-summary">{% trans "Customers & Sales" %}</summary>
   <div class="sidebar-collapsible-links">
     {% if request.user|has_internal_permission:'vendor.customers.view' or request.user|has_internal_permission:'vendor.orders.view' or request.user|has_internal_permission:'vendor.notes.view' %}
@@ -126,13 +126,6 @@
     <a href="{% url 'tomar_pedido' %}"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'tomar_pedido' or request.resolver_match.url_name == 'catalogo_vendedor' and request.session.take_order_flow != 'quote' or request.resolver_match.url_name == 'ver_pedido' and request.session.take_order_flow != 'quote' %}active{% endif %}">
       {% trans "Take Order" %}
-    </a>
-    {% endif %}
-
-    {% if request.user|has_internal_permission:'vendor.quotes.view' or request.user|has_internal_permission:'backoffice.quotes.view' %}
-    <a href="{% url 'tomar_cotizacion' %}"
-      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'tomar_cotizacion' or request.session.take_order_flow == 'quote' and request.resolver_match.url_name == 'catalogo_vendedor' or request.session.take_order_flow == 'quote' and request.resolver_match.url_name == 'ver_pedido' %}active{% endif %}">
-      {% trans "Create Quote" %}
     </a>
     {% endif %}
 
@@ -171,8 +164,8 @@
 </details>
 {% endif %}
 
-{% if request.user|has_internal_permission:'backoffice.dashboard.view' or request.user|has_internal_permission:'backoffice.quotes.view' or request.user|has_internal_permission:'backoffice.orders.view' %}
-<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'backoffice_dashboard' or request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_crm_pipeline' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' or request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' or request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' or request.resolver_match.url_name == 'backoffice_daily_closing_list' or request.resolver_match.url_name == 'backoffice_daily_closing_detail' or request.resolver_match.url_name == 'backoffice_daily_closing_item_review' or request.resolver_match.url_name == 'backoffice_adjustment_notes_list' or request.resolver_match.url_name == 'backoffice_adjustment_note_create' %}open{% endif %}>
+{% if request.user|has_internal_permission:'backoffice.dashboard.view' or request.user|has_internal_permission:'backoffice.quotes.view' or request.user|has_internal_permission:'backoffice.orders.view' or request.user|has_internal_permission:'vendor.quotes.view' %}
+<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'backoffice_dashboard' or request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'tomar_cotizacion' or request.session.take_order_flow == 'quote' and request.resolver_match.url_name == 'catalogo_vendedor' or request.session.take_order_flow == 'quote' and request.resolver_match.url_name == 'ver_pedido' or request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_crm_pipeline' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' or request.resolver_match.url_name == 'backoffice_live_drivers' or request.resolver_match.url_name == 'backoffice_live_drivers_data' or request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' or request.resolver_match.url_name == 'backoffice_daily_closing_list' or request.resolver_match.url_name == 'backoffice_daily_closing_detail' or request.resolver_match.url_name == 'backoffice_daily_closing_item_review' or request.resolver_match.url_name == 'backoffice_adjustment_notes_list' or request.resolver_match.url_name == 'backoffice_adjustment_note_create' %}open{% endif %}>
   <summary class="sidebar-collapsible-summary">{% trans "Commercial" %}</summary>
   <div class="sidebar-collapsible-links">
     {% if request.user|has_internal_permission:'backoffice.dashboard.view' %}
@@ -195,8 +188,15 @@
       {% trans "Sales pipeline" %}
     </a>
     <a href="{% url 'backoffice_pedidos' %}"
-      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' %}active{% endif %}">
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' %}active{% endif %}">
       {% trans "Orders" %}
+    </a>
+    {% endif %}
+
+    {% if request.user|has_internal_permission:'backoffice.quotes.view' or request.user|has_internal_permission:'vendor.quotes.view' %}
+    <a href="{% url 'backoffice_cotizaciones' %}"
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_cotizaciones' or request.resolver_match.url_name == 'backoffice_cotizacion_detalle' or request.resolver_match.url_name == 'tomar_cotizacion' or request.session.take_order_flow == 'quote' and request.resolver_match.url_name == 'catalogo_vendedor' or request.session.take_order_flow == 'quote' and request.resolver_match.url_name == 'ver_pedido' %}active{% endif %}">
+      {% trans "Quotes" %}
     </a>
     {% endif %}
 

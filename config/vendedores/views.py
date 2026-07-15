@@ -447,9 +447,9 @@ def vendedor_home(request):
         })
     if user_has_permission(request.user, 'vendor.quotes.view'):
         tiles.append({
-            'title': _('Create Quote'),
-            'description': _('Build a quotation with prices and discounts, then send it to the customer.'),
-            'url': reverse('tomar_cotizacion'),
+            'title': _('Quotes'),
+            'description': _('Create quotations, send them to customers, and turn confirmed quotes into orders.'),
+            'url': reverse('backoffice_cotizaciones'),
             'tone': 'navy',
         })
     if user_has_permission(request.user, 'vendor.customers.view'):

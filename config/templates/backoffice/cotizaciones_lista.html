@@ -1,64 +1,156 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n %}
+{% load i18n pagination_tags %}
 
-{% block title %}{% trans "Quotes BackOffice" %}{% endblock %}
+{% block title %}{% trans "Quotes" %}{% endblock %}
 
 {% block content %}
-<h2 class="mb-4">{% trans "Quotes Received" %}</h2>
-
-<div class="btn-group mb-3" role="group" aria-label="{% trans 'Quote views' %}">
-  <a href="{% url 'backoffice_cotizaciones' %}" class="btn {% if view_mode == 'pending' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-    {% trans "Pending Quotes" %}
-    <span class="badge {% if view_mode == 'pending' %}bg-light text-primary{% else %}bg-primary{% endif %} ms-1">{{ pending_count }}</span>
-  </a>
-  <a href="{% url 'backoffice_cotizaciones' %}?view=confirmed" class="btn {% if view_mode == 'confirmed' %}btn-success{% else %}btn-outline-success{% endif %}">
-    {% trans "Confirmed Quotes" %}
-    <span class="badge {% if view_mode == 'confirmed' %}bg-light text-success{% else %}bg-success{% endif %} ms-1">{{ confirmed_count }}</span>
-  </a>
-  <a href="{% url 'backoffice_cotizaciones' %}?view=cancelled" class="btn {% if view_mode == 'cancelled' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-    {% trans "Cancelled Quotes" %}
-    <span class="badge {% if view_mode == 'cancelled' %}bg-light text-secondary{% else %}bg-secondary{% endif %} ms-1">{{ cancelled_count }}</span>
-  </a>
-  <a href="{% url 'backoffice_cotizaciones' %}?view=processed" class="btn {% if view_mode == 'processed' %}btn-dark{% else %}btn-outline-dark{% endif %}">
-    {% trans "Processed Quotes" %}
-    <span class="badge {% if view_mode == 'processed' %}bg-light text-dark{% else %}bg-dark{% endif %} ms-1">{{ processed_count }}</span>
-  </a>
-</div>
-
-<div class="card shadow-sm">
-  <div class="table-responsive mobile-stack-responsive">
-    <table class="table table-striped align-middle mb-0 mobile-stack-table mobile-stack-table--list">
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>{% trans "Client" %}</th>
-          <th>{% trans "Date" %}</th>
-          <th>{% trans "Status" %}</th>
-          <th>{% trans "Total" %}</th>
-          <th>{% trans "Action" %}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for cotizacion in cotizaciones %}
-        <tr>
-          <td data-label="ID">#{{ cotizacion.id }}</td>
-          <td data-label="{% trans 'Client' %}">{{ cotizacion.cliente.nombre_empresa }}</td>
-          <td data-label="{% trans 'Date' %}">{{ cotizacion.fecha|date:"m/d/Y H:i" }}</td>
-          <td data-label="{% trans 'Status' %}">
-            <span class="badge {% if cotizacion.estado == 'CONFIRMADA_CLIENTE' %}bg-success{% elif cotizacion.estado == 'CANCELADA_CLIENTE' %}bg-secondary{% elif cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}bg-warning text-dark{% elif cotizacion.estado == 'RECHAZADA' %}bg-danger{% elif cotizacion.estado == 'APROBADA' %}bg-dark{% else %}bg-primary{% endif %}">{{ cotizacion.get_estado_display }}</span>
-          </td>
-          <td data-label="{% trans 'Total' %}">${{ cotizacion.total }}</td>
-          <td data-label="{% trans 'Action' %}" class="mobile-stack-table__action">
-            <a class="btn btn-sm btn-warning" href="{% url 'backoffice_cotizacion_detalle' cotizacion.id %}">{% trans "Manage" %}</a>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="6" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No quotes registered." %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<div class="quotes-hub">
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-start gap-3 mb-3">
+    <div class="min-w-0">
+      <h2 class="mb-1">{% trans "Quotes" %}</h2>
+      <p class="text-muted mb-0">{% trans "Create quotes for customers, send them for confirmation, and turn confirmed quotes into pending orders." %}</p>
+    </div>
+    {% if can_create_quote %}
+    <a href="{% url 'tomar_cotizacion' %}" class="btn btn-primary flex-shrink-0">{% trans "Create quote" %}</a>
+    {% endif %}
   </div>
+
+  <div class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="{% trans 'Quote views' %}">
+    <a href="?view=active{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn btn-sm {% if view_mode == 'active' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+      {% trans "Active" %}
+      <span class="badge {% if view_mode == 'active' %}bg-light text-primary{% else %}bg-primary{% endif %} ms-1">{{ pending_count }}</span>
+    </a>
+    <a href="?view=confirmed{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn btn-sm {% if view_mode == 'confirmed' %}btn-success{% else %}btn-outline-success{% endif %}">
+      {% trans "Confirmed" %}
+      <span class="badge {% if view_mode == 'confirmed' %}bg-light text-success{% else %}bg-success{% endif %} ms-1">{{ confirmed_count }}</span>
+    </a>
+    <a href="?view=cancelled{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn btn-sm {% if view_mode == 'cancelled' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+      {% trans "Cancelled" %}
+      <span class="badge {% if view_mode == 'cancelled' %}bg-light text-secondary{% else %}bg-secondary{% endif %} ms-1">{{ cancelled_count }}</span>
+    </a>
+    <a href="?view=processed{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn btn-sm {% if view_mode == 'processed' %}btn-dark{% else %}btn-outline-dark{% endif %}">
+      {% trans "Converted to order" %}
+      <span class="badge {% if view_mode == 'processed' %}bg-light text-dark{% else %}bg-dark{% endif %} ms-1">{{ processed_count }}</span>
+    </a>
+    <a href="?view=all{% if search_query %}&q={{ search_query|urlencode }}{% endif %}" class="btn btn-sm {% if view_mode == 'all' %}btn-info text-dark{% else %}btn-outline-info{% endif %}">
+      {% trans "All" %}
+      <span class="badge {% if view_mode == 'all' %}bg-light text-dark{% else %}bg-info text-dark{% endif %} ms-1">{{ all_count }}</span>
+    </a>
+  </div>
+
+  <form method="get" class="quotes-search mb-3">
+    <input type="hidden" name="view" value="{{ view_mode }}">
+    <div class="input-group">
+      <input
+        type="search"
+        name="q"
+        value="{{ search_query }}"
+        class="form-control"
+        placeholder="{% trans 'Search by quote #, customer, or status' %}"
+        aria-label="{% trans 'Search quotes' %}"
+      >
+      <button type="submit" class="btn btn-outline-primary">{% trans "Search" %}</button>
+      {% if search_query %}
+      <a href="?view={{ view_mode }}" class="btn btn-outline-secondary">{% trans "Clear" %}</a>
+      {% endif %}
+    </div>
+  </form>
+
+  <div class="card shadow-sm quotes-list-card">
+    <div class="table-responsive mobile-stack-responsive">
+      <table class="table table-striped align-middle mb-0 mobile-stack-table mobile-stack-table--list">
+        <thead>
+          <tr>
+            <th>{% trans "Quote" %}</th>
+            <th>{% trans "Customer" %}</th>
+            <th>{% trans "Date" %}</th>
+            <th>{% trans "Status" %}</th>
+            <th>{% trans "Total" %}</th>
+            <th>{% trans "Actions" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for cotizacion in cotizaciones %}
+          <tr>
+            <td data-label="{% trans 'Quote' %}">
+              <strong>#{{ cotizacion.id }}</strong>
+              {% if cotizacion.pedido_existente %}
+              <div class="small text-muted">
+                {% trans "Order" %}
+                <a href="{% url 'backoffice_pedido_detalle' cotizacion.pedido_existente.id %}">#{{ cotizacion.pedido_existente.id }}</a>
+              </div>
+              {% endif %}
+            </td>
+            <td data-label="{% trans 'Customer' %}">{{ cotizacion.cliente.nombre_empresa }}</td>
+            <td data-label="{% trans 'Date' %}">{{ cotizacion.fecha|date:"m/d/Y H:i" }}</td>
+            <td data-label="{% trans 'Status' %}">
+              <span class="badge {% if cotizacion.estado == 'CONFIRMADA_CLIENTE' %}bg-success{% elif cotizacion.estado == 'CANCELADA_CLIENTE' or cotizacion.estado == 'RECHAZADA' %}bg-secondary{% elif cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}bg-warning text-dark{% elif cotizacion.estado == 'APROBADA' %}bg-dark{% elif cotizacion.estado == 'BORRADOR' %}bg-light text-dark border{% else %}bg-primary{% endif %}">
+                {{ cotizacion.get_estado_display }}
+              </span>
+            </td>
+            <td data-label="{% trans 'Total' %}">${{ cotizacion.total }}</td>
+            <td data-label="{% trans 'Actions' %}" class="mobile-stack-table__action">
+              <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'backoffice_cotizacion_detalle' cotizacion.id %}">{% trans "Open" %}</a>
+                {% if cotizacion.can_generate_order %}
+                <form method="post" action="{% url 'generar_pedido_desde_cotizacion' cotizacion.id %}" class="d-inline">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-success">{% trans "Generate order" %}</button>
+                </form>
+                {% elif cotizacion.pedido_existente %}
+                <a class="btn btn-sm btn-outline-success" href="{% url 'backoffice_pedido_detalle' cotizacion.pedido_existente.id %}">{% trans "View order" %}</a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-muted py-4 mobile-stack-table__empty">
+              {% if search_query %}
+              {% trans "No quotes match your search." %}
+              {% else %}
+              {% trans "No quotes registered." %}
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+    {% pagination_controls page_obj aria_label=_('Quote pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0" view=view_mode q=search_query %}
+  {% endif %}
 </div>
+
+<style>
+  .quotes-hub {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .quotes-search .input-group {
+    max-width: 40rem;
+  }
+
+  .quotes-list-card {
+    overflow: hidden;
+  }
+
+  @media (max-width: 767.98px) {
+    .quotes-search .input-group {
+      max-width: none;
+    }
+
+    .quotes-hub .btn-group,
+    .quotes-hub [role="group"] {
+      width: 100%;
+    }
+
+    .quotes-hub [role="group"] .btn {
+      flex: 1 1 auto;
+    }
+  }
+</style>
 {% endblock %}

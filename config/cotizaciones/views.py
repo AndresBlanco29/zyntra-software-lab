@@ -8,7 +8,9 @@ from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
+from django.core.paginator import Paginator
 from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -16,6 +18,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from config.clientes.assignment import filter_clientes_for_vendedor
 from config.clientes.models import Cliente
 from config.notificaciones.models import crear_notificacion_backoffice
 from config.pedidos.models import Pedido
@@ -37,6 +40,8 @@ from django.utils.translation import gettext as _
 
 
 logger = logging.getLogger(__name__)
+
+BACKOFFICE_QUOTES_PAGE_SIZE = 50
 
 QUOTE_SEND_READY_SESSION_KEY = 'backoffice_quote_send_ready'
 MIN_BACKOFFICE_QUOTE_PRICE = Decimal('1.00')
@@ -573,25 +578,86 @@ def guardar_cotizacion(request):
 
 
 @login_required
-@internal_permission_required('backoffice.quotes.view')
+@internal_permission_required('backoffice.quotes.view', 'vendor.quotes.view')
 def backoffice_cotizaciones(request):
-    view_mapping = {
-        'confirmed': 'pending',
-        'processed': 'completed',
-        'cancelled': 'cancelled',
-        'pending': 'pending',
-    }
-    target_view = view_mapping.get(request.GET.get('view'), 'pending')
-    params = []
-    if target_view != 'pending':
-        params.append(f'view={target_view}')
-    page = request.GET.get('page')
-    if page:
-        params.append(f'page={page}')
-    target_url = reverse('backoffice_pedidos')
-    if params:
-        target_url = f'{target_url}?{"&".join(params)}'
-    return redirect(target_url)
+    search_query = (request.GET.get('q') or '').strip()
+    view_mode = (request.GET.get('view') or 'active').strip()
+    if view_mode not in {'active', 'confirmed', 'cancelled', 'processed', 'all'}:
+        view_mode = 'active'
+
+    queryset = Cotizacion.objects.select_related(
+        'cliente',
+        'vendedor',
+        'pedido_generado',
+    ).order_by('-fecha', '-id')
+
+    if not user_has_permission(request.user, 'backoffice.quotes.view'):
+        assigned_ids = filter_clientes_for_vendedor(Cliente.objects.all(), request.user).values_list('id', flat=True)
+        queryset = queryset.filter(cliente_id__in=assigned_ids)
+
+    pending_statuses = {'BORRADOR', 'ENVIADA', 'LISTA_PARA_CONFIRMACION'}
+    confirmed_statuses = {'CONFIRMADA_CLIENTE'}
+    cancelled_statuses = {'CANCELADA_CLIENTE', 'RECHAZADA'}
+    processed_statuses = {'APROBADA'}
+
+    counts_base = queryset
+    pending_count = counts_base.filter(estado__in=pending_statuses).count()
+    confirmed_count = counts_base.filter(estado__in=confirmed_statuses).count()
+    cancelled_count = counts_base.filter(estado__in=cancelled_statuses).count()
+    processed_count = counts_base.filter(
+        Q(estado__in=processed_statuses) | Q(pedido_generado__isnull=False)
+    ).distinct().count()
+    all_count = counts_base.count()
+
+    if view_mode == 'confirmed':
+        queryset = queryset.filter(estado__in=confirmed_statuses)
+    elif view_mode == 'cancelled':
+        queryset = queryset.filter(estado__in=cancelled_statuses)
+    elif view_mode == 'processed':
+        queryset = queryset.filter(Q(estado__in=processed_statuses) | Q(pedido_generado__isnull=False)).distinct()
+    elif view_mode == 'all':
+        pass
+    else:
+        view_mode = 'active'
+        queryset = queryset.filter(estado__in=pending_statuses)
+
+    if search_query:
+        search_filter = (
+            Q(cliente__nombre_empresa__icontains=search_query)
+            | Q(cliente__usuario__username__icontains=search_query)
+            | Q(estado__icontains=search_query)
+            | Q(nota_cliente__icontains=search_query)
+        )
+        if search_query.isdigit():
+            search_filter |= Q(id=int(search_query))
+        queryset = queryset.filter(search_filter)
+
+    page_obj = Paginator(queryset, BACKOFFICE_QUOTES_PAGE_SIZE).get_page(request.GET.get('page'))
+    for cotizacion in page_obj:
+        cotizacion.pedido_existente = _get_generated_order_from_quote(cotizacion)
+        cotizacion.can_generate_order = (
+            cotizacion.pedido_existente is None
+            and cotizacion.backoffice_pricing_confirmed
+            and cotizacion.estado in {'CONFIRMADA_CLIENTE', 'LISTA_PARA_CONFIRMACION', 'APROBADA'}
+            and user_has_permission(request.user, 'backoffice.orders.manage')
+        )
+
+    return render(request, 'backoffice/cotizaciones_lista.html', {
+        'cotizaciones': page_obj,
+        'page_obj': page_obj,
+        'view_mode': view_mode,
+        'search_query': search_query,
+        'pending_count': pending_count,
+        'confirmed_count': confirmed_count,
+        'cancelled_count': cancelled_count,
+        'processed_count': processed_count,
+        'all_count': all_count,
+        'can_create_quote': (
+            user_has_permission(request.user, 'backoffice.quotes.manage')
+            or user_has_permission(request.user, 'vendor.quotes.manage')
+        ),
+        'can_generate_orders': user_has_permission(request.user, 'backoffice.orders.manage'),
+    })
 
 
 @login_required
@@ -603,7 +669,7 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
     )
     if not user_can_view_cotizacion(request.user, cotizacion):
         messages.error(request, _('You do not have permission to access this section.'))
-        return redirect('vendedor_home' if getattr(request.user, 'role', '') == 'vendedor' else 'backoffice_pedidos')
+        return redirect('vendedor_home' if getattr(request.user, 'role', '') == 'vendedor' else 'backoffice_cotizaciones')
 
     pedido_existente = _get_generated_order_from_quote(cotizacion)
     can_manage = user_can_manage_cotizacion(request.user, cotizacion)
@@ -776,7 +842,7 @@ def backoffice_cotizacion_void(request, cotizacion_id):
         return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
     messages.success(request, _('Quote voided successfully. Inventory was not changed.'))
-    return redirect('backoffice_pedidos')
+    return redirect('backoffice_cotizaciones')
 
 
 @login_required
@@ -791,7 +857,7 @@ def backoffice_cotizacion_delete(request, cotizacion_id):
         return redirect('backoffice_cotizacion_detalle', cotizacion_id=cotizacion.id)
 
     messages.success(request, _('Quote deleted permanently. Inventory was not changed.'))
-    return redirect('backoffice_pedidos')
+    return redirect('backoffice_cotizaciones')
 
 
 @login_required
@@ -804,7 +870,7 @@ def enviar_cotizacion_cliente(request, cotizacion_id):
     )
     if not user_can_manage_cotizacion(request.user, cotizacion):
         messages.error(request, _('You do not have permission to access this section.'))
-        return redirect('vendedor_home' if getattr(request.user, 'role', '') == 'vendedor' else 'backoffice_pedidos')
+        return redirect('vendedor_home' if getattr(request.user, 'role', '') == 'vendedor' else 'backoffice_cotizaciones')
 
     if not cotizacion.items.exists():
         messages.error(request, _('The order has no products to send to the customer.'))
@@ -905,7 +971,7 @@ def abrir_whatsapp_manual_cotizacion(request, cotizacion_id):
     cotizacion = get_object_or_404(Cotizacion.objects.select_related('cliente__usuario'), id=cotizacion_id)
     if not user_can_manage_cotizacion(request.user, cotizacion):
         messages.error(request, _('You do not have permission to access this section.'))
-        return redirect('vendedor_home' if getattr(request.user, 'role', '') == 'vendedor' else 'backoffice_pedidos')
+        return redirect('vendedor_home' if getattr(request.user, 'role', '') == 'vendedor' else 'backoffice_cotizaciones')
     confirm_url, phone_number, whatsapp_link, outbound_message = _get_whatsapp_contact_data(cotizacion, request)
 
     if not _is_quote_send_ready(request.session, cotizacion.id):

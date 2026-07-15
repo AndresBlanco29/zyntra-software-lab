@@ -18,7 +18,7 @@ from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from config.clientes.credit_limit import (
 	CreditLimitBlockedError,
@@ -519,12 +519,12 @@ def _build_invoice_pdf_item_data(invoice):
 	return items
 
 
-INVOICE_PDF_ITEMS_PER_PAGE = 20
+INVOICE_PDF_ITEMS_PER_PAGE = 20  # Legacy helper size; invoice PDF uses one continuous table.
 INVOICE_PDF_UNIT_OF_MEASURE = 'CS'
 INVOICE_PDF_SHOW_SUGGESTED_RETAIL = False
-INVOICE_PDF_BARCODE_BAR_HEIGHT = 30
-INVOICE_PDF_BARCODE_FONT_SIZE = 7
-INVOICE_PDF_BARCODE_CELL_HEIGHT = INVOICE_PDF_BARCODE_BAR_HEIGHT + INVOICE_PDF_BARCODE_FONT_SIZE + 4
+INVOICE_PDF_BARCODE_BAR_HEIGHT = 22
+INVOICE_PDF_BARCODE_FONT_SIZE = 6
+INVOICE_PDF_BARCODE_CELL_HEIGHT = INVOICE_PDF_BARCODE_BAR_HEIGHT + INVOICE_PDF_BARCODE_FONT_SIZE + 3
 INVOICE_PDF_ITEM_COLUMN_WEIGHTS_BASE = (104, 108, 36, 26, 26, 46, 32, 46, 46)
 INVOICE_PDF_SUGGESTED_RETAIL_COLUMN_WEIGHT = 84
 
@@ -927,7 +927,6 @@ def _invoice_pdf_response(invoice):
 	]))
 	customer_company_name = resolve_customer_company_name(invoice.cliente)
 	item_rows = _build_invoice_pdf_item_data(invoice)
-	item_chunks = _chunk_invoice_pdf_item_rows(item_rows)
 	item_column_widths = _invoice_pdf_item_table_column_widths(content_width)
 	left_footer_width = item_column_widths[0] + item_column_widths[1]
 	generated_label = format_local_datetime(invoice.creada_en)
@@ -986,56 +985,68 @@ def _invoice_pdf_response(invoice):
 	]))
 	content.extend([party_table, Spacer(1, 4)])
 
-	for index, chunk in enumerate(item_chunks):
-		if index > 0:
-			content.append(PageBreak())
+	# One continuous item table so ReportLab fills each page from the top.
+	# Forced page-breaks every N rows left half-empty continuation sheets.
+	rows = [_build_invoice_pdf_item_table_header(table_header_style)]
+	barcode_column_width = item_column_widths[0] - 8
+	for item in item_rows:
+		barcode_cell = _build_invoice_pdf_barcode_cell(
+			item['barcode'],
+			max_width=max(barcode_column_width, 58),
+			placeholder_style=body_style,
+		)
+		row = [
+			barcode_cell,
+			Paragraph(item['product_name'], body_style),
+			Paragraph(item['pack_size'], body_style),
+			Paragraph(item['requested_quantity'], table_cell_center_style),
+			Paragraph(item['dispatched_quantity'], table_cell_center_style),
+			Paragraph(item['list_price'], table_cell_center_style),
+			Paragraph(item['discount_amount_unit'], table_cell_center_style),
+			Paragraph(item['customer_price'], table_cell_center_style),
+			Paragraph(item['subtotal'], table_cell_center_style),
+		]
+		if INVOICE_PDF_SHOW_SUGGESTED_RETAIL:
+			row.append(Paragraph(item['suggested_unit_price'], table_cell_center_style))
+		rows.append(row)
 
-		rows = [_build_invoice_pdf_item_table_header(table_header_style)]
-		barcode_column_width = item_column_widths[0] - 8
-		for item in chunk:
-			barcode_cell = _build_invoice_pdf_barcode_cell(
-				item['barcode'],
-				max_width=max(barcode_column_width, 58),
-				placeholder_style=body_style,
-			)
-			row = [
-				barcode_cell,
-				Paragraph(item['product_name'], body_style),
-				Paragraph(item['pack_size'], body_style),
-				Paragraph(item['requested_quantity'], table_cell_center_style),
-				Paragraph(item['dispatched_quantity'], table_cell_center_style),
-				Paragraph(item['list_price'], table_cell_center_style),
-				Paragraph(item['discount_amount_unit'], table_cell_center_style),
-				Paragraph(item['customer_price'], table_cell_center_style),
-				Paragraph(item['subtotal'], table_cell_center_style),
-			]
-			if INVOICE_PDF_SHOW_SUGGESTED_RETAIL:
-				row.append(Paragraph(item['suggested_unit_price'], table_cell_center_style))
-			rows.append(row)
+	if len(rows) == 1:
+		# Keep a header-only placeholder when the invoice has no lines.
+		rows.append([
+			Paragraph('-', body_style),
+			Paragraph('-', body_style),
+			Paragraph('-', body_style),
+			Paragraph('0', table_cell_center_style),
+			Paragraph('0', table_cell_center_style),
+			Paragraph(_format_pdf_money(0), table_cell_center_style),
+			Paragraph('—', table_cell_center_style),
+			Paragraph(_format_pdf_money(0), table_cell_center_style),
+			Paragraph(_format_pdf_money(0), table_cell_center_style),
+		])
+		if INVOICE_PDF_SHOW_SUGGESTED_RETAIL:
+			rows[-1].append(Paragraph(_format_pdf_money(0), table_cell_center_style))
 
-		table = Table(rows, colWidths=item_column_widths, repeatRows=1)
-		table.setStyle(TableStyle([
-			('BACKGROUND', (0, 0), (-1, 0), BRAND_PRIMARY),
-			('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-			('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-			('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-			('FONTSIZE', (0, 1), (-1, -1), 7),
-			('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
-			('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, BRAND_SURFACE]),
-			('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-			('BOTTOMPADDING', (0, 0), (-1, -1), 2),
-			('TOPPADDING', (0, 0), (-1, -1), 2),
-			('TOPPADDING', (0, 0), (-1, 0), 4),
-			('BOTTOMPADDING', (0, 0), (-1, 0), 4),
-			('VALIGN', (0, 1), (0, -1), 'TOP'),
-			('TOPPADDING', (0, 1), (0, -1), 1),
-			('BOTTOMPADDING', (0, 1), (0, -1), 4),
-			('LEFTPADDING', (0, 0), (-1, -1), 4),
-			('RIGHTPADDING', (0, 0), (-1, -1), 4),
-		]))
-		content.append(table)
-		if index == len(item_chunks) - 1:
-			content.append(Spacer(1, 8))
+	table = Table(rows, colWidths=item_column_widths, repeatRows=1)
+	table.setStyle(TableStyle([
+		('BACKGROUND', (0, 0), (-1, 0), BRAND_PRIMARY),
+		('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+		('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+		('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+		('FONTSIZE', (0, 1), (-1, -1), 7),
+		('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, BRAND_SURFACE]),
+		('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+		('TOPPADDING', (0, 0), (-1, -1), 2),
+		('TOPPADDING', (0, 0), (-1, 0), 4),
+		('BOTTOMPADDING', (0, 0), (-1, 0), 4),
+		('VALIGN', (0, 1), (0, -1), 'TOP'),
+		('TOPPADDING', (0, 1), (0, -1), 1),
+		('BOTTOMPADDING', (0, 1), (0, -1), 4),
+		('LEFTPADDING', (0, 0), (-1, -1), 4),
+		('RIGHTPADDING', (0, 0), (-1, -1), 4),
+	]))
+	content.extend([table, Spacer(1, 8)])
 
 	content.append(_build_invoice_pdf_footer_layout(
 		invoice,

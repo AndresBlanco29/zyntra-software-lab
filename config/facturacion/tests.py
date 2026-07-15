@@ -18,7 +18,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate
 
 from config.clientes.models import Cliente
-from config.facturacion.models import Delivery, DeliveryNotificationLog, FacturacionRegistroAnulacion, Invoice, NotaAjuste, NotaAjusteAplicacion
+from config.facturacion.models import Delivery, DeliveryNotificationLog, FacturacionRegistroAnulacion, Invoice, InvoiceItem, NotaAjuste, NotaAjusteAplicacion
 from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, attach_invoice_item_net_dispatched_quantities, build_google_maps_route_url, build_invoice_shipment_summary, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, invoice_delete_requires_confirmation_phrase, mark_delivery_unpaid_from_backoffice, resolve_customer_amount_owed, resolve_customer_overdue_balance, resolve_invoice_item_net_dispatched_quantity, resolve_invoice_payment_base_date, resolve_invoice_payment_due_date, start_delivery_route, unlock_client_from_delivery, validate_invoice_delete_confirmation_phrase
 from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_barcode_cell, _build_invoice_pdf_footer_layout, _build_invoice_pdf_item_data, _build_invoice_pdf_shipment_summary_table, _build_invoice_pdf_terms_paragraph, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_pdf_due_date_label, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_SYNCED
@@ -3219,7 +3219,7 @@ class InvoiceFlowTests(TestCase):
 			['Alpha Soda', 'Tortilla 12', 'Zulu Soda'],
 		)
 
-	def test_invoice_pdf_item_rows_are_chunked_in_groups_of_twenty(self):
+	def test_invoice_pdf_item_rows_chunk_helper_keeps_legacy_groups_of_twenty(self):
 		rows = [{'index': number} for number in range(23)]
 
 		chunks = _chunk_invoice_pdf_item_rows(rows)
@@ -3227,6 +3227,50 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual([len(chunk) for chunk in chunks], [20, 3])
 		self.assertEqual(chunks[0][0]['index'], 0)
 		self.assertEqual(chunks[-1][-1]['index'], 22)
+
+	def test_invoice_pdf_uses_continuous_table_without_forced_page_breaks(self):
+		from reportlab.platypus import PageBreak, Table
+
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		extra_items = [
+			InvoiceItem(
+				invoice=invoice,
+				presentacion=self.presentacion,
+				producto_nombre=f'Extra Product {index:02d}',
+				presentacion_nombre='Case',
+				cantidad_facturada=1,
+				precio_unitario=Decimal('1.00'),
+				subtotal=Decimal('1.00'),
+			)
+			for index in range(25)
+		]
+		InvoiceItem.objects.bulk_create(extra_items)
+
+		captured = {}
+		original_build = SimpleDocTemplate.build
+
+		def capture_build(doc, flowables, **kwargs):
+			captured['flowables'] = list(flowables)
+			return original_build(doc, flowables, **kwargs)
+
+		self.client.force_login(self.backoffice)
+		with patch.object(SimpleDocTemplate, 'build', capture_build):
+			response = self.client.get(reverse('backoffice_invoice_pdf', args=[invoice.id]))
+
+		self.assertEqual(response.status_code, 200)
+		flowables = captured['flowables']
+		self.assertFalse(any(isinstance(flowable, PageBreak) for flowable in flowables))
+		item_tables = [
+			flowable
+			for flowable in flowables
+			if isinstance(flowable, Table) and len(getattr(flowable, '_cellvalues', []) or []) >= 20
+		]
+		self.assertEqual(len(item_tables), 1)
 
 	def test_invoice_pdf_item_table_column_widths_use_full_content_width(self):
 		content_width = 564
@@ -3241,8 +3285,8 @@ class InvoiceFlowTests(TestCase):
 
 		self.assertEqual(barcode.__class__.__name__, 'Code128')
 		self.assertEqual(barcode.fontName, 'Helvetica')
-		self.assertEqual(barcode.fontSize, 7)
-		self.assertEqual(barcode.barHeight, 30)
+		self.assertEqual(barcode.fontSize, 6)
+		self.assertEqual(barcode.barHeight, 22)
 
 	def test_invoice_pdf_barcode_cell_uses_same_height_with_or_without_barcode(self):
 		styles = getSampleStyleSheet()

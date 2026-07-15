@@ -5,7 +5,7 @@ from xml.sax.saxutils import escape
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db.models import Case, IntegerField, Q, Value, When
+from django.db.models import Case, Exists, IntegerField, OuterRef, Q, Value, When
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -25,7 +25,7 @@ from config.core.pdf_branding import (
 	BRAND_TEXT,
 	build_pdf_brand_banner,
 )
-from config.core.workflow_badges import build_order_workflow_badge
+from config.core.workflow_badges import _safe_related, build_order_workflow_badge
 from config.clientes.credit_limit import evaluate_customer_credit_limit, resolve_credit_limit_alert
 from config.clientes.models import ClienteCreditoLimiteAlerta
 from config.usuarios.permissions import internal_permission_required
@@ -38,7 +38,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from config.clientes.models import Cliente
-from config.facturacion.models import NotaAjuste
+from config.facturacion.models import Invoice, NotaAjuste
 from config.facturacion.views import _build_invoice_pdf_shipment_summary_table
 from config.facturacion.services import (
 	DEFAULT_SUGGESTED_PROFIT_PERCENTAGE,
@@ -259,7 +259,11 @@ def _pedido_state_choices():
 
 
 def _selector_pedidos_queryset(user):
-	queryset = Pedido.objects.select_related('cliente__usuario', 'seleccionador').prefetch_related('items__presentacion__producto').order_by('-actualizada_en', '-creada_en')
+	queryset = Pedido.objects.select_related(
+		'cliente__usuario',
+		'seleccionador',
+		'invoice',
+	).prefetch_related('items__presentacion__producto').order_by('-actualizada_en', '-creada_en')
 	if user.is_superuser or getattr(user, 'role', '') == 'admin':
 		return queryset.filter(seleccionador__isnull=False)
 	return queryset.filter(seleccionador=user)
@@ -270,6 +274,30 @@ SELECTOR_PICKING_PROCESS_COMPLETED_STATES = frozenset({
 	'DESPACHADO',
 	'CANCELADO',
 })
+
+
+def _selector_pedido_has_voided_invoice(pedido):
+	invoice = _safe_related(pedido, 'invoice')
+	return bool(invoice and invoice.estado == 'ANULADA')
+
+
+def _selector_picking_process_completed(pedido):
+	return (
+		pedido.estado in SELECTOR_PICKING_PROCESS_COMPLETED_STATES
+		or _selector_pedido_has_voided_invoice(pedido)
+	)
+
+
+def _selector_picking_done_rank_annotation():
+	return Case(
+		When(estado__in=list(SELECTOR_PICKING_PROCESS_COMPLETED_STATES), then=Value(1)),
+		When(
+			Exists(Invoice.objects.filter(pedido_id=OuterRef('pk'), estado='ANULADA')),
+			then=Value(1),
+		),
+		default=Value(0),
+		output_field=IntegerField(),
+	)
 
 
 def _filter_selector_picking_queryset(queryset, search_query):
@@ -284,9 +312,13 @@ def _filter_selector_picking_queryset(queryset, search_query):
 
 def _annotate_selector_picking_rows(pedidos):
 	for pedido in pedidos:
-		pedido.estado_label = _pedido_state_label(pedido.estado)
+		invoice_voided = _selector_pedido_has_voided_invoice(pedido)
+		pedido.picker_process_completed = _selector_picking_process_completed(pedido)
+		if invoice_voided or pedido.estado == 'CANCELADO':
+			pedido.estado_label = _('Cancelled')
+		else:
+			pedido.estado_label = _pedido_state_label(pedido.estado)
 		pedido.workflow_badge = build_order_workflow_badge(pedido)
-		pedido.picker_process_completed = pedido.estado in SELECTOR_PICKING_PROCESS_COMPLETED_STATES
 	return pedidos
 
 
@@ -1371,13 +1403,7 @@ def selector_picking_list(request):
 	if view_mode == 'completed':
 		pedidos = (
 			filtered_queryset.exclude(estado='PARA_VERIFICAR')
-			.annotate(
-				picker_done_rank=Case(
-					When(estado__in=list(SELECTOR_PICKING_PROCESS_COMPLETED_STATES), then=Value(1)),
-					default=Value(0),
-					output_field=IntegerField(),
-				)
-			)
+			.annotate(picker_done_rank=_selector_picking_done_rank_annotation())
 			.order_by('picker_done_rank', '-actualizada_en', '-creada_en')
 		)
 	else:

@@ -96,9 +96,11 @@ def build_order_workflow_badge(pedido):
     if estado == 'CANCELADO':
         return _solid_badge(role='backoffice', label=_('Cancelled'))
 
+    if invoice and invoice.estado == 'ANULADA':
+        return _solid_badge(role='backoffice', label=_('Invoice voided'))
+
     if delivery and delivery.estado in {'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'}:
         return _solid_badge(role='driver', label=_('Delivery completed'))
-
     if delivery and delivery.estado == 'EN_RUTA':
         driver = delivery.driver
         driver_label = (driver.get_full_name() or driver.username) if driver else ''

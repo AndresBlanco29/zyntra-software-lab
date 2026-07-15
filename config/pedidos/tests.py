@@ -12,7 +12,7 @@ from django.utils import timezone
 from config.clientes.models import Cliente
 from config.core.datetime_formats import format_local_datetime
 from config.facturacion.models import Invoice, InvoiceItem
-from config.facturacion.services import generar_invoice_desde_picking, resolve_invoice_sale_reference_date
+from config.facturacion.services import anular_invoice, eliminar_invoice, generar_invoice_desde_picking, resolve_invoice_sale_reference_date
 from config.inventario.models import StockPresentacion
 from config.inventario.services import registrar_entrada_manual
 from config.notificaciones.models import Notificacion
@@ -497,6 +497,126 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertGreater(waiting_pos, -1)
 		self.assertGreater(invoiced_pos, -1)
 		self.assertLess(waiting_pos, invoiced_pos)
+		self.assertContains(response, 'Process completed')
+		self.assertContains(response, 'selector-picking-row--completed', html=False)
+
+	def test_selector_processed_list_marks_voided_and_deleted_invoices_completed_last(self):
+		waiting_order = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='LISTO_PARA_PICKING',
+			total=Decimal('12.00'),
+		)
+		waiting_item = PedidoItem.objects.create(
+			pedido=waiting_order,
+			presentacion=self.presentacion,
+			cantidad_solicitada=1,
+			cantidad_reservada_inventario=1,
+			cantidad=1,
+			precio=Decimal('12.00'),
+			subtotal=Decimal('12.00'),
+		)
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		stock.stock_reservado += 1
+		stock.stock_disponible = stock.stock_fisico - stock.stock_reservado
+		stock.save(update_fields=['stock_reservado', 'stock_disponible', 'actualizado_en'])
+		asignar_picking_a_seleccionador(pedido=waiting_order, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=waiting_order,
+			seleccionador=self.selector,
+			cantidades_reales={waiting_item.id: 1},
+			nota='Waiting invoice',
+			nota_resuelta=True,
+		)
+
+		voided_order = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='LISTO_PARA_PICKING',
+			total=Decimal('12.00'),
+		)
+		voided_item = PedidoItem.objects.create(
+			pedido=voided_order,
+			presentacion=self.presentacion,
+			cantidad_solicitada=1,
+			cantidad_reservada_inventario=1,
+			cantidad=1,
+			precio=Decimal('12.00'),
+			subtotal=Decimal('12.00'),
+		)
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		stock.stock_reservado += 1
+		stock.stock_disponible = stock.stock_fisico - stock.stock_reservado
+		stock.save(update_fields=['stock_reservado', 'stock_disponible', 'actualizado_en'])
+		asignar_picking_a_seleccionador(pedido=voided_order, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=voided_order,
+			seleccionador=self.selector,
+			cantidades_reales={voided_item.id: 1},
+			nota='Void later',
+			nota_resuelta=True,
+		)
+		voided_invoice = generar_invoice_desde_picking(
+			pedido=voided_order,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		anular_invoice(invoice=voided_invoice, usuario=self.backoffice, motivo='Already billed elsewhere')
+
+		deleted_order = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='LISTO_PARA_PICKING',
+			total=Decimal('12.00'),
+		)
+		deleted_item = PedidoItem.objects.create(
+			pedido=deleted_order,
+			presentacion=self.presentacion,
+			cantidad_solicitada=1,
+			cantidad_reservada_inventario=1,
+			cantidad=1,
+			precio=Decimal('12.00'),
+			subtotal=Decimal('12.00'),
+		)
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		stock.stock_reservado += 1
+		stock.stock_disponible = stock.stock_fisico - stock.stock_reservado
+		stock.save(update_fields=['stock_reservado', 'stock_disponible', 'actualizado_en'])
+		asignar_picking_a_seleccionador(pedido=deleted_order, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=deleted_order,
+			seleccionador=self.selector,
+			cantidades_reales={deleted_item.id: 1},
+			nota='Delete later',
+			nota_resuelta=True,
+		)
+		deleted_invoice = generar_invoice_desde_picking(
+			pedido=deleted_order,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		eliminar_invoice(invoice=deleted_invoice)
+
+		self.client.force_login(self.selector)
+		pending_response = self.client.get(reverse('selector_picking_list'))
+		self.assertNotContains(pending_response, reverse('selector_picking_detail', args=[voided_order.id]))
+		self.assertNotContains(pending_response, reverse('selector_picking_detail', args=[deleted_order.id]))
+
+		response = self.client.get(reverse('selector_picking_list') + '?view=completed')
+		self.assertEqual(response.status_code, 200)
+		body = response.content.decode('utf-8')
+		waiting_pos = body.find(f'#{waiting_order.id}')
+		voided_pos = body.find(f'#{voided_order.id}')
+		deleted_pos = body.find(f'#{deleted_order.id}')
+		self.assertGreater(waiting_pos, -1)
+		self.assertGreater(voided_pos, -1)
+		self.assertGreater(deleted_pos, -1)
+		self.assertLess(waiting_pos, voided_pos)
+		self.assertLess(waiting_pos, deleted_pos)
+		self.assertContains(response, 'Invoice voided')
+		self.assertContains(response, 'Cancelled')
 		self.assertContains(response, 'Process completed')
 		self.assertContains(response, 'selector-picking-row--completed', html=False)
 

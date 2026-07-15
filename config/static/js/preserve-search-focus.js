@@ -111,10 +111,29 @@
         });
     }
 
+    function bindEnterOnlySearch(input, submitFn) {
+        if (!input || typeof submitFn !== 'function') {
+            return;
+        }
+
+        function submitWithFocus() {
+            rememberSearchFocus(input);
+            submitFn();
+        }
+
+        input.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                submitWithFocus();
+            }
+        });
+    }
+
     window.PreserveSearchFocus = {
         remember: rememberSearchFocus,
         restore: restoreSearchFocus,
         bindDebouncedSearch: bindDebouncedSearch,
+        bindEnterOnlySearch: bindEnterOnlySearch,
     };
 
     document.addEventListener('DOMContentLoaded', restoreSearchFocus);

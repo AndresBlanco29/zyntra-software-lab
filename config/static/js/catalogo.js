@@ -38,7 +38,22 @@ document.addEventListener('DOMContentLoaded', function() {
     const filtroMarca = document.getElementById('filtroMarca');
 
     if (buscador && window.PreserveSearchFocus) {
-        window.PreserveSearchFocus.bindDebouncedSearch(buscador, submitCatalogFilters, 3000);
+        window.PreserveSearchFocus.bindEnterOnlySearch(buscador, submitCatalogFilters);
+    }
+
+    function syncCatalogSearchStickyTop() {
+        var nav = document.querySelector('.navbar-custom');
+        var sticky = document.querySelector('.catalog-search-sticky');
+        if (!nav || !sticky) {
+            return;
+        }
+        sticky.style.top = nav.offsetHeight + 'px';
+    }
+
+    syncCatalogSearchStickyTop();
+    window.addEventListener('resize', syncCatalogSearchStickyTop);
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', syncCatalogSearchStickyTop);
     }
 
     if (filtroCategoria) {

@@ -212,3 +212,25 @@ class DispatchOrderClassificationTests(TestCase):
 		self.assertIn(managed_pedido.id, self._order_ids_for_view('purchase-order'))
 		row = self._order_row_for_pedido(managed_pedido.id, view_mode='purchase-order')
 		self.assertEqual(row.status_label, 'Purchase order · BackOffice')
+
+	def test_search_completed_orders_tolerates_lazy_workflow_labels(self):
+		pedido = self._create_verified_pedido()
+		invoice = generar_invoice_desde_picking(
+			pedido=pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		delivery = ensure_delivery_for_invoice(invoice)
+		delivery.estado = 'ENTREGADA_PAGADA'
+		delivery.save(update_fields=['estado', 'updated_at'])
+		pedido.estado = 'DESPACHADO'
+		pedido.save(update_fields=['estado', 'actualizada_en'])
+
+		_, page_obj = build_dispatch_order_page(
+			view_mode='completed',
+			page_number=1,
+			page_size=50,
+			search_term='PRUEBA',
+		)
+		self.assertIn(pedido.id, [row.source_id for row in page_obj if row.record_type == 'order'])

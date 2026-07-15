@@ -420,13 +420,16 @@ def _matches_dispatch_search(row, search_term):
 	query = (search_term or '').strip().lower()
 	if not query:
 		return True
+	workflow_label = ''
+	if isinstance(row.workflow_badge, dict):
+		workflow_label = row.workflow_badge.get('label') or ''
 	haystack = ' '.join([
 		str(row.source_id),
-		row.customer_name or '',
-		row.selector_name or '',
+		str(row.customer_name or ''),
+		str(row.selector_name or ''),
 		str(row.origin_label or ''),
 		str(row.status_label or ''),
-		(row.workflow_badge or {}).get('label', '') if isinstance(row.workflow_badge, dict) else '',
+		str(workflow_label),
 	]).lower()
 	return query in haystack
 

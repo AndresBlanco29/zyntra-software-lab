@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const filtroMarca = document.getElementById('filtroMarca');
 
     if (buscador && window.PreserveSearchFocus) {
-        window.PreserveSearchFocus.bindDebouncedSearch(buscador, submitCatalogFilters);
+        window.PreserveSearchFocus.bindDebouncedSearch(buscador, submitCatalogFilters, 3000);
     }
 
     if (filtroCategoria) {

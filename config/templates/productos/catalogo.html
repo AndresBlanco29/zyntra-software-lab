@@ -142,11 +142,14 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
 
                     </div>
 
-                    <form method="get" id="catalogo-filter-form" class="selects-row d-flex w-100 gap-2 mt-2">
-                        {% if guest_mode %}
-                        <input type="hidden" name="guest" value="1">
-                        {% endif %}
+                </div>
 
+                <form method="get" id="catalogo-filter-form" class="catalog-filter-form">
+                    {% if guest_mode %}
+                    <input type="hidden" name="guest" value="1">
+                    {% endif %}
+
+                    <div class="catalog-search-sticky">
                         <input
                             type="search"
                             id="buscador"
@@ -156,7 +159,9 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                             placeholder="{% trans 'Buscar Productos' %}"
                             autocomplete="off"
                         >
+                    </div>
 
+                    <div class="catalog-filter-selects selects-row d-flex w-100 gap-2 mt-2">
                         <select class="form-select" id="filtroCategoria" name="categoria">
                             <option value="">{% trans "Categoría" %}</option>
                             {% for c in categorias %}
@@ -179,10 +184,7 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                             {% endfor %}
 
                         </select>
-
-                    </form>
-
-                </div>
+                    </div>
 
                 <hr>
 
@@ -277,6 +279,7 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                     {% endfor %}
 
                 </div>
+                </form>
 
                 {% pagination_controls page_obj aria_label=_('Product pagination') nav_class="catalog-pagination d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-2" q=filter_q categoria=filter_categoria marca=filter_marca guest=guest_mode|yesno:"1," %}
 

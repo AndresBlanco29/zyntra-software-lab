@@ -2,33 +2,49 @@ body {
     background-color: #f4f6f9;
 }
 
-/* Desktop: restaurar layout original (titulo izquierda, buscador+selects a la derecha) */
+/* Desktop: título arriba; filtros y buscador a ancho completo debajo */
 @media (min-width: 993px) {
     .catalog-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        display: block;
     }
 
     .catalog-header .top-row {
         display: block;
     }
 
-    .catalog-header .selects-row {
+    .catalog-filter-form .catalog-filter-selects {
         display: flex;
         gap: 10px;
         align-items: center;
-        width: auto;
+        width: 100%;
     }
 
-    .catalog-header .selects-row > #buscador {
-        width: 460px;
-        min-width: 360px;
+    .catalog-filter-form .catalog-search-sticky > #buscador {
+        width: 100%;
+        max-width: 560px;
+        min-width: 280px;
     }
 
-    .catalog-header .selects-row select {
+    .catalog-filter-form .catalog-filter-selects select {
         width: auto;
+        min-width: 180px;
     }
+}
+
+/* Buscador sticky debajo del navbar fijo — solo el input, no Category/Brand */
+.catalog-search-sticky {
+    position: sticky;
+    top: 70px;
+    z-index: 40;
+    background: #f4f6f9;
+    padding: 0.55rem 0 0.65rem;
+    margin: 0 0 0.25rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    box-shadow: 0 6px 12px -10px rgba(15, 23, 42, 0.35);
+}
+
+.catalog-search-sticky > #buscador {
+    width: 100%;
 }
 
 /* NAVBAR */
@@ -417,7 +433,7 @@ z-index:9999;
 
 @media (max-width: 768px) {
     /* organiza filtros y buscador en columna */
-    .catalog-header .selects-row {
+    .catalog-filter-form .catalog-filter-selects {
         flex-direction: column;
         gap: 10px !important;
     }
@@ -426,7 +442,7 @@ z-index:9999;
         width: 100%;
         min-width: unset !important;
         flex: 0 0 auto;
-        margin-bottom: 6px;
+        margin-bottom: 0;
     }
 
     .presentacion-select {
@@ -481,24 +497,20 @@ z-index:9999;
         margin: 0;
     }
 
-    .catalog-header .selects-row {
-        width: 100%;
-    }
-
-    .catalog-header .selects-row > #buscador {
-        width: 100%;
-        min-width: 0;
-        flex: 0 0 auto;
-    }
-
-    .catalog-header .selects-row {
+    .catalog-filter-form .catalog-filter-selects {
         width: 100%;
         display: flex;
         gap: 10px;
         flex-direction: column;
     }
 
-    .catalog-header .selects-row select {
+    .catalog-search-sticky > #buscador {
+        width: 100%;
+        min-width: 0;
+        flex: 0 0 auto;
+    }
+
+    .catalog-filter-form .catalog-filter-selects select {
         width: 100%;
     }
 }
@@ -609,7 +621,6 @@ z-index:9999;
         min-width:220px !important;
         }
 
-        /* Posicionar buscador a la derecha en la fila superior; selects debajo */
         .catalog-header .top-row{
         display:flex;
         justify-content:space-between;
@@ -622,14 +633,12 @@ z-index:9999;
         min-width:200px;
         }
 
-        /* Buscador arriba a la derecha (agrupado dentro de selects-row), tamaño fijo razonable */
-        .catalog-header .selects-row > #buscador{
-        width:260px;
-        max-width:40vw;
+        .catalog-filter-form .catalog-search-sticky > #buscador{
+        width:100%;
+        max-width:420px;
         }
 
-        /* Selects en la línea inferior: categoria izquierda, marca derecha */
-        .catalog-header .selects-row{
+        .catalog-filter-form .catalog-filter-selects{
         display:flex;
         justify-content:space-between;
         gap:12px;
@@ -637,7 +646,7 @@ z-index:9999;
         margin-top:8px;
         }
 
-        .catalog-header .selects-row select{
+        .catalog-filter-form .catalog-filter-selects select{
         width:48%;
         min-width:140px;
         }

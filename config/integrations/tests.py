@@ -67,6 +67,7 @@ from config.integrations.quickbooks.sync import (
     _resolve_quickbooks_item_active,
     _resolve_item_import_force_full,
     refresh_linked_quickbooks_invoice_status,
+    sync_product,
 )
 from config.inventario.models import StockPresentacion
 from config.pedidos.models import Pedido, PedidoItem
@@ -300,7 +301,11 @@ class QuickBooksItemPayloadTests(TestCase):
     def test_build_item_name_uses_product_name_without_ltg_prefix(self):
         self.assertEqual(_build_item_name(self.presentacion), 'QB payload product')
 
-    def test_build_item_payload_preserves_remote_quickbooks_name(self):
+    @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
+    @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
+    @patch('config.integrations.quickbooks.sync._get_default_expense_account_ref', return_value={'value': '80', 'name': 'COGS'})
+    @patch('config.integrations.quickbooks.sync._get_inventory_income_account_ref', return_value={'value': '79', 'name': 'Sales of Product Income'})
+    def test_build_item_payload_preserves_remote_quickbooks_name(self, *_mocks):
         payload = _build_item_payload(
             self.presentacion,
             client=Mock(),
@@ -360,6 +365,35 @@ class QuickBooksItemPayloadTests(TestCase):
 
         self.assertEqual(payload['Type'], 'Inventory')
         self.assertNotIn('QtyOnHand', payload)
+        self.assertNotIn('InvStartDate', payload)
+
+    @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
+    @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
+    @patch('config.integrations.quickbooks.sync._get_default_expense_account_ref', return_value={'value': '80', 'name': 'COGS'})
+    @patch('config.integrations.quickbooks.sync._get_inventory_income_account_ref', return_value={'value': '79', 'name': 'Sales of Product Income'})
+    def test_build_item_payload_omits_price_cost_and_qty_for_metadata_update(self, *_mocks):
+        payload = _build_item_payload(
+            self.presentacion,
+            client=Mock(),
+            remote_payload={
+                'Id': '1062',
+                'Type': 'Inventory',
+                'UnitPrice': 99.0,
+                'PurchaseCost': 40.0,
+                'QtyOnHand': 20,
+            },
+            sync_qty_on_hand=False,
+            sync_pricing=False,
+        )
+
+        self.assertEqual(payload['Type'], 'Inventory')
+        self.assertIn('Name', payload)
+        self.assertIn('Description', payload)
+        self.assertIn('Sku', payload)
+        self.assertNotIn('UnitPrice', payload)
+        self.assertNotIn('PurchaseCost', payload)
+        self.assertNotIn('QtyOnHand', payload)
+        self.assertNotIn('InvStartDate', payload)
 
     @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
     @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
@@ -378,6 +412,7 @@ class QuickBooksItemPayloadTests(TestCase):
         remote_payload = {
             'Id': '1062',
             'Type': 'Inventory',
+            'Name': expected_payload['Name'],
             'Active': expected_payload['Active'],
             'Description': expected_payload['Description'],
             'UnitPrice': expected_payload['UnitPrice'],
@@ -396,6 +431,84 @@ class QuickBooksItemPayloadTests(TestCase):
                 sync_qty_on_hand=False,
             )
         )
+
+    @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
+    @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
+    @patch('config.integrations.quickbooks.sync._get_default_expense_account_ref', return_value={'value': '80', 'name': 'COGS'})
+    @patch('config.integrations.quickbooks.sync._get_inventory_income_account_ref', return_value={'value': '79', 'name': 'Sales of Product Income'})
+    def test_item_payload_needs_update_ignores_price_cost_qty_for_metadata_update(self, *_mocks):
+        expected_payload = _build_item_payload(
+            self.presentacion,
+            client=Mock(),
+            remote_payload={
+                'Id': '1062',
+                'Type': 'Inventory',
+            },
+            sync_qty_on_hand=False,
+            sync_pricing=False,
+        )
+        remote_payload = {
+            'Id': '1062',
+            'Type': 'Inventory',
+            'Name': expected_payload['Name'],
+            'Active': expected_payload['Active'],
+            'Description': expected_payload['Description'],
+            'UnitPrice': 999.0,
+            'IncomeAccountRef': expected_payload['IncomeAccountRef'],
+            'Sku': expected_payload['Sku'],
+            'QtyOnHand': 20,
+            'PurchaseCost': 111.0,
+            'ExpenseAccountRef': expected_payload['ExpenseAccountRef'],
+            'AssetAccountRef': expected_payload['AssetAccountRef'],
+        }
+
+        self.assertFalse(
+            _item_payload_needs_update(
+                remote_payload,
+                expected_payload,
+                sync_qty_on_hand=False,
+                sync_pricing=False,
+            )
+        )
+
+    @override_settings(QUICKBOOKS_USE_INVENTORY_ITEMS=True)
+    @patch('config.integrations.quickbooks.sync._get_default_asset_account_ref', return_value={'value': '81', 'name': 'Inventory Asset'})
+    @patch('config.integrations.quickbooks.sync._get_default_expense_account_ref', return_value={'value': '80', 'name': 'COGS'})
+    @patch('config.integrations.quickbooks.sync._get_inventory_income_account_ref', return_value={'value': '79', 'name': 'Sales of Product Income'})
+    def test_sync_product_update_does_not_push_price_cost_or_qty(self, *_mocks):
+        self.presentacion.quickbooks_id = '1062'
+        self.presentacion.save(update_fields=['quickbooks_id'])
+        self.presentacion.producto.codigo_barras = 'SKU-LOCAL-1'
+        self.presentacion.producto.save(update_fields=['codigo_barras'])
+
+        remote = {
+            'Id': '1062',
+            'SyncToken': '4',
+            'Type': 'Inventory',
+            'Name': 'MILAGRO CORN TORTILLA 16/36CT',
+            'Active': True,
+            'Description': 'Old description',
+            'UnitPrice': 99.0,
+            'PurchaseCost': 40.0,
+            'QtyOnHand': 250,
+            'Sku': 'OLD-SKU',
+            'IncomeAccountRef': {'value': '79', 'name': 'Sales of Product Income'},
+            'ExpenseAccountRef': {'value': '80', 'name': 'COGS'},
+            'AssetAccountRef': {'value': '81', 'name': 'Inventory Asset'},
+        }
+        client = Mock()
+        client.find_by_id.return_value = remote
+        client.update_item.return_value = {**remote, 'SyncToken': '5', 'Description': 'updated'}
+
+        result = sync_product(presentacion=self.presentacion, client=client)
+
+        self.assertEqual(result['action'], 'updated')
+        update_payload = client.update_item.call_args.args[0]
+        self.assertEqual(update_payload['Sku'], 'SKU-LOCAL-1')
+        self.assertNotIn('UnitPrice', update_payload)
+        self.assertNotIn('PurchaseCost', update_payload)
+        self.assertNotIn('QtyOnHand', update_payload)
+        self.assertNotIn('InvStartDate', update_payload)
 
     def test_get_inventory_start_date_defaults_to_early_date(self):
         self.assertEqual(_get_inventory_start_date(), date(2015, 1, 1))

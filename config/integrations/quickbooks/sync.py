@@ -1051,19 +1051,33 @@ def _local_presentacion_qty_on_hand(presentacion):
     return max(int(stock.stock_fisico or 0), 0)
 
 
-def _build_item_payload(presentacion, *, client, income_account_ref=None, remote_payload=None, sync_qty_on_hand=True):
+def _build_item_payload(
+    presentacion,
+    *,
+    client,
+    income_account_ref=None,
+    remote_payload=None,
+    sync_qty_on_hand=True,
+    sync_pricing=True,
+):
     use_inventory = getattr(settings, 'QUICKBOOKS_USE_INVENTORY_ITEMS', True)
     if remote_payload is not None and not use_inventory:
         # When inventory export is disabled, preserve the existing QuickBooks item type on updates.
         use_inventory = _quickbooks_item_is_inventory(remote_payload)
 
+    # New QB items can seed price/cost/qty from ERP. Updates omit them by default so QuickBooks
+    # remains the source of truth for pricing and on-hand quantity.
+    include_pricing = sync_pricing or remote_payload is None
+    include_qty = sync_qty_on_hand or remote_payload is None
+
     payload = {
         'Name': _resolve_item_payload_name(presentacion, remote_payload=remote_payload),
         'Active': bool(presentacion.producto.activo),
         'Description': _build_item_description(presentacion),
-        'UnitPrice': _as_float(presentacion.precio_3),
         'Sku': _truncate(presentacion.producto.codigo_barras, limit=100),
     }
+    if include_pricing:
+        payload['UnitPrice'] = _as_float(presentacion.precio_3)
 
     if use_inventory:
         if remote_payload is not None and _quickbooks_item_is_inventory(remote_payload) and income_account_ref:
@@ -1077,13 +1091,14 @@ def _build_item_payload(presentacion, *, client, income_account_ref=None, remote
         inventory_payload = {
             'Type': 'Inventory',
             'TrackQtyOnHand': True,
-            'InvStartDate': _get_inventory_start_date().isoformat(),
-            'PurchaseCost': _as_float(presentacion.costo or 0),
             'IncomeAccountRef': income_ref,
             'ExpenseAccountRef': _get_default_expense_account_ref(client),
             'AssetAccountRef': _get_default_asset_account_ref(client),
         }
-        if sync_qty_on_hand or remote_payload is None:
+        if include_pricing:
+            inventory_payload['PurchaseCost'] = _as_float(presentacion.costo or 0)
+        if include_qty:
+            inventory_payload['InvStartDate'] = _get_inventory_start_date().isoformat()
             inventory_payload['QtyOnHand'] = _local_presentacion_qty_on_hand(presentacion)
         payload.update(inventory_payload)
     else:
@@ -1094,21 +1109,24 @@ def _build_item_payload(presentacion, *, client, income_account_ref=None, remote
     return payload
 
 
-def _item_payload_needs_update(remote_payload, expected_payload, *, sync_qty_on_hand=True):
+def _item_payload_needs_update(remote_payload, expected_payload, *, sync_qty_on_hand=True, sync_pricing=True):
     compare_fields = (
+        'Name',
         'Type',
         'Active',
         'Description',
-        'UnitPrice',
         'IncomeAccountRef.value',
         'Sku',
     )
+    if sync_pricing:
+        compare_fields = compare_fields + ('UnitPrice',)
     if _quickbooks_item_is_inventory(remote_payload) or str(expected_payload.get('Type') or '').lower() == 'inventory':
         inventory_fields = (
-            'PurchaseCost',
             'ExpenseAccountRef.value',
             'AssetAccountRef.value',
         )
+        if sync_pricing:
+            inventory_fields = ('PurchaseCost',) + inventory_fields
         if sync_qty_on_hand:
             inventory_fields = ('QtyOnHand',) + inventory_fields
         compare_fields = compare_fields + inventory_fields
@@ -4275,7 +4293,14 @@ def link_quickbooks_import_conflict(conflict, *, local_record_id=None, local_mod
     }
 
 
-def _normalize_inventory_start_date_if_needed(presentacion, existing, *, client, sync_qty_on_hand=True):
+def _normalize_inventory_start_date_if_needed(
+    presentacion,
+    existing,
+    *,
+    client,
+    sync_qty_on_hand=True,
+    sync_pricing=True,
+):
     if not sync_qty_on_hand:
         return existing
 
@@ -4293,6 +4318,7 @@ def _normalize_inventory_start_date_if_needed(presentacion, existing, *, client,
         income_account_ref=existing.get('IncomeAccountRef') or None,
         remote_payload=existing,
         sync_qty_on_hand=sync_qty_on_hand,
+        sync_pricing=sync_pricing,
     )
     desired_payload['InvStartDate'] = target_start.isoformat()
     recreated = _recreate_presentacion_as_inventory_item(
@@ -4306,7 +4332,14 @@ def _normalize_inventory_start_date_if_needed(presentacion, existing, *, client,
     return recreated
 
 
-def _push_presentacion_to_quickbooks_item(presentacion, existing, *, client, sync_qty_on_hand=True):
+def _push_presentacion_to_quickbooks_item(
+    presentacion,
+    existing,
+    *,
+    client,
+    sync_qty_on_hand=False,
+    sync_pricing=False,
+):
     existing_income_ref = existing.get('IncomeAccountRef') if _quickbooks_item_is_inventory(existing) else None
     desired_payload = _build_item_payload(
         presentacion,
@@ -4314,13 +4347,20 @@ def _push_presentacion_to_quickbooks_item(presentacion, existing, *, client, syn
         income_account_ref=existing_income_ref or None,
         remote_payload=existing,
         sync_qty_on_hand=sync_qty_on_hand,
+        sync_pricing=sync_pricing,
     )
-    if not _item_payload_needs_update(existing, desired_payload, sync_qty_on_hand=sync_qty_on_hand):
+    if not _item_payload_needs_update(
+        existing,
+        desired_payload,
+        sync_qty_on_hand=sync_qty_on_hand,
+        sync_pricing=sync_pricing,
+    ):
         normalized = _normalize_inventory_start_date_if_needed(
             presentacion,
             existing,
             client=client,
             sync_qty_on_hand=sync_qty_on_hand,
+            sync_pricing=sync_pricing,
         )
         if normalized is not existing:
             return _sync_result(entity='Item', action='converted', payload=normalized)
@@ -4343,7 +4383,7 @@ def _push_presentacion_to_quickbooks_item(presentacion, existing, *, client, syn
     return _sync_result(entity='Item', action='updated', payload=updated)
 
 
-def sync_product(*, presentacion, client=None, sync_qty_on_hand=True):
+def sync_product(*, presentacion, client=None, sync_qty_on_hand=False, sync_pricing=False):
     client = client or QuickBooksAPIClient()
     try:
         if presentacion.quickbooks_id:
@@ -4354,6 +4394,7 @@ def sync_product(*, presentacion, client=None, sync_qty_on_hand=True):
                     existing,
                     client=client,
                     sync_qty_on_hand=sync_qty_on_hand,
+                    sync_pricing=sync_pricing,
                 )
 
         item_name = _build_item_name(presentacion)
@@ -4364,6 +4405,7 @@ def sync_product(*, presentacion, client=None, sync_qty_on_hand=True):
                 existing,
                 client=client,
                 sync_qty_on_hand=sync_qty_on_hand,
+                sync_pricing=sync_pricing,
             )
             if result.get('action') == 'existing':
                 result = {**result, 'action': 'linked'}
@@ -4378,7 +4420,11 @@ def sync_product(*, presentacion, client=None, sync_qty_on_hand=True):
 
 
 def push_linked_quickbooks_items(*, limit=None, client=None, task_cache_key=None):
-    """Push local changes for catalog rows already linked in QuickBooks."""
+    """Push local catalog metadata for rows already linked in QuickBooks.
+
+    Updates name/SKU/description/active (and related item metadata) only.
+    Price, cost, and QtyOnHand stay under QuickBooks control.
+    """
     del client, task_cache_key
     queryset = _linked_catalog_presentacion_queryset().select_related('stock_operativo')
     if limit is not None:

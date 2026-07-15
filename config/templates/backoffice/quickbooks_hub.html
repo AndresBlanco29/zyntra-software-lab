@@ -1467,7 +1467,7 @@
           <div class="qb-outbound-panel__head">
             <div>
               <h4 class="qb-outbound-panel__title">{% trans "Update linked catalog in QuickBooks" %}</h4>
-              <p class="qb-outbound-panel__subtitle">{% trans "Search any product in your catalog and update it in QuickBooks, whether it was synced recently or not. The list below shows the first items alphabetically; use search to find any product. Update all linked only updates the items already connected to QuickBooks." %}</p>
+              <p class="qb-outbound-panel__subtitle">{% trans "Search any product and update name, SKU, description, and active status in QuickBooks. Price, cost, and inventory always stay under QuickBooks control—use Import from QuickBooks to refresh those fields in this app. Update all linked only updates items already connected to QuickBooks." %}</p>
             </div>
             <span class="qb-outbound-panel__badge">{{ quickbooks_catalog_presentation_count }}</span>
           </div>
@@ -1481,7 +1481,7 @@
                 <input type="hidden" name="redirect_to" value="{{ request.path }}">
                 <button type="submit" class="btn btn-success w-100" {% if not quickbooks_status.is_active or not quickbooks_linked_presentation_count %}disabled{% endif %}>{% trans "Update all linked items now" %}</button>
               </form>
-              <p class="qb-outbound-note mb-0">{% trans "Same as Update all linked, but runs as one quick action without selecting rows first." %}</p>
+              <p class="qb-outbound-note mb-0">{% trans "Same as Update all linked, but runs as one quick action without selecting rows first. Does not push price, cost, or inventory quantities." %}</p>
             </div>
           </div>
         </div>

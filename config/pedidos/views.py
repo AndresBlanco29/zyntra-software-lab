@@ -5,9 +5,10 @@ from xml.sax.saxutils import escape
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db.models import Q
+from django.db.models import Case, IntegerField, Q, Value, When
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.db import transaction
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
@@ -262,6 +263,31 @@ def _selector_pedidos_queryset(user):
 	if user.is_superuser or getattr(user, 'role', '') == 'admin':
 		return queryset.filter(seleccionador__isnull=False)
 	return queryset.filter(seleccionador=user)
+
+
+SELECTOR_PICKING_PROCESS_COMPLETED_STATES = frozenset({
+	'INVOICE_GENERADA',
+	'DESPACHADO',
+	'CANCELADO',
+})
+
+
+def _filter_selector_picking_queryset(queryset, search_query):
+	query_text = str(search_query or '').strip()
+	if not query_text:
+		return queryset
+	filters = Q(cliente__nombre_empresa__icontains=query_text)
+	if query_text.isdigit():
+		filters |= Q(id=int(query_text))
+	return queryset.filter(filters)
+
+
+def _annotate_selector_picking_rows(pedidos):
+	for pedido in pedidos:
+		pedido.estado_label = _pedido_state_label(pedido.estado)
+		pedido.workflow_badge = build_order_workflow_badge(pedido)
+		pedido.picker_process_completed = pedido.estado in SELECTOR_PICKING_PROCESS_COMPLETED_STATES
+	return pedidos
 
 
 def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentation_overrides=None):
@@ -1339,19 +1365,30 @@ def selector_picking_list(request):
 		return redirect('login')
 
 	base_queryset = _selector_pedidos_queryset(request.user)
+	search_query = str(request.GET.get('q') or '').strip()
+	filtered_queryset = _filter_selector_picking_queryset(base_queryset, search_query)
 	view_mode = request.GET.get('view')
 	if view_mode == 'completed':
-		pedidos = base_queryset.exclude(estado='PARA_VERIFICAR')
+		pedidos = (
+			filtered_queryset.exclude(estado='PARA_VERIFICAR')
+			.annotate(
+				picker_done_rank=Case(
+					When(estado__in=list(SELECTOR_PICKING_PROCESS_COMPLETED_STATES), then=Value(1)),
+					default=Value(0),
+					output_field=IntegerField(),
+				)
+			)
+			.order_by('picker_done_rank', '-actualizada_en', '-creada_en')
+		)
 	else:
 		view_mode = 'active'
-		pedidos = base_queryset.filter(estado='PARA_VERIFICAR')
+		pedidos = filtered_queryset.filter(estado='PARA_VERIFICAR')
 
-	for pedido in pedidos:
-		pedido.estado_label = _pedido_state_label(pedido.estado)
-		pedido.workflow_badge = build_order_workflow_badge(pedido)
+	_annotate_selector_picking_rows(pedidos)
 	return render(request, 'backoffice/selector_picking_list.html', {
 		'pedidos': pedidos,
 		'view_mode': view_mode,
+		'search_query': search_query,
 		'active_count': base_queryset.filter(estado='PARA_VERIFICAR').count(),
 		'completed_count': base_queryset.exclude(estado='PARA_VERIFICAR').count(),
 	})
@@ -1439,7 +1476,7 @@ def selector_picking_detail(request, pedido_id):
 				messages.warning(request, _('Physical stock is insufficient. The verification was saved and the order remains blocked for BackOffice review.'))
 			else:
 				messages.success(request, _('Picking ticket verified successfully.'))
-			return redirect('selector_picking_list')
+			return redirect(f"{reverse('selector_picking_list')}?view=completed")
 
 	context = {
 		'pedido': pedido,

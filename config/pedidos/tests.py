@@ -423,6 +423,122 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(completed_response, 'Processed Picking Tickets')
 		self.assertContains(completed_response, reverse('selector_picking_detail', args=[processed_order.id]))
 		self.assertNotContains(completed_response, reverse('selector_picking_detail', args=[self.pedido.id]))
+		self.assertContains(completed_response, 'Search picking tickets')
+
+	def test_selector_processed_list_shades_invoiced_tickets_and_puts_them_last(self):
+		waiting_order = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='LISTO_PARA_PICKING',
+			total=Decimal('12.00'),
+		)
+		waiting_item = PedidoItem.objects.create(
+			pedido=waiting_order,
+			presentacion=self.presentacion,
+			cantidad_solicitada=1,
+			cantidad_reservada_inventario=1,
+			cantidad=1,
+			precio=Decimal('12.00'),
+			subtotal=Decimal('12.00'),
+		)
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		stock.stock_reservado += 1
+		stock.stock_disponible = stock.stock_fisico - stock.stock_reservado
+		stock.save(update_fields=['stock_reservado', 'stock_disponible', 'actualizado_en'])
+		asignar_picking_a_seleccionador(pedido=waiting_order, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=waiting_order,
+			seleccionador=self.selector,
+			cantidades_reales={waiting_item.id: 1},
+			nota='Waiting invoice',
+			nota_resuelta=True,
+		)
+
+		invoiced_order = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='LISTO_PARA_PICKING',
+			total=Decimal('12.00'),
+		)
+		invoiced_item = PedidoItem.objects.create(
+			pedido=invoiced_order,
+			presentacion=self.presentacion,
+			cantidad_solicitada=1,
+			cantidad_reservada_inventario=1,
+			cantidad=1,
+			precio=Decimal('12.00'),
+			subtotal=Decimal('12.00'),
+		)
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		stock.stock_reservado += 1
+		stock.stock_disponible = stock.stock_fisico - stock.stock_reservado
+		stock.save(update_fields=['stock_reservado', 'stock_disponible', 'actualizado_en'])
+		asignar_picking_a_seleccionador(pedido=invoiced_order, seleccionador=self.selector)
+		guardar_verificacion_picking(
+			pedido=invoiced_order,
+			seleccionador=self.selector,
+			cantidades_reales={invoiced_item.id: 1},
+			nota='Ready to invoice',
+			nota_resuelta=True,
+		)
+		generar_invoice_desde_picking(
+			pedido=invoiced_order,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+
+		self.client.force_login(self.selector)
+		response = self.client.get(reverse('selector_picking_list') + '?view=completed')
+		self.assertEqual(response.status_code, 200)
+		body = response.content.decode('utf-8')
+		waiting_pos = body.find(f'#{waiting_order.id}')
+		invoiced_pos = body.find(f'#{invoiced_order.id}')
+		self.assertGreater(waiting_pos, -1)
+		self.assertGreater(invoiced_pos, -1)
+		self.assertLess(waiting_pos, invoiced_pos)
+		self.assertContains(response, 'Process completed')
+		self.assertContains(response, 'selector-picking-row--completed', html=False)
+
+	def test_selector_picking_list_search_filters_by_customer_or_id(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		other_cliente_user = Usuario.objects.create_user(username='cliente-picker-search', password='secret123', role='cliente')
+		other_cliente = Cliente.objects.create(
+			usuario=other_cliente_user,
+			nombre_empresa='Alpha Market Search',
+			telefono='5559998888',
+			direccion='9 Search St',
+			ciudad='Dallas',
+			estado='TX',
+			codigo_postal='75001',
+			pais='USA',
+			sales_tax_number='TX-SEARCH',
+			certificado_tax='certificados/test.pdf',
+		)
+		other_order = Pedido.objects.create(
+			cliente=other_cliente,
+			origen='CLIENTE',
+			estado='LISTO_PARA_PICKING',
+			total=Decimal('12.00'),
+		)
+		PedidoItem.objects.create(
+			pedido=other_order,
+			presentacion=self.presentacion,
+			cantidad_solicitada=1,
+			cantidad=1,
+			precio=Decimal('12.00'),
+			subtotal=Decimal('12.00'),
+		)
+		asignar_picking_a_seleccionador(pedido=other_order, seleccionador=self.selector)
+
+		self.client.force_login(self.selector)
+		by_name = self.client.get(reverse('selector_picking_list'), {'q': 'Alpha Market'})
+		self.assertContains(by_name, reverse('selector_picking_detail', args=[other_order.id]))
+		self.assertNotContains(by_name, reverse('selector_picking_detail', args=[self.pedido.id]))
+
+		by_id = self.client.get(reverse('selector_picking_list'), {'q': str(self.pedido.id)})
+		self.assertContains(by_id, reverse('selector_picking_detail', args=[self.pedido.id]))
+		self.assertNotContains(by_id, reverse('selector_picking_detail', args=[other_order.id]))
 
 	def test_completed_picking_ticket_shows_saved_quantities(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
@@ -507,7 +623,7 @@ class PickingVerificationFlowTests(TestCase):
 		})
 
 		self.assertEqual(response.status_code, 302)
-		self.assertEqual(response.url, reverse('selector_picking_list'))
+		self.assertEqual(response.url, reverse('selector_picking_list') + '?view=completed')
 
 	def test_selector_can_change_unit_of_measure_during_picking(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)

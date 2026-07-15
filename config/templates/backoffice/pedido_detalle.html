@@ -154,109 +154,6 @@
 <div class="card shadow-sm mb-3">
   <div class="card-body">
     <div class="row g-3 align-items-end">
-      <div class="col-lg-5">
-        <label class="form-label fw-semibold">{% trans "Assigned selector" %}</label>
-        <div>
-          {% if pedido.seleccionador %}
-            <strong>{% firstof pedido.seleccionador.get_full_name pedido.seleccionador.username %}</strong>
-          {% else %}
-            <span class="text-muted">{% trans "Not assigned" %}</span>
-          {% endif %}
-        </div>
-        {% if pedido.picking_asignado_en %}
-          <small class="text-muted d-block mt-1">{% trans "Assigned on" %}: {{ pedido.picking_asignado_en|date:"m/d/Y H:i" }}</small>
-        {% endif %}
-      </div>
-      <div class="col-lg-7">
-        <fieldset {% if not can_manage_pedido %}disabled{% endif %}>
-        {% if can_send_picking %}
-        <form method="post" action="{% url 'backoffice_asignar_picking' pedido.id %}" class="row g-2">
-          {% csrf_token %}
-          <div class="col-md-8">
-            <label class="form-label fw-semibold">{% trans "Send picking ticket to selector" %}</label>
-            <select name="seleccionador_id" class="form-select" required>
-              <option value="">{% trans "Select a selector..." %}</option>
-              {% for selector in selectores %}
-                <option value="{{ selector.id }}" {% if pedido.seleccionador_id == selector.id %}selected{% endif %}>{% firstof selector.get_full_name selector.username %}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="col-md-4 d-flex align-items-end">
-            <button type="submit" class="btn btn-outline-primary w-100">{{ picking_send_button_label }}</button>
-          </div>
-        </form>
-        {% else %}
-        <div class="row g-2">
-          <div class="col-md-8">
-            <label class="form-label fw-semibold">{% trans "Send picking ticket to selector" %}</label>
-            <select class="form-select" disabled>
-              {% if pedido.seleccionador %}
-                <option selected>{% firstof pedido.seleccionador.get_full_name pedido.seleccionador.username %}</option>
-              {% else %}
-                <option selected>{% trans "Not assigned" %}</option>
-              {% endif %}
-            </select>
-          </div>
-          <div class="col-md-4 d-flex align-items-end">
-            <button type="button" class="btn btn-outline-secondary w-100" disabled>{{ picking_send_button_label }}</button>
-          </div>
-        </div>
-        {% if pedido.estado == 'VERIFICADO_AJUSTADO' and not invoice %}
-        <div class="form-text mt-2">{% trans "Picking was already completed. Review the order and generate the invoice when ready." %}</div>
-        {% endif %}
-        {% endif %}
-        </fieldset>
-      </div>
-      <div class="col-12">
-        <div class="border rounded-3 p-3 bg-light-subtle">
-          <div class="d-flex flex-wrap gap-3 align-items-center">
-            <span><strong>{% trans "Selector note" %}:</strong> {{ pedido.nota_seleccionador|default:'-' }}</span>
-            <span><strong>{% trans "Resolved" %}:</strong> {% if pedido.nota_seleccionador %}{% if pedido.nota_seleccionador_resuelta %}{% trans "Yes" %}{% else %}{% trans "No" %}{% endif %}{% else %}-{% endif %}</span>
-            <span><strong>{% trans "Order lock" %}:</strong> {% if pedido.picking_bloqueado %}<span class="badge bg-danger">{% trans "Blocked" %}</span>{% else %}<span class="badge bg-success">{% trans "Unlocked" %}</span>{% endif %}</span>
-          </div>
-          {% if pedido_has_picker_changes %}
-          <div class="alert alert-danger mt-3 mb-0">
-            {% trans "Rows marked in red were changed by the picker, including U/M changes or products added during picking." %}
-          </div>
-          {% endif %}
-          {% if picker_stock_shortage_blocked %}
-          <div class="alert alert-danger mt-3 mb-0">
-            <div class="fw-semibold">{% trans "Picker reported physical stock shortage" %}</div>
-            <div class="small mb-2">{% trans "This order stays blocked until BackOffice reviews the shortage reported during picking." %}</div>
-            <ul class="mb-3 ps-3">
-              {% for row in picker_stock_shortage_rows %}
-              <li>
-                {{ row.product_name }} - {{ row.presentation_name }}:
-                {% blocktrans with requested=row.quantity_to_pick available=row.available_physical_stock shortage=row.shortage_amount %}picker entered {{ requested }} CS, available stock {{ available }} CS, shortage {{ shortage }} CS.{% endblocktrans %}
-              </li>
-              {% endfor %}
-            </ul>
-            {% if can_unlock_pedido and can_manage_pedido %}
-            <form method="post" action="{% url 'backoffice_resolver_bloqueo_picking' pedido.id %}" class="d-flex flex-wrap gap-2 align-items-center" onsubmit="return confirm('{% trans "Confirm you reviewed the picker note and adjusted quantities if needed. Unlock this order?" %}');">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-success">{% trans "Unlock order" %}</button>
-              <span class="small text-muted">{% trans "Use this after reviewing quantities and confirming the order is ready to invoice." %}</span>
-            </form>
-            {% endif %}
-          </div>
-          {% elif can_unlock_pedido and can_manage_pedido %}
-          <div class="alert alert-warning mt-3 mb-0 d-flex flex-wrap gap-2 align-items-center justify-content-between">
-            <span>{% trans "This order is blocked by a picker note pending BackOffice review." %}</span>
-            <form method="post" action="{% url 'backoffice_resolver_bloqueo_picking' pedido.id %}" onsubmit="return confirm('{% trans "Confirm you reviewed the picker note. Unlock this order?" %}');">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-success btn-sm">{% trans "Unlock order" %}</button>
-            </form>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="card shadow-sm mb-3">
-  <div class="card-body">
-    <div class="row g-3 align-items-end">
       <div class="col-lg-4">
         <label class="form-label fw-semibold">{% trans "Invoice status" %}</label>
         <div>
@@ -900,6 +797,109 @@
   </div>
   </fieldset>
 </form>
+
+<div class="card shadow-sm mb-3" id="pedido-picking-assignment">
+  <div class="card-body">
+    <div class="row g-3 align-items-end">
+      <div class="col-lg-5">
+        <label class="form-label fw-semibold">{% trans "Assigned selector" %}</label>
+        <div>
+          {% if pedido.seleccionador %}
+            <strong>{% firstof pedido.seleccionador.get_full_name pedido.seleccionador.username %}</strong>
+          {% else %}
+            <span class="text-muted">{% trans "Not assigned" %}</span>
+          {% endif %}
+        </div>
+        {% if pedido.picking_asignado_en %}
+          <small class="text-muted d-block mt-1">{% trans "Assigned on" %}: {{ pedido.picking_asignado_en|date:"m/d/Y H:i" }}</small>
+        {% endif %}
+      </div>
+      <div class="col-lg-7">
+        <fieldset {% if not can_manage_pedido %}disabled{% endif %}>
+        {% if can_send_picking %}
+        <form method="post" action="{% url 'backoffice_asignar_picking' pedido.id %}" class="row g-2">
+          {% csrf_token %}
+          <div class="col-md-8">
+            <label class="form-label fw-semibold">{% trans "Send picking ticket to selector" %}</label>
+            <select name="seleccionador_id" class="form-select" required>
+              <option value="">{% trans "Select a selector..." %}</option>
+              {% for selector in selectores %}
+                <option value="{{ selector.id }}" {% if pedido.seleccionador_id == selector.id %}selected{% endif %}>{% firstof selector.get_full_name selector.username %}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button type="submit" class="btn btn-outline-primary w-100">{{ picking_send_button_label }}</button>
+          </div>
+        </form>
+        {% else %}
+        <div class="row g-2">
+          <div class="col-md-8">
+            <label class="form-label fw-semibold">{% trans "Send picking ticket to selector" %}</label>
+            <select class="form-select" disabled>
+              {% if pedido.seleccionador %}
+                <option selected>{% firstof pedido.seleccionador.get_full_name pedido.seleccionador.username %}</option>
+              {% else %}
+                <option selected>{% trans "Not assigned" %}</option>
+              {% endif %}
+            </select>
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button type="button" class="btn btn-outline-secondary w-100" disabled>{{ picking_send_button_label }}</button>
+          </div>
+        </div>
+        {% if pedido.estado == 'VERIFICADO_AJUSTADO' and not invoice %}
+        <div class="form-text mt-2">{% trans "Picking was already completed. Review the order and generate the invoice when ready." %}</div>
+        {% endif %}
+        {% endif %}
+        </fieldset>
+      </div>
+      <div class="col-12">
+        <div class="border rounded-3 p-3 bg-light-subtle">
+          <div class="d-flex flex-wrap gap-3 align-items-center">
+            <span><strong>{% trans "Selector note" %}:</strong> {{ pedido.nota_seleccionador|default:'-' }}</span>
+            <span><strong>{% trans "Resolved" %}:</strong> {% if pedido.nota_seleccionador %}{% if pedido.nota_seleccionador_resuelta %}{% trans "Yes" %}{% else %}{% trans "No" %}{% endif %}{% else %}-{% endif %}</span>
+            <span><strong>{% trans "Order lock" %}:</strong> {% if pedido.picking_bloqueado %}<span class="badge bg-danger">{% trans "Blocked" %}</span>{% else %}<span class="badge bg-success">{% trans "Unlocked" %}</span>{% endif %}</span>
+          </div>
+          {% if pedido_has_picker_changes %}
+          <div class="alert alert-danger mt-3 mb-0">
+            {% trans "Rows marked in red were changed by the picker, including U/M changes or products added during picking." %}
+          </div>
+          {% endif %}
+          {% if picker_stock_shortage_blocked %}
+          <div class="alert alert-danger mt-3 mb-0">
+            <div class="fw-semibold">{% trans "Picker reported physical stock shortage" %}</div>
+            <div class="small mb-2">{% trans "This order stays blocked until BackOffice reviews the shortage reported during picking." %}</div>
+            <ul class="mb-3 ps-3">
+              {% for row in picker_stock_shortage_rows %}
+              <li>
+                {{ row.product_name }} - {{ row.presentation_name }}:
+                {% blocktrans with requested=row.quantity_to_pick available=row.available_physical_stock shortage=row.shortage_amount %}picker entered {{ requested }} CS, available stock {{ available }} CS, shortage {{ shortage }} CS.{% endblocktrans %}
+              </li>
+              {% endfor %}
+            </ul>
+            {% if can_unlock_pedido and can_manage_pedido %}
+            <form method="post" action="{% url 'backoffice_resolver_bloqueo_picking' pedido.id %}" class="d-flex flex-wrap gap-2 align-items-center" onsubmit="return confirm('{% trans "Confirm you reviewed the picker note and adjusted quantities if needed. Unlock this order?" %}');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-success">{% trans "Unlock order" %}</button>
+              <span class="small text-muted">{% trans "Use this after reviewing quantities and confirming the order is ready to invoice." %}</span>
+            </form>
+            {% endif %}
+          </div>
+          {% elif can_unlock_pedido and can_manage_pedido %}
+          <div class="alert alert-warning mt-3 mb-0 d-flex flex-wrap gap-2 align-items-center justify-content-between">
+            <span>{% trans "This order is blocked by a picker note pending BackOffice review." %}</span>
+            <form method="post" action="{% url 'backoffice_resolver_bloqueo_picking' pedido.id %}" onsubmit="return confirm('{% trans "Confirm you reviewed the picker note. Unlock this order?" %}');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-success btn-sm">{% trans "Unlock order" %}</button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="d-flex gap-2">
   <a class="btn btn-outline-dark" href="{% url 'backoffice_picking_ticket' pedido.id %}">{% trans "Generate Picking Ticket" %}</a>

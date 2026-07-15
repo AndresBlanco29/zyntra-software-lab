@@ -748,14 +748,18 @@
       });
     });
 
-    {% if show_prominent_adjustment_note %}
-    const adjustmentAnchor = document.getElementById('backoffice-adjustment-note');
-    if (adjustmentAnchor) {
-      window.requestAnimationFrame(function () {
-        adjustmentAnchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const toggleCreateNote = document.getElementById('toggleBackofficeCreateNote');
+    const noteFormBody = document.getElementById('backofficeNoteFormBody');
+    if (toggleCreateNote && noteFormBody) {
+      const showLabel = toggleCreateNote.getAttribute('data-label-show') || 'Create note';
+      const hideLabel = toggleCreateNote.getAttribute('data-label-hide') || 'Hide note';
+      toggleCreateNote.addEventListener('click', function () {
+        const willOpen = noteFormBody.classList.contains('d-none');
+        noteFormBody.classList.toggle('d-none', !willOpen);
+        toggleCreateNote.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+        toggleCreateNote.textContent = willOpen ? hideLabel : showLabel;
       });
     }
-    {% endif %}
   })();
 </script>
 <div class="modal fade" id="invoiceDeleteModal" tabindex="-1" aria-labelledby="invoiceDeleteModalLabel" aria-hidden="true">

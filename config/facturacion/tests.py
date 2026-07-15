@@ -2077,8 +2077,8 @@ class InvoiceFlowTests(TestCase):
 	def test_backoffice_invoice_detail_shows_prominent_adjustment_note_after_invoice_generation(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
-			metodo_entrega='CUSTOMER_PICK_UP',
-			driver=None,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
 			usuario=self.backoffice,
 		)
 		self.client.force_login(self.backoffice)
@@ -2089,10 +2089,15 @@ class InvoiceFlowTests(TestCase):
 		self.assertTrue(response.context['show_prominent_adjustment_note'])
 		self.assertContains(response, 'driver-adjustment-callout', html=False)
 		self.assertContains(response, 'id="backoffice-adjustment-note"', html=False)
+		self.assertContains(response, 'id="toggleBackofficeCreateNote"', html=False)
+		self.assertContains(response, 'Create note')
+		self.assertContains(response, 'id="backofficeNoteFormBody"', html=False)
+		self.assertContains(response, 'driver-adjustment-callout-body d-none', html=False)
+		self.assertNotContains(response, 'scrollIntoView')
 		self.assertContains(response, 'Start here: note type')
 		self.assertContains(response, 'No adjustment note')
 		self.assertContains(response, 'Requested qty.')
-		self.assertContains(response, 'Invoiced qty.')
+		self.assertContains(response, 'Dispatched qty.')
 		self.assertNotContains(response, 'Choose customer and invoice')
 
 	def test_backoffice_invoice_detail_shows_adjustment_action_and_products(self):

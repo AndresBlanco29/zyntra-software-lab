@@ -346,10 +346,20 @@
             <h5 class="pickup-adjustment-callout-title">{% trans "Create adjustment note" %}</h5>
             <span class="badge pickup-adjustment-callout-pill">{% trans "Credit notes" %}</span>
           </div>
-          <p class="pickup-adjustment-callout-lead">{% trans "Use this section when the customer returns products, reports damage, or needs a credit note before closing the pick up." %}</p>
+          <p class="pickup-adjustment-callout-lead mb-2">{% trans "Only open this if the customer returns products, reports damage, or needs a credit note." %}</p>
+          <button
+            type="button"
+            class="btn btn-primary"
+            id="togglePickupCreateNote"
+            aria-expanded="false"
+            aria-controls="pickupNoteFormBody"
+            data-label-show="{% trans 'Create note' %}"
+            data-label-hide="{% trans 'Hide note' %}">
+            {% trans "Create note" %}
+          </button>
         </div>
       </div>
-      <div class="pickup-adjustment-callout-body">
+      <div class="pickup-adjustment-callout-body d-none mt-3" id="pickupNoteFormBody">
         <div class="row g-3 align-items-start">
           <div class="col-12 col-md-auto">
             <div class="pickup-note-type-highlight">
@@ -612,3 +622,20 @@
 <script src="{% static 'js/form-draft-restore.js' %}"></script>
 <script src="{% static 'js/camera-upload-widget.js' %}"></script>
 <script src="{% static 'js/delivery-completion-form.js' %}"></script>
+<script>
+(function () {
+  const toggleCreateNote = document.getElementById('togglePickupCreateNote');
+  const noteFormBody = document.getElementById('pickupNoteFormBody');
+  if (!toggleCreateNote || !noteFormBody) {
+    return;
+  }
+  const showLabel = toggleCreateNote.getAttribute('data-label-show') || 'Create note';
+  const hideLabel = toggleCreateNote.getAttribute('data-label-hide') || 'Hide note';
+  toggleCreateNote.addEventListener('click', function () {
+    const willOpen = noteFormBody.classList.contains('d-none');
+    noteFormBody.classList.toggle('d-none', !willOpen);
+    toggleCreateNote.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    toggleCreateNote.textContent = willOpen ? hideLabel : showLabel;
+  });
+})();
+</script>

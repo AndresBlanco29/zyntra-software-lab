@@ -4,7 +4,7 @@
 {% if adjustment_note_form_draft %}
 <div class="alert alert-info mb-3">{% trans "Your previous entries were restored so you can finish the missing fields." %}</div>
 {% endif %}
-    <div class="driver-adjustment-callout-head mb-3">
+    <div class="driver-adjustment-callout-head mb-0">
       <div class="driver-adjustment-callout-icon" aria-hidden="true">
         <i class="bi bi-receipt-cutoff"></i>
       </div>
@@ -13,10 +13,20 @@
           <h5 class="driver-adjustment-callout-title mb-0">{% trans "Create adjustment note" %}</h5>
           <span class="badge driver-adjustment-callout-pill">{% trans "Credit notes" %}</span>
         </div>
-        <p class="driver-adjustment-callout-lead mb-0">{% trans "Use this section when the customer returns products, reports damage, or needs a credit note right after invoicing." %}</p>
+        <p class="driver-adjustment-callout-lead mb-2">{% trans "Only open this if the customer returns products, reports damage, or needs a credit note." %}</p>
+        <button
+          type="button"
+          class="btn btn-primary"
+          id="toggleBackofficeCreateNote"
+          aria-expanded="{% if adjustment_note_form_draft %}true{% else %}false{% endif %}"
+          aria-controls="backofficeNoteFormBody"
+          data-label-show="{% trans 'Create note' %}"
+          data-label-hide="{% trans 'Hide note' %}">
+          {% if adjustment_note_form_draft %}{% trans "Hide note" %}{% else %}{% trans "Create note" %}{% endif %}
+        </button>
       </div>
     </div>
-    <div class="driver-adjustment-callout-body">
+    <div class="driver-adjustment-callout-body{% if not adjustment_note_form_draft %} d-none{% endif %} mt-3" id="backofficeNoteFormBody">
 {% endif %}
 <form method="post" enctype="multipart/form-data" action="{% url 'backoffice_invoice_create_note' invoice.id %}" class="invoice-adjustment-note-form">
   {% csrf_token %}

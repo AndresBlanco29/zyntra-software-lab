@@ -1114,13 +1114,22 @@ def lista_vendedores(request):
 @login_required
 @internal_permission_required('admin.users.view')
 def lista_usuarios_internos(request):
+    base_queryset = _internal_users_queryset()
+    view_mode = str(request.GET.get('view') or 'active').strip().lower()
+    if view_mode == 'deactivated':
+        usuarios_internos = base_queryset.filter(is_active=False)
+    else:
+        view_mode = 'active'
+        usuarios_internos = base_queryset.filter(is_active=True)
 
-    usuarios_internos = _internal_users_queryset()
     for usuario in usuarios_internos:
         usuario.permission_summary_labels = get_permission_summary_labels(usuario)
 
     context = {
-        'usuarios_internos': usuarios_internos
+        'usuarios_internos': usuarios_internos,
+        'view_mode': view_mode,
+        'active_count': base_queryset.filter(is_active=True).count(),
+        'deactivated_count': base_queryset.filter(is_active=False).count(),
     }
 
     return render(request, 'admin/usuarios_internos.html', context)
@@ -1333,7 +1342,7 @@ def desactivar_usuario_interno(request, usuario_id, preset_role=None):
         % {'role': _get_internal_role_label(usuario.role), 'name': usuario.first_name or usuario.username}
     )
 
-    return redirect('lista_usuarios_internos')
+    return redirect(f"{reverse('lista_usuarios_internos')}?view=deactivated")
 
 @login_required
 def activar_vendedor(request, vendedor_id):

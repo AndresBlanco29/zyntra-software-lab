@@ -51,7 +51,9 @@ def build_pdf_logo_image(*, max_width, max_height):
     )
 
 
-def build_pdf_brand_banner(*, styles, title, subtitle='', total_width=540):
+def build_pdf_brand_banner(*, styles, title, subtitle='', document_date='', total_width=540):
+    from html import escape
+
     logo_cell = build_pdf_logo_image(max_width=94, max_height=52)
     if logo_cell:
         logo_cell.hAlign = 'LEFT'
@@ -82,10 +84,30 @@ def build_pdf_brand_banner(*, styles, title, subtitle='', total_width=540):
         textColor=colors.white,
     )
 
-    banner = Table(
-        [[logo_cell, Paragraph(title_html, title_style)]],
-        colWidths=[108, max(total_width - 108, 220)],
-    )
+    date_width = 0
+    cells = [logo_cell, Paragraph(title_html, title_style)]
+    col_widths = [108, max(total_width - 108, 220)]
+    if document_date:
+        date_width = 110
+        col_widths = [108, max(total_width - 108 - date_width, 180), date_width]
+        date_style = ParagraphStyle(
+            'PdfBrandDate',
+            parent=styles['BodyText'],
+            fontName='Helvetica-Bold',
+            fontSize=9,
+            leading=11,
+            textColor=colors.white,
+            alignment=2,  # TA_RIGHT
+        )
+        cells.append(
+            Paragraph(
+                f'<font size="8" color="#DBEAFE">Date</font><br/>'
+                f'<font size="11" color="#FFFFFF"><b>{escape(str(document_date))}</b></font>',
+                date_style,
+            )
+        )
+
+    banner = Table([cells], colWidths=col_widths)
     banner.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, -1), BRAND_PRIMARY),
         ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),

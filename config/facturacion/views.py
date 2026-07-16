@@ -88,6 +88,7 @@ from .services import (
 	generar_invoice_directa_backoffice,
 	list_pending_customer_notes,
 	resolve_invoice_payment_due_date,
+	resolve_invoice_sale_reference_date,
 	resolve_presentacion_suggested_unit_price,
 	resolve_driver_credit_type_from_motivo,
 	summarize_pending_customer_notes,
@@ -587,7 +588,7 @@ def _get_invoice_pdf_company_contact_lines():
 	return [line.strip() for line in lines if line and str(line).strip()]
 
 
-def _build_invoice_pdf_compact_header(*, styles, invoice_number, total_width):
+def _build_invoice_pdf_compact_header(*, styles, invoice_number, total_width, document_date=''):
 	from html import escape
 
 	logo_cell = build_pdf_logo_image(max_width=36, max_height=36)
@@ -621,13 +622,17 @@ def _build_invoice_pdf_compact_header(*, styles, invoice_number, total_width):
 	)
 	contact_html = '<br/>'.join(escape(line) for line in _get_invoice_pdf_company_contact_lines())
 	company_html = f'<b>La Tortilla Grocery</b><br/>{contact_html}'
+	right_lines = [escape(invoice_number)]
+	if document_date:
+		right_lines.append(f'<font size="7">Date: {escape(str(document_date))}</font>')
+	right_html = '<br/>'.join(right_lines)
 	invoice_number_width = 150
 	center_width = max(total_width - 62 - invoice_number_width, 200)
 	header = Table(
 		[[
 			logo_cell,
 			Paragraph(company_html, header_text_style),
-			Paragraph(escape(invoice_number), invoice_number_style),
+			Paragraph(right_html, invoice_number_style),
 		]],
 		colWidths=[62, center_width, invoice_number_width],
 	)
@@ -941,14 +946,14 @@ def _invoice_pdf_response(invoice):
 	item_rows = _build_invoice_pdf_item_data(invoice)
 	item_column_widths = _invoice_pdf_item_table_column_widths(content_width)
 	left_footer_width = item_column_widths[0] + item_column_widths[1]
-	generated_label = format_local_datetime(invoice.creada_en)
+	document_date = format_local_date(resolve_invoice_sale_reference_date(invoice)) or format_local_date(invoice.creada_en)
 
 	content = []
 	meta_table = Table([
 		[
 			Paragraph(_('Customer no.'), meta_label_style), Paragraph(str(invoice.cliente_id), meta_value_style),
 			Paragraph(_('Order no.'), meta_label_style), Paragraph(str(invoice.pedido_id), meta_value_style),
-			Paragraph(_('Generated'), meta_label_style), Paragraph(generated_label, meta_value_style),
+			Paragraph(_('Date'), meta_label_style), Paragraph(document_date or '-', meta_value_style),
 		],
 		[
 			Paragraph(_('Sales rep'), meta_label_style), Paragraph(sales_rep, meta_value_style),
@@ -966,7 +971,12 @@ def _invoice_pdf_response(invoice):
 		('BOTTOMPADDING', (0, 0), (-1, -1), 3),
 	]))
 	content.extend([
-		_build_invoice_pdf_compact_header(styles=styles, invoice_number=invoice.numero, total_width=content_width),
+		_build_invoice_pdf_compact_header(
+			styles=styles,
+			invoice_number=invoice.numero,
+			total_width=content_width,
+			document_date=document_date,
+		),
 		Spacer(1, 6),
 		meta_table,
 		Spacer(1, 6),

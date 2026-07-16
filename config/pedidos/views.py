@@ -14,7 +14,8 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 import logging
 
-from config.core.datetime_formats import format_local_datetime
+from config.core.datetime_formats import format_local_date, format_local_datetime
+from django.utils import timezone
 from config.core.product_ordering import order_pedido_items_for_display
 from config.core.shipment_summary import build_shipment_summary_from_pedido_items, with_total_pallets
 from config.core.pdf_branding import (
@@ -1301,11 +1302,19 @@ def backoffice_picking_pdf(request, pedido_id):
 	styles = getSampleStyleSheet()
 	summary_label_style = ParagraphStyle('PickingSummaryLabel', parent=styles['BodyText'], fontName='Helvetica-Bold', fontSize=9, textColor=BRAND_MUTED_TEXT, leading=11)
 	summary_value_style = ParagraphStyle('PickingSummaryValue', parent=styles['BodyText'], fontSize=10, textColor=BRAND_TEXT, leading=12)
+	document_date = format_local_date(pedido.picking_verificado_en or pedido.creada_en) or format_local_date(timezone.now())
 
 	content = [
-		build_pdf_brand_banner(styles=styles, title=_("Picking Ticket"), subtitle=f'PO #{pedido.numero_display}', total_width=540),
+		build_pdf_brand_banner(
+			styles=styles,
+			title=_("Picking Ticket"),
+			subtitle=f'PO #{pedido.numero_display}',
+			document_date=document_date,
+			total_width=540,
+		),
 		Spacer(1, 12),
 		Table([
+			[Paragraph(_("Date"), summary_label_style), Paragraph(document_date or '-', summary_value_style)],
 			[Paragraph(_("Customer"), summary_label_style), Paragraph(pedido.cliente.nombre_empresa, summary_value_style)],
 			[Paragraph(_("Contact"), summary_label_style), Paragraph(pedido.cliente.usuario.get_full_name() or pedido.cliente.usuario.username, summary_value_style)],
 			[Paragraph(_("Received date"), summary_label_style), Paragraph(format_local_datetime(pedido.creada_en) or '-', summary_value_style)],

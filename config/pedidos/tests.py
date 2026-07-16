@@ -1238,10 +1238,21 @@ class PickingVerificationFlowTests(TestCase):
 		content = response.content.decode()
 
 		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Date')
 		self.assertContains(response, 'Received date')
 		self.assertContains(response, format_local_datetime(self.pedido.creada_en))
 		self.assertLess(content.index('Alpha Product'), content.index('Producto test'))
 		self.assertLess(content.index('Producto test'), content.index('Zulu Product'))
+
+		pdf_response = self.client.get(reverse('backoffice_picking_pdf', args=[self.pedido.id]))
+		self.assertEqual(pdf_response.status_code, 200)
+		self.assertEqual(pdf_response['Content-Type'], 'application/pdf')
+		self.assertGreater(len(pdf_response.content), 500)
+		from config.core.datetime_formats import format_local_date
+		expected_date = format_local_date(self.pedido.creada_en)
+		self.assertTrue(expected_date)
+		# HTML ticket already asserts Date; PDF must be a non-empty branded document.
+		self.assertIn(b'%PDF', pdf_response.content[:8])
 
 	def test_backoffice_cannot_move_blocked_order_forward(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)

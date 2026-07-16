@@ -292,6 +292,96 @@ class PromocionPersistenceTests(TestCase):
         self.assertEqual(item.descuento_monto, Decimal('2.00'))
         self.assertEqual(item.subtotal, Decimal('40.00'))
 
+    def test_backoffice_quote_applies_missing_fixed_promo_when_price_is_zero(self):
+        from config.cotizaciones.models import Cotizacion
+        from config.productos.promotions import asegurar_promociones_en_cotizacion
+
+        Promocion.objects.filter(producto=self.producto).delete()
+        Promocion.objects.create(
+            nombre='Fixed $2 even without price',
+            descripcion='10 CS $2 OFF',
+            producto=self.producto,
+            presentacion=self.presentacion,
+            cantidad_minima=10,
+            tipo_beneficio=Promocion.TIPO_FIXED,
+            valor_beneficio=Decimal('2.00'),
+            activa=True,
+        )
+        cotizacion = Cotizacion.objects.create(cliente=self.cliente, estado='ENVIADA', total=0)
+        item = CotizacionItem.objects.create(
+            cotizacion=cotizacion,
+            presentacion=self.presentacion,
+            cantidad=10,
+            precio=Decimal('0.00'),
+            subtotal=Decimal('0.00'),
+            descuento_aplicado=False,
+            descuento_monto=Decimal('0.00'),
+        )
+
+        self.assertTrue(asegurar_promociones_en_cotizacion(cotizacion))
+        item.refresh_from_db()
+        self.assertTrue(item.descuento_aplicado)
+        self.assertEqual(item.descuento_monto, Decimal('2.00'))
+
+    def test_backoffice_quote_detail_auto_applies_promo_on_open(self):
+        from config.cotizaciones.models import Cotizacion
+
+        Promocion.objects.filter(producto=self.producto).delete()
+        Promocion.objects.create(
+            nombre='BO open promo',
+            descripcion='Buy 10 get $1.50 off',
+            producto=self.producto,
+            cantidad_minima=10,
+            tipo_beneficio=Promocion.TIPO_FIXED,
+            valor_beneficio=Decimal('1.50'),
+            activa=True,
+        )
+        admin = Usuario.objects.create_user(username='promo-bo', password='secret123', role='admin')
+        cotizacion = Cotizacion.objects.create(cliente=self.cliente, estado='ENVIADA', total=0)
+        item = CotizacionItem.objects.create(
+            cotizacion=cotizacion,
+            presentacion=self.presentacion,
+            cantidad=10,
+            precio=Decimal('0.00'),
+            subtotal=Decimal('0.00'),
+            descuento_aplicado=False,
+            descuento_monto=Decimal('0.00'),
+        )
+
+        client = DjangoClient()
+        client.force_login(admin)
+        response = client.get(reverse('backoffice_cotizacion_detalle', args=[cotizacion.id]))
+        self.assertEqual(response.status_code, 200)
+        item.refresh_from_db()
+        self.assertTrue(item.descuento_aplicado)
+        self.assertEqual(item.descuento_monto, Decimal('1.50'))
+        self.assertContains(response, 'Apply discount')
+        self.assertContains(response, 'checked')
+
+    def test_percent_promo_uses_list_price_when_line_price_is_zero(self):
+        from config.productos.promotions import aplicar_promocion_en_item_sesion
+
+        Promocion.objects.filter(producto=self.producto).delete()
+        Presentacion.objects.filter(id=self.presentacion.id).update(precio_1=Decimal('20.00'))
+        self.presentacion.refresh_from_db()
+        Promocion.objects.create(
+            nombre='Percent fallback',
+            producto=self.producto,
+            cantidad_minima=5,
+            tipo_beneficio=Promocion.TIPO_PERCENT,
+            valor_beneficio=Decimal('20'),
+            activa=True,
+        )
+        item = {
+            'producto_id': self.producto.id,
+            'presentacion_id': self.presentacion.id,
+            'cantidad': 5,
+            'precio': 0,
+        }
+        aplicar_promocion_en_item_sesion(item, precio_unitario=0, presentacion=self.presentacion)
+        self.assertTrue(item['descuento_aplicado'])
+        self.assertEqual(float(item['descuento_monto']), 4.0)
+
     def test_catalogo_shows_promotion_badge(self):
         client = DjangoClient()
         client.force_login(self.user)

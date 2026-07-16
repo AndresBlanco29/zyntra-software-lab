@@ -109,17 +109,47 @@ def promociones_activas_queryset(now=None):
     )
 
 
-def calcular_descuento_monto_promocion(promocion, precio_unitario):
+def precio_referencia_presentacion(presentacion, precio_unitario=None):
+    """Prefer the line price; otherwise the first positive list price on the presentation."""
     precio = _quantize_money(precio_unitario)
-    if precio <= 0:
+    if precio > 0:
+        return precio
+    if presentacion is None:
         return Decimal('0.00')
+    for attr in ('precio_1', 'precio_2', 'precio_3', 'precio_4', 'precio_5'):
+        candidate = _quantize_money(getattr(presentacion, attr, 0))
+        if candidate > 0:
+            return candidate
+    qb = getattr(presentacion, 'qb_price', None)
+    if qb is not None:
+        candidate = _quantize_money(qb)
+        if candidate > 0:
+            return candidate
+    return Decimal('0.00')
+
+
+def calcular_descuento_monto_promocion(promocion, precio_unitario, *, presentacion=None):
+    """
+    Return per-unit discount dollars for a promotion.
+
+    Fixed-dollar promos apply even when the line price is still $0 (BackOffice often
+    sets the selling price later). Percentage promos use the line price, or a list
+    price fallback from the presentation when the line is still unpriced.
+    """
+    precio = _quantize_money(precio_unitario)
     valor = _quantize_money(promocion.valor_beneficio)
     if promocion.tipo_beneficio == Promocion.TIPO_PERCENT:
-        monto = _quantize_money(precio * valor / Decimal('100'))
+        base = precio_referencia_presentacion(presentacion, precio)
+        if base <= 0:
+            return Decimal('0.00')
+        monto = _quantize_money(base * valor / Decimal('100'))
+        # Cap only against the real line price when it is already known.
+        if precio > 0 and monto > precio:
+            monto = precio
     else:
         monto = valor
-    if monto > precio:
-        monto = precio
+        if precio > 0 and monto > precio:
+            monto = precio
     if monto < 0:
         monto = Decimal('0.00')
     return monto
@@ -164,6 +194,7 @@ def resolver_promocion_disponible_para_linea(
     presentacion_id,
     precio_unitario,
     now=None,
+    presentacion=None,
 ):
     """Return the most attractive active promo even before its minimum is met."""
     if not producto_id:
@@ -171,6 +202,10 @@ def resolver_promocion_disponible_para_linea(
 
     presentacion_id = int(presentacion_id) if presentacion_id else None
     precio = _quantize_money(precio_unitario)
+    if presentacion is None and presentacion_id:
+        from config.productos.models import Presentacion
+        presentacion = Presentacion.objects.filter(id=presentacion_id).first()
+
     candidates = promociones_activas_queryset(now=now).filter(
         producto_id=int(producto_id),
     ).filter(
@@ -180,7 +215,7 @@ def resolver_promocion_disponible_para_linea(
     best_promo = None
     best_monto = Decimal('0.00')
     for promo in candidates:
-        monto = calcular_descuento_monto_promocion(promo, precio)
+        monto = calcular_descuento_monto_promocion(promo, precio, presentacion=presentacion)
         if monto <= 0:
             continue
         if best_promo is None or monto > best_monto:
@@ -202,6 +237,7 @@ def estado_promocion_para_linea(
     cantidad,
     precio_unitario,
     now=None,
+    presentacion=None,
 ):
     """Build serializable UI state for an active promotion on a cart line."""
     try:
@@ -215,12 +251,14 @@ def estado_promocion_para_linea(
         cantidad=qty,
         precio_unitario=precio_unitario,
         now=now,
+        presentacion=presentacion,
     )
     available_promo, available_amount = resolver_promocion_disponible_para_linea(
         producto_id=producto_id,
         presentacion_id=presentacion_id,
         precio_unitario=precio_unitario,
         now=now,
+        presentacion=presentacion,
     )
     promo = applied_promo or available_promo
     amount = applied_amount if applied_promo else available_amount
@@ -256,6 +294,7 @@ def resolver_promocion_para_linea(
     cantidad,
     precio_unitario,
     now=None,
+    presentacion=None,
 ):
     """
     Return (promocion_or_None, descuento_monto_per_unit) for the best qualifying promo.
@@ -270,6 +309,10 @@ def resolver_promocion_para_linea(
 
     presentacion_id = int(presentacion_id) if presentacion_id else None
     precio = _quantize_money(precio_unitario)
+    if presentacion is None and presentacion_id:
+        from config.productos.models import Presentacion
+        presentacion = Presentacion.objects.filter(id=presentacion_id).first()
+
     candidates = promociones_activas_queryset(now=now).filter(
         producto_id=int(producto_id),
         cantidad_minima__lte=qty,
@@ -280,7 +323,7 @@ def resolver_promocion_para_linea(
     best_promo = None
     best_monto = Decimal('0.00')
     for promo in candidates:
-        monto = calcular_descuento_monto_promocion(promo, precio)
+        monto = calcular_descuento_monto_promocion(promo, precio, presentacion=presentacion)
         if monto <= 0:
             continue
         if best_promo is None or monto > best_monto:
@@ -304,7 +347,7 @@ def _clear_promo_fields(item):
     return item
 
 
-def aplicar_promocion_en_item_sesion(item, *, precio_unitario=None, respect_manual=True):
+def aplicar_promocion_en_item_sesion(item, *, precio_unitario=None, respect_manual=True, presentacion=None):
     """
     Mutate a session cart line with the best active promotion discount.
 
@@ -325,6 +368,7 @@ def aplicar_promocion_en_item_sesion(item, *, precio_unitario=None, respect_manu
         presentacion_id=item.get('presentacion_id'),
         cantidad=item.get('cantidad'),
         precio_unitario=precio,
+        presentacion=presentacion,
     )
     if promo is None:
         if origen == DESCUENTO_ORIGEN_PROMOCION or not item.get('descuento_aplicado'):
@@ -338,6 +382,87 @@ def aplicar_promocion_en_item_sesion(item, *, precio_unitario=None, respect_manu
     item['promocion_nombre'] = promo.nombre
     item['promocion_descripcion'] = promo.texto_catalogo()
     return item
+
+
+def aplicar_promocion_a_item_persistido(item, *, only_if_missing=True):
+    """
+    Apply the best qualifying promotion onto a CotizacionItem or PedidoItem.
+
+    When only_if_missing is True, lines that already have a discount are left alone
+    (BackOffice may have set a manual discount).
+    Returns True when the item was modified.
+    """
+    if item is None:
+        return False
+    if only_if_missing and item.descuento_aplicado and _quantize_money(item.descuento_monto) > 0:
+        return False
+
+    presentacion = getattr(item, 'presentacion', None)
+    producto_id = getattr(presentacion, 'producto_id', None) if presentacion is not None else None
+    if not producto_id:
+        return False
+
+    promo, monto = resolver_promocion_para_linea(
+        producto_id=producto_id,
+        presentacion_id=getattr(item, 'presentacion_id', None),
+        cantidad=item.cantidad,
+        precio_unitario=item.precio,
+        presentacion=presentacion,
+    )
+    if promo is None:
+        return False
+
+    item.descuento_aplicado = True
+    item.descuento_monto = monto
+    item.subtotal = _quantize_money(
+        max(Decimal('0.00'), _quantize_money(item.precio) - monto) * Decimal(str(item.cantidad or 0))
+    )
+    return True
+
+
+def asegurar_promociones_en_cotizacion(cotizacion, *, only_if_missing=True):
+    """Persist missing promotion discounts onto quote lines that already qualify."""
+    from config.cotizaciones.models import CotizacionItem
+
+    changed = False
+    items = list(
+        CotizacionItem.objects.filter(cotizacion=cotizacion)
+        .select_related('presentacion__producto')
+    )
+    for item in items:
+        if aplicar_promocion_a_item_persistido(item, only_if_missing=only_if_missing):
+            item.save(update_fields=['descuento_aplicado', 'descuento_monto', 'subtotal'])
+            changed = True
+
+    if changed:
+        total = sum((_quantize_money(row.subtotal) for row in items), Decimal('0.00'))
+        cotizacion.total = _quantize_money(total)
+        cotizacion.save(update_fields=['total'])
+    return changed
+
+
+def asegurar_promociones_en_pedido(pedido, *, only_if_missing=True):
+    """Persist missing promotion discounts onto order lines that already qualify."""
+    from config.pedidos.models import PedidoItem
+
+    changed = False
+    items = list(
+        PedidoItem.objects.filter(pedido=pedido)
+        .select_related('presentacion__producto')
+    )
+    for item in items:
+        if aplicar_promocion_a_item_persistido(item, only_if_missing=only_if_missing):
+            item.save(update_fields=['descuento_aplicado', 'descuento_monto', 'subtotal'])
+            changed = True
+
+    if changed:
+        total = sum((_quantize_money(row.subtotal) for row in items), Decimal('0.00'))
+        pedido.total = _quantize_money(total)
+        update_fields = ['total']
+        if hasattr(pedido, 'actualizada_en'):
+            update_fields.append('actualizada_en')
+        pedido.save(update_fields=update_fields)
+    return changed
 
 
 def marcar_descuento_manual_en_item(item):

@@ -34,6 +34,7 @@ from config.pedidos.services import (
 from config.productos.models import ConfiguracionDescuentos, ConfiguracionPrecios, Presentacion
 from config.productos.promotions import (
     aplicar_promocion_en_item_sesion,
+    asegurar_promociones_en_cotizacion,
     estado_promocion_para_linea,
 )
 from config.usuarios.permissions import internal_permission_required, user_has_permission
@@ -452,7 +453,7 @@ def agregar_a_cotizacion(request):
                 "precio": float(precio),
             }
 
-        aplicar_promocion_en_item_sesion(carrito[key], precio_unitario=precio)
+        aplicar_promocion_en_item_sesion(carrito[key], precio_unitario=precio, presentacion=presentacion)
 
         request.session["carrito"] = carrito
 
@@ -488,12 +489,13 @@ def ver_cotizacion(request):
         item["producto_id"] = producto.id
         item["presentacion_id"] = presentacion.id
         item["precio"] = float(precio)
-        aplicar_promocion_en_item_sesion(item, precio_unitario=precio)
+        aplicar_promocion_en_item_sesion(item, precio_unitario=precio, presentacion=presentacion)
         promocion_estado = estado_promocion_para_linea(
             producto_id=producto.id,
             presentacion_id=presentacion.id,
             cantidad=item["cantidad"],
             precio_unitario=precio,
+            presentacion=presentacion,
         )
         carrito_session[presentacion_id] = item
         dirty = True
@@ -572,7 +574,7 @@ def guardar_cotizacion(request):
         item["producto_id"] = presentacion.producto_id
         item["presentacion_id"] = presentacion.id
         item["cantidad"] = cantidad
-        aplicar_promocion_en_item_sesion(item, precio_unitario=precio)
+        aplicar_promocion_en_item_sesion(item, precio_unitario=precio, presentacion=presentacion)
         descuento_aplicado = bool(item.get("descuento_aplicado"))
         descuento_monto = _parse_decimal(item.get("descuento_monto", 0), 0) if descuento_aplicado else Decimal('0.00')
         subtotal = calcular_subtotal_item_pedido(
@@ -596,6 +598,9 @@ def guardar_cotizacion(request):
 
     cotizacion.total = total
     cotizacion.save(update_fields=['total'])
+    # Belt-and-suspenders: re-apply any qualifying promos that session math missed
+    # (e.g. $0 line price with a fixed-dollar or list-price-based % promo).
+    asegurar_promociones_en_cotizacion(cotizacion)
 
     items = cotizacion.items.all()
 
@@ -853,6 +858,11 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
         _set_quote_send_ready(request.session, cotizacion.id, True)
     else:
         _set_quote_send_ready(request.session, cotizacion.id, False)
+
+    # Auto-apply configured Promotions onto lines that still lack a discount so
+    # BackOffice opens with Apply discount already checked.
+    if pedido_existente is None:
+        asegurar_promociones_en_cotizacion(cotizacion)
 
     confirm_url, telefono_contacto, whatsapp_link, outbound_message = _get_whatsapp_contact_data(cotizacion, request)
     cotizacion_item_rows, display_total = _build_quote_item_rows(cotizacion)

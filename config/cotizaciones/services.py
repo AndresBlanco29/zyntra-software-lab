@@ -102,4 +102,7 @@ def crear_cotizacion_desde_items(
 	CotizacionItem.objects.bulk_create(line_items)
 	cotizacion.total = total
 	cotizacion.save(update_fields=['total'])
+	from config.productos.promotions import asegurar_promociones_en_cotizacion
+	asegurar_promociones_en_cotizacion(cotizacion)
+	cotizacion.refresh_from_db(fields=['total'])
 	return cotizacion

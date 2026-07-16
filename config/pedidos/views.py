@@ -502,6 +502,11 @@ def backoffice_pedido_detalle(request, pedido_id):
 		return redirect('backoffice_pedidos')
 
 	pedido_items = list(pedido.items.select_related('presentacion__producto', 'presentacion__stock_operativo'))
+	if not hasattr(pedido, 'invoice'):
+		from config.productos.promotions import asegurar_promociones_en_pedido
+		if asegurar_promociones_en_pedido(pedido):
+			pedido.refresh_from_db(fields=['total'])
+			pedido_items = list(pedido.items.select_related('presentacion__producto', 'presentacion__stock_operativo'))
 	pedido.workflow_badge = build_order_workflow_badge(pedido)
 	picker_stock_evaluation = evaluar_stock_fisico_verificacion_picking(
 		pedido_items=pedido_items,

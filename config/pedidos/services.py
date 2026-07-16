@@ -654,6 +654,60 @@ def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales
     return evaluation
 
 
+def build_pedido_inventory_needs_analysis(*, pedido, pedido_items=None):
+	"""Compare requested order quantities with available stock for purchase planning."""
+	items = list(
+		pedido_items
+		if pedido_items is not None
+		else pedido.items.select_related('presentacion__producto', 'presentacion__stock_operativo')
+	)
+	stock_eval = evaluar_stock_fisico_verificacion_picking(
+		pedido_items=items,
+		cantidades_reales={
+			item.id: int(getattr(item, 'cantidad_solicitada_documentada', None) or item.cantidad_solicitada or item.cantidad or 0)
+			for item in items
+		},
+	)
+	rows = []
+	for item in items:
+		evaluation = stock_eval[item.id]
+		requested = int(getattr(item, 'cantidad_solicitada_documentada', None) or item.cantidad_solicitada or item.cantidad or 0)
+		available = int(evaluation['available_packages'])
+		to_buy = max(requested - available, 0)
+		if requested <= 0:
+			status = 'sufficient'
+			status_label = _('Sufficient stock')
+		elif available <= 0:
+			status = 'out_of_stock'
+			status_label = _('Out of stock')
+		elif to_buy > 0:
+			status = 'insufficient'
+			status_label = _('Insufficient stock')
+		else:
+			status = 'sufficient'
+			status_label = _('Sufficient stock')
+		rows.append({
+			'item_id': item.id,
+			'product_name': item.presentacion.producto.nombre,
+			'presentation_name': item.presentacion.nombre_empaque_cliente,
+			'sku': (item.presentacion.producto.codigo_barras or '').strip(),
+			'requested_quantity': requested,
+			'available_stock': available,
+			'to_buy_quantity': to_buy,
+			'status': status,
+			'status_label': status_label,
+			'needs_purchase': to_buy > 0,
+		})
+	rows.sort(key=lambda row: (0 if row['needs_purchase'] else 1, row['product_name'].casefold(), row['item_id']))
+	needs_purchase_count = sum(1 for row in rows if row['needs_purchase'])
+	return {
+		'rows': rows,
+		'needs_purchase_count': needs_purchase_count,
+		'has_needs': needs_purchase_count > 0,
+		'total_to_buy': sum(row['to_buy_quantity'] for row in rows),
+	}
+
+
 @transaction.atomic
 def asignar_picking_a_seleccionador(*, pedido, seleccionador, asignado_por=None):
     if getattr(seleccionador, 'role', '') != 'seleccionador':

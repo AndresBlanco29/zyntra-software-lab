@@ -21,6 +21,7 @@ urlpatterns = [
     path('backoffice/<int:pedido_id>/credit-limit/resolve/', views.backoffice_resolve_credit_limit, name='backoffice_resolve_credit_limit'),
     path('backoffice/<int:pedido_id>/picking-ticket/', views.backoffice_picking_ticket, name='backoffice_picking_ticket'),
     path('backoffice/<int:pedido_id>/picking-ticket/pdf/', views.backoffice_picking_pdf, name='backoffice_picking_pdf'),
+    path('backoffice/<int:pedido_id>/inventory-needs/pdf/', views.backoffice_inventory_needs_pdf, name='backoffice_inventory_needs_pdf'),
     path('seleccionador/picking/', views.selector_picking_list, name='selector_picking_list'),
     path('seleccionador/picking/<int:pedido_id>/', views.selector_picking_detail, name='selector_picking_detail'),
 ]

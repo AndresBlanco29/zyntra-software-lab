@@ -21,6 +21,7 @@ from config.pedidos.services import (
 	PEDIDO_EDIT_LOCK_TIMEOUT,
 	acquire_pedido_edit_lock,
 	asignar_picking_a_seleccionador,
+	build_pedido_inventory_needs_analysis,
 	evaluar_stock_fisico_verificacion_picking,
 	guardar_verificacion_picking,
 	resolver_bloqueo_picking_desde_backoffice,
@@ -111,6 +112,68 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'Available stock: 10 CS')
 		self.assertContains(response, 'text-success fw-semibold')
 		self.assertNotContains(response, 'Physical:')
+
+	def test_inventory_needs_analysis_flags_shortage_and_out_of_stock(self):
+		self.presentacion.producto.codigo_barras = 'SKU-TEST-001'
+		self.presentacion.producto.save(update_fields=['codigo_barras'])
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(
+			stock_fisico=1,
+			stock_reservado=2,
+			stock_disponible=0,
+		)
+		analysis = build_pedido_inventory_needs_analysis(pedido=self.pedido)
+
+		self.assertTrue(analysis['has_needs'])
+		self.assertEqual(analysis['needs_purchase_count'], 1)
+		row = analysis['rows'][0]
+		self.assertEqual(row['sku'], 'SKU-TEST-001')
+		self.assertEqual(row['requested_quantity'], 2)
+		self.assertEqual(row['available_stock'], 1)
+		self.assertEqual(row['to_buy_quantity'], 1)
+		self.assertEqual(row['status'], 'insufficient')
+
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(
+			stock_fisico=0,
+			stock_reservado=2,
+			stock_disponible=0,
+		)
+		analysis = build_pedido_inventory_needs_analysis(pedido=self.pedido)
+		row = analysis['rows'][0]
+		self.assertEqual(row['available_stock'], 0)
+		self.assertEqual(row['to_buy_quantity'], 2)
+		self.assertEqual(row['status'], 'out_of_stock')
+
+	def test_backoffice_detail_shows_inventory_analysis_and_export_button(self):
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(
+			stock_fisico=0,
+			stock_reservado=2,
+			stock_disponible=0,
+		)
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Inventory analysis')
+		self.assertContains(response, 'Export Inventory Report')
+		self.assertContains(response, reverse('backoffice_inventory_needs_pdf', args=[self.pedido.id]))
+		self.assertContains(response, 'Out of stock')
+		self.assertContains(response, 'table-danger')
+
+	def test_backoffice_inventory_needs_pdf_exports_purchase_rows(self):
+		self.presentacion.producto.codigo_barras = 'SKU-PDF-9'
+		self.presentacion.producto.save(update_fields=['codigo_barras'])
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(
+			stock_fisico=0,
+			stock_reservado=2,
+			stock_disponible=0,
+		)
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_inventory_needs_pdf', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response['Content-Type'], 'application/pdf')
+		self.assertIn(f'inventory-needs-order-{self.pedido.id}.pdf', response['Content-Disposition'])
+		self.assertTrue(response.content.startswith(b'%PDF'))
 
 	def test_backoffice_detail_shows_order_comment(self):
 		self.pedido.nota_cliente = 'Leave at back door'

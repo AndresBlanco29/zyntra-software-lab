@@ -591,6 +591,69 @@
       </div>
     </div>
 
+    <h5 class="mb-3">{% trans "Inventory analysis" %}</h5>
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+          <div>
+            <p class="text-muted mb-1">{% trans "Automatic comparison of requested quantities against available stock for this order." %}</p>
+            {% if inventory_needs_analysis.has_needs %}
+            <div class="alert alert-warning py-2 mb-0">
+              {% blocktrans count counter=inventory_needs_analysis.needs_purchase_count %}{{ counter }} product needs purchase to complete this order.{% plural %}{{ counter }} products need purchase to complete this order.{% endblocktrans %}
+              {% blocktrans with total=inventory_needs_analysis.total_to_buy %}Total to buy: {{ total }} CS.{% endblocktrans %}
+            </div>
+            {% else %}
+            <div class="alert alert-success py-2 mb-0">{% trans "All products on this order currently have enough stock." %}</div>
+            {% endif %}
+          </div>
+          <a class="btn btn-outline-primary" href="{% url 'backoffice_inventory_needs_pdf' pedido.id %}">
+            {% trans "Export Inventory Report" %}
+          </a>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>{% trans "Product" %}</th>
+                <th>{% trans "SKU" %}</th>
+                <th>{% trans "Requested" %}</th>
+                <th>{% trans "Stock" %}</th>
+                <th>{% trans "To buy" %}</th>
+                <th>{% trans "Status" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in inventory_needs_analysis.rows %}
+              <tr class="{% if row.status == 'out_of_stock' %}table-danger{% elif row.status == 'insufficient' %}table-warning{% endif %}">
+                <td>
+                  <div class="fw-semibold">{{ row.product_name }}</div>
+                  <div class="small text-muted">{{ row.presentation_name }}</div>
+                </td>
+                <td>{% if row.sku %}{{ row.sku }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                <td>{{ row.requested_quantity }} CS</td>
+                <td>{{ row.available_stock }} CS</td>
+                <td class="{% if row.to_buy_quantity %}fw-semibold{% endif %}">{{ row.to_buy_quantity }} CS</td>
+                <td>
+                  {% if row.status == 'sufficient' %}
+                  <span class="badge text-bg-success">{% trans "Sufficient stock" %}</span>
+                  {% elif row.status == 'insufficient' %}
+                  <span class="badge text-bg-warning text-dark">{% trans "Insufficient stock" %}</span>
+                  {% else %}
+                  <span class="badge text-bg-danger">{% trans "Out of stock" %}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" class="text-center text-muted py-3">{% trans "This order has no product lines yet." %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <h5 class="mb-3">{% trans "Editable product details" %}</h5>
     {% if picker_stock_shortage_rows %}
     <div class="alert alert-danger py-2 mb-3">
@@ -913,9 +976,10 @@
   </div>
 </div>
 
-<div class="d-flex gap-2">
+<div class="d-flex flex-wrap gap-2">
   <a class="btn btn-outline-dark" href="{% url 'backoffice_picking_ticket' pedido.id %}">{% trans "Generate Picking Ticket" %}</a>
   <a class="btn btn-success" href="{% url 'backoffice_picking_pdf' pedido.id %}">{% trans "Export PDF" %}</a>
+  <a class="btn btn-outline-primary" href="{% url 'backoffice_inventory_needs_pdf' pedido.id %}">{% trans "Export Inventory Report" %}</a>
 </div>
 
 {{ presentation_price_map|json_script:"pedido-presentation-price-map" }}

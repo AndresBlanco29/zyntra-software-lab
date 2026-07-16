@@ -20,6 +20,7 @@ from .views import (
     editar_promocion,
     desactivar_promocion,
     activar_promocion,
+    eliminar_promocion,
 )
 
 
@@ -36,6 +37,7 @@ urlpatterns = [
     path('panel-admin/promociones/editar/<int:promocion_id>/', editar_promocion, name='editar_promocion'),
     path('panel-admin/promociones/desactivar/<int:promocion_id>/', desactivar_promocion, name='desactivar_promocion'),
     path('panel-admin/promociones/activar/<int:promocion_id>/', activar_promocion, name='activar_promocion'),
+    path('panel-admin/promociones/eliminar/<int:promocion_id>/', eliminar_promocion, name='eliminar_promocion'),
     path('panel-admin/categorias/crear/', crear_categoria, name='crear_categoria'),
     path('panel-admin/marcas/crear/', crear_marca, name='crear_marca'),
     path('panel-admin/marcas/editar/<int:marca_id>/', editar_marca, name='editar_marca'),

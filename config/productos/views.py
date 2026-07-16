@@ -1175,15 +1175,95 @@ def _build_promocion_from_post(post, promocion=None):
     return promocion
 
 
+ADMIN_PROMOCIONES_PAGE_SIZE = 50
+
+
+def _promociones_admin_filter_params(request):
+    params = {}
+    query = str(request.GET.get("q") or "").strip()
+    if query:
+        params["q"] = query
+
+    estado = str(request.GET.get("estado") or "activas").strip().lower()
+    if estado not in {"activas", "inactivas"}:
+        estado = "activas"
+    params["estado"] = estado
+
+    producto_id = str(request.GET.get("producto") or "").strip()
+    if producto_id.isdigit():
+        params["producto"] = producto_id
+
+    tipo = str(request.GET.get("tipo") or "").strip().upper()
+    if tipo in {Promocion.TIPO_PERCENT, Promocion.TIPO_FIXED}:
+        params["tipo"] = tipo
+
+    return params
+
+
+def _promociones_admin_queryset(request):
+    filters = _promociones_admin_filter_params(request)
+    queryset = (
+        Promocion.objects.select_related("producto", "presentacion")
+        .order_by("-creada_en", "id")
+    )
+
+    if filters["estado"] == "activas":
+        queryset = queryset.filter(activa=True)
+    else:
+        queryset = queryset.filter(activa=False)
+
+    query = filters.get("q")
+    if query:
+        queryset = queryset.filter(
+            Q(nombre__icontains=query)
+            | Q(descripcion__icontains=query)
+            | Q(producto__nombre__icontains=query)
+            | Q(producto__nombre_en__icontains=query)
+            | Q(presentacion__nombre__icontains=query)
+        )
+
+    if filters.get("producto"):
+        queryset = queryset.filter(producto_id=filters["producto"])
+
+    if filters.get("tipo"):
+        queryset = queryset.filter(tipo_beneficio=filters["tipo"])
+
+    return queryset, filters
+
+
+def _promociones_list_redirect(request, *, estado=None):
+    from urllib.parse import urlencode
+
+    params = _promociones_admin_filter_params(request)
+    if estado in {"activas", "inactivas"}:
+        params["estado"] = estado
+    query = urlencode(params)
+    url = reverse("lista_promociones")
+    return redirect(f"{url}?{query}" if query else url)
+
+
 @login_required
 @internal_permission_required("admin.products.view")
 def lista_promociones(request):
-    promociones = (
-        Promocion.objects.select_related("producto", "presentacion")
-        .order_by("-activa", "-creada_en")
-    )
+    queryset, filter_params = _promociones_admin_queryset(request)
+    paginator = Paginator(queryset, ADMIN_PROMOCIONES_PAGE_SIZE)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    active_count = Promocion.objects.filter(activa=True).count()
+    inactive_count = Promocion.objects.filter(activa=False).count()
+
     return render(request, "admin/promociones.html", {
-        "promociones": promociones,
+        "promociones": page_obj.object_list,
+        "page_obj": page_obj,
+        "filter_params": filter_params,
+        "filter_q": filter_params.get("q", ""),
+        "filter_estado": filter_params.get("estado", "activas"),
+        "filter_producto": filter_params.get("producto", ""),
+        "filter_tipo": filter_params.get("tipo", ""),
+        "active_count": active_count,
+        "inactive_count": inactive_count,
+        "productos": Producto.objects.only("id", "nombre").order_by("nombre"),
+        "tipos_beneficio": Promocion.TIPO_BENEFICIO_CHOICES,
     })
 
 
@@ -1233,7 +1313,7 @@ def desactivar_promocion(request, promocion_id):
     promocion.activa = False
     promocion.save(update_fields=["activa", "actualizada_en"])
     messages.success(request, _("Promotion deactivated."))
-    return redirect("lista_promociones")
+    return _promociones_list_redirect(request, estado="inactivas")
 
 
 @login_required
@@ -1243,6 +1323,18 @@ def activar_promocion(request, promocion_id):
     promocion.activa = True
     promocion.save(update_fields=["activa", "actualizada_en"])
     messages.success(request, _("Promotion activated."))
-    return redirect("lista_promociones")
+    return _promociones_list_redirect(request, estado="activas")
+
+
+@login_required
+@internal_permission_required("admin.products.manage")
+@require_http_methods(["POST"])
+def eliminar_promocion(request, promocion_id):
+    promocion = get_object_or_404(Promocion, id=promocion_id)
+    nombre = promocion.nombre
+    estado = "activas" if promocion.activa else "inactivas"
+    promocion.delete()
+    messages.success(request, _('Promotion "%(name)s" deleted.') % {"name": nombre})
+    return _promociones_list_redirect(request, estado=estado)
 
 

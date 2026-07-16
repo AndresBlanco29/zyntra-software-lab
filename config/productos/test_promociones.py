@@ -652,3 +652,59 @@ class PromocionAdminBenefitValueTests(TestCase):
             _match_discount_preset_key(_build_quote_discount_preset_options(), order_item.descuento_monto),
             'descuento_6',
         )
+
+    def test_list_tabs_search_filters_and_delete(self):
+        from config.productos.views import ADMIN_PROMOCIONES_PAGE_SIZE
+
+        self.assertEqual(ADMIN_PROMOCIONES_PAGE_SIZE, 50)
+
+        active = Promocion.objects.create(
+            nombre='Active Promo Tab',
+            descripcion='Active deal',
+            producto=self.producto,
+            cantidad_minima=5,
+            tipo_beneficio=Promocion.TIPO_PERCENT,
+            valor_beneficio=Decimal('10'),
+            activa=True,
+        )
+        inactive = Promocion.objects.create(
+            nombre='Inactive Promo Tab',
+            descripcion='Old deal',
+            producto=self.producto,
+            cantidad_minima=3,
+            tipo_beneficio=Promocion.TIPO_FIXED,
+            valor_beneficio=Decimal('1.00'),
+            activa=False,
+        )
+
+        client = DjangoClient()
+        client.force_login(self.admin)
+
+        active_response = client.get(reverse('lista_promociones'), {'estado': 'activas'})
+        self.assertEqual(active_response.status_code, 200)
+        self.assertContains(active_response, 'Active promotions')
+        self.assertContains(active_response, 'Inactive promotions')
+        self.assertContains(active_response, active.nombre)
+        self.assertNotContains(active_response, inactive.nombre)
+        self.assertContains(active_response, 'buscadorPromociones')
+        self.assertContains(active_response, 'filtroProductoPromo')
+        self.assertContains(active_response, 'Delete')
+
+        inactive_response = client.get(reverse('lista_promociones'), {'estado': 'inactivas'})
+        self.assertEqual(inactive_response.status_code, 200)
+        self.assertContains(inactive_response, inactive.nombre)
+        self.assertNotContains(inactive_response, active.nombre)
+
+        search_response = client.get(reverse('lista_promociones'), {
+            'estado': 'activas',
+            'q': 'Active Promo',
+            'producto': str(self.producto.id),
+            'tipo': Promocion.TIPO_PERCENT,
+        })
+        self.assertEqual(search_response.status_code, 200)
+        self.assertContains(search_response, active.nombre)
+        self.assertEqual(search_response.context['page_obj'].paginator.count, 1)
+
+        delete_response = client.post(reverse('eliminar_promocion', args=[inactive.id]))
+        self.assertEqual(delete_response.status_code, 302)
+        self.assertFalse(Promocion.objects.filter(id=inactive.id).exists())

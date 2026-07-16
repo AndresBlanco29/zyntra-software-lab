@@ -62,7 +62,7 @@
       {% trans "Products" %}
     </a>
     <a href="{% url 'lista_promociones' %}"
-      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_promociones' or request.resolver_match.url_name == 'crear_promocion' or request.resolver_match.url_name == 'editar_promocion' %}active{% endif %}">
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_promociones' or request.resolver_match.url_name == 'crear_promocion' or request.resolver_match.url_name == 'editar_promocion' or request.resolver_match.url_name == 'eliminar_promocion' %}active{% endif %}">
       {% trans "Promotions" %}
     </a>
     {% endif %}

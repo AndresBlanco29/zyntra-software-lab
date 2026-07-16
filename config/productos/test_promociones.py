@@ -370,3 +370,169 @@ class PromocionPersistenceTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(client.session['carrito'][str(self.presentacion.id)]['cantidad'], 5)
         self.assertTrue(client.session['carrito'][str(self.presentacion.id)]['descuento_aplicado'])
+
+
+class PromocionAdminBenefitValueTests(TestCase):
+    def setUp(self):
+        self.categoria = Categoria.objects.create(nombre='Promo Admin Cat')
+        self.marca = Marca.objects.create(nombre='Promo Admin Brand')
+        self.producto = Producto.objects.create(
+            nombre='Admin Promo Product',
+            categoria=self.categoria,
+            marca=self.marca,
+            activo=True,
+        )
+        self.presentacion = Presentacion.objects.create(
+            producto=self.producto,
+            nombre='Case',
+            unidades=12,
+            tipo_contenido='unidad',
+            precio_1=Decimal('10.00'),
+        )
+        Presentacion.objects.filter(id=self.presentacion.id).update(
+            precio_1=Decimal('10.00'),
+            costo=None,
+        )
+        self.admin = Usuario.objects.create_user(
+            username='promo-admin',
+            password='secret123',
+            role='admin',
+        )
+
+    def test_create_form_shows_percentage_dropdown_and_fixed_presets(self):
+        client = DjangoClient()
+        client.force_login(self.admin)
+        response = client.get(reverse('crear_promocion'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'promoValorPorcentaje')
+        self.assertContains(response, 'Discount 1')
+        self.assertContains(response, 'promoValorFijoPreset')
+        self.assertTrue(len(response.context['percentage_preset_options']) >= 5)
+        self.assertTrue(len(response.context['fixed_preset_options']) >= 1)
+
+    def test_create_percentage_promotion_from_preset_dropdown(self):
+        client = DjangoClient()
+        client.force_login(self.admin)
+        response = client.post(reverse('crear_promocion'), {
+            'nombre': 'Percent Promo',
+            'descripcion': 'Buy 5 get 20%',
+            'producto': str(self.producto.id),
+            'presentacion': '',
+            'cantidad_minima': '5',
+            'tipo_beneficio': Promocion.TIPO_PERCENT,
+            'valor_beneficio': '20.00',
+            'activa': '1',
+        })
+        self.assertEqual(response.status_code, 302)
+        promo = Promocion.objects.get(nombre='Percent Promo')
+        self.assertEqual(promo.tipo_beneficio, Promocion.TIPO_PERCENT)
+        self.assertEqual(promo.valor_beneficio, Decimal('20.00'))
+
+    def test_reject_non_preset_percentage_on_create(self):
+        client = DjangoClient()
+        client.force_login(self.admin)
+        response = client.post(reverse('crear_promocion'), {
+            'nombre': 'Bad Percent Promo',
+            'descripcion': 'Invalid %',
+            'producto': str(self.producto.id),
+            'presentacion': '',
+            'cantidad_minima': '5',
+            'tipo_beneficio': Promocion.TIPO_PERCENT,
+            'valor_beneficio': '17.50',
+            'activa': '1',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Promocion.objects.filter(nombre='Bad Percent Promo').exists())
+        self.assertContains(response, 'configured percentage')
+
+    def test_create_fixed_promotion_from_orders_preset_amount(self):
+        from config.productos.models import ConfiguracionDescuentos
+
+        preset_amount = ConfiguracionDescuentos.obtener().descuento_6
+        client = DjangoClient()
+        client.force_login(self.admin)
+        response = client.post(reverse('crear_promocion'), {
+            'nombre': 'Fixed Promo',
+            'descripcion': 'Buy 3 save fixed',
+            'producto': str(self.producto.id),
+            'presentacion': str(self.presentacion.id),
+            'cantidad_minima': '3',
+            'tipo_beneficio': Promocion.TIPO_FIXED,
+            'valor_beneficio': format(preset_amount, '.2f'),
+            'activa': '1',
+        })
+        self.assertEqual(response.status_code, 302)
+        promo = Promocion.objects.get(nombre='Fixed Promo')
+        self.assertEqual(promo.tipo_beneficio, Promocion.TIPO_FIXED)
+        self.assertEqual(promo.valor_beneficio, preset_amount)
+
+    def test_quote_discount_matches_orders_preset_after_promo_save(self):
+        from config.cotizaciones.models import Cotizacion
+        from config.cotizaciones.views import _build_quote_item_rows, _match_discount_preset_key, _build_quote_discount_preset_options
+        from config.pedidos.services import crear_pedido_desde_items
+        from config.productos.models import ConfiguracionDescuentos
+
+        preset_amount = ConfiguracionDescuentos.obtener().descuento_6
+        Promocion.objects.create(
+            nombre='Fixed match',
+            producto=self.producto,
+            presentacion=self.presentacion,
+            cantidad_minima=1,
+            tipo_beneficio=Promocion.TIPO_FIXED,
+            valor_beneficio=preset_amount,
+            activa=True,
+        )
+        cliente_user = Usuario.objects.create_user(username='promo-order-client', password='secret123', role='cliente')
+        cliente = Cliente.objects.create(
+            usuario=cliente_user,
+            nombre_empresa='Order Promo Co',
+            telefono='5550008888',
+            direccion='100 Order St',
+            ciudad='Atlanta',
+            estado='GA',
+            codigo_postal='30301',
+            pais='USA',
+            sales_tax_number='TX-PROMO-2',
+            certificado_tax='certificados/test.pdf',
+            nivel_precio=1,
+            estado_revision=Cliente.REVIEW_STATUS_APPROVED,
+            aprobado=True,
+        )
+        cotizacion = Cotizacion.objects.create(cliente=cliente, estado='ENVIADA', total=0)
+        item = CotizacionItem.objects.create(
+            cotizacion=cotizacion,
+            presentacion=self.presentacion,
+            cantidad=3,
+            precio=Decimal('10.00'),
+            subtotal=Decimal('24.00'),
+            descuento_aplicado=True,
+            descuento_monto=preset_amount,
+        )
+        rows, _ = _build_quote_item_rows(cotizacion)
+        self.assertEqual(rows[0]['selected_discount_preset_key'], 'descuento_6')
+        self.assertEqual(
+            _match_discount_preset_key(_build_quote_discount_preset_options(), item.descuento_monto),
+            'descuento_6',
+        )
+
+        pedido = crear_pedido_desde_items(
+            cliente=cliente,
+            items_payload=[{
+                'presentacion': self.presentacion,
+                'cantidad': 3,
+                'precio': Decimal('10.00'),
+                'descuento_aplicado': True,
+                'descuento_monto': preset_amount,
+            }],
+            origen='BACKOFFICE',
+            vendedor=None,
+            bypass_stock_check=True,
+            reservar_inventario=False,
+        )
+        order_item = pedido.items.get()
+        self.assertTrue(order_item.descuento_aplicado)
+        self.assertEqual(order_item.descuento_monto, preset_amount)
+        self.assertEqual(
+            _match_discount_preset_key(_build_quote_discount_preset_options(), order_item.descuento_monto),
+            'descuento_6',
+        )

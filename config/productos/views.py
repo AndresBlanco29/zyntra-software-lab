@@ -15,7 +15,12 @@ from .models import (
     Promocion,
     normalize_codigo_barras,
 )
-from .promotions import adjuntar_promociones_a_productos, promociones_activas_queryset
+from .promotions import (
+    adjuntar_promociones_a_productos,
+    opciones_monto_fijo_promocion,
+    opciones_porcentaje_promocion,
+    promociones_activas_queryset,
+)
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
@@ -1113,11 +1118,15 @@ def _promocion_form_context(promocion=None, *, post=None, error=None):
             "fecha_fin": (post.get("fecha_fin") or "").strip(),
             "activa": bool(post.get("activa")),
         })
+
+    valor_actual = data.get("valor_beneficio") or None
     return {
         "promocion": promocion,
         "productos": productos,
         "presentaciones": presentaciones,
         "tipos_beneficio": Promocion.TIPO_BENEFICIO_CHOICES,
+        "percentage_preset_options": opciones_porcentaje_promocion(valor_actual),
+        "fixed_preset_options": opciones_monto_fijo_promocion(valor_actual),
         "error": error,
         **data,
     }
@@ -1140,7 +1149,22 @@ def _build_promocion_from_post(post, promocion=None):
     promocion.tipo_beneficio = (post.get("tipo_beneficio") or Promocion.TIPO_PERCENT).strip()
     if promocion.tipo_beneficio not in {Promocion.TIPO_PERCENT, Promocion.TIPO_FIXED}:
         raise ValidationError(_("Invalid benefit type."))
-    promocion.valor_beneficio = _parse_decimal(post.get("valor_beneficio"), "0")
+    valor_raw = (post.get("valor_beneficio") or "").strip()
+    if not valor_raw:
+        raise ValidationError(_("Benefit value is required."))
+    promocion.valor_beneficio = _parse_decimal(valor_raw, "0")
+    if promocion.tipo_beneficio == Promocion.TIPO_PERCENT:
+        # Only preset % values are allowed; when editing, keep a legacy/custom value selectable.
+        legacy_value = None
+        if promocion.pk:
+            legacy_value = (
+                Promocion.objects.filter(pk=promocion.pk)
+                .values_list("valor_beneficio", flat=True)
+                .first()
+            )
+        allowed = {option["value"] for option in opciones_porcentaje_promocion(legacy_value)}
+        if format(promocion.valor_beneficio, ".2f") not in allowed:
+            raise ValidationError(_("Select one of the configured percentage discounts."))
     promocion.fecha_inicio = _parse_optional_datetime(post.get("fecha_inicio"))
     promocion.fecha_fin = _parse_optional_datetime(post.get("fecha_fin"))
     promocion.activa = bool(post.get("activa"))

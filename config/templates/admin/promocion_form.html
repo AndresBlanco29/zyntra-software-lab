@@ -18,7 +18,7 @@
 <div class="alert alert-danger">{{ error }}</div>
 {% endif %}
 
-<form method="POST">
+<form method="POST" id="promoForm">
 {% csrf_token %}
 
 <div class="mb-3">
@@ -68,17 +68,56 @@
 <input type="number" name="cantidad_minima" class="form-control" min="1" step="1" value="{{ cantidad_minima }}" required>
 </div>
 <div class="col-md-4 mb-3">
-<label class="form-label">{% trans "Benefit type" %}</label>
-<select name="tipo_beneficio" class="form-select" required>
+<label class="form-label" for="promoTipoBeneficio">{% trans "Benefit type" %}</label>
+<select name="tipo_beneficio" id="promoTipoBeneficio" class="form-select" required>
 {% for value, label in tipos_beneficio %}
 <option value="{{ value }}" {% if tipo_beneficio == value %}selected{% endif %}>{{ label }}</option>
 {% endfor %}
 </select>
 </div>
 <div class="col-md-4 mb-3">
-<label class="form-label">{% trans "Benefit value" %}</label>
-<input type="number" name="valor_beneficio" class="form-control" min="0.01" step="0.01" value="{{ valor_beneficio }}" required>
-<div class="form-text">{% trans "Percent or dollars per unit." %}</div>
+<label class="form-label" for="promoValorBeneficio">{% trans "Benefit value" %}</label>
+
+<select
+  id="promoValorPorcentaje"
+  class="form-select"
+  data-benefit-field="percent"
+  {% if tipo_beneficio != 'PERCENT' %}disabled hidden{% endif %}
+>
+<option value="">{% trans "Select a percentage discount" %}</option>
+{% for option in percentage_preset_options %}
+<option value="{{ option.value }}" {% if valor_beneficio == option.value %}selected{% endif %}>
+{{ option.label }}
+</option>
+{% endfor %}
+</select>
+
+<div id="promoValorFijoWrap" data-benefit-field="fixed" {% if tipo_beneficio == 'PERCENT' %}hidden{% endif %}>
+<select id="promoValorFijoPreset" class="form-select mb-2">
+<option value="">{% trans "Custom amount" %}</option>
+{% for option in fixed_preset_options %}
+<option value="{{ option.value }}" {% if valor_beneficio == option.value %}selected{% endif %}>
+{{ option.label }}
+</option>
+{% endfor %}
+</select>
+<input
+  type="number"
+  id="promoValorFijo"
+  class="form-control"
+  min="0.01"
+  step="0.01"
+  value="{% if tipo_beneficio == 'FIXED' %}{{ valor_beneficio }}{% endif %}"
+  placeholder="0.00"
+  {% if tipo_beneficio == 'PERCENT' %}disabled{% endif %}
+>
+<div class="form-text">{% trans "Same dollar presets used in Orders, or enter a custom amount." %}</div>
+</div>
+
+<input type="hidden" name="valor_beneficio" id="promoValorBeneficio" value="{{ valor_beneficio }}">
+<div id="promoValorPercentHelp" class="form-text" data-benefit-field="percent" {% if tipo_beneficio != 'PERCENT' %}hidden{% endif %}>
+{% trans "Uses the same Discount 1–10 naming used across sales. The selected % becomes a per-unit dollar discount on the order." %}
+</div>
 </div>
 </div>
 
@@ -114,9 +153,17 @@
 (function () {
   const productSelect = document.getElementById('promoProducto');
   const presentationSelect = document.getElementById('promoPresentacion');
-  if (!productSelect || !presentationSelect) return;
+  const tipoSelect = document.getElementById('promoTipoBeneficio');
+  const percentSelect = document.getElementById('promoValorPorcentaje');
+  const fixedWrap = document.getElementById('promoValorFijoWrap');
+  const fixedPreset = document.getElementById('promoValorFijoPreset');
+  const fixedInput = document.getElementById('promoValorFijo');
+  const hiddenValue = document.getElementById('promoValorBeneficio');
+  const percentHelp = document.getElementById('promoValorPercentHelp');
+  const form = document.getElementById('promoForm');
 
   function filterPresentations() {
+    if (!productSelect || !presentationSelect) return;
     const productId = productSelect.value;
     Array.from(presentationSelect.options).forEach(function (option) {
       if (!option.value) {
@@ -131,8 +178,71 @@
     });
   }
 
-  productSelect.addEventListener('change', filterPresentations);
+  function syncHiddenValue() {
+    if (!tipoSelect || !hiddenValue) return;
+    if (tipoSelect.value === 'PERCENT') {
+      hiddenValue.value = percentSelect ? percentSelect.value : '';
+    } else {
+      hiddenValue.value = fixedInput ? fixedInput.value : '';
+    }
+  }
+
+  function syncBenefitFields() {
+    if (!tipoSelect) return;
+    const isPercent = tipoSelect.value === 'PERCENT';
+
+    if (percentSelect) {
+      percentSelect.hidden = !isPercent;
+      percentSelect.disabled = !isPercent;
+      percentSelect.required = isPercent;
+    }
+    if (percentHelp) {
+      percentHelp.hidden = !isPercent;
+    }
+    if (fixedWrap) {
+      fixedWrap.hidden = isPercent;
+    }
+    if (fixedInput) {
+      fixedInput.disabled = isPercent;
+      fixedInput.required = !isPercent;
+    }
+    if (fixedPreset) {
+      fixedPreset.disabled = isPercent;
+    }
+    syncHiddenValue();
+  }
+
+  if (productSelect) {
+    productSelect.addEventListener('change', filterPresentations);
+  }
+  if (tipoSelect) {
+    tipoSelect.addEventListener('change', syncBenefitFields);
+  }
+  if (percentSelect) {
+    percentSelect.addEventListener('change', syncHiddenValue);
+  }
+  if (fixedInput) {
+    fixedInput.addEventListener('input', function () {
+      if (fixedPreset && fixedPreset.value && fixedPreset.value !== fixedInput.value) {
+        fixedPreset.value = '';
+      }
+      syncHiddenValue();
+    });
+  }
+  if (fixedPreset) {
+    fixedPreset.addEventListener('change', function () {
+      if (fixedPreset.value && fixedInput) {
+        fixedInput.value = fixedPreset.value;
+      }
+      syncHiddenValue();
+    });
+  }
+  if (form) {
+    form.addEventListener('submit', syncHiddenValue);
+  }
+
   filterPresentations();
+  syncBenefitFields();
 })();
 </script>
 

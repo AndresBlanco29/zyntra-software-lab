@@ -168,6 +168,18 @@
                       {% if not can_manage_quote_lines %}disabled{% endif %}>
                     <label class="form-check-label small" for="descuentoAplicado{{ item.id }}">{% trans "Apply discount" %}</label>
                   </div>
+                  {% if item.descuento_aplicado %}
+                  <div class="mb-2">
+                    <span class="badge text-bg-warning">
+                      <i class="bi bi-tag-fill" aria-hidden="true"></i>
+                      {% if row.selected_discount_preset_key %}
+                        {% trans "Preset discount applied" %}
+                      {% else %}
+                        {% trans "Promotion / manual discount applied" %}
+                      {% endif %}
+                    </span>
+                  </div>
+                  {% endif %}
                   <div class="quote-item-discount-fields {% if not item.descuento_aplicado %}d-none{% endif %}">
                     <select class="form-select form-select-sm mb-1 quote-item-discount-preset" data-target-input="descuento_monto_{{ item.id }}" data-item-id="{{ item.id }}" {% if not can_manage_quote_lines %}disabled{% endif %}>
                       <option value="">{% trans "Manual discount" %}</option>

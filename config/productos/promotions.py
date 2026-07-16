@@ -13,6 +13,80 @@ from config.productos.models import Promocion
 DESCUENTO_ORIGEN_PROMOCION = 'promocion'
 DESCUENTO_ORIGEN_MANUAL = 'manual'
 
+# Preset percentage options for Promotions admin (Benefit Type = Percentage).
+# Labels mirror the Orders "Discount N" wording so ops can map them consistently.
+DEFAULT_PROMO_PERCENTAGE_PRESETS = (
+    Decimal('5.00'),
+    Decimal('10.00'),
+    Decimal('15.00'),
+    Decimal('20.00'),
+    Decimal('25.00'),
+    Decimal('30.00'),
+    Decimal('35.00'),
+    Decimal('40.00'),
+    Decimal('45.00'),
+    Decimal('50.00'),
+)
+
+
+def opciones_porcentaje_promocion(extra_value=None):
+    """Return [{value, label, key}, ...] for the Percentage benefit dropdown."""
+    from django.utils.translation import gettext as _
+
+    values = []
+    seen = set()
+    for amount in DEFAULT_PROMO_PERCENTAGE_PRESETS:
+        quantized = _quantize_money(amount)
+        key = format(quantized, '.2f')
+        if key in seen:
+            continue
+        seen.add(key)
+        values.append(quantized)
+
+    if extra_value is not None:
+        extra = _quantize_money(extra_value)
+        if extra > 0:
+            key = format(extra, '.2f')
+            if key not in seen:
+                values.append(extra)
+                seen.add(key)
+
+    options = []
+    for index, amount in enumerate(values, start=1):
+        options.append({
+            'key': f'descuento_{index}',
+            'value': format(amount, '.2f'),
+            'label': str(_('Discount %(number)s – %(amount)s%%') % {
+                'number': index,
+                'amount': format(amount, '.0f') if amount == amount.to_integral_value() else format(amount, '.2f'),
+            }),
+        })
+    return options
+
+
+def opciones_monto_fijo_promocion(extra_value=None):
+    """Return Orders preset dollar discounts for the Fixed Dollars benefit dropdown."""
+    from django.utils.translation import gettext as _
+    from config.productos.models import ConfiguracionDescuentos
+
+    options = list(ConfiguracionDescuentos.obtener().opciones_activas())
+    if extra_value is None:
+        return options
+
+    extra = _quantize_money(extra_value)
+    if extra <= 0:
+        return options
+    extra_key = format(extra, '.2f')
+    if any(option['value'] == extra_key for option in options):
+        return options
+
+    options.append({
+        'key': 'custom',
+        'value': extra_key,
+        'label': str(_('Custom – $%(amount)s') % {'amount': extra_key}),
+    })
+    return options
+
 
 def _to_decimal(value, default='0'):
     try:

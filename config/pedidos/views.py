@@ -311,10 +311,18 @@ def _filter_selector_picking_queryset(queryset, search_query):
 	return queryset.filter(filters)
 
 
+def _pedido_has_picking_draft(pedido):
+	if pedido.picking_progress_saved_at:
+		return True
+	progress = pedido.picking_progress or {}
+	return bool(progress)
+
+
 def _annotate_selector_picking_rows(pedidos):
 	for pedido in pedidos:
 		invoice_voided = _selector_pedido_has_voided_invoice(pedido)
 		pedido.picker_process_completed = _selector_picking_process_completed(pedido)
+		pedido.has_picking_draft = _pedido_has_picking_draft(pedido) and not pedido.picker_process_completed
 		if invoice_voided or pedido.estado == 'CANCELADO':
 			pedido.estado_label = _('Cancelled')
 		else:

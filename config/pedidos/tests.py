@@ -1070,6 +1070,11 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(self.pedido.picking_progress['quantities'][str(self.item.id)], 1)
 		self.assertEqual(self.pedido.picking_progress['additional_items'][0]['cantidad'], 3)
 
+		list_response = self.client.get(reverse('selector_picking_list'))
+		self.assertEqual(list_response.status_code, 200)
+		self.assertContains(list_response, 'selector-picking-draft-badge')
+		self.assertContains(list_response, 'DRAFT')
+
 		detail = self.client.get(reverse('selector_picking_detail', args=[self.pedido.id]))
 		self.assertEqual(detail.status_code, 200)
 		self.assertContains(detail, 'Saved picking progress was restored.')
@@ -1097,6 +1102,9 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(self.pedido.estado, 'VERIFICADO_AJUSTADO')
 		self.assertEqual(self.pedido.picking_progress, {})
 		self.assertIsNone(self.pedido.picking_progress_saved_at)
+
+		pending_list = self.client.get(reverse('selector_picking_list'))
+		self.assertNotContains(pending_list, reverse('selector_picking_detail', args=[self.pedido.id]))
 
 	def test_selector_picking_products_are_sorted_by_case_weight_descending(self):
 		self.presentacion.peso_por_caja = Decimal('5.000')

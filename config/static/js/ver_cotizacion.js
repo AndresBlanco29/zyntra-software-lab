@@ -2,6 +2,9 @@ const actualizarURL = document.body.dataset.actualizarUrl;
 const eliminarUrl = document.body.dataset.eliminarUrl;
 const presentacionURL = document.body.dataset.presentacionUrl;
 const csrf = document.body.dataset.csrf;
+const promoProductLabel = document.body.dataset.msgPromoProduct || "Product on promotion";
+const promoActiveMessage = document.body.dataset.msgPromoActive || "Promotion active: your discount will be applied when you submit the order.";
+const promoMinimumTemplate = document.body.dataset.msgPromoMinimum || "This promotion requires a minimum purchase of {minimum} units. You currently have {current}, so the discount will not be applied.";
 
 console.log("URL actualizar:", actualizarURL);
 console.log("URL eliminar:", eliminarUrl);
@@ -25,6 +28,52 @@ document.getElementById("buscador").addEventListener("keyup", function() {
     });
 
 });
+
+function actualizarEstadoPromocion(productoId, promo) {
+    const fila = document.querySelector(`#tablaProductos tbody tr[data-id="${productoId}"]`);
+    if (!fila) {
+        return;
+    }
+
+    const container = fila.querySelector('[data-role="promo-status"]');
+    if (!container) {
+        return;
+    }
+
+    container.replaceChildren();
+    const available = Boolean(promo && promo.available);
+    fila.classList.toggle("cart-promo-row", available);
+    if (!available) {
+        return;
+    }
+
+    const label = document.createElement("span");
+    label.className = "cart-promo-label";
+    const labelIcon = document.createElement("i");
+    labelIcon.className = "bi bi-tag-fill";
+    labelIcon.setAttribute("aria-hidden", "true");
+    label.append(labelIcon, document.createTextNode(" " + promoProductLabel));
+    container.appendChild(label);
+
+    const message = document.createElement("div");
+    message.className = promo.applied
+        ? "cart-promo-message cart-promo-message--active"
+        : "cart-promo-message cart-promo-message--warning";
+
+    const icon = document.createElement("i");
+    icon.className = promo.applied
+        ? "bi bi-check-circle-fill"
+        : "bi bi-exclamation-triangle-fill";
+    icon.setAttribute("aria-hidden", "true");
+
+    const messageText = promo.applied
+        ? promoActiveMessage
+        : promoMinimumTemplate
+            .replace("{minimum}", String(promo.minimum))
+            .replace("{current}", String(promo.current));
+    message.append(icon, document.createTextNode(" " + messageText));
+    container.appendChild(message);
+}
 
 // SUMAR / RESTAR / INGRESO MANUAL
 function actualizarCantidad(productoId, accion, cantidad) {
@@ -51,6 +100,7 @@ function actualizarCantidad(productoId, accion, cantidad) {
         if (input) {
             input.value = data.cantidad;
         }
+        actualizarEstadoPromocion(productoId, data.promo);
         return data;
     });
 }
@@ -95,8 +145,7 @@ document.querySelectorAll(".presentacion-select").forEach(select => {
         })
         .then(response => response.json())
         .then(data => {
-
-
+            actualizarEstadoPromocion(producto_id, data.promo);
         });
 
     });

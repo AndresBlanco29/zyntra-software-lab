@@ -76,7 +76,103 @@ def adjuntar_promociones_a_productos(productos, now=None):
         promo = mapping.get(producto.id)
         producto.promocion_activa = promo
         producto.promocion_texto = promo.texto_catalogo() if promo else ''
+        producto.promocion_cantidad_minima = promo.cantidad_minima if promo else None
+        producto.promocion_presentacion_id = promo.presentacion_id if promo else None
+        producto.promocion_presentacion_nombre = (
+            promo.presentacion.nombre if promo and promo.presentacion_id else ''
+        )
     return productos
+
+
+def resolver_promocion_disponible_para_linea(
+    *,
+    producto_id,
+    presentacion_id,
+    precio_unitario,
+    now=None,
+):
+    """Return the most attractive active promo even before its minimum is met."""
+    if not producto_id:
+        return None, Decimal('0.00')
+
+    presentacion_id = int(presentacion_id) if presentacion_id else None
+    precio = _quantize_money(precio_unitario)
+    candidates = promociones_activas_queryset(now=now).filter(
+        producto_id=int(producto_id),
+    ).filter(
+        Q(presentacion__isnull=True) | Q(presentacion_id=presentacion_id)
+    )
+
+    best_promo = None
+    best_monto = Decimal('0.00')
+    for promo in candidates:
+        monto = calcular_descuento_monto_promocion(promo, precio)
+        if monto <= 0:
+            continue
+        if best_promo is None or monto > best_monto:
+            best_promo = promo
+            best_monto = monto
+        elif monto == best_monto:
+            if promo.cantidad_minima < best_promo.cantidad_minima:
+                best_promo = promo
+            elif promo.cantidad_minima == best_promo.cantidad_minima and promo.id < best_promo.id:
+                best_promo = promo
+
+    return best_promo, best_monto
+
+
+def estado_promocion_para_linea(
+    *,
+    producto_id,
+    presentacion_id,
+    cantidad,
+    precio_unitario,
+    now=None,
+):
+    """Build serializable UI state for an active promotion on a cart line."""
+    try:
+        qty = int(cantidad or 0)
+    except (TypeError, ValueError):
+        qty = 0
+
+    applied_promo, applied_amount = resolver_promocion_para_linea(
+        producto_id=producto_id,
+        presentacion_id=presentacion_id,
+        cantidad=qty,
+        precio_unitario=precio_unitario,
+        now=now,
+    )
+    available_promo, available_amount = resolver_promocion_disponible_para_linea(
+        producto_id=producto_id,
+        presentacion_id=presentacion_id,
+        precio_unitario=precio_unitario,
+        now=now,
+    )
+    promo = applied_promo or available_promo
+    amount = applied_amount if applied_promo else available_amount
+    if promo is None:
+        return {
+            'available': False,
+            'applied': False,
+            'minimum': 0,
+            'current': qty,
+            'missing': 0,
+            'name': '',
+            'description': '',
+            'discount_amount': '0.00',
+        }
+
+    minimum = int(promo.cantidad_minima)
+    return {
+        'available': True,
+        'applied': applied_promo is not None,
+        'minimum': minimum,
+        'current': qty,
+        'missing': max(0, minimum - qty),
+        'name': promo.nombre,
+        'description': promo.texto_catalogo(),
+        'discount_amount': format(amount, '.2f'),
+    }
 
 
 def resolver_promocion_para_linea(

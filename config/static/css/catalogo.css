@@ -327,6 +327,114 @@ z-index:9999;
     color: #6c757d;
 }
 
+.promo-welcome-banner {
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1.25rem;
+    padding: 1.35rem 1.5rem;
+    color: #fff;
+    background:
+        radial-gradient(circle at 85% 10%, rgba(255, 226, 94, 0.35), transparent 28%),
+        linear-gradient(120deg, #9a3412 0%, #ea580c 48%, #f59e0b 100%);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 18px;
+    box-shadow: 0 14px 34px rgba(194, 65, 12, 0.24);
+}
+
+.promo-welcome-banner::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.16) 50%, transparent 65%);
+    transform: translateX(-120%);
+    animation: promo-banner-shine 5s ease-in-out infinite;
+}
+
+@keyframes promo-banner-shine {
+    0%, 65% { transform: translateX(-120%); }
+    85%, 100% { transform: translateX(120%); }
+}
+
+.promo-welcome-banner__icon {
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    font-size: 2rem;
+    background: rgba(255, 255, 255, 0.17);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 16px;
+}
+
+.promo-welcome-banner__content {
+    position: relative;
+    z-index: 1;
+}
+
+.promo-welcome-banner__title {
+    margin: 0 0 0.25rem;
+    font-size: clamp(1.25rem, 2vw, 1.7rem);
+    font-weight: 800;
+}
+
+.promo-welcome-banner__text {
+    margin: 0 0 0.8rem;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.promo-search-form {
+    max-width: 720px;
+}
+
+.promo-search-form .input-group {
+    box-shadow: 0 8px 20px rgba(124, 45, 18, 0.2);
+}
+
+.promo-search-form .input-group-text {
+    color: #9a3412;
+    background: #fff;
+    border: 0;
+}
+
+.promo-search-form .form-control {
+    border: 0;
+}
+
+.promo-search-button,
+.promo-banner-cta,
+.promo-clear-filter {
+    position: relative;
+    z-index: 1;
+    color: #7c2d12;
+    background: #fff7d6;
+    border: 0;
+    font-weight: 800;
+}
+
+.promo-search-button:hover,
+.promo-banner-cta:hover,
+.promo-clear-filter:hover {
+    color: #7c2d12;
+    background: #fff;
+}
+
+.promo-banner-cta,
+.promo-clear-filter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding: 0.75rem 1rem;
+    text-decoration: none;
+    border-radius: 10px;
+    white-space: nowrap;
+    box-shadow: 0 8px 20px rgba(124, 45, 18, 0.2);
+}
+
         /* CARD PRODUCTO */
 /* CARD PRODUCTO */
 .catalog-product-grid {
@@ -351,11 +459,30 @@ z-index:9999;
     position: relative;
 }
 
+.producto-card--promo {
+    border: 2px solid #f97316;
+    background: linear-gradient(180deg, #fffaf0 0%, #fff 38%);
+    box-shadow:
+        0 0 0 4px rgba(249, 115, 22, 0.11),
+        0 13px 32px rgba(194, 65, 12, 0.22);
+    animation: promo-card-glow 2.8s ease-in-out infinite;
+}
+
+@keyframes promo-card-glow {
+    0%, 100% {
+        box-shadow:
+            0 0 0 4px rgba(249, 115, 22, 0.1),
+            0 13px 32px rgba(194, 65, 12, 0.18);
+    }
+    50% {
+        box-shadow:
+            0 0 0 7px rgba(249, 115, 22, 0.18),
+            0 16px 38px rgba(194, 65, 12, 0.3);
+    }
+}
+
 .promo-badge {
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    z-index: 2;
+    align-self: flex-start;
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
@@ -368,14 +495,74 @@ z-index:9999;
     padding: 0.28rem 0.55rem;
     border-radius: 6px;
     box-shadow: 0 2px 8px rgba(196, 92, 38, 0.35);
+    margin-bottom: 0.7rem;
+}
+
+.promo-offer-panel {
+    padding: 0.7rem 0.8rem;
+    color: #7c2d12;
+    background: #fff1dc;
+    border: 1px solid #fdba74;
+    border-radius: 10px;
+    text-align: left;
+}
+
+.promo-minimum {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.88rem;
+    font-weight: 800;
 }
 
 .promo-detail {
     color: #9a4a1c;
     font-size: 0.86rem;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.3;
-    min-height: 1.3em;
+}
+
+.promo-description {
+    margin-top: 0.25rem;
+    color: #7c5a45;
+    font-size: 0.76rem;
+    line-height: 1.25;
+}
+
+.promo-add-btn {
+    color: #fff;
+    background: linear-gradient(90deg, #ea580c, #f59e0b);
+    border: 0;
+    font-weight: 800;
+    box-shadow: 0 7px 16px rgba(234, 88, 12, 0.25);
+}
+
+.promo-add-btn:hover,
+.promo-add-btn:focus {
+    color: #fff;
+    background: linear-gradient(90deg, #c2410c, #ea580c);
+    transform: translateY(-1px);
+}
+
+.promo-empty-state {
+    padding: 3rem 1.5rem;
+    color: #475569;
+    background: #fff;
+    border: 2px dashed #fdba74;
+    border-radius: 16px;
+    text-align: center;
+}
+
+.promo-empty-state > i {
+    display: block;
+    margin-bottom: 0.75rem;
+    color: #ea580c;
+    font-size: 2rem;
+}
+
+.promo-empty-state h4 {
+    color: #9a3412;
+    font-weight: 800;
 }
 
 .producto-card:hover {
@@ -468,6 +655,41 @@ z-index:9999;
         /* SIDEBAR MOBILE */
 
 @media (max-width: 768px) {
+    .promo-welcome-banner {
+        grid-template-columns: auto 1fr;
+        padding: 1rem;
+    }
+
+    .promo-welcome-banner__icon {
+        width: 48px;
+        height: 48px;
+        font-size: 1.5rem;
+    }
+
+    .promo-welcome-banner__content {
+        min-width: 0;
+    }
+
+    .promo-welcome-banner__text {
+        font-size: 0.9rem;
+    }
+
+    .promo-search-form .input-group {
+        display: grid;
+        grid-template-columns: auto 1fr;
+    }
+
+    .promo-search-form .promo-search-button {
+        grid-column: 1 / -1;
+        border-radius: 0 0 8px 8px;
+    }
+
+    .promo-banner-cta,
+    .promo-clear-filter {
+        grid-column: 1 / -1;
+        width: 100%;
+    }
+
     /* organiza filtros y buscador en columna */
     .catalog-filter-form .catalog-filter-selects {
         flex-direction: column;
@@ -548,6 +770,13 @@ z-index:9999;
 
     .catalog-filter-form .catalog-filter-selects select {
         width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .promo-welcome-banner::after,
+    .producto-card--promo {
+        animation: none;
     }
 }
 

@@ -15,7 +15,7 @@ from .models import (
     Promocion,
     normalize_codigo_barras,
 )
-from .promotions import adjuntar_promociones_a_productos
+from .promotions import adjuntar_promociones_a_productos, promociones_activas_queryset
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
@@ -375,6 +375,8 @@ def _catalogo_public_filter_params(request):
     marca_id = str(request.GET.get('marca') or '').strip()
     if marca_id.isdigit():
         params['marca'] = marca_id
+    if request.GET.get('promociones') == '1':
+        params['promociones'] = '1'
     if request.GET.get('guest') == '1':
         params['guest'] = '1'
     return params
@@ -408,6 +410,9 @@ def _catalogo_public_productos_queryset(request):
         queryset = queryset.filter(categoria_id=filters['categoria'])
     if filters.get('marca'):
         queryset = queryset.filter(marca_id=filters['marca'])
+    if filters.get('promociones'):
+        promo_product_ids = promociones_activas_queryset().values('producto_id')
+        queryset = queryset.filter(id__in=promo_product_ids)
     return queryset
 
 
@@ -437,8 +442,14 @@ def catalogo(request):
     catalogo_url = reverse("catalogo")
     if force_guest_mode:
         catalogo_url = f"{catalogo_url}?guest=1"
+    promociones_url = reverse("catalogo")
+    promociones_query = ["promociones=1"]
+    if force_guest_mode:
+        promociones_query.append("guest=1")
+    promociones_url = f"{promociones_url}?{'&'.join(promociones_query)}"
 
     filter_params = _catalogo_public_filter_params(request)
+    promociones_disponibles = promociones_activas_queryset().exists()
     paginator = Paginator(_catalogo_public_productos_queryset(request), CATALOGO_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get('page'))
     productos = adjuntar_promociones_a_productos(_hydrate_productos(list(page_obj.object_list)))
@@ -451,6 +462,7 @@ def catalogo(request):
         'filter_q': filter_params.get('q', ''),
         'filter_categoria': filter_params.get('categoria', ''),
         'filter_marca': filter_params.get('marca', ''),
+        'filter_promociones': filter_params.get('promociones', ''),
         'categorias': categorias,
         'marcas': marcas,
         'guest_mode': force_guest_mode,
@@ -458,6 +470,8 @@ def catalogo(request):
         'can_view_received_quotes': can_view_received_quotes,
         'pendientes_cotizaciones': pendientes_cotizaciones,
         'catalogo_url': catalogo_url,
+        'promociones_url': promociones_url,
+        'promociones_disponibles': promociones_disponibles,
         'client_price_tier': client_price_tier,
         'show_client_prices': client_price_tier is not None,
     }

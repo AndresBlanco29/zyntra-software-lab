@@ -32,7 +32,10 @@ from config.pedidos.services import (
     notificar_cliente_pedido,
 )
 from config.productos.models import ConfiguracionDescuentos, ConfiguracionPrecios, Presentacion
-from config.productos.promotions import aplicar_promocion_en_item_sesion
+from config.productos.promotions import (
+    aplicar_promocion_en_item_sesion,
+    estado_promocion_para_linea,
+)
 from config.usuarios.permissions import internal_permission_required, user_has_permission
 
 from .models import Cotizacion, CotizacionItem
@@ -417,6 +420,7 @@ def agregar_a_cotizacion(request):
     if request.method == "POST":
         presentacion_id = request.POST.get("presentacion_id")
         cantidad = int(request.POST.get("cantidad"))
+        ensure_promo_minimum = request.POST.get("promo_minimum") == "1"
 
         presentacion = Presentacion.objects.get(id=presentacion_id)
         producto = presentacion.producto
@@ -434,7 +438,10 @@ def agregar_a_cotizacion(request):
         key = str(presentacion_id)
 
         if key in carrito:
-            carrito[key]["cantidad"] += cantidad
+            if ensure_promo_minimum:
+                carrito[key]["cantidad"] = max(carrito[key]["cantidad"], cantidad)
+            else:
+                carrito[key]["cantidad"] += cantidad
             carrito[key]["precio"] = float(precio)
         else:
             carrito[key] = {
@@ -482,6 +489,12 @@ def ver_cotizacion(request):
         item["presentacion_id"] = presentacion.id
         item["precio"] = float(precio)
         aplicar_promocion_en_item_sesion(item, precio_unitario=precio)
+        promocion_estado = estado_promocion_para_linea(
+            producto_id=producto.id,
+            presentacion_id=presentacion.id,
+            cantidad=item["cantidad"],
+            precio_unitario=precio,
+        )
         carrito_session[presentacion_id] = item
         dirty = True
 
@@ -495,6 +508,7 @@ def ver_cotizacion(request):
             "descuento_origen": item.get("descuento_origen") or "",
             "promocion_nombre": item.get("promocion_nombre") or "",
             "promocion_descripcion": item.get("promocion_descripcion") or "",
+            "promocion_estado": promocion_estado,
         })
 
     if dirty:

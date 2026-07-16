@@ -22,6 +22,9 @@
 data-actualizar-url="{% url 'actualizar_cantidad' %}"
 data-eliminar-url="{% url 'eliminar_producto' %}"
 data-presentacion-url="{% url 'cambiar_presentacion' %}"
+data-msg-promo-product="{% trans 'Product on promotion' %}"
+data-msg-promo-active="{% trans 'Promotion active: your discount will be applied when you submit the order.' %}"
+data-msg-promo-minimum="{% trans 'This promotion requires a minimum purchase of {minimum} units. You currently have {current}, so the discount will not be applied.' %}"
 data-csrf="{{ csrf_token }}">
 
 <!-- NAVBAR -->
@@ -128,22 +131,39 @@ La Tortilla Grocery
 <tbody>
 
 {% for item in carrito %}
-<tr data-id="{{ item.id }}">
+<tr data-id="{{ item.id }}" {% if item.promocion_estado.available %}class="cart-promo-row"{% endif %}>
 
 <td>
-<div class="d-flex align-items-center gap-3 nombre-producto">
+<div class="d-flex align-items-start gap-3 nombre-producto">
 
 {% if item.producto.imagen %}
 <img src="{{ item.producto.imagen.url }}"
 style="width:45px;height:45px;object-fit:contain;">
 {% endif %}
 
-<span class="fw-bold">{{ item.producto.nombre_traducido }}</span>
-{% if item.descuento_origen == 'promocion' and item.descuento_aplicado %}
-<span class="badge text-bg-warning mt-1 d-inline-block">
-{% trans "Promo applied" %}: {{ item.promocion_descripcion|default:item.promocion_nombre }}
-</span>
+<div>
+<span class="fw-bold d-block">{{ item.producto.nombre_traducido }}</span>
+<div class="cart-promo-status mt-2" data-role="promo-status">
+{% if item.promocion_estado.available %}
+  <span class="cart-promo-label">
+    <i class="bi bi-tag-fill" aria-hidden="true"></i> {% trans "Product on promotion" %}
+  </span>
+  {% if item.promocion_estado.applied %}
+  <div class="cart-promo-message cart-promo-message--active">
+    <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+    {% trans "Promotion active: your discount will be applied when you submit the order." %}
+  </div>
+  {% else %}
+  <div class="cart-promo-message cart-promo-message--warning">
+    <i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i>
+    {% blocktrans with minimum=item.promocion_estado.minimum current=item.promocion_estado.current %}
+    This promotion requires a minimum purchase of {{ minimum }} units. You currently have {{ current }}, so the discount will not be applied.
+    {% endblocktrans %}
+  </div>
+  {% endif %}
 {% endif %}
+</div>
+</div>
 
 </div>
 </td>

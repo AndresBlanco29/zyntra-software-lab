@@ -144,9 +144,55 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
 
                 </div>
 
+                {% if promociones_disponibles %}
+                <section class="promo-welcome-banner mb-4" aria-labelledby="promoWelcomeTitle">
+                    <div class="promo-welcome-banner__icon" aria-hidden="true">🎉</div>
+                    <div class="promo-welcome-banner__content">
+                        <h2 id="promoWelcomeTitle" class="promo-welcome-banner__title">
+                            {% trans "There are products on promotion!" %}
+                        </h2>
+                        <p class="promo-welcome-banner__text">
+                            {% trans "Take advantage of discounts and special offers available for a limited time." %}
+                        </p>
+                        <form method="get" class="promo-search-form">
+                            {% if guest_mode %}<input type="hidden" name="guest" value="1">{% endif %}
+                            <input type="hidden" name="promociones" value="1">
+                            <label class="visually-hidden" for="promoSearch">{% trans "Search promotional products" %}</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
+                                <input
+                                    type="search"
+                                    id="promoSearch"
+                                    name="q"
+                                    value="{% if filter_promociones %}{{ filter_q }}{% endif %}"
+                                    class="form-control"
+                                    placeholder="{% trans 'Search a promotional product...' %}"
+                                    autocomplete="off"
+                                >
+                                <button class="btn promo-search-button" type="submit">
+                                    {% trans "View promotional products" %}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    {% if filter_promociones %}
+                    <a href="{{ catalogo_url }}" class="promo-clear-filter">
+                        <i class="bi bi-x-circle" aria-hidden="true"></i> {% trans "View all products" %}
+                    </a>
+                    {% else %}
+                    <a href="{{ promociones_url }}" class="promo-banner-cta">
+                        <i class="bi bi-stars" aria-hidden="true"></i> {% trans "View promotional products" %}
+                    </a>
+                    {% endif %}
+                </section>
+                {% endif %}
+
                 <form method="get" id="catalogo-filter-form" class="catalog-filter-form">
                     {% if guest_mode %}
                     <input type="hidden" name="guest" value="1">
+                    {% endif %}
+                    {% if filter_promociones %}
+                    <input type="hidden" name="promociones" value="1">
                     {% endif %}
 
                     <div class="catalog-search-sticky">
@@ -195,11 +241,15 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
 
                         <div class="col-12 col-sm-6 col-md-4 col-lg-3 catalog-product-col">
 
-                            <div class="producto-card text-center"
+                            <div class="producto-card text-center{% if producto.promocion_activa %} producto-card--promo{% endif %}"
                                 data-producto-id="{{ producto.id }}"
                                 data-nombre="{{ producto.nombre_traducido }}"
                                 data-categoria="{{ producto.categoria.id|default:'' }}"
-                                data-marca="{{ producto.marca.id }}">
+                                data-marca="{{ producto.marca.id }}"
+                                {% if producto.promocion_activa %}
+                                data-promo-minimum="{{ producto.promocion_cantidad_minima }}"
+                                data-promo-presentation="{{ producto.promocion_presentacion_id|default:'' }}"
+                                {% endif %}>
 
                                 {% if producto.promocion_activa %}
                                 <div class="promo-badge" title="{{ producto.promocion_texto }}">
@@ -221,8 +271,27 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                                 </div>
 
                                 {% if producto.promocion_texto %}
-                                <div class="promo-detail mb-2">
-                                    {{ producto.promocion_texto }}
+                                <div class="promo-offer-panel mb-3">
+                                    <div class="promo-minimum">
+                                        <i class="bi bi-cart-check-fill" aria-hidden="true"></i>
+                                        {% blocktrans with minimum=producto.promocion_cantidad_minima %}
+                                        Minimum purchase: {{ minimum }} units
+                                        {% endblocktrans %}
+                                    </div>
+                                    <div class="promo-detail">
+                                        {% if producto.promocion_activa.tipo_beneficio == 'PERCENT' %}
+                                            {% blocktrans with value=producto.promocion_activa.valor_beneficio %}
+                                            Get {{ value }}% off.
+                                            {% endblocktrans %}
+                                        {% else %}
+                                            {% blocktrans with value=producto.promocion_activa.valor_beneficio %}
+                                            Get USD {{ value }} off per unit.
+                                            {% endblocktrans %}
+                                        {% endif %}
+                                    </div>
+                                    {% if producto.promocion_texto != producto.promocion_activa.nombre %}
+                                    <div class="promo-description">{{ producto.promocion_texto }}</div>
+                                    {% endif %}
                                 </div>
                                 {% endif %}
 
@@ -256,6 +325,7 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                                               {% if show_client_prices %}
                                               data-price="{% if client_price_tier == 1 %}{{ p.precio_1 }}{% elif client_price_tier == 2 %}{{ p.precio_2 }}{% elif client_price_tier == 3 %}{{ p.precio_3 }}{% elif client_price_tier == 4 %}{{ p.precio_4 }}{% else %}{{ p.precio_5 }}{% endif %}"
                                               {% endif %}
+                                              {% if producto.promocion_presentacion_id == p.id %}selected{% endif %}
                                             >
                                                 {{ p.nombre_empaque_cliente }}
                                             </option>
@@ -275,8 +345,14 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                                     </div>
                                 </div>
 
-                                   {% if can_quote %}
-                                <button class="btn btn-yellow w-100 agregar-btn">
+                                {% if can_quote %}
+                                {% if producto.promocion_activa %}
+                                <button type="button" class="btn promo-add-btn w-100 mb-2">
+                                    <i class="bi bi-cart-plus-fill" aria-hidden="true"></i>
+                                    {% trans "Add Promotion to Order" %}
+                                </button>
+                                {% endif %}
+                                <button type="button" class="btn btn-yellow w-100 agregar-btn">
                                     {% trans "Añadir pedido" %}
                                 </button>
                                 {% else %}
@@ -289,12 +365,26 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
 
                         </div>
 
+                    {% empty %}
+                        <div class="col-12">
+                            <div class="promo-empty-state">
+                                <i class="bi bi-search" aria-hidden="true"></i>
+                                {% if filter_promociones %}
+                                <h4>{% trans "No promotional products found" %}</h4>
+                                <p>{% trans "Try another product name or view the complete catalog." %}</p>
+                                {% else %}
+                                <h4>{% trans "No products found" %}</h4>
+                                <p>{% trans "Try another product name or clear the catalog filters." %}</p>
+                                {% endif %}
+                                <a href="{{ catalogo_url }}" class="btn btn-outline-primary">{% trans "View all products" %}</a>
+                            </div>
+                        </div>
                     {% endfor %}
 
                 </div>
                 </form>
 
-                {% pagination_controls page_obj aria_label=_('Product pagination') nav_class="catalog-pagination d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-2" q=filter_q categoria=filter_categoria marca=filter_marca guest=guest_mode|yesno:"1," %}
+                {% pagination_controls page_obj aria_label=_('Product pagination') nav_class="catalog-pagination d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-2" q=filter_q categoria=filter_categoria marca=filter_marca promociones=filter_promociones guest=guest_mode|yesno:"1," %}
 
             </div>
 

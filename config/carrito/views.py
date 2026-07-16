@@ -3,7 +3,10 @@ from django.views.decorators.http import require_POST
 from config.clientes.models import Cliente
 from config.pedidos.services import calcular_subtotal_item_pedido
 from config.productos.models import Producto, Presentacion
-from config.productos.promotions import aplicar_promocion_en_item_sesion
+from config.productos.promotions import (
+    aplicar_promocion_en_item_sesion,
+    estado_promocion_para_linea,
+)
 from django.shortcuts import render
 from django.utils.translation import gettext as _
 
@@ -128,12 +131,19 @@ def actualizar_cantidad(request):
     request.session["carrito"] = carrito
 
     item = carrito.get(producto_id) or {}
+    promo_state = estado_promocion_para_linea(
+        producto_id=item.get("producto_id"),
+        presentacion_id=item.get("presentacion_id"),
+        cantidad=item.get("cantidad"),
+        precio_unitario=item.get("precio", 0),
+    )
     return JsonResponse({
         "success": True,
         "cantidad": cantidad,
         "subtotal": subtotal,
         "promo_applied": str(item.get("descuento_origen") or "") == "promocion",
         "promo_label": item.get("promocion_descripcion") or item.get("promocion_nombre") or "",
+        "promo": promo_state,
     })
 
 @require_POST
@@ -181,12 +191,19 @@ def cambiar_presentacion(request):
             for item in carrito.values()
         )
 
+        promo_state = estado_promocion_para_linea(
+            producto_id=carrito[producto_id].get("producto_id"),
+            presentacion_id=carrito[producto_id].get("presentacion_id"),
+            cantidad=carrito[producto_id].get("cantidad"),
+            precio_unitario=carrito[producto_id].get("precio", 0),
+        )
         return JsonResponse({
             "precio": precio_actual,
             "subtotal": subtotal,
             "total": total,
             "promo_applied": str(carrito[producto_id].get("descuento_origen") or "") == "promocion",
             "promo_label": carrito[producto_id].get("promocion_descripcion") or carrito[producto_id].get("promocion_nombre") or "",
+            "promo": promo_state,
         })
 
     return JsonResponse({"error": True})

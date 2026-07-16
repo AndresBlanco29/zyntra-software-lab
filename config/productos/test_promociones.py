@@ -11,6 +11,7 @@ from config.productos.models import Categoria, Marca, Presentacion, Producto, Pr
 from config.productos.promotions import (
     adjuntar_promociones_a_productos,
     aplicar_promocion_en_item_sesion,
+    estado_promocion_para_linea,
     promociones_activas_queryset,
     resolver_promocion_para_linea,
 )
@@ -190,6 +191,17 @@ class PromocionResolverTests(TestCase):
         self.assertFalse(item['descuento_aplicado'])
         self.assertEqual(item.get('descuento_origen'), '')
 
+        state = estado_promocion_para_linea(
+            producto_id=self.producto.id,
+            presentacion_id=self.presentacion.id,
+            cantidad=3,
+            precio_unitario=Decimal('20.00'),
+        )
+        self.assertTrue(state['available'])
+        self.assertFalse(state['applied'])
+        self.assertEqual(state['minimum'], 10)
+        self.assertEqual(state['missing'], 7)
+
 
 class PromocionPersistenceTests(TestCase):
     def setUp(self):
@@ -197,6 +209,12 @@ class PromocionPersistenceTests(TestCase):
         self.marca = Marca.objects.create(nombre='Promo Persist Brand')
         self.producto = Producto.objects.create(
             nombre='Persist Product',
+            categoria=self.categoria,
+            marca=self.marca,
+            activo=True,
+        )
+        self.producto_sin_promo = Producto.objects.create(
+            nombre='Regular Product',
             categoria=self.categoria,
             marca=self.marca,
             activo=True,
@@ -276,7 +294,79 @@ class PromocionPersistenceTests(TestCase):
 
     def test_catalogo_shows_promotion_badge(self):
         client = DjangoClient()
+        client.force_login(self.user)
         response = client.get(reverse('catalogo'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Promotion')
         self.assertContains(response, 'Buy 5 get 20%')
+        self.assertContains(response, 'Add Promotion to Order')
+        self.assertContains(response, 'Minimum purchase: 5 units')
+        self.assertContains(response, 'There are products on promotion!')
+
+    def test_promotions_filter_and_search_only_return_active_promo_products(self):
+        client = DjangoClient()
+        response = client.get(reverse('catalogo'), {
+            'promociones': '1',
+            'q': 'Persist',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.producto.nombre)
+        self.assertNotContains(response, self.producto_sin_promo.nombre)
+        self.assertEqual(response.context['filter_promociones'], '1')
+
+    def test_cart_quantity_response_warns_below_minimum_and_applies_at_threshold(self):
+        client = DjangoClient()
+        client.force_login(self.user)
+        session = client.session
+        session['carrito'] = {
+            str(self.presentacion.id): {
+                'producto_id': self.producto.id,
+                'presentacion_id': self.presentacion.id,
+                'nombre': self.producto.nombre,
+                'cantidad': 4,
+                'precio': 10.0,
+            }
+        }
+        session.save()
+
+        below = client.post(reverse('actualizar_cantidad'), {
+            'producto_id': str(self.presentacion.id),
+            'accion': 'set',
+            'cantidad': '4',
+        })
+        self.assertEqual(below.status_code, 200)
+        self.assertTrue(below.json()['promo']['available'])
+        self.assertFalse(below.json()['promo']['applied'])
+        self.assertEqual(below.json()['promo']['minimum'], 5)
+
+        threshold = client.post(reverse('actualizar_cantidad'), {
+            'producto_id': str(self.presentacion.id),
+            'accion': 'set',
+            'cantidad': '5',
+        })
+        self.assertEqual(threshold.status_code, 200)
+        self.assertTrue(threshold.json()['promo']['applied'])
+
+    def test_add_promotion_button_ensures_minimum_instead_of_adding_it_twice(self):
+        client = DjangoClient()
+        client.force_login(self.user)
+        session = client.session
+        session['carrito'] = {
+            str(self.presentacion.id): {
+                'producto_id': self.producto.id,
+                'presentacion_id': self.presentacion.id,
+                'nombre': self.producto.nombre,
+                'cantidad': 2,
+                'precio': 10.0,
+            }
+        }
+        session.save()
+
+        response = client.post(reverse('agregar_a_cotizacion'), {
+            'presentacion_id': str(self.presentacion.id),
+            'cantidad': '5',
+            'promo_minimum': '1',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(client.session['carrito'][str(self.presentacion.id)]['cantidad'], 5)
+        self.assertTrue(client.session['carrito'][str(self.presentacion.id)]['descuento_aplicado'])

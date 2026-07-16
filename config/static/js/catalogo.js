@@ -89,46 +89,80 @@ document.addEventListener('DOMContentLoaded', function() {
         window.CatalogQuantity.bindLocalQuantityStepper(card);
     });
 
-    /* AGREGAR AL CARRITO */
-    document.querySelectorAll(".agregar-btn").forEach(btn => {
-        if (!btn.dataset.defaultLabel) {
-            btn.dataset.defaultLabel = btn.textContent.trim();
+    function addCardToCart(card, feedbackButton, options = {}) {
+        const isAuthenticated = document.body.dataset.auth === 'true';
+        if (!isAuthenticated) {
+            const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+            loginModal.show();
+            return;
         }
 
-        btn.addEventListener("click", function () {
-            const isAuthenticated = document.body.dataset.auth === 'true';
+        const productoId = card.dataset.productoId;
+        const presentacionId = card.querySelector(".presentacion-select").value;
+        const cantidad = window.CatalogQuantity.getQuantityValue(card.querySelector(".cantidad"));
+        const defaultLabel = feedbackButton.textContent.trim();
+        feedbackButton.disabled = true;
 
-            if (!isAuthenticated) {
-                const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
-                loginModal.show();
-                return;
-            }
+        const requestBody = new URLSearchParams({
+            producto_id: productoId,
+            presentacion_id: presentacionId,
+            cantidad: cantidad,
+        });
+        if (options.ensurePromotionMinimum) {
+            requestBody.set("promo_minimum", "1");
+        }
 
-            let card = this.closest(".producto-card");
-
-            let producto_id = card.dataset.productoId;
-            let presentacion_id = card.querySelector(".presentacion-select").value;
-            let cantidad = window.CatalogQuantity.getQuantityValue(card.querySelector(".cantidad"));
-
-            fetch(agregarUrl, {
+        fetch(agregarUrl, {
                 method: "POST",
                 headers: {
                     "X-CSRFToken": csrfToken,
                     "Content-Type": "application/x-www-form-urlencoded"
                 },
-                body: `producto_id=${producto_id}&presentacion_id=${presentacion_id}&cantidad=${cantidad}`
+                body: requestBody.toString()
             })
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
                         document.getElementById("contadorCarrito").textContent = data.total_items;
-
-                        btn.textContent = addedButtonLabel;
+                        feedbackButton.textContent = addedButtonLabel;
                         setTimeout(() => {
-                            btn.textContent = btn.dataset.defaultLabel;
+                            feedbackButton.textContent = defaultLabel;
+                            feedbackButton.disabled = false;
                         }, 1200);
+                    } else {
+                        feedbackButton.disabled = false;
                     }
+                })
+                .catch(() => {
+                    feedbackButton.disabled = false;
                 });
+    }
+
+    /* AGREGAR AL CARRITO */
+    document.querySelectorAll(".agregar-btn").forEach(btn => {
+        btn.addEventListener("click", function () {
+            addCardToCart(this.closest(".producto-card"), this);
+        });
+    });
+
+    /* AGREGAR LA CANTIDAD MÍNIMA DE LA PROMOCIÓN CON UN CLIC */
+    document.querySelectorAll(".promo-add-btn").forEach(btn => {
+        btn.addEventListener("click", function () {
+            const card = this.closest(".producto-card");
+            const minimum = parseInt(card.dataset.promoMinimum, 10);
+            const promoPresentation = card.dataset.promoPresentation;
+            const quantityInput = card.querySelector(".cantidad");
+            const presentationSelect = card.querySelector(".presentacion-select");
+
+            if (Number.isFinite(minimum) && minimum > 0) {
+                quantityInput.value = String(minimum);
+            }
+            if (promoPresentation && presentationSelect) {
+                presentationSelect.value = promoPresentation;
+                presentationSelect.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+
+            addCardToCart(card, this, { ensurePromotionMinimum: true });
         });
     });
 

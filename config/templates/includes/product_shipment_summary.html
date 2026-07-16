@@ -13,6 +13,30 @@
           <span class="invoice-summary-box__value">{{ shipment_summary.total_weight|floatformat:1 }}</span>
         </div>
       </div>
+      <div class="col-md-4">
+        <div class="invoice-summary-box">
+          <span class="invoice-summary-box__label">Pallets:</span>
+          {% if editable_pallets %}
+          <input
+            type="number"
+            name="cantidad_pallets"
+            id="pickerPalletsInput"
+            class="form-control form-control-sm invoice-summary-box__input"
+            min="0"
+            step="0.01"
+            required
+            inputmode="decimal"
+            value="{% if shipment_summary.total_pallets is not None %}{{ shipment_summary.total_pallets }}{% endif %}"
+            placeholder="0"
+            aria-label="Pallets"
+          >
+          {% elif shipment_summary.total_pallets is not None %}
+          <span class="invoice-summary-box__value">{{ shipment_summary.total_pallets }}</span>
+          {% else %}
+          <span class="invoice-summary-box__value text-muted">-</span>
+          {% endif %}
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -34,6 +58,10 @@
   }
   .product-shipment-summary .invoice-summary-box__value {
     font-size: 1.05rem;
+    font-weight: 600;
+  }
+  .product-shipment-summary .invoice-summary-box__input {
+    max-width: 6.5rem;
     font-weight: 600;
   }
   @media print {

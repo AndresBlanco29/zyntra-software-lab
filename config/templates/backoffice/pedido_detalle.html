@@ -743,7 +743,7 @@
       </table>
     </div>
 
-    {% product_shipment_summary source='pedido_items' value=pedido_items quantity='cantidad' %}
+    {% product_shipment_summary source='pedido_items' value=pedido_items quantity='cantidad' pallets=pedido.cantidad_pallets %}
 
     {% if lineas_bloqueadas_para_picking %}
     <div class="alert alert-warning mt-3 mb-0">

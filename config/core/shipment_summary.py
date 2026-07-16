@@ -31,7 +31,17 @@ def build_shipment_summary_from_lines(lines):
 	return {
 		'total_cases': total_cases,
 		'total_weight': total_weight.quantize(Decimal('0.1'), rounding=ROUND_HALF_UP),
+		'total_pallets': None,
 	}
+
+
+def with_total_pallets(summary, total_pallets=None):
+	payload = dict(summary or {'total_cases': 0, 'total_weight': Decimal('0')})
+	if total_pallets is None:
+		payload['total_pallets'] = None
+	else:
+		payload['total_pallets'] = _to_decimal(total_pallets, '0')
+	return payload
 
 
 def _line_from_model_item(item, *, quantity_attr='cantidad'):

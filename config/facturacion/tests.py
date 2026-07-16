@@ -3737,6 +3737,7 @@ class InvoiceFlowTests(TestCase):
 		pdf_text = response.content.decode('latin-1', errors='ignore')
 		self.assertIn('No. of Cases:', pdf_text)
 		self.assertIn('Total WGT:', pdf_text)
+		self.assertIn('Pallets:', pdf_text)
 		self.assertIn("Customer's Signature:", pdf_text)
 
 	def test_invoice_pdf_shipment_summary_table_builds_without_reportlab_error(self):
@@ -3787,6 +3788,8 @@ class InvoiceFlowTests(TestCase):
 		self.assertGreater(len(buffer.getvalue()), 500)
 
 	def test_backoffice_invoice_detail_shows_cases_and_weight_summary(self):
+		self.pedido.cantidad_pallets = Decimal('3.50')
+		self.pedido.save(update_fields=['cantidad_pallets', 'actualizada_en'])
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
 			metodo_entrega='CUSTOMER_PICK_UP',
@@ -3797,7 +3800,8 @@ class InvoiceFlowTests(TestCase):
 		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
 		self.assertContains(response, 'No. of Cases:')
 		self.assertContains(response, 'Total WGT:')
-		self.assertContains(response, "Customer's Signature:")
+		self.assertContains(response, 'Pallets:')
+		self.assertContains(response, '3.50')
 
 	def test_backoffice_and_driver_delivery_details_show_estimated_delivery(self):
 		estimated_delivery_at = timezone.make_aware(datetime(2026, 4, 18, 9, 30), timezone.get_current_timezone())

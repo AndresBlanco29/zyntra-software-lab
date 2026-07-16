@@ -64,6 +64,13 @@ class Pedido(models.Model):
 	picking_bloqueado = models.BooleanField(default=False)
 	picking_asignado_en = models.DateTimeField(blank=True, null=True)
 	picking_verificado_en = models.DateTimeField(blank=True, null=True)
+	cantidad_pallets = models.DecimalField(
+		max_digits=8,
+		decimal_places=2,
+		null=True,
+		blank=True,
+		help_text=_('Pallet count entered by the picker when verification finishes.'),
+	)
 	credit_limit_liberado = models.BooleanField(default=False)
 	credit_limit_bloqueado = models.BooleanField(default=False)
 	acepta_terminos = models.BooleanField(default=False)

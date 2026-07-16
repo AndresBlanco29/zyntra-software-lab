@@ -16,7 +16,7 @@ import logging
 
 from config.core.datetime_formats import format_local_datetime
 from config.core.product_ordering import order_pedido_items_for_display
-from config.core.shipment_summary import build_shipment_summary_from_pedido_items
+from config.core.shipment_summary import build_shipment_summary_from_pedido_items, with_total_pallets
 from config.core.pdf_branding import (
 	BRAND_BORDER,
 	BRAND_MUTED_TEXT,
@@ -1360,7 +1360,10 @@ def backoffice_picking_pdf(request, pedido_id):
 	content.append(table)
 	content.append(Spacer(1, 12))
 	picking_items = order_pedido_items_for_display(pedido)
-	shipment_summary = build_shipment_summary_from_pedido_items(picking_items, quantity_attr='cantidad')
+	shipment_summary = with_total_pallets(
+		build_shipment_summary_from_pedido_items(picking_items, quantity_attr='cantidad'),
+		pedido.cantidad_pallets,
+	)
 	summary_box_style = ParagraphStyle(
 		'PickingShipmentSummaryLabel',
 		parent=styles['BodyText'],
@@ -1494,6 +1497,7 @@ def selector_picking_detail(request, pedido_id):
 				nota_resuelta=nota_resuelta,
 				presentacion_updates=posted_presentations,
 				additional_items=additional_items,
+				cantidad_pallets=request.POST.get('cantidad_pallets'),
 			)
 		except (PermissionDenied, ValidationError) as exc:
 			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))

@@ -137,7 +137,7 @@
       </table>
     </div>
 
-    {% product_shipment_summary source='pedido' value=pedido quantity='cantidad_solicitada' %}
+    {% product_shipment_summary source='pedido' value=pedido quantity='cantidad_solicitada' editable_pallets=True %}
 
     {% if picker_requires_full_line_review %}
     <div class="form-text mt-2">{% trans "Check each line in the Reviewed column to confirm you verified every product before saving." %}</div>

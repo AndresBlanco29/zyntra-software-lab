@@ -41,6 +41,19 @@ def _quantize_money(value):
     return _to_decimal(value, '0').quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
+def parse_required_pallets_quantity(value):
+    text = str(value if value is not None else '').strip().replace(',', '.')
+    if text == '':
+        raise ValidationError(_('Pallets quantity is required.'))
+    try:
+        parsed = Decimal(text)
+    except Exception as exc:
+        raise ValidationError(_('Enter a valid pallets quantity.')) from exc
+    if parsed < 0:
+        raise ValidationError(_('Pallets quantity cannot be negative.'))
+    return parsed.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+
+
 def _resolve_pedido_item_price(*, pedido, presentacion):
     cliente = getattr(pedido, 'cliente', None)
     tier = cliente.get_nivel_precio_normalizado() if cliente and hasattr(cliente, 'get_nivel_precio_normalizado') else None
@@ -705,10 +718,12 @@ def guardar_verificacion_picking(
     nota_resuelta,
     presentacion_updates=None,
     additional_items=None,
+    cantidad_pallets=0,
 ):
     if pedido.seleccionador_id != seleccionador.id:
         raise PermissionDenied(_('You are not assigned to this picking ticket.'))
 
+    pallets_cantidad = parse_required_pallets_quantity(cantidad_pallets)
     nota_texto = (nota or '').strip()
     presentacion_updates = presentacion_updates or {}
     additional_items = additional_items or []
@@ -777,11 +792,13 @@ def guardar_verificacion_picking(
     pedido.nota_seleccionador = nota_texto
     pedido.nota_seleccionador_resuelta = bool(nota_resuelta) and not has_stock_shortage
     pedido.picking_verificado_en = timezone.now()
+    pedido.cantidad_pallets = pallets_cantidad
     pedido.save(update_fields=[
         'estado',
         'nota_seleccionador',
         'nota_seleccionador_resuelta',
         'picking_verificado_en',
+        'cantidad_pallets',
         'picking_bloqueado',
         'actualizada_en',
     ])

@@ -527,11 +527,11 @@
 {% include 'backoffice/includes/invoice_adjustment_note_form.html' with prominent=True invoice=invoice invoice_items=invoice_items adjustment_note_form_draft=adjustment_note_form_draft %}
 {% endif %}
 
+{% product_shipment_summary source='invoice' value=invoice %}
+
 {% if show_customer_pickup_completion %}
 {% include 'backoffice/includes/invoice_customer_pickup_form.html' with invoice=invoice pickup_delivery=pickup_delivery pickup_collectible_balance=pickup_collectible_balance pickup_form_draft=pickup_form_draft %}
 {% else %}
-{% product_shipment_summary source='invoice' value=invoice %}
-
 <div class="card shadow-sm mb-3 invoice-signature-print">
   <div class="card-body">
     <div class="invoice-signature-print__label">Customer's Signature:</div>

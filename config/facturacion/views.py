@@ -710,14 +710,22 @@ def _format_pdf_weight(value):
 
 
 def _build_invoice_pdf_shipment_summary_table(summary, *, box_style, value_style, total_width=None):
+	pallets_value = summary.get('total_pallets')
+	if pallets_value is None:
+		pallets_label = '-'
+	else:
+		pallets_label = str(pallets_value)
+
 	if total_width is None:
-		col_widths = [92, 58, 78, 78]
+		col_widths = [78, 48, 68, 58, 62, 52]
 	else:
 		col_widths = [
-			total_width * 0.38,
-			total_width * 0.12,
-			total_width * 0.32,
-			total_width * 0.18,
+			total_width * 0.26,
+			total_width * 0.10,
+			total_width * 0.20,
+			total_width * 0.14,
+			total_width * 0.16,
+			total_width * 0.14,
 		]
 	summary_table = Table(
 		[[
@@ -725,6 +733,8 @@ def _build_invoice_pdf_shipment_summary_table(summary, *, box_style, value_style
 			Paragraph(str(summary['total_cases']), value_style),
 			Paragraph('<b>Total WGT:</b>', box_style),
 			Paragraph(_format_pdf_weight(summary['total_weight']), value_style),
+			Paragraph('<b>Pallets:</b>', box_style),
+			Paragraph(pallets_label, value_style),
 		]],
 		colWidths=col_widths,
 		hAlign='LEFT',
@@ -732,8 +742,10 @@ def _build_invoice_pdf_shipment_summary_table(summary, *, box_style, value_style
 	summary_table.setStyle(TableStyle([
 		('BOX', (0, 0), (0, 0), 0.75, BRAND_BORDER),
 		('BOX', (2, 0), (2, 0), 0.75, BRAND_BORDER),
+		('BOX', (4, 0), (4, 0), 0.75, BRAND_BORDER),
 		('BACKGROUND', (0, 0), (0, 0), colors.white),
 		('BACKGROUND', (2, 0), (2, 0), colors.white),
+		('BACKGROUND', (4, 0), (4, 0), colors.white),
 		('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
 		('LEFTPADDING', (0, 0), (-1, -1), 4),
 		('RIGHTPADDING', (0, 0), (-1, -1), 4),

@@ -736,6 +736,7 @@ class PickingVerificationFlowTests(TestCase):
 		self.client.force_login(self.selector)
 
 		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'cantidad_pallets': '1.5',
 			f'cantidad_real_{self.item.id}': '2',
 			'nota_seleccionador': 'Todo correcto',
 			'nota_seleccionador_resuelta': 'on',
@@ -750,6 +751,7 @@ class PickingVerificationFlowTests(TestCase):
 		self.client.force_login(self.selector)
 
 		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'cantidad_pallets': '1.5',
 			f'presentacion_{self.item.id}': str(self.presentacion_unidad.id),
 			f'cantidad_real_{self.item.id}': '2',
 			'nota_seleccionador': 'Cambio de U/M en picking',
@@ -770,6 +772,7 @@ class PickingVerificationFlowTests(TestCase):
 		self.client.force_login(self.selector)
 
 		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'cantidad_pallets': '1.5',
 			f'presentacion_{self.item.id}': str(self.presentacion.id),
 			f'cantidad_real_{self.item.id}': '2',
 			'presentacion_nueva': str(self.presentacion_extra.id),
@@ -1004,6 +1007,7 @@ class PickingVerificationFlowTests(TestCase):
 		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=0)
 
 		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'cantidad_pallets': '1.5',
 			f'cantidad_real_{self.item.id}': '2',
 			'nota_seleccionador': 'Mantener cantidad digitada',
 			'nota_seleccionador_resuelta': 'on',
@@ -1035,12 +1039,42 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'text-success')
 		self.assertContains(response, 'id="pickerSummaryOrdered"', html=False)
 		self.assertContains(response, 'CS ordered')
+		self.assertContains(response, 'name="cantidad_pallets"', html=False)
+		self.assertContains(response, 'Pallets:')
+
+	def test_selector_save_requires_and_persists_pallets_quantity(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+
+		missing = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			f'cantidad_real_{self.item.id}': '2',
+			f'linea_revisada_{self.item.id}': 'on',
+			'nota_seleccionador': 'Todo correcto',
+			'nota_seleccionador_resuelta': 'on',
+		})
+		self.assertEqual(missing.status_code, 200)
+		self.assertContains(missing, 'Pallets quantity is required', html=False)
+		self.pedido.refresh_from_db()
+		self.assertIsNone(self.pedido.cantidad_pallets)
+
+		ok = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'cantidad_pallets': '2.5',
+			f'cantidad_real_{self.item.id}': '2',
+			f'linea_revisada_{self.item.id}': 'on',
+			'nota_seleccionador': 'Todo correcto',
+			'nota_seleccionador_resuelta': 'on',
+		})
+		self.assertEqual(ok.status_code, 302)
+		self.pedido.refresh_from_db()
+		self.assertEqual(self.pedido.cantidad_pallets, Decimal('2.50'))
+		self.assertEqual(self.pedido.estado, 'VERIFICADO_AJUSTADO')
 
 	def test_selector_must_review_every_line_before_saving(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		self.client.force_login(self.selector)
 
 		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'cantidad_pallets': '1.5',
 			f'cantidad_real_{self.item.id}': '2',
 			'nota_seleccionador': 'Todo correcto',
 			'nota_seleccionador_resuelta': 'on',
@@ -1079,6 +1113,7 @@ class PickingVerificationFlowTests(TestCase):
 		self.client.force_login(self.selector)
 
 		missing_changed_review = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'cantidad_pallets': '1.5',
 			f'presentacion_{self.item.id}': str(self.presentacion.id),
 			f'cantidad_real_{self.item.id}': '1',
 			f'presentacion_{second_item.id}': str(self.presentacion_extra.id),
@@ -1094,6 +1129,7 @@ class PickingVerificationFlowTests(TestCase):
 		)
 
 		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'cantidad_pallets': '1.5',
 			f'presentacion_{self.item.id}': str(self.presentacion.id),
 			f'cantidad_real_{self.item.id}': '1',
 			f'presentacion_{second_item.id}': str(self.presentacion_extra.id),
@@ -1124,6 +1160,7 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'badge bg-success', html=False)
 
 		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'cantidad_pallets': '1.5',
 			f'cantidad_real_{self.item.id}': '2',
 			'nota_seleccionador': 'Sin stock fisico',
 			f'linea_revisada_{self.item.id}': 'on',
@@ -1139,6 +1176,7 @@ class PickingVerificationFlowTests(TestCase):
 		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=0)
 
 		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'cantidad_pallets': '1.5',
 			f'cantidad_real_{self.item.id}': '0',
 			'nota_seleccionador': '',
 			'nota_seleccionador_resuelta': 'on',

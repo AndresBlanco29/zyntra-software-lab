@@ -146,10 +146,10 @@ def attach_invoice_item_net_dispatched_quantities(invoice, items):
 
 
 def build_invoice_shipment_summary(invoice):
-	from config.core.shipment_summary import build_shipment_summary_from_lines
+	from config.core.shipment_summary import build_shipment_summary_from_lines, with_total_pallets
 
 	returned_units_map = build_invoice_item_returned_units_map(invoice)
-	return build_shipment_summary_from_lines([
+	summary = build_shipment_summary_from_lines([
 		{
 			'quantity': resolve_invoice_item_net_dispatched_quantity(item, returned_units_map),
 			'case_weight': item.peso_por_caja,
@@ -157,6 +157,11 @@ def build_invoice_shipment_summary(invoice):
 		}
 		for item in invoice.items.all()
 	])
+	pedido = getattr(invoice, 'pedido', None)
+	return with_total_pallets(
+		summary,
+		getattr(pedido, 'cantidad_pallets', None) if pedido is not None else None,
+	)
 
 
 def _to_decimal(value, default='0'):

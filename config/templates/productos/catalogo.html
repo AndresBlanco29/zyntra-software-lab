@@ -163,29 +163,6 @@ data-countdown-ended="{% trans 'Promotion ended' %}">
 
                 </div>
 
-                {% if productos_favoritos %}
-                <section class="favorites-section mb-4" aria-labelledby="favoritesTitle">
-                    <div class="favorites-section__header">
-                        <div>
-                            <h2 id="favoritesTitle" class="favorites-section__title">
-                                {% trans "Your Favorite Products" %}
-                            </h2>
-                            <p class="favorites-section__subtitle mb-0">
-                                {% trans "Products you bought before — add them again in one tap." %}
-                            </p>
-                        </div>
-                        <a href="{% url 'cliente_historial_ordenes' %}" class="btn btn-outline-secondary btn-sm">
-                            {% trans "View order history" %}
-                        </a>
-                    </div>
-                    <div class="row g-4 catalog-product-grid favorites-section__grid">
-                        {% for producto in productos_favoritos %}
-                            {% include "productos/includes/catalogo_producto_card.html" with card_prefix="fav" %}
-                        {% endfor %}
-                    </div>
-                </section>
-                {% endif %}
-
                 {% if promociones_disponibles %}
                 <section class="promo-welcome-banner mb-4" aria-labelledby="promoWelcomeTitle">
                     <div class="promo-welcome-banner__icon" aria-hidden="true">🎉</div>
@@ -226,6 +203,29 @@ data-countdown-ended="{% trans 'Promotion ended' %}">
                         <i class="bi bi-stars" aria-hidden="true"></i> {% trans "View promotional products" %}
                     </a>
                     {% endif %}
+                </section>
+                {% endif %}
+
+                {% if productos_favoritos %}
+                <section class="favorites-section mb-4" aria-labelledby="favoritesTitle">
+                    <div class="favorites-section__header">
+                        <div>
+                            <h2 id="favoritesTitle" class="favorites-section__title">
+                                {% trans "Your Favorite Products" %}
+                            </h2>
+                            <p class="favorites-section__subtitle mb-0">
+                                {% trans "Products you bought before — add them again in one tap." %}
+                            </p>
+                        </div>
+                        <a href="{% url 'cliente_historial_ordenes' %}" class="btn btn-outline-secondary btn-sm">
+                            {% trans "View order history" %}
+                        </a>
+                    </div>
+                    <div class="row g-4 catalog-product-grid favorites-section__grid">
+                        {% for producto in productos_favoritos %}
+                            {% include "productos/includes/catalogo_producto_card.html" with card_prefix="fav" %}
+                        {% endfor %}
+                    </div>
                 </section>
                 {% endif %}
 

@@ -1,7 +1,9 @@
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from config.clientes.models import Cliente
+from config.pedidos.services import calcular_subtotal_item_pedido
 from config.productos.models import Producto, Presentacion
+from config.productos.promotions import aplicar_promocion_en_item_sesion
 from django.shortcuts import render
 from django.utils.translation import gettext as _
 
@@ -38,9 +40,16 @@ def ver_cotizacion(request):
     for producto_id, item in carrito.items():
 
         producto = Producto.objects.get(id=producto_id)
+        item["producto_id"] = producto.id
+        aplicar_promocion_en_item_sesion(item, precio_unitario=item.get("precio", 0))
 
         precio = item.get("precio", 0)
-        subtotal = precio * item["cantidad"]
+        subtotal = float(calcular_subtotal_item_pedido(
+            precio=precio,
+            cantidad=item["cantidad"],
+            descuento_aplicado=item.get("descuento_aplicado", False),
+            descuento_monto=item.get("descuento_monto", 0),
+        ))
         total += subtotal
 
         carrito_items.append({
@@ -51,7 +60,13 @@ def ver_cotizacion(request):
             "precio": precio,
             "cantidad": item["cantidad"],
             "subtotal": subtotal,
+            "descuento_aplicado": bool(item.get("descuento_aplicado")),
+            "descuento_origen": item.get("descuento_origen") or "",
+            "promocion_nombre": item.get("promocion_nombre") or "",
+            "promocion_descripcion": item.get("promocion_descripcion") or "",
         })
+
+    request.session["carrito"] = carrito
 
     context = {
         "carrito": carrito_items,
@@ -86,12 +101,25 @@ def actualizar_cantidad(request):
         presentacion_id = carrito[producto_id].get("presentacion_id")
 
         if presentacion_id:
-            presentacion = Presentacion.objects.get(id=presentacion_id)
+            presentacion = Presentacion.objects.select_related("producto").get(id=presentacion_id)
+            carrito[producto_id]["producto_id"] = presentacion.producto_id
+            assigned_price = _get_request_price_for_presentacion(request, presentacion)
+            if assigned_price is not None:
+                carrito[producto_id]["precio"] = float(assigned_price)
+
+        aplicar_promocion_en_item_sesion(
+            carrito[producto_id],
+            precio_unitario=carrito[producto_id].get("precio", 0),
+        )
 
         precio = carrito[producto_id].get("precio", 0)
         cantidad = carrito[producto_id]["cantidad"]
-
-        subtotal = precio * cantidad
+        subtotal = float(calcular_subtotal_item_pedido(
+            precio=precio,
+            cantidad=cantidad,
+            descuento_aplicado=carrito[producto_id].get("descuento_aplicado", False),
+            descuento_monto=carrito[producto_id].get("descuento_monto", 0),
+        ))
 
     else:
         subtotal = 0
@@ -99,10 +127,13 @@ def actualizar_cantidad(request):
 
     request.session["carrito"] = carrito
 
+    item = carrito.get(producto_id) or {}
     return JsonResponse({
         "success": True,
         "cantidad": cantidad,
-        "subtotal": subtotal
+        "subtotal": subtotal,
+        "promo_applied": str(item.get("descuento_origen") or "") == "promocion",
+        "promo_label": item.get("promocion_descripcion") or item.get("promocion_nombre") or "",
     })
 
 @require_POST
@@ -125,23 +156,37 @@ def cambiar_presentacion(request):
         precio_actual = float(assigned_price)
 
         carrito[producto_id]["presentacion_id"] = presentacion.id
+        carrito[producto_id]["producto_id"] = presentacion.producto_id
         carrito[producto_id]["precio"] = precio_actual
+        aplicar_promocion_en_item_sesion(carrito[producto_id], precio_unitario=precio_actual)
 
         cantidad = carrito[producto_id]["cantidad"]
-        subtotal = precio_actual * cantidad
+        subtotal = float(calcular_subtotal_item_pedido(
+            precio=precio_actual,
+            cantidad=cantidad,
+            descuento_aplicado=carrito[producto_id].get("descuento_aplicado", False),
+            descuento_monto=carrito[producto_id].get("descuento_monto", 0),
+        ))
 
         carrito[producto_id]["subtotal"] = subtotal
         request.session["carrito"] = carrito
 
         total = sum(
-            item.get("precio", 0) * item["cantidad"]
+            float(calcular_subtotal_item_pedido(
+                precio=item.get("precio", 0),
+                cantidad=item["cantidad"],
+                descuento_aplicado=item.get("descuento_aplicado", False),
+                descuento_monto=item.get("descuento_monto", 0),
+            ))
             for item in carrito.values()
         )
 
         return JsonResponse({
             "precio": precio_actual,
             "subtotal": subtotal,
-            "total": total
+            "total": total,
+            "promo_applied": str(carrito[producto_id].get("descuento_origen") or "") == "promocion",
+            "promo_label": carrito[producto_id].get("promocion_descripcion") or carrito[producto_id].get("promocion_nombre") or "",
         })
 
     return JsonResponse({"error": True})
@@ -187,22 +232,28 @@ def agregar_carrito(request):
     if producto_id in carrito:
 
         carrito[producto_id]["cantidad"] += cantidad
+        carrito[producto_id]["precio"] = precio_actual
+        carrito[producto_id]["presentacion_id"] = presentacion_id
+        carrito[producto_id]["producto_id"] = producto.id
     
     else:
 
         carrito[producto_id] = {
             "nombre": producto.nombre,
+            "producto_id": producto.id,
             "presentacion_id": presentacion_id,
             "presentacion_nombre": presentacion.nombre,
             "precio": precio_actual,
             "cantidad": cantidad,
         }
 
-    # recalcular subtotal
-    carrito[producto_id]["subtotal"] = (
-        carrito[producto_id]["precio"] *
-        carrito[producto_id]["cantidad"]
-    )
+    aplicar_promocion_en_item_sesion(carrito[producto_id], precio_unitario=precio_actual)
+    carrito[producto_id]["subtotal"] = float(calcular_subtotal_item_pedido(
+        precio=carrito[producto_id]["precio"],
+        cantidad=carrito[producto_id]["cantidad"],
+        descuento_aplicado=carrito[producto_id].get("descuento_aplicado", False),
+        descuento_monto=carrito[producto_id].get("descuento_monto", 0),
+    ))
 
     request.session["carrito"] = carrito
 

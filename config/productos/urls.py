@@ -15,6 +15,11 @@ from .views import (
     configurar_precios,
     configurar_descuentos,
     parse_packaging_from_name,
+    lista_promociones,
+    crear_promocion,
+    editar_promocion,
+    desactivar_promocion,
+    activar_promocion,
 )
 
 
@@ -26,6 +31,11 @@ urlpatterns = [
     path('panel-admin/productos/parse-packaging/', parse_packaging_from_name, name='parse_packaging_from_name'),
     path('panel-admin/productos/configurar-precios/', configurar_precios, name='configurar_precios'),
     path('panel-admin/productos/configurar-descuentos/', configurar_descuentos, name='configurar_descuentos'),
+    path('panel-admin/promociones/', lista_promociones, name='lista_promociones'),
+    path('panel-admin/promociones/crear/', crear_promocion, name='crear_promocion'),
+    path('panel-admin/promociones/editar/<int:promocion_id>/', editar_promocion, name='editar_promocion'),
+    path('panel-admin/promociones/desactivar/<int:promocion_id>/', desactivar_promocion, name='desactivar_promocion'),
+    path('panel-admin/promociones/activar/<int:promocion_id>/', activar_promocion, name='activar_promocion'),
     path('panel-admin/categorias/crear/', crear_categoria, name='crear_categoria'),
     path('panel-admin/marcas/crear/', crear_marca, name='crear_marca'),
     path('panel-admin/marcas/editar/<int:marca_id>/', editar_marca, name='editar_marca'),

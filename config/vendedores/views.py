@@ -8,6 +8,11 @@ from config.clientes.assignment import filter_clientes_for_vendedor
 from config.clientes.phone import normalize_stored_phone_number
 from config.usuarios.models import Usuario
 from config.productos.models import Producto, Presentacion, Categoria, Marca, ConfiguracionPrecios, ConfiguracionDescuentos
+from config.productos.promotions import (
+    aplicar_promocion_en_item_sesion,
+    marcar_descuento_manual_en_item,
+    adjuntar_promociones_a_productos,
+)
 from config.productos.views import _hydrate_productos
 from django.views.decorators.http import require_POST
 import uuid
@@ -659,7 +664,7 @@ def catalogo_vendedor(request, cliente_id):
     filter_params = _catalogo_vendedor_filter_params(request)
     paginator = Paginator(_catalogo_vendedor_queryset(request), VENDEDOR_CATALOGO_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get('page'))
-    productos = _hydrate_productos(list(page_obj.object_list))
+    productos = adjuntar_promociones_a_productos(_hydrate_productos(list(page_obj.object_list)))
     _attach_recent_customer_order_history(cliente=cliente, productos=productos)
 
     categorias = Categoria.objects.all()
@@ -747,15 +752,13 @@ def agregar_producto_pedido(request):
                 carrito_item["precio_key"] = precio_key
             carrito[presentacion_id] = carrito_item
 
+        aplicar_promocion_en_item_sesion(carrito[presentacion_id], precio_unitario=precio)
+
         request.session["pedido"] = carrito
         persist_session_take_order_cart(request)
 
         total_items = sum(item["cantidad"] for item in carrito.values())
-    
-        total = sum(
-            item["precio"] * item["cantidad"]
-            for item in carrito.values()
-        )
+        total = float(_cart_total(carrito))
 
         return JsonResponse({
             "success": True,
@@ -805,6 +808,8 @@ def ver_pedido(request):
         if float(item.get("precio", 0) or 0) != precio:
             carrito[key]["precio"] = precio
 
+        aplicar_promocion_en_item_sesion(carrito[key], precio_unitario=precio)
+        item = carrito[key]
         subtotal = _cart_item_subtotal(item)
 
         total += subtotal
@@ -818,6 +823,9 @@ def ver_pedido(request):
             "cantidad": item["cantidad"],
             "descuento_aplicado": bool(item.get("descuento_aplicado")),
             "descuento_monto": _money_decimal(item.get("descuento_monto", 0) if item.get("descuento_aplicado") else 0),
+            "descuento_origen": item.get("descuento_origen") or "",
+            "promocion_nombre": item.get("promocion_nombre") or "",
+            "promocion_descripcion": item.get("promocion_descripcion") or "",
             "selected_discount_preset_key": (
                 _match_discount_preset_key(discount_options, item.get("descuento_monto", 0))
                 if item.get("descuento_aplicado")
@@ -997,6 +1005,13 @@ def actualizar_cantidad_pedido(request):
             )
             carrito[producto_id]["descuento_aplicado"] = aplicado
             carrito[producto_id]["descuento_monto"] = float(monto)
+            marcar_descuento_manual_en_item(carrito[producto_id])
+
+        if accion in {"sumar", "restar", "set", "cambiar_precio", "cambiar_presentacion"}:
+            aplicar_promocion_en_item_sesion(
+                carrito[producto_id],
+                precio_unitario=carrito[producto_id].get("precio"),
+            )
 
     # Guardar sesión + borrador persistente
     request.session["pedido"] = carrito
@@ -1005,6 +1020,7 @@ def actualizar_cantidad_pedido(request):
     cantidad = carrito[producto_id]["cantidad"]
     pricing = _cart_item_pricing_payload(carrito[producto_id])
     total = _cart_total(carrito)
+    item = carrito[producto_id]
 
     return JsonResponse({
         "cantidad": cantidad,
@@ -1013,6 +1029,8 @@ def actualizar_cantidad_pedido(request):
         "discount_amount": pricing["discount_amount"],
         "line_savings": pricing["line_savings"],
         "discount_applied": pricing["discount_applied"],
+        "promo_applied": str(item.get("descuento_origen") or "") == "promocion",
+        "promo_label": item.get("promocion_descripcion") or item.get("promocion_nombre") or "",
         "total": _money_string(total)
     })
 
@@ -1051,6 +1069,7 @@ def enviar_pedido(request):
     for item in carrito.values():
 
         presentacion = Presentacion.objects.get(id=item["presentacion_id"])
+        aplicar_promocion_en_item_sesion(item, precio_unitario=item.get("precio"))
         items_payload.append({
             "presentacion": presentacion,
             "cantidad": item["cantidad"],
@@ -1142,6 +1161,7 @@ def crear_cotizacion_desde_toma(request):
     items_payload = []
     for item in carrito.values():
         presentacion = Presentacion.objects.get(id=item["presentacion_id"])
+        aplicar_promocion_en_item_sesion(item, precio_unitario=item.get("precio"))
         items_payload.append({
             "presentacion": presentacion,
             "cantidad": item["cantidad"],

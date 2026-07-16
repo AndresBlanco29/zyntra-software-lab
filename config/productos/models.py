@@ -504,3 +504,81 @@ class ConfiguracionDescuentos(models.Model):
 
     def __str__(self):
         return _("Discount configuration")
+
+
+class Promocion(models.Model):
+    TIPO_PERCENT = 'PERCENT'
+    TIPO_FIXED = 'FIXED'
+    TIPO_BENEFICIO_CHOICES = (
+        (TIPO_PERCENT, _('Percentage')),
+        (TIPO_FIXED, _('Fixed dollars')),
+    )
+
+    nombre = models.CharField(max_length=150, verbose_name=_('Name'))
+    descripcion = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name=_('Customer description'),
+        help_text=_('Short text shown in the catalog, e.g. "Buy 10 cases and get 15% off".'),
+    )
+    producto = models.ForeignKey(
+        Producto,
+        on_delete=models.CASCADE,
+        related_name='promociones',
+        verbose_name=_('Product'),
+    )
+    presentacion = models.ForeignKey(
+        Presentacion,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='promociones',
+        verbose_name=_('Presentation'),
+        help_text=_('Leave empty to apply to any presentation of the product.'),
+    )
+    cantidad_minima = models.PositiveIntegerField(
+        default=1,
+        verbose_name=_('Minimum quantity'),
+    )
+    tipo_beneficio = models.CharField(
+        max_length=10,
+        choices=TIPO_BENEFICIO_CHOICES,
+        default=TIPO_PERCENT,
+        verbose_name=_('Benefit type'),
+    )
+    valor_beneficio = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        verbose_name=_('Benefit value'),
+        help_text=_('Percentage (e.g. 15) or dollars per unit (e.g. 2.00), depending on type.'),
+    )
+    fecha_inicio = models.DateTimeField(null=True, blank=True, verbose_name=_('Start date'))
+    fecha_fin = models.DateTimeField(null=True, blank=True, verbose_name=_('End date'))
+    activa = models.BooleanField(default=True, verbose_name=_('Active'))
+    creada_en = models.DateTimeField(auto_now_add=True)
+    actualizada_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = _('Promotion')
+        verbose_name_plural = _('Promotions')
+        ordering = ['-activa', '-creada_en']
+
+    def __str__(self):
+        return self.nombre
+
+    def clean(self):
+        if self.cantidad_minima is None or self.cantidad_minima < 1:
+            raise ValidationError({'cantidad_minima': _('Minimum quantity must be at least 1.')})
+        valor = _quantize_money(self.valor_beneficio or 0)
+        if valor <= 0:
+            raise ValidationError({'valor_beneficio': _('Benefit value must be greater than zero.')})
+        if self.tipo_beneficio == self.TIPO_PERCENT and valor > Decimal('100'):
+            raise ValidationError({'valor_beneficio': _('Percentage benefit cannot exceed 100.')})
+        self.valor_beneficio = valor
+        if self.presentacion_id and self.producto_id and self.presentacion.producto_id != self.producto_id:
+            raise ValidationError({'presentacion': _('The presentation must belong to the selected product.')})
+        if self.fecha_inicio and self.fecha_fin and self.fecha_fin < self.fecha_inicio:
+            raise ValidationError({'fecha_fin': _('End date cannot be earlier than start date.')})
+
+    def texto_catalogo(self):
+        return (self.descripcion or self.nombre or '').strip()

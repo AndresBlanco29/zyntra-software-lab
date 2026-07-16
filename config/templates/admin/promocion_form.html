@@ -1,0 +1,139 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}
+{% if promocion %}{% trans "Edit promotion" %}{% else %}{% trans "Create promotion" %}{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4">
+{% if promocion %}{% trans "Edit promotion" %}{% else %}{% trans "Create promotion" %}{% endif %}
+</h2>
+
+<div class="card shadow-sm">
+<div class="card-body">
+
+{% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+<form method="POST">
+{% csrf_token %}
+
+<div class="mb-3">
+<label class="form-label">{% trans "Name" %}</label>
+<input type="text" name="nombre" class="form-control" value="{{ nombre }}" required maxlength="150">
+</div>
+
+<div class="mb-3">
+<label class="form-label">{% trans "Customer description" %}</label>
+<input type="text" name="descripcion" class="form-control" value="{{ descripcion }}" maxlength="255"
+  placeholder="{% trans 'Buy 10 cases and get 15% off' %}">
+<div class="form-text">{% trans "Shown under the product name in the catalog." %}</div>
+</div>
+
+<div class="row">
+<div class="col-md-6 mb-3">
+<label class="form-label">{% trans "Product" %}</label>
+<select name="producto" id="promoProducto" class="form-select" required>
+<option value="">{% trans "Select product" %}</option>
+{% for producto in productos %}
+<option value="{{ producto.id }}" {% if producto_id == producto.id|stringformat:"s" %}selected{% endif %}>
+{{ producto.nombre }}
+</option>
+{% endfor %}
+</select>
+</div>
+<div class="col-md-6 mb-3">
+<label class="form-label">{% trans "Presentation (optional)" %}</label>
+<select name="presentacion" id="promoPresentacion" class="form-select">
+<option value="">{% trans "Any presentation" %}</option>
+{% for presentacion in presentaciones %}
+<option
+  value="{{ presentacion.id }}"
+  data-producto="{{ presentacion.producto_id }}"
+  {% if presentacion_id == presentacion.id|stringformat:"s" %}selected{% endif %}
+>
+{{ presentacion.producto.nombre }} — {{ presentacion.nombre }}
+</option>
+{% endfor %}
+</select>
+</div>
+</div>
+
+<div class="row">
+<div class="col-md-4 mb-3">
+<label class="form-label">{% trans "Minimum quantity" %}</label>
+<input type="number" name="cantidad_minima" class="form-control" min="1" step="1" value="{{ cantidad_minima }}" required>
+</div>
+<div class="col-md-4 mb-3">
+<label class="form-label">{% trans "Benefit type" %}</label>
+<select name="tipo_beneficio" class="form-select" required>
+{% for value, label in tipos_beneficio %}
+<option value="{{ value }}" {% if tipo_beneficio == value %}selected{% endif %}>{{ label }}</option>
+{% endfor %}
+</select>
+</div>
+<div class="col-md-4 mb-3">
+<label class="form-label">{% trans "Benefit value" %}</label>
+<input type="number" name="valor_beneficio" class="form-control" min="0.01" step="0.01" value="{{ valor_beneficio }}" required>
+<div class="form-text">{% trans "Percent or dollars per unit." %}</div>
+</div>
+</div>
+
+<div class="row">
+<div class="col-md-6 mb-3">
+<label class="form-label">{% trans "Start date (optional)" %}</label>
+<input type="datetime-local" name="fecha_inicio" class="form-control" value="{{ fecha_inicio }}">
+</div>
+<div class="col-md-6 mb-3">
+<label class="form-label">{% trans "End date (optional)" %}</label>
+<input type="datetime-local" name="fecha_fin" class="form-control" value="{{ fecha_fin }}">
+</div>
+</div>
+
+<div class="form-check mb-4">
+<input type="checkbox" name="activa" value="1" class="form-check-input" id="promoActiva" {% if activa %}checked{% endif %}>
+<label class="form-check-label" for="promoActiva">{% trans "Active" %}</label>
+</div>
+
+<div class="d-flex gap-2">
+<button type="submit" class="btn btn-success">
+{% if promocion %}{% trans "Save changes" %}{% else %}{% trans "Create promotion" %}{% endif %}
+</button>
+<a href="{% url 'lista_promociones' %}" class="btn btn-secondary">{% trans "Cancel" %}</a>
+</div>
+
+</form>
+
+</div>
+</div>
+
+<script>
+(function () {
+  const productSelect = document.getElementById('promoProducto');
+  const presentationSelect = document.getElementById('promoPresentacion');
+  if (!productSelect || !presentationSelect) return;
+
+  function filterPresentations() {
+    const productId = productSelect.value;
+    Array.from(presentationSelect.options).forEach(function (option) {
+      if (!option.value) {
+        option.hidden = false;
+        return;
+      }
+      const match = !productId || option.dataset.producto === productId;
+      option.hidden = !match;
+      if (!match && option.selected) {
+        presentationSelect.value = '';
+      }
+    });
+  }
+
+  productSelect.addEventListener('change', filterPresentations);
+  filterPresentations();
+})();
+</script>
+
+{% endblock %}

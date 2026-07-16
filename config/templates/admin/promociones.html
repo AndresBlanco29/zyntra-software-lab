@@ -1,0 +1,96 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}
+{% trans "Promotions" %}
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4 admin-toolbar">
+<span>{% trans "Promotions" %}</span>
+</h2>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+<a href="{% url 'crear_promocion' %}" class="btn btn-primary">
+{% trans "Create promotion" %}
+</a>
+<a href="{% url 'lista_productos' %}" class="btn btn-secondary">
+{% trans "Back to Products" %}
+</a>
+</div>
+
+<div class="table-responsive">
+<table class="table table-striped align-middle">
+<thead>
+<tr>
+<th>{% trans "Name" %}</th>
+<th>{% trans "Product" %}</th>
+<th>{% trans "Presentation" %}</th>
+<th>{% trans "Min. qty" %}</th>
+<th>{% trans "Benefit" %}</th>
+<th>{% trans "Validity" %}</th>
+<th>{% trans "Status" %}</th>
+<th>{% trans "Actions" %}</th>
+</tr>
+</thead>
+<tbody>
+{% for promo in promociones %}
+<tr>
+<td>
+<div class="fw-semibold">{{ promo.nombre }}</div>
+{% if promo.descripcion %}
+<div class="small text-muted">{{ promo.descripcion }}</div>
+{% endif %}
+</td>
+<td>{{ promo.producto.nombre }}</td>
+<td>
+{% if promo.presentacion %}
+{{ promo.presentacion.nombre }}
+{% else %}
+<span class="text-muted">{% trans "Any presentation" %}</span>
+{% endif %}
+</td>
+<td>{{ promo.cantidad_minima }}</td>
+<td>
+{% if promo.tipo_beneficio == 'PERCENT' %}
+{{ promo.valor_beneficio }}%
+{% else %}
+${{ promo.valor_beneficio }}
+{% endif %}
+</td>
+<td class="small">
+{% if promo.fecha_inicio or promo.fecha_fin %}
+{% if promo.fecha_inicio %}{{ promo.fecha_inicio|date:"Y-m-d H:i" }}{% else %}—{% endif %}
+→
+{% if promo.fecha_fin %}{{ promo.fecha_fin|date:"Y-m-d H:i" }}{% else %}—{% endif %}
+{% else %}
+<span class="text-muted">{% trans "No date limit" %}</span>
+{% endif %}
+</td>
+<td>
+{% if promo.activa %}
+<span class="badge bg-success">{% trans "Active" %}</span>
+{% else %}
+<span class="badge bg-secondary">{% trans "Inactive" %}</span>
+{% endif %}
+</td>
+<td class="text-nowrap">
+<a href="{% url 'editar_promocion' promo.id %}" class="btn btn-sm btn-outline-primary">{% trans "Edit" %}</a>
+{% if promo.activa %}
+<a href="{% url 'desactivar_promocion' promo.id %}" class="btn btn-sm btn-outline-warning">{% trans "Deactivate" %}</a>
+{% else %}
+<a href="{% url 'activar_promocion' promo.id %}" class="btn btn-sm btn-outline-success">{% trans "Activate" %}</a>
+{% endif %}
+</td>
+</tr>
+{% empty %}
+<tr>
+<td colspan="8" class="text-muted text-center py-4">{% trans "No promotions yet." %}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+
+{% endblock %}

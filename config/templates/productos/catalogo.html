@@ -201,6 +201,13 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                                 data-categoria="{{ producto.categoria.id|default:'' }}"
                                 data-marca="{{ producto.marca.id }}">
 
+                                {% if producto.promocion_activa %}
+                                <div class="promo-badge" title="{{ producto.promocion_texto }}">
+                                    <i class="bi bi-star-fill" aria-hidden="true"></i>
+                                    {% trans "Promotion" %}
+                                </div>
+                                {% endif %}
+
                                 {% if producto.imagen %}
                                     <img
                                         src="{{ producto.imagen.url }}"
@@ -212,6 +219,12 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                                 <div class="product-name">
                                     {{ producto.nombre_traducido }}
                                 </div>
+
+                                {% if producto.promocion_texto %}
+                                <div class="promo-detail mb-2">
+                                    {{ producto.promocion_texto }}
+                                </div>
+                                {% endif %}
 
                                 <div class="units-text mb-2 info-presentacion">
                                 {% if producto.primera_presentacion %}

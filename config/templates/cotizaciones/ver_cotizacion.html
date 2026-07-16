@@ -139,6 +139,11 @@ style="width:45px;height:45px;object-fit:contain;">
 {% endif %}
 
 <span class="fw-bold">{{ item.producto.nombre_traducido }}</span>
+{% if item.descuento_origen == 'promocion' and item.descuento_aplicado %}
+<span class="badge text-bg-warning mt-1 d-inline-block">
+{% trans "Promo applied" %}: {{ item.promocion_descripcion|default:item.promocion_nombre }}
+</span>
+{% endif %}
 
 </div>
 </td>

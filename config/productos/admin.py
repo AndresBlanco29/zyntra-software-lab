@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.core.exceptions import ValidationError
-from .models import Producto, Presentacion, Categoria, Marca, ConfiguracionPrecios, ConfiguracionDescuentos
+from .models import Producto, Presentacion, Categoria, Marca, ConfiguracionPrecios, ConfiguracionDescuentos, Promocion
 
 
 class PresentacionInline(admin.TabularInline):
@@ -110,3 +110,20 @@ class ConfiguracionDescuentosAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(Promocion)
+class PromocionAdmin(admin.ModelAdmin):
+    list_display = (
+        'nombre',
+        'producto',
+        'presentacion',
+        'cantidad_minima',
+        'tipo_beneficio',
+        'valor_beneficio',
+        'activa',
+        'fecha_inicio',
+        'fecha_fin',
+    )
+    list_filter = ('activa', 'tipo_beneficio')
+    search_fields = ('nombre', 'descripcion', 'producto__nombre')

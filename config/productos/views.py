@@ -12,8 +12,10 @@ from .models import (
     Presentacion,
     ConfiguracionPrecios,
     ConfiguracionDescuentos,
+    Promocion,
     normalize_codigo_barras,
 )
+from .promotions import adjuntar_promociones_a_productos
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 from django.contrib import messages
@@ -439,7 +441,7 @@ def catalogo(request):
     filter_params = _catalogo_public_filter_params(request)
     paginator = Paginator(_catalogo_public_productos_queryset(request), CATALOGO_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get('page'))
-    productos = _hydrate_productos(list(page_obj.object_list))
+    productos = adjuntar_promociones_a_productos(_hydrate_productos(list(page_obj.object_list)))
     categorias = _sort_catalog_categorias(_get_cached_catalogo_categorias())
     marcas = _sort_catalog_marcas(_get_cached_catalogo_marcas())
 
@@ -1034,5 +1036,172 @@ def parse_packaging_from_name(request):
         )
 
     return JsonResponse({"ok": True, "defaults": parsed})
+
+
+def _parse_optional_datetime(value):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    # HTML datetime-local: YYYY-MM-DDTHH:MM
+    from datetime import datetime
+
+    from django.utils import timezone as dj_timezone
+
+    for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            parsed = datetime.strptime(text, fmt)
+            if dj_timezone.is_naive(parsed):
+                return dj_timezone.make_aware(parsed, dj_timezone.get_current_timezone())
+            return parsed
+        except ValueError:
+            continue
+    raise ValidationError(_("Enter a valid date/time."))
+
+
+def _promocion_form_context(promocion=None, *, post=None, error=None):
+    productos = Producto.objects.filter(activo=True).order_by("nombre")
+    presentaciones = Presentacion.objects.select_related("producto").order_by("producto__nombre", "nombre")
+    data = {
+        "nombre": "",
+        "descripcion": "",
+        "producto_id": "",
+        "presentacion_id": "",
+        "cantidad_minima": "1",
+        "tipo_beneficio": Promocion.TIPO_PERCENT,
+        "valor_beneficio": "",
+        "fecha_inicio": "",
+        "fecha_fin": "",
+        "activa": True,
+    }
+    if promocion is not None:
+        data.update({
+            "nombre": promocion.nombre,
+            "descripcion": promocion.descripcion,
+            "producto_id": str(promocion.producto_id),
+            "presentacion_id": str(promocion.presentacion_id or ""),
+            "cantidad_minima": str(promocion.cantidad_minima),
+            "tipo_beneficio": promocion.tipo_beneficio,
+            "valor_beneficio": format(promocion.valor_beneficio, ".2f"),
+            "fecha_inicio": promocion.fecha_inicio.strftime("%Y-%m-%dT%H:%M") if promocion.fecha_inicio else "",
+            "fecha_fin": promocion.fecha_fin.strftime("%Y-%m-%dT%H:%M") if promocion.fecha_fin else "",
+            "activa": promocion.activa,
+        })
+    if post is not None:
+        data.update({
+            "nombre": (post.get("nombre") or "").strip(),
+            "descripcion": (post.get("descripcion") or "").strip(),
+            "producto_id": (post.get("producto") or "").strip(),
+            "presentacion_id": (post.get("presentacion") or "").strip(),
+            "cantidad_minima": (post.get("cantidad_minima") or "1").strip(),
+            "tipo_beneficio": (post.get("tipo_beneficio") or Promocion.TIPO_PERCENT).strip(),
+            "valor_beneficio": (post.get("valor_beneficio") or "").strip(),
+            "fecha_inicio": (post.get("fecha_inicio") or "").strip(),
+            "fecha_fin": (post.get("fecha_fin") or "").strip(),
+            "activa": bool(post.get("activa")),
+        })
+    return {
+        "promocion": promocion,
+        "productos": productos,
+        "presentaciones": presentaciones,
+        "tipos_beneficio": Promocion.TIPO_BENEFICIO_CHOICES,
+        "error": error,
+        **data,
+    }
+
+
+def _build_promocion_from_post(post, promocion=None):
+    promocion = promocion or Promocion()
+    promocion.nombre = (post.get("nombre") or "").strip()
+    promocion.descripcion = (post.get("descripcion") or "").strip()
+    producto_id = (post.get("producto") or "").strip()
+    presentacion_id = (post.get("presentacion") or "").strip()
+    if not producto_id:
+        raise ValidationError(_("Product is required."))
+    promocion.producto = get_object_or_404(Producto, id=producto_id)
+    promocion.presentacion = get_object_or_404(Presentacion, id=presentacion_id) if presentacion_id else None
+    try:
+        promocion.cantidad_minima = int(post.get("cantidad_minima") or 1)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError(_("Minimum quantity must be a whole number.")) from exc
+    promocion.tipo_beneficio = (post.get("tipo_beneficio") or Promocion.TIPO_PERCENT).strip()
+    if promocion.tipo_beneficio not in {Promocion.TIPO_PERCENT, Promocion.TIPO_FIXED}:
+        raise ValidationError(_("Invalid benefit type."))
+    promocion.valor_beneficio = _parse_decimal(post.get("valor_beneficio"), "0")
+    promocion.fecha_inicio = _parse_optional_datetime(post.get("fecha_inicio"))
+    promocion.fecha_fin = _parse_optional_datetime(post.get("fecha_fin"))
+    promocion.activa = bool(post.get("activa"))
+    promocion.full_clean()
+    return promocion
+
+
+@login_required
+@internal_permission_required("admin.products.view")
+def lista_promociones(request):
+    promociones = (
+        Promocion.objects.select_related("producto", "presentacion")
+        .order_by("-activa", "-creada_en")
+    )
+    return render(request, "admin/promociones.html", {
+        "promociones": promociones,
+    })
+
+
+@login_required
+@internal_permission_required("admin.products.manage")
+def crear_promocion(request):
+    if request.method == "POST":
+        try:
+            promocion = _build_promocion_from_post(request.POST)
+            promocion.save()
+            messages.success(request, _("Promotion created successfully."))
+            return redirect("lista_promociones")
+        except ValidationError as exc:
+            error = exc.messages[0] if getattr(exc, "messages", None) else str(exc)
+            return render(
+                request,
+                "admin/promocion_form.html",
+                _promocion_form_context(post=request.POST, error=error),
+            )
+    return render(request, "admin/promocion_form.html", _promocion_form_context())
+
+
+@login_required
+@internal_permission_required("admin.products.manage")
+def editar_promocion(request, promocion_id):
+    promocion = get_object_or_404(Promocion, id=promocion_id)
+    if request.method == "POST":
+        try:
+            promocion = _build_promocion_from_post(request.POST, promocion=promocion)
+            promocion.save()
+            messages.success(request, _("Promotion updated successfully."))
+            return redirect("lista_promociones")
+        except ValidationError as exc:
+            error = exc.messages[0] if getattr(exc, "messages", None) else str(exc)
+            return render(
+                request,
+                "admin/promocion_form.html",
+                _promocion_form_context(promocion, post=request.POST, error=error),
+            )
+    return render(request, "admin/promocion_form.html", _promocion_form_context(promocion))
+
+
+@login_required
+@internal_permission_required("admin.products.manage")
+def desactivar_promocion(request, promocion_id):
+    promocion = get_object_or_404(Promocion, id=promocion_id)
+    promocion.activa = False
+    promocion.save(update_fields=["activa", "actualizada_en"])
+    messages.success(request, _("Promotion deactivated."))
+    return redirect("lista_promociones")
+
+
+@login_required
+@internal_permission_required("admin.products.manage")
+def activar_promocion(request, promocion_id):
+    promocion = get_object_or_404(Promocion, id=promocion_id)
+    promocion.activa = True
+    promocion.save(update_fields=["activa", "actualizada_en"])
+    messages.success(request, _("Promotion activated."))
+    return redirect("lista_promociones")
 
 

@@ -32,6 +32,7 @@ from config.pedidos.services import (
     notificar_cliente_pedido,
 )
 from config.productos.models import ConfiguracionDescuentos, ConfiguracionPrecios, Presentacion
+from config.productos.promotions import aplicar_promocion_en_item_sesion
 from config.usuarios.permissions import internal_permission_required, user_has_permission
 
 from .models import Cotizacion, CotizacionItem
@@ -419,6 +420,14 @@ def agregar_a_cotizacion(request):
 
         presentacion = Presentacion.objects.get(id=presentacion_id)
         producto = presentacion.producto
+        cliente = None
+        if getattr(request.user, 'is_authenticated', False):
+            cliente = Cliente.objects.filter(usuario=request.user).first()
+        precio = _quote_item_price_for_customer(
+            cliente=cliente,
+            presentacion=presentacion,
+            session_price=0,
+        )
 
         carrito = request.session.get("carrito", {})
 
@@ -426,13 +435,17 @@ def agregar_a_cotizacion(request):
 
         if key in carrito:
             carrito[key]["cantidad"] += cantidad
+            carrito[key]["precio"] = float(precio)
         else:
             carrito[key] = {
                 "producto_id": producto.id,
                 "presentacion_id": presentacion.id,
                 "nombre": producto.nombre,
-                "cantidad": cantidad
+                "cantidad": cantidad,
+                "precio": float(precio),
             }
+
+        aplicar_promocion_en_item_sesion(carrito[key], precio_unitario=precio)
 
         request.session["carrito"] = carrito
 
@@ -449,8 +462,10 @@ def ver_cotizacion(request):
 
     carrito_session = request.session.get("carrito", {})
     carrito = []
+    cliente = _cliente_from_user(request.user)
+    dirty = False
 
-    for presentacion_id, item in carrito_session.items():
+    for presentacion_id, item in list(carrito_session.items()):
 
         try:
             presentacion = Presentacion.objects.get(id=presentacion_id)
@@ -458,17 +473,36 @@ def ver_cotizacion(request):
             continue
 
         producto = presentacion.producto
+        precio = _quote_item_price_for_customer(
+            cliente=cliente,
+            presentacion=presentacion,
+            session_price=item.get("precio", 0),
+        )
+        item["producto_id"] = producto.id
+        item["presentacion_id"] = presentacion.id
+        item["precio"] = float(precio)
+        aplicar_promocion_en_item_sesion(item, precio_unitario=precio)
+        carrito_session[presentacion_id] = item
+        dirty = True
 
         carrito.append({
             "id": presentacion_id,
             "producto": producto,
             "presentacion": presentacion,
             "cantidad": item["cantidad"],
+            "descuento_aplicado": bool(item.get("descuento_aplicado")),
+            "descuento_monto": item.get("descuento_monto", 0),
+            "descuento_origen": item.get("descuento_origen") or "",
+            "promocion_nombre": item.get("promocion_nombre") or "",
+            "promocion_descripcion": item.get("promocion_descripcion") or "",
         })
+
+    if dirty:
+        request.session["carrito"] = carrito_session
 
     return render(request, "cotizaciones/ver_cotizacion.html", {
         "carrito": carrito,
-        "pendientes_cotizaciones": _cotizaciones_pendientes_cliente(_cliente_from_user(request.user)),
+        "pendientes_cotizaciones": _cotizaciones_pendientes_cliente(cliente),
     })
 
 
@@ -521,14 +555,27 @@ def guardar_cotizacion(request):
             presentacion=presentacion,
             session_price=item.get("precio", 0),
         )
-        subtotal = precio * cantidad
+        item["producto_id"] = presentacion.producto_id
+        item["presentacion_id"] = presentacion.id
+        item["cantidad"] = cantidad
+        aplicar_promocion_en_item_sesion(item, precio_unitario=precio)
+        descuento_aplicado = bool(item.get("descuento_aplicado"))
+        descuento_monto = _parse_decimal(item.get("descuento_monto", 0), 0) if descuento_aplicado else Decimal('0.00')
+        subtotal = calcular_subtotal_item_pedido(
+            precio=precio,
+            cantidad=cantidad,
+            descuento_aplicado=descuento_aplicado,
+            descuento_monto=descuento_monto,
+        )
 
         CotizacionItem.objects.create(
             cotizacion=cotizacion,
             presentacion=presentacion,
             cantidad=cantidad,
             precio=precio,
-            subtotal=subtotal
+            subtotal=subtotal,
+            descuento_aplicado=descuento_aplicado,
+            descuento_monto=descuento_monto,
         )
 
         total += subtotal

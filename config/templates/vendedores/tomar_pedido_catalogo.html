@@ -273,6 +273,12 @@ data-marca="{{ producto.marca.id }}"
 data-costo="{{ producto.presentaciones.first.costo|default:'0' }}"
 >
 
+{% if producto.promocion_activa %}
+<div class="promo-badge" title="{{ producto.promocion_texto }}">
+★ {% trans "Promotion" %}
+</div>
+{% endif %}
+
 {% if producto.imagen %}
 
 <img
@@ -288,6 +294,12 @@ alt="{{ producto.nombre }}"
 {{ producto.nombre }}
 
 </div>
+
+{% if producto.promocion_texto %}
+<div class="promo-detail mb-2">
+{{ producto.promocion_texto }}
+</div>
+{% endif %}
 
 
 {% with p=producto.presentaciones.first %}

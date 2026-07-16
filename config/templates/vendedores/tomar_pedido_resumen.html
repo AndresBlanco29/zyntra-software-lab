@@ -246,6 +246,13 @@ La Tortilla Grocery
 
 <td class="fw-bold" data-label="{% trans "Producto" %}">
 {{ item.nombre }}
+{% if item.descuento_origen == 'promocion' and item.descuento_aplicado %}
+<div class="mt-1">
+<span class="badge text-bg-warning">
+{% trans "Promo applied" %}: {{ item.promocion_descripcion|default:item.promocion_nombre }}
+</span>
+</div>
+{% endif %}
 </td>
 
 <td data-label="{% trans "Presentación" %}">

@@ -52,8 +52,16 @@
     entriesMatch: 'Entered payments match the required total.',
     remaining: 'Remaining amount to collect:',
     exceeded: 'Entered payments exceed the required total by',
+    overPaymentCredit: 'Over payment will be credited to the customer balance:',
+    shortPaymentDebt: 'Short payment will remain as pending customer balance:',
     removeIncomingPayments: 'Do not register incoming payments. This delivery results in money due back to the customer.',
   };
+  const overPaymentFields = Array.from(root.querySelectorAll('.over-payment-only'));
+  const shortPaymentFields = Array.from(root.querySelectorAll('.short-payment-only'));
+  const motivoOverPayment = root.querySelector('#motivoOverPayment');
+  const motivoShortPayment = root.querySelector('#motivoShortPayment');
+  const overPaymentDifferenceHelp = root.querySelector('#overPaymentDifferenceHelp');
+  const shortPaymentDifferenceHelp = root.querySelector('#shortPaymentDifferenceHelp');
 
   function formatMoney(value) {
     return `$${Number(value || 0).toFixed(2)}`;
@@ -79,41 +87,86 @@
     return baseBalance - getDriverDraftCreditAmount() + getDriverDraftDebitAmount();
   }
 
+  function togglePaymentDifferenceFields(requiredAmount, totalEntered, isPaid) {
+    const difference = Number((totalEntered - requiredAmount).toFixed(2));
+    const isOver = isPaid && requiredAmount > 0 && difference > 0.004;
+    const isShort = isPaid && requiredAmount > 0 && difference < -0.004;
+    overPaymentFields.forEach((element) => element.classList.toggle('d-none', !isOver));
+    shortPaymentFields.forEach((element) => element.classList.toggle('d-none', !isShort));
+    if (motivoOverPayment) {
+      motivoOverPayment.required = isOver;
+      if (!isOver) motivoOverPayment.value = '';
+    }
+    if (motivoShortPayment) {
+      motivoShortPayment.required = isShort;
+      if (!isShort) motivoShortPayment.value = '';
+    }
+    if (overPaymentDifferenceHelp) {
+      overPaymentDifferenceHelp.textContent = isOver
+        ? `${paymentStrings.overPaymentCredit} ${formatMoney(difference)}.`
+        : '';
+    }
+    if (shortPaymentDifferenceHelp) {
+      shortPaymentDifferenceHelp.textContent = isShort
+        ? `${paymentStrings.shortPaymentDebt} ${formatMoney(Math.abs(difference))}.`
+        : '';
+    }
+    if (!isShort) {
+      const shortEvidenceInput = root.querySelector('input[name="short_payment_evidence"]');
+      if (shortEvidenceInput) {
+        shortEvidenceInput.value = '';
+        shortEvidenceInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+  }
+
   function updatePaymentEntriesValidation(requiredAmount, signedDelta) {
     if (!paymentEntriesFeedback) return;
     const totalEntered = paymentEntryAmounts.reduce((sum, input) => sum + Number(input.value || '0'), 0);
-    paymentEntriesFeedback.classList.remove('text-danger', 'text-success', 'text-muted');
+    paymentEntriesFeedback.classList.remove('text-danger', 'text-success', 'text-muted', 'text-warning');
     paymentEntryAmounts.forEach((input) => input.classList.remove('is-invalid', 'is-valid'));
-    if (!paymentStatus || paymentStatus.value !== 'PAGADO') {
+    const isPaid = paymentStatus && paymentStatus.value === 'PAGADO';
+    if (!isPaid) {
       paymentEntriesFeedback.textContent = '';
+      togglePaymentDifferenceFields(requiredAmount, totalEntered, false);
       return;
     }
     if (signedDelta < 0) {
       paymentEntriesFeedback.textContent = paymentStrings.removeIncomingPayments;
       paymentEntriesFeedback.classList.add(totalEntered > 0 ? 'text-danger' : 'text-muted');
+      togglePaymentDifferenceFields(requiredAmount, totalEntered, false);
       return;
     }
     if (requiredAmount === 0) {
       paymentEntriesFeedback.textContent = paymentStrings.noPaymentRequired;
       paymentEntriesFeedback.classList.add(totalEntered > 0 ? 'text-danger' : 'text-muted');
+      togglePaymentDifferenceFields(requiredAmount, totalEntered, false);
       return;
     }
     if (Math.abs(totalEntered - requiredAmount) < 0.005) {
       paymentEntriesFeedback.textContent = paymentStrings.entriesMatch;
       paymentEntriesFeedback.classList.add('text-success');
+      paymentEntryAmounts.forEach((input) => {
+        if (Number(input.value || '0') > 0) input.classList.add('is-valid');
+      });
+      togglePaymentDifferenceFields(requiredAmount, totalEntered, true);
       return;
     }
     paymentEntriesFeedback.textContent = totalEntered > requiredAmount
       ? `${paymentStrings.exceeded} ${formatMoney(totalEntered - requiredAmount)}.`
       : `${paymentStrings.remaining} ${formatMoney(requiredAmount - totalEntered)}.`;
-    paymentEntriesFeedback.classList.add('text-danger');
+    paymentEntriesFeedback.classList.add('text-warning');
+    paymentEntryAmounts.forEach((input) => {
+      if (Number(input.value || '0') > 0) input.classList.add('is-valid');
+    });
+    togglePaymentDifferenceFields(requiredAmount, totalEntered, true);
   }
 
   function updatePaymentAmountSuggestion() {
     if (!paymentAmountInput) return;
     const signedDelta = getSignedPaymentDelta();
     const suggestedAmount = Math.max(signedDelta, 0);
-    paymentAmountInput.max = suggestedAmount.toFixed(2);
+    paymentAmountInput.removeAttribute('max');
     paymentAmountInput.readOnly = true;
     paymentAmountInput.value = suggestedAmount.toFixed(2);
     paymentAmountInput.dataset.requiredAmount = suggestedAmount.toFixed(2);
@@ -220,6 +273,9 @@
       if (!isPaid) {
         receivedByInput.value = '';
       }
+    }
+    if (!isPaid) {
+      togglePaymentDifferenceFields(0, 0, false);
     }
     updatePaymentAmountSuggestion();
     togglePaymentEntryFields();

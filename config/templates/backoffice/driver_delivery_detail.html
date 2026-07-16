@@ -648,6 +648,22 @@
         <div class="driver-summary-value">${{ delivery.invoice.saldo_cliente }}</div>
       </div>
     </div>
+    {% if delivery.is_completed and delivery.over_payment_amount > 0 %}
+    <div class="alert alert-success small mt-3 mb-0">
+      <strong>{% trans "Over Payment" %}:</strong> ${{ delivery.over_payment_amount }}
+      — {{ delivery.motivo_over_payment }}
+    </div>
+    {% elif delivery.is_completed and delivery.short_payment_amount > 0 %}
+    <div class="alert alert-warning small mt-3 mb-0">
+      <strong>{% trans "Short Payment" %}:</strong> ${{ delivery.short_payment_amount }}
+      — {{ delivery.motivo_short_payment }}
+      {% if delivery.short_payment_evidence %}
+      <div class="mt-2">
+        <a href="{{ delivery.short_payment_evidence.url }}" target="_blank" rel="noopener">{% trans "View short payment evidence" %}</a>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
     <div class="row g-3 mb-3">
       <div class="col-12 col-md-4"><div class="text-muted small">{% trans "Estimated delivery" %}</div><div>{% if delivery.estimated_delivery_at %}{{ delivery.estimated_delivery_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</div></div>
       <div class="col-12 col-md-4"><div class="text-muted small">{% trans "Started" %}</div><div>{% if delivery.route_started_at %}{{ delivery.route_started_at|date:"m/d/Y H:i" }}{% else %}-{% endif %}</div></div>
@@ -924,6 +940,21 @@
             <div class="col-12 unpaid-only d-none">
               <label class="form-label fw-semibold form-label-required">{% trans "Reason for non-payment" %}</label>
               <textarea name="motivo_no_pago" class="form-control" rows="3"></textarea>
+            </div>
+
+            <div class="col-12 paid-only over-payment-only d-none" id="overPaymentReasonWrapper">
+              <label class="form-label fw-semibold form-label-required">{% trans "Over Payment Reason" %}</label>
+              <textarea name="motivo_over_payment" id="motivoOverPayment" class="form-control" rows="3"></textarea>
+              <div class="form-text" id="overPaymentDifferenceHelp"></div>
+            </div>
+
+            <div class="col-12 paid-only short-payment-only d-none" id="shortPaymentReasonWrapper">
+              <label class="form-label fw-semibold form-label-required">{% trans "Short Payment Reason" %}</label>
+              <textarea name="motivo_short_payment" id="motivoShortPayment" class="form-control" rows="3"></textarea>
+              <div class="form-text" id="shortPaymentDifferenceHelp"></div>
+              <label class="form-label fw-semibold mt-3">{% trans "Short payment evidence photo" %}</label>
+              {% blocktrans asvar short_payment_photo_help %}Optional photo of the receipt, signed document or other support for the short payment.{% endblocktrans %}
+              {% include "backoffice/includes/camera_upload_field.html" with input_name="short_payment_evidence" single=True status_text=short_payment_photo_help %}
             </div>
           </div>
         </div>
@@ -1288,8 +1319,16 @@
       entriesMatch: '{% trans "Entered payments match the required total." %}',
       remaining: '{% trans "Remaining amount to collect:" %}',
       exceeded: '{% trans "Entered payments exceed the required total by" %}',
+      overPaymentCredit: '{% trans "Over payment will be credited to the customer balance:" %}',
+      shortPaymentDebt: '{% trans "Short payment will remain as pending customer balance:" %}',
       removeIncomingPayments: '{% trans "Do not register incoming payments. This delivery results in money due back to the customer." %}',
     };
+    const overPaymentFields = Array.from(document.querySelectorAll('.over-payment-only'));
+    const shortPaymentFields = Array.from(document.querySelectorAll('.short-payment-only'));
+    const motivoOverPayment = document.getElementById('motivoOverPayment');
+    const motivoShortPayment = document.getElementById('motivoShortPayment');
+    const overPaymentDifferenceHelp = document.getElementById('overPaymentDifferenceHelp');
+    const shortPaymentDifferenceHelp = document.getElementById('shortPaymentDifferenceHelp');
 
     function formatMoney(value) {
       return `$${Number(value || 0).toFixed(2)}`;
@@ -1312,6 +1351,9 @@
         if (!isPaid) {
           receivedByInput.value = '';
         }
+      }
+      if (!isPaid) {
+        togglePaymentDifferenceFields(0, 0, false);
       }
       updatePaymentAmountSuggestion();
       togglePaymentEntryFields();
@@ -1357,16 +1399,51 @@
       return baseBalance - getDriverDraftCreditAmount() + getDriverDraftDebitAmount();
     }
 
+    function togglePaymentDifferenceFields(requiredAmount, totalEntered, isPaid) {
+      const difference = Number((totalEntered - requiredAmount).toFixed(2));
+      const isOver = isPaid && requiredAmount > 0 && difference > 0.004;
+      const isShort = isPaid && requiredAmount > 0 && difference < -0.004;
+      overPaymentFields.forEach((element) => element.classList.toggle('d-none', !isOver));
+      shortPaymentFields.forEach((element) => element.classList.toggle('d-none', !isShort));
+      if (motivoOverPayment) {
+        motivoOverPayment.required = isOver;
+        if (!isOver) motivoOverPayment.value = '';
+      }
+      if (motivoShortPayment) {
+        motivoShortPayment.required = isShort;
+        if (!isShort) motivoShortPayment.value = '';
+      }
+      if (overPaymentDifferenceHelp) {
+        overPaymentDifferenceHelp.textContent = isOver
+          ? `${paymentStrings.overPaymentCredit} ${formatMoney(difference)}.`
+          : '';
+      }
+      if (shortPaymentDifferenceHelp) {
+        shortPaymentDifferenceHelp.textContent = isShort
+          ? `${paymentStrings.shortPaymentDebt} ${formatMoney(Math.abs(difference))}.`
+          : '';
+      }
+      if (!isShort) {
+        const shortEvidenceInput = document.querySelector('input[name="short_payment_evidence"]');
+        if (shortEvidenceInput) {
+          shortEvidenceInput.value = '';
+          shortEvidenceInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+    }
+
     function updatePaymentEntriesValidation(requiredAmount, signedDelta) {
       if (!paymentEntriesFeedback) {
         return;
       }
       const totalEntered = paymentEntryAmounts.reduce((sum, input) => sum + Number(input.value || '0'), 0);
-      paymentEntriesFeedback.classList.remove('text-danger', 'text-success', 'text-muted');
+      paymentEntriesFeedback.classList.remove('text-danger', 'text-success', 'text-muted', 'text-warning');
       paymentEntryAmounts.forEach((input) => input.classList.remove('is-invalid', 'is-valid'));
 
-      if (!paymentStatus || paymentStatus.value !== 'PAGADO') {
+      const isPaid = paymentStatus && paymentStatus.value === 'PAGADO';
+      if (!isPaid) {
         paymentEntriesFeedback.textContent = '';
+        togglePaymentDifferenceFields(requiredAmount, totalEntered, false);
         return;
       }
 
@@ -1374,6 +1451,7 @@
         paymentEntriesFeedback.textContent = paymentStrings.removeIncomingPayments;
         paymentEntriesFeedback.classList.add(totalEntered > 0 ? 'text-danger' : 'text-muted');
         paymentEntryAmounts.forEach((input) => input.classList.add(totalEntered > 0 ? 'is-invalid' : 'is-valid'));
+        togglePaymentDifferenceFields(requiredAmount, totalEntered, false);
         return;
       }
 
@@ -1381,6 +1459,7 @@
         paymentEntriesFeedback.textContent = paymentStrings.noPaymentRequired;
         paymentEntriesFeedback.classList.add(totalEntered > 0 ? 'text-danger' : 'text-muted');
         paymentEntryAmounts.forEach((input) => input.classList.add(totalEntered > 0 ? 'is-invalid' : 'is-valid'));
+        togglePaymentDifferenceFields(requiredAmount, totalEntered, false);
         return;
       }
 
@@ -1392,20 +1471,23 @@
             input.classList.add('is-valid');
           }
         });
+        togglePaymentDifferenceFields(requiredAmount, totalEntered, true);
         return;
       }
 
       if (totalEntered > requiredAmount) {
         paymentEntriesFeedback.textContent = `${paymentStrings.exceeded} ${formatMoney(totalEntered - requiredAmount)}.`;
+        paymentEntriesFeedback.classList.add('text-warning');
       } else {
         paymentEntriesFeedback.textContent = `${paymentStrings.remaining} ${formatMoney(requiredAmount - totalEntered)}.`;
+        paymentEntriesFeedback.classList.add('text-warning');
       }
-      paymentEntriesFeedback.classList.add('text-danger');
       paymentEntryAmounts.forEach((input) => {
         if (Number(input.value || '0') > 0) {
-          input.classList.add('is-invalid');
+          input.classList.add('is-valid');
         }
       });
+      togglePaymentDifferenceFields(requiredAmount, totalEntered, true);
     }
 
     function updatePaymentAmountSuggestion() {
@@ -1414,7 +1496,7 @@
       }
       const signedDelta = getSignedPaymentDelta();
       const suggestedAmount = Math.max(signedDelta, 0);
-      paymentAmountInput.max = suggestedAmount.toFixed(2);
+      paymentAmountInput.removeAttribute('max');
       paymentAmountInput.readOnly = true;
       paymentAmountInput.value = suggestedAmount.toFixed(2);
       paymentAmountInput.dataset.requiredAmount = suggestedAmount.toFixed(2);

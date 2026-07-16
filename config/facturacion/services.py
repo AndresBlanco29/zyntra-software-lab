@@ -321,7 +321,9 @@ def _operational_open_invoice_outstanding_queryset(*, cliente):
 		estado='GENERADA',
 		saldo_cliente__gt=0,
 	).filter(
-		Q(metodo_entrega='CUSTOMER_PICK_UP') | Q(delivery__estado_pago='NO_PAGADO')
+		Q(metodo_entrega='CUSTOMER_PICK_UP')
+		| Q(delivery__estado_pago='NO_PAGADO')
+		| Q(delivery__estado_pago='PAGADO', delivery__short_payment_amount__gt=0)
 	)
 
 
@@ -346,6 +348,8 @@ def _invoice_operational_outstanding(invoice):
 	delivery = getattr(invoice, 'delivery', None)
 	if delivery is not None and delivery.estado_pago == 'NO_PAGADO':
 		return outstanding
+	if delivery is not None and delivery.estado_pago == 'PAGADO' and _quantize_money(delivery.short_payment_amount) > 0:
+		return outstanding
 	return Decimal('0.00')
 
 
@@ -363,7 +367,11 @@ def annotate_clientes_open_invoice_balance(queryset):
 			estado='GENERADA',
 			saldo_cliente__gt=0,
 		)
-		.filter(Q(metodo_entrega='CUSTOMER_PICK_UP') | Q(delivery__estado_pago='NO_PAGADO'))
+		.filter(
+			Q(metodo_entrega='CUSTOMER_PICK_UP')
+			| Q(delivery__estado_pago='NO_PAGADO')
+			| Q(delivery__estado_pago='PAGADO', delivery__short_payment_amount__gt=0)
+		)
 		.values('cliente_id')
 		.annotate(total=Sum('saldo_cliente'))
 		.values('total')
@@ -508,6 +516,15 @@ def _finalize_delivery_completion(
 	delivery.monto_pagado_cheque = payment_details['monto_pagado_cheque'] if payment_details else Decimal('0.00')
 	delivery.recibido_por = recibido_por
 	delivery.motivo_no_pago = motivo_no_pago if estado_pago == 'NO_PAGADO' else ''
+	delivery.motivo_over_payment = payment_details['motivo_over_payment'] if payment_details else ''
+	delivery.motivo_short_payment = payment_details['motivo_short_payment'] if payment_details else ''
+	delivery.over_payment_amount = payment_details['over_payment_amount'] if payment_details else Decimal('0.00')
+	delivery.short_payment_amount = payment_details['short_payment_amount'] if payment_details else Decimal('0.00')
+	delivery.payment_balance_delta = payment_details['payment_balance_delta'] if payment_details else Decimal('0.00')
+	if payment_details and payment_details.get('short_payment_evidence') is not None:
+		delivery.short_payment_evidence = payment_details['short_payment_evidence']
+	elif not payment_details:
+		delivery.short_payment_evidence = None
 	delivery.notas_driver = (payload.get('notas_driver') or payload.get('notas_pickup') or '').strip()
 	delivery.firma_cliente = signature_file
 	delivery.firma_recibida_en = timezone.now()
@@ -558,6 +575,9 @@ def _finalize_delivery_completion(
 			payment_entry['cheque_imagen'] = _rewind_uploaded_file(payment_entry.get('cheque_imagen'))
 			DeliveryPayment.objects.create(delivery=delivery, **payment_entry)
 	_recalculate_invoice_balances(delivery.invoice)
+	balance_delta = payment_details['payment_balance_delta'] if payment_details else Decimal('0.00')
+	if balance_delta:
+		_apply_customer_balance_delta(cliente=delivery.invoice.cliente, delta=balance_delta)
 	for normalized_file in evidence_files:
 		DeliveryEvidencePhoto.objects.create(delivery=delivery, image=normalized_file)
 
@@ -978,6 +998,12 @@ def _empty_driver_payment_details():
 		'zelle_remitente': '',
 		'ach_referencia': '',
 		'ach_cuenta_ultimos_4': '',
+		'motivo_over_payment': '',
+		'motivo_short_payment': '',
+		'over_payment_amount': Decimal('0.00'),
+		'short_payment_amount': Decimal('0.00'),
+		'payment_balance_delta': Decimal('0.00'),
+		'short_payment_evidence': None,
 	}
 
 
@@ -1149,10 +1175,32 @@ def _resolve_driver_delivery_payment(*, payload, collectible_balance, payment_de
 		raise ValidationError(_('This delivery does not require collecting payment from the customer.'))
 	if collectible_balance > 0 and total_paid <= 0:
 		raise ValidationError(_('Paid deliveries must include a payment amount greater than zero.'))
-	if total_paid > collectible_balance:
-		raise ValidationError(_('The paid amount cannot exceed the customer balance.'))
-	if total_paid < collectible_balance:
-		raise ValidationError(_('The total paid amount must exactly match the amount due from the customer.'))
+
+	motivo_over_payment = (payload.get('motivo_over_payment') or '').strip()
+	motivo_short_payment = (payload.get('motivo_short_payment') or '').strip()
+	short_payment_evidence = _normalize_uploaded_file(payment_files.get('short_payment_evidence'))
+	payment_difference = _quantize_money(total_paid - collectible_balance)
+	over_payment_amount = _clamp_non_negative_money(payment_difference)
+	short_payment_amount = _clamp_non_negative_money(-payment_difference)
+	payment_balance_delta = Decimal('0.00')
+
+	if over_payment_amount > 0:
+		if not motivo_over_payment:
+			raise ValidationError(_('Over Payment Reason is required when the paid amount exceeds the invoice total.'))
+		motivo_short_payment = ''
+		short_payment_evidence = None
+		# Excess becomes customer credit (negative balance).
+		payment_balance_delta = _quantize_money(-over_payment_amount)
+	elif short_payment_amount > 0:
+		if not motivo_short_payment:
+			raise ValidationError(_('Short Payment Reason is required when the paid amount is less than the invoice total.'))
+		motivo_over_payment = ''
+		# Remaining invoice saldo is the pending debt; no cliente.balance delta (avoids double-count).
+		payment_balance_delta = Decimal('0.00')
+	else:
+		motivo_over_payment = ''
+		motivo_short_payment = ''
+		short_payment_evidence = None
 
 	cheque_entries = [entry for entry in entries if entry['metodo_pago'] == 'CHEQUE']
 	single_entry = entries[0] if len(entries) == 1 else None
@@ -1172,6 +1220,12 @@ def _resolve_driver_delivery_payment(*, payload, collectible_balance, payment_de
 		'zelle_remitente': single_entry['zelle_remitente'] if single_entry else '',
 		'ach_referencia': single_entry['ach_referencia'] if single_entry else '',
 		'ach_cuenta_ultimos_4': single_entry['ach_cuenta_ultimos_4'] if single_entry else '',
+		'motivo_over_payment': motivo_over_payment,
+		'motivo_short_payment': motivo_short_payment,
+		'over_payment_amount': over_payment_amount,
+		'short_payment_amount': short_payment_amount,
+		'payment_balance_delta': payment_balance_delta,
+		'short_payment_evidence': short_payment_evidence,
 	}
 
 
@@ -2031,6 +2085,10 @@ def mark_delivery_unpaid_from_backoffice(*, delivery, backoffice_user, motivo_no
 	if not reason:
 		raise ValidationError(_('A reason is required when marking the delivery as unpaid.'))
 
+	balance_delta_to_reverse = _quantize_money(delivery.payment_balance_delta)
+	if balance_delta_to_reverse:
+		_apply_customer_balance_delta(cliente=delivery.invoice.cliente, delta=-balance_delta_to_reverse)
+
 	delivery.estado_pago = 'NO_PAGADO'
 	delivery.estado = 'ENTREGADA_SIN_PAGO'
 	delivery.metodo_pago = ''
@@ -2038,6 +2096,12 @@ def mark_delivery_unpaid_from_backoffice(*, delivery, backoffice_user, motivo_no
 	delivery.monto_pagado_cash = Decimal('0.00')
 	delivery.monto_pagado_cheque = Decimal('0.00')
 	delivery.motivo_no_pago = reason
+	delivery.motivo_over_payment = ''
+	delivery.motivo_short_payment = ''
+	delivery.over_payment_amount = Decimal('0.00')
+	delivery.short_payment_amount = Decimal('0.00')
+	delivery.payment_balance_delta = Decimal('0.00')
+	delivery.short_payment_evidence = None
 	delivery.transferencia_referencia = ''
 	delivery.tarjeta_ultimos_4 = ''
 	delivery.tarjeta_autorizacion = ''
@@ -2060,6 +2124,12 @@ def mark_delivery_unpaid_from_backoffice(*, delivery, backoffice_user, motivo_no
 		'monto_pagado_cash',
 		'monto_pagado_cheque',
 		'motivo_no_pago',
+		'motivo_over_payment',
+		'motivo_short_payment',
+		'over_payment_amount',
+		'short_payment_amount',
+		'payment_balance_delta',
+		'short_payment_evidence',
 		'transferencia_referencia',
 		'tarjeta_ultimos_4',
 		'tarjeta_autorizacion',

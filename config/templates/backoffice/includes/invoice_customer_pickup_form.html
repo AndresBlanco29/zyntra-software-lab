@@ -582,6 +582,21 @@
           <textarea name="motivo_no_pago" class="form-control" rows="3"></textarea>
         </div>
 
+        <div class="col-12 paid-only over-payment-only d-none" id="overPaymentReasonWrapper">
+          <label class="form-label fw-semibold form-label-required">{% trans "Over Payment Reason" %}</label>
+          <textarea name="motivo_over_payment" id="motivoOverPayment" class="form-control" rows="3"></textarea>
+          <div class="form-text" id="overPaymentDifferenceHelp"></div>
+        </div>
+
+        <div class="col-12 paid-only short-payment-only d-none" id="shortPaymentReasonWrapper">
+          <label class="form-label fw-semibold form-label-required">{% trans "Short Payment Reason" %}</label>
+          <textarea name="motivo_short_payment" id="motivoShortPayment" class="form-control" rows="3"></textarea>
+          <div class="form-text" id="shortPaymentDifferenceHelp"></div>
+          <label class="form-label fw-semibold mt-3">{% trans "Short payment evidence photo" %}</label>
+          {% blocktrans asvar short_payment_photo_help %}Optional photo of the receipt, signed document or other support for the short payment.{% endblocktrans %}
+          {% include "backoffice/includes/camera_upload_field.html" with input_name="short_payment_evidence" single=True status_text=short_payment_photo_help %}
+        </div>
+
         <div class="col-12">
           <label class="form-label fw-semibold">{% trans "Pick up notes" %}</label>
           <textarea name="notas_pickup" class="form-control" rows="2" placeholder="{% trans 'Optional internal notes about this pick up.' %}"></textarea>

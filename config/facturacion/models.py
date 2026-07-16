@@ -243,6 +243,12 @@ class Delivery(models.Model):
 	monto_pagado_cheque = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
 	recibido_por = models.CharField(max_length=160, blank=True)
 	motivo_no_pago = models.TextField(blank=True)
+	motivo_over_payment = models.TextField(blank=True)
+	motivo_short_payment = models.TextField(blank=True)
+	over_payment_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	short_payment_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	payment_balance_delta = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	short_payment_evidence = models.ImageField(upload_to='delivery/short-payment/', blank=True, null=True)
 	notas_driver = models.TextField(blank=True)
 	firma_cliente = models.ImageField(upload_to='delivery/signatures/', blank=True, null=True)
 	firma_recibida_en = models.DateTimeField(blank=True, null=True)
@@ -370,8 +376,11 @@ class Delivery(models.Model):
 				raise ValidationError({'metodo_pago': _('A payment method is required when the delivery is paid.')})
 			if self.monto_pagado <= 0:
 				raise ValidationError({'monto_pagado': _('Paid deliveries must include a payment amount greater than zero.')})
-			if self.monto_pagado > (self.invoice.saldo_cliente if self.invoice_id else Decimal('0.00')):
-				raise ValidationError({'monto_pagado': _('The paid amount cannot exceed the customer balance.')})
+			invoice_balance = self.invoice.saldo_cliente if self.invoice_id else Decimal('0.00')
+			if self.monto_pagado > invoice_balance and not (self.motivo_over_payment or '').strip():
+				raise ValidationError({'motivo_over_payment': _('Over Payment Reason is required when the paid amount exceeds the invoice total.')})
+			if self.monto_pagado < invoice_balance and not (self.motivo_short_payment or '').strip():
+				raise ValidationError({'motivo_short_payment': _('Short Payment Reason is required when the paid amount is less than the invoice total.')})
 			if not self.recibido_por.strip():
 				raise ValidationError({'recibido_por': _('Recipient name is required for delivered orders.')})
 			if not self.firma_cliente:

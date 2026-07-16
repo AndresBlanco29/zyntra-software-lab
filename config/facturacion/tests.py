@@ -1805,7 +1805,7 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(nota.tipo_credito, 'CREDIT_DUMP')
 		self.assertEqual(nota.evidence_photos.count(), 1)
 
-	def test_driver_complete_view_rejects_payment_above_credit_adjusted_balance(self):
+	def test_driver_complete_view_rejects_over_payment_without_reason(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
 			metodo_entrega='RUTA_DRIVER',
@@ -1835,9 +1835,9 @@ class InvoiceFlowTests(TestCase):
 		invoice.refresh_from_db()
 		self.assertEqual(invoice.delivery.estado, 'ASIGNADA')
 		self.assertEqual(invoice.notas_ajuste.count(), 0)
-		self.assertContains(response, 'The paid amount cannot exceed the customer balance.')
+		self.assertContains(response, 'Over Payment Reason is required when the paid amount exceeds the invoice total.')
 
-	def test_driver_complete_view_rejects_payment_below_credit_adjusted_balance(self):
+	def test_driver_complete_view_rejects_short_payment_without_reason(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,
 			metodo_entrega='RUTA_DRIVER',
@@ -1867,7 +1867,86 @@ class InvoiceFlowTests(TestCase):
 		invoice.refresh_from_db()
 		self.assertEqual(invoice.delivery.estado, 'ASIGNADA')
 		self.assertEqual(invoice.notas_ajuste.count(), 0)
-		self.assertContains(response, 'The total paid amount must exactly match the amount due from the customer.')
+		self.assertContains(response, 'Short Payment Reason is required when the paid amount is less than the invoice total.')
+
+	def test_driver_complete_view_accepts_over_payment_and_credits_customer_balance(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		cliente = invoice.cliente
+		cliente.balance = Decimal('0.00')
+		cliente.save(update_fields=['balance'])
+		self.client.force_login(self.driver)
+
+		response = self.client.post(
+			reverse('driver_delivery_complete', args=[invoice.delivery.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'payment_method_1': 'CASH',
+				'payment_amount_1': '50.00',
+				'monto_pagado': '50.00',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+				'motivo_over_payment': 'Customer paid with a larger bill and asked to keep credit.',
+			},
+		)
+
+		invoice.refresh_from_db()
+		cliente.refresh_from_db()
+		delivery = invoice.delivery
+		self.assertRedirects(response, reverse('driver_delivery_list'))
+		self.assertEqual(delivery.estado, 'ENTREGADA_PAGADA')
+		self.assertEqual(delivery.monto_pagado, Decimal('50.00'))
+		self.assertEqual(delivery.over_payment_amount, Decimal('5.00'))
+		self.assertEqual(delivery.short_payment_amount, Decimal('0.00'))
+		self.assertEqual(delivery.payment_balance_delta, Decimal('-5.00'))
+		self.assertIn('larger bill', delivery.motivo_over_payment)
+		self.assertEqual(invoice.saldo_cliente, Decimal('0.00'))
+		self.assertEqual(cliente.customer_credit_balance, Decimal('5.00'))
+
+	def test_driver_complete_view_accepts_short_payment_and_keeps_pending_balance(self):
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		cliente = invoice.cliente
+		cliente.balance = Decimal('0.00')
+		cliente.save(update_fields=['balance'])
+		self.client.force_login(self.driver)
+
+		response = self.client.post(
+			reverse('driver_delivery_complete', args=[invoice.delivery.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'payment_method_1': 'CASH',
+				'payment_amount_1': '30.00',
+				'monto_pagado': '30.00',
+				'recibido_por': 'Juan Perez',
+				'firma_cliente_data': self.signature_data,
+				'motivo_short_payment': 'Customer only had thirty dollars available today.',
+				'short_payment_evidence': SimpleUploadedFile('short-pay.jpg', b'fake-image-bytes', content_type='image/jpeg'),
+			},
+		)
+
+		invoice.refresh_from_db()
+		cliente.refresh_from_db()
+		delivery = invoice.delivery
+		self.assertRedirects(response, reverse('driver_delivery_list'))
+		self.assertEqual(delivery.estado, 'ENTREGADA_PAGADA')
+		self.assertEqual(delivery.monto_pagado, Decimal('30.00'))
+		self.assertEqual(delivery.short_payment_amount, Decimal('15.00'))
+		self.assertEqual(delivery.over_payment_amount, Decimal('0.00'))
+		self.assertEqual(delivery.payment_balance_delta, Decimal('0.00'))
+		self.assertIn('thirty dollars', delivery.motivo_short_payment)
+		self.assertTrue(bool(delivery.short_payment_evidence))
+		self.assertEqual(invoice.saldo_cliente, Decimal('15.00'))
+		self.assertEqual(cliente.balance, Decimal('0.00'))
+		self.assertEqual(resolve_customer_amount_owed(cliente=cliente, invoice=invoice), Decimal('15.00'))
 
 	def test_driver_complete_view_uses_credit_return_for_factory_defect(self):
 		invoice = generar_invoice_desde_picking(

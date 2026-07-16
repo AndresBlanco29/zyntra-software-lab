@@ -329,7 +329,9 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 	presentation_overrides = presentation_overrides or {}
 	picking_verified = bool(pedido.picking_verificado_en)
 	for item in pedido.items.select_related('presentacion__producto').all():
-		product_presentations = item.presentacion.producto.presentaciones.select_related('stock_operativo').order_by('nombre')
+		product_presentations = list(
+			item.presentacion.producto.presentaciones.select_related('stock_operativo').order_by('nombre')
+		)
 		if item.id in actual_quantity_overrides:
 			actual_quantity = actual_quantity_overrides[item.id]
 		elif picking_verified:
@@ -337,6 +339,10 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 		else:
 			actual_quantity = 0
 		selected_presentation_id = presentation_overrides.get(item.id, item.presentacion_id)
+		selected_presentation = next(
+			(presentation for presentation in product_presentations if presentation.id == selected_presentation_id),
+			item.presentacion,
+		)
 		selected_stock = next(
 			(
 				option['stock_fisico']
@@ -372,8 +378,9 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 			),
 			'stock_physical': selected_stock,
 			'applied_quantity': int(item.cantidad_inventario_aplicada or 0),
+			'case_weight': Decimal(str(selected_presentation.peso_por_caja or '0')),
 		})
-	rows.sort(key=lambda row: (row['product'].casefold(), row['id']))
+	rows.sort(key=lambda row: (-row['case_weight'], row['product'].casefold(), row['id']))
 	return rows
 
 
@@ -1450,8 +1457,28 @@ def selector_picking_detail(request, pedido_id):
 	form_note = pedido.nota_seleccionador
 	form_note_resolved = pedido.nota_seleccionador_resuelta
 	additional_item_rows = []
+	reviewed_item_ids = set()
+	picking_progress = pedido.picking_progress or {}
+	if picking_progress:
+		posted_quantities = {
+			int(item_id): _parse_non_negative_quantity(quantity, 0)
+			for item_id, quantity in (picking_progress.get('quantities') or {}).items()
+		}
+		posted_presentations = {
+			int(item_id): int(presentation_id)
+			for item_id, presentation_id in (picking_progress.get('presentations') or {}).items()
+		}
+		form_note = str(picking_progress.get('note') or '')
+		form_note_resolved = bool(picking_progress.get('note_resolved'))
+		reviewed_item_ids = {
+			int(item_id) for item_id in (picking_progress.get('reviewed_item_ids') or [])
+		}
+		additional_item_rows = list(picking_progress.get('additional_items') or [])
+		saved_pallets = picking_progress.get('pallets')
+		if saved_pallets not in (None, ''):
+			pedido.cantidad_pallets = _parse_decimal(saved_pallets, 0)
 	saved_quantities = _saved_selector_picking_quantities(pedido)
-	initial_quantities = saved_quantities or {item.id: 0 for item in pedido.items.all()}
+	initial_quantities = posted_quantities or saved_quantities or {item.id: 0 for item in pedido.items.all()}
 	stock_evaluation = evaluar_stock_fisico_verificacion_picking(
 		pedido_items=list(pedido.items.all()),
 		cantidades_reales=initial_quantities,
@@ -1494,6 +1521,28 @@ def selector_picking_detail(request, pedido_id):
 		nota_resuelta = request.POST.get('nota_seleccionador_resuelta') == 'on' and not form_has_stock_shortage
 		form_note = nota
 		form_note_resolved = nota_resuelta
+		reviewed_item_ids = {
+			item.id for item in pedido.items.all()
+			if request.POST.get(f'linea_revisada_{item.id}') == 'on'
+		}
+
+		if request.POST.get('submit_action') == 'save_progress':
+			reviewed_additional_count = len(request.POST.getlist('linea_revisada_adicional[]'))
+			for index, row in enumerate(additional_item_rows):
+				row['reviewed'] = index < reviewed_additional_count
+			pedido.picking_progress = {
+				'quantities': {str(item_id): quantity for item_id, quantity in cantidades_reales.items()},
+				'presentations': {str(item_id): presentation_id for item_id, presentation_id in posted_presentations.items()},
+				'reviewed_item_ids': sorted(reviewed_item_ids),
+				'additional_items': additional_item_rows,
+				'note': nota or '',
+				'note_resolved': nota_resuelta,
+				'pallets': str(request.POST.get('cantidad_pallets') or ''),
+			}
+			pedido.picking_progress_saved_at = timezone.now()
+			pedido.save(update_fields=['picking_progress', 'picking_progress_saved_at', 'actualizada_en'])
+			messages.success(request, _('Picking progress saved. You can continue this verification later.'))
+			return redirect('selector_picking_detail', pedido_id=pedido.id)
 
 		try:
 			_validate_selector_line_reviews(
@@ -1520,6 +1569,7 @@ def selector_picking_detail(request, pedido_id):
 				messages.warning(request, _('Physical stock is insufficient. The verification was saved and the order remains blocked for BackOffice review.'))
 			else:
 				messages.success(request, _('Picking ticket verified successfully.'))
+			Pedido.objects.filter(id=pedido.id).update(picking_progress={}, picking_progress_saved_at=None)
 			return redirect(f"{reverse('selector_picking_list')}?view=completed")
 
 	context = {
@@ -1532,6 +1582,7 @@ def selector_picking_detail(request, pedido_id):
 		'form_note_resolved': form_note_resolved,
 		'form_has_stock_shortage': form_has_stock_shortage,
 		'additional_item_rows': additional_item_rows,
+		'reviewed_item_ids': reviewed_item_ids,
 		'available_presentations': Presentacion.objects.select_related('producto', 'stock_operativo').filter(producto__activo=True).order_by('producto__nombre', 'nombre'),
 	}
 	return render(request, 'backoffice/selector_picking_detail.html', context)

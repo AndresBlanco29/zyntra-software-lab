@@ -1042,6 +1042,87 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'name="cantidad_pallets"', html=False)
 		self.assertContains(response, 'Pallets:')
 
+	def test_selector_can_save_and_restore_picking_progress_without_completing(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+
+		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'submit_action': 'save_progress',
+			'cantidad_pallets': '1.5',
+			f'presentacion_{self.item.id}': str(self.presentacion_unidad.id),
+			f'cantidad_real_{self.item.id}': '1',
+			f'linea_revisada_{self.item.id}': 'on',
+			'presentacion_nueva[]': str(self.presentacion_extra.id),
+			'cantidad_nueva[]': '3',
+			'linea_revisada_adicional[]': 'on',
+			'nota_seleccionador': 'Picking parcialmente avanzado',
+			'nota_seleccionador_resuelta': 'on',
+		})
+
+		self.assertRedirects(response, reverse('selector_picking_detail', args=[self.pedido.id]))
+		self.pedido.refresh_from_db()
+		self.item.refresh_from_db()
+		self.assertEqual(self.pedido.estado, 'PARA_VERIFICAR')
+		self.assertIsNone(self.pedido.picking_verificado_en)
+		self.assertIsNotNone(self.pedido.picking_progress_saved_at)
+		self.assertEqual(self.item.cantidad, 2)
+		self.assertEqual(self.item.presentacion, self.presentacion)
+		self.assertEqual(self.pedido.picking_progress['quantities'][str(self.item.id)], 1)
+		self.assertEqual(self.pedido.picking_progress['additional_items'][0]['cantidad'], 3)
+
+		detail = self.client.get(reverse('selector_picking_detail', args=[self.pedido.id]))
+		self.assertEqual(detail.status_code, 200)
+		self.assertContains(detail, 'Saved picking progress was restored.')
+		self.assertContains(detail, f'name="cantidad_real_{self.item.id}" value="1"', html=False)
+		self.assertContains(
+			detail,
+			f'<option value="{self.presentacion_unidad.id}" data-stock-physical="10" selected>',
+			html=False,
+		)
+		self.assertContains(detail, 'Picking parcialmente avanzado')
+		self.assertContains(detail, 'value="1.5"', html=False)
+		self.assertContains(detail, 'Save progress')
+
+		completed = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'submit_action': 'complete_verification',
+			'cantidad_pallets': '1.5',
+			f'presentacion_{self.item.id}': str(self.presentacion.id),
+			f'cantidad_real_{self.item.id}': '2',
+			f'linea_revisada_{self.item.id}': 'on',
+			'nota_seleccionador': 'Verificación terminada',
+			'nota_seleccionador_resuelta': 'on',
+		})
+		self.assertEqual(completed.status_code, 302)
+		self.pedido.refresh_from_db()
+		self.assertEqual(self.pedido.estado, 'VERIFICADO_AJUSTADO')
+		self.assertEqual(self.pedido.picking_progress, {})
+		self.assertIsNone(self.pedido.picking_progress_saved_at)
+
+	def test_selector_picking_products_are_sorted_by_case_weight_descending(self):
+		self.presentacion.peso_por_caja = Decimal('5.000')
+		self.presentacion.save(update_fields=['peso_por_caja'])
+		self.presentacion_extra.peso_por_caja = Decimal('20.000')
+		self.presentacion_extra.save(update_fields=['peso_por_caja'])
+		heavy_item = PedidoItem.objects.create(
+			pedido=self.pedido,
+			presentacion=self.presentacion_extra,
+			cantidad_solicitada=1,
+			cantidad_reservada_inventario=1,
+			cantidad=1,
+			precio=Decimal('6.00'),
+			subtotal=Decimal('6.00'),
+		)
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+
+		response = self.client.get(reverse('selector_picking_detail', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(
+			[row['id'] for row in response.context['item_rows']],
+			[heavy_item.id, self.item.id],
+		)
+
 	def test_selector_save_requires_and_persists_pallets_quantity(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		self.client.force_login(self.selector)

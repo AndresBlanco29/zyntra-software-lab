@@ -64,6 +64,8 @@ class Pedido(models.Model):
 	picking_bloqueado = models.BooleanField(default=False)
 	picking_asignado_en = models.DateTimeField(blank=True, null=True)
 	picking_verificado_en = models.DateTimeField(blank=True, null=True)
+	picking_progress = models.JSONField(default=dict, blank=True)
+	picking_progress_saved_at = models.DateTimeField(blank=True, null=True)
 	cantidad_pallets = models.DecimalField(
 		max_digits=8,
 		decimal_places=2,

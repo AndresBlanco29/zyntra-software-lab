@@ -506,6 +506,9 @@
     });
 
     form.addEventListener('submit', function (event) {
+      if (event.submitter && event.submitter.value === 'save_progress') {
+        return;
+      }
       if (!validateRequiredLineReviews()) {
         event.preventDefault();
       }

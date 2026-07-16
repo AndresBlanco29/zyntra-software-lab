@@ -18,6 +18,13 @@
   {% endfor %}
 {% endif %}
 
+{% if pedido.picking_progress_saved_at %}
+<div class="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-2">
+  <span>{% trans "Saved picking progress was restored." %}</span>
+  <small>{% trans "Last saved" %}: {{ pedido.picking_progress_saved_at|date:"m/d/Y H:i" }}</small>
+</div>
+{% endif %}
+
 <div class="card shadow-sm mb-3">
   <div class="card-body">
     <div class="row g-3">
@@ -88,6 +95,7 @@
                   class="form-check-input picker-line-reviewed"
                   id="lineaRevisada{{ item.id }}"
                   name="linea_revisada_{{ item.id }}"
+                  {% if item.id in reviewed_item_ids %}checked{% endif %}
                   aria-label="{% blocktrans with product=item.product %}I reviewed {{ product }}{% endblocktrans %}">
                 <label class="form-check-label visually-hidden" for="lineaRevisada{{ item.id }}">{% trans "Reviewed" %}</label>
               </div>
@@ -128,7 +136,7 @@
             </td>
             <td data-label="{% trans 'Reviewed' %}" class="text-center">
               <div class="form-check d-inline-flex justify-content-center mb-0">
-                <input type="checkbox" class="form-check-input picker-line-reviewed" name="linea_revisada_adicional[]" value="on" aria-label="{% trans 'I reviewed this added product' %}">
+                <input type="checkbox" class="form-check-input picker-line-reviewed" name="linea_revisada_adicional[]" value="on" {% if row.reviewed %}checked{% endif %} aria-label="{% trans 'I reviewed this added product' %}">
               </div>
             </td>
           </tr>
@@ -140,9 +148,9 @@
     {% product_shipment_summary source='pedido' value=pedido quantity='cantidad_solicitada' editable_pallets=True %}
 
     {% if picker_requires_full_line_review %}
-    <div class="form-text mt-2">{% trans "Check each line in the Reviewed column to confirm you verified every product before saving." %}</div>
+    <div class="form-text mt-2">{% trans "Check each line in the Reviewed column to confirm you verified every product before completing verification." %}</div>
     {% else %}
-    <div class="form-text mt-2">{% trans "When editing a saved ticket, check Reviewed only for the lines you change or add." %}</div>
+    <div class="form-text mt-2">{% trans "When editing a completed ticket, check Reviewed only for the lines you change or add." %}</div>
     {% endif %}
     <div class="form-text">{% trans "Products added here will be marked in red for BackOffice review." %}</div>
 
@@ -190,8 +198,13 @@
       </div>
     </div>
 
-    <div class="d-flex justify-content-end mt-4">
-      <button type="submit" class="btn btn-primary">{% trans "Save verification" %}</button>
+    <div class="d-flex flex-wrap justify-content-end gap-2 mt-4">
+      <button type="submit" name="submit_action" value="save_progress" class="btn btn-outline-primary" formnovalidate>
+        {% trans "Save progress" %}
+      </button>
+      <button type="submit" name="submit_action" value="complete_verification" class="btn btn-primary">
+        {% trans "Save verification" %}
+      </button>
     </div>
   </div>
 </form>

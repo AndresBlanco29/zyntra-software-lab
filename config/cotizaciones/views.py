@@ -22,6 +22,10 @@ from config.clientes.assignment import filter_clientes_for_vendedor
 from config.clientes.models import Cliente
 from config.notificaciones.models import crear_notificacion_backoffice
 from config.pedidos.models import Pedido
+from config.pedidos.client_history import (
+    list_cliente_purchase_orders,
+    merge_pedido_into_session_cart,
+)
 from config.facturacion.services import get_recent_customer_invoice_items_by_presentation
 from config.pedidos.services import (
     calcular_precio_unitario_neto_item,
@@ -342,6 +346,19 @@ def _redirect_to_home_login(request):
 
 def _cotizaciones_pendientes_cliente(cliente):
     return Cotizacion.objects.filter(cliente=cliente, estado='LISTA_PARA_CONFIRMACION').count()
+
+
+def _cliente_pedido_estado_label(state):
+    return {
+        'RECIBIDO': _('Received'),
+        'EN_GESTION': _('In progress'),
+        'LISTO_PARA_PICKING': _('Ready for picking'),
+        'PARA_VERIFICAR': _('Pending verification'),
+        'VERIFICADO_AJUSTADO': _('Verified and adjusted'),
+        'INVOICE_GENERADA': _('Invoice generated'),
+        'DESPACHADO': _('Dispatched'),
+        'CANCELADO': _('Cancelled'),
+    }.get(state, state)
 
 
 def _build_confirm_url(request, cotizacion):
@@ -1172,6 +1189,76 @@ def cliente_cotizaciones_recibidas(request):
         'view_mode': view_mode,
     }
     return render(request, 'cotizaciones/cliente_cotizaciones_recibidas.html', context)
+
+
+def cliente_historial_ordenes(request):
+    if not request.user.is_authenticated:
+        return _redirect_to_home_login(request)
+
+    if getattr(request.user, 'role', '') != 'cliente':
+        logout(request)
+        return _redirect_to_home_login(request)
+
+    cliente = _cliente_from_user(request.user)
+    pedidos = list(list_cliente_purchase_orders(cliente=cliente)[:100])
+    for pedido in pedidos:
+        pedido.estado_label = _cliente_pedido_estado_label(pedido.estado)
+        pedido.product_total_display = int(pedido.product_unit_count or 0)
+
+    context = {
+        'pedidos': pedidos,
+        'pendientes_cotizaciones': _cotizaciones_pendientes_cliente(cliente),
+    }
+    return render(request, 'cotizaciones/cliente_historial_ordenes.html', context)
+
+
+@require_POST
+def cliente_reordenar_pedido(request, pedido_id):
+    if not request.user.is_authenticated:
+        return _redirect_to_home_login(request)
+
+    if getattr(request.user, 'role', '') != 'cliente':
+        logout(request)
+        return _redirect_to_home_login(request)
+
+    cliente = _cliente_from_user(request.user)
+    pedido = get_object_or_404(
+        Pedido.objects.prefetch_related('items__presentacion__producto'),
+        id=pedido_id,
+        cliente=cliente,
+    )
+
+    def price_fn(*, presentacion):
+        return _quote_item_price_for_customer(
+            cliente=cliente,
+            presentacion=presentacion,
+            session_price=0,
+        )
+
+    carrito, added_count = merge_pedido_into_session_cart(
+        carrito=request.session.get('carrito', {}) or {},
+        pedido=pedido,
+        price_fn=price_fn,
+        promo_fn=aplicar_promocion_en_item_sesion,
+    )
+    request.session['carrito'] = carrito
+    request.session.modified = True
+
+    if added_count:
+        messages.success(
+            request,
+            _('Order #%(number)s was added to your cart. Review quantities before submitting.') % {
+                'number': pedido.numero_display,
+            },
+        )
+    else:
+        messages.warning(
+            request,
+            _('No active products from order #%(number)s could be added to your cart.') % {
+                'number': pedido.numero_display,
+            },
+        )
+    return redirect('ver_cotizacion')
 
 
 def cliente_cotizacion_recibida_detalle(request, token):

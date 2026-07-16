@@ -52,6 +52,9 @@ La Tortilla Grocery
 <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
 {% endif %}
 </a>
+<a href="{% url 'cliente_historial_ordenes' %}" class="btn btn-outline-light d-none d-xl-inline-flex">
+{% trans "Order History" %}
+</a>
 <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#logoutModal" style="font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
     <i class="bi bi-box-arrow-right"></i> {% trans "Log out" %}
 </button>
@@ -85,6 +88,10 @@ La Tortilla Grocery
 {% if pendientes_cotizaciones %}
 <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
 {% endif %}
+</a>
+
+<a href="{% url 'cliente_historial_ordenes' %}" class="list-group-item">
+{% trans "Order History" %}
 </a>
 
 </div>

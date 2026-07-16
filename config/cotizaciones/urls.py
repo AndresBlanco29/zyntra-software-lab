@@ -9,6 +9,8 @@ from .views import (
     backoffice_cotizaciones,
     cliente_cotizacion_recibida_detalle,
     cliente_cotizaciones_recibidas,
+    cliente_historial_ordenes,
+    cliente_reordenar_pedido,
     eliminar_producto,
     enviar_cotizacion_cliente,
     generar_pedido_desde_cotizacion,
@@ -31,4 +33,6 @@ urlpatterns = [
     path('backoffice/<int:cotizacion_id>/whatsapp/', abrir_whatsapp_manual_cotizacion, name='abrir_whatsapp_manual_cotizacion'),
     path('cliente/recibidas/', cliente_cotizaciones_recibidas, name='cliente_cotizaciones_recibidas'),
     path('cliente/recibidas/<uuid:token>/', cliente_cotizacion_recibida_detalle, name='cliente_cotizacion_recibida_detalle'),
+    path('cliente/historial/', cliente_historial_ordenes, name='cliente_historial_ordenes'),
+    path('cliente/historial/<int:pedido_id>/reordenar/', cliente_reordenar_pedido, name='cliente_reordenar_pedido'),
 ]

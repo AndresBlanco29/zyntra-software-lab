@@ -31,6 +31,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from config.clientes.models import Cliente
 from config.cotizaciones.models import Cotizacion
+from config.pedidos.client_history import load_cliente_favorite_productos
 from config.productos.packaging import parse_case_packaging_from_product_name
 from config.usuarios.permissions import internal_permission_required
 
@@ -433,16 +434,18 @@ def catalogo(request):
         and is_cliente
     )
     pendientes_cotizaciones = 0
+    cliente = None
 
     if can_view_received_quotes:
         try:
-            cliente = Cliente.objects.only('id').get(usuario=request.user)
+            cliente = Cliente.objects.get(usuario=request.user)
             pendientes_cotizaciones = Cotizacion.objects.filter(
                 cliente=cliente,
                 estado='LISTA_PARA_CONFIRMACION',
             ).count()
         except Cliente.DoesNotExist:
             can_view_received_quotes = False
+            cliente = None
 
     catalogo_url = reverse("catalogo")
     if force_guest_mode:
@@ -463,8 +466,25 @@ def catalogo(request):
     carrito_session = request.session.get('carrito', {}) or {}
     carrito_total_items = sum(int(item.get('cantidad') or 0) for item in carrito_session.values())
 
+    productos_favoritos = []
+    if (
+        cliente is not None
+        and can_view_received_quotes
+        and not force_guest_mode
+        and not filter_params.get('promociones')
+        and not filter_params.get('q')
+        and not filter_params.get('categoria')
+        and not filter_params.get('marca')
+    ):
+        productos_favoritos = load_cliente_favorite_productos(
+            cliente=cliente,
+            hydrate_fn=_hydrate_productos,
+            attach_promos_fn=adjuntar_promociones_a_productos,
+        )
+
     context = {
         'productos': productos,
+        'productos_favoritos': productos_favoritos,
         'page_obj': page_obj,
         'filter_q': filter_params.get('q', ''),
         'filter_categoria': filter_params.get('categoria', ''),

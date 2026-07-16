@@ -1,0 +1,153 @@
+{% load i18n %}
+<div class="col-12 col-sm-6 col-md-4 col-lg-3 catalog-product-col">
+  <div class="producto-card text-center{% if producto.promocion_activa %} producto-card--promo{% endif %}"
+      data-producto-id="{{ producto.id }}"
+      data-nombre="{{ producto.nombre_traducido }}"
+      data-categoria="{{ producto.categoria.id|default:'' }}"
+      data-marca="{{ producto.marca.id }}"
+      {% if producto.promocion_activa %}
+      data-promo-minimum="{{ producto.promocion_cantidad_minima }}"
+      data-promo-presentation="{{ producto.promocion_presentacion_id|default:'' }}"
+      {% endif %}>
+
+      {% if producto.promocion_activa %}
+      <div class="promo-badge" title="{{ producto.promocion_texto }}">
+          <i class="bi bi-star-fill" aria-hidden="true"></i>
+          {% trans "Promotion" %}
+      </div>
+      {% endif %}
+
+      {% if producto.promocion_fecha_fin_iso %}
+      <div
+        class="promo-countdown js-promo-countdown promo-countdown--top"
+        data-ends-at="{{ producto.promocion_fecha_fin_iso }}"
+        role="status"
+        aria-live="polite"
+      >
+        <i class="bi bi-alarm-fill" aria-hidden="true"></i>
+        <span class="promo-countdown__text"></span>
+      </div>
+      {% endif %}
+
+      <div class="producto-img-wrap mb-3">
+          {% if producto.imagen %}
+              <img
+                  src="{{ producto.imagen.url }}"
+                  class="producto-img"
+                  alt="{{ producto.nombre_traducido  }}"
+              >
+          {% else %}
+              <div class="producto-img-placeholder" aria-hidden="true"></div>
+          {% endif %}
+      </div>
+
+      <div class="product-name">
+          {{ producto.nombre_traducido }}
+      </div>
+
+      {% if producto.promocion_texto %}
+      <div class="promo-offer-panel mb-3">
+          <div class="promo-minimum promo-minimum--compact">
+              <i class="bi bi-cart-check-fill" aria-hidden="true"></i>
+              {% blocktrans with minimum=producto.promocion_cantidad_minima %}
+              Minimum: {{ minimum }} units
+              {% endblocktrans %}
+          </div>
+          <div class="promo-detail promo-detail--compact">
+              {% if producto.promocion_activa.tipo_beneficio == 'PERCENT' %}
+                  {% blocktrans with value=producto.promocion_activa.valor_beneficio %}
+                  Get {{ value }}% off.
+                  {% endblocktrans %}
+              {% else %}
+                  {% blocktrans with value=producto.promocion_activa.valor_beneficio %}
+                  Get USD {{ value }} off/unit.
+                  {% endblocktrans %}
+              {% endif %}
+          </div>
+
+          {% if producto.promocion_texto != producto.promocion_activa.nombre %}
+          <button
+            type="button"
+            class="btn btn-link btn-sm promo-view-btn p-0 mt-2"
+            data-bs-toggle="collapse"
+            data-bs-target="#promoDetails-{{ card_prefix|default:'cat' }}-{{ producto.id }}"
+            aria-expanded="false"
+            aria-controls="promoDetails-{{ card_prefix|default:'cat' }}-{{ producto.id }}"
+          >
+            {% trans "View promotion" %}
+          </button>
+          <div class="collapse mt-2" id="promoDetails-{{ card_prefix|default:'cat' }}-{{ producto.id }}">
+            <div class="promo-description">{{ producto.promocion_texto }}</div>
+          </div>
+          {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="units-text mb-2 info-presentacion">
+      {% if producto.primera_presentacion %}
+      {{ producto.primera_presentacion.descripcion_empaque_cliente }}
+      {% endif %}
+      </div>
+
+      {% if show_client_prices and producto.primera_presentacion %}
+      <div class="mb-3 text-center">
+        <div class="fw-semibold small">{% trans "Your price" %}</div>
+        <div class="fs-5 fw-bold text-success product-price">
+          ${% if client_price_tier == 1 %}{{ producto.primera_presentacion.precio_1 }}{% elif client_price_tier == 2 %}{{ producto.primera_presentacion.precio_2 }}{% elif client_price_tier == 3 %}{{ producto.primera_presentacion.precio_3 }}{% elif client_price_tier == 4 %}{{ producto.primera_presentacion.precio_4 }}{% else %}{{ producto.primera_presentacion.precio_5 }}{% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="mb-2">
+          <label class="fw-bold small">
+              {% trans "Presentación" %}:
+          </label>
+
+          <select class="form-select form-select-sm presentacion-select">
+              {% for p in producto.presentaciones_prefetch %}
+                  <option
+                      value="{{ p.id }}"
+                      data-unidades="{{ p.unidades }}"
+                      data-tipo="{{ p.tipo_contenido_traducido|lower }}"
+                      data-summary="{{ p.descripcion_empaque_cliente }}"
+                    {% if show_client_prices %}
+                    data-price="{% if client_price_tier == 1 %}{{ p.precio_1 }}{% elif client_price_tier == 2 %}{{ p.precio_2 }}{% elif client_price_tier == 3 %}{{ p.precio_3 }}{% elif client_price_tier == 4 %}{{ p.precio_4 }}{% else %}{{ p.precio_5 }}{% endif %}"
+                    {% endif %}
+                    {% if producto.preferred_presentation_id == p.id or producto.promocion_presentacion_id == p.id %}selected{% endif %}
+                  >
+                      {{ p.nombre_empaque_cliente }}
+                  </option>
+              {% endfor %}
+          </select>
+      </div>
+
+      <div class="mb-3">
+          <label class="fw-bold small">
+              {% trans "Cantidad" %}:
+          </label>
+
+          <div class="d-flex justify-content-center align-items-center gap-2 mt-1">
+              <button type="button" class="qty-btn restar">-</button>
+              <input type="number" min="1" step="1" class="cantidad-input cantidad" value="1" inputmode="numeric" aria-label="{% trans 'Cantidad' %}">
+              <button type="button" class="qty-btn sumar">+</button>
+          </div>
+      </div>
+
+      {% if can_quote %}
+      {% if producto.promocion_activa %}
+      <button type="button" class="btn promo-add-btn w-100 mb-2">
+          <i class="bi bi-cart-plus-fill" aria-hidden="true"></i>
+          {% trans "Add Promotion to Order" %}
+      </button>
+      {% endif %}
+      <button type="button" class="btn btn-yellow w-100 agregar-btn">
+          {% trans "Añadir pedido" %}
+      </button>
+      {% else %}
+      <button type="button" class="btn btn-outline-warning w-100 agregar-btn-login">
+         {% trans "Inicia sesión para cotizar" %}
+      </button>
+      {% endif %}
+
+  </div>
+</div>

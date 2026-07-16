@@ -438,11 +438,12 @@ z-index:9999;
         /* CARD PRODUCTO */
 /* CARD PRODUCTO */
 .catalog-product-grid {
-    align-items: stretch;
+    align-items: flex-start;
 }
 
 .catalog-product-col {
     display: flex;
+    align-items: flex-start;
 }
 
 .producto-card {
@@ -455,7 +456,7 @@ z-index:9999;
     display: flex;
     flex-direction: column;
     width: 100%;
-    height: 100%;
+    height: auto;
     position: relative;
 }
 
@@ -499,7 +500,7 @@ z-index:9999;
 }
 
 .promo-offer-panel {
-    padding: 0.7rem 0.8rem;
+    padding: 0.55rem 0.65rem;
     color: #7c2d12;
     background: #fff1dc;
     border: 1px solid #fdba74;
@@ -510,43 +511,43 @@ z-index:9999;
 .promo-minimum {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    font-size: 0.88rem;
+    gap: 0.35rem;
+    font-size: 0.8rem;
     font-weight: 800;
 }
 
 .promo-detail {
     color: #9a4a1c;
-    font-size: 0.86rem;
+    font-size: 0.78rem;
     font-weight: 700;
-    line-height: 1.3;
+    line-height: 1.25;
 }
 
 .promo-description {
-    margin-top: 0.25rem;
+    margin-top: 0.2rem;
     color: #7c5a45;
-    font-size: 0.76rem;
-    line-height: 1.25;
+    font-size: 0.72rem;
+    line-height: 1.2;
 }
 
 .promo-countdown {
     display: flex;
-    align-items: flex-start;
-    gap: 0.4rem;
-    margin-top: 0.55rem;
-    padding: 0.45rem 0.55rem;
-    border-radius: 8px;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.4rem;
+    padding: 0.35rem 0.45rem;
+    border-radius: 7px;
     background: linear-gradient(90deg, #7c2d12, #c2410c);
     color: #fff7ed;
-    font-size: 0.74rem;
+    font-size: 0.68rem;
     font-weight: 700;
-    line-height: 1.35;
-    box-shadow: 0 4px 12px rgba(124, 45, 18, 0.28);
+    line-height: 1.25;
+    box-shadow: 0 3px 10px rgba(124, 45, 18, 0.22);
 }
 
 .promo-countdown i {
-    margin-top: 0.1rem;
     flex-shrink: 0;
+    font-size: 0.85rem;
 }
 
 .promo-countdown--ended {
@@ -664,12 +665,13 @@ z-index:9999;
 }
 
 .producto-card > .mb-2 {
-    margin-top: auto;
+    margin-top: 0;
 }
 
 .producto-card .agregar-btn,
-.producto-card .agregar-btn-login {
-    margin-top: auto;
+.producto-card .agregar-btn-login,
+.producto-card .promo-add-btn {
+    margin-top: 0;
 }
 
         /* BOTONES CANTIDAD */

@@ -390,7 +390,7 @@ class PromocionPersistenceTests(TestCase):
         self.assertContains(response, 'Promotion')
         self.assertContains(response, 'Buy 5 get 20%')
         self.assertContains(response, 'Add Promotion to Order')
-        self.assertContains(response, 'Minimum purchase: 5 units')
+        self.assertContains(response, 'Minimum: 5 units')
         self.assertContains(response, 'There are products on promotion!')
 
     def test_catalogo_shows_countdown_and_my_order_attention_with_cart(self):

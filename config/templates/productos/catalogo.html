@@ -271,13 +271,29 @@ data-countdown-ended="{% trans 'Promotion ended' %}">
                                 </div>
                                 {% endif %}
 
-                                {% if producto.imagen %}
-                                    <img
-                                        src="{{ producto.imagen.url }}"
-                                        class="producto-img mb-3"
-                                        alt="{{ producto.nombre_traducido  }}"
-                                    >
+                                {% if producto.promocion_fecha_fin_iso %}
+                                <div
+                                  class="promo-countdown js-promo-countdown promo-countdown--top"
+                                  data-ends-at="{{ producto.promocion_fecha_fin_iso }}"
+                                  role="status"
+                                  aria-live="polite"
+                                >
+                                  <i class="bi bi-alarm-fill" aria-hidden="true"></i>
+                                  <span class="promo-countdown__text"></span>
+                                </div>
                                 {% endif %}
+
+                                <div class="producto-img-wrap mb-3">
+                                    {% if producto.imagen %}
+                                        <img
+                                            src="{{ producto.imagen.url }}"
+                                            class="producto-img"
+                                            alt="{{ producto.nombre_traducido  }}"
+                                        >
+                                    {% else %}
+                                        <div class="producto-img-placeholder" aria-hidden="true"></div>
+                                    {% endif %}
+                                </div>
 
                                 <div class="product-name">
                                     {{ producto.nombre_traducido }}
@@ -285,35 +301,37 @@ data-countdown-ended="{% trans 'Promotion ended' %}">
 
                                 {% if producto.promocion_texto %}
                                 <div class="promo-offer-panel mb-3">
-                                    <div class="promo-minimum">
+                                    <div class="promo-minimum promo-minimum--compact">
                                         <i class="bi bi-cart-check-fill" aria-hidden="true"></i>
                                         {% blocktrans with minimum=producto.promocion_cantidad_minima %}
-                                        Minimum purchase: {{ minimum }} units
+                                        Minimum: {{ minimum }} units
                                         {% endblocktrans %}
                                     </div>
-                                    <div class="promo-detail">
+                                    <div class="promo-detail promo-detail--compact">
                                         {% if producto.promocion_activa.tipo_beneficio == 'PERCENT' %}
                                             {% blocktrans with value=producto.promocion_activa.valor_beneficio %}
                                             Get {{ value }}% off.
                                             {% endblocktrans %}
                                         {% else %}
                                             {% blocktrans with value=producto.promocion_activa.valor_beneficio %}
-                                            Get USD {{ value }} off per unit.
+                                            Get USD {{ value }} off/unit.
                                             {% endblocktrans %}
                                         {% endif %}
                                     </div>
+
                                     {% if producto.promocion_texto != producto.promocion_activa.nombre %}
-                                    <div class="promo-description">{{ producto.promocion_texto }}</div>
-                                    {% endif %}
-                                    {% if producto.promocion_fecha_fin_iso %}
-                                    <div
-                                      class="promo-countdown js-promo-countdown"
-                                      data-ends-at="{{ producto.promocion_fecha_fin_iso }}"
-                                      role="status"
-                                      aria-live="polite"
+                                    <button
+                                      type="button"
+                                      class="btn btn-link btn-sm promo-view-btn p-0 mt-2"
+                                      data-bs-toggle="collapse"
+                                      data-bs-target="#promoDetails-{{ producto.id }}"
+                                      aria-expanded="false"
+                                      aria-controls="promoDetails-{{ producto.id }}"
                                     >
-                                      <i class="bi bi-alarm-fill" aria-hidden="true"></i>
-                                      <span class="promo-countdown__text"></span>
+                                      {% trans "View promotion" %}
+                                    </button>
+                                    <div class="collapse mt-2" id="promoDetails-{{ producto.id }}">
+                                      <div class="promo-description">{{ producto.promocion_texto }}</div>
                                     </div>
                                     {% endif %}
                                 </div>

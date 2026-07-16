@@ -460,6 +460,8 @@ def catalogo(request):
     productos = adjuntar_promociones_a_productos(_hydrate_productos(list(page_obj.object_list)))
     categorias = _sort_catalog_categorias(_get_cached_catalogo_categorias())
     marcas = _sort_catalog_marcas(_get_cached_catalogo_marcas())
+    carrito_session = request.session.get('carrito', {}) or {}
+    carrito_total_items = sum(int(item.get('cantidad') or 0) for item in carrito_session.values())
 
     context = {
         'productos': productos,
@@ -479,6 +481,7 @@ def catalogo(request):
         'promociones_disponibles': promociones_disponibles,
         'client_price_tier': client_price_tier,
         'show_client_prices': client_price_tier is not None,
+        'carrito_total_items': carrito_total_items,
     }
 
     response = render(request, 'productos/catalogo.html', context)

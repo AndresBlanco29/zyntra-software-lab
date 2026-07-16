@@ -185,6 +185,9 @@ def adjuntar_promociones_a_productos(productos, now=None):
         producto.promocion_presentacion_nombre = (
             promo.presentacion.nombre if promo and promo.presentacion_id else ''
         )
+        producto.promocion_fecha_fin_iso = (
+            promo.fecha_fin.isoformat() if promo and promo.fecha_fin else ''
+        )
     return productos
 
 

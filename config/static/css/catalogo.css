@@ -529,6 +529,64 @@ z-index:9999;
     line-height: 1.25;
 }
 
+.promo-countdown {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    margin-top: 0.55rem;
+    padding: 0.45rem 0.55rem;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #7c2d12, #c2410c);
+    color: #fff7ed;
+    font-size: 0.74rem;
+    font-weight: 700;
+    line-height: 1.35;
+    box-shadow: 0 4px 12px rgba(124, 45, 18, 0.28);
+}
+
+.promo-countdown i {
+    margin-top: 0.1rem;
+    flex-shrink: 0;
+}
+
+.promo-countdown--ended {
+    background: #78716c;
+    box-shadow: none;
+}
+
+.my-order-cta--attention {
+    position: relative;
+    z-index: 1;
+    border-color: #fbbf24 !important;
+    color: #111827 !important;
+    background: linear-gradient(135deg, #fde68a, #f59e0b) !important;
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55);
+    animation: my-order-attention 1.5s ease-in-out infinite;
+}
+
+.list-group-item.my-order-cta--attention {
+    color: #7c2d12 !important;
+    font-weight: 700;
+}
+
+@keyframes my-order-attention {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5);
+    }
+    50% {
+        transform: scale(1.04);
+        box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .producto-card--promo,
+    .my-order-cta--attention {
+        animation: none;
+    }
+}
+
 .promo-add-btn {
     color: #fff;
     background: linear-gradient(90deg, #ea580c, #f59e0b);

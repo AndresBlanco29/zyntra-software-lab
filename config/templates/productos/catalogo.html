@@ -25,7 +25,15 @@ data-lang="{{ LANGUAGE_CODE }}"
 data-agregar-url="{% url 'agregar_a_cotizacion' %}"
 data-csrf="{{ csrf_token }}"
 data-msg-added="{% trans 'Added' %} ✔"
-data-auth="{{ can_quote|yesno:'true,false' }}">
+data-auth="{{ can_quote|yesno:'true,false' }}"
+data-page="catalog"
+data-cart-count="{{ carrito_total_items|default:0 }}"
+data-countdown-prefix="{% trans 'Promotion ends in:' %}"
+data-countdown-days="{% trans 'days' %}"
+data-countdown-hours="{% trans 'hours' %}"
+data-countdown-minutes="{% trans 'minutes' %}"
+data-countdown-seconds="{% trans 'seconds' %}"
+data-countdown-ended="{% trans 'Promotion ended' %}">
 
     <!-- NAVBAR -->
     <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
@@ -56,8 +64,10 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                 {% endif %}
               </a>
               {% endif %}
-                <a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">
-                    {% trans "My Order" %} (<span id="contadorCarrito">{{ carrito|length }}</span>)
+                <a href="{% url 'ver_cotizacion' %}"
+                   class="btn btn-outline-light js-my-order-cta{% if carrito_total_items %} my-order-cta--attention{% endif %}"
+                   id="myOrderNavBtn">
+                    {% trans "My Order" %} (<span id="contadorCarrito">{{ carrito_total_items|default:0 }}</span>)
                 </a>
                 <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#logoutModal" style="font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
                     <i class="bi bi-box-arrow-right"></i> {% trans "Log out" %}
@@ -94,8 +104,11 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                         {% trans "Catálogo" %}
                     </a>
                   {% if can_quote %}
-                    <a href="{% url 'ver_cotizacion' %}" class="list-group-item">
+                    <a href="{% url 'ver_cotizacion' %}"
+                       class="list-group-item js-my-order-cta{% if carrito_total_items %} my-order-cta--attention{% endif %}"
+                       id="myOrderSidebarLink">
                         {% trans "My Order" %}
+                        <span class="badge text-bg-warning ms-1 js-cart-badge{% if not carrito_total_items %} d-none{% endif %}">{{ carrito_total_items|default:0 }}</span>
                     </a>
                     {% if can_view_received_quotes %}
                     <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="list-group-item">
@@ -291,6 +304,17 @@ data-auth="{{ can_quote|yesno:'true,false' }}">
                                     </div>
                                     {% if producto.promocion_texto != producto.promocion_activa.nombre %}
                                     <div class="promo-description">{{ producto.promocion_texto }}</div>
+                                    {% endif %}
+                                    {% if producto.promocion_fecha_fin_iso %}
+                                    <div
+                                      class="promo-countdown js-promo-countdown"
+                                      data-ends-at="{{ producto.promocion_fecha_fin_iso }}"
+                                      role="status"
+                                      aria-live="polite"
+                                    >
+                                      <i class="bi bi-alarm-fill" aria-hidden="true"></i>
+                                      <span class="promo-countdown__text"></span>
+                                    </div>
                                     {% endif %}
                                 </div>
                                 {% endif %}

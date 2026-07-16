@@ -393,6 +393,32 @@ class PromocionPersistenceTests(TestCase):
         self.assertContains(response, 'Minimum purchase: 5 units')
         self.assertContains(response, 'There are products on promotion!')
 
+    def test_catalogo_shows_countdown_and_my_order_attention_with_cart(self):
+        Promocion.objects.filter(producto=self.producto).update(
+            fecha_fin=timezone.now() + timedelta(days=2, hours=3),
+        )
+        client = DjangoClient()
+        client.force_login(self.user)
+        session = client.session
+        session['carrito'] = {
+            str(self.presentacion.id): {
+                'producto_id': self.producto.id,
+                'presentacion_id': self.presentacion.id,
+                'nombre': self.producto.nombre,
+                'cantidad': 10,
+                'precio': 10.0,
+            }
+        }
+        session.save()
+
+        response = client.get(reverse('catalogo'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'js-promo-countdown')
+        self.assertContains(response, 'data-ends-at=')
+        self.assertContains(response, 'my-order-cta--attention')
+        self.assertContains(response, 'id="contadorCarrito">10')
+        self.assertEqual(response.context['carrito_total_items'], 10)
+
     def test_promotions_filter_and_search_only_return_active_promo_products(self):
         client = DjangoClient()
         response = client.get(reverse('catalogo'), {

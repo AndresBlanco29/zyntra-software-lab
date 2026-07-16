@@ -1,4 +1,3 @@
-
 document.addEventListener('DOMContentLoaded', function() {
     const lang = document.body.dataset.lang.slice(0,2);
     const agregarUrl = document.body.dataset.agregarUrl;
@@ -25,6 +24,76 @@ document.addEventListener('DOMContentLoaded', function() {
         pallets: { es: "pallets", en: "pallets" }
 
     };
+
+    function pad2(value) {
+        return String(Math.max(0, value)).padStart(2, '0');
+    }
+
+    function syncMyOrderAttention(totalItems) {
+        const count = Math.max(0, parseInt(totalItems, 10) || 0);
+        document.body.dataset.cartCount = String(count);
+
+        const counter = document.getElementById('contadorCarrito');
+        if (counter) {
+            counter.textContent = String(count);
+        }
+
+        document.querySelectorAll('.js-cart-badge').forEach(function (badge) {
+            badge.textContent = String(count);
+            badge.classList.toggle('d-none', count < 1);
+        });
+
+        const onMyOrderPage = document.body.dataset.page === 'my-order';
+        document.querySelectorAll('.js-my-order-cta').forEach(function (el) {
+            el.classList.toggle('my-order-cta--attention', count > 0 && !onMyOrderPage);
+        });
+    }
+
+    function formatCountdown(remainingMs) {
+        const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+        const days = Math.floor(totalSeconds / 86400);
+        const hours = Math.floor((totalSeconds % 86400) / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        const prefix = document.body.dataset.countdownPrefix || 'Promotion ends in:';
+        const daysLabel = document.body.dataset.countdownDays || 'days';
+        const hoursLabel = document.body.dataset.countdownHours || 'hours';
+        const minutesLabel = document.body.dataset.countdownMinutes || 'minutes';
+        const secondsLabel = document.body.dataset.countdownSeconds || 'seconds';
+        return prefix + ' ' +
+            pad2(days) + ' ' + daysLabel + ' · ' +
+            pad2(hours) + ' ' + hoursLabel + ' · ' +
+            pad2(minutes) + ' ' + minutesLabel + ' · ' +
+            pad2(seconds) + ' ' + secondsLabel;
+    }
+
+    function tickPromoCountdowns() {
+        const endedLabel = document.body.dataset.countdownEnded || 'Promotion ended';
+        document.querySelectorAll('.js-promo-countdown').forEach(function (el) {
+            const endsAt = Date.parse(el.dataset.endsAt || '');
+            const textEl = el.querySelector('.promo-countdown__text');
+            if (!textEl || Number.isNaN(endsAt)) {
+                el.hidden = true;
+                return;
+            }
+            const remaining = endsAt - Date.now();
+            if (remaining <= 0) {
+                el.classList.add('promo-countdown--ended');
+                textEl.textContent = endedLabel;
+                return;
+            }
+            el.classList.remove('promo-countdown--ended');
+            textEl.textContent = formatCountdown(remaining);
+        });
+    }
+
+    function initPromoCountdowns() {
+        if (!document.querySelector('.js-promo-countdown')) {
+            return;
+        }
+        tickPromoCountdowns();
+        window.setInterval(tickPromoCountdowns, 1000);
+    }
 
     function submitCatalogFilters() {
         const form = document.getElementById('catalogo-filter-form');
@@ -123,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        document.getElementById("contadorCarrito").textContent = data.total_items;
+                        syncMyOrderAttention(data.total_items);
                         feedbackButton.textContent = addedButtonLabel;
                         setTimeout(() => {
                             feedbackButton.textContent = defaultLabel;
@@ -204,4 +273,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
     });
+
+    syncMyOrderAttention(document.body.dataset.cartCount || 0);
+    initPromoCountdowns();
 });

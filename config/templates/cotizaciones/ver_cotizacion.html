@@ -25,7 +25,8 @@ data-presentacion-url="{% url 'cambiar_presentacion' %}"
 data-msg-promo-product="{% trans 'Product on promotion' %}"
 data-msg-promo-active="{% trans 'Promotion active: your discount will be applied when you submit the order.' %}"
 data-msg-promo-minimum="{% trans 'This promotion requires a minimum purchase of {minimum} units. You currently have {current}, so the discount will not be applied.' %}"
-data-csrf="{{ csrf_token }}">
+data-csrf="{{ csrf_token }}"
+data-page="my-order">
 
 <!-- NAVBAR -->
 <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">

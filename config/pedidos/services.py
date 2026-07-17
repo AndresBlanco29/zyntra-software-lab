@@ -308,6 +308,10 @@ def crear_pedido_parcial(*, pedido, lineas_payload, usuario=None, request=None):
         },
         request=request,
     )
+
+    from config.clientes.credit_limit import apply_credit_hold_on_order_arrival
+
+    apply_credit_hold_on_order_arrival(pedido=parcial, request=request)
     return parcial
 
 
@@ -435,6 +439,10 @@ def crear_pedido_desde_items(
         request=request,
     )
 
+    from config.clientes.credit_limit import apply_credit_hold_on_order_arrival
+
+    apply_credit_hold_on_order_arrival(pedido=pedido, request=request)
+
     return pedido
 
 
@@ -443,7 +451,12 @@ def validar_estado_backoffice_con_bloqueo(pedido, nuevo_estado):
         raise ValidationError(_('This sales order is blocked by an unresolved order comment. Resolve it before continuing.'))
     if pedido.picking_bloqueado and nuevo_estado != pedido.estado:
         raise ValidationError(_('This sales order is blocked by an unresolved picking note.'))
+    from config.clientes.credit_limit import pedido_tiene_credit_hold_pendiente
 
+    if pedido_tiene_credit_hold_pendiente(pedido) and nuevo_estado != pedido.estado:
+        raise ValidationError(
+            _('This sales order is on CREDIT HOLD because the customer exceeded the credit limit. Release it before continuing.')
+        )
 
 def validar_pedido_sin_nota_cliente_pendiente(pedido):
     if pedido.tiene_nota_cliente_pendiente:
@@ -715,6 +728,12 @@ def asignar_picking_a_seleccionador(*, pedido, seleccionador, asignado_por=None)
     if pedido.estado not in {'RECIBIDO', 'EN_GESTION', 'LISTO_PARA_PICKING', 'PARA_VERIFICAR'}:
         raise ValidationError(_('This sales order cannot be assigned to picking in its current status.'))
     validar_pedido_sin_nota_cliente_pendiente(pedido)
+    from config.clientes.credit_limit import pedido_tiene_credit_hold_pendiente
+
+    if pedido_tiene_credit_hold_pendiente(pedido):
+        raise ValidationError(
+            _('This sales order is on CREDIT HOLD because the customer exceeded the credit limit. Release it before assigning picking.')
+        )
 
     pedido.seleccionador = seleccionador
     pedido.estado = 'PARA_VERIFICAR'

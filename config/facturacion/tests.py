@@ -304,6 +304,58 @@ class InvoiceFlowTests(TestCase):
 			f"{reverse('backoffice_invoice_detail', args=[invoice.id])}?focus_adjustment_note=1",
 		)
 
+	@override_settings(CREDIT_HOLD_TEST_EMAIL='credit-hold-test@example.com')
+	def test_order_creation_places_credit_hold_when_limit_exceeded(self):
+		from django.core import mail
+
+		from config.clientes.credit_limit import pedido_tiene_credit_hold_pendiente
+		from config.pedidos.services import asignar_picking_a_seleccionador, crear_pedido_desde_items
+
+		self.cliente.credit_limit = Decimal('2000.00')
+		self.cliente.balance = Decimal('1900.00')
+		self.cliente.save(update_fields=['credit_limit', 'balance'])
+		selector = Usuario.objects.create_user(username='selector-hold', password='secret123', role='seleccionador')
+
+		pedido = crear_pedido_desde_items(
+			cliente=self.cliente,
+			items_payload=[{
+				'presentacion': self.presentacion,
+				'cantidad': 10,
+				'precio': Decimal('20.00'),
+			}],
+			origen='VENDEDOR',
+			vendedor=self.backoffice,
+			reservar_inventario=False,
+		)
+
+		self.assertTrue(pedido_tiene_credit_hold_pendiente(pedido))
+		self.assertTrue(
+			self.cliente.alertas_limite_credito.filter(pedido=pedido, estado='PENDIENTE').exists()
+		)
+		self.assertTrue(
+			Notificacion.objects.filter(titulo__icontains='CREDIT HOLD', url__contains=str(pedido.id)).exists()
+		)
+		self.assertTrue(mail.outbox)
+		self.assertEqual(mail.outbox[-1].to, ['credit-hold-test@example.com'])
+		self.assertIn('CREDIT HOLD', mail.outbox[-1].subject)
+
+		with self.assertRaises(ValidationError):
+			asignar_picking_a_seleccionador(pedido=pedido, seleccionador=selector)
+
+		self.client.force_login(self.backoffice)
+		release_response = self.client.post(reverse('backoffice_resolve_credit_limit', args=[pedido.id]), {
+			'action': 'release',
+			'comentario': 'Customer will pay tomorrow',
+		})
+		self.assertRedirects(release_response, reverse('backoffice_pedido_detalle', args=[pedido.id]))
+		pedido.refresh_from_db()
+		self.assertTrue(pedido.credit_limit_liberado)
+		self.assertFalse(pedido_tiene_credit_hold_pendiente(pedido))
+
+		asignar_picking_a_seleccionador(pedido=pedido, seleccionador=selector)
+		pedido.refresh_from_db()
+		self.assertEqual(pedido.estado, 'PARA_VERIFICAR')
+
 	def test_generate_invoice_keeps_zero_quantity_lines_with_zero_subtotal(self):
 		self.pedido_item.cantidad = 0
 		self.pedido_item.subtotal = Decimal('0.00')

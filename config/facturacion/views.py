@@ -1674,11 +1674,18 @@ def backoffice_generate_invoice(request, pedido_id):
 		)
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 	except CreditLimitExceededError as exc:
+		from config.clientes.models import ClienteCreditoLimiteAlerta
+
+		already_pending = ClienteCreditoLimiteAlerta.objects.filter(
+			pedido=pedido,
+			estado=ClienteCreditoLimiteAlerta.ESTADO_PENDIENTE,
+		).exists()
 		alerta = create_credit_limit_alert(cliente=pedido.cliente, pedido=pedido, evaluation=exc.evaluation)
-		notify_credit_limit_alert(alerta=alerta, pedido_id=pedido.id)
+		if not already_pending:
+			notify_credit_limit_alert(alerta=alerta, pedido_id=pedido.id, evaluation=exc.evaluation)
 		messages.warning(
 			request,
-			_('The customer exceeded the credit limit. Review the alert and choose Release or Block before generating the invoice.'),
+			_('This order is on CREDIT HOLD because the customer exceeded the credit limit. Release or Block it before generating the invoice.'),
 		)
 		return redirect(f"{reverse('backoffice_pedido_detalle', args=[pedido.id])}?credit_limit_alert=1")
 	except ValidationError as exc:

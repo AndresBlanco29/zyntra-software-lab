@@ -94,12 +94,12 @@
 {% endif %}
 
 {% if credit_limit_evaluation.has_limit %}
-<div class="alert {% if credit_limit_evaluation.exceeds_limit %}alert-danger{% else %}alert-info{% endif %} border-0 shadow-sm mb-3 credit-limit-summary-banner">
+<div class="alert {% if credit_limit_evaluation.exceeds_limit and not pedido.credit_limit_liberado %}alert-warning{% elif credit_limit_evaluation.exceeds_limit %}alert-danger{% else %}alert-info{% endif %} border-0 shadow-sm mb-3 credit-limit-summary-banner">
   <div class="d-flex flex-wrap justify-content-between gap-3 align-items-start">
     <div>
       <div class="fw-bold text-uppercase small mb-1">{% trans "Customer credit limit" %}</div>
       <div>{% trans "Limit" %}: <strong>${{ credit_limit_evaluation.credit_limit|floatformat:2 }}</strong> |
-      {% trans "Due balance" %}: <strong>${{ credit_limit_evaluation.due_balance|floatformat:2 }}</strong> |
+      {% trans "Open balance" %}: <strong>${{ credit_limit_evaluation.open_balance|floatformat:2 }}</strong> |
       {% trans "This order" %}: <strong>${{ credit_limit_evaluation.request_amount|floatformat:2 }}</strong></div>
       <div class="small mt-1">
         {% trans "Remaining limit" %}: <strong>${{ credit_limit_evaluation.remaining_limit|floatformat:2 }}</strong>
@@ -109,42 +109,47 @@
       </div>
     </div>
     {% if pedido.credit_limit_liberado %}
-    <span class="badge text-bg-success">{% trans "Exception released for this order" %}</span>
-    {% elif pedido.credit_limit_bloqueado %}
-    <span class="badge text-bg-danger">{% trans "Blocked by credit limit" %}</span>
+    <span class="badge text-bg-success">🟢 {% trans "RELEASE" %}</span>
+    {% elif pedido.credit_limit_bloqueado or pending_credit_limit_alert %}
+    <span class="badge text-bg-warning text-dark">🟡 {% trans "HOLD" %}</span>
     {% endif %}
   </div>
 </div>
 {% endif %}
 
 {% if pending_credit_limit_alert %}
-<div class="alert alert-danger border-danger shadow-lg mb-3 credit-limit-alert-banner" role="alert">
+<div class="alert alert-warning border-warning shadow-lg mb-3 credit-limit-alert-banner" role="alert">
   <div class="d-flex align-items-start gap-3">
     <div class="credit-limit-alert-icon">!</div>
     <div class="flex-grow-1">
-      <h4 class="alert-heading mb-2">{% trans "Credit limit exceeded — admin review required" %}</h4>
-      <p class="mb-2">{% blocktrans with customer=pedido.cliente.nombre_empresa %}The customer <strong>{{ customer }}</strong> is trying to generate an invoice / order that exceeds the configured credit limit.{% endblocktrans %}</p>
+      <h4 class="alert-heading mb-2">🟡 {% trans "CREDIT HOLD — authorization required" %}</h4>
+      <p class="mb-2">{% blocktrans with customer=pedido.cliente.nombre_empresa %}The order for <strong>{{ customer }}</strong> exceeded the configured credit limit and was placed on hold when it arrived at LTG.{% endblocktrans %}</p>
+      <p class="mb-2"><strong>{% trans "Reason" %}:</strong> {% trans "Credit Limit Exceeded" %}</p>
       <ul class="mb-3">
         <li>{% trans "Credit limit" %}: <strong>${{ pending_credit_limit_alert.limite_credito|floatformat:2 }}</strong></li>
-        <li>{% trans "Current due balance" %}: <strong>${{ pending_credit_limit_alert.monto_adeudado|floatformat:2 }}</strong></li>
-        <li>{% trans "This order / invoice amount" %}: <strong>${{ pending_credit_limit_alert.monto_operacion|floatformat:2 }}</strong></li>
-        <li>{% trans "Projected due balance" %}: <strong>${{ pending_credit_limit_alert.saldo_proyectado|floatformat:2 }}</strong></li>
+        <li>{% trans "Current open balance" %}: <strong>${{ pending_credit_limit_alert.monto_adeudado|floatformat:2 }}</strong></li>
+        <li>{% trans "This order amount" %}: <strong>${{ pending_credit_limit_alert.monto_operacion|floatformat:2 }}</strong></li>
+        <li>{% trans "Projected open balance" %}: <strong>${{ pending_credit_limit_alert.saldo_proyectado|floatformat:2 }}</strong></li>
         <li>{% trans "Exceeded by" %}: <strong>${{ pending_credit_limit_alert.exceso|floatformat:2 }}</strong></li>
       </ul>
       {% if request.user|has_internal_permission:'backoffice.orders.manage' %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold" for="creditHoldComment">{% trans "Comment / observation (optional)" %}</label>
+        <textarea form="creditHoldReleaseForm" id="creditHoldComment" name="comentario" class="form-control" rows="2" placeholder="{% trans 'Payment received, payment arrangement, etc.' %}"></textarea>
+      </div>
       <div class="d-flex flex-wrap gap-2">
-        <form method="post" action="{% url 'backoffice_resolve_credit_limit' pedido.id %}">
+        <form method="post" action="{% url 'backoffice_resolve_credit_limit' pedido.id %}" id="creditHoldReleaseForm">
           {% csrf_token %}
           <input type="hidden" name="action" value="release">
-          <button type="submit" class="btn btn-success btn-lg">{% trans "Release" %}</button>
+          <button type="submit" class="btn btn-success btn-lg">🟢 {% trans "Release Order" %}</button>
         </form>
         <form method="post" action="{% url 'backoffice_resolve_credit_limit' pedido.id %}">
           {% csrf_token %}
           <input type="hidden" name="action" value="block">
-          <button type="submit" class="btn btn-danger btn-lg">{% trans "Block invoice" %}</button>
+          <button type="submit" class="btn btn-danger btn-lg">{% trans "Block permanently" %}</button>
         </form>
       </div>
-      <div class="small text-muted mt-2">{% trans "Release allows this order to generate the invoice despite the exceeded limit. Block prevents issuing the invoice and places the customer on credit hold." %}</div>
+      <div class="small text-muted mt-2">{% trans "Release authorizes this order to continue (picking and invoice). Block keeps the order stopped and places the customer on credit hold." %}</div>
       {% endif %}
     </div>
   </div>

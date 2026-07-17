@@ -1292,9 +1292,15 @@ def backoffice_resolve_credit_limit(request, pedido_id):
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
 	action = (request.POST.get('action') or '').strip().lower()
+	comentario = (request.POST.get('comentario') or '').strip()
 	try:
 		with transaction.atomic():
-			resolve_credit_limit_alert(pedido=pedido, usuario=request.user, action=action)
+			resolve_credit_limit_alert(
+				pedido=pedido,
+				usuario=request.user,
+				action=action,
+				comentario=comentario,
+			)
 	except ValueError:
 		messages.error(request, _('The credit limit alert is no longer pending review.'))
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
@@ -1302,7 +1308,7 @@ def backoffice_resolve_credit_limit(request, pedido_id):
 	if action == 'release':
 		messages.success(
 			request,
-			_('Credit limit exception released for this order. You can now generate the invoice.'),
+			_('Credit hold released for this order. Processing can continue.'),
 		)
 	else:
 		messages.error(

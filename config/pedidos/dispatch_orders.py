@@ -57,6 +57,8 @@ class DispatchOrderRow:
 	detail_url: str
 	workflow_badge: Optional[object] = None
 	display_ref: str = ''
+	credit_hold_pending: bool = False
+	credit_hold_released: bool = False
 
 
 def _quote_status_badge_class(estado):
@@ -345,9 +347,21 @@ def _quote_rows_for_statuses(*, statuses):
 
 
 def _pedido_rows_from_pedidos(*, pedidos, bucket):
+	from config.clientes.models import ClienteCreditoLimiteAlerta
+
+	pedido_ids = [pedido.id for pedido in pedidos]
+	pending_hold_ids = set(
+		ClienteCreditoLimiteAlerta.objects.filter(
+			pedido_id__in=pedido_ids,
+			estado=ClienteCreditoLimiteAlerta.ESTADO_PENDIENTE,
+		).values_list('pedido_id', flat=True)
+	)
 	rows = []
 	for pedido in pedidos:
 		status_label, status_badge_class = _pedido_status_display(pedido, bucket=bucket)
+		credit_hold_pending = bool(
+			pedido.credit_limit_bloqueado or pedido.id in pending_hold_ids
+		) and not pedido.credit_limit_liberado
 		rows.append(
 			DispatchOrderRow(
 				row_key=f'order-{pedido.id}',
@@ -363,6 +377,8 @@ def _pedido_rows_from_pedidos(*, pedidos, bucket):
 				detail_url=_pedido_manage_url(pedido),
 				workflow_badge=build_order_workflow_badge(pedido),
 				display_ref=pedido.numero_display,
+				credit_hold_pending=credit_hold_pending,
+				credit_hold_released=bool(pedido.credit_limit_liberado),
 			)
 		)
 	return rows

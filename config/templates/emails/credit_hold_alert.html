@@ -1,0 +1,34 @@
+{% extends "emails/base_email.html" %}
+{% load i18n %}
+
+{% block preheader %}{% blocktrans with order_id=pedido.id customer=cliente.nombre_empresa %}Credit hold on order #{{ order_id }} for {{ customer }}.{% endblocktrans %}{% endblock %}
+{% block header_title %}{% trans "CREDIT HOLD" %}{% endblock %}
+{% block header_subtitle %}{{ reason_label }}{% endblock %}
+
+{% block content %}
+<div style="background:#fff7ed; border:1px solid #fdba74; border-radius:12px; padding:16px 18px; margin-bottom:22px;">
+  <div style="font-size:14px; font-weight:700; color:#9a3412; margin-bottom:8px;">{% trans "This order is on hold and cannot continue until authorized." %}</div>
+  <div style="font-size:13px; color:#7c2d12;">{% trans "Reason" %}: <strong>{{ reason_label }}</strong></div>
+</div>
+
+<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px 18px; margin-bottom:22px;">
+  <table width="100%" cellspacing="0" cellpadding="0" role="presentation" style="font-size:14px; color:#1e293b;">
+    <tr><td style="padding:6px 0; width:180px;"><strong>{% trans "Customer:" %}</strong></td><td>{{ cliente.nombre_empresa }}</td></tr>
+    <tr><td style="padding:6px 0;"><strong>{% trans "Order:" %}</strong></td><td>#{{ pedido.id }}</td></tr>
+    <tr><td style="padding:6px 0;"><strong>{% trans "Credit limit:" %}</strong></td><td>${{ evaluation.credit_limit }}</td></tr>
+    <tr><td style="padding:6px 0;"><strong>{% trans "Current open balance:" %}</strong></td><td>${{ evaluation.open_balance }}</td></tr>
+    <tr><td style="padding:6px 0;"><strong>{% trans "This order amount:" %}</strong></td><td>${{ evaluation.request_amount }}</td></tr>
+    <tr><td style="padding:6px 0;"><strong>{% trans "Projected open balance:" %}</strong></td><td>${{ evaluation.projected_balance }}</td></tr>
+    <tr><td style="padding:6px 0;"><strong>{% trans "Exceeded by:" %}</strong></td><td style="color:#b91c1c; font-weight:700;">${{ evaluation.excess_amount }}</td></tr>
+  </table>
+</div>
+
+<div style="text-align:center; margin:28px 0 8px;">
+  <a href="{{ order_url }}" style="display:inline-block; background:#0b3d91; color:#ffffff; text-decoration:none; font-weight:700; padding:12px 22px; border-radius:10px;">
+    {% trans "Review order and Release / Block" %}
+  </a>
+</div>
+<p style="font-size:12px; color:#64748b; text-align:center; margin-top:12px;">
+  {% trans "For security, authorization must be completed inside the application." %}
+</p>
+{% endblock %}

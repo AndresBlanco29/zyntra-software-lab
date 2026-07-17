@@ -4598,23 +4598,165 @@ def _build_invoice_payment_terms_payload(*, invoice, client):
     return payload
 
 
+def _client_account_ref_cache(client):
+    cache = getattr(client, '_ltg_account_refs', None)
+    if not isinstance(cache, dict):
+        cache = {}
+        try:
+            client._ltg_account_refs = cache
+        except Exception:
+            return {}
+    return cache
+
+
 def _get_undeposited_funds_account_ref(client):
-    cached = getattr(client, '_ltg_undeposited_funds_ref', None)
-    if cached is not None or hasattr(client, '_ltg_undeposited_funds_ref'):
-        return cached
+    cache = _client_account_ref_cache(client)
+    if 'undeposited' in cache:
+        return cache['undeposited']
     account_ref = _account_ref_from_setting(client, 'QUICKBOOKS_UNDEPOSITED_FUNDS_ACCOUNT_ID')
-    if account_ref:
-        setattr(client, '_ltg_undeposited_funds_ref', account_ref)
-        return account_ref
-    account_ref = _first_account_ref_from_queries(
-        client,
-        (
-            "select Id, Name from Account where AccountSubType = 'UndepositedFunds' maxresults 1",
-            "select Id, Name from Account where Name = 'Undeposited Funds' maxresults 1",
-        ),
-    )
-    setattr(client, '_ltg_undeposited_funds_ref', account_ref)
+    if not account_ref:
+        account_ref = _first_account_ref_from_queries(
+            client,
+            (
+                "select Id, Name from Account where AccountSubType = 'UndepositedFunds' maxresults 1",
+                "select Id, Name from Account where Name = 'Undeposited Funds' maxresults 1",
+            ),
+        )
+    cache['undeposited'] = account_ref
     return account_ref
+
+
+def _get_cash_account_ref(client):
+    cache = _client_account_ref_cache(client)
+    if 'cash' in cache:
+        return cache['cash']
+    account_ref = _account_ref_from_setting(client, 'QUICKBOOKS_CASH_ACCOUNT_ID')
+    if not account_ref:
+        account_ref = _first_account_ref_from_queries(
+            client,
+            (
+                "select Id, Name from Account where AccountSubType = 'CashOnHand' maxresults 1",
+                "select Id, Name from Account where Name = 'Cash' maxresults 1",
+                "select Id, Name from Account where Name = 'Cash on hand' maxresults 1",
+            ),
+        )
+    cache['cash'] = account_ref
+    return account_ref
+
+
+def _is_cash_payment_method(method):
+    return str(method or '').strip().upper() == 'CASH'
+
+
+def _delivery_payment_rows(delivery):
+    payments = getattr(delivery, 'payments', None)
+    if payments is None:
+        return []
+    try:
+        return list(payments.all())
+    except (TypeError, AttributeError):
+        try:
+            return list(payments)
+        except TypeError:
+            return []
+
+
+def _payment_slices_for_delivery(delivery):
+    """
+    Split a paid delivery into cash vs non-cash slices for QuickBooks deposit routing.
+
+    Cash goes to the Cash account. Card/ACH/cheque/transfer/Zelle/etc. go to
+    Undeposited Funds (Payments to Deposit) for later bank reconciliation.
+    """
+    if delivery is None:
+        return []
+
+    payment_rows = _delivery_payment_rows(delivery)
+    if payment_rows:
+        slices = []
+        for row in payment_rows:
+            amount = _quantize_money(getattr(row, 'monto', 0) or 0)
+            if amount <= 0:
+                continue
+            method = str(getattr(row, 'metodo_pago', '') or '').strip().upper()
+            if hasattr(row, 'get_metodo_pago_display'):
+                method_label = str(row.get_metodo_pago_display() or method)
+            else:
+                method_label = method
+            slices.append(
+                {
+                    'amount': amount,
+                    'is_cash': _is_cash_payment_method(method),
+                    'method': method,
+                    'method_label': method_label,
+                }
+            )
+        if slices:
+            return slices
+
+    method = str(getattr(delivery, 'metodo_pago', '') or '').strip().upper()
+    total = _quantize_money(getattr(delivery, 'monto_pagado', 0) or 0)
+    if total <= 0:
+        return []
+
+    if method == 'MIXTO':
+        cash_amount = _quantize_money(getattr(delivery, 'monto_pagado_cash', 0) or 0)
+        cheque_amount = _quantize_money(getattr(delivery, 'monto_pagado_cheque', 0) or 0)
+        slices = []
+        if cash_amount > 0:
+            slices.append(
+                {
+                    'amount': cash_amount,
+                    'is_cash': True,
+                    'method': 'CASH',
+                    'method_label': 'Cash',
+                }
+            )
+        if cheque_amount > 0:
+            slices.append(
+                {
+                    'amount': cheque_amount,
+                    'is_cash': False,
+                    'method': 'CHEQUE',
+                    'method_label': 'Cheque',
+                }
+            )
+        if slices:
+            return slices
+
+    if hasattr(delivery, 'get_metodo_pago_display') and method:
+        method_label = str(delivery.get_metodo_pago_display() or method)
+    else:
+        method_label = method
+
+    # MULTIPLE without line items cannot be safely split: route to Undeposited Funds.
+    is_cash = _is_cash_payment_method(method)
+    return [
+        {
+            'amount': total,
+            'is_cash': is_cash,
+            'method': method,
+            'method_label': method_label,
+        }
+    ]
+
+
+def _deposit_account_ref_for_payment_slice(client, *, is_cash):
+    if is_cash:
+        cash_ref = _get_cash_account_ref(client)
+        if not cash_ref:
+            raise QuickBooksSyncError(
+                'QuickBooks Cash account was not found. '
+                'Set QUICKBOOKS_CASH_ACCOUNT_ID or create a Cash / Cash on hand account in QuickBooks.'
+            )
+        return cash_ref
+    undeposited_ref = _get_undeposited_funds_account_ref(client)
+    if not undeposited_ref:
+        raise QuickBooksSyncError(
+            'QuickBooks Undeposited Funds account was not found. '
+            'Set QUICKBOOKS_UNDEPOSITED_FUNDS_ACCOUNT_ID or ensure Undeposited Funds exists in QuickBooks.'
+        )
+    return undeposited_ref
 
 
 def _local_invoice_paid_amount(invoice):
@@ -4645,9 +4787,47 @@ def _payment_txn_date_for_invoice(invoice):
     return timezone.localdate()
 
 
+def _build_invoice_payment_payload(
+    *,
+    customer_qb_id,
+    invoice_qb_id,
+    invoice,
+    amount,
+    deposit_ref,
+    method_label='',
+):
+    note = f'La Tortilla delivery payment for {invoice.numero}'
+    if method_label:
+        note = f'{note} | Method: {method_label}'
+    payload = {
+        'CustomerRef': {'value': customer_qb_id},
+        'TotalAmt': _as_float(amount),
+        'TxnDate': _payment_txn_date_for_invoice(invoice).isoformat(),
+        'PrivateNote': _truncate(note, limit=4000),
+        'Line': [
+            {
+                'Amount': _as_float(amount),
+                'LinkedTxn': [
+                    {
+                        'TxnId': invoice_qb_id,
+                        'TxnType': 'Invoice',
+                    }
+                ],
+            }
+        ],
+        'DepositToAccountRef': deposit_ref,
+    }
+    return payload
+
+
 def _sync_invoice_payment_if_needed(*, client, invoice, remote_invoice, customer_quickbooks_id):
     """
-    Create a QB Payment when the local delivery is paid.
+    Create QB Payment(s) when the local delivery is paid.
+
+    Cash → DepositToAccountRef = Cash account (funds already received).
+    Non-cash (card, ACH, cheque, transfer, Zelle, etc.) → Undeposited Funds
+    (Payments to Deposit) so bank reconciliation can match the deposit later.
+
     Soft-fails: never raises; returns a result dict or None.
     """
     paid_amount = _local_invoice_paid_amount(invoice)
@@ -4663,46 +4843,61 @@ def _sync_invoice_payment_if_needed(*, client, invoice, remote_invoice, customer
     if open_balance <= 0:
         return {'action': 'skipped', 'reason': 'Invoice already has zero open balance in QuickBooks.'}
 
-    pay_amount = min(paid_amount, open_balance)
-    payment_payload = {
-        'CustomerRef': {'value': customer_qb_id},
-        'TotalAmt': _as_float(pay_amount),
-        'TxnDate': _payment_txn_date_for_invoice(invoice).isoformat(),
-        'PrivateNote': _truncate(
-            f'La Tortilla delivery payment for {invoice.numero}',
-            limit=4000,
-        ),
-        'Line': [
-            {
-                'Amount': _as_float(pay_amount),
-                'LinkedTxn': [
-                    {
-                        'TxnId': invoice_qb_id,
-                        'TxnType': 'Invoice',
-                    }
-                ],
-            }
-        ],
-    }
     delivery = getattr(invoice, 'delivery', None)
-    if delivery is not None and getattr(delivery, 'metodo_pago', ''):
-        payment_payload['PrivateNote'] = _truncate(
-            f"{payment_payload['PrivateNote']} | Method: {delivery.get_metodo_pago_display()}",
-            limit=4000,
-        )
+    slices = _payment_slices_for_delivery(delivery)
+    if not slices:
+        slices = [
+            {
+                'amount': paid_amount,
+                'is_cash': False,
+                'method': '',
+                'method_label': '',
+            }
+        ]
 
+    remaining = min(paid_amount, open_balance)
+    created_payments = []
     try:
-        deposit_ref = _get_undeposited_funds_account_ref(client)
-        if deposit_ref:
-            payment_payload['DepositToAccountRef'] = deposit_ref
-        created_payment = client.create_payment(payment_payload)
+        for payment_slice in slices:
+            if remaining <= 0:
+                break
+            slice_amount = min(_quantize_money(payment_slice['amount']), remaining)
+            if slice_amount <= 0:
+                continue
+            deposit_ref = _deposit_account_ref_for_payment_slice(
+                client,
+                is_cash=bool(payment_slice.get('is_cash')),
+            )
+            payment_payload = _build_invoice_payment_payload(
+                customer_qb_id=customer_qb_id,
+                invoice_qb_id=invoice_qb_id,
+                invoice=invoice,
+                amount=slice_amount,
+                deposit_ref=deposit_ref,
+                method_label=payment_slice.get('method_label') or '',
+            )
+            created_payment = client.create_payment(payment_payload)
+            created_payments.append(
+                {
+                    'quickbooks_id': str(created_payment.get('Id') or ''),
+                    'amount': _as_float(slice_amount),
+                    'is_cash': bool(payment_slice.get('is_cash')),
+                    'method': payment_slice.get('method') or '',
+                    'deposit_account': deposit_ref,
+                    'payload': created_payment,
+                }
+            )
+            remaining = _quantize_money(remaining - slice_amount)
     except (QuickBooksAPIError, QuickBooksSyncError, TypeError, ValueError, AttributeError) as exc:
         logger.warning(
             'QuickBooks payment sync failed for invoice %s: %s',
             getattr(invoice, 'numero', invoice.pk),
             exc,
         )
-        return {'action': 'failed', 'error': str(exc)}
+        return {'action': 'failed', 'error': str(exc), 'payments': created_payments}
+
+    if not created_payments:
+        return {'action': 'skipped', 'reason': 'No payment amount remaining to sync.'}
 
     update_fields = []
     if invoice.qb_payment_status != 'PAID':
@@ -4711,11 +4906,13 @@ def _sync_invoice_payment_if_needed(*, client, invoice, remote_invoice, customer
     if update_fields:
         invoice.save(update_fields=update_fields)
 
+    total_synced = sum((_quantize_money(item['amount']) for item in created_payments), Decimal('0.00'))
     return {
         'action': 'created',
-        'quickbooks_id': str(created_payment.get('Id') or ''),
-        'amount': _as_float(pay_amount),
-        'payload': created_payment,
+        'quickbooks_id': created_payments[0]['quickbooks_id'],
+        'amount': _as_float(total_synced),
+        'payments': created_payments,
+        'payload': created_payments[0]['payload'],
     }
 
 

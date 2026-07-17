@@ -10,13 +10,28 @@ from django.utils import timezone
 
 from config.integrations.quickbooks.sync import (
 	_build_invoice_payment_terms_payload,
+	_is_cash_payment_method,
 	_local_invoice_paid_amount,
+	_payment_slices_for_delivery,
 	_preferred_term_name_for_local,
 	_remote_invoice_open_balance,
 	_resolve_or_create_sales_term_ref,
 	_sync_invoice_payment_if_needed,
 	_sync_result,
 )
+
+
+def _mock_account_query(query):
+	text = str(query or '')
+	if 'Undeposited' in text:
+		return {'Account': [{'Id': '4', 'Name': 'Undeposited Funds'}]}
+	if 'CashOnHand' in text or "Name = 'Cash'" in text or 'Cash on hand' in text:
+		return {'Account': [{'Id': '35', 'Name': 'Cash'}]}
+	if "Id = '35'" in text:
+		return {'Account': [{'Id': '35', 'Name': 'Cash'}]}
+	if "Id = '4'" in text:
+		return {'Account': [{'Id': '4', 'Name': 'Undeposited Funds'}]}
+	return {'Account': []}
 
 
 class InvoiceExportTermsHelpersTests(SimpleTestCase):
@@ -111,7 +126,7 @@ class InvoiceExportPaymentHelpersTests(SimpleTestCase):
 	def test_payment_created_for_paid_invoice(self):
 		client = MagicMock()
 		client._escape_query_value.side_effect = lambda value: value
-		client.query.return_value = {'Account': [{'Id': '4', 'Name': 'Undeposited Funds'}]}
+		client.query.side_effect = _mock_account_query
 		client.create_payment.return_value = {'Id': '500', 'TotalAmt': 50}
 		invoice = SimpleNamespace(
 			numero='INV-PAID',
@@ -122,8 +137,11 @@ class InvoiceExportPaymentHelpersTests(SimpleTestCase):
 			delivery=SimpleNamespace(
 				estado_pago='PAGADO',
 				monto_pagado=Decimal('50.00'),
+				monto_pagado_cash=Decimal('0.00'),
+				monto_pagado_cheque=Decimal('0.00'),
 				metodo_pago='CASH',
 				delivered_at=timezone.now(),
+				payments=SimpleNamespace(all=lambda: []),
 				get_metodo_pago_display=lambda: 'Cash',
 			),
 			save=MagicMock(),
@@ -143,14 +161,128 @@ class InvoiceExportPaymentHelpersTests(SimpleTestCase):
 		payment_payload = client.create_payment.call_args.args[0]
 		self.assertEqual(payment_payload['TotalAmt'], 50.0)
 		self.assertEqual(payment_payload['Line'][0]['LinkedTxn'][0]['TxnId'], '88')
+		self.assertEqual(payment_payload['DepositToAccountRef']['value'], '35')
+		self.assertEqual(payment_payload['DepositToAccountRef']['name'], 'Cash')
 		self.assertEqual(invoice.qb_payment_status, 'PAID')
+
+	def test_card_payment_goes_to_undeposited_funds(self):
+		client = MagicMock()
+		client._escape_query_value.side_effect = lambda value: value
+		client.query.side_effect = _mock_account_query
+		client.create_payment.return_value = {'Id': '501', 'TotalAmt': 40}
+		invoice = SimpleNamespace(
+			numero='INV-CARD',
+			pk=12,
+			quickbooks_id='',
+			qb_payment_status='',
+			creada_en=timezone.now(),
+			delivery=SimpleNamespace(
+				estado_pago='PAGADO',
+				monto_pagado=Decimal('40.00'),
+				monto_pagado_cash=Decimal('0.00'),
+				monto_pagado_cheque=Decimal('0.00'),
+				metodo_pago='TARJETA',
+				delivered_at=timezone.now(),
+				payments=SimpleNamespace(all=lambda: []),
+				get_metodo_pago_display=lambda: 'Card',
+			),
+			save=MagicMock(),
+		)
+
+		result = _sync_invoice_payment_if_needed(
+			client=client,
+			invoice=invoice,
+			remote_invoice={'Id': '89', 'Balance': 40, 'TotalAmt': 40},
+			customer_quickbooks_id='33',
+		)
+
+		self.assertEqual(result['action'], 'created')
+		payment_payload = client.create_payment.call_args.args[0]
+		self.assertEqual(payment_payload['DepositToAccountRef']['value'], '4')
+		self.assertEqual(payment_payload['DepositToAccountRef']['name'], 'Undeposited Funds')
+		self.assertIn('Card', payment_payload['PrivateNote'])
+
+	def test_mixto_splits_cash_and_cheque_deposit_accounts(self):
+		client = MagicMock()
+		client._escape_query_value.side_effect = lambda value: value
+		client.query.side_effect = _mock_account_query
+		client.create_payment.side_effect = [
+			{'Id': '601', 'TotalAmt': 30},
+			{'Id': '602', 'TotalAmt': 20},
+		]
+		invoice = SimpleNamespace(
+			numero='INV-MIX',
+			pk=13,
+			quickbooks_id='',
+			qb_payment_status='',
+			creada_en=timezone.now(),
+			delivery=SimpleNamespace(
+				estado_pago='PAGADO',
+				monto_pagado=Decimal('50.00'),
+				monto_pagado_cash=Decimal('30.00'),
+				monto_pagado_cheque=Decimal('20.00'),
+				metodo_pago='MIXTO',
+				delivered_at=timezone.now(),
+				payments=SimpleNamespace(all=lambda: []),
+				get_metodo_pago_display=lambda: 'Cash + cheque',
+			),
+			save=MagicMock(),
+		)
+
+		result = _sync_invoice_payment_if_needed(
+			client=client,
+			invoice=invoice,
+			remote_invoice={'Id': '90', 'Balance': 50, 'TotalAmt': 50},
+			customer_quickbooks_id='33',
+		)
+
+		self.assertEqual(result['action'], 'created')
+		self.assertEqual(client.create_payment.call_count, 2)
+		cash_payload = client.create_payment.call_args_list[0].args[0]
+		cheque_payload = client.create_payment.call_args_list[1].args[0]
+		self.assertEqual(cash_payload['DepositToAccountRef']['value'], '35')
+		self.assertEqual(cheque_payload['DepositToAccountRef']['value'], '4')
+		self.assertEqual(result['payments'][0]['is_cash'], True)
+		self.assertEqual(result['payments'][1]['is_cash'], False)
+
+	def test_payment_slices_from_delivery_payment_rows(self):
+		delivery = SimpleNamespace(
+			metodo_pago='MULTIPLE',
+			monto_pagado=Decimal('70.00'),
+			monto_pagado_cash=Decimal('0.00'),
+			monto_pagado_cheque=Decimal('0.00'),
+			payments=SimpleNamespace(
+				all=lambda: [
+					SimpleNamespace(
+						monto=Decimal('25.00'),
+						metodo_pago='CASH',
+						get_metodo_pago_display=lambda: 'Cash',
+					),
+					SimpleNamespace(
+						monto=Decimal('45.00'),
+						metodo_pago='ACH',
+						get_metodo_pago_display=lambda: 'ACH',
+					),
+				]
+			),
+		)
+		slices = _payment_slices_for_delivery(delivery)
+		self.assertEqual(len(slices), 2)
+		self.assertTrue(slices[0]['is_cash'])
+		self.assertFalse(slices[1]['is_cash'])
+		self.assertEqual(slices[1]['method'], 'ACH')
+
+	def test_is_cash_payment_method(self):
+		self.assertTrue(_is_cash_payment_method('CASH'))
+		self.assertFalse(_is_cash_payment_method('TARJETA'))
+		self.assertFalse(_is_cash_payment_method('ACH'))
 
 	def test_payment_soft_fails_without_raising(self):
 		from config.integrations.quickbooks.client import QuickBooksAPIError
 
 		client = MagicMock()
 		client._escape_query_value.side_effect = lambda value: value
-		client.query.return_value = {'Account': [{'Id': '4', 'Name': 'Undeposited Funds'}]}
+		client.query.side_effect = _mock_account_query
 		client.create_payment.side_effect = QuickBooksAPIError('boom')
 		invoice = SimpleNamespace(
 			numero='INV-FAIL',
@@ -161,9 +293,12 @@ class InvoiceExportPaymentHelpersTests(SimpleTestCase):
 			delivery=SimpleNamespace(
 				estado_pago='PAGADO',
 				monto_pagado=Decimal('20.00'),
-				metodo_pago='',
+				monto_pagado_cash=Decimal('0.00'),
+				monto_pagado_cheque=Decimal('0.00'),
+				metodo_pago='ZELLE',
 				delivered_at=None,
-				get_metodo_pago_display=lambda: '',
+				payments=SimpleNamespace(all=lambda: []),
+				get_metodo_pago_display=lambda: 'Zelle',
 			),
 			save=MagicMock(),
 		)
@@ -177,6 +312,40 @@ class InvoiceExportPaymentHelpersTests(SimpleTestCase):
 
 		self.assertEqual(result['action'], 'failed')
 		self.assertIn('boom', result['error'])
+
+	def test_cash_payment_fails_soft_when_cash_account_missing(self):
+		client = MagicMock()
+		client._escape_query_value.side_effect = lambda value: value
+		client.query.return_value = {'Account': []}
+		invoice = SimpleNamespace(
+			numero='INV-NO-CASH-ACCT',
+			pk=14,
+			quickbooks_id='91',
+			qb_payment_status='',
+			creada_en=timezone.now(),
+			delivery=SimpleNamespace(
+				estado_pago='PAGADO',
+				monto_pagado=Decimal('15.00'),
+				monto_pagado_cash=Decimal('0.00'),
+				monto_pagado_cheque=Decimal('0.00'),
+				metodo_pago='CASH',
+				delivered_at=timezone.now(),
+				payments=SimpleNamespace(all=lambda: []),
+				get_metodo_pago_display=lambda: 'Cash',
+			),
+			save=MagicMock(),
+		)
+
+		result = _sync_invoice_payment_if_needed(
+			client=client,
+			invoice=invoice,
+			remote_invoice={'Id': '91', 'Balance': 15},
+			customer_quickbooks_id='33',
+		)
+
+		self.assertEqual(result['action'], 'failed')
+		self.assertIn('Cash account', result['error'])
+		client.create_payment.assert_not_called()
 
 	def test_payment_skipped_when_unpaid(self):
 		client = MagicMock()

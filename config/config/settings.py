@@ -268,6 +268,7 @@ QUICKBOOKS_IMAGE_DOWNLOAD_TIMEOUT = max(int(os.environ.get('QUICKBOOKS_IMAGE_DOW
 # When True, new QuickBooks items are created as Inventory so invoicing reduces QtyOnHand in QuickBooks.
 QUICKBOOKS_USE_INVENTORY_ITEMS = env_bool('QUICKBOOKS_USE_INVENTORY_ITEMS', default=True)
 QUICKBOOKS_UNDEPOSITED_FUNDS_ACCOUNT_ID = os.environ.get('QUICKBOOKS_UNDEPOSITED_FUNDS_ACCOUNT_ID', '').strip()
+QUICKBOOKS_CASH_ACCOUNT_ID = os.environ.get('QUICKBOOKS_CASH_ACCOUNT_ID', '').strip()
 
 mysql_configured = bool(
     mysql_name

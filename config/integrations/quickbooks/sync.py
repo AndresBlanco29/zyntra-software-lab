@@ -2059,6 +2059,36 @@ def _apply_quickbooks_item_to_local_record(
     return presentacion
 
 
+def _skip_or_deactivate_deleted_quickbooks_item(*, payload, quickbooks_id, prefetched_presentacion=None):
+    """Skip deleted QB items; deactivate any already-linked local catalog product."""
+    deactivated = _deactivate_local_product_for_quickbooks_item(
+        quickbooks_id=quickbooks_id,
+        prefetched_presentacion=prefetched_presentacion,
+    )
+    if deactivated is not None:
+        producto = deactivated.producto
+        label = (
+            f'{producto.nombre} / {deactivated.nombre}'
+            if producto is not None
+            else ((payload or {}).get('Name') or quickbooks_id)
+        )
+        return {
+            'ok': True,
+            'action': 'deactivated',
+            'entity': 'Item',
+            'quickbooks_id': quickbooks_id,
+            'local_id': deactivated.id,
+            'label': label,
+            'reason': 'QuickBooks item is deleted.',
+        }
+    return _skip_import_result(
+        entity='Item',
+        quickbooks_id=quickbooks_id,
+        label=(payload or {}).get('Name') or quickbooks_id,
+        reason='QuickBooks item is deleted.',
+    )
+
+
 @transaction.atomic
 def import_quickbooks_item_record(
     payload,
@@ -2074,11 +2104,10 @@ def import_quickbooks_item_record(
     if not quickbooks_id:
         raise QuickBooksSyncError('QuickBooks item payload is missing an Id.')
     if not _quickbooks_item_payload_is_importable(payload):
-        return _skip_import_result(
-            entity='Item',
+        return _skip_or_deactivate_deleted_quickbooks_item(
+            payload=payload,
             quickbooks_id=quickbooks_id,
-            label=(payload or {}).get('Name') or quickbooks_id,
-            reason='QuickBooks item is deleted.',
+            prefetched_presentacion=prefetched_presentacion,
         )
 
     if skip_images is None:
@@ -2088,14 +2117,11 @@ def import_quickbooks_item_record(
     else:
         payload = dict(payload or {})
     if not _quickbooks_item_payload_is_importable(payload):
-        return _skip_import_result(
-            entity='Item',
+        return _skip_or_deactivate_deleted_quickbooks_item(
+            payload=payload,
             quickbooks_id=quickbooks_id,
-            label=payload.get('Name') or quickbooks_id,
-            reason='QuickBooks item is deleted.',
+            prefetched_presentacion=prefetched_presentacion,
         )
-    client = client or QuickBooksAPIClient()
-
     product_name, presentation_name, tipo_contenido, unidades = _parse_quickbooks_presentation(payload)
     description = _truncate(payload.get('Description') or payload.get('FullyQualifiedName') or '', limit=4000)
     sku = _truncate(payload.get('Sku') or '', limit=100)
@@ -2106,6 +2132,20 @@ def import_quickbooks_item_record(
         quickbooks_id,
         prefetched_presentacion=prefetched_presentacion,
     )
+    item_active = _resolve_quickbooks_item_active(
+        payload,
+        client=client,
+        fetch_when_missing=False,
+        force_refresh=False,
+    )
+    if not item_active and existing is None:
+        return _skip_import_result(
+            entity='Item',
+            quickbooks_id=quickbooks_id,
+            label=payload.get('Name') or quickbooks_id,
+            reason='QuickBooks item is inactive.',
+        )
+    client = client or QuickBooksAPIClient()
     item_active = _resolve_quickbooks_item_active(
         payload,
         client=client,

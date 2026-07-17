@@ -1138,6 +1138,8 @@ class QuickBooksDeletedRecordImportTests(TestCase):
     @patch('config.integrations.quickbooks.sync._save_quickbooks_item_image', return_value=False)
     @patch('config.integrations.quickbooks.sync._enrich_quickbooks_item_payload', side_effect=lambda payload, **kwargs: payload)
     def test_inactive_item_deactivates_existing_linked_product(self, _mock_enrich, _mock_image):
+        from unittest.mock import MagicMock
+
         producto = Producto.objects.create(
             nombre='Was Active',
             activo=True,
@@ -1146,6 +1148,7 @@ class QuickBooksDeletedRecordImportTests(TestCase):
         Presentacion.objects.create(
             producto=producto,
             nombre='Unit',
+            unidades=1,
             quickbooks_id='QB-INACTIVE-LINKED',
         )
 
@@ -1154,10 +1157,48 @@ class QuickBooksDeletedRecordImportTests(TestCase):
             'Name': 'Was Active',
             'Type': 'Inventory',
             'Active': False,
-        })
+        }, client=MagicMock())
 
         producto.refresh_from_db()
         self.assertEqual(result['action'], 'updated')
+        self.assertFalse(producto.activo)
+
+    @patch('config.integrations.quickbooks.sync._save_quickbooks_item_image', return_value=False)
+    @patch('config.integrations.quickbooks.sync._enrich_quickbooks_item_payload', side_effect=lambda payload, **kwargs: payload)
+    def test_deleted_item_label_is_skipped_on_new_import(self, _mock_enrich, _mock_image):
+        result = import_quickbooks_item_record({
+            'Id': 'QB-DELETED-ITEM',
+            'Name': 'coca cola 1.5 litros (deleted)',
+            'Type': 'Inventory',
+            'Active': False,
+        })
+        self.assertEqual(result['action'], 'skipped')
+        self.assertFalse(Presentacion.objects.filter(quickbooks_id='QB-DELETED-ITEM').exists())
+
+    @patch('config.integrations.quickbooks.sync._save_quickbooks_item_image', return_value=False)
+    @patch('config.integrations.quickbooks.sync._enrich_quickbooks_item_payload', side_effect=lambda payload, **kwargs: payload)
+    def test_deleted_item_label_deactivates_existing_linked_product(self, _mock_enrich, _mock_image):
+        producto = Producto.objects.create(
+            nombre='Coca Cola',
+            activo=True,
+            quickbooks_id='QB-DELETED-LINKED',
+        )
+        Presentacion.objects.create(
+            producto=producto,
+            nombre='Unit',
+            unidades=1,
+            quickbooks_id='QB-DELETED-LINKED',
+        )
+
+        result = import_quickbooks_item_record({
+            'Id': 'QB-DELETED-LINKED',
+            'Name': 'coca cola 1.5 litros (deleted)',
+            'Type': 'Inventory',
+            'Active': False,
+        })
+
+        producto.refresh_from_db()
+        self.assertEqual(result['action'], 'deactivated')
         self.assertFalse(producto.activo)
 
     def test_inactive_customer_is_skipped(self):

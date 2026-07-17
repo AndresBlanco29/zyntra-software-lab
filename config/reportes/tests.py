@@ -136,6 +136,18 @@ class ReportsDashboardTests(TestCase):
 		self.assertContains(response, 'Business Intelligence')
 		self.assertContains(response, 'Send by email')
 
+	def test_reports_dashboard_handles_delivery_without_driver(self):
+		invoice = self._create_paid_delivery()
+		invoice.delivery.driver = None
+		invoice.delivery.save(update_fields=['driver'])
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('reportes_dashboard'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context['driver_rows'][0]['name'], 'Unassigned')
+		self.assertEqual(response.context['recent_close_rows'][0]['driver_name'], 'Unassigned')
+
 	def test_reports_exports_excel_and_pdf(self):
 		self._create_paid_delivery()
 		self.client.force_login(self.backoffice)

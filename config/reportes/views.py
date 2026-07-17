@@ -254,10 +254,12 @@ def _build_close_snapshot(deliveries):
 def _build_driver_rows(deliveries):
 	rows = {}
 	for delivery in deliveries:
+		driver = delivery.driver
 		key = delivery.driver_id or 0
+		name = driver.get_full_name() or driver.username if driver else _('Unassigned')
 		if key not in rows:
 			rows[key] = {
-				'name': delivery.driver.get_full_name() or delivery.driver.username,
+				'name': name,
 				'deliveries_count': 0,
 				'paid_count': 0,
 				'unpaid_count': 0,
@@ -787,10 +789,11 @@ def _build_recent_close_rows(deliveries):
 	rows = []
 	for delivery in deliveries[:8]:
 		invoice = delivery.invoice
+		driver = delivery.driver
 		rows.append({
 			'invoice_number': invoice.numero,
 			'customer_name': invoice.cliente.nombre_empresa,
-			'driver_name': delivery.driver.get_full_name() or delivery.driver.username,
+			'driver_name': driver.get_full_name() or driver.username if driver else _('Unassigned'),
 			'delivery_status': delivery.get_estado_display(),
 			'payment_status': delivery.get_estado_pago_display(),
 			'delivered_amount': invoice.total_neto,

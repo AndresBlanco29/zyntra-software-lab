@@ -2,7 +2,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal
 from html import escape
-from io import BytesIO
+from io import BytesIO, StringIO
 
 from django.conf import settings
 from django.contrib import messages
@@ -23,6 +23,21 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 from config.facturacion.models import Delivery, Invoice, InvoiceItem
 from config.pedidos.models import Pedido
+from config.reportes.bi_metrics import (
+	append_inventory_kpi_cards,
+	build_bi_kpi_cards,
+	build_brand_rows,
+	build_customer_rankings,
+	build_inventory_snapshot,
+	build_never_sold_products,
+	build_new_vs_returning_customers,
+	build_period_sales_strip,
+	build_product_rankings,
+	build_smart_question_presets,
+	enrich_customer_rows,
+	enrich_product_rows_with_margin,
+	parse_focus,
+)
 from config.usuarios.models import Usuario
 from config.usuarios.permissions import internal_permission_required
 
@@ -39,9 +54,10 @@ PAYMENT_METHOD_LABELS = {
 }
 PERIOD_CHOICES = (
 	('today', _('Today')),
-	('week', _('Weekly')),
-	('biweekly', _('Biweekly')),
-	('month', _('Monthly')),
+	('week', _('This week')),
+	('biweekly', _('Last 14 days')),
+	('month', _('This month')),
+	('year', _('This year')),
 	('custom', _('Custom range')),
 )
 TREND_CHART_WIDTH = Decimal('100')
@@ -54,6 +70,8 @@ EXPORTABLE_SECTIONS = {
 	'categories': _('Categories'),
 	'payments': _('Payment methods'),
 	'products': _('Products'),
+	'margins': _('Margins'),
+	'inventory': _('Inventory'),
 	'vendors': _('Sales'),
 	'users': _('Internal users'),
 }
@@ -116,6 +134,10 @@ def _parse_range(request):
 		start_date = today.replace(day=1)
 		end_date = today
 		label = _('This month')
+	elif preset == 'year':
+		start_date = today.replace(month=1, day=1)
+		end_date = today
+		label = _('This year')
 	else:
 		preset = 'today'
 		start_date = today
@@ -584,24 +606,46 @@ def _build_export_querystring(request, period):
 
 
 def _build_export_sections(report_data, section='all'):
+	product_export_rows = report_data.get('product_rows_full') or report_data.get('top_products') or []
+	customer_export_rows = report_data.get('customer_rows_full') or report_data.get('customer_rows') or []
 	sections = [
 		{
 			'key': 'summary',
-			'title': _('Summary'),
-			'headers': [_('Metric'), _('Value')],
-			'rows': [[card['label'], _format_money(card['value']) if card['is_currency'] else card['value']] for card in report_data['summary_cards']],
+			'title': _('Executive summary'),
+			'headers': [_('Metric'), _('Value'), _('Change %')],
+			'rows': [
+				[
+					card['label'],
+					_format_money(card['value']) if card['is_currency'] else card['value'],
+					f"{card['change_percent']}%" if card.get('change_percent') is not None else '—',
+				]
+				for card in report_data['summary_cards']
+			],
 		},
 		{
 			'key': 'drivers',
 			'title': _('Driver close'),
-			'headers': [_('Driver'), _('Deliveries'), _('Delivered'), _('Collected'), _('Pending')],
-			'rows': [[row['name'], row['deliveries_count'], _format_money(row['delivered_amount']), _format_money(row['collected_amount']), _format_money(row['outstanding_amount'])] for row in report_data['driver_rows']],
+			'headers': [_('Driver'), _('Deliveries'), _('Delivered'), _('Collected'), _('Outstanding')],
+			'rows': [
+				[row['name'], row['deliveries_count'], _format_money(row['delivered_amount']), _format_money(row['collected_amount']), _format_money(row['outstanding_amount'])]
+				for row in report_data['driver_rows']
+			],
 		},
 		{
 			'key': 'customers',
-			'title': _('Top customers'),
-			'headers': [_('Customer'), _('Invoices'), _('Revenue'), _('Collected'), _('Pending')],
-			'rows': [[row['name'], row['invoices_count'], _format_money(row['sales_amount']), _format_money(row['collected_amount']), _format_money(row['pending_amount'])] for row in report_data['customer_rows']],
+			'title': _('Customers'),
+			'headers': [_('Customer'), _('Invoices'), _('Sales'), _('Collected'), _('Pending'), _('Avg ticket')],
+			'rows': [
+				[
+					row['name'],
+					row['invoices_count'],
+					_format_money(row['sales_amount']),
+					_format_money(row['collected_amount']),
+					_format_money(row['pending_amount']),
+					_format_money(row.get('avg_ticket', 0)),
+				]
+				for row in customer_export_rows
+			],
 		},
 		{
 			'key': 'categories',
@@ -612,26 +656,67 @@ def _build_export_sections(report_data, section='all'):
 		{
 			'key': 'payments',
 			'title': _('Payment methods'),
-			'headers': [_('Method'), _('Deliveries'), _('Collected'), _('Share %')],
-			'rows': [[row['label'], row['deliveries_count'], _format_money(row['amount']), row['share_percent']] for row in report_data['payment_method_rows']],
+			'headers': [_('Method'), _('Amount'), _('Deliveries')],
+			'rows': [[row['label'], _format_money(row['amount']), row['deliveries_count']] for row in report_data['payment_method_rows']],
 		},
 		{
 			'key': 'products',
 			'title': _('Products'),
-			'headers': [_('Product'), _('Units'), _('Revenue')],
-			'rows': [[row['name'], row['units_sold'], _format_money(row['revenue'])] for row in report_data['top_products']],
+			'headers': [_('Product'), _('Units'), _('Revenue'), _('Profit'), _('Margin %')],
+			'rows': [
+				[
+					row['name'],
+					row['units_sold'],
+					_format_money(row['revenue']),
+					_format_money(row.get('profit', 0)),
+					f"{row['margin_percent']}%" if row.get('margin_percent') is not None else '—',
+				]
+				for row in product_export_rows
+			],
+		},
+		{
+			'key': 'margins',
+			'title': _('Best margins'),
+			'headers': [_('Product'), _('Margin %'), _('Profit'), _('Revenue')],
+			'rows': [
+				[
+					row['name'],
+					f"{row['margin_percent']}%" if row.get('margin_percent') is not None else '—',
+					_format_money(row.get('profit', 0)),
+					_format_money(row['revenue']),
+				]
+				for row in report_data.get('product_rankings', {}).get('top_margin', [])
+			],
+		},
+		{
+			'key': 'inventory',
+			'title': _('Inventory alerts'),
+			'headers': [_('Product'), _('Presentation'), _('Available'), _('Value')],
+			'rows': [
+				[row['name'], row['presentation'], row['available'], _format_money(row['value'])]
+				for row in (
+					report_data.get('inventory', {}).get('out_of_stock', [])
+					+ report_data.get('inventory', {}).get('low_stock', [])
+				)
+			],
 		},
 		{
 			'key': 'vendors',
-			'title': _('Sales'),
-			'headers': [_('Sales'), _('Orders'), _('Invoices'), _('Amount'), _('Pending')],
-			'rows': [[row['name'], row['orders_count'], row['invoices_count'], _format_money(row['sales_amount']), _format_money(row['pending_amount'])] for row in report_data['vendor_rows']],
+			'title': _('Sales reps'),
+			'headers': [_('Sales rep'), _('Orders'), _('Invoices'), _('Sales'), _('Avg ticket'), _('Pending')],
+			'rows': [
+				[row['name'], row['orders_count'], row['invoices_count'], _format_money(row['sales_amount']), _format_money(row['avg_ticket']), _format_money(row['pending_amount'])]
+				for row in report_data['vendor_rows']
+			],
 		},
 		{
 			'key': 'users',
 			'title': _('Internal users'),
 			'headers': [_('User'), _('Invoices'), _('Total'), _('Collected'), _('Pending')],
-			'rows': [[row['name'], row['invoices_count'], _format_money(row['total_amount']), _format_money(row['collected_amount']), _format_money(row['pending_amount'])] for row in report_data['creator_rows']],
+			'rows': [
+				[row['name'], row['invoices_count'], _format_money(row['total_amount']), _format_money(row['collected_amount']), _format_money(row['pending_amount'])]
+				for row in report_data['creator_rows']
+			],
 		},
 	]
 	if section == 'all':
@@ -848,21 +933,34 @@ def send_reports_email(*, period, report_data, section='all', recipient_emails=N
 
 def _build_pdf_response(*, period, report_data, section='all'):
 	buffer = BytesIO()
-	doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), rightMargin=24, leftMargin=24, topMargin=24, bottomMargin=24)
+	doc = SimpleDocTemplate(buffer, pagesize=landscape(letter), rightMargin=24, leftMargin=24, topMargin=36, bottomMargin=36)
 	styles = getSampleStyleSheet()
 	title_style = ParagraphStyle('ReportsTitle', parent=styles['Heading1'], textColor=colors.HexColor('#083b66'), fontSize=20, leading=24)
 	subtitle_style = ParagraphStyle('ReportsSubtitle', parent=styles['BodyText'], textColor=colors.HexColor('#50657a'), fontSize=10, leading=13)
 	header_style = ParagraphStyle('ReportsHeader', parent=styles['Heading3'], textColor=colors.HexColor('#0f5c91'), fontSize=12, leading=15, spaceAfter=8)
 	body_style = styles['BodyText']
+	company = report_data.get('company_name') or 'La Tortilla Grocery'
+	generated_by = report_data.get('generated_by') or '—'
 	story = [
-		Paragraph(str(_('Reports Center')), title_style),
-		Paragraph(f"{period['label']} | {format_local_date(period['start_date'])} - {format_local_date(period['end_date'])}", subtitle_style),
-		Spacer(1, 0.2 * inch),
+		Paragraph(escape(str(company)), title_style),
+		Paragraph(str(_('Business Intelligence Report')), header_style),
+		Paragraph(
+			f"{period['label']} | {format_local_date(period['start_date'])} - {format_local_date(period['end_date'])} | "
+			f"{_('Generated by')}: {escape(str(generated_by))} | {format_local_datetime(timezone.now())}",
+			subtitle_style,
+		),
+		Spacer(1, 0.15 * inch),
+		Paragraph(str(_('Executive summary')), header_style),
 	]
+	for card in report_data.get('summary_cards', [])[:8]:
+		value = _format_money(card['value']) if card['is_currency'] else card['value']
+		delta = f" ({card['change_percent']}%)" if card.get('change_percent') is not None else ''
+		story.append(Paragraph(f"• {escape(str(card['label']))}: {escape(str(value))}{delta}", body_style))
+	story.append(Spacer(1, 0.16 * inch))
 
 	for section_item in _filter_export_sections(_build_export_sections(report_data, section=section)):
 		story.append(Paragraph(str(section_item['title']), header_style))
-		table_data = [section_item['headers']] + section_item['rows'][:12]
+		table_data = [section_item['headers']] + [[str(cell) for cell in row] for row in section_item['rows'][:18]]
 		table = Table(table_data, repeatRows=1)
 		table.setStyle(TableStyle([
 			('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0f5c91')),
@@ -870,15 +968,23 @@ def _build_pdf_response(*, period, report_data, section='all'):
 			('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
 			('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#d3e4f2')),
 			('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f7fbff')]),
-			('FONTSIZE', (0, 0), (-1, -1), 9),
-			('LEADING', (0, 0), (-1, -1), 11),
+			('FONTSIZE', (0, 0), (-1, -1), 8),
+			('LEADING', (0, 0), (-1, -1), 10),
 			('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-			('LEFTPADDING', (0, 0), (-1, -1), 6),
-			('RIGHTPADDING', (0, 0), (-1, -1), 6),
+			('LEFTPADDING', (0, 0), (-1, -1), 5),
+			('RIGHTPADDING', (0, 0), (-1, -1), 5),
 		]))
 		story.extend([table, Spacer(1, 0.16 * inch)])
 
-	doc.build(story)
+	def _add_page_number(canvas, doc_obj):
+		canvas.saveState()
+		canvas.setFont('Helvetica', 8)
+		canvas.setFillColor(colors.HexColor('#50657a'))
+		canvas.drawString(24, 18, str(company))
+		canvas.drawRightString(landscape(letter)[0] - 24, 18, f"{_('Page')} {doc_obj.page}")
+		canvas.restoreState()
+
+	doc.build(story, onFirstPage=_add_page_number, onLaterPages=_add_page_number)
 	pdf = buffer.getvalue()
 	buffer.close()
 	response = HttpResponse(pdf, content_type='application/pdf')
@@ -908,6 +1014,24 @@ def _build_excel_response(*, period, report_data, section='all'):
 	parts.append('</body></html>')
 	response = HttpResponse(''.join(parts), content_type='application/vnd.ms-excel; charset=utf-8')
 	response['Content-Disposition'] = f'attachment; filename="reports-{period["start_date"]}-{period["end_date"]}.xls"'
+	return response
+
+
+def _build_csv_response(*, period, report_data, section='all'):
+	import csv
+
+	buffer = StringIO()
+	writer = csv.writer(buffer)
+	writer.writerow([_('Reports Center'), period['label'], format_local_date(period['start_date']), format_local_date(period['end_date'])])
+	writer.writerow([])
+	for section_item in _filter_export_sections(_build_export_sections(report_data, section=section)):
+		writer.writerow([section_item['title']])
+		writer.writerow(section_item['headers'])
+		for row in section_item['rows']:
+			writer.writerow(row)
+		writer.writerow([])
+	response = HttpResponse(buffer.getvalue(), content_type='text/csv; charset=utf-8')
+	response['Content-Disposition'] = f'attachment; filename="reports-{period["start_date"]}-{period["end_date"]}.csv"'
 	return response
 
 
@@ -973,7 +1097,11 @@ def _collect_report_data(period, filters=None):
 	invoices = list(invoices_queryset.order_by('-creada_en'))
 	deliveries = list(deliveries_queryset.order_by('-delivered_at', '-updated_at'))
 	invoice_items = list(
-		InvoiceItem.objects.select_related('invoice', 'presentacion__producto__categoria').filter(
+		InvoiceItem.objects.select_related(
+			'invoice',
+			'presentacion__producto__categoria',
+			'presentacion__producto__marca',
+		).filter(
 			invoice__estado='GENERADA',
 			invoice_id__in=[invoice.id for invoice in invoices] or [-1],
 		).order_by('producto_nombre')
@@ -1011,6 +1139,7 @@ def _collect_report_data(period, filters=None):
 
 def _build_dashboard_context(request, period, raw_data, filters=None):
 	filters = filters or {'driver_id': None, 'vendor_id': None, 'customer_id': None, 'section': 'all'}
+	focus = parse_focus(request)
 	orders = raw_data['orders']
 	invoices = raw_data['invoices']
 	deliveries = raw_data['deliveries']
@@ -1023,20 +1152,48 @@ def _build_dashboard_context(request, period, raw_data, filters=None):
 	close_snapshot = _build_close_snapshot(deliveries)
 	comparison_close = _build_close_snapshot(comparison_deliveries)
 	today_close = _build_close_snapshot(today_deliveries)
-	product_rows = _add_bar_metadata(_build_product_rows(invoice_items), 'revenue')
-	top_products = product_rows[:6]
-	low_products = list(reversed(product_rows[-6:])) if product_rows else []
+
+	product_rows_full = enrich_product_rows_with_margin(invoice_items)
+	product_rows = _add_bar_metadata(product_rows_full, 'revenue')
+	product_rankings = build_product_rankings(product_rows_full)
+	top_products = product_rows[:10]
+	low_products = list(reversed(product_rows[-10:])) if product_rows else []
+
+	customer_rows_full = enrich_customer_rows(invoices)
+	customer_rows = _add_bar_metadata(customer_rows_full, 'sales_amount')
+	customer_rankings = build_customer_rankings(customer_rows_full)
+
 	driver_rows = _build_driver_rows(deliveries)
 	vendor_rows = _add_bar_metadata(_build_vendor_rows(orders, invoices), 'sales_amount')
 	creator_rows = _add_bar_metadata(_build_creator_rows(invoices), 'total_amount')
-	customer_rows = _add_bar_metadata(_build_customer_rows(invoices), 'sales_amount')
 	category_rows = _add_bar_metadata(_build_category_rows(invoice_items), 'revenue')
+	brand_rows = _add_bar_metadata(build_brand_rows(invoice_items), 'revenue')
 	payment_method_rows = _build_payment_method_rows(deliveries)
 	trend_rows = _build_trend_rows(period, orders, invoices, deliveries)
 	trend_chart = _build_trend_chart(trend_rows)
 	category_chart = _build_donut_chart(category_rows, value_key='revenue')
 	payment_chart = _build_donut_chart(payment_method_rows, value_key='amount', label_key='label')
 	recent_close_rows = _build_recent_close_rows(deliveries)
+
+	inventory = build_inventory_snapshot()
+	customer_mix = build_new_vs_returning_customers(invoices=invoices, period_start=period['start_datetime'])
+	summary_cards = append_inventory_kpi_cards(
+		build_bi_kpi_cards(
+			orders=orders,
+			invoices=invoices,
+			deliveries=deliveries,
+			close_snapshot=close_snapshot,
+			comparison_orders=comparison_orders,
+			comparison_invoices=comparison_invoices,
+			comparison_close=comparison_close,
+			invoice_items=invoice_items,
+		),
+		inventory,
+		customer_mix,
+	)
+	period_sales = build_period_sales_strip(invoice_model=Invoice)
+	never_sold = build_never_sold_products(sold_names=[row['name'] for row in product_rows_full])
+
 	chart_payloads = {
 		'trend': _build_trend_chart_payload(trend_rows),
 		'categories': _build_donut_chart_payload(category_chart),
@@ -1046,6 +1203,19 @@ def _build_dashboard_context(request, period, raw_data, filters=None):
 		'vendors': _build_vendor_chart_payload(vendor_rows),
 		'creators': _build_creator_chart_payload(creator_rows),
 		'low_rotation': _build_low_rotation_chart_payload(low_products),
+		'products': {
+			'labels': [row['name'][:28] for row in top_products[:8]],
+			'units': [row['units_sold'] for row in top_products[:8]],
+			'revenue': [float(row['revenue']) for row in top_products[:8]],
+		},
+		'customers': {
+			'labels': [row['name'][:28] for row in customer_rows[:8]],
+			'sales': [float(row['sales_amount']) for row in customer_rows[:8]],
+		},
+		'brands': {
+			'labels': [row['name'][:28] for row in brand_rows[:8]],
+			'revenue': [float(row['revenue']) for row in brand_rows[:8]],
+		},
 	}
 
 	return {
@@ -1056,19 +1226,30 @@ def _build_dashboard_context(request, period, raw_data, filters=None):
 			'vendor_id': filters.get('vendor_id'),
 			'customer_id': filters.get('customer_id'),
 			'section': filters.get('section', 'all'),
+			'focus': focus,
 		},
 		'filter_options': raw_data.get('filter_options', {'drivers': [], 'vendors': [], 'customers': []}),
 		'section_choices': [(key, label) for key, label in EXPORTABLE_SECTIONS.items()],
 		'export_querystring': _build_export_querystring(request, period),
-		'summary_cards': _build_summary_cards(orders, invoices, deliveries, close_snapshot),
+		'summary_cards': summary_cards,
+		'period_sales': period_sales,
+		'inventory': inventory,
+		'customer_mix': customer_mix,
+		'product_rankings': product_rankings,
+		'customer_rankings': customer_rankings,
+		'product_rows_full': product_rows_full[:50],
+		'customer_rows_full': customer_rows_full[:50],
+		'brand_rows': brand_rows[:10],
+		'never_sold_products': never_sold,
+		'smart_questions': build_smart_question_presets(),
 		'close_snapshot': close_snapshot,
 		'close_payment_rows': _build_payment_rows(close_snapshot['payment_totals']),
 		'today_close': today_close,
 		'driver_rows': driver_rows,
-		'vendor_rows': vendor_rows[:8],
+		'vendor_rows': vendor_rows[:12],
 		'creator_rows': creator_rows[:8],
-		'customer_rows': customer_rows[:8],
-		'category_rows': category_rows[:8],
+		'customer_rows': customer_rows[:12],
+		'category_rows': category_rows[:12],
 		'category_chart': category_chart,
 		'payment_method_rows': payment_method_rows,
 		'payment_chart': payment_chart,
@@ -1080,7 +1261,16 @@ def _build_dashboard_context(request, period, raw_data, filters=None):
 		'chart_payloads': chart_payloads,
 		'trend_rows': trend_rows,
 		'trend_chart': trend_chart,
+		'generated_by': _resolve_report_author(request),
+		'company_name': getattr(settings, 'COMPANY_NAME', None) or getattr(settings, 'APP_DISPLAY_NAME', None) or 'La Tortilla Grocery',
 	}
+
+
+def _resolve_report_author(request):
+	user = getattr(request, 'user', None)
+	if user is not None and getattr(user, 'is_authenticated', False):
+		return user.get_full_name() or user.username
+	return _('System')
 
 
 @internal_permission_required('backoffice.reports.view')
@@ -1105,6 +1295,14 @@ def export_pdf(request):
 	filters = _parse_filters(request)
 	report_data = _build_dashboard_context(request, period, _collect_report_data(period, filters=filters), filters=filters)
 	return _build_pdf_response(period=period, report_data=report_data, section=filters['section'])
+
+
+@internal_permission_required('backoffice.reports.view')
+def export_csv(request):
+	period = _parse_range(request)
+	filters = _parse_filters(request)
+	report_data = _build_dashboard_context(request, period, _collect_report_data(period, filters=filters), filters=filters)
+	return _build_csv_response(period=period, report_data=report_data, section=filters['section'])
 
 
 @internal_permission_required('backoffice.reports.view')

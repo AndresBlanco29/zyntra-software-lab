@@ -1,25 +1,53 @@
 {% extends "bases/base_vendedor.html" %}
 {% load i18n static %}
 
-{% block title %}{% trans "Reports Center" %}{% endblock %}
+{% block title %}{% trans "Business Intelligence" %}{% endblock %}
 
 {% block content %}
 <link rel="stylesheet" href="{% static 'css/reports_dashboard.css' %}">
 
-<div class="reports-shell">
+<div class="reports-shell bi-dashboard" data-focus="{{ active_filters.focus }}">
   <div class="reports-hero d-flex flex-wrap justify-content-between align-items-start gap-3">
     <div>
-      <div class="small text-white-50 text-uppercase fw-semibold">{% trans "Analytics workspace" %}</div>
+      <div class="small text-white-50 text-uppercase fw-semibold">{% trans "Business Intelligence" %}</div>
       <h1>{% trans "Reports Center" %}</h1>
-      <p class="mb-0 text-white-50">{{ period.label }} · {{ period.start_date|date:"m/d/Y" }} — {{ period.end_date|date:"m/d/Y" }}</p>
+      <p class="mb-0 text-white-50">{{ company_name }} · {{ period.label }} · {{ period.start_date|date:"m/d/Y" }} — {{ period.end_date|date:"m/d/Y" }}</p>
     </div>
-    <div class="d-flex flex-wrap gap-2">
-      <a href="{% url 'reportes_export_excel' %}?{{ export_querystring }}" class="btn btn-light text-primary fw-semibold">{% trans "Export Excel" %}</a>
-      <a href="{% url 'reportes_export_pdf' %}?{{ export_querystring }}" class="btn btn-outline-light">{% trans "Export PDF" %}</a>
+    <div class="d-flex flex-wrap gap-2 no-print">
+      <a href="{% url 'reportes_export_excel' %}?{{ export_querystring }}" class="btn btn-light text-primary fw-semibold">{% trans "Excel" %}</a>
+      <a href="{% url 'reportes_export_csv' %}?{{ export_querystring }}" class="btn btn-outline-light">{% trans "CSV" %}</a>
+      <a href="{% url 'reportes_export_pdf' %}?{{ export_querystring }}" class="btn btn-outline-light">{% trans "PDF" %}</a>
+      <button type="button" class="btn btn-outline-light" onclick="window.print()">{% trans "Print" %}</button>
     </div>
   </div>
 
-  <form method="get" class="card reports-filter-card mb-4">
+  <div class="reports-period-strip mb-3">
+    {% for item in period_sales %}
+    <div class="reports-period-pill">
+      <div class="label">{{ item.label }}</div>
+      <div class="value">${{ item.value|floatformat:2 }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="reports-smart-search card reports-filter-card mb-3 no-print">
+    <div class="card-body">
+      <label class="form-label small fw-semibold mb-2">{% trans "Ask a business question" %}</label>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <input type="search" id="bi-smart-input" class="form-control form-control-sm flex-grow-1" style="min-width:220px"
+               placeholder="{% trans 'e.g. Which product sold most this month?' %}" autocomplete="off">
+        <button type="button" id="bi-smart-go" class="btn btn-primary btn-sm">{% trans "Find report" %}</button>
+      </div>
+      <div class="reports-smart-chips mt-2">
+        {% for q in smart_questions %}
+        <a class="reports-chip" href="?{{ q.query }}" title="{{ q.description }}">{{ q.label }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <form method="get" class="card reports-filter-card mb-3 no-print" id="bi-filters-form">
+    <input type="hidden" name="focus" id="bi-focus-input" value="{{ active_filters.focus }}">
     <div class="card-body row g-3 align-items-end">
       <div class="col-md-2">
         <label class="form-label small fw-semibold">{% trans "Period" %}</label>
@@ -78,325 +106,477 @@
     </div>
   </form>
 
-  <div class="reports-kpi-grid">
-    {% for card in summary_cards %}
-    <div class="reports-kpi">
-      <div class="label">{{ card.label }}</div>
-      <div class="value">{% if card.is_currency %}${{ card.value|floatformat:2 }}{% else %}{{ card.value }}{% endif %}</div>
-      <p class="caption">{{ card.caption }}</p>
-    </div>
-    {% endfor %}
-  </div>
+  <nav class="reports-focus-nav no-print mb-4" aria-label="{% trans 'Report sections' %}">
+    <button type="button" class="reports-focus-btn {% if active_filters.focus == 'summary' %}is-active{% endif %}" data-focus="summary">{% trans "Overview" %}</button>
+    <button type="button" class="reports-focus-btn {% if active_filters.focus == 'products' %}is-active{% endif %}" data-focus="products">{% trans "Products" %}</button>
+    <button type="button" class="reports-focus-btn {% if active_filters.focus == 'margins' %}is-active{% endif %}" data-focus="margins">{% trans "Margins" %}</button>
+    <button type="button" class="reports-focus-btn {% if active_filters.focus == 'customers' %}is-active{% endif %}" data-focus="customers">{% trans "Customers" %}</button>
+    <button type="button" class="reports-focus-btn {% if active_filters.focus == 'vendors' %}is-active{% endif %}" data-focus="vendors">{% trans "Sellers" %}</button>
+    <button type="button" class="reports-focus-btn {% if active_filters.focus == 'drivers' %}is-active{% endif %}" data-focus="drivers">{% trans "Drivers" %}</button>
+    <button type="button" class="reports-focus-btn {% if active_filters.focus == 'inventory' %}is-active{% endif %}" data-focus="inventory">{% trans "Inventory" %}</button>
+    <button type="button" class="reports-focus-btn {% if active_filters.focus == 'finance' %}is-active{% endif %}" data-focus="finance">{% trans "Finance" %}</button>
+    <button type="button" class="reports-focus-btn {% if active_filters.focus == 'trends' %}is-active{% endif %}" data-focus="trends">{% trans "Trends" %}</button>
+  </nav>
 
-  {% if focus_alerts %}
-  <div class="mb-4">
-    {% for alert in focus_alerts %}
-    <div class="reports-alert">
-      <strong>{{ alert.title }}</strong>
-      <div class="small text-muted mt-1">{{ alert.description }}</div>
-    </div>
-    {% endfor %}
-  </div>
-  {% endif %}
-
-  <div class="row g-4 mb-4">
-    <div class="col-xl-8">
-      <div class="reports-panel h-100">
-        <div class="panel-head">
-          <h3>{% trans "Sales vs collections trend" %}</h3>
-          <span class="badge text-bg-light text-primary">{{ period.days }} {% trans "days" %}</span>
-        </div>
-        <div class="panel-body">
-          {% if trend_rows %}
-          <svg class="reports-trend-svg mb-3" viewBox="0 0 100 64" preserveAspectRatio="none" role="img" aria-label="{% trans 'Trend chart' %}">
-            <polyline fill="none" stroke="#1d5cb8" stroke-width="1.8" stroke-linejoin="round" points="{{ trend_chart.sales_points }}"></polyline>
-            <polyline fill="none" stroke="#2b9f5a" stroke-width="1.8" stroke-linejoin="round" points="{{ trend_chart.collected_points }}"></polyline>
-          </svg>
-          <div class="reports-trend-bars">
-            {% for row in trend_rows %}
-            <div class="day">
-              <div class="bar-group">
-                <div class="bar sales" style="height: {{ row.sales_bar_height }}px;" title="{% trans 'Sales' %}"></div>
-                <div class="bar collected" style="height: {{ row.collected_bar_height }}px;" title="{% trans 'Collected' %}"></div>
-              </div>
-              <div class="day-label">{{ row.label }}</div>
-            </div>
-            {% endfor %}
-          </div>
-          <div class="reports-legend-inline">
-            <span class="lg-sales">{% trans "Gross sales" %}</span>
-            <span class="lg-collected">{% trans "Collected on routes" %}</span>
-          </div>
-          {% else %}
-          <p class="text-muted mb-0">{% trans "No trend data for the selected period." %}</p>
+  <section class="bi-section" data-section="summary" id="section-summary">
+    <div class="reports-kpi-grid">
+      {% for card in summary_cards %}
+      <div class="reports-kpi {% if card.change_percent != None %}{% if card.is_positive %}is-up{% else %}is-down{% endif %}{% endif %}">
+        <div class="label">{{ card.label }}</div>
+        <div class="value">{% if card.is_currency %}${{ card.value|floatformat:2 }}{% else %}{{ card.value|floatformat:0 }}{% endif %}</div>
+        {% if card.change_percent != None %}
+        <div class="delta {% if card.is_positive %}text-success{% else %}text-danger{% endif %}">
+          {% if card.is_positive %}▲{% else %}▼{% endif %}
+          {{ card.change_percent|floatformat:1 }}%
+          {% if card.change != None and card.is_currency %}
+          <span class="delta-abs">({% if card.change >= 0 %}+{% endif %}${{ card.change|floatformat:2 }})</span>
           {% endif %}
         </div>
+        {% endif %}
+        {% if card.caption %}<p class="caption">{{ card.caption }}</p>{% endif %}
       </div>
+      {% endfor %}
     </div>
-    <div class="col-xl-4">
-      <div class="reports-panel h-100">
-        <div class="panel-head"><h3>{% trans "Period comparison" %}</h3></div>
-        <div class="panel-body p-0">
-          <div class="table-responsive">
-            <table class="table table-sm mb-0 reports-compare-table">
-              <thead>
-                <tr>
-                  <th>{% trans "Metric" %}</th>
-                  <th class="text-end">{% trans "Current" %}</th>
-                  <th class="text-end">{% trans "Change" %}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for row in comparison_rows %}
-                <tr>
-                  <td>{{ row.label }}</td>
-                  <td class="text-end fw-semibold">
-                    {% if forloop.counter <= 2 %}
-                      {{ row.current_value|floatformat:0 }}
-                    {% else %}
-                      ${{ row.current_value|floatformat:2 }}
-                    {% endif %}
-                  </td>
-                  <td class="text-end {% if row.is_positive %}text-success{% else %}text-danger{% endif %}">
-                    {% if row.change_percent %}{{ row.change_percent|floatformat:1 }}%{% else %}—{% endif %}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+
+    {% if focus_alerts %}
+    <div class="mb-4">
+      {% for alert in focus_alerts %}
+      <div class="reports-alert">
+        <strong>{{ alert.title }}</strong>
+        <div class="small text-muted mt-1">{{ alert.description }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="bi-section" data-section="summary trends" id="section-trends">
+    <div class="row g-4 mb-4">
+      <div class="col-xl-8">
+        <div class="reports-panel h-100">
+          <div class="panel-head">
+            <h3>{% trans "Sales vs collections trend" %}</h3>
+            <span class="badge text-bg-light text-primary">{{ period.days }} {% trans "days" %}</span>
+          </div>
+          <div class="panel-body">
+            <canvas id="chart-trend" height="110"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-xl-4">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Period comparison" %}</h3></div>
+          <div class="panel-body p-0">
+            <div class="table-responsive">
+              <table class="table table-sm mb-0 reports-compare-table reports-sortable">
+                <thead>
+                  <tr>
+                    <th>{% trans "Metric" %}</th>
+                    <th class="text-end">{% trans "Current" %}</th>
+                    <th class="text-end">{% trans "Previous" %}</th>
+                    <th class="text-end">{% trans "Change" %}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in comparison_rows %}
+                  <tr>
+                    <td>{{ row.label }}</td>
+                    <td class="text-end fw-semibold">
+                      {% if forloop.counter <= 2 %}{{ row.current_value|floatformat:0 }}{% else %}${{ row.current_value|floatformat:2 }}{% endif %}
+                    </td>
+                    <td class="text-end text-muted">
+                      {% if forloop.counter <= 2 %}{{ row.previous_value|floatformat:0 }}{% else %}${{ row.previous_value|floatformat:2 }}{% endif %}
+                    </td>
+                    <td class="text-end {% if row.is_positive %}text-success{% else %}text-danger{% endif %}">
+                      {% if row.change_percent != None %}{{ row.change_percent|floatformat:1 }}%{% else %}—{% endif %}
+                    </td>
+                  </tr>
+                  {% empty %}
+                  <tr><td colspan="4" class="text-muted p-3">{% trans "No comparison data." %}</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <div class="row g-4 mb-4">
-    <div class="col-lg-6">
-      <div class="reports-panel h-100">
-        <div class="panel-head"><h3>{% trans "Revenue by category" %}</h3></div>
-        <div class="panel-body">
-          {% if category_chart.segments %}
-          <div class="reports-donut-wrap">
-            <div class="reports-donut" style="background: {{ category_chart.style }};"></div>
-            <div class="reports-donut-legend">
-              {% for segment in category_chart.segments %}
-              <div class="reports-legend-item">
-                <span><span class="reports-legend-swatch" style="background: {{ segment.color }};"></span> {{ segment.label }}</span>
-                <span class="fw-semibold">${{ segment.value|floatformat:2 }} ({{ segment.share_percent }}%)</span>
+    <div class="row g-4 mb-4">
+      <div class="col-lg-4">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Revenue by category" %}</h3></div>
+          <div class="panel-body"><canvas id="chart-categories" height="180"></canvas></div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Payment methods" %}</h3></div>
+          <div class="panel-body"><canvas id="chart-payments" height="180"></canvas></div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Top brands" %}</h3></div>
+          <div class="panel-body"><canvas id="chart-brands" height="180"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="bi-section" data-section="products margins" id="section-products">
+    <div class="row g-4 mb-4">
+      <div class="col-xl-6">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Top products by revenue" %}</h3></div>
+          <div class="panel-body"><canvas id="chart-products" height="160"></canvas></div>
+        </div>
+      </div>
+      <div class="col-xl-6">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Top 10 / Bottom 10 by units" %}</h3></div>
+          <div class="panel-body p-0">
+            <div class="row g-0">
+              <div class="col-md-6 border-end">
+                <div class="p-3"><div class="small text-success fw-bold mb-2">{% trans "Top 10" %}</div>
+                  {% for row in product_rankings.top_units %}
+                  <div class="reports-rank-row"><span>{{ forloop.counter }}. {{ row.name }}</span><span>{{ row.units_sold }} · ${{ row.revenue|floatformat:0 }}</span></div>
+                  {% empty %}<p class="text-muted small mb-0">{% trans "No data" %}</p>{% endfor %}
+                </div>
               </div>
+              <div class="col-md-6">
+                <div class="p-3"><div class="small text-danger fw-bold mb-2">{% trans "Bottom 10" %}</div>
+                  {% for row in product_rankings.bottom_units %}
+                  <div class="reports-rank-row"><span>{{ forloop.counter }}. {{ row.name }}</span><span>{{ row.units_sold }}</span></div>
+                  {% empty %}<p class="text-muted small mb-0">{% trans "No data" %}</p>{% endfor %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+      <div class="col-lg-6">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Highest profit products" %}</h3></div>
+          <div class="panel-body">
+            {% for row in product_rankings.top_profit %}
+            <div class="reports-rank-row"><span>{{ row.name }}</span><span class="text-success">${{ row.profit|floatformat:2 }} · {{ row.margin_percent|default:"—" }}%</span></div>
+            {% empty %}<p class="text-muted mb-0">{% trans "Add product costs to unlock margin analytics." %}</p>{% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Best / worst margins" %}</h3></div>
+          <div class="panel-body p-0">
+            <div class="row g-0">
+              <div class="col-md-6 border-end p-3">
+                <div class="small text-success fw-bold mb-2">{% trans "Highest margin" %}</div>
+                {% for row in product_rankings.top_margin %}
+                <div class="reports-rank-row"><span>{{ row.name }}</span><span>{{ row.margin_percent }}%</span></div>
+                {% empty %}<p class="text-muted small">{% trans "No margin data" %}</p>{% endfor %}
+              </div>
+              <div class="col-md-6 p-3">
+                <div class="small text-danger fw-bold mb-2">{% trans "Lowest margin" %}</div>
+                {% for row in product_rankings.bottom_margin %}
+                <div class="reports-rank-row"><span>{{ row.name }}</span><span>{{ row.margin_percent }}%</span></div>
+                {% empty %}<p class="text-muted small">{% trans "No margin data" %}</p>{% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="reports-panel mb-4">
+      <div class="panel-head">
+        <h3>{% trans "Product detail" %}</h3>
+        <input type="search" class="form-control form-control-sm reports-table-filter no-print" data-target="#table-products" placeholder="{% trans 'Search products…' %}" style="max-width:220px">
+      </div>
+      <div class="panel-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 reports-sortable" id="table-products">
+            <thead>
+              <tr>
+                <th data-sort="text">{% trans "Product" %}</th>
+                <th class="text-end" data-sort="num">{% trans "Units" %}</th>
+                <th class="text-end" data-sort="num">{% trans "Revenue" %}</th>
+                <th class="text-end" data-sort="num">{% trans "Profit" %}</th>
+                <th class="text-end" data-sort="num">{% trans "Margin %" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in product_rows_full %}
+              <tr>
+                <td>{{ row.name }}</td>
+                <td class="text-end" data-value="{{ row.units_sold }}">{{ row.units_sold }}</td>
+                <td class="text-end" data-value="{{ row.revenue }}">${{ row.revenue|floatformat:2 }}</td>
+                <td class="text-end" data-value="{{ row.profit }}">${{ row.profit|floatformat:2 }}</td>
+                <td class="text-end" data-value="{{ row.margin_percent|default_if_none:0 }}">{% if row.margin_percent != None %}{{ row.margin_percent }}%{% else %}—{% endif %}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5" class="text-muted p-3">{% trans "No product sales in this range." %}</td></tr>
               {% endfor %}
-            </div>
-          </div>
-          {% else %}
-          <p class="text-muted mb-0">{% trans "No category breakdown yet." %}</p>
-          {% endif %}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
-    <div class="col-lg-6">
-      <div class="reports-panel h-100">
-        <div class="panel-head"><h3>{% trans "Collections by payment method" %}</h3></div>
-        <div class="panel-body">
-          {% if payment_chart.segments %}
-          <div class="reports-donut-wrap">
-            <div class="reports-donut" style="background: {{ payment_chart.style }};"></div>
-            <div class="reports-donut-legend">
-              {% for segment in payment_chart.segments %}
-              <div class="reports-legend-item">
-                <span><span class="reports-legend-swatch" style="background: {{ segment.color }};"></span> {{ segment.label }}</span>
-                <span class="fw-semibold">${{ segment.value|floatformat:2 }} ({{ segment.share_percent }}%)</span>
+
+    <div class="reports-panel mb-4">
+      <div class="panel-head"><h3>{% trans "Never sold in this period" %}</h3></div>
+      <div class="panel-body">
+        <div class="reports-chip-list">
+          {% for row in never_sold_products %}
+          <span class="reports-chip muted">{{ row.name }} <small>({{ row.presentation }})</small></span>
+          {% empty %}
+          <p class="text-muted mb-0">{% trans "Every active SKU had at least one sale, or catalog is empty." %}</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="bi-section" data-section="customers" id="section-customers">
+    <div class="row g-4 mb-4">
+      <div class="col-xl-5">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Top customers" %}</h3></div>
+          <div class="panel-body"><canvas id="chart-customers" height="180"></canvas></div>
+        </div>
+      </div>
+      <div class="col-xl-7">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Customer rankings" %}</h3></div>
+          <div class="panel-body p-0">
+            <div class="row g-0">
+              <div class="col-md-4 border-end p-3">
+                <div class="small fw-bold mb-2">{% trans "By sales" %}</div>
+                {% for row in customer_rankings.top_sales %}
+                <div class="reports-rank-row"><span>{{ row.name }}</span><span>${{ row.sales_amount|floatformat:0 }}</span></div>
+                {% empty %}<p class="text-muted small">{% trans "No data" %}</p>{% endfor %}
               </div>
-              {% endfor %}
+              <div class="col-md-4 border-end p-3">
+                <div class="small fw-bold mb-2">{% trans "By orders" %}</div>
+                {% for row in customer_rankings.top_orders %}
+                <div class="reports-rank-row"><span>{{ row.name }}</span><span>{{ row.invoices_count }}</span></div>
+                {% empty %}<p class="text-muted small">{% trans "No data" %}</p>{% endfor %}
+              </div>
+              <div class="col-md-4 p-3">
+                <div class="small fw-bold text-danger mb-2">{% trans "Highest debt" %}</div>
+                {% for row in customer_rankings.top_debt %}
+                <div class="reports-rank-row"><span>{{ row.name }}</span><span>${{ row.pending_amount|floatformat:0 }}</span></div>
+                {% empty %}<p class="text-muted small">{% trans "No open balances" %}</p>{% endfor %}
+              </div>
             </div>
           </div>
-          {% else %}
-          <p class="text-muted mb-0">{% trans "No payment breakdown yet." %}</p>
-          {% endif %}
         </div>
       </div>
     </div>
-  </div>
 
-  <div class="row g-4 mb-4">
-    <div class="col-xl-6">
-      <div class="reports-panel h-100">
-        <div class="panel-head"><h3>{% trans "Driver close" %}</h3></div>
-        <div class="panel-body">
-          {% if driver_rows %}
-            {% with max_amount=driver_rows.0.delivered_amount %}
-            {% for row in driver_rows %}
-            <div class="reports-bar-row fill-green">
-              <div class="meta"><span class="fw-semibold">{{ row.name }}</span><span>${{ row.collected_amount|floatformat:2 }} · {{ row.deliveries_count }} {% trans "deliveries" %}</span></div>
-              <div class="track"><div class="fill" style="width: {% widthratio row.delivered_amount max_amount 100 %}%;"></div></div>
-            </div>
-            {% endfor %}
-            {% endwith %}
-          {% else %}
-          <p class="text-muted mb-0">{% trans "No driver activity in this range." %}</p>
-          {% endif %}
+    <div class="reports-panel mb-4">
+      <div class="panel-head">
+        <h3>{% trans "Customer detail" %}</h3>
+        <input type="search" class="form-control form-control-sm reports-table-filter no-print" data-target="#table-customers" placeholder="{% trans 'Search customers…' %}" style="max-width:220px">
+      </div>
+      <div class="panel-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 reports-sortable" id="table-customers">
+            <thead>
+              <tr>
+                <th data-sort="text">{% trans "Customer" %}</th>
+                <th class="text-end" data-sort="num">{% trans "Invoices" %}</th>
+                <th class="text-end" data-sort="num">{% trans "Sales" %}</th>
+                <th class="text-end" data-sort="num">{% trans "Avg ticket" %}</th>
+                <th class="text-end" data-sort="num">{% trans "Pending" %}</th>
+                <th data-sort="text">{% trans "Last purchase" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in customer_rows_full %}
+              <tr>
+                <td>{{ row.name }}</td>
+                <td class="text-end" data-value="{{ row.invoices_count }}">{{ row.invoices_count }}</td>
+                <td class="text-end" data-value="{{ row.sales_amount }}">${{ row.sales_amount|floatformat:2 }}</td>
+                <td class="text-end" data-value="{{ row.avg_ticket }}">${{ row.avg_ticket|floatformat:2 }}</td>
+                <td class="text-end" data-value="{{ row.pending_amount }}">${{ row.pending_amount|floatformat:2 }}</td>
+                <td>{% if row.last_purchase %}{{ row.last_purchase|date:"m/d/Y" }}{% else %}—{% endif %}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="6" class="text-muted p-3">{% trans "No customer activity." %}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
-    <div class="col-xl-6">
-      <div class="reports-panel h-100">
-        <div class="panel-head"><h3>{% trans "Customer drill-down" %}</h3></div>
-        <div class="panel-body">
-          {% if customer_rows %}
-            {% with max_sales=customer_rows.0.sales_amount %}
-            {% for row in customer_rows %}
-            <div class="reports-bar-row">
-              <div class="meta"><span class="fw-semibold">{{ row.name }}</span><span>${{ row.sales_amount|floatformat:2 }}</span></div>
-              <div class="track"><div class="fill" style="width: {% widthratio row.sales_amount max_sales 100 %}%;"></div></div>
-              <div class="small text-muted mt-1">{% trans "Pending" %}: ${{ row.pending_amount|floatformat:2 }} · {% trans "Invoices" %}: {{ row.invoices_count }}</div>
-            </div>
-            {% endfor %}
-            {% endwith %}
-          {% else %}
-          <p class="text-muted mb-0">{% trans "No customer sales in this range." %}</p>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
+  </section>
 
-  <div class="row g-4 mb-4">
-    <div class="col-lg-6">
-      <div class="reports-panel h-100">
-        <div class="panel-head"><h3>{% trans "Sales reps" %}</h3></div>
-        <div class="panel-body">
-          {% if vendor_rows %}
-            {% with max_sales=vendor_rows.0.sales_amount %}
+  <section class="bi-section" data-section="vendors" id="section-vendors">
+    <div class="row g-4 mb-4">
+      <div class="col-xl-6">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Sales reps comparison" %}</h3></div>
+          <div class="panel-body"><canvas id="chart-vendors" height="160"></canvas></div>
+        </div>
+      </div>
+      <div class="col-xl-6">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Rep performance" %}</h3></div>
+          <div class="panel-body">
             {% for row in vendor_rows %}
             <div class="reports-bar-row fill-amber">
               <div class="meta"><span class="fw-semibold">{{ row.name }}</span><span>${{ row.sales_amount|floatformat:2 }}</span></div>
               <div class="track"><div class="fill" style="width: {{ row.bar_width }}%;"></div></div>
-              <div class="small text-muted mt-1">{% trans "Orders" %}: {{ row.orders_count }} · {% trans "Avg. ticket" %}: ${{ row.avg_ticket|floatformat:2 }}</div>
+              <div class="small text-muted mt-1">{% trans "Orders" %}: {{ row.orders_count }} · {% trans "Invoices" %}: {{ row.invoices_count }} · {% trans "Avg" %}: ${{ row.avg_ticket|floatformat:2 }}</div>
             </div>
+            {% empty %}
+            <p class="text-muted mb-0">{% trans "No rep activity yet." %}</p>
             {% endfor %}
-            {% endwith %}
-          {% else %}
-          <p class="text-muted mb-0">{% trans "No rep activity yet." %}</p>
-          {% endif %}
+          </div>
         </div>
       </div>
     </div>
-    <div class="col-lg-6">
-      <div class="reports-panel h-100">
-        <div class="panel-head"><h3>{% trans "Internal users (invoice creators)" %}</h3></div>
-        <div class="panel-body">
-          {% if creator_rows %}
-            {% for row in creator_rows %}
-            <div class="reports-bar-row">
-              <div class="meta"><span class="fw-semibold">{{ row.name }}</span><span>${{ row.total_amount|floatformat:2 }}</span></div>
-              <div class="track"><div class="fill" style="width: {{ row.bar_width }}%;"></div></div>
+  </section>
+
+  <section class="bi-section" data-section="drivers" id="section-drivers">
+    <div class="row g-4 mb-4">
+      <div class="col-xl-5">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Driver collections" %}</h3></div>
+          <div class="panel-body"><canvas id="chart-drivers" height="160"></canvas></div>
+        </div>
+      </div>
+      <div class="col-xl-7">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Route close snapshot" %}</h3></div>
+          <div class="panel-body">
+            <div class="row g-3 mb-3">
+              <div class="col-6 col-md-4"><div class="reports-mini-stat"><div class="label">{% trans "Deliveries" %}</div><div class="value">{{ close_snapshot.deliveries_count }}</div></div></div>
+              <div class="col-6 col-md-4"><div class="reports-mini-stat"><div class="label">{% trans "Collected" %}</div><div class="value">${{ close_snapshot.collected_amount|floatformat:2 }}</div></div></div>
+              <div class="col-6 col-md-4"><div class="reports-mini-stat"><div class="label">{% trans "Outstanding" %}</div><div class="value">${{ close_snapshot.outstanding_amount|floatformat:2 }}</div></div></div>
             </div>
+            {% for row in driver_rows %}
+            <div class="reports-bar-row fill-green">
+              <div class="meta"><span class="fw-semibold">{{ row.name }}</span><span>${{ row.collected_amount|floatformat:2 }} · {{ row.deliveries_count }}</span></div>
+              <div class="track"><div class="fill" style="width: {% if close_snapshot.delivered_amount %}{% widthratio row.delivered_amount close_snapshot.delivered_amount 100 %}{% else %}0{% endif %}%;"></div></div>
+            </div>
+            {% empty %}
+            <p class="text-muted mb-0">{% trans "No driver activity in this range." %}</p>
             {% endfor %}
-          {% else %}
-          <p class="text-muted mb-0">{% trans "No internal billing activity." %}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="reports-panel mb-4">
+      <div class="panel-head"><h3>{% trans "Recent route closes" %}</h3></div>
+      <div class="panel-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th>{% trans "Invoice" %}</th>
+                <th>{% trans "Customer" %}</th>
+                <th>{% trans "Driver" %}</th>
+                <th class="text-end">{% trans "Collected" %}</th>
+                <th class="text-end">{% trans "Pending" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in recent_close_rows %}
+              <tr>
+                <td>{{ row.invoice_number }}</td>
+                <td>{{ row.customer_name }}</td>
+                <td>{{ row.driver_name }}</td>
+                <td class="text-end">${{ row.collected_amount|floatformat:2 }}</td>
+                <td class="text-end">${{ row.outstanding_amount|floatformat:2 }}</td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5" class="text-muted p-3">{% trans "No recent closes in range." %}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="bi-section" data-section="inventory" id="section-inventory">
+    <div class="row g-3 mb-4">
+      <div class="col-md-3"><div class="reports-mini-stat danger"><div class="label">{% trans "Out of stock" %}</div><div class="value">{{ inventory.out_of_stock_count }}</div></div></div>
+      <div class="col-md-3"><div class="reports-mini-stat warn"><div class="label">{% trans "Low stock" %}</div><div class="value">{{ inventory.low_stock_count }}</div></div></div>
+      <div class="col-md-3"><div class="reports-mini-stat"><div class="label">{% trans "Overstock" %}</div><div class="value">{{ inventory.overstock_count }}</div></div></div>
+      <div class="col-md-3"><div class="reports-mini-stat"><div class="label">{% trans "Inventory value" %}</div><div class="value">${{ inventory.inventory_value|floatformat:2 }}</div></div></div>
+    </div>
+    <div class="row g-4 mb-4">
+      <div class="col-lg-4">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Out of stock" %}</h3></div>
+          <div class="panel-body">
+            {% for row in inventory.out_of_stock %}
+            <div class="reports-rank-row"><span>{{ row.name }} <small class="text-muted">{{ row.presentation }}</small></span><span>0</span></div>
+            {% empty %}<p class="text-muted mb-0">{% trans "None" %}</p>{% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Needs replenishment" %}</h3></div>
+          <div class="panel-body">
+            {% for row in inventory.low_stock %}
+            <div class="reports-rank-row"><span>{{ row.name }}</span><span class="text-warning fw-semibold">{{ row.available }}</span></div>
+            {% empty %}<p class="text-muted mb-0">{% trans "None" %}</p>{% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="reports-panel h-100">
+          <div class="panel-head"><h3>{% trans "Overstock" %}</h3></div>
+          <div class="panel-body">
+            {% for row in inventory.overstock %}
+            <div class="reports-rank-row"><span>{{ row.name }}</span><span>{{ row.available }}</span></div>
+            {% empty %}<p class="text-muted mb-0">{% trans "None" %}</p>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="bi-section" data-section="finance trends" id="section-finance">
+    <div class="reports-panel mb-4">
+      <div class="panel-head"><h3>{% trans "Financial snapshot" %}</h3></div>
+      <div class="panel-body">
+        <div class="row g-3">
+          {% for card in summary_cards %}
+          {% if forloop.counter <= 8 %}
+          <div class="col-6 col-md-3">
+            <div class="reports-mini-stat">
+              <div class="label">{{ card.label }}</div>
+              <div class="value">{% if card.is_currency %}${{ card.value|floatformat:2 }}{% else %}{{ card.value|floatformat:0 }}{% endif %}</div>
+            </div>
+          </div>
           {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="row g-4 mb-4">
-    <div class="col-lg-6">
-      <div class="reports-panel h-100">
-        <div class="panel-head"><h3>{% trans "Top products" %}</h3></div>
-        <div class="panel-body">
-          {% for row in top_products %}
-          <div class="reports-bar-row fill-green">
-            <div class="meta"><span>{{ row.name }}</span><span>{{ row.units_sold }} {% trans "units" %} · ${{ row.revenue|floatformat:2 }}</span></div>
-            <div class="track"><div class="fill" style="width: {{ row.bar_width }}%;"></div></div>
-          </div>
-          {% empty %}
-          <p class="text-muted mb-0">{% trans "No product sales yet." %}</p>
           {% endfor %}
         </div>
       </div>
     </div>
-    <div class="col-lg-6">
-      <div class="reports-panel h-100">
-        <div class="panel-head"><h3>{% trans "Low rotation watchlist" %}</h3></div>
-        <div class="panel-body">
-          {% for row in low_products %}
-          <div class="reports-bar-row fill-amber">
-            <div class="meta"><span>{{ row.name }}</span><span>{{ row.units_sold }} {% trans "units" %}</span></div>
-            <div class="track"><div class="fill" style="width: {{ row.bar_width }}%;"></div></div>
-          </div>
-          {% empty %}
-          <p class="text-muted mb-0">{% trans "No low-rotation items flagged." %}</p>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-  </div>
+  </section>
 
-  <div class="row g-4 mb-4">
-    <div class="col-lg-5">
-      <div class="reports-panel h-100">
-        <div class="panel-head"><h3>{% trans "Route close snapshot" %}</h3></div>
-        <div class="panel-body">
-          <ul class="list-unstyled mb-3">
-            <li class="mb-2"><strong>{% trans "Deliveries" %}:</strong> {{ close_snapshot.deliveries_count }}</li>
-            <li class="mb-2"><strong>{% trans "Drivers active" %}:</strong> {{ close_snapshot.drivers_count }}</li>
-            <li class="mb-2"><strong>{% trans "Delivered value" %}:</strong> ${{ close_snapshot.delivered_amount|floatformat:2 }}</li>
-            <li class="mb-2"><strong>{% trans "Collected" %}:</strong> ${{ close_snapshot.collected_amount|floatformat:2 }}</li>
-            <li class="mb-2"><strong>{% trans "Outstanding" %}:</strong> ${{ close_snapshot.outstanding_amount|floatformat:2 }}</li>
-            <li class="mb-2"><strong>{% trans "Paid / unpaid" %}:</strong> {{ close_snapshot.paid_count }} / {{ close_snapshot.unpaid_count }}</li>
-          </ul>
-          {% for row in close_payment_rows %}
-          <div class="reports-bar-row">
-            <div class="meta"><span>{{ row.label }}</span><span>${{ row.value|floatformat:2 }}</span></div>
-            <div class="track"><div class="fill" style="width: {% if close_snapshot.collected_amount %}{% widthratio row.value close_snapshot.collected_amount 100 %}{% else %}0{% endif %}%;"></div></div>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-    <div class="col-lg-7">
-      <div class="reports-panel h-100">
-        <div class="panel-head"><h3>{% trans "Recent route closes" %}</h3></div>
-        <div class="panel-body p-0">
-          <div class="table-responsive">
-            <table class="table table-sm mb-0">
-              <thead>
-                <tr>
-                  <th>{% trans "Invoice" %}</th>
-                  <th>{% trans "Customer" %}</th>
-                  <th>{% trans "Driver" %}</th>
-                  <th class="text-end">{% trans "Collected" %}</th>
-                  <th class="text-end">{% trans "Pending" %}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for row in recent_close_rows %}
-                <tr>
-                  <td>{{ row.invoice_number }}</td>
-                  <td>{{ row.customer_name }}</td>
-                  <td>{{ row.driver_name }}</td>
-                  <td class="text-end">${{ row.collected_amount|floatformat:2 }}</td>
-                  <td class="text-end">${{ row.outstanding_amount|floatformat:2 }}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="5" class="text-muted p-3">{% trans "No recent closes in range." %}</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <form method="post" action="{% url 'reportes_send_email_now' %}" class="card reports-filter-card">
+  <form method="post" action="{% url 'reportes_send_email_now' %}" class="card reports-filter-card no-print">
     {% csrf_token %}
     <div class="card-body d-flex flex-wrap align-items-center gap-3">
       <input type="hidden" name="period" value="{{ period.preset }}">
       <input type="hidden" name="start_date" value="{{ period.start_date|date:'Y-m-d' }}">
       <input type="hidden" name="end_date" value="{{ period.end_date|date:'Y-m-d' }}">
       <input type="hidden" name="section" value="{{ active_filters.section }}">
+      <input type="hidden" name="focus" value="{{ active_filters.focus }}">
       {% if active_filters.driver_id %}<input type="hidden" name="driver_id" value="{{ active_filters.driver_id }}">{% endif %}
+      {% if active_filters.vendor_id %}<input type="hidden" name="vendor_id" value="{{ active_filters.vendor_id }}">{% endif %}
+      {% if active_filters.customer_id %}<input type="hidden" name="customer_id" value="{{ active_filters.customer_id }}">{% endif %}
       <button type="submit" class="btn btn-primary">{% trans "Send by email" %}</button>
       <span class="text-muted small">{% trans "Delivers the selected section as a PDF attachment to configured recipients." %}</span>
     </div>
@@ -404,4 +584,6 @@
 </div>
 
 {{ chart_payloads|json_script:"reports-chart-payloads" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/reports_dashboard.js' %}"></script>
 {% endblock %}

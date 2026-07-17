@@ -129,8 +129,11 @@ class ReportsDashboardTests(TestCase):
 		self.assertEqual(response.context['top_products'][0]['name'], 'Tortilla Reporte')
 		self.assertEqual(response.context['customer_rows'][0]['name'], 'Cliente Reportes')
 		self.assertEqual(response.context['category_rows'][0]['name'], 'Tortillas Reporte')
-		self.assertContains(response, 'Export Excel')
-		self.assertContains(response, 'Customer drill-down')
+		self.assertIn('product_rankings', response.context)
+		self.assertIn('inventory', response.context)
+		self.assertIn('period_sales', response.context)
+		self.assertContains(response, 'Excel')
+		self.assertContains(response, 'Business Intelligence')
 		self.assertContains(response, 'Send by email')
 
 	def test_reports_exports_excel_and_pdf(self):
@@ -159,7 +162,7 @@ class ReportsDashboardTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.context['driver_rows'], [])
 		self.assertContains(excel_response, 'Driver close')
-		self.assertNotContains(excel_response, 'Top customers')
+		self.assertNotContains(excel_response, 'Executive summary')
 
 	def test_reports_can_send_email_now(self):
 		self._create_paid_delivery()

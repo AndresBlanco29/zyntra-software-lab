@@ -384,8 +384,17 @@ class InvoiceFlowTests(TestCase):
 		self.assertTrue(pedido_tiene_credit_hold_pendiente(pedido))
 
 		self.client.force_login(self.backoffice)
+		missing_name_response = self.client.post(reverse('backoffice_resolve_credit_limit', args=[pedido.id]), {
+			'action': 'unblock',
+			'comentario': 'Customer paid outstanding balance',
+		})
+		self.assertRedirects(missing_name_response, reverse('backoffice_pedido_detalle', args=[pedido.id]))
+		pedido.refresh_from_db()
+		self.assertTrue(pedido.credit_limit_bloqueado)
+
 		response = self.client.post(reverse('backoffice_resolve_credit_limit', args=[pedido.id]), {
 			'action': 'unblock',
+			'autorizado_por': 'Maria Lopez',
 			'comentario': 'Customer paid outstanding balance',
 		})
 		self.assertRedirects(response, reverse('backoffice_pedido_detalle', args=[pedido.id]))

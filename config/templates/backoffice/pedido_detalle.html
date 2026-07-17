@@ -175,6 +175,20 @@
       {% endif %}
       {% if request.user|has_internal_permission:'backoffice.orders.manage' %}
       <div class="mb-3">
+        <label class="form-label fw-semibold" for="creditHoldUnblockAuthorizedBy">{% trans "Name of person authorizing the unblock" %} <span class="text-danger">*</span></label>
+        <input
+          type="text"
+          form="creditHoldUnblockForm"
+          id="creditHoldUnblockAuthorizedBy"
+          name="autorizado_por"
+          class="form-control"
+          required
+          maxlength="120"
+          autocomplete="name"
+          placeholder="{% trans 'Full name of the person authorizing this unblock' %}"
+        >
+      </div>
+      <div class="mb-3">
         <label class="form-label fw-semibold" for="creditHoldUnblockComment">{% trans "Comment / observation (optional)" %}</label>
         <textarea form="creditHoldUnblockForm" id="creditHoldUnblockComment" name="comentario" class="form-control" rows="2" placeholder="{% trans 'Payment received, payment arrangement, etc.' %}"></textarea>
       </div>

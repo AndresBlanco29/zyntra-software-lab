@@ -1301,6 +1301,7 @@ def backoffice_resolve_credit_limit(request, pedido_id):
 
 	action = (request.POST.get('action') or '').strip().lower()
 	comentario = (request.POST.get('comentario') or '').strip()
+	autorizado_por = (request.POST.get('autorizado_por') or '').strip()
 	try:
 		with transaction.atomic():
 			if action == 'unblock':
@@ -1308,6 +1309,7 @@ def backoffice_resolve_credit_limit(request, pedido_id):
 					pedido=pedido,
 					usuario=request.user,
 					comentario=comentario,
+					autorizado_por=autorizado_por,
 				)
 			else:
 				resolve_credit_limit_alert(
@@ -1319,6 +1321,11 @@ def backoffice_resolve_credit_limit(request, pedido_id):
 	except ValueError as exc:
 		if str(exc) == 'order_not_credit_blocked':
 			messages.error(request, _('This order is not blocked by credit limit.'))
+		elif str(exc) == 'unblock_authorized_by_required':
+			messages.error(
+				request,
+				_('Enter the name of the person authorizing the unblock before continuing.'),
+			)
 		else:
 			messages.error(request, _('The credit limit alert is no longer pending review.'))
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)

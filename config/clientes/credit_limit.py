@@ -426,7 +426,7 @@ def _sync_cliente_credit_hold_after_order_unblock(cliente, *, pedido_id):
 		cliente.save(update_fields=['credit_hold'])
 
 
-def unblock_credit_limit_blocked_order(*, pedido, usuario, comentario=''):
+def unblock_credit_limit_blocked_order(*, pedido, usuario, comentario='', autorizado_por=''):
 	"""Release a previously blocked order and allow processing to continue."""
 	from django.utils import timezone
 
@@ -436,6 +436,10 @@ def unblock_credit_limit_blocked_order(*, pedido, usuario, comentario=''):
 
 	if not pedido.credit_limit_bloqueado:
 		raise ValueError('order_not_credit_blocked')
+
+	autorizado_por = (autorizado_por or '').strip()
+	if not autorizado_por:
+		raise ValueError('unblock_authorized_by_required')
 
 	now = timezone.now()
 	comentario = (comentario or '').strip()
@@ -473,6 +477,7 @@ def unblock_credit_limit_blocked_order(*, pedido, usuario, comentario=''):
 		},
 		metadata={
 			'action': 'unblock',
+			'autorizado_por': autorizado_por,
 			'comentario': comentario,
 			'alerta_id': alerta.id if alerta else None,
 		},
@@ -481,6 +486,11 @@ def unblock_credit_limit_blocked_order(*, pedido, usuario, comentario=''):
 				'field': str(_('Credit hold')),
 				'before': str(_('BLOCK — Customer placed on credit hold')),
 				'after': str(_('RELEASE — Authorized to continue')),
+			},
+			{
+				'field': str(_('Authorized by')),
+				'before': '',
+				'after': autorizado_por,
 			},
 			*([{
 				'field': str(_('Comment')),

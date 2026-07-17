@@ -1915,7 +1915,6 @@ def quickbooks_database_backup_download(request, backup_name):
         return redirect('database_backups_center')
 
     response = FileResponse(backup_file, as_attachment=True, filename=normalized_name, content_type='application/gzip')
-    response['X-Backup-Path'] = str(Path(settings.MEDIA_ROOT) / saved_path)
     return response
 
 
@@ -1929,7 +1928,6 @@ def system_backup_download(request, backup_name):
         return redirect('database_backups_center')
 
     response = FileResponse(backup_file, as_attachment=True, filename=normalized_name, content_type='application/gzip')
-    response['X-Backup-Path'] = str(Path(settings.MEDIA_ROOT) / saved_path)
     return response
 
 

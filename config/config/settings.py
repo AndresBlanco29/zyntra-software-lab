@@ -49,7 +49,8 @@ LOCALE_PATHS = [
 # SEGURIDAD
 # ========================
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key')
+_SECRET_KEY_ENV = (os.environ.get('SECRET_KEY') or '').strip()
+SECRET_KEY = _SECRET_KEY_ENV or 'django-insecure-dev-key'
 
 
 def _is_railway_deploy():
@@ -70,6 +71,12 @@ elif _is_local_runserver() and not _is_railway_deploy():
     DEBUG = True
 else:
     DEBUG = False
+
+# En producción no permitir la clave de desarrollo por defecto.
+if not DEBUG and (not _SECRET_KEY_ENV or _SECRET_KEY_ENV == 'django-insecure-dev-key'):
+    raise RuntimeError(
+        'SECRET_KEY must be set to a strong, unique value when DEBUG is False.'
+    )
 
 SERVE_MEDIA = env_bool('SERVE_MEDIA', True)
 
@@ -126,7 +133,10 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
 SECURE_HSTS_PRELOAD            = not DEBUG
 SECURE_CONTENT_TYPE_NOSNIFF    = True
 SESSION_COOKIE_SECURE          = not DEBUG
+SESSION_COOKIE_HTTPONLY        = True
+SESSION_COOKIE_SAMESITE        = 'Lax'
 CSRF_COOKIE_SECURE             = not DEBUG
+CSRF_COOKIE_SAMESITE           = 'Lax'
 
 # ========================
 # APPS

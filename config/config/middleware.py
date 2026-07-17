@@ -99,10 +99,22 @@ class ProtectedAreaLoginMiddleware:
     }
 
     # Zonas privadas que requieren usuario autenticado.
+    # Las rutas públicas de cotización/carrito (agregar, eliminar, etc.) no entran aquí.
     PROTECTED_PATH_PREFIXES = (
         "/panel-admin/",
         "/vendedores/",
         "/productos/",
+        "/pedidos/",
+        "/facturacion/",
+        "/reportes/",
+        "/auditoria/",
+        "/inventario/",
+        "/notificaciones/",
+        "/quickbooks/",
+        "/cotizaciones/backoffice/",
+        "/cotizaciones/cliente/",
+        "/cotizaciones/ver/",
+        "/cotizaciones/guardar/",
     )
 
     def __init__(self, get_response):

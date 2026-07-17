@@ -1243,12 +1243,9 @@ function bindLoginForm(container) {
       if (data.success) {
         window.location.href = data.redirect;
       } else {
-        let mensajeError = '{% trans "Credenciales incorrectas" %}';
-
-        if (data.error === 'user_not_found') {
-          mensajeError = '{% trans "El usuario no existe en la base de datos" %}';
-        } else if (data.error === 'password_incorrect') {
-          mensajeError = '{% trans "Contraseña incorrecta" %}';
+        let mensajeError = data.message || '{% trans "Invalid username or password." %}';
+        if (data.error === 'account_inactive') {
+          mensajeError = data.message || '{% trans "This account is inactive. Contact an administrator." %}';
         }
 
         const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));

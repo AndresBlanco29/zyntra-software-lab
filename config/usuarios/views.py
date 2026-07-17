@@ -1712,10 +1712,11 @@ def ver_certificado_cliente(request, cliente_id):
 def login_view(request):
 
     next_url = request.POST.get('next') or request.GET.get('next') or ''
+    invalid_credentials_message = _('Invalid username or password.')
 
     if request.method == 'POST':
 
-        username = request.POST.get('username').lower()
+        username = (request.POST.get('username') or '').lower()
         password = request.POST.get('password')
         
         # Detectar si es una petición AJAX (para cargar en modal)
@@ -1745,18 +1746,22 @@ def login_view(request):
                         # Redirecciones normales
                         return redirect(redirect_url)
                 else:
-                    # Usuario existe pero contraseña es incorrecta
                     if is_ajax:
-                        return JsonResponse({'success': False, 'error': 'password_incorrect', 'message': _('Contraseña incorrecta')})
-                    else:
-                        messages.error(request, _('Contraseña incorrecta'))
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'invalid_credentials',
+                            'message': invalid_credentials_message,
+                        })
+                    messages.error(request, invalid_credentials_message)
         
         except Usuario.DoesNotExist:
-            # Usuario no existe en la base de datos
             if is_ajax:
-                return JsonResponse({'success': False, 'error': 'user_not_found', 'message': _('El usuario no existe en la base de datos')})
-            else:
-                messages.error(request, _('Usuario no existe'))
+                return JsonResponse({
+                    'success': False,
+                    'error': 'invalid_credentials',
+                    'message': invalid_credentials_message,
+                })
+            messages.error(request, invalid_credentials_message)
 
     # Detectar si es una petición AJAX (para cargar en modal)
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
@@ -1799,8 +1804,6 @@ def registro_view(request):
                 return JsonResponse({'success': False, 'error': 'username_exists', 'message': message}, status=400)
             messages.error(request, message)
             return redirect('registro')
-
-        print("POST DATA:", request.POST)
 
         if password != password2:
             message = _("Las contraseñas no coinciden")
@@ -1984,24 +1987,29 @@ def corregir_solicitud_cliente(request, correction_token):
 def login_form_modal(request):
     """Devuelve solo el formulario de login para cargar en modal"""
     from django.http import HttpResponse
+    import json
+
+    invalid_credentials_message = str(_('Invalid username or password.'))
     
     if request.method == 'POST':
-        username = request.POST.get('username', '').lower()
+        username = (request.POST.get('username') or '').lower()
         password = request.POST.get('password', '')
         
         try:
             user_exists = Usuario.objects.get(username=username)
         except Usuario.DoesNotExist:
-            import json
             return HttpResponse(
-                json.dumps({'success': False, 'error': _('El usuario no existe en la base de datos')}),
+                json.dumps({'success': False, 'error': 'invalid_credentials', 'message': invalid_credentials_message}),
                 content_type='application/json'
             )
 
         if not user_exists.is_active:
-            import json
             return HttpResponse(
-                json.dumps({'success': False, 'error': _('This account is inactive. Contact an administrator.')}),
+                json.dumps({
+                    'success': False,
+                    'error': 'account_inactive',
+                    'message': str(_('This account is inactive. Contact an administrator.')),
+                }),
                 content_type='application/json'
             )
 
@@ -2009,21 +2017,17 @@ def login_form_modal(request):
         
         if user is not None:
             login(request, user)
-            
-            # Devolver JSON con redirect
-            import json
             redirect_url = _redirect_for_user(user)
             
             return HttpResponse(
                 json.dumps({'success': True, 'redirect': redirect_url}),
                 content_type='application/json'
             )
-        else:
-            import json
-            return HttpResponse(
-                json.dumps({'success': False, 'error': _('Credenciales incorrectas')}),
-                content_type='application/json'
-            )
+
+        return HttpResponse(
+            json.dumps({'success': False, 'error': 'invalid_credentials', 'message': invalid_credentials_message}),
+            content_type='application/json'
+        )
     
     # GET - Devolver solo el formulario
     return render(request, 'usuarios/login_modal.html')

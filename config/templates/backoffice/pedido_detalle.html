@@ -693,7 +693,7 @@
     </div>
     {% endif %}
     <div class="table-responsive">
-      <table class="table align-middle">
+      <table class="table align-middle" id="pedidoItemsTable">
         <thead>
           <tr>
             <th>{% trans "Product" %}</th>
@@ -707,7 +707,7 @@
             <th>{% trans "Remove" %}</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="pedidoItemsTableBody">
           {% for item in pedido_items %}
           <tr class="{% if item.has_picker_stock_shortage or item.selector_has_changes %}table-danger{% endif %}" data-pedido-item-row="{{ item.id }}" {% if item.has_picker_stock_shortage %}data-stock-shortage="true"{% endif %}>
             <td>
@@ -828,8 +828,11 @@
 
     <hr>
     <h6 class="mb-3">{% trans "Add a new product to this order" %}</h6>
+    <p class="text-muted small mb-2">
+      {% trans "Use Add to queue several products first. Press Save changes once when you are done." %}
+    </p>
     <div class="row g-2 mb-3 align-items-end">
-      <div class="col-md-6">
+      <div class="col-md-5">
         <label class="form-label fw-semibold" for="buscadorProductoPedido">{% trans "Search product" %}</label>
         <div
           class="product-search-field position-relative"
@@ -839,7 +842,12 @@
           data-empty-message="{% trans 'No products found.'|escapejs %}"
           data-min-chars-message="{% trans 'Type at least 2 characters to search.'|escapejs %}"
           data-price-placeholder="{% trans 'Select price...'|escapejs %}"
-          data-manual-price-label="{% trans 'Manual price'|escapejs %}">
+          data-manual-price-label="{% trans 'Manual price'|escapejs %}"
+          data-add-missing-message="{% trans 'Select a product before adding it.'|escapejs %}"
+          data-add-qty-message="{% trans 'Enter a quantity of at least 1.'|escapejs %}"
+          data-add-price-message="{% trans 'Enter a valid price.'|escapejs %}"
+          data-pending-label="{% trans 'Pending'|escapejs %}"
+          data-remove-label="{% trans 'Remove'|escapejs %}">
           <input
             type="search"
             id="buscadorProductoPedido"
@@ -847,26 +855,31 @@
             placeholder="{% trans 'Search products by full name...' %}"
             autocomplete="off"
             {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
-          <input type="hidden" name="presentacion_nueva" id="presentacionNuevaId" value="">
+          <input type="hidden" id="presentacionNuevaId" value="">
           <div id="newProductSearchResults" class="product-search-results list-group shadow-sm" hidden></div>
           <div id="newProductSelectedLabel" class="small text-success fw-semibold mt-1" hidden></div>
         </div>
       </div>
       <div class="col-md-2">
         <label class="form-label fw-semibold" for="cantidadNuevaPedido">{% trans "Qty." %}</label>
-        <input type="number" min="1" id="cantidadNuevaPedido" name="cantidad_nueva" class="form-control" placeholder="{% trans 'Qty.' %}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+        <input type="number" min="1" id="cantidadNuevaPedido" class="form-control" value="1" placeholder="{% trans 'Qty.' %}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
       </div>
-      <div class="col-md-2">
+      <div class="col-md-3">
         <label class="form-label fw-semibold" for="precioNuevoPedidoPreset">{% trans "Price" %}</label>
         <select id="precioNuevoPedidoPreset" class="form-select form-select-sm mb-2 preset-price-select" data-target-input="precioNuevoPedido" disabled {% if lineas_bloqueadas_para_picking %}data-locked="true"{% endif %}>
           <option value="">{% trans "Manual price" %}</option>
         </select>
-        <input type="number" min="0.01" step="0.01" id="precioNuevoPedido" name="precio_nuevo" class="form-control form-control-sm" placeholder="{% trans 'Price' %}" disabled {% if lineas_bloqueadas_para_picking %}data-locked="true"{% endif %}>
+        <input type="number" min="0.01" step="0.01" id="precioNuevoPedido" class="form-control form-control-sm" placeholder="{% trans 'Price' %}" disabled {% if lineas_bloqueadas_para_picking %}data-locked="true"{% endif %}>
+      </div>
+      <div class="col-md-2 d-grid">
+        <button type="button" class="btn btn-success" id="addPendingProductBtn" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+          {% trans "Add" %}
+        </button>
       </div>
     </div>
 
     <div class="d-flex justify-content-between align-items-center">
-      <strong>{% trans "Total" %}: ${{ pedido.total }}</strong>
+      <strong>{% trans "Total" %}: $<span id="pedidoFormTotalDisplay">{{ pedido.total }}</span></strong>
       <button type="submit" class="btn btn-primary">{% trans "Save changes" %}</button>
     </div>
   </div>

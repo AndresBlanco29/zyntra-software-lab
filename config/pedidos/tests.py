@@ -1406,6 +1406,44 @@ class PickingVerificationFlowTests(TestCase):
 		# HTML ticket already asserts Date; PDF must be a non-empty branded document.
 		self.assertIn(b'%PDF', pdf_response.content[:8])
 
+	def test_backoffice_detail_can_add_multiple_products_in_one_save(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), {
+			'estado': self.pedido.estado,
+			'nota_backoffice': 'Multi add',
+			f'cantidad_{self.item.id}': str(self.item.cantidad),
+			f'precio_{self.item.id}': str(self.item.precio),
+			'presentacion_nueva[]': [str(self.presentacion_unidad.id), str(self.presentacion_extra.id)],
+			'cantidad_nueva[]': ['2', '3'],
+			'precio_nuevo[]': ['3.50', '6.00'],
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.assertTrue(
+			PedidoItem.objects.filter(
+				pedido=self.pedido,
+				presentacion=self.presentacion_unidad,
+				cantidad=2,
+				precio=Decimal('3.50'),
+			).exists()
+		)
+		self.assertTrue(
+			PedidoItem.objects.filter(
+				pedido=self.pedido,
+				presentacion=self.presentacion_extra,
+				cantidad=3,
+				precio=Decimal('6.00'),
+			).exists()
+		)
+
+	def test_backoffice_detail_shows_add_product_button(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'id="addPendingProductBtn"', html=False)
+		self.assertContains(response, 'id="pedidoItemsTableBody"', html=False)
+		self.assertContains(response, 'Use Add to queue several products first')
+
 	def test_backoffice_cannot_move_blocked_order_forward(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=0)

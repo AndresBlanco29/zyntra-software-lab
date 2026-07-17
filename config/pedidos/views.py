@@ -603,15 +603,25 @@ def backoffice_pedido_detalle(request, pedido_id):
 					)
 					item.save(update_fields=['precio', 'descuento_aplicado', 'descuento_monto', 'subtotal'])
 
-				nueva_presentacion_id = request.POST.get('presentacion_nueva')
-				if nueva_presentacion_id:
+				nueva_presentacion_ids = [value.strip() for value in request.POST.getlist('presentacion_nueva[]') if str(value or '').strip()]
+				nueva_cantidades = request.POST.getlist('cantidad_nueva[]')
+				nueva_precios = request.POST.getlist('precio_nuevo[]')
+				# Backward compatibility with the previous single-line add fields.
+				if not nueva_presentacion_ids and request.POST.get('presentacion_nueva'):
+					nueva_presentacion_ids = [str(request.POST.get('presentacion_nueva')).strip()]
+					nueva_cantidades = [request.POST.get('cantidad_nueva') or '1']
+					nueva_precios = [request.POST.get('precio_nuevo') or '0']
+
+				for index, nueva_presentacion_id in enumerate(nueva_presentacion_ids):
 					presentacion = get_object_or_404(Presentacion.objects.select_related('producto'), id=nueva_presentacion_id)
-					cantidad_nueva = _parse_quantity(request.POST.get('cantidad_nueva'), 1)
-					precio_nuevo = _parse_decimal(request.POST.get('precio_nuevo'), 0)
+					cantidad_value = nueva_cantidades[index] if index < len(nueva_cantidades) else '1'
+					precio_value = nueva_precios[index] if index < len(nueva_precios) else '0'
+					cantidad_nueva = _parse_quantity(cantidad_value, 1)
+					precio_nuevo = _parse_decimal(precio_value, 0)
 					descuento_aplicado_nuevo, descuento_monto_nuevo = normalizar_descuento_item_pedido(
 						precio=precio_nuevo,
-						descuento_aplicado=request.POST.get('descuento_aplicado_nuevo'),
-						descuento_monto=_parse_decimal(request.POST.get('descuento_monto_nuevo'), 0),
+						descuento_aplicado=False,
+						descuento_monto=Decimal('0'),
 					)
 					PedidoItem.objects.create(
 						pedido=pedido,

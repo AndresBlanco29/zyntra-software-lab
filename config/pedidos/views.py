@@ -555,6 +555,21 @@ def backoffice_pedido_detalle(request, pedido_id):
 		if not request.user.has_internal_permission('backoffice.orders.manage'):
 			return redirect('backoffice_pedidos')
 		estado_anterior = pedido.estado
+		nota_anterior = pedido.nota_backoffice or ''
+		before_items = [
+			{
+				'item_id': item.id,
+				'producto': item.presentacion.producto.nombre,
+				'presentacion': item.presentacion.nombre_empaque_cliente,
+				'cantidad': item.cantidad,
+				'precio': str(item.precio),
+				'descuento_aplicado': bool(item.descuento_aplicado),
+				'descuento_monto': str(item.descuento_monto),
+				'subtotal': str(item.subtotal),
+			}
+			for item in pedido.items.select_related('presentacion__producto')
+		]
+		total_anterior = str(pedido.total)
 		try:
 			ensure_pedido_edit_lock_owner(pedido=pedido, user=request.user)
 			with transaction.atomic():
@@ -646,6 +661,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 
 		release_pedido_edit_lock(pedido=pedido, user=request.user)
 		from config.auditoria.business_events import log_business_event
+		from config.auditoria.enrichment import build_line_item_changes
 		from config.auditoria.models import AuditLog
 		pedido.refresh_from_db()
 		line_items = [
@@ -661,6 +677,14 @@ def backoffice_pedido_detalle(request, pedido_id):
 			}
 			for item in pedido.items.select_related('presentacion__producto')
 		]
+		changes = []
+		if estado_anterior != pedido.estado:
+			changes.append({'field': 'Status', 'before': estado_anterior, 'after': pedido.estado})
+		if (nota_anterior or '') != (pedido.nota_backoffice or ''):
+			changes.append({'field': 'Backoffice note', 'before': nota_anterior, 'after': pedido.nota_backoffice})
+		if total_anterior != str(pedido.total):
+			changes.append({'field': 'Total', 'before': total_anterior, 'after': str(pedido.total)})
+		changes.extend(build_line_item_changes(before_items, line_items))
 		log_business_event(
 			request.user,
 			action_label=_('Updated sales order #%(id)s') % {'id': pedido.id},
@@ -674,8 +698,11 @@ def backoffice_pedido_detalle(request, pedido_id):
 				'nota_backoffice': pedido.nota_backoffice,
 				'total': str(pedido.total),
 				'line_items': line_items,
+				'line_items_before': before_items,
 			},
+			changes=changes,
 			request=request,
+			module='Orders',
 		)
 		messages.success(request, _('Sales order updated successfully.'))
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)

@@ -1,4 +1,5 @@
 import logging
+import time
 
 from config.auditoria.services import record_audit_event_from_request
 
@@ -10,6 +11,7 @@ class AuditMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        request._audit_started_at = time.monotonic()
         response = self.get_response(request)
         try:
             record_audit_event_from_request(request, response)

@@ -1,216 +1,282 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block title %}{% trans "Audit trail" %}{% endblock %}
 
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
-  <div>
-    <h2 class="mb-1">{% trans "Audit trail" %}</h2>
-    <p class="text-muted mb-0">{% trans "Track who performed each action, how it was executed, when it happened, and what changed across the system." %}</p>
-    {% if archive_earliest %}
-    <p class="small text-muted mb-0 mt-1">
-      {% blocktrans with start=archive_earliest|date:"m/d/Y H:i" end=archive_latest|date:"m/d/Y H:i" %}
-      Records available from {{ start }} through {{ end }}. Leave date filters empty to show the full history.
-      {% endblocktrans %}
-    </p>
-    {% endif %}
-  </div>
-  <div class="badge text-bg-light border px-3 py-2">
-    {% blocktrans with count=total_count %}Showing {{ count }} matching records{% endblocktrans %}
-  </div>
-</div>
+<link rel="stylesheet" href="{% static 'css/audit_trail.css' %}">
 
-<div class="card shadow-sm mb-4">
-  <div class="card-body">
-    <form method="get" class="row g-3 align-items-end">
-      <div class="col-12 col-lg-4">
-        <label class="form-label" for="auditSearch">{% trans "Search" %}</label>
-        <input
-          id="auditSearch"
-          type="search"
-          name="q"
-          value="{{ filters.q }}"
-          class="form-control"
-          placeholder="{% trans 'User, action, path, entity, IP...' %}">
-      </div>
-      <div class="col-12 col-md-6 col-lg-2">
-        <label class="form-label" for="auditUser">{% trans "User" %}</label>
-        <select id="auditUser" name="user_id" class="form-select">
-          <option value="">{% trans "All users" %}</option>
-          {% regroup users by role as users_by_role %}
-          {% for role_group in users_by_role %}
-          <optgroup label="{{ role_group.grouper|capfirst }}">
-            {% for user in role_group.list %}
-            <option value="{{ user.id }}" {% if filters.user_id == user.id %}selected{% endif %}>
-              {% firstof user.get_full_name user.username %}{% if not user.is_active %} ({% trans "inactive" %}){% endif %}
-            </option>
-            {% endfor %}
-          </optgroup>
+<div class="audit-shell">
+  <div class="audit-hero d-flex flex-wrap justify-content-between align-items-start gap-3">
+    <div>
+      <div class="small text-uppercase fw-semibold opacity-75">{% trans "Security & compliance" %}</div>
+      <h1>{% trans "Audit trail" %}</h1>
+      <p class="mb-0 opacity-75">{% trans "Who did what, when, from where, and exactly what changed." %}</p>
+      {% if archive_earliest %}
+      <p class="small mb-0 mt-2 opacity-75">
+        {% blocktrans with start=archive_earliest|date:"m/d/Y H:i" end=archive_latest|date:"m/d/Y H:i" %}
+        History from {{ start }} through {{ end }}.
+        {% endblocktrans %}
+      </p>
+      {% endif %}
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a class="btn btn-light btn-sm" href="{% url 'audit_log_export_excel' %}?{{ export_querystring }}">{% trans "Excel" %}</a>
+      <a class="btn btn-outline-light btn-sm" href="{% url 'audit_log_export_csv' %}?{{ export_querystring }}">{% trans "CSV" %}</a>
+      <a class="btn btn-outline-light btn-sm" href="{% url 'audit_log_export_pdf' %}?{{ export_querystring }}">{% trans "PDF" %}</a>
+    </div>
+  </div>
+
+  <div class="audit-stats-grid mb-4">
+    <div class="audit-stat"><div class="label">{% trans "Matching events" %}</div><div class="value">{{ total_count }}</div></div>
+    <div class="audit-stat"><div class="label">{% trans "Created" %}</div><div class="value">{{ stats.created_count }}</div></div>
+    <div class="audit-stat"><div class="label">{% trans "Updated" %}</div><div class="value">{{ stats.updated_count }}</div></div>
+    <div class="audit-stat"><div class="label">{% trans "Deleted" %}</div><div class="value">{{ stats.deleted_count }}</div></div>
+    <div class="audit-stat"><div class="label">{% trans "Logins" %}</div><div class="value">{{ stats.login_count }}</div></div>
+    <div class="audit-stat danger"><div class="label">{% trans "Failed logins" %}</div><div class="value">{{ stats.failed_login_count }}</div></div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-lg-4">
+      <div class="audit-panel h-100">
+        <div class="panel-head"><h3>{% trans "Most active users" %}</h3></div>
+        <div class="panel-body">
+          {% for row in stats.top_users %}
+          <div class="audit-rank-row">
+            <span>{% firstof row.actor_full_name row.actor_username %} <small class="text-muted">{{ row.actor_role }}</small></span>
+            <strong>{{ row.total }}</strong>
+          </div>
+          {% empty %}
+          <p class="text-muted mb-0">{% trans "No activity in this filter." %}</p>
           {% endfor %}
-        </select>
-      </div>
-      <div class="col-12 col-md-6 col-lg-2">
-        <label class="form-label" for="auditCategory">{% trans "Action type" %}</label>
-        <select id="auditCategory" name="action_category" class="form-select">
-          <option value="">{% trans "All types" %}</option>
-          {% for value, label in category_choices %}
-          <option value="{{ value }}" {% if filters.action_category == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-12 col-md-6 col-lg-2">
-        <label class="form-label" for="auditMethod">{% trans "Method" %}</label>
-        <select id="auditMethod" name="http_method" class="form-select">
-          <option value="">{% trans "All methods" %}</option>
-          {% for value, label in method_choices %}
-          <option value="{{ value }}" {% if filters.http_method == value %}selected{% endif %}>{{ label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-12 col-md-6 col-lg-2">
-        <label class="form-label" for="auditEntityType">{% trans "Entity" %}</label>
-        <select id="auditEntityType" name="entity_type" class="form-select">
-          <option value="">{% trans "All entities" %}</option>
-          {% for entity_type in entity_types %}
-          <option value="{{ entity_type }}" {% if filters.entity_type == entity_type %}selected{% endif %}>{{ entity_type }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-12 col-md-6 col-lg-2">
-        <label class="form-label" for="auditStart">{% trans "From" %}</label>
-        <input id="auditStart" type="date" name="start_date" value="{{ filters.start_date|date:'Y-m-d' }}" class="form-control">
-      </div>
-      <div class="col-12 col-md-6 col-lg-2">
-        <label class="form-label" for="auditEnd">{% trans "To" %}</label>
-        <input id="auditEnd" type="date" name="end_date" value="{{ filters.end_date|date:'Y-m-d' }}" class="form-control">
-      </div>
-      <div class="col-12 col-md-6 col-lg-3">
-        <div class="form-check mt-4">
-          <input type="hidden" name="business_only" value="0">
-          <input
-            id="auditBusinessOnly"
-            type="checkbox"
-            name="business_only"
-            value="1"
-            class="form-check-input"
-            {% if filters.business_only %}checked{% endif %}>
-          <label class="form-check-label" for="auditBusinessOnly">{% trans "Business actions only" %}</label>
         </div>
-        <div class="small text-muted">{% trans "Optional. Check to hide navigation and show only orders, invoices, deliveries, QuickBooks, and pricing." %}</div>
       </div>
-      <div class="col-12 col-lg-4 d-flex gap-2">
-        <button type="submit" class="btn btn-primary">{% trans "Apply filters" %}</button>
-        <a href="{% url 'audit_log_list' %}" class="btn btn-outline-secondary">{% trans "Clear" %}</a>
+    </div>
+    <div class="col-lg-4">
+      <div class="audit-panel h-100">
+        <div class="panel-head"><h3>{% trans "Top editors" %}</h3></div>
+        <div class="panel-body">
+          {% for row in stats.top_modifiers %}
+          <div class="audit-rank-row">
+            <span>{% firstof row.actor_full_name row.actor_username %}</span>
+            <strong>{{ row.total }}</strong>
+          </div>
+          {% empty %}
+          <p class="text-muted mb-0">{% trans "No updates in this filter." %}</p>
+          {% endfor %}
+        </div>
       </div>
-    </form>
+    </div>
+    <div class="col-lg-4">
+      <div class="audit-panel h-100">
+        <div class="panel-head"><h3>{% trans "By module" %}</h3></div>
+        <div class="panel-body">
+          {% for row in stats.by_module %}
+          <div class="audit-rank-row"><span>{{ row.module }}</span><strong>{{ row.total }}</strong></div>
+          {% empty %}
+          <p class="text-muted mb-0">{% trans "No module breakdown." %}</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
   </div>
-</div>
 
-<div class="card shadow-sm">
-  <div class="table-responsive">
-    <table class="table table-sm table-hover mb-0 align-middle audit-log-table">
-      <thead class="table-light">
-        <tr>
-          <th>{% trans "When" %}</th>
-          <th>{% trans "Who" %}</th>
-          <th>{% trans "How" %}</th>
-          <th>{% trans "Action" %}</th>
-          <th>{% trans "Entity" %}</th>
-          <th>{% trans "IP" %}</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for log in page_obj %}
-        <tr>
-          <td class="text-nowrap">{{ log.created_at|date:"m/d/Y H:i:s" }}</td>
-          <td>
-            <div class="fw-semibold">{{ log.actor_display }}</div>
-            <div class="small text-muted">{{ log.actor_role|default:"-" }}</div>
-          </td>
-          <td>
-            <span class="badge text-bg-secondary">{{ log.http_method }}</span>
-            <div class="small text-muted mt-1">{{ log.get_action_category_display }}</div>
-          </td>
-          <td>
-            <div class="fw-semibold">{{ log.action_label }}</div>
-            {% if not log.entity_type %}
-            <div class="small text-muted text-break">{{ log.path }}</div>
-            {% endif %}
-          </td>
-          <td>
-            {% if log.entity_label %}
-              <div>{{ log.entity_label }}</div>
-              <div class="small text-muted">{{ log.entity_type }}{% if log.entity_id %} #{{ log.entity_id }}{% endif %}</div>
-            {% else %}
-              <span class="text-muted">-</span>
-            {% endif %}
-          </td>
-          <td class="small text-muted">{{ log.ip_address|default:"-" }}</td>
-          <td class="text-end">
-            <button
-              type="button"
-              class="btn btn-sm btn-outline-primary"
-              data-bs-toggle="collapse"
-              data-bs-target="#audit-detail-{{ log.id }}"
-              aria-expanded="false">
-              {% trans "Details" %}
-            </button>
-          </td>
-        </tr>
-        <tr class="collapse" id="audit-detail-{{ log.id }}">
-          <td colspan="7" class="bg-light">
-            <div class="p-3 small">
-              <div class="row g-3">
-                <div class="col-md-4"><strong>{% trans "Route" %}:</strong> {{ log.route_name|default:"-" }}</div>
-                <div class="col-md-4"><strong>{% trans "Status" %}:</strong> {{ log.status_code }}</div>
-                <div class="col-md-4"><strong>{% trans "User agent" %}:</strong> {{ log.user_agent|default:"-" }}</div>
+  <form method="get" class="audit-panel mb-4">
+    <div class="panel-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-lg-3">
+          <label class="form-label small fw-semibold" for="auditSearch">{% trans "Smart search" %}</label>
+          <input id="auditSearch" type="search" name="q" value="{{ filters.q }}" class="form-control form-control-sm"
+                 placeholder="{% trans 'User, customer, product, order, invoice, IP, action…' %}">
+        </div>
+        <div class="col-md-4 col-lg-2">
+          <label class="form-label small fw-semibold" for="auditUser">{% trans "User" %}</label>
+          <select id="auditUser" name="user_id" class="form-select form-select-sm">
+            <option value="">{% trans "All users" %}</option>
+            {% regroup users by role as users_by_role %}
+            {% for role_group in users_by_role %}
+            <optgroup label="{{ role_group.grouper|capfirst }}">
+              {% for user in role_group.list %}
+              <option value="{{ user.id }}" {% if filters.user_id == user.id %}selected{% endif %}>
+                {% firstof user.get_full_name user.username %}
+              </option>
+              {% endfor %}
+            </optgroup>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4 col-lg-2">
+          <label class="form-label small fw-semibold" for="auditRole">{% trans "Role" %}</label>
+          <select id="auditRole" name="actor_role" class="form-select form-select-sm">
+            <option value="">{% trans "All roles" %}</option>
+            {% for value, label in role_choices %}
+            <option value="{{ value }}" {% if filters.actor_role == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4 col-lg-2">
+          <label class="form-label small fw-semibold" for="auditCategory">{% trans "Action" %}</label>
+          <select id="auditCategory" name="action_category" class="form-select form-select-sm">
+            <option value="">{% trans "All types" %}</option>
+            {% for value, label in category_choices %}
+            <option value="{{ value }}" {% if filters.action_category == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4 col-lg-2">
+          <label class="form-label small fw-semibold" for="auditModule">{% trans "Module" %}</label>
+          <select id="auditModule" name="module" class="form-select form-select-sm">
+            <option value="">{% trans "All modules" %}</option>
+            {% for module in modules %}
+            <option value="{{ module }}" {% if filters.module == module %}selected{% endif %}>{{ module }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4 col-lg-2">
+          <label class="form-label small fw-semibold" for="auditEntityType">{% trans "Entity" %}</label>
+          <select id="auditEntityType" name="entity_type" class="form-select form-select-sm">
+            <option value="">{% trans "All entities" %}</option>
+            {% for entity_type in entity_types %}
+            <option value="{{ entity_type }}" {% if filters.entity_type == entity_type %}selected{% endif %}>{{ entity_type }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4 col-lg-2">
+          <label class="form-label small fw-semibold" for="auditMethod">{% trans "Method" %}</label>
+          <select id="auditMethod" name="http_method" class="form-select form-select-sm">
+            <option value="">{% trans "All methods" %}</option>
+            {% for value, label in method_choices %}
+            <option value="{{ value }}" {% if filters.http_method == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4 col-lg-2">
+          <label class="form-label small fw-semibold" for="auditResult">{% trans "Result" %}</label>
+          <select id="auditResult" name="result" class="form-select form-select-sm">
+            <option value="">{% trans "All results" %}</option>
+            <option value="success" {% if filters.result == 'success' %}selected{% endif %}>{% trans "Success" %}</option>
+            <option value="failed" {% if filters.result == 'failed' %}selected{% endif %}>{% trans "Failed" %}</option>
+          </select>
+        </div>
+        <div class="col-md-4 col-lg-2">
+          <label class="form-label small fw-semibold" for="auditIp">{% trans "IP" %}</label>
+          <input id="auditIp" type="text" name="ip_address" value="{{ filters.ip_address }}" class="form-control form-control-sm" placeholder="x.x.x.x">
+        </div>
+        <div class="col-md-4 col-lg-2">
+          <label class="form-label small fw-semibold" for="auditStart">{% trans "From" %}</label>
+          <input id="auditStart" type="date" name="start_date" value="{{ filters.start_date|date:'Y-m-d' }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-4 col-lg-2">
+          <label class="form-label small fw-semibold" for="auditEnd">{% trans "To" %}</label>
+          <input id="auditEnd" type="date" name="end_date" value="{{ filters.end_date|date:'Y-m-d' }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <div class="form-check mt-4">
+            <input type="hidden" name="business_only" value="0">
+            <input id="auditBusinessOnly" type="checkbox" name="business_only" value="1" class="form-check-input" {% if filters.business_only %}checked{% endif %}>
+            <label class="form-check-label" for="auditBusinessOnly">{% trans "Business actions only" %}</label>
+          </div>
+        </div>
+        <div class="col-lg-3 d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-sm">{% trans "Apply filters" %}</button>
+          <a href="{% url 'audit_log_list' %}" class="btn btn-outline-secondary btn-sm">{% trans "Clear" %}</a>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <div class="audit-panel">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0 align-middle audit-log-table">
+        <thead>
+          <tr>
+            <th>{% trans "When" %}</th>
+            <th>{% trans "Who" %}</th>
+            <th>{% trans "Action" %}</th>
+            <th>{% trans "Module" %}</th>
+            <th>{% trans "Entity" %}</th>
+            <th>{% trans "Result" %}</th>
+            <th>{% trans "IP" %}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in page_obj %}
+          <tr>
+            <td class="text-nowrap small">{{ log.created_at|date:"m/d/Y H:i:s" }}</td>
+            <td>
+              <div class="fw-semibold">{{ log.actor_display }}</div>
+              <div class="small text-muted">{{ log.actor_role|default:"-" }}</div>
+            </td>
+            <td>
+              <div class="fw-semibold">{{ log.action_label }}</div>
+              <div class="small text-muted">
+                <span class="badge text-bg-secondary">{{ log.http_method }}</span>
+                {{ log.get_action_category_display }}
               </div>
-              {% if log.metadata %}
-              <pre class="mt-3 mb-0 p-2 bg-white border rounded small">{{ log.metadata }}</pre>
+            </td>
+            <td class="small">{{ log.module|default:"-" }}</td>
+            <td>
+              {% if log.entity_label or log.entity_type %}
+              <div>{{ log.entity_label|default:log.entity_type }}</div>
+              <div class="small text-muted">{{ log.entity_type }}{% if log.entity_id %} #{{ log.entity_id }}{% endif %}</div>
+              {% else %}<span class="text-muted">-</span>{% endif %}
+            </td>
+            <td>
+              {% if log.success %}
+              <span class="audit-pill ok">{% trans "Success" %}</span>
+              {% else %}
+              <span class="audit-pill fail">{% trans "Failed" %}</span>
               {% endif %}
-            </div>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="7" class="text-center text-muted py-5">{% trans "No audit records match the selected filters." %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+            </td>
+            <td class="small text-muted">{{ log.ip_address|default:"-" }}</td>
+            <td class="text-end">
+              <button type="button" class="btn btn-sm btn-outline-primary audit-open-detail" data-log-id="{{ log.id }}">
+                {% trans "Details" %}
+              </button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-center text-muted py-5">{% trans "No audit records match the selected filters." %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <nav class="mt-4" aria-label="{% trans 'Audit pagination' %}">
+    <ul class="pagination justify-content-center flex-wrap">
+      {% if page_obj.has_previous %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&{{ export_querystring }}">{% trans "Previous" %}</a></li>
+      {% endif %}
+      <li class="page-item disabled"><span class="page-link">{% blocktrans with page=page_obj.number total=page_obj.paginator.num_pages %}Page {{ page }} of {{ total }}{% endblocktrans %}</span></li>
+      {% if page_obj.has_next %}
+      <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&{{ export_querystring }}">{% trans "Next" %}</a></li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
 </div>
 
-{% if page_obj.paginator.num_pages > 1 %}
-<nav class="mt-4" aria-label="{% trans 'Audit pagination' %}">
-  <ul class="pagination justify-content-center flex-wrap">
-    {% if page_obj.has_previous %}
-    <li class="page-item">
-      <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ filters.q }}&user_id={{ filters.user_id|default:'' }}&action_category={{ filters.action_category }}&http_method={{ filters.http_method }}&entity_type={{ filters.entity_type }}&business_only={% if filters.business_only %}1{% else %}0{% endif %}&start_date={% if filters.start_date %}{{ filters.start_date|date:'Y-m-d' }}{% endif %}&end_date={% if filters.end_date %}{{ filters.end_date|date:'Y-m-d' }}{% endif %}">{% trans "Previous" %}</a>
-    </li>
-    {% endif %}
-    <li class="page-item disabled">
-      <span class="page-link">{% blocktrans with page=page_obj.number total=page_obj.paginator.num_pages %}Page {{ page }} of {{ total }}{% endblocktrans %}</span>
-    </li>
-    {% if page_obj.has_next %}
-    <li class="page-item">
-      <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ filters.q }}&user_id={{ filters.user_id|default:'' }}&action_category={{ filters.action_category }}&http_method={{ filters.http_method }}&entity_type={{ filters.entity_type }}&business_only={% if filters.business_only %}1{% else %}0{% endif %}&start_date={% if filters.start_date %}{{ filters.start_date|date:'Y-m-d' }}{% endif %}&end_date={% if filters.end_date %}{{ filters.end_date|date:'Y-m-d' }}{% endif %}">{% trans "Next" %}</a>
-    </li>
-    {% endif %}
-  </ul>
-</nav>
-{% endif %}
+<div class="audit-drawer-backdrop" id="auditDrawerBackdrop" hidden></div>
+<aside class="audit-drawer" id="auditDrawer" aria-hidden="true">
+  <div class="audit-drawer-head">
+    <div>
+      <div class="small text-uppercase text-muted fw-semibold">{% trans "Event details" %}</div>
+      <h2 id="auditDrawerTitle">{% trans "Audit event" %}</h2>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="auditDrawerClose">{% trans "Close" %}</button>
+  </div>
+  <div class="audit-drawer-body" id="auditDrawerBody">
+    <p class="text-muted">{% trans "Select an event to inspect details." %}</p>
+  </div>
+</aside>
 
-<style>
-  .audit-log-table td,
-  .audit-log-table th {
-    vertical-align: top;
-  }
-  .audit-log-table pre {
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-</style>
+<script>
+  window.AUDIT_DETAIL_URL_TEMPLATE = "{% url 'audit_log_detail_json' 0 %}".replace('/0/', '/__ID__/');
+</script>
+<script src="{% static 'js/audit_trail.js' %}"></script>
 {% endblock %}

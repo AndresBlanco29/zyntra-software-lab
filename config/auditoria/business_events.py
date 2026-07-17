@@ -2,6 +2,12 @@ import logging
 
 from django.utils.translation import gettext as _
 
+from config.auditoria.enrichment import (
+    geo_hint_from_ip,
+    normalize_changes,
+    parse_user_agent,
+    resolve_module,
+)
 from config.auditoria.models import AuditLog
 
 logger = logging.getLogger(__name__)
@@ -40,11 +46,14 @@ def _actor_fields(user):
         return {
             'actor': None,
             'actor_username': '',
+            'actor_full_name': '',
             'actor_role': '',
         }
+    full_name = (user.get_full_name() or user.username or '')[:255]
     return {
         'actor': user,
         'actor_username': (getattr(user, 'username', '') or '')[:150],
+        'actor_full_name': full_name,
         'actor_role': (getattr(user, 'role', '') or '')[:30],
     }
 
@@ -57,18 +66,34 @@ def _request_fields(request):
             'route_name': '',
             'ip_address': None,
             'user_agent': '',
+            'browser': '',
+            'os_name': '',
+            'device': '',
+            'geo_city': '',
+            'geo_country': '',
             'status_code': 200,
+            'duration_ms': None,
         }
 
-    from config.auditoria.services import _client_ip, _resolve_route_name, _truncate
+    from config.auditoria.services import _client_ip, _duration_ms_from_request, _resolve_route_name, _truncate
 
+    ua = _truncate(request.META.get('HTTP_USER_AGENT', ''), 500)
+    ua_parts = parse_user_agent(ua)
+    ip_address = _client_ip(request)
+    geo = geo_hint_from_ip(ip_address)
     return {
         'http_method': _truncate(request.method, 10),
         'path': _truncate(request.path, 500),
         'route_name': _truncate(_resolve_route_name(request), 120),
-        'ip_address': _client_ip(request),
-        'user_agent': _truncate(request.META.get('HTTP_USER_AGENT', ''), 500),
+        'ip_address': ip_address,
+        'user_agent': ua,
+        'browser': ua_parts['browser'],
+        'os_name': ua_parts['os_name'],
+        'device': ua_parts['device'],
+        'geo_city': geo['geo_city'],
+        'geo_country': geo['geo_country'],
         'status_code': 200,
+        'duration_ms': _duration_ms_from_request(request),
     }
 
 
@@ -81,14 +106,23 @@ def log_business_event(
     entity_id='',
     entity_label='',
     metadata=None,
+    changes=None,
     request=None,
     status_code=200,
+    module='',
 ):
     try:
         fields = _actor_fields(user)
         request_data = _request_fields(request)
         if status_code != 200:
             request_data['status_code'] = status_code
+        meta = metadata or {}
+        resolved_changes = normalize_changes(changes, meta if isinstance(meta, dict) else {})
+        resolved_module = module or resolve_module(
+            route_name=request_data.get('route_name', ''),
+            path=request_data.get('path', ''),
+            entity_type=entity_type,
+        )
         return AuditLog.objects.create(
             **fields,
             action_category=action_category,
@@ -96,7 +130,10 @@ def log_business_event(
             entity_type=str(entity_type or '')[:80],
             entity_id=str(entity_id or '')[:80],
             entity_label=str(entity_label or '')[:255],
-            metadata=metadata or {},
+            module=str(resolved_module or '')[:80],
+            success=int(status_code) < 400,
+            changes=resolved_changes,
+            metadata=meta,
             **request_data,
         )
     except Exception:
@@ -177,4 +214,5 @@ def log_quickbooks_operation(request, *, operation, result=None, error=None):
         metadata=metadata,
         request=request,
         status_code=status_code,
+        module='QuickBooks',
     )

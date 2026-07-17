@@ -1,8 +1,15 @@
 import logging
 import re
+import time
 
 from django.utils.translation import gettext as _
 
+from config.auditoria.enrichment import (
+    geo_hint_from_ip,
+    normalize_changes,
+    parse_user_agent,
+    resolve_module,
+)
 from config.auditoria.models import AuditLog
 
 logger = logging.getLogger(__name__)
@@ -20,6 +27,7 @@ SKIP_ROUTE_NAMES = {
     'quickbooks_task_status',
     'backup_restore_status',
     'backup_job_status',
+    'audit_log_detail_json',
 }
 
 ROUTE_LABELS = {
@@ -108,6 +116,8 @@ def _resolve_action_category(request):
         return AuditLog.CATEGORY_LOGIN
     if route_name == 'logout' or 'logout' in path:
         return AuditLog.CATEGORY_LOGOUT
+    if 'print' in route_name or '/print/' in path:
+        return AuditLog.CATEGORY_PRINT
     if 'export' in route_name or path.endswith('/export/') or '/export/' in path:
         return AuditLog.CATEGORY_EXPORT
     if route_name.startswith('quickbooks_') and method == 'POST':
@@ -150,6 +160,22 @@ def _build_metadata(request, response):
     return metadata
 
 
+def _duration_ms_from_request(request):
+    started = getattr(request, '_audit_started_at', None)
+    if started is None:
+        return None
+    try:
+        return max(0, int((time.monotonic() - float(started)) * 1000))
+    except (TypeError, ValueError):
+        return None
+
+
+def _actor_full_name(actor):
+    if not actor:
+        return ''
+    return _truncate(actor.get_full_name() or actor.username, 255)
+
+
 def record_audit_event(
     request,
     *,
@@ -160,6 +186,9 @@ def record_audit_event(
     entity_id='',
     entity_label='',
     metadata=None,
+    changes=None,
+    duration_ms=None,
+    module='',
 ):
     user = getattr(request, 'user', None)
     route_name = _resolve_route_name(request)
@@ -171,22 +200,52 @@ def record_audit_event(
 
     try:
         actor = user if getattr(user, 'is_authenticated', False) else None
+        status_code = getattr(response, 'status_code', 200) if response is not None else 200
+        success = int(status_code) < 400
+        # Failed login attempts are unsuccessful even with redirect 302 in some flows.
+        category = action_category or _resolve_action_category(request)
+        if category == AuditLog.CATEGORY_LOGIN and actor is None:
+            success = False
+
+        meta = metadata if metadata is not None else _build_metadata(request, response)
+        ua = _truncate(request.META.get('HTTP_USER_AGENT', ''), 500)
+        ua_parts = parse_user_agent(ua)
+        ip_address = _client_ip(request)
+        geo = geo_hint_from_ip(ip_address)
+        resolved_changes = normalize_changes(changes, meta if isinstance(meta, dict) else {})
+        resolved_module = module or resolve_module(
+            route_name=route_name,
+            path=request.path or '',
+            entity_type=entity_type,
+        )
+        resolved_duration = duration_ms if duration_ms is not None else _duration_ms_from_request(request)
+
         log = AuditLog.objects.create(
             actor=actor,
             actor_username=_truncate(getattr(actor, 'username', '') if actor else request.POST.get('username', ''), 150),
+            actor_full_name=_actor_full_name(actor),
             actor_role=_truncate(getattr(actor, 'role', '') if actor else '', 30),
-            action_category=action_category or _resolve_action_category(request),
+            action_category=category,
             action_label=_truncate(action_label or _resolve_action_label(request), 255),
             http_method=_truncate(request.method, 10),
             path=_truncate(request.path, 500),
             route_name=_truncate(route_name, 120),
-            ip_address=_client_ip(request),
-            user_agent=_truncate(request.META.get('HTTP_USER_AGENT', ''), 500),
+            module=_truncate(resolved_module, 80),
+            ip_address=ip_address,
+            user_agent=ua,
+            browser=ua_parts['browser'],
+            os_name=ua_parts['os_name'],
+            device=ua_parts['device'],
+            geo_city=geo['geo_city'],
+            geo_country=geo['geo_country'],
             entity_type=_truncate(entity_type, 80),
             entity_id=_truncate(entity_id, 80),
             entity_label=_truncate(entity_label, 255),
-            status_code=getattr(response, 'status_code', 200) if response is not None else 200,
-            metadata=metadata if metadata is not None else _build_metadata(request, response),
+            status_code=status_code,
+            success=success,
+            duration_ms=resolved_duration,
+            changes=resolved_changes,
+            metadata=meta if isinstance(meta, dict) else {},
         )
         return log
     except Exception:

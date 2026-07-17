@@ -56,8 +56,11 @@ class AuditTrailTests(TestCase):
         self.assertGreater(AuditLog.objects.count(), before)
 
     def test_business_only_filter_hides_page_views(self):
+        self.client.force_login(self.admin)
+        request = self.client.get('/auditoria/').wsgi_request
+        request.user = self.admin
         record_audit_event(
-            self.client.get('/auditoria/').wsgi_request,
+            request,
             action_label='Page view',
             action_category=AuditLog.CATEGORY_VIEW,
         )
@@ -68,7 +71,6 @@ class AuditTrailTests(TestCase):
             entity_type='QuickBooks',
             entity_label='Items sync',
         )
-        self.client.force_login(self.admin)
         response = self.client.get(reverse('audit_log_list'))
         self.assertContains(response, 'Page view')
         self.assertContains(response, 'Import from QuickBooks')
@@ -81,3 +83,52 @@ class AuditTrailTests(TestCase):
         self.client.force_login(self.admin)
         response = self.client.get(reverse('audit_log_list'))
         self.assertContains(response, 'backoffice_audit')
+
+    def test_detail_json_and_exports(self):
+        log = log_business_event(
+            self.admin,
+            action_label='Edited product price',
+            action_category=AuditLog.CATEGORY_UPDATE,
+            entity_type='Producto',
+            entity_id='42',
+            entity_label='Coca-Cola 2L',
+            changes=[{'field': 'Price', 'before': '3.50', 'after': '3.80'}],
+            metadata={'estado_anterior': 'A', 'estado_nuevo': 'B'},
+        )
+        self.assertIsNotNone(log)
+        self.assertTrue(log.changes)
+        self.client.force_login(self.admin)
+
+        detail = self.client.get(reverse('audit_log_detail_json', args=[log.id]))
+        self.assertEqual(detail.status_code, 200)
+        payload = detail.json()
+        self.assertEqual(payload['entity_label'], 'Coca-Cola 2L')
+        self.assertEqual(payload['changes'][0]['field'], 'Price')
+        self.assertTrue(payload['timeline'])
+
+        csv_response = self.client.get(reverse('audit_log_export_csv'))
+        excel_response = self.client.get(reverse('audit_log_export_excel'))
+        pdf_response = self.client.get(reverse('audit_log_export_pdf'))
+        self.assertEqual(csv_response.status_code, 200)
+        self.assertIn('text/csv', csv_response['Content-Type'])
+        self.assertEqual(excel_response.status_code, 200)
+        self.assertEqual(pdf_response.status_code, 200)
+        self.assertEqual(pdf_response['Content-Type'], 'application/pdf')
+
+    def test_ua_enrichment_on_record(self):
+        self.client.force_login(self.admin)
+        request = self.client.get('/auditoria/').wsgi_request
+        request.user = self.admin
+        request.META['HTTP_USER_AGENT'] = (
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+            '(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        )
+        log = record_audit_event(
+            request,
+            action_label='UA check',
+            action_category=AuditLog.CATEGORY_ACTION,
+        )
+        self.assertEqual(log.browser, 'Chrome')
+        self.assertEqual(log.os_name, 'Windows')
+        self.assertEqual(log.device, 'Desktop')
+        self.assertEqual(log.module, 'Audit')

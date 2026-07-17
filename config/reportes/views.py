@@ -291,7 +291,7 @@ def _build_vendor_rows(orders, invoices):
 	for order in orders:
 		vendor = getattr(order, 'vendedor', None)
 		key = vendor.id if vendor else 0
-		name = vendor.get_full_name() or vendor.username if vendor else _('Unassigned')
+		name = vendor.get_full_name() or vendor.username if vendor else _('Customers')
 		rows.setdefault(key, {
 			'name': name,
 			'orders_count': 0,
@@ -305,7 +305,7 @@ def _build_vendor_rows(orders, invoices):
 	for invoice in invoices:
 		vendor = getattr(invoice.pedido, 'vendedor', None) if invoice.pedido_id else None
 		key = vendor.id if vendor else 0
-		name = vendor.get_full_name() or vendor.username if vendor else _('Unassigned')
+		name = vendor.get_full_name() or vendor.username if vendor else _('Customers')
 		rows.setdefault(key, {
 			'name': name,
 			'orders_count': 0,

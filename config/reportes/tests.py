@@ -148,6 +148,19 @@ class ReportsDashboardTests(TestCase):
 		self.assertEqual(response.context['driver_rows'][0]['name'], 'Unassigned')
 		self.assertEqual(response.context['recent_close_rows'][0]['driver_name'], 'Unassigned')
 
+	def test_reports_dashboard_labels_orders_without_seller_as_customers(self):
+		invoice = self._create_paid_delivery()
+		invoice.pedido.vendedor = None
+		invoice.pedido.save(update_fields=['vendedor'])
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('reportes_dashboard'))
+
+		self.assertEqual(response.status_code, 200)
+		vendor_names = [row['name'] for row in response.context['vendor_rows']]
+		self.assertIn('Customers', vendor_names)
+		self.assertNotIn('Unassigned', vendor_names)
+
 	def test_reports_exports_excel_and_pdf(self):
 		self._create_paid_delivery()
 		self.client.force_login(self.backoffice)

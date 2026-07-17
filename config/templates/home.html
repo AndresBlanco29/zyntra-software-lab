@@ -574,6 +574,8 @@ en un mercado competitivo.
 
 {% if producto.imagen %}
 <img src="{{ producto.imagen.url }}" class="producto-img">
+{% else %}
+<img src="{% static 'img/product-placeholder.svg' %}" class="producto-img producto-img--placeholder" alt="{% trans 'No product image' %}">
 {% endif %}
 
 <h5>{{ producto.nombre }}</h5>
@@ -663,6 +665,8 @@ en un mercado competitivo.
 
 {% if producto.imagen %}
 <img src="{{ producto.imagen.url }}" class="producto-img">
+{% else %}
+<img src="{% static 'img/product-placeholder.svg' %}" class="producto-img producto-img--placeholder" alt="{% trans 'No product image' %}">
 {% endif %}
 
 <h5>{{ producto.nombre }}</h5>

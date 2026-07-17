@@ -146,7 +146,12 @@ La Tortilla Grocery
 
 {% if item.producto.imagen %}
 <img src="{{ item.producto.imagen.url }}"
-style="width:45px;height:45px;object-fit:contain;">
+style="width:45px;height:45px;object-fit:contain;"
+alt="{{ item.producto.nombre_traducido }}">
+{% else %}
+<img src="{% static 'img/product-placeholder.svg' %}"
+style="width:45px;height:45px;object-fit:contain;"
+alt="{% trans 'No product image' %}">
 {% endif %}
 
 <div>

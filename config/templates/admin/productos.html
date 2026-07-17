@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n pagination_tags %}
+{% load i18n pagination_tags static %}
 
 {% block title %}
 {% trans "Products" %}
@@ -119,6 +119,8 @@
 <td>
 {% if producto.imagen %}
 <img src="{{ producto.imagen.url }}" width="70" height="70" loading="lazy" decoding="async" alt="" style="object-fit:cover;">
+{% else %}
+<img src="{% static 'img/product-placeholder.svg' %}" width="70" height="70" loading="lazy" decoding="async" alt="{% trans 'No product image' %}" style="object-fit:contain;background:#f3f4f6;border-radius:6px;">
 {% endif %}
 </td>
 

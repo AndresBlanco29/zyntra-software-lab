@@ -1,0 +1,20 @@
+{% load static i18n %}
+{% if producto.imagen %}
+<img
+  src="{{ producto.imagen.url }}"
+  class="producto-img{% if img_extra_class %} {{ img_extra_class }}{% endif %}"
+  alt="{{ producto.nombre_traducido|default:producto.nombre }}"
+  {% if img_style %}style="{{ img_style }}"{% endif %}
+  loading="lazy"
+  decoding="async"
+>
+{% else %}
+<img
+  src="{% static 'img/product-placeholder.svg' %}"
+  class="producto-img producto-img--placeholder{% if img_extra_class %} {{ img_extra_class }}{% endif %}"
+  alt="{% trans 'No product image' %}"
+  {% if img_style %}style="{{ img_style }}"{% endif %}
+  loading="lazy"
+  decoding="async"
+>
+{% endif %}

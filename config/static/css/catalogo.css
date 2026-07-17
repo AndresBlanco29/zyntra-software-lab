@@ -670,11 +670,21 @@ z-index:9999;
     display: flex;
     align-items: center;
     justify-content: center;
+    background: #f8fafc;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    overflow: hidden;
 }
 
 .producto-img-placeholder {
     width: 100%;
     height: 160px;
+}
+
+.producto-img--placeholder {
+    background: #f3f4f6;
+    padding: 12px;
+    object-fit: contain;
 }
 
         /* NOMBRE PRODUCTO */

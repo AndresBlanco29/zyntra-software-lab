@@ -279,15 +279,9 @@ data-costo="{{ producto.presentaciones.first.costo|default:'0' }}"
 </div>
 {% endif %}
 
-{% if producto.imagen %}
-
-<img
-src="{{ producto.imagen.url }}"
-class="producto-img mb-3"
-alt="{{ producto.nombre }}"
->
-
-{% endif %}
+<div class="producto-img-wrap mb-3">
+{% include "productos/includes/producto_imagen.html" with img_extra_class="mb-0" %}
+</div>
 
 <div class="product-name">
 

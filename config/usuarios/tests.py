@@ -614,7 +614,8 @@ class CustomerRequestReviewWorkflowTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(len(response.context['clientes']), 50)
 		self.assertEqual(response.context['page_obj'].paginator.count, 56)
-		self.assertContains(response, 'Page 1 of 2')
+		self.assertContains(response, 'page=2"')
+		self.assertContains(response, 'aria-current="page"')
 
 	def test_customer_requests_search_by_company_name(self):
 		self.cliente.nombre_empresa = 'Unique Search Foods LLC'

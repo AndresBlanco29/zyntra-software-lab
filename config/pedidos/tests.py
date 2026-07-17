@@ -1979,9 +1979,10 @@ class PickingVerificationFlowTests(TestCase):
 		second_page = self.client.get(reverse('backoffice_pedidos'), {'view': 'purchase-order', 'page': 2})
 
 		self.assertEqual(len(list(first_page.context['dispatch_orders'])), 2)
-		self.assertContains(first_page, 'Page 1 of')
+		self.assertContains(first_page, 'page=2"')
 		self.assertContains(first_page, 'Showing 1-2 of 3 orders')
 		self.assertEqual(len(list(second_page.context['dispatch_orders'])), 1)
+		self.assertContains(second_page, 'aria-current="page"')
 
 	def test_backoffice_order_list_excludes_quickbooks_imported_pedidos(self):
 		imported_pedido = Pedido.objects.create(
@@ -2031,7 +2032,6 @@ class PickingVerificationFlowTests(TestCase):
 			[row.source_id for row in response.context['dispatch_orders'] if row.record_type == 'order'],
 			[target_order.id],
 		)
-		self.assertContains(second_page, 'Page 2 of 2')
 
 
 class PedidoEditLockTests(TestCase):

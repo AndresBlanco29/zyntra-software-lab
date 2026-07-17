@@ -1,31 +1,41 @@
 {% load i18n %}
 {% if page_obj.paginator.num_pages > 1 %}
 <nav aria-label="{{ aria_label|default:'Pagination' }}" class="{{ nav_class|default:'d-flex justify-content-center align-items-center flex-wrap gap-2' }}">
-  <ul class="pagination mb-0 flex-wrap">
+  <ul class="pagination mb-0 flex-wrap align-items-center">
     {% if page_obj.has_previous %}
     <li class="page-item">
-      <a class="page-link" href="?{% for key, value in query_params.items %}{{ key }}={{ value|urlencode }}&{% endfor %}page={{ page_obj.previous_page_number }}">{% trans "Previous" %}</a>
+      <a class="page-link" href="?{% for key, value in query_params.items %}{{ key }}={{ value|urlencode }}&{% endfor %}page=1" aria-label="{% trans 'First page' %}" title="{% trans 'First page' %}">&laquo;</a>
+    </li>
+    <li class="page-item">
+      <a class="page-link" href="?{% for key, value in query_params.items %}{{ key }}={{ value|urlencode }}&{% endfor %}page={{ page_obj.previous_page_number }}" aria-label="{% trans 'Previous' %}" title="{% trans 'Previous' %}">&lsaquo;</a>
     </li>
     {% else %}
-    <li class="page-item disabled"><span class="page-link">{% trans "Previous" %}</span></li>
+    <li class="page-item disabled"><span class="page-link" aria-hidden="true">&laquo;</span></li>
+    <li class="page-item disabled"><span class="page-link" aria-hidden="true">&lsaquo;</span></li>
     {% endif %}
 
-    <li class="page-item disabled">
-      <span class="page-link">{% blocktrans with current=page_obj.number total=page_obj.paginator.num_pages %}Page {{ current }} of {{ total }}{% endblocktrans %}</span>
-    </li>
-
-    {% for jump_page in jump_pages %}
-    <li class="page-item">
-      <a class="page-link" href="?{% for key, value in query_params.items %}{{ key }}={{ value|urlencode }}&{% endfor %}page={{ jump_page }}">{{ jump_page }}</a>
-    </li>
+    {% for page_number in page_numbers %}
+      {% if page_number == page_obj.number %}
+      <li class="page-item active" aria-current="page">
+        <span class="page-link">{{ page_number }}</span>
+      </li>
+      {% else %}
+      <li class="page-item">
+        <a class="page-link" href="?{% for key, value in query_params.items %}{{ key }}={{ value|urlencode }}&{% endfor %}page={{ page_number }}">{{ page_number }}</a>
+      </li>
+      {% endif %}
     {% endfor %}
 
     {% if page_obj.has_next %}
     <li class="page-item">
-      <a class="page-link" href="?{% for key, value in query_params.items %}{{ key }}={{ value|urlencode }}&{% endfor %}page={{ page_obj.next_page_number }}">{% trans "Next" %}</a>
+      <a class="page-link" href="?{% for key, value in query_params.items %}{{ key }}={{ value|urlencode }}&{% endfor %}page={{ page_obj.next_page_number }}" aria-label="{% trans 'Next' %}" title="{% trans 'Next' %}">&rsaquo;</a>
+    </li>
+    <li class="page-item">
+      <a class="page-link" href="?{% for key, value in query_params.items %}{{ key }}={{ value|urlencode }}&{% endfor %}page={{ page_obj.paginator.num_pages }}" aria-label="{% trans 'Last page' %}" title="{% trans 'Last page' %}">&raquo;</a>
     </li>
     {% else %}
-    <li class="page-item disabled"><span class="page-link">{% trans "Next" %}</span></li>
+    <li class="page-item disabled"><span class="page-link" aria-hidden="true">&rsaquo;</span></li>
+    <li class="page-item disabled"><span class="page-link" aria-hidden="true">&raquo;</span></li>
     {% endif %}
   </ul>
 </nav>

@@ -523,7 +523,8 @@ class VendedorPedidoTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(len(response.context['clientes']), 50)
 		self.assertEqual(response.context['page_obj'].paginator.count, 56)
-		self.assertContains(response, 'Page 1 of 2')
+		self.assertContains(response, 'page=2"')
+		self.assertContains(response, 'aria-current="page"')
 
 	def test_catalogo_vendedor_paginates_products_alphabetically(self):
 		categoria = Categoria.objects.create(nombre='Catalog Pagination')
@@ -542,7 +543,8 @@ class VendedorPedidoTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(len(response.context['productos']), 50)
 		self.assertEqual(response.context['page_obj'].paginator.count, 56)
-		self.assertContains(response, 'Page 1 of 2')
+		self.assertContains(response, 'page=2"')
+		self.assertContains(response, 'aria-current="page"')
 		self.assertContains(response, 'Coca-Colaaaaaaaa')
 		product_names = [producto.nombre for producto in response.context['productos']]
 		self.assertEqual(product_names, sorted(product_names))
@@ -709,7 +711,8 @@ class VendedorEditarClienteTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(len(response.context['clientes']), 50)
 		self.assertEqual(response.context['page_obj'].paginator.count, 56)
-		self.assertContains(response, 'Page 1 of 2')
+		self.assertContains(response, 'page=2"')
+		self.assertContains(response, 'aria-current="page"')
 
 	def test_customer_list_search_filters_on_server(self):
 		self.client.force_login(self.vendor)

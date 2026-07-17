@@ -1,6 +1,6 @@
 from django import template
 
-from config.core.pagination import get_quick_jump_pages
+from config.core.pagination import get_visible_page_numbers
 
 register = template.Library()
 
@@ -14,7 +14,7 @@ def pagination_controls(page_obj, aria_label='', nav_class='', **query_params):
     }
     return {
         'page_obj': page_obj,
-        'jump_pages': get_quick_jump_pages(page_obj.number, page_obj.paginator.num_pages),
+        'page_numbers': get_visible_page_numbers(page_obj.number, page_obj.paginator.num_pages),
         'query_params': cleaned_params,
         'aria_label': aria_label,
         'nav_class': nav_class,

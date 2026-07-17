@@ -468,7 +468,8 @@ def catalogo(request):
 
     productos_favoritos = []
     if (
-        cliente is not None
+        page_obj.number == 1
+        and cliente is not None
         and can_view_received_quotes
         and not force_guest_mode
         and not filter_params.get('promociones')

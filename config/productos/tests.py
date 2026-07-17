@@ -168,7 +168,8 @@ class AdminProductosListTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(len(response.context['productos']), 50)
 		self.assertEqual(response.context['page_obj'].paginator.count, 55)
-		self.assertContains(response, 'Page 1 of 2')
+		self.assertContains(response, 'page=2"')
+		self.assertContains(response, 'aria-current="page"')
 
 	def test_lista_productos_search_filters_on_server(self):
 		self.client.force_login(self.admin)
@@ -339,10 +340,11 @@ class CatalogCustomerPriceTierTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(len(response.context['productos']), 50)
 		self.assertEqual(response.context['page_obj'].paginator.count, 56)
-		self.assertContains(response, 'Page 1 of 2')
+		self.assertContains(response, 'page=2"')
+		self.assertContains(response, 'aria-current="page"')
 
 	@patch('config.productos.views.CATALOGO_PAGE_SIZE', 5)
-	def test_catalog_shows_quick_jump_page_links(self):
+	def test_catalog_shows_visible_page_window_links(self):
 		for index in range(99):
 			producto = Producto.objects.create(
 				nombre=f'Catalog Jump {index:03d}',
@@ -363,9 +365,43 @@ class CatalogCustomerPriceTierTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.context['page_obj'].paginator.num_pages, 20)
-		self.assertContains(response, 'page=10"')
-		self.assertContains(response, 'page=15"')
+		self.assertContains(response, 'page=2"')
+		self.assertContains(response, 'page=3"')
+		self.assertContains(response, 'page=4"')
+		self.assertContains(response, 'page=5"')
 		self.assertContains(response, 'page=20"')
+		self.assertNotContains(response, 'Page 1 of')
+
+	@patch('config.productos.views.CATALOGO_PAGE_SIZE', 5)
+	@patch('config.productos.views.load_cliente_favorite_productos', return_value=[])
+	def test_catalog_hides_favorites_after_first_page(self, mock_favorites):
+		mock_favorites.return_value = [self.producto]
+		for index in range(9):
+			producto = Producto.objects.create(
+				nombre=f'Catalog Fav Page {index:03d}',
+				categoria=self.producto.categoria,
+				marca=self.producto.marca,
+				activo=True,
+			)
+			Presentacion.objects.create(
+				producto=producto,
+				nombre='Caja',
+				unidades=1,
+				tipo_contenido='caja',
+				costo=Decimal('10.00'),
+			)
+
+		self.client.force_login(self.usuario)
+		first_page = self.client.get(reverse('catalogo'))
+		second_page = self.client.get(reverse('catalogo'), {'page': 2})
+
+		self.assertEqual(first_page.status_code, 200)
+		self.assertEqual(second_page.status_code, 200)
+		self.assertTrue(first_page.context['productos_favoritos'])
+		self.assertContains(first_page, 'Your Favorite Products')
+		self.assertEqual(second_page.context['productos_favoritos'], [])
+		self.assertNotContains(second_page, 'Your Favorite Products')
+		self.assertEqual(mock_favorites.call_count, 1)
 
 
 class ProductPresentationFormTests(TestCase):

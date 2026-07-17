@@ -15,7 +15,7 @@ from datetime import datetime
 
 from config.core.datetime_formats import format_local_date, format_local_datetime
 from config.core.workflow_badges import build_delivery_workflow_badge, build_order_workflow_badge
-from config.core.pagination import get_quick_jump_pages
+from config.core.pagination import get_quick_jump_pages, get_visible_page_numbers
 from config.usuarios.models import Usuario
 
 
@@ -43,6 +43,23 @@ class QuickJumpPaginationTests(TestCase):
 
 	def test_no_jump_pages_on_last_page(self):
 		self.assertEqual(get_quick_jump_pages(20, 20), [])
+
+
+class VisiblePageWindowTests(TestCase):
+	def test_first_page_shows_leading_window(self):
+		self.assertEqual(get_visible_page_numbers(1, 20), [1, 2, 3, 4, 5])
+
+	def test_middle_page_centers_window(self):
+		self.assertEqual(get_visible_page_numbers(10, 20), [8, 9, 10, 11, 12])
+
+	def test_last_page_shows_trailing_window(self):
+		self.assertEqual(get_visible_page_numbers(20, 20), [16, 17, 18, 19, 20])
+
+	def test_short_catalog_shows_all_pages(self):
+		self.assertEqual(get_visible_page_numbers(2, 3), [1, 2, 3])
+
+	def test_single_page_returns_empty(self):
+		self.assertEqual(get_visible_page_numbers(1, 1), [])
 
 
 class BackofficeSpanishTranslationsTests(TestCase):

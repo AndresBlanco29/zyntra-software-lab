@@ -206,7 +206,7 @@ data-countdown-ended="{% trans 'Promotion ended' %}">
                 </section>
                 {% endif %}
 
-                {% if productos_favoritos %}
+                {% if productos_favoritos and page_obj.number == 1 %}
                 <section class="favorites-section mb-4" aria-labelledby="favoritesTitle">
                     <div class="favorites-section__header">
                         <div>

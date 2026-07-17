@@ -129,10 +129,26 @@ def create_credit_limit_alert(*, cliente, pedido, evaluation):
 
 
 def credit_hold_email_recipients():
-	"""Prefer test inbox during validation; otherwise admin/backoffice emails."""
-	test_email = (getattr(settings, 'CREDIT_HOLD_TEST_EMAIL', '') or '').strip()
-	if test_email:
-		return [test_email]
+	"""Prefer configured test inbox(es); otherwise admin/backoffice emails.
+
+	CREDIT_HOLD_TEST_EMAIL may be a single address or several separated by
+	commas/semicolons (e.g. "a@x.com, b@y.com").
+	"""
+	raw = (getattr(settings, 'CREDIT_HOLD_TEST_EMAIL', '') or '').strip()
+	if raw:
+		recipients = []
+		seen = set()
+		for part in raw.replace(';', ',').split(','):
+			email = part.strip()
+			if not email:
+				continue
+			key = email.lower()
+			if key in seen:
+				continue
+			seen.add(key)
+			recipients.append(email)
+		if recipients:
+			return recipients
 
 	from django.contrib.auth import get_user_model
 

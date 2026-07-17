@@ -447,7 +447,8 @@ ANYMAIL = {
 # Destinatario para notificaciones de cotizaciones y pedidos.
 ORDERS_NOTIFICATION_EMAIL = os.environ.get('ORDERS_NOTIFICATION_EMAIL', 'ltgordersapp@gmail.com')
 
-# Si está definida, TODAS las alertas de Credit Hold van solo a este correo (fase de prueba).
+# Si está definida, las alertas de Credit Hold van a estos correos (fase de prueba).
+# Acepta uno o varios separados por coma: "a@x.com, b@y.com"
 CREDIT_HOLD_TEST_EMAIL = (os.environ.get('CREDIT_HOLD_TEST_EMAIL') or '').strip()
 
 APP_BASE_URL = os.environ.get('APP_BASE_URL', '').rstrip('/')

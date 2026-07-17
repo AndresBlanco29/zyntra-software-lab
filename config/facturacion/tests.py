@@ -307,6 +307,7 @@ class InvoiceFlowTests(TestCase):
 	@override_settings(CREDIT_HOLD_TEST_EMAIL='credit-hold-test@example.com')
 	def test_order_creation_places_credit_hold_when_limit_exceeded(self):
 		from django.core import mail
+		from django.core.exceptions import ValidationError
 
 		from config.clientes.credit_limit import pedido_tiene_credit_hold_pendiente
 		from config.pedidos.services import asignar_picking_a_seleccionador, crear_pedido_desde_items
@@ -355,6 +356,15 @@ class InvoiceFlowTests(TestCase):
 		asignar_picking_a_seleccionador(pedido=pedido, seleccionador=selector)
 		pedido.refresh_from_db()
 		self.assertEqual(pedido.estado, 'PARA_VERIFICAR')
+
+	@override_settings(CREDIT_HOLD_TEST_EMAIL='one@example.com, two@example.com; ONE@example.com')
+	def test_credit_hold_test_email_supports_multiple_recipients(self):
+		from config.clientes.credit_limit import credit_hold_email_recipients
+
+		self.assertEqual(
+			credit_hold_email_recipients(),
+			['one@example.com', 'two@example.com'],
+		)
 
 	def test_blocked_credit_hold_can_be_unblocked(self):
 		from config.clientes.credit_limit import pedido_tiene_credit_hold_pendiente, resolve_credit_limit_alert

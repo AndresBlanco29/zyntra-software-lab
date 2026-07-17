@@ -356,6 +356,48 @@ class InvoiceFlowTests(TestCase):
 		pedido.refresh_from_db()
 		self.assertEqual(pedido.estado, 'PARA_VERIFICAR')
 
+	def test_blocked_credit_hold_can_be_unblocked(self):
+		from config.clientes.credit_limit import pedido_tiene_credit_hold_pendiente, resolve_credit_limit_alert
+		from config.pedidos.services import crear_pedido_desde_items
+
+		self.cliente.credit_limit = Decimal('2000.00')
+		self.cliente.balance = Decimal('1900.00')
+		self.cliente.save(update_fields=['credit_limit', 'balance'])
+
+		pedido = crear_pedido_desde_items(
+			cliente=self.cliente,
+			items_payload=[{
+				'presentacion': self.presentacion,
+				'cantidad': 10,
+				'precio': Decimal('20.00'),
+			}],
+			origen='VENDEDOR',
+			vendedor=self.backoffice,
+			reservar_inventario=False,
+		)
+		alerta = self.cliente.alertas_limite_credito.get(pedido=pedido, estado='PENDIENTE')
+		resolve_credit_limit_alert(pedido=pedido, usuario=self.backoffice, action='block')
+		pedido.refresh_from_db()
+		self.cliente.refresh_from_db()
+		self.assertTrue(pedido.credit_limit_bloqueado)
+		self.assertTrue(self.cliente.credit_hold)
+		self.assertTrue(pedido_tiene_credit_hold_pendiente(pedido))
+
+		self.client.force_login(self.backoffice)
+		response = self.client.post(reverse('backoffice_resolve_credit_limit', args=[pedido.id]), {
+			'action': 'unblock',
+			'comentario': 'Customer paid outstanding balance',
+		})
+		self.assertRedirects(response, reverse('backoffice_pedido_detalle', args=[pedido.id]))
+		pedido.refresh_from_db()
+		self.cliente.refresh_from_db()
+		alerta.refresh_from_db()
+		self.assertFalse(pedido.credit_limit_bloqueado)
+		self.assertTrue(pedido.credit_limit_liberado)
+		self.assertFalse(self.cliente.credit_hold)
+		self.assertEqual(alerta.estado, 'LIBERADO')
+		self.assertFalse(pedido_tiene_credit_hold_pendiente(pedido))
+
 	def test_generate_invoice_keeps_zero_quantity_lines_with_zero_subtotal(self):
 		self.pedido_item.cantidad = 0
 		self.pedido_item.subtotal = Decimal('0.00')

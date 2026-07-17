@@ -110,7 +110,9 @@
     </div>
     {% if pedido.credit_limit_liberado %}
     <span class="badge text-bg-success">🟢 {% trans "RELEASE" %}</span>
-    {% elif pedido.credit_limit_bloqueado or pending_credit_limit_alert %}
+    {% elif pedido.credit_limit_bloqueado %}
+    <span class="badge text-bg-danger">{% trans "BLOCKED" %}</span>
+    {% elif pending_credit_limit_alert %}
     <span class="badge text-bg-warning text-dark">🟡 {% trans "HOLD" %}</span>
     {% endif %}
   </div>
@@ -150,6 +152,38 @@
         </form>
       </div>
       <div class="small text-muted mt-2">{% trans "Release authorizes this order to continue (picking and invoice). Block keeps the order stopped and places the customer on credit hold." %}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if pedido.credit_limit_bloqueado and not pending_credit_limit_alert %}
+<div class="alert alert-danger border-danger shadow-lg mb-3 credit-limit-blocked-banner" role="alert">
+  <div class="d-flex align-items-start gap-3">
+    <div class="credit-limit-alert-icon">!</div>
+    <div class="flex-grow-1">
+      <h4 class="alert-heading mb-2">{% trans "Order blocked — release required to continue" %}</h4>
+      <p class="mb-2">{% blocktrans with customer=pedido.cliente.nombre_empresa %}This order for <strong>{{ customer }}</strong> was blocked because it exceeded the credit limit.{% endblocktrans %}</p>
+      {% if blocked_credit_limit_alert %}
+      <ul class="mb-3">
+        <li>{% trans "Credit limit" %}: <strong>${{ blocked_credit_limit_alert.limite_credito|floatformat:2 }}</strong></li>
+        <li>{% trans "Open balance at hold" %}: <strong>${{ blocked_credit_limit_alert.monto_adeudado|floatformat:2 }}</strong></li>
+        <li>{% trans "This order amount" %}: <strong>${{ blocked_credit_limit_alert.monto_operacion|floatformat:2 }}</strong></li>
+        <li>{% trans "Exceeded by" %}: <strong>${{ blocked_credit_limit_alert.exceso|floatformat:2 }}</strong></li>
+      </ul>
+      {% endif %}
+      {% if request.user|has_internal_permission:'backoffice.orders.manage' %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold" for="creditHoldUnblockComment">{% trans "Comment / observation (optional)" %}</label>
+        <textarea form="creditHoldUnblockForm" id="creditHoldUnblockComment" name="comentario" class="form-control" rows="2" placeholder="{% trans 'Payment received, payment arrangement, etc.' %}"></textarea>
+      </div>
+      <form method="post" action="{% url 'backoffice_resolve_credit_limit' pedido.id %}" id="creditHoldUnblockForm">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="unblock">
+        <button type="submit" class="btn btn-success btn-lg">🟢 {% trans "Unblock and release order" %}</button>
+      </form>
+      <div class="small text-muted mt-2">{% trans "This authorizes the order to continue with picking and invoicing. The action is recorded in the Audit Trail." %}</div>
       {% endif %}
     </div>
   </div>

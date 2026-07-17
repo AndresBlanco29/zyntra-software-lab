@@ -27,7 +27,7 @@ from config.core.pdf_branding import (
 	build_pdf_brand_banner,
 )
 from config.core.workflow_badges import _safe_related, build_order_workflow_badge
-from config.clientes.credit_limit import evaluate_customer_credit_limit, resolve_credit_limit_alert
+from config.clientes.credit_limit import evaluate_customer_credit_limit, resolve_credit_limit_alert, unblock_credit_limit_blocked_order
 from config.clientes.models import ClienteCreditoLimiteAlerta
 from config.usuarios.permissions import internal_permission_required
 from config.usuarios.models import Usuario
@@ -778,6 +778,14 @@ def backoffice_pedido_detalle(request, pedido_id):
 				estado=ClienteCreditoLimiteAlerta.ESTADO_PENDIENTE,
 			).order_by('-creado_en').first()
 		),
+		'blocked_credit_limit_alert': (
+			ClienteCreditoLimiteAlerta.objects.filter(
+				pedido=pedido,
+				estado=ClienteCreditoLimiteAlerta.ESTADO_BLOQUEADO,
+			).order_by('-creado_en').first()
+			if pedido.credit_limit_bloqueado
+			else None
+		),
 		'show_credit_limit_alert_modal': request.GET.get('credit_limit_alert') == '1',
 		**edit_lock_context,
 	}
@@ -1295,22 +1303,32 @@ def backoffice_resolve_credit_limit(request, pedido_id):
 	comentario = (request.POST.get('comentario') or '').strip()
 	try:
 		with transaction.atomic():
-			resolve_credit_limit_alert(
-				pedido=pedido,
-				usuario=request.user,
-				action=action,
-				comentario=comentario,
-			)
-	except ValueError:
-		messages.error(request, _('The credit limit alert is no longer pending review.'))
+			if action == 'unblock':
+				unblock_credit_limit_blocked_order(
+					pedido=pedido,
+					usuario=request.user,
+					comentario=comentario,
+				)
+			else:
+				resolve_credit_limit_alert(
+					pedido=pedido,
+					usuario=request.user,
+					action=action,
+					comentario=comentario,
+				)
+	except ValueError as exc:
+		if str(exc) == 'order_not_credit_blocked':
+			messages.error(request, _('This order is not blocked by credit limit.'))
+		else:
+			messages.error(request, _('The credit limit alert is no longer pending review.'))
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
-	if action == 'release':
+	if action == 'release' or action == 'unblock':
 		messages.success(
 			request,
 			_('Credit hold released for this order. Processing can continue.'),
 		)
-	else:
+	elif action == 'block':
 		messages.error(
 			request,
 			_('This order was blocked and the customer was placed on credit hold. The invoice cannot be issued.'),

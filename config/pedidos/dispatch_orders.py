@@ -59,6 +59,7 @@ class DispatchOrderRow:
 	display_ref: str = ''
 	credit_hold_pending: bool = False
 	credit_hold_released: bool = False
+	credit_hold_blocked: bool = False
 
 
 def _quote_status_badge_class(estado):
@@ -360,8 +361,10 @@ def _pedido_rows_from_pedidos(*, pedidos, bucket):
 	for pedido in pedidos:
 		status_label, status_badge_class = _pedido_status_display(pedido, bucket=bucket)
 		credit_hold_pending = bool(
-			pedido.credit_limit_bloqueado or pedido.id in pending_hold_ids
-		) and not pedido.credit_limit_liberado
+			(pedido.id in pending_hold_ids or pedido.credit_limit_bloqueado)
+			and not pedido.credit_limit_liberado
+		)
+		credit_hold_blocked = bool(pedido.credit_limit_bloqueado and not pedido.credit_limit_liberado)
 		rows.append(
 			DispatchOrderRow(
 				row_key=f'order-{pedido.id}',
@@ -379,6 +382,7 @@ def _pedido_rows_from_pedidos(*, pedidos, bucket):
 				display_ref=pedido.numero_display,
 				credit_hold_pending=credit_hold_pending,
 				credit_hold_released=bool(pedido.credit_limit_liberado),
+				credit_hold_blocked=credit_hold_blocked,
 			)
 		)
 	return rows

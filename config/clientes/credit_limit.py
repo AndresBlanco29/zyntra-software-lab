@@ -396,3 +396,98 @@ def resolve_credit_limit_alert(*, pedido, usuario, action, comentario=''):
 		module='Orders',
 	)
 	return alerta
+
+
+def _cliente_has_active_delivery_credit_block(cliente):
+	from config.facturacion.models import Delivery
+
+	return Delivery.objects.filter(
+		invoice__cliente=cliente,
+		client_blocked_on_delivery=True,
+	).exists()
+
+
+def _cliente_has_other_credit_limit_blocked_orders(cliente, *, exclude_pedido_id=None):
+	from config.pedidos.models import Pedido
+
+	queryset = Pedido.objects.filter(cliente=cliente, credit_limit_bloqueado=True)
+	if exclude_pedido_id:
+		queryset = queryset.exclude(pk=exclude_pedido_id)
+	return queryset.exists()
+
+
+def _sync_cliente_credit_hold_after_order_unblock(cliente, *, pedido_id):
+	if _cliente_has_other_credit_limit_blocked_orders(cliente, exclude_pedido_id=pedido_id):
+		return
+	if _cliente_has_active_delivery_credit_block(cliente):
+		return
+	if cliente.credit_hold:
+		cliente.credit_hold = False
+		cliente.save(update_fields=['credit_hold'])
+
+
+def unblock_credit_limit_blocked_order(*, pedido, usuario, comentario=''):
+	"""Release a previously blocked order and allow processing to continue."""
+	from django.utils import timezone
+
+	from config.auditoria.business_events import log_business_event
+	from config.auditoria.models import AuditLog
+	from config.clientes.models import ClienteCreditoLimiteAlerta
+
+	if not pedido.credit_limit_bloqueado:
+		raise ValueError('order_not_credit_blocked')
+
+	now = timezone.now()
+	comentario = (comentario or '').strip()
+	alerta = (
+		ClienteCreditoLimiteAlerta.objects.filter(
+			pedido=pedido,
+			estado=ClienteCreditoLimiteAlerta.ESTADO_BLOQUEADO,
+		)
+		.order_by('-creado_en')
+		.first()
+	)
+
+	pedido.credit_limit_bloqueado = False
+	pedido.credit_limit_liberado = True
+	pedido.save(update_fields=['credit_limit_liberado', 'credit_limit_bloqueado', 'actualizada_en'])
+
+	if alerta is not None:
+		alerta.estado = ClienteCreditoLimiteAlerta.ESTADO_LIBERADO
+		alerta.resuelto_por = usuario
+		alerta.resuelto_en = now
+		alerta.save(update_fields=['estado', 'resuelto_por', 'resuelto_en'])
+
+	cliente = pedido.cliente
+	_sync_cliente_credit_hold_after_order_unblock(cliente, pedido_id=pedido.id)
+
+	log_business_event(
+		usuario,
+		action_label=_('Unblocked credit hold for order #%(id)s') % {'id': pedido.id},
+		action_category=AuditLog.CATEGORY_ACTION,
+		entity_type='Pedido',
+		entity_id=str(pedido.id),
+		entity_label=_('Order #%(id)s - %(client)s') % {
+			'id': pedido.id,
+			'client': cliente.nombre_empresa,
+		},
+		metadata={
+			'action': 'unblock',
+			'comentario': comentario,
+			'alerta_id': alerta.id if alerta else None,
+		},
+		changes=[
+			{
+				'field': str(_('Credit hold')),
+				'before': str(_('BLOCK — Customer placed on credit hold')),
+				'after': str(_('RELEASE — Authorized to continue')),
+			},
+			*([{
+				'field': str(_('Comment')),
+				'before': '',
+				'after': comentario,
+			}] if comentario else []),
+		],
+		module='Orders',
+	)
+	return pedido

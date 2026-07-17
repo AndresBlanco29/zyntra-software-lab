@@ -7,6 +7,12 @@
 
 html {
     scroll-padding-top: calc(var(--panel-navbar-offset) + var(--panel-content-top-gap));
+    overflow-x: clip;
+}
+
+body {
+    overflow-x: clip;
+    max-width: 100vw;
 }
 
 .workflow-status-stack {
@@ -104,6 +110,9 @@ top:0;
 left:0;
 right:0;
 z-index:1000;
+overflow-x: clip;
+box-sizing: border-box;
+max-width: 100vw;
 }
 
 
@@ -135,8 +144,18 @@ padding:40px;
 
 height:calc(100vh - var(--panel-navbar-offset) - var(--panel-content-top-gap));
 overflow-y:auto;
+overflow-x:clip;
 
-width:100%;
+width:calc(100% - 240px);
+max-width:calc(100% - 240px);
+min-width:0;
+box-sizing:border-box;
+}
+
+.content > .container-fluid,
+.content .dashboard-cards,
+.content .card {
+    max-width: 100%;
 }
 
 
@@ -147,9 +166,13 @@ width:100%;
 
 .navbar-custom .container-fluid {
     display: grid;
-    grid-template-columns: minmax(220px, auto) minmax(360px, 1fr) auto;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
     align-items: center;
-    gap: 18px;
+    gap: 12px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .navbar-center-tools {
@@ -520,11 +543,15 @@ width:100%;
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-shrink: 0;
+    min-width: 0;
 }
 
 .navbar-custom .ms-auto {
     margin-left: 0 !important;
     justify-self: end;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .navbar-profile-link {
@@ -583,6 +610,8 @@ width:100%;
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 /* sidebar estilos */
@@ -837,6 +866,11 @@ width:100%;
         height: auto;
         min-height: calc(100vh - var(--panel-navbar-offset));
         margin-left: 240px;
+        width: calc(100% - 240px);
+        max-width: calc(100% - 240px);
+        min-width: 0;
+        box-sizing: border-box;
+        overflow-x: clip;
     }
 
     /* Sidebar siempre visible en escritorio */
@@ -861,6 +895,11 @@ width:100%;
         }
         .content {
             margin-left: 240px;
+            width: calc(100% - 240px);
+            max-width: calc(100% - 240px);
+            min-width: 0;
+            box-sizing: border-box;
+            overflow-x: clip;
         }
     }
 
@@ -892,6 +931,80 @@ width:100%;
         }
         .content {
             margin-left: 0;
+            width: 100%;
+            max-width: 100%;
+        }
+
+        /* iPad / tablet navbar: keep Log out fully visible */
+        :root {
+            --panel-navbar-offset: 148px;
+        }
+
+        .navbar-custom {
+            padding: 10px 12px;
+        }
+
+        .navbar-custom .container-fluid {
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px;
+        }
+
+        .navbar-brand-group {
+            grid-column: 1;
+            min-width: 0;
+        }
+
+        .navbar-brand {
+            font-size: 16px;
+            max-width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .navbar-center-tools {
+            grid-column: 1 / -1;
+            order: 3;
+            width: 100%;
+            justify-content: stretch;
+            gap: 8px;
+        }
+
+        .navbar-search {
+            max-width: 100%;
+        }
+
+        .navbar-search-field {
+            min-height: 44px;
+            padding: 0 12px;
+        }
+
+        .navbar-custom .ms-auto {
+            grid-column: 2;
+            justify-self: end;
+        }
+
+        .navbar-actions {
+            gap: 6px;
+        }
+
+        .navbar-profile-text {
+            display: none;
+        }
+
+        .navbar-profile-link {
+            padding: 0.45rem 0.65rem;
+            min-width: 40px;
+            min-height: 40px;
+        }
+
+        .navbar-logout-button {
+            padding: 0.45rem 0.85rem;
+            font-size: 13px;
+        }
+
+        .navbar-urgent-alerts-label {
+            display: none;
         }
     }
 
@@ -1461,7 +1574,7 @@ width:100%;
     margin-left: 0;
     width: 100%;
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
     padding: 16px;
     padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
     height: auto;

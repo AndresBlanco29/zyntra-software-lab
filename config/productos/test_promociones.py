@@ -494,6 +494,8 @@ class PromocionPersistenceTests(TestCase):
         response = client.get(reverse('catalogo'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'View discounts')
+        self.assertContains(response, 'data-minimum="10"')
+        self.assertContains(response, 'data-minimum="20"')
         self.assertContains(response, '10+ units')
         self.assertContains(response, '20+ units')
         self.assertContains(response, 'Get USD 0.25 off/unit.')

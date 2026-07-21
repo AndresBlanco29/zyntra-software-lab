@@ -34,7 +34,10 @@ data-countdown-hours="{% trans 'hours' %}"
 data-countdown-minutes="{% trans 'minutes' %}"
 data-countdown-seconds="{% trans 'seconds' %}"
 data-countdown-ended="{% trans 'Promotion ended' %}"
-data-promo-discounts-title="{% trans 'Available discounts' %}">
+data-promo-discounts-title="{% trans 'Available discounts' %}"
+data-promo-add-select-title="{% trans 'Which promotion would you like to add?' %}"
+data-promo-tier-hint="{% trans 'Tap a discount to set the quantity.' %}"
+data-promo-add-tier-hint="{% trans 'Select a promotion to add it to your order.' %}">
 
     <!-- NAVBAR -->
     <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
@@ -319,6 +322,7 @@ data-promo-discounts-title="{% trans 'Available discounts' %}">
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="{% trans 'Close' %}"></button>
       </div>
       <div class="offcanvas-body">
+        <p class="promo-discounts-hint small mb-2" id="promoDiscountsPanelHint"></p>
         <p class="promo-discounts-description small mb-3" id="promoDiscountsPanelDesc" hidden></p>
         <div id="promoDiscountsPanelList"></div>
       </div>

@@ -8,6 +8,7 @@
       {% if producto.promocion_activa %}
       data-promo-minimum="{{ producto.promocion_cantidad_minima }}"
       data-promo-presentation="{{ producto.promocion_presentacion_id|default:'' }}"
+      data-promo-tier-count="{{ producto.promocion_escalas|length }}"
       {% endif %}>
 
       {% if producto.promocion_activa %}

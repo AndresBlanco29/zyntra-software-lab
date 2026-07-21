@@ -101,19 +101,59 @@ document.addEventListener('DOMContentLoaded', function() {
         panel.classList.add(useSidePanel ? 'offcanvas-end' : 'offcanvas-bottom');
     }
 
-    function initPromoDiscountsPanel() {
+    function getPromoTierCount(card) {
+        const template = card.querySelector('.js-promo-discounts-template');
+        if (!template || !template.content) {
+            return 0;
+        }
+        return template.content.querySelectorAll('.js-promo-tier-option').length;
+    }
+
+    function applyPromoTierToCard(card, minimum) {
+        const quantityInput = card.querySelector('.cantidad');
+        const promoPresentation = card.dataset.promoPresentation;
+        const presentationSelect = card.querySelector('.presentacion-select');
+
+        if (quantityInput && Number.isFinite(minimum) && minimum > 0) {
+            quantityInput.value = String(minimum);
+        }
+        if (promoPresentation && presentationSelect) {
+            presentationSelect.value = promoPresentation;
+            presentationSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    }
+
+    function markSelectedPromoTier(panelList, minimum) {
+        panelList.querySelectorAll('.js-promo-tier-option').forEach(function (button) {
+            const isSelected = parseInt(button.dataset.minimum, 10) === minimum;
+            button.classList.toggle('is-selected', isSelected);
+            button.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+        });
+    }
+
+    function createPromoDiscountsPanelController(addToCartFn) {
         const panel = document.getElementById('promoDiscountsPanel');
         const panelTitle = document.getElementById('promoDiscountsPanelTitle');
+        const panelHint = document.getElementById('promoDiscountsPanelHint');
         const panelDesc = document.getElementById('promoDiscountsPanelDesc');
         const panelList = document.getElementById('promoDiscountsPanelList');
-        const buttons = document.querySelectorAll('.js-promo-discounts-btn');
+        const viewButtons = document.querySelectorAll('.js-promo-discounts-btn');
 
-        if (!panel || !panelTitle || !panelDesc || !panelList || !buttons.length) {
-            return;
+        if (!panel || !panelTitle || !panelHint || !panelDesc || !panelList) {
+            return {
+                openForCard: function () {},
+            };
         }
 
-        const baseTitle = document.body.dataset.promoDiscountsTitle || 'Available discounts';
+        const viewTitle = document.body.dataset.promoDiscountsTitle || 'Available discounts';
+        const addTitle = document.body.dataset.promoAddSelectTitle || 'Which promotion would you like to add?';
+        const viewHint = document.body.dataset.promoTierHint || 'Tap a discount to set the quantity.';
+        const addHint = document.body.dataset.promoAddTierHint || 'Select a promotion to add it to your order.';
+
         let offcanvasInstance = null;
+        let activeCard = null;
+        let panelMode = 'view';
+        let activeFeedbackButton = null;
 
         function getOffcanvasInstance() {
             if (!offcanvasInstance) {
@@ -122,30 +162,73 @@ document.addEventListener('DOMContentLoaded', function() {
             return offcanvasInstance;
         }
 
-        buttons.forEach(function (button) {
+        function openForCard(card, options) {
+            const template = card.querySelector('.js-promo-discounts-template');
+            if (!template) {
+                return;
+            }
+
+            activeCard = card;
+            panelMode = options.mode || 'view';
+            activeFeedbackButton = options.feedbackButton || null;
+
+            const productName = (options.productName || card.dataset.nombre || '').trim();
+            const baseTitle = panelMode === 'add' ? addTitle : viewTitle;
+            panelTitle.textContent = productName ? baseTitle + ' · ' + productName : baseTitle;
+            panelHint.textContent = panelMode === 'add' ? addHint : viewHint;
+            panelHint.hidden = false;
+
+            const description = (options.promoDescription || '').trim();
+            if (description) {
+                panelDesc.textContent = description;
+                panelDesc.hidden = false;
+            } else {
+                panelDesc.textContent = '';
+                panelDesc.hidden = true;
+            }
+
+            panelList.innerHTML = template.innerHTML.trim();
+            const currentQty = window.CatalogQuantity.getQuantityValue(card.querySelector('.cantidad'));
+            markSelectedPromoTier(panelList, currentQty);
+            applyPromoDiscountsPanelPlacement(panel);
+            getOffcanvasInstance().show();
+        }
+
+        panelList.addEventListener('click', function (event) {
+            const tierButton = event.target.closest('.js-promo-tier-option');
+            if (!tierButton || !activeCard) {
+                return;
+            }
+
+            const minimum = parseInt(tierButton.dataset.minimum, 10);
+            if (!Number.isFinite(minimum) || minimum < 1) {
+                return;
+            }
+
+            applyPromoTierToCard(activeCard, minimum);
+            markSelectedPromoTier(panelList, minimum);
+
+            if (panelMode === 'add' && activeFeedbackButton) {
+                getOffcanvasInstance().hide();
+                addToCartFn(activeCard, activeFeedbackButton, { ensurePromotionMinimum: true });
+                return;
+            }
+
+            getOffcanvasInstance().hide();
+            activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+
+        viewButtons.forEach(function (button) {
             button.addEventListener('click', function () {
-                const template = button.parentElement.querySelector('.js-promo-discounts-template');
-                if (!template) {
+                const card = button.closest('.producto-card');
+                if (!card) {
                     return;
                 }
-
-                const productName = (button.dataset.productName || '').trim();
-                panelTitle.textContent = productName
-                    ? baseTitle + ' · ' + productName
-                    : baseTitle;
-
-                const description = (button.dataset.promoDescription || '').trim();
-                if (description) {
-                    panelDesc.textContent = description;
-                    panelDesc.hidden = false;
-                } else {
-                    panelDesc.textContent = '';
-                    panelDesc.hidden = true;
-                }
-
-                panelList.innerHTML = template.innerHTML.trim();
-                applyPromoDiscountsPanelPlacement(panel);
-                getOffcanvasInstance().show();
+                openForCard(card, {
+                    mode: 'view',
+                    productName: button.dataset.productName || '',
+                    promoDescription: button.dataset.promoDescription || '',
+                });
             });
         });
 
@@ -154,6 +237,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 applyPromoDiscountsPanelPlacement(panel);
             }
         });
+
+        return { openForCard: openForCard };
     }
 
     function submitCatalogFilters() {
@@ -276,22 +361,26 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     /* AGREGAR LA CANTIDAD MÍNIMA DE LA PROMOCIÓN CON UN CLIC */
+    const promoDiscountsPanel = createPromoDiscountsPanelController(addCardToCart);
+
     document.querySelectorAll(".promo-add-btn").forEach(btn => {
         btn.addEventListener("click", function () {
             const card = this.closest(".producto-card");
+            const tierCount = getPromoTierCount(card);
+
+            if (tierCount > 1) {
+                const viewBtn = card.querySelector('.js-promo-discounts-btn');
+                promoDiscountsPanel.openForCard(card, {
+                    mode: 'add',
+                    feedbackButton: this,
+                    productName: card.dataset.nombre || '',
+                    promoDescription: viewBtn ? (viewBtn.dataset.promoDescription || '') : '',
+                });
+                return;
+            }
+
             const minimum = parseInt(card.dataset.promoMinimum, 10);
-            const promoPresentation = card.dataset.promoPresentation;
-            const quantityInput = card.querySelector(".cantidad");
-            const presentationSelect = card.querySelector(".presentacion-select");
-
-            if (Number.isFinite(minimum) && minimum > 0) {
-                quantityInput.value = String(minimum);
-            }
-            if (promoPresentation && presentationSelect) {
-                presentationSelect.value = promoPresentation;
-                presentationSelect.dispatchEvent(new Event("change", { bubbles: true }));
-            }
-
+            applyPromoTierToCard(card, minimum);
             addCardToCart(card, this, { ensurePromotionMinimum: true });
         });
     });
@@ -337,5 +426,4 @@ document.addEventListener('DOMContentLoaded', function() {
 
     syncMyOrderAttention(document.body.dataset.cartCount || 0);
     initPromoCountdowns();
-    initPromoDiscountsPanel();
 });

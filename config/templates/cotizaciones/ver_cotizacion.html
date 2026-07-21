@@ -105,6 +105,15 @@ La Tortilla Grocery
 
 <div class="container-fluid">
 
+<div class="cot-order-search cot-order-search--top mb-3">
+<input
+type="search"
+id="buscador"
+class="form-control"
+placeholder="{% trans "Search products..." %}"
+autocomplete="off">
+</div>
+
 <div class="row">
 
 <!-- LEFT COLUMN (PRODUCTS) -->
@@ -285,17 +294,6 @@ aria-label="{% trans 'Quantity' %}"
 
 <!-- RIGHT COLUMN (PANEL) -->
             <div class="col-12 col-lg-3 order-2 order-lg-2">
-<!-- SEARCH -->
-<div class="mb-4 cot-order-search">
-
-<input
-type="search"
-id="buscador"
-class="form-control"
-placeholder="{% trans "Search products..." %}">
-
-</div>
-
 
 <!-- CARD -->
 <div class="card custom-card">

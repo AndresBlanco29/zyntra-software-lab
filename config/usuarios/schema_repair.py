@@ -174,6 +174,45 @@ def _should_defer_table_creation(exc):
     return 'failed to open the referenced table' in message or '1824' in message
 
 
+def _create_missing_m2m_tables(connection, table_names):
+    """Create implicit ManyToMany through tables skipped by _iter_managed_models()."""
+    for model in _iter_managed_models():
+        for field in model._meta.many_to_many:
+            through_model = field.remote_field.through
+            if through_model is None or not through_model._meta.auto_created:
+                continue
+
+            table_name = through_model._meta.db_table
+            if table_name in table_names:
+                continue
+
+            try:
+                with connection.schema_editor() as schema_editor:
+                    schema_editor.create_model(through_model)
+                table_names.add(table_name)
+                logger.warning(
+                    "Runtime schema repair created missing M2M table %s",
+                    table_name,
+                )
+            except (OperationalError, ProgrammingError) as exc:
+                message = str(exc).lower()
+                if 'already exists' in message or '1050' in message:
+                    table_names.add(table_name)
+                    continue
+
+                logger.exception(
+                    "Runtime schema repair failed creating M2M table %s: %s",
+                    table_name,
+                    exc,
+                )
+            except Exception as exc:
+                logger.exception(
+                    "Runtime schema repair failed creating M2M table %s: %s",
+                    table_name,
+                    exc,
+                )
+
+
 def _create_missing_tables(connection, table_names):
     pending_models = [model for model in _iter_managed_models() if model._meta.db_table not in table_names]
 
@@ -276,6 +315,7 @@ def ensure_runtime_schema():
             table_names = set(connection.introspection.table_names(cursor))
 
         _create_missing_tables(connection, table_names)
+        _create_missing_m2m_tables(connection, table_names)
 
         for model in _iter_managed_models():
             table_name = model._meta.db_table

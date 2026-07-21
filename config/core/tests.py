@@ -1,6 +1,12 @@
 from decimal import Decimal
 from types import SimpleNamespace
 
+from config.core.profit import (
+	build_order_line_profit,
+	calculate_profit_from_revenue,
+	calculate_profit_percentage,
+	summarize_order_profit,
+)
 from config.core.shipment_summary import (
 	build_shipment_summary_from_cart_entries,
 	build_shipment_summary_from_lines,
@@ -131,6 +137,41 @@ class WorkflowBadgeTests(TestCase):
 		self.assertEqual(badge['kind'], 'split')
 		self.assertEqual(badge['sender_role'], 'backoffice')
 		self.assertEqual(badge['receiver_role'], 'driver')
+
+
+class ProfitCalculationTests(TestCase):
+	def test_calculate_profit_percentage_uses_selling_price_margin(self):
+		self.assertEqual(calculate_profit_percentage(cost=Decimal('7.00'), sale_price=Decimal('10.00')), Decimal('30.00'))
+
+	def test_build_order_line_profit_applies_discount_before_margin(self):
+		profit = build_order_line_profit(
+			cost=Decimal('5.00'),
+			list_price=Decimal('10.00'),
+			quantity=2,
+			descuento_aplicado=True,
+			descuento_monto=Decimal('1.00'),
+		)
+		self.assertEqual(profit['net_unit_price'], Decimal('9.00'))
+		self.assertEqual(profit['unit_profit_amount'], Decimal('4.00'))
+		self.assertEqual(profit['line_profit_amount'], Decimal('8.00'))
+		self.assertEqual(profit['profit_percent'], Decimal('44.44'))
+
+	def test_calculate_profit_from_revenue_matches_invoice_line_math(self):
+		result = calculate_profit_from_revenue(
+			cost_per_unit=Decimal('4.00'),
+			quantity=3,
+			revenue=Decimal('30.00'),
+		)
+		self.assertEqual(result['profit_amount'], Decimal('18.00'))
+		self.assertEqual(result['profit_percent'], Decimal('60.0'))
+
+	def test_summarize_order_profit_totals_lines(self):
+		summary = summarize_order_profit([
+			{'line_revenue': Decimal('20.00'), 'line_profit_amount': Decimal('5.00')},
+			{'line_revenue': Decimal('30.00'), 'line_profit_amount': Decimal('10.00')},
+		])
+		self.assertEqual(summary['total_profit_amount'], Decimal('15.00'))
+		self.assertEqual(summary['total_profit_percent'], Decimal('30.0'))
 
 
 class ShipmentSummaryTests(TestCase):

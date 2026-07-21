@@ -757,6 +757,7 @@
             <th style="width: 180px;">{% trans "Discount" %}</th>
             <th>{% trans "You pay" %}</th>
             <th>{% trans "Subtotal" %}</th>
+            <th>{% trans "Profit" %}</th>
             <th>{% trans "Remove" %}</th>
           </tr>
         </thead>
@@ -807,7 +808,12 @@
                 <option value="{{ option.value|unlocalize }}" data-price-key="{{ option.key }}" {% if item.selected_price_key == option.key %}selected{% endif %}>{{ option.label }}</option>
                 {% endfor %}
               </select>
-              <input type="number" min="0" step="0.01" class="form-control form-control-sm pedido-item-list-price" id="precio_{{ item.id }}" name="precio_{{ item.id }}" value="{{ item.precio|unlocalize }}" data-item-id="{{ item.id }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+              <input type="number" min="0" step="0.01" class="form-control form-control-sm pedido-item-list-price" id="precio_{{ item.id }}" name="precio_{{ item.id }}" value="{{ item.precio|unlocalize }}" data-item-id="{{ item.id }}" data-cost="{% if item.presentacion.costo is not None %}{{ item.presentacion.costo|unlocalize }}{% endif %}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+              {% if item.profit.has_cost and item.profit.unit_profit_amount is not None %}
+              <div class="small text-muted mt-1 pedido-unit-profit-hint">{% blocktrans with amount=item.profit.unit_profit_amount percentage=item.profit.profit_percent %}Unit profit: ${{ amount }} ({{ percentage }}%){% endblocktrans %}</div>
+              {% else %}
+              <div class="small text-muted mt-1 pedido-unit-profit-hint d-none"></div>
+              {% endif %}
             </td>
             <td class="pedido-item-discount-cell" data-item-id="{{ item.id }}">
               <div class="form-check mb-2">
@@ -864,6 +870,15 @@
               </div>
             </td>
             <td><span class="pedido-item-subtotal" data-item-id="{{ item.id }}">${{ item.subtotal }}</span></td>
+            <td>
+              <div class="fw-semibold pedido-item-line-profit {% if item.profit.line_profit_amount is not None and item.profit.line_profit_amount < 0 %}text-danger{% elif item.profit.line_profit_amount is not None %}text-success{% else %}text-muted{% endif %}" data-item-id="{{ item.id }}">
+                {% if item.profit.line_profit_amount is not None %}
+                  ${{ item.profit.line_profit_amount|floatformat:2 }} ({{ item.profit.line_profit_percent|floatformat:1 }}%)
+                {% else %}
+                  —
+                {% endif %}
+              </div>
+            </td>
             <td><input type="checkbox" class="form-check-input" name="eliminar_{{ item.id }}" {% if item.selector_has_changes %}data-picker-modified="true"{% endif %} {% if lineas_bloqueadas_para_picking %}disabled{% endif %}></td>
           </tr>
           {% endfor %}
@@ -932,7 +947,19 @@
     </div>
 
     <div class="d-flex justify-content-between align-items-center">
-      <strong>{% trans "Total" %}: $<span id="pedidoFormTotalDisplay">{{ pedido.total }}</span></strong>
+      <div>
+        <strong>{% trans "Total" %}: $<span id="pedidoFormTotalDisplay">{{ pedido.total }}</span></strong>
+        <div class="small mt-1 {% if order_profit_summary.total_profit_amount is not None and order_profit_summary.total_profit_amount < 0 %}text-danger{% elif order_profit_summary.total_profit_amount is not None %}text-success{% else %}text-muted{% endif %}">
+          {% trans "Total profit" %}:
+          <span id="pedidoFormTotalProfitDisplay">
+            {% if order_profit_summary.total_profit_amount is not None %}
+              ${{ order_profit_summary.total_profit_amount|floatformat:2 }} ({{ order_profit_summary.total_profit_percent|floatformat:1 }}%)
+            {% else %}
+              —
+            {% endif %}
+          </span>
+        </div>
+      </div>
       <button type="submit" class="btn btn-primary">{% trans "Save changes" %}</button>
     </div>
   </div>
@@ -1050,6 +1077,7 @@
 
 {{ presentation_price_map|json_script:"pedido-presentation-price-map" }}
 
+<script src="{% static 'js/order_profit.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const invoiceDeliveryMethod = document.getElementById('invoiceDeliveryMethod');
@@ -1127,6 +1155,76 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   const orderForm = document.getElementById('backofficeOrderForm');
+  const missingCostMessage = '{% trans "Profit unavailable because this presentation has no cost configured."|escapejs %}';
+
+  function refreshPedidoItemProfitRow(itemId, netUnit, quantity, listPriceInput) {
+    const lineProfitElement = document.querySelector(`.pedido-item-line-profit[data-item-id="${itemId}"]`);
+    const row = listPriceInput ? listPriceInput.closest('[data-pedido-item-row]') : null;
+    const unitProfitHint = row ? row.querySelector('.pedido-unit-profit-hint') : null;
+    const profit = window.LTGOrderProfit.calculateLineProfit({
+      cost: listPriceInput ? listPriceInput.dataset.cost : null,
+      netUnitPrice: netUnit,
+      quantity,
+    });
+
+    if (unitProfitHint) {
+      if (profit.unitProfitAmount !== null) {
+        unitProfitHint.textContent = `{% trans "Unit profit"|escapejs %}: $${window.LTGOrderProfit.formatMoney(profit.unitProfitAmount)} (${window.LTGOrderProfit.formatPercent(profit.profitPercent)}%)`;
+        unitProfitHint.classList.remove('d-none');
+      } else {
+        unitProfitHint.classList.add('d-none');
+      }
+    }
+
+    if (lineProfitElement) {
+      if (profit.lineProfitAmount === null) {
+        lineProfitElement.textContent = '—';
+        lineProfitElement.className = 'fw-semibold pedido-item-line-profit text-muted';
+      } else {
+        lineProfitElement.textContent = `$${window.LTGOrderProfit.formatMoney(profit.lineProfitAmount)} (${window.LTGOrderProfit.formatPercent(profit.lineProfitPercent)}%)`;
+        lineProfitElement.className = `fw-semibold pedido-item-line-profit ${profit.lineProfitAmount < 0 ? 'text-danger' : 'text-success'}`;
+      }
+    }
+  }
+
+  function refreshPedidoOrderProfitTotal() {
+    const totalProfitElement = document.getElementById('pedidoFormTotalProfitDisplay');
+    if (!totalProfitElement) {
+      return;
+    }
+
+    let totalProfit = 0;
+    let totalRevenue = 0;
+    let hasProfit = false;
+    document.querySelectorAll('.pedido-item-list-price').forEach((listPriceInput) => {
+      const itemId = listPriceInput.dataset.itemId;
+      const quantityInput = document.querySelector(`input[name="cantidad_${itemId}"]`);
+      const toggle = document.querySelector(`.pedido-item-discount-toggle[data-item-id="${itemId}"]`);
+      const amountInput = document.querySelector(`.pedido-item-discount-amount[data-item-id="${itemId}"]`);
+      const listPrice = parseNumber(listPriceInput.value) || 0;
+      const quantity = parseNumber(quantityInput ? quantityInput.value : null) || 0;
+      const discountEnabled = toggle ? toggle.checked : false;
+      const discountAmount = discountEnabled ? (parseNumber(amountInput ? amountInput.value : null) || 0) : 0;
+      const netUnit = Math.max(0, listPrice - discountAmount);
+      const profit = window.LTGOrderProfit.calculateLineProfit({
+        cost: listPriceInput.dataset.cost,
+        netUnitPrice: netUnit,
+        quantity,
+      });
+      if (profit.lineProfitAmount !== null) {
+        hasProfit = true;
+        totalProfit += profit.lineProfitAmount;
+        totalRevenue += profit.lineRevenue;
+      }
+    });
+
+    if (!hasProfit) {
+      totalProfitElement.textContent = '—';
+      return;
+    }
+    const totalPercent = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+    totalProfitElement.textContent = `$${window.LTGOrderProfit.formatMoney(totalProfit)} (${window.LTGOrderProfit.formatPercent(totalPercent)}%)`;
+  }
 
   function refreshPedidoItemDiscountRow(itemId) {
     const listPriceInput = document.querySelector(`.pedido-item-list-price[data-item-id="${itemId}"]`);
@@ -1178,6 +1276,8 @@ document.addEventListener('DOMContentLoaded', function () {
     if (subtotal) {
       subtotal.textContent = `$${formatNumber(lineSubtotal)}`;
     }
+    refreshPedidoItemProfitRow(itemId, netUnit, quantity, listPriceInput);
+    refreshPedidoOrderProfitTotal();
   }
 
   document.querySelectorAll('.pedido-item-discount-toggle, .pedido-item-discount-amount, .pedido-item-list-price').forEach((input) => {

@@ -8,6 +8,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from config.clientes.models import Cliente
+from config.core.profit import calculate_profit_from_revenue, safe_profit_percentage
 from config.inventario.models import StockPresentacion
 from config.productos.models import Presentacion
 
@@ -28,9 +29,7 @@ def _sum_money(values):
 
 
 def _safe_pct(numerator, denominator):
-	if not denominator:
-		return None
-	return round((numerator / denominator) * 100, 1)
+	return safe_profit_percentage(numerator, denominator)
 
 
 def _delta_row(*, label, current, previous, is_currency=True, invert_positive=False):
@@ -79,7 +78,6 @@ def build_bi_kpi_cards(*, orders, invoices, deliveries, close_snapshot, comparis
 		cost = _as_money(getattr(presentacion, 'costo', 0) if presentacion is not None else 0)
 		cogs += cost * Decimal(str(item.cantidad_facturada or 0))
 	gross_profit = gross_sales - cogs
-	prev_cogs = DECIMAL_ZERO  # previous period COGS would need previous items; approximate via sales ratio later
 	margin_pct = _safe_pct(gross_profit, gross_sales)
 
 	debits = _sum_money(getattr(invoice, 'total_debitos', 0) for invoice in invoices)
@@ -197,10 +195,14 @@ def enrich_product_rows_with_margin(invoice_items):
 	for item in invoice_items:
 		name = item.producto_nombre or _('Unnamed product')
 		presentacion = getattr(item, 'presentacion', None)
-		cost = _as_money(getattr(presentacion, 'costo', 0) if presentacion is not None else 0)
-		qty = Decimal(str(item.cantidad_facturada or 0))
+		cost = getattr(presentacion, 'costo', None) if presentacion is not None else None
+		qty = int(item.cantidad_facturada or 0)
 		revenue = _as_money(item.subtotal)
-		cogs = cost * qty
+		line_profit = calculate_profit_from_revenue(
+			cost_per_unit=cost,
+			quantity=qty,
+			revenue=revenue,
+		)
 		rows.setdefault(
 			name,
 			{
@@ -213,10 +215,10 @@ def enrich_product_rows_with_margin(invoice_items):
 				'presentacion_id': getattr(presentacion, 'id', None),
 			},
 		)
-		rows[name]['units_sold'] += int(item.cantidad_facturada or 0)
-		rows[name]['revenue'] += revenue
-		rows[name]['cogs'] += cogs
-		rows[name]['profit'] += revenue - cogs
+		rows[name]['units_sold'] += qty
+		rows[name]['revenue'] += line_profit['revenue']
+		rows[name]['cogs'] += line_profit['cogs']
+		rows[name]['profit'] += line_profit['profit_amount']
 		rows[name]['invoices_count'] += 1
 
 	ordered = list(rows.values())
@@ -440,12 +442,17 @@ def build_brand_rows(invoice_items):
 			name,
 			{'name': name, 'units_sold': 0, 'revenue': DECIMAL_ZERO, 'profit': DECIMAL_ZERO},
 		)
-		qty = Decimal(str(item.cantidad_facturada or 0))
+		qty = int(item.cantidad_facturada or 0)
 		revenue = _as_money(item.subtotal)
-		cost = _as_money(getattr(presentacion, 'costo', 0) if presentacion is not None else 0)
-		rows[name]['units_sold'] += int(item.cantidad_facturada or 0)
-		rows[name]['revenue'] += revenue
-		rows[name]['profit'] += revenue - (cost * qty)
+		cost = getattr(presentacion, 'costo', None) if presentacion is not None else None
+		line_profit = calculate_profit_from_revenue(
+			cost_per_unit=cost,
+			quantity=qty,
+			revenue=revenue,
+		)
+		rows[name]['units_sold'] += qty
+		rows[name]['revenue'] += line_profit['revenue']
+		rows[name]['profit'] += line_profit['profit_amount']
 	ordered = sorted(rows.values(), key=lambda row: row['revenue'], reverse=True)
 	for row in ordered:
 		row['margin_percent'] = _safe_pct(row['profit'], row['revenue'])

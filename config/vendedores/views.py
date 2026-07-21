@@ -8,6 +8,7 @@ from config.clientes.assignment import filter_clientes_for_vendedor
 from config.clientes.phone import normalize_stored_phone_number
 from config.usuarios.models import Usuario
 from config.productos.models import Producto, Presentacion, Categoria, Marca, ConfiguracionPrecios, ConfiguracionDescuentos
+from config.core.profit import build_order_line_profit, summarize_order_profit
 from config.productos.promotions import (
     aplicar_promocion_en_item_sesion,
     marcar_descuento_manual_en_item,
@@ -823,11 +824,19 @@ def ver_pedido(request):
         subtotal = _cart_item_subtotal(item)
 
         total += subtotal
+        profit = build_order_line_profit(
+            cost=presentacion.costo,
+            list_price=precio,
+            quantity=item["cantidad"],
+            descuento_aplicado=bool(item.get("descuento_aplicado")),
+            descuento_monto=item.get("descuento_monto", 0),
+        )
 
         productos.append({
             "id": key,
             "nombre": item["nombre"],
             "presentacion_id": item["presentacion_id"],
+            "costo": presentacion.costo,
             "precio": precio,
             "precio_key": precio_key,
             "cantidad": item["cantidad"],
@@ -846,6 +855,7 @@ def ver_pedido(request):
                 descuento_aplicado=item.get("descuento_aplicado", False),
                 descuento_monto=item.get("descuento_monto", 0),
             ),
+            "profit": profit,
             "ahorro_linea": _money_decimal(
                 (_money_decimal(item.get("descuento_monto", 0) if item.get("descuento_aplicado") else 0))
                 * int(item.get("cantidad", 0) or 0)
@@ -861,6 +871,7 @@ def ver_pedido(request):
     context = {
         "productos": productos,
         "total": _money_decimal(total),
+        "order_profit_summary": summarize_order_profit([producto["profit"] for producto in productos]),
         "cliente": cliente,
         "cliente_id": cliente_id,
         "pedido_nota": get_session_pedido_nota(request),

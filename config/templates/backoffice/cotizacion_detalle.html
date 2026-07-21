@@ -114,6 +114,7 @@
                 <th style="width: 180px;">{% trans "Discount" %}</th>
                 <th>{% trans "You pay" %}</th>
                 <th>{% trans "Subtotal" %}</th>
+                <th>{% trans "Profit" %}</th>
                 {% if can_manage_quote_lines %}<th>{% trans "Remove" %}</th>{% endif %}
               </tr>
             </thead>
@@ -149,10 +150,10 @@
                   </select>
                   <input type="number" min="1.01" step="0.01" id="precio_{{ item.id }}" name="precio_{{ item.id }}" value="{{ row.current_price|unlocalize }}" class="form-control form-control-sm customer-price-input quote-item-list-price" data-item-id="{{ item.id }}" data-product-name="{{ item.presentacion.producto.nombre|escape }}" data-presentation-name="{{ item.presentacion.nombre|escape }}" data-cost="{% if row.cost is not None %}{{ row.cost|unlocalize }}{% endif %}" data-min-price="{{ row.minimum_price|unlocalize }}" data-margin-target="margin_{{ item.id }}" {% if not can_manage_quote_lines %}disabled{% endif %}>
                   <div id="margin_{{ item.id }}" class="small text-muted mt-1 utility-indicator">
-                    {% if row.current_utility_percentage is not None %}
-                      {% blocktrans with percentage=row.current_utility_percentage %}Utility: {{ percentage }}%{% endblocktrans %}
+                    {% if row.profit.has_cost and row.profit.unit_profit_amount is not None %}
+                      {% blocktrans with amount=row.profit.unit_profit_amount percentage=row.profit.profit_percent %}Unit profit: ${{ amount }} ({{ percentage }}%){% endblocktrans %}
                     {% else %}
-                      {% trans "Utility: unavailable because this presentation has no cost configured." %}
+                      {% trans "Profit unavailable because this presentation has no cost configured." %}
                     {% endif %}
                   </div>
                 </td>
@@ -211,6 +212,15 @@
                   </div>
                 </td>
                 <td data-label="{% trans 'Subtotal' %}"><span class="quote-subtotal" data-item-id="{{ item.id }}">${{ row.display_subtotal }}</span></td>
+                <td data-label="{% trans 'Profit' %}">
+                  <div class="fw-semibold quote-item-line-profit {% if row.profit.line_profit_amount is not None and row.profit.line_profit_amount < 0 %}text-danger{% elif row.profit.line_profit_amount is not None %}text-success{% else %}text-muted{% endif %}" data-item-id="{{ item.id }}">
+                    {% if row.profit.line_profit_amount is not None %}
+                      ${{ row.profit.line_profit_amount|floatformat:2 }} ({{ row.profit.line_profit_percent|floatformat:1 }}%)
+                    {% else %}
+                      —
+                    {% endif %}
+                  </div>
+                </td>
                 {% if can_manage_quote_lines %}
                 <td data-label="{% trans 'Remove' %}"><input type="checkbox" class="form-check-input" name="eliminar_{{ item.id }}"></td>
                 {% endif %}
@@ -274,7 +284,19 @@
         </div>
 
         <div class="d-flex justify-content-between align-items-center quote-save-row">
-          <strong>{% trans "Updated total" %}: <span id="quoteTotalValue">${{ display_total }}</span></strong>
+          <div>
+            <strong>{% trans "Updated total" %}: <span id="quoteTotalValue">${{ display_total }}</span></strong>
+            <div class="small mt-1 {% if order_profit_summary.total_profit_amount is not None and order_profit_summary.total_profit_amount < 0 %}text-danger{% elif order_profit_summary.total_profit_amount is not None %}text-success{% else %}text-muted{% endif %}">
+              {% trans "Total profit" %}:
+              <span id="quoteTotalProfitValue">
+                {% if order_profit_summary.total_profit_amount is not None %}
+                  ${{ order_profit_summary.total_profit_amount|floatformat:2 }} ({{ order_profit_summary.total_profit_percent|floatformat:1 }}%)
+                {% else %}
+                  —
+                {% endif %}
+              </span>
+            </div>
+          </div>
           {% if can_manage_quote_lines %}
           <button type="submit" class="btn btn-primary">{% trans "Save changes" %}</button>
           {% endif %}
@@ -405,6 +427,7 @@
   </div>
 </div>
 
+<script src="{% static 'js/order_profit.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const includePricesToggle = document.getElementById('emailIncludePrices');
@@ -437,8 +460,9 @@ document.addEventListener('DOMContentLoaded', function () {
   const emailButton = document.querySelector('.quote-send-email-button');
   const whatsappButton = document.querySelector('.quote-send-whatsapp-button');
   const whatsappOriginalHref = whatsappButton ? whatsappButton.getAttribute('href') : '#';
-  const missingCostMessage = 'Utility: unavailable because this presentation has no cost configured.';
+  const missingCostMessage = '{% trans "Profit unavailable because this presentation has no cost configured."|escapejs %}';
   const totalElement = document.getElementById('quoteTotalValue');
+  const totalProfitElement = document.getElementById('quoteTotalProfitValue');
   let canSendCustomerQuote = quoteForm ? quoteForm.dataset.sendReadyInitial === 'true' : false;
   const priceValidationMessages = {
     minimum: "{% trans 'The price for %(product)s must be greater than $1.00.' %}".replace('%(product)s', '{product}'),
@@ -566,7 +590,37 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     subtotalElement.textContent = formatCurrency(subtotal);
+    updateProfitIndicators(itemId, netUnit, quantity);
     return subtotal;
+  }
+
+  function updateProfitIndicators(itemId, netUnitPrice, quantity) {
+    const priceInput = document.querySelector(`.customer-price-input[data-item-id="${itemId}"]`);
+    const utilityIndicator = priceInput ? document.getElementById(priceInput.dataset.marginTarget) : null;
+    const lineProfitElement = document.querySelector(`.quote-item-line-profit[data-item-id="${itemId}"]`);
+    const profit = window.LTGOrderProfit.calculateLineProfit({
+      cost: priceInput ? priceInput.dataset.cost : null,
+      netUnitPrice,
+      quantity,
+    });
+
+    if (utilityIndicator) {
+      if (profit.unitProfitAmount !== null) {
+        utilityIndicator.textContent = `{% trans "Unit profit"|escapejs %}: $${window.LTGOrderProfit.formatMoney(profit.unitProfitAmount)} (${window.LTGOrderProfit.formatPercent(profit.profitPercent)}%)`;
+      } else {
+        utilityIndicator.textContent = missingCostMessage;
+      }
+    }
+
+    if (lineProfitElement) {
+      if (profit.lineProfitAmount === null) {
+        lineProfitElement.textContent = '—';
+        lineProfitElement.className = 'fw-semibold quote-item-line-profit text-muted';
+      } else {
+        lineProfitElement.textContent = `$${window.LTGOrderProfit.formatMoney(profit.lineProfitAmount)} (${window.LTGOrderProfit.formatPercent(profit.lineProfitPercent)}%)`;
+        lineProfitElement.className = `fw-semibold quote-item-line-profit ${profit.lineProfitAmount < 0 ? 'text-danger' : 'text-success'}`;
+      }
+    }
   }
 
   function syncQuoteDiscountPresetFromInput(presetSelect, amountInput) {
@@ -598,28 +652,57 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     let total = 0;
+    let totalProfit = 0;
+    let totalRevenueForProfit = 0;
+    let hasProfit = false;
     document.querySelectorAll('.quote-subtotal').forEach(function (subtotalElement) {
       const itemId = subtotalElement.dataset.itemId;
-      total += updateSubtotal(itemId);
+      const lineSubtotal = updateSubtotal(itemId);
+      total += lineSubtotal;
+
+      const priceInput = document.querySelector(`.customer-price-input[data-item-id="${itemId}"]`);
+      const quantityInput = document.querySelector(`.quote-quantity-input[data-item-id="${itemId}"]`);
+      const toggle = document.querySelector(`.quote-item-discount-toggle[data-item-id="${itemId}"]`);
+      const amountInput = document.querySelector(`.quote-item-discount-amount[data-item-id="${itemId}"]`);
+      const listPrice = parseDecimal(priceInput ? priceInput.value : null) || 0;
+      const quantity = Math.max(parseInt(quantityInput ? quantityInput.value : '1', 10) || 1, 1);
+      const discountEnabled = Boolean(toggle && toggle.checked);
+      const discountAmount = discountEnabled ? (parseDecimal(amountInput ? amountInput.value : null) || 0) : 0;
+      const netUnit = Math.max(0, listPrice - discountAmount);
+      const profit = window.LTGOrderProfit.calculateLineProfit({
+        cost: priceInput ? priceInput.dataset.cost : null,
+        netUnitPrice: netUnit,
+        quantity,
+      });
+      if (profit.lineProfitAmount !== null) {
+        hasProfit = true;
+        totalProfit += profit.lineProfitAmount;
+        totalRevenueForProfit += profit.lineRevenue;
+      }
     });
     totalElement.textContent = formatCurrency(total);
+
+    if (totalProfitElement) {
+      if (!hasProfit) {
+        totalProfitElement.textContent = '—';
+      } else {
+        const totalPercent = totalRevenueForProfit > 0 ? (totalProfit / totalRevenueForProfit) * 100 : 0;
+        totalProfitElement.textContent = `$${window.LTGOrderProfit.formatMoney(totalProfit)} (${window.LTGOrderProfit.formatPercent(totalPercent)}%)`;
+      }
+    }
   }
 
   function updateUtilityIndicator(input) {
-    const indicator = document.getElementById(input.dataset.marginTarget);
-    if (!indicator) {
-      return;
-    }
-
-    const cost = parseDecimal(input.dataset.cost);
-    const price = parseDecimal(input.value);
-    if (cost === null || price === null || price <= 0) {
-      indicator.textContent = missingCostMessage;
-      return;
-    }
-
-    const percentage = (1 - (cost / price)) * 100;
-    indicator.textContent = `Utility: ${formatPercentage(percentage)}%`;
+    const itemId = input.dataset.itemId;
+    const quantityInput = document.querySelector(`.quote-quantity-input[data-item-id="${itemId}"]`);
+    const toggle = document.querySelector(`.quote-item-discount-toggle[data-item-id="${itemId}"]`);
+    const amountInput = document.querySelector(`.quote-item-discount-amount[data-item-id="${itemId}"]`);
+    const listPrice = parseDecimal(input.value) || 0;
+    const quantity = Math.max(parseInt(quantityInput ? quantityInput.value : '1', 10) || 1, 1);
+    const discountEnabled = Boolean(toggle && toggle.checked);
+    const discountAmount = discountEnabled ? (parseDecimal(amountInput ? amountInput.value : null) || 0) : 0;
+    const netUnit = Math.max(0, listPrice - discountAmount);
+    updateProfitIndicators(itemId, netUnit, quantity);
   }
 
   presetSelects.forEach(function (select) {

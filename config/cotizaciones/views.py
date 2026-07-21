@@ -98,17 +98,7 @@ def _parse_quantity(value, default=1):
     return max(quantity, 1)
 
 
-def _calculate_quote_utility_percentage(cost, price):
-    if cost is None:
-        return None
-
-    cost_decimal = _parse_decimal(cost, 0)
-    price_decimal = _parse_decimal(price, 0)
-    if price_decimal <= 0:
-        return None
-
-    percentage = (Decimal('1') - (cost_decimal / price_decimal)) * Decimal('100')
-    return percentage.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+from config.core.profit import build_order_line_profit, summarize_order_profit
 
 
 def _default_backoffice_quote_price(item, cotizacion):
@@ -227,6 +217,13 @@ def _build_quote_item_rows(cotizacion):
                 'margin': None,
             })
 
+        profit = build_order_line_profit(
+            cost=item.presentacion.costo,
+            list_price=current_price,
+            quantity=item.cantidad,
+            descuento_aplicado=item.descuento_aplicado,
+            descuento_monto=item.descuento_monto,
+        )
         rows.append({
             'item': item,
             'price_options': price_options,
@@ -245,12 +242,13 @@ def _build_quote_item_rows(cotizacion):
                 (_parse_decimal(item.presentacion.costo, 0) if item.presentacion.costo is not None else Decimal('0.00')),
                 Decimal('1.01'),
             ),
-            'current_utility_percentage': _calculate_quote_utility_percentage(item.presentacion.costo, current_price),
+            'profit': profit,
+            'current_utility_percentage': profit.get('profit_percent'),
             'recent_customer_sales': recent_orders_by_presentation.get(item.presentacion_id, []),
         })
         display_total += display_subtotal
 
-    return rows, display_total
+    return rows, display_total, summarize_order_profit([row['profit'] for row in rows])
 
 
 def _build_bulk_quote_price_options():
@@ -884,7 +882,7 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
         asegurar_promociones_en_cotizacion(cotizacion)
 
     confirm_url, telefono_contacto, whatsapp_link, outbound_message = _get_whatsapp_contact_data(cotizacion, request)
-    cotizacion_item_rows, display_total = _build_quote_item_rows(cotizacion)
+    cotizacion_item_rows, display_total, order_profit_summary = _build_quote_item_rows(cotizacion)
     can_send_customer_quote = _is_quote_send_ready(request.session, cotizacion.id) and can_manage
     can_generate_backoffice_order = bool(
         user_has_permission(request.user, 'backoffice.orders.manage')
@@ -901,6 +899,7 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
         'bulk_price_options': _build_bulk_quote_price_options(),
         'discount_preset_options': _build_quote_discount_preset_options(),
         'display_total': display_total,
+        'order_profit_summary': order_profit_summary,
         'can_send_customer_quote': can_send_customer_quote,
         'can_generate_backoffice_order': can_generate_backoffice_order,
         'can_void_cotizacion': (

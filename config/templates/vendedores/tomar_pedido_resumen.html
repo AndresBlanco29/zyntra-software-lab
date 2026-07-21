@@ -232,6 +232,7 @@ La Tortilla Grocery
 <th>{% trans "Descuento" %}</th>
 <th>{% trans "Pagas" %}</th>
 <th>{% trans "Subtotal" %}</th>
+<th>{% trans "Profit" %}</th>
 <th>{% trans "Acción" %}</th>
 
 </tr>
@@ -269,6 +270,7 @@ data-precio2="{{ p.precio_2 }}"
 data-precio3="{{ p.precio_3 }}"
 data-precio4="{{ p.precio_4 }}"
 data-precio5="{{ p.precio_5 }}"
+data-costo="{% if p.costo is not None %}{{ p.costo|unlocalize }}{% endif %}"
 
 {% if p.id|stringformat:"s" == item.presentacion_id|stringformat:"s" %}
 selected
@@ -330,6 +332,7 @@ min="1"
   step="0.01"
   class="form-control precio-resumen-manual"
   data-id="{{ item.id }}"
+  data-cost="{% if item.costo is not None %}{{ item.costo|unlocalize }}{% endif %}"
   value="{{ item.precio|floatformat:2 }}"
   aria-label="{% trans 'Manual price' %}">
 </div>
@@ -378,6 +381,16 @@ min="1"
 ${{ item.subtotal|floatformat:2 }}
 </td>
 
+<td data-label="{% trans "Profit" %}">
+<div class="fw-semibold line-profit {% if item.profit.line_profit_amount is not None and item.profit.line_profit_amount < 0 %}text-danger{% elif item.profit.line_profit_amount is not None %}text-success{% else %}text-muted{% endif %}" data-id="{{ item.id }}">
+{% if item.profit.line_profit_amount is not None %}
+${{ item.profit.line_profit_amount|floatformat:2 }} ({{ item.profit.line_profit_percent|floatformat:1 }}%)
+{% else %}
+—
+{% endif %}
+</div>
+</td>
+
 <td data-label="{% trans "Acción" %}" class="mobile-stack-table__action">
 
 <button class="accion eliminar" data-id="{{ item.id }}">🗑️</button>
@@ -389,7 +402,7 @@ ${{ item.subtotal|floatformat:2 }}
 {% empty %}
 
 <tr>
-<td colspan="8" class="text-center text-muted py-4 mobile-stack-table__empty">
+<td colspan="9" class="text-center text-muted py-4 mobile-stack-table__empty">
 {% trans "No hay productos en el pedido." %}
 </td>
 </tr>
@@ -475,6 +488,22 @@ ${{ item.subtotal|floatformat:2 }}
 
 </div>
 
+<hr>
+
+<div class="d-flex justify-content-between {% if order_profit_summary.total_profit_amount is not None and order_profit_summary.total_profit_amount < 0 %}text-danger{% elif order_profit_summary.total_profit_amount is not None %}text-success{% else %}text-muted{% endif %}">
+
+<span>{% trans "Total profit" %}:</span>
+
+<strong id="totalProfit">
+{% if order_profit_summary.total_profit_amount is not None %}
+${{ order_profit_summary.total_profit_amount|floatformat:2 }} ({{ order_profit_summary.total_profit_percent|floatformat:1 }}%)
+{% else %}
+—
+{% endif %}
+</strong>
+
+</div>
+
 </div>
 
 </div>
@@ -504,6 +533,7 @@ ${{ item.subtotal|floatformat:2 }}
 </div>
 
 
+<script src="{% static 'js/order_profit.js' %}"></script>
 <script src="{% static 'js/pedido_resumen.js' %}"></script>
 
 <script>

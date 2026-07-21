@@ -133,6 +133,80 @@ function updateOrderTotals(total) {
         total1.classList.remove('total-update')
         total2.classList.remove('total-update')
     }, 350)
+    updateOrderProfitTotal()
+}
+
+function updateOrderProfitTotal() {
+    const totalProfitElement = document.getElementById('totalProfit')
+    if (!totalProfitElement || !window.LTGOrderProfit) {
+        return
+    }
+
+    let totalProfit = 0
+    let totalRevenue = 0
+    let hasProfit = false
+
+    document.querySelectorAll('.precio-resumen-manual').forEach(function (priceInput) {
+        const id = priceInput.dataset.id
+        const quantityInput = document.querySelector(`.cantidad-input[data-id="${id}"]`)
+        const toggle = document.querySelector(`.descuento-toggle[data-id="${id}"]`)
+        const amountInput = document.querySelector(`.descuento-monto[data-id="${id}"]`)
+        const listPrice = parseDecimalValue(priceInput.value) || 0
+        const quantity = Math.max(parseInt(quantityInput ? quantityInput.value : '1', 10) || 1, 1)
+        const discountEnabled = Boolean(toggle && toggle.checked)
+        const discountAmount = discountEnabled ? (parseDecimalValue(amountInput ? amountInput.value : null) || 0) : 0
+        const netUnit = Math.max(0, listPrice - discountAmount)
+        const profit = window.LTGOrderProfit.calculateLineProfit({
+            cost: priceInput.dataset.cost,
+            netUnitPrice: netUnit,
+            quantity,
+        })
+
+        if (profit.lineProfitAmount !== null) {
+            hasProfit = true
+            totalProfit += profit.lineProfitAmount
+            totalRevenue += profit.lineRevenue
+        }
+    })
+
+    if (!hasProfit) {
+        totalProfitElement.textContent = '—'
+        return
+    }
+
+    const totalPercent = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0
+    totalProfitElement.textContent = `$${window.LTGOrderProfit.formatMoney(totalProfit)} (${window.LTGOrderProfit.formatPercent(totalPercent)}%)`
+}
+
+function refreshLineProfit(id) {
+    const priceInput = document.querySelector(`.precio-resumen-manual[data-id="${id}"]`)
+    const quantityInput = document.querySelector(`.cantidad-input[data-id="${id}"]`)
+    const toggle = document.querySelector(`.descuento-toggle[data-id="${id}"]`)
+    const amountInput = document.querySelector(`.descuento-monto[data-id="${id}"]`)
+    const lineProfitElement = document.querySelector(`.line-profit[data-id="${id}"]`)
+    if (!priceInput || !lineProfitElement || !window.LTGOrderProfit) {
+        return
+    }
+
+    const listPrice = parseDecimalValue(priceInput.value) || 0
+    const quantity = Math.max(parseInt(quantityInput ? quantityInput.value : '1', 10) || 1, 1)
+    const discountEnabled = Boolean(toggle && toggle.checked)
+    const discountAmount = discountEnabled ? (parseDecimalValue(amountInput ? amountInput.value : null) || 0) : 0
+    const netUnit = Math.max(0, listPrice - discountAmount)
+    const profit = window.LTGOrderProfit.calculateLineProfit({
+        cost: priceInput.dataset.cost,
+        netUnitPrice: netUnit,
+        quantity,
+    })
+
+    if (profit.lineProfitAmount === null) {
+        lineProfitElement.textContent = '—'
+        lineProfitElement.className = 'fw-semibold line-profit text-muted'
+        return
+    }
+
+    lineProfitElement.textContent = `$${window.LTGOrderProfit.formatMoney(profit.lineProfitAmount)} (${window.LTGOrderProfit.formatPercent(profit.lineProfitPercent)}%)`
+    lineProfitElement.className = `fw-semibold line-profit ${profit.lineProfitAmount < 0 ? 'text-danger' : 'text-success'}`
 }
 
 function refreshDiscountRow(id, data) {
@@ -166,6 +240,7 @@ function refreshDiscountRow(id, data) {
             savings.textContent = `Ahorras $${formatMoney(lineSavings)}`
         }
     }
+    refreshLineProfit(id)
 }
 
 function parseDecimalValue(value) {
@@ -462,6 +537,9 @@ if (controls.presetSelect) {
 }
 if (controls.priceInput) {
     controls.priceInput.value = formatMoney(nextPrice)
+}
+if (controls.priceInput && option) {
+    controls.priceInput.dataset.cost = option.dataset.costo || ''
 }
 
 fetch(actualizarURL,{

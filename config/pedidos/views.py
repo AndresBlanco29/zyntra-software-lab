@@ -16,6 +16,7 @@ import logging
 
 from config.core.datetime_formats import format_local_date, format_local_datetime
 from django.utils import timezone
+from config.core.profit import attach_profit_to_order_item, summarize_order_profit
 from config.core.product_ordering import order_pedido_items_for_display
 from config.core.shipment_summary import build_shipment_summary_from_pedido_items, with_total_pallets
 from config.core.pdf_branding import (
@@ -771,6 +772,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 		'discount_preset_options': _build_pedido_discount_preset_options(),
 		'presentation_price_map': _build_pedido_presentation_price_map(pedido=pedido, pedido_items=pedido_items),
 		'default_price_key': _default_presentacion_price_key_for_pedido(pedido=pedido),
+		'order_profit_summary': summarize_order_profit(pedido_items),
 		'credit_limit_evaluation': evaluate_customer_credit_limit(cliente=pedido.cliente, additional_amount=pedido.total),
 		'pending_credit_limit_alert': (
 			ClienteCreditoLimiteAlerta.objects.filter(
@@ -1091,6 +1093,7 @@ def _enrich_pedido_items_with_price_options(*, pedido, pedido_items):
 			if item.descuento_aplicado
 			else ''
 		)
+		attach_profit_to_order_item(item)
 
 
 @login_required

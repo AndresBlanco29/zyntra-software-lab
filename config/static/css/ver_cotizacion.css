@@ -84,6 +84,12 @@ body {
     font-weight: 600;
 }
 
+@media (min-width: 992px) {
+    .cot-order-search {
+        padding-top: 1rem;
+    }
+}
+
 .main-content{
     margin-left:240px;
     margin-top: var(--app-navbar-height, 70px);
@@ -552,9 +558,13 @@ transform:translateY(0);
         max-width: 100%;
     }
 
-    /* Panel derecho: cuando apila encima de la tabla en móvil */
+    /* Panel resumen: debajo de la lista de productos en móvil */
     .col-lg-3 .card.custom-card {
         margin-bottom: 1.25rem;
+    }
+
+    .cot-order-search {
+        padding-top: 0;
     }
 }
 

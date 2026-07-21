@@ -29,7 +29,7 @@ data-csrf="{{ csrf_token }}"
 data-page="my-order">
 
 <!-- NAVBAR -->
-<nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm" id="appNavbar">
 <div class="container-fluid">
 
 <button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="cotSidebarToggle" aria-label="Open menu">
@@ -40,23 +40,23 @@ data-page="my-order">
 La Tortilla Grocery
 </a>
 
-<div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">
-<a href="{% url 'catalogo' %}" class="btn btn-outline-light">{% trans "Catalog" %}</a>
-<a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">
+<div class="ms-auto cot-navbar-actions">
+<a href="{% url 'catalogo' %}" class="btn btn-outline-light btn-sm">{% trans "Catalog" %}</a>
+<a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light btn-sm">
 {% trans "My Order" %}
 <span class="badge text-bg-light ms-1" id="contadorCarritoDesktop">{{ carrito|length }}</span>
 </a>
-<a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-light">
+<a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-light btn-sm">
 {% trans "Orders Received" %}
 {% if pendientes_cotizaciones %}
 <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
 {% endif %}
 </a>
-<a href="{% url 'cliente_historial_ordenes' %}" class="btn btn-outline-light d-none d-xl-inline-flex">
+<a href="{% url 'cliente_historial_ordenes' %}" class="btn btn-outline-light btn-sm d-none d-xl-inline-flex">
 {% trans "Order History" %}
 </a>
-<button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#logoutModal" style="font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
-    <i class="bi bi-box-arrow-right"></i> {% trans "Log out" %}
+<button class="btn btn-danger btn-sm cot-navbar-logout" data-bs-toggle="modal" data-bs-target="#logoutModal">
+    <i class="bi bi-box-arrow-right"></i> <span class="cot-navbar-logout__text">{% trans "Log out" %}</span>
 </button>
 </div>
 

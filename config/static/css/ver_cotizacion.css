@@ -3,6 +3,10 @@ body {
     overflow-x: hidden;
 }
 
+:root {
+    --app-navbar-height: 70px;
+}
+
 .cart-promo-row {
     background: linear-gradient(90deg, rgba(255, 247, 214, 0.75), rgba(255, 255, 255, 0));
 }
@@ -64,13 +68,29 @@ body {
     letter-spacing: 0.5px;
 }
 
+.cot-navbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: flex-end;
+    max-width: 100%;
+}
+
+.cot-navbar-logout {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-weight: 600;
+}
+
 .main-content{
     margin-left:240px;
-    margin-top:70px;
+    margin-top: var(--app-navbar-height, 70px);
 
     width:calc(100% - 240px);
 
-    height:calc(100vh - 70px);
+    height:calc(100vh - var(--app-navbar-height, 70px));
     overflow-y:auto;
 
     padding:40px;
@@ -81,11 +101,11 @@ body {
     box-shadow:4px 0 12px rgba(0,0,0,0.06);
 
     position: fixed;
-    top: 70px; /* altura del navbar */
+    top: var(--app-navbar-height, 70px);
     left: 0;
     width: 253px;
 
-    height: calc(100vh - 70px);
+    height: calc(100vh - var(--app-navbar-height, 70px));
     overflow-y: auto;
 }
 
@@ -478,12 +498,16 @@ transform:translateY(0);
 }
 
 @media (max-width: 992px) {
+    :root {
+        --app-navbar-height: 128px;
+    }
+
     .main-content {
         margin-left: 0;
         width: 100%;
         max-width: 100%;
         height: auto;
-        min-height: calc(100vh - 70px);
+        min-height: calc(100vh - var(--app-navbar-height, 128px));
         padding: 20px;
         overflow-x: hidden;
     }
@@ -501,7 +525,7 @@ transform:translateY(0);
     .sidebar-backdrop {
         display: none;
         position: fixed;
-        top: 70px;
+        top: var(--app-navbar-height, 128px);
         left: 0;
         right: 0;
         bottom: 0;
@@ -513,12 +537,16 @@ transform:translateY(0);
         display: block;
     }
 
+    .navbar-custom {
+        padding: 10px 12px;
+    }
+
     .navbar-custom .container-fluid {
         flex-wrap: wrap;
         gap: 0.35rem;
     }
 
-    .navbar-custom .ms-auto {
+    .cot-navbar-actions {
         flex-wrap: wrap;
         justify-content: flex-end;
         max-width: 100%;
@@ -616,6 +644,10 @@ transform:translateY(0);
 }
 
 @media (max-width: 576px) {
+    :root {
+        --app-navbar-height: 118px;
+    }
+
     .navbar-brand {
         font-size: 15px;
     }
@@ -641,13 +673,19 @@ transform:translateY(0);
     }
 
     /* Compress navbar buttons so they fit on small phones */
-    .navbar-custom .ms-auto {
+    .navbar-custom .ms-auto,
+    .cot-navbar-actions {
         gap: 0.25rem !important;
     }
 
-    .navbar-custom .ms-auto .btn {
+    .navbar-custom .ms-auto .btn,
+    .cot-navbar-actions .btn {
         padding: 4px 8px !important;
         font-size: 12px !important;
+    }
+
+    .cot-navbar-logout__text {
+        display: none;
     }
 
     /* Panel resumen: padding reducido */

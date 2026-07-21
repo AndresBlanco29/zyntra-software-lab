@@ -6,11 +6,29 @@ const promoProductLabel = document.body.dataset.msgPromoProduct || "Product on p
 const promoActiveMessage = document.body.dataset.msgPromoActive || "Promotion active: your discount will be applied when you submit the order.";
 const promoMinimumTemplate = document.body.dataset.msgPromoMinimum || "This promotion requires a minimum purchase of {minimum} units. You currently have {current}, so the discount will not be applied.";
 
+function syncAppNavbarOffset() {
+    const navbar = document.getElementById("appNavbar") || document.querySelector(".navbar-custom");
+    if (!navbar) {
+        return;
+    }
+    const height = Math.ceil(navbar.getBoundingClientRect().height);
+    document.documentElement.style.setProperty("--app-navbar-height", height + "px");
+}
+
+syncAppNavbarOffset();
+window.addEventListener("resize", syncAppNavbarOffset);
+if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", syncAppNavbarOffset);
+}
+window.addEventListener("load", syncAppNavbarOffset);
+
 console.log("URL actualizar:", actualizarURL);
 console.log("URL eliminar:", eliminarUrl);
 console.log("URL presentación:", presentacionURL);
 
-document.getElementById("buscador").addEventListener("keyup", function() {
+const buscadorInput = document.getElementById("buscador");
+if (buscadorInput) {
+    buscadorInput.addEventListener("keyup", function() {
 
     let filtro = this.value.toLowerCase();
     let filas = document.querySelectorAll("#tablaProductos tbody tr");
@@ -27,7 +45,8 @@ document.getElementById("buscador").addEventListener("keyup", function() {
 
     });
 
-});
+    });
+}
 
 function actualizarEstadoPromocion(productoId, promo) {
     const fila = document.querySelector(`#tablaProductos tbody tr[data-id="${productoId}"]`);

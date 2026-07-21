@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block title %}
 {% if promocion %}{% trans "Edit promotion" %}{% else %}{% trans "Create promotion" %}{% endif %}
@@ -14,8 +14,11 @@
 <div class="card shadow-sm">
 <div class="card-body">
 
-{% if error %}
-<div class="alert alert-danger">{{ error }}</div>
+{% if form.non_field_errors %}
+<div class="alert alert-danger">{{ form.non_field_errors }}</div>
+{% endif %}
+{% if escalas_formset.non_form_errors %}
+<div class="alert alert-danger">{{ escalas_formset.non_form_errors }}</div>
 {% endif %}
 
 <form method="POST" id="promoForm">
@@ -23,121 +26,169 @@
 
 <div class="mb-3">
 <label class="form-label">{% trans "Name" %}</label>
-<input type="text" name="nombre" class="form-control" value="{{ nombre }}" required maxlength="150">
+{{ form.nombre }}
+{% if form.nombre.errors %}<div class="text-danger small">{{ form.nombre.errors|striptags }}</div>{% endif %}
 </div>
 
 <div class="mb-3">
 <label class="form-label">{% trans "Customer description" %}</label>
-<input type="text" name="descripcion" class="form-control" value="{{ descripcion }}" maxlength="255"
-  placeholder="{% trans 'Buy 10 cases and get 15% off' %}">
+{{ form.descripcion }}
 <div class="form-text">{% trans "Shown under the product name in the catalog." %}</div>
+{% if form.descripcion.errors %}<div class="text-danger small">{{ form.descripcion.errors|striptags }}</div>{% endif %}
 </div>
 
 <div class="row">
-<div class="col-md-6 mb-3">
+<div class="col-md-6 mb-3" id="promoProductSearchRoot" data-search-url="{{ producto_search_url }}" data-presentaciones-url-template="{{ producto_presentaciones_url_template }}">
 <label class="form-label">{% trans "Product" %}</label>
-<select name="producto" id="promoProducto" class="form-select" required>
-<option value="">{% trans "Select product" %}</option>
-{% for producto in productos %}
-<option value="{{ producto.id }}" {% if producto_id == producto.id|stringformat:"s" %}selected{% endif %}>
-{{ producto.nombre }}
-</option>
-{% endfor %}
-</select>
+<div class="position-relative">
+  <input
+    type="text"
+    id="promoProductoBuscador"
+    class="form-control"
+    autocomplete="off"
+    placeholder="{% trans 'Search by name, code or barcode…' %}"
+    value="{% if producto_seleccionado %}{{ producto_seleccionado.nombre }}{% endif %}"
+  >
+  <div id="promoProductoResultados" class="list-group position-absolute w-100 shadow-sm" style="z-index: 1000;" hidden></div>
+</div>
+{{ form.producto }}
+<div class="form-text">{% trans "Type at least 2 characters. Only matching products are loaded — not the whole catalog." %}</div>
+{% if form.producto.errors %}<div class="text-danger small">{{ form.producto.errors|striptags }}</div>{% endif %}
 </div>
 <div class="col-md-6 mb-3">
 <label class="form-label">{% trans "Presentation (optional)" %}</label>
-<select name="presentacion" id="promoPresentacion" class="form-select">
+<select id="promoPresentacionVisible" class="form-select" {% if not producto_seleccionado %}disabled{% endif %}>
 <option value="">{% trans "Any presentation" %}</option>
-{% for presentacion in presentaciones %}
-<option
-  value="{{ presentacion.id }}"
-  data-producto="{{ presentacion.producto_id }}"
-  {% if presentacion_id == presentacion.id|stringformat:"s" %}selected{% endif %}
->
-{{ presentacion.producto.nombre }} — {{ presentacion.nombre }}
-</option>
-{% endfor %}
+{% if presentacion_seleccionada %}
+<option value="{{ presentacion_seleccionada.id }}" selected>{{ presentacion_seleccionada.nombre }}</option>
+{% endif %}
 </select>
+{{ form.presentacion }}
+{% if form.presentacion.errors %}<div class="text-danger small">{{ form.presentacion.errors|striptags }}</div>{% endif %}
 </div>
 </div>
 
-<div class="row">
-<div class="col-md-4 mb-3">
-<label class="form-label">{% trans "Minimum quantity" %}</label>
-<input type="number" name="cantidad_minima" class="form-control" min="1" step="1" value="{{ cantidad_minima }}" required>
+<div class="mb-4">
+<label class="form-label d-block">{% trans "Customer types" %}</label>
+<div class="d-flex flex-wrap gap-3">
+{% for checkbox in form.tipos_cliente %}
+<div class="form-check">
+  {{ checkbox.tag }}
+  <label class="form-check-label" for="{{ checkbox.id_for_label }}">{{ checkbox.choice_label }}</label>
 </div>
-<div class="col-md-4 mb-3">
-<label class="form-label" for="promoTipoBeneficio">{% trans "Benefit type" %}</label>
-<select name="tipo_beneficio" id="promoTipoBeneficio" class="form-select" required>
-{% for value, label in tipos_beneficio %}
-<option value="{{ value }}" {% if tipo_beneficio == value %}selected{% endif %}>{{ label }}</option>
 {% endfor %}
-</select>
 </div>
-<div class="col-md-4 mb-3">
-<label class="form-label" for="promoValorBeneficio">{% trans "Benefit value" %}</label>
-
-<select
-  id="promoValorPorcentaje"
-  class="form-select"
-  data-benefit-field="percent"
-  {% if tipo_beneficio != 'PERCENT' %}disabled hidden{% endif %}
->
-<option value="">{% trans "Select a percentage discount" %}</option>
-{% for option in percentage_preset_options %}
-<option value="{{ option.value }}" {% if valor_beneficio == option.value %}selected{% endif %}>
-{{ option.label }}
-</option>
-{% endfor %}
-</select>
-
-<div id="promoValorFijoWrap" data-benefit-field="fixed" {% if tipo_beneficio == 'PERCENT' %}hidden{% endif %}>
-<select id="promoValorFijoPreset" class="form-select mb-2">
-<option value="">{% trans "Custom amount" %}</option>
-{% for option in fixed_preset_options %}
-<option value="{{ option.value }}" {% if valor_beneficio == option.value %}selected{% endif %}>
-{{ option.label }}
-</option>
-{% endfor %}
-</select>
-<input
-  type="number"
-  id="promoValorFijo"
-  class="form-control"
-  min="0.01"
-  step="0.01"
-  value="{% if tipo_beneficio == 'FIXED' %}{{ valor_beneficio }}{% endif %}"
-  placeholder="0.00"
-  {% if tipo_beneficio == 'PERCENT' %}disabled{% endif %}
->
-<div class="form-text">{% trans "Same dollar presets used in Orders, or enter a custom amount." %}</div>
-</div>
-
-<input type="hidden" name="valor_beneficio" id="promoValorBeneficio" value="{{ valor_beneficio }}">
-<div id="promoValorPercentHelp" class="form-text" data-benefit-field="percent" {% if tipo_beneficio != 'PERCENT' %}hidden{% endif %}>
-{% trans "Uses the same Discount 1–10 naming used across sales. The selected % becomes a per-unit dollar discount on the order." %}
-</div>
-</div>
+<div class="form-text">{{ form.tipos_cliente.help_text }}</div>
+{% if form.tipos_cliente.errors %}<div class="text-danger small">{{ form.tipos_cliente.errors|striptags }}</div>{% endif %}
 </div>
 
 <div class="row">
 <div class="col-md-6 mb-3">
 <label class="form-label">{% trans "Start date (optional)" %}</label>
-<input type="datetime-local" name="fecha_inicio" class="form-control" value="{{ fecha_inicio }}">
+{{ form.fecha_inicio }}
+{% if form.fecha_inicio.errors %}<div class="text-danger small">{{ form.fecha_inicio.errors|striptags }}</div>{% endif %}
 </div>
 <div class="col-md-6 mb-3">
 <label class="form-label">{% trans "End date (optional)" %}</label>
-<input type="datetime-local" name="fecha_fin" class="form-control" value="{{ fecha_fin }}">
+{{ form.fecha_fin }}
+{% if form.fecha_fin.errors %}<div class="text-danger small">{{ form.fecha_fin.errors|striptags }}</div>{% endif %}
 </div>
 </div>
 
 <div class="form-check mb-4">
-<input type="checkbox" name="activa" value="1" class="form-check-input" id="promoActiva" {% if activa %}checked{% endif %}>
-<label class="form-check-label" for="promoActiva">{% trans "Active" %}</label>
+{{ form.activa }}
+<label class="form-check-label" for="{{ form.activa.id_for_label }}">{% trans "Active" %}</label>
 </div>
 
-<div class="d-flex gap-2">
+<hr>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+<h5 class="mb-0">{% trans "Quantity scales" %}</h5>
+<button type="button" id="promoAddEscalaBtn" class="btn btn-sm btn-outline-primary">{% trans "+ Add scale" %}</button>
+</div>
+<p class="text-muted small">
+{% trans "Define one or more purchase-quantity tiers for this promotion, e.g. buy 12 → 5% off, buy 24 → 10% off." %}
+</p>
+
+{{ escalas_formset.management_form }}
+
+<datalist id="promoPercentPresets">
+{% for option in percentage_preset_options %}<option value="{{ option.value }}">{% endfor %}
+</datalist>
+<datalist id="promoFixedPresets">
+{% for option in fixed_preset_options %}<option value="{{ option.value }}">{% endfor %}
+</datalist>
+
+<div id="promoEscalasContainer">
+{% for escala_form in escalas_formset %}
+  <div class="card mb-2 promo-escala-row" data-escala-row>
+    <div class="card-body py-3">
+      <div class="row align-items-end g-2">
+        <div class="col-md-2">
+          <label class="form-label small">{% trans "Minimum qty" %}</label>
+          {{ escala_form.cantidad_minima }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{% trans "Benefit type" %}</label>
+          {{ escala_form.tipo_beneficio }}
+        </div>
+        <div class="col-md-3" data-escala-field="valor_beneficio">
+          <label class="form-label small">{% trans "Value (% or $)" %}</label>
+          {{ escala_form.valor_beneficio }}
+          <input type="text" class="form-control form-control-sm mt-1" list="promoPercentPresets" placeholder="{% trans 'Quick % presets…' %}" data-preset-input="percent">
+        </div>
+        <div class="col-md-3" data-escala-field="unidades_gratis">
+          <label class="form-label small">{% trans "Free units" %}</label>
+          {{ escala_form.unidades_gratis }}
+        </div>
+        <div class="col-md-1 text-end">
+          <div class="d-none">{{ escala_form.DELETE }}</div>
+          <button type="button" class="btn btn-sm btn-outline-danger" data-remove-escala>&times;</button>
+        </div>
+      </div>
+      {{ escala_form.id }}
+      {{ escala_form.orden }}
+      {% if escala_form.errors %}
+      <div class="text-danger small mt-2">{{ escala_form.errors|striptags }}</div>
+      {% endif %}
+    </div>
+  </div>
+{% endfor %}
+</div>
+
+<template id="promoEscalaEmptyTemplate">
+  <div class="card mb-2 promo-escala-row" data-escala-row>
+    <div class="card-body py-3">
+      <div class="row align-items-end g-2">
+        <div class="col-md-2">
+          <label class="form-label small">{% trans "Minimum qty" %}</label>
+          {{ escalas_formset.empty_form.cantidad_minima }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">{% trans "Benefit type" %}</label>
+          {{ escalas_formset.empty_form.tipo_beneficio }}
+        </div>
+        <div class="col-md-3" data-escala-field="valor_beneficio">
+          <label class="form-label small">{% trans "Value (% or $)" %}</label>
+          {{ escalas_formset.empty_form.valor_beneficio }}
+          <input type="text" class="form-control form-control-sm mt-1" list="promoPercentPresets" placeholder="{% trans 'Quick % presets…' %}" data-preset-input="percent">
+        </div>
+        <div class="col-md-3" data-escala-field="unidades_gratis">
+          <label class="form-label small">{% trans "Free units" %}</label>
+          {{ escalas_formset.empty_form.unidades_gratis }}
+        </div>
+        <div class="col-md-1 text-end">
+          {{ escalas_formset.empty_form.DELETE }}
+          <button type="button" class="btn btn-sm btn-outline-danger" data-remove-escala>&times;</button>
+        </div>
+      </div>
+      {{ escalas_formset.empty_form.id }}
+      {{ escalas_formset.empty_form.orden }}
+    </div>
+  </div>
+</template>
+
+<div class="d-flex gap-2 mt-4">
 <button type="submit" class="btn btn-success">
 {% if promocion %}{% trans "Save changes" %}{% else %}{% trans "Create promotion" %}{% endif %}
 </button>
@@ -149,101 +200,13 @@
 </div>
 </div>
 
+<script src="{% static 'js/promocion_form.js' %}"></script>
 <script>
-(function () {
-  const productSelect = document.getElementById('promoProducto');
-  const presentationSelect = document.getElementById('promoPresentacion');
-  const tipoSelect = document.getElementById('promoTipoBeneficio');
-  const percentSelect = document.getElementById('promoValorPorcentaje');
-  const fixedWrap = document.getElementById('promoValorFijoWrap');
-  const fixedPreset = document.getElementById('promoValorFijoPreset');
-  const fixedInput = document.getElementById('promoValorFijo');
-  const hiddenValue = document.getElementById('promoValorBeneficio');
-  const percentHelp = document.getElementById('promoValorPercentHelp');
-  const form = document.getElementById('promoForm');
-
-  function filterPresentations() {
-    if (!productSelect || !presentationSelect) return;
-    const productId = productSelect.value;
-    Array.from(presentationSelect.options).forEach(function (option) {
-      if (!option.value) {
-        option.hidden = false;
-        return;
-      }
-      const match = !productId || option.dataset.producto === productId;
-      option.hidden = !match;
-      if (!match && option.selected) {
-        presentationSelect.value = '';
-      }
-    });
-  }
-
-  function syncHiddenValue() {
-    if (!tipoSelect || !hiddenValue) return;
-    if (tipoSelect.value === 'PERCENT') {
-      hiddenValue.value = percentSelect ? percentSelect.value : '';
-    } else {
-      hiddenValue.value = fixedInput ? fixedInput.value : '';
-    }
-  }
-
-  function syncBenefitFields() {
-    if (!tipoSelect) return;
-    const isPercent = tipoSelect.value === 'PERCENT';
-
-    if (percentSelect) {
-      percentSelect.hidden = !isPercent;
-      percentSelect.disabled = !isPercent;
-      percentSelect.required = isPercent;
-    }
-    if (percentHelp) {
-      percentHelp.hidden = !isPercent;
-    }
-    if (fixedWrap) {
-      fixedWrap.hidden = isPercent;
-    }
-    if (fixedInput) {
-      fixedInput.disabled = isPercent;
-      fixedInput.required = !isPercent;
-    }
-    if (fixedPreset) {
-      fixedPreset.disabled = isPercent;
-    }
-    syncHiddenValue();
-  }
-
-  if (productSelect) {
-    productSelect.addEventListener('change', filterPresentations);
-  }
-  if (tipoSelect) {
-    tipoSelect.addEventListener('change', syncBenefitFields);
-  }
-  if (percentSelect) {
-    percentSelect.addEventListener('change', syncHiddenValue);
-  }
-  if (fixedInput) {
-    fixedInput.addEventListener('input', function () {
-      if (fixedPreset && fixedPreset.value && fixedPreset.value !== fixedInput.value) {
-        fixedPreset.value = '';
-      }
-      syncHiddenValue();
-    });
-  }
-  if (fixedPreset) {
-    fixedPreset.addEventListener('change', function () {
-      if (fixedPreset.value && fixedInput) {
-        fixedInput.value = fixedPreset.value;
-      }
-      syncHiddenValue();
-    });
-  }
-  if (form) {
-    form.addEventListener('submit', syncHiddenValue);
-  }
-
-  filterPresentations();
-  syncBenefitFields();
-})();
+document.addEventListener('DOMContentLoaded', function () {
+  window.PromocionForm.init({
+    formPrefix: '{{ escalas_formset.prefix }}',
+  });
+});
 </script>
 
 {% endblock %}

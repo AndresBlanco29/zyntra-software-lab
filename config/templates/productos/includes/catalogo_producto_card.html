@@ -46,12 +46,20 @@
               {% endblocktrans %}
           </div>
           <div class="promo-detail promo-detail--compact">
-              {% if producto.promocion_activa.tipo_beneficio == 'PERCENT' %}
-                  {% blocktrans with value=producto.promocion_activa.valor_beneficio %}
+              {% if producto.promocion_escala_minima.tipo_beneficio == 'PERCENT' %}
+                  {% blocktrans with value=producto.promocion_escala_minima.valor_beneficio %}
                   Get {{ value }}% off.
                   {% endblocktrans %}
+              {% elif producto.promocion_escala_minima.tipo_beneficio == 'FREE_UNITS' %}
+                  {% blocktrans with value=producto.promocion_escala_minima.unidades_gratis %}
+                  Get {{ value }} free unit(s).
+                  {% endblocktrans %}
+              {% elif producto.promocion_escala_minima.tipo_beneficio == 'PRECIO_ESPECIAL' %}
+                  {% blocktrans with value=producto.promocion_escala_minima.valor_beneficio %}
+                  Special price: USD {{ value }}/unit.
+                  {% endblocktrans %}
               {% else %}
-                  {% blocktrans with value=producto.promocion_activa.valor_beneficio %}
+                  {% blocktrans with value=producto.promocion_escala_minima.valor_beneficio %}
                   Get USD {{ value }} off/unit.
                   {% endblocktrans %}
               {% endif %}

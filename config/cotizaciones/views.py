@@ -1,3 +1,4 @@
+import functools
 import logging
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from urllib.parse import quote
@@ -470,7 +471,7 @@ def agregar_a_cotizacion(request):
                 "precio": float(precio),
             }
 
-        aplicar_promocion_en_item_sesion(carrito[key], precio_unitario=precio, presentacion=presentacion)
+        aplicar_promocion_en_item_sesion(carrito[key], precio_unitario=precio, presentacion=presentacion, cliente=cliente)
 
         request.session["carrito"] = carrito
 
@@ -506,13 +507,14 @@ def ver_cotizacion(request):
         item["producto_id"] = producto.id
         item["presentacion_id"] = presentacion.id
         item["precio"] = float(precio)
-        aplicar_promocion_en_item_sesion(item, precio_unitario=precio, presentacion=presentacion)
+        aplicar_promocion_en_item_sesion(item, precio_unitario=precio, presentacion=presentacion, cliente=cliente)
         promocion_estado = estado_promocion_para_linea(
             producto_id=producto.id,
             presentacion_id=presentacion.id,
             cantidad=item["cantidad"],
             precio_unitario=precio,
             presentacion=presentacion,
+            cliente=cliente,
         )
         carrito_session[presentacion_id] = item
         dirty = True
@@ -591,7 +593,7 @@ def guardar_cotizacion(request):
         item["producto_id"] = presentacion.producto_id
         item["presentacion_id"] = presentacion.id
         item["cantidad"] = cantidad
-        aplicar_promocion_en_item_sesion(item, precio_unitario=precio, presentacion=presentacion)
+        aplicar_promocion_en_item_sesion(item, precio_unitario=precio, presentacion=presentacion, cliente=cliente)
         descuento_aplicado = bool(item.get("descuento_aplicado"))
         descuento_monto = _parse_decimal(item.get("descuento_monto", 0), 0) if descuento_aplicado else Decimal('0.00')
         subtotal = calcular_subtotal_item_pedido(
@@ -1239,7 +1241,7 @@ def cliente_reordenar_pedido(request, pedido_id):
         carrito=request.session.get('carrito', {}) or {},
         pedido=pedido,
         price_fn=price_fn,
-        promo_fn=aplicar_promocion_en_item_sesion,
+        promo_fn=functools.partial(aplicar_promocion_en_item_sesion, cliente=cliente),
     )
     request.session['carrito'] = carrito
     request.session.modified = True

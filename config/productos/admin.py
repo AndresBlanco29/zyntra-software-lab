@@ -1,6 +1,15 @@
 from django.contrib import admin
 from django.core.exceptions import ValidationError
-from .models import Producto, Presentacion, Categoria, Marca, ConfiguracionPrecios, ConfiguracionDescuentos, Promocion
+from .models import (
+    Producto,
+    Presentacion,
+    Categoria,
+    Marca,
+    ConfiguracionPrecios,
+    ConfiguracionDescuentos,
+    Promocion,
+    PromocionEscala,
+)
 
 
 class PresentacionInline(admin.TabularInline):
@@ -112,18 +121,28 @@ class ConfiguracionDescuentosAdmin(admin.ModelAdmin):
         return False
 
 
+class PromocionEscalaInline(admin.TabularInline):
+    model = PromocionEscala
+    extra = 1
+    fields = ('cantidad_minima', 'tipo_beneficio', 'valor_beneficio', 'unidades_gratis', 'orden')
+
+
 @admin.register(Promocion)
 class PromocionAdmin(admin.ModelAdmin):
     list_display = (
         'nombre',
         'producto',
         'presentacion',
-        'cantidad_minima',
-        'tipo_beneficio',
-        'valor_beneficio',
+        'escalas_resumen',
         'activa',
         'fecha_inicio',
         'fecha_fin',
     )
-    list_filter = ('activa', 'tipo_beneficio')
+    list_filter = ('activa', 'tipos_cliente')
     search_fields = ('nombre', 'descripcion', 'producto__nombre')
+    filter_horizontal = ('tipos_cliente',)
+    inlines = [PromocionEscalaInline]
+
+    def escalas_resumen(self, obj):
+        return ', '.join(f'{escala.cantidad_minima}+ -> {escala.texto_beneficio()}' for escala in obj.escalas.all())
+    escalas_resumen.short_description = 'Scales'

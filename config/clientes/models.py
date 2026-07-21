@@ -3,10 +3,48 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.db import models
+from django.utils.translation import get_language, gettext_lazy as _
 
 from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_CHOICES, QUICKBOOKS_SYNC_STATUS_PENDING
 from config.productos.models import normalize_price_tier
 from config.usuarios.models import Usuario
+
+
+class TipoCliente(models.Model):
+    """
+    Customer category/segment (e.g. Supermarkets, Distributors).
+
+    This is a plain lookup table on purpose: new categories are added as data
+    (from the admin) instead of code changes, and every place that scopes a
+    promotion "by client type" only needs to check membership in this table -
+    never an explicit list of hard-coded categories.
+    """
+
+    codigo = models.SlugField(
+        max_length=50,
+        unique=True,
+        verbose_name=_('Code'),
+        help_text=_('Stable internal identifier, e.g. "supermercados".'),
+    )
+    nombre = models.CharField(max_length=100, verbose_name=_('Name'))
+    nombre_en = models.CharField(max_length=100, blank=True, verbose_name=_('Name (English)'))
+    activo = models.BooleanField(default=True, verbose_name=_('Active'))
+    orden = models.PositiveSmallIntegerField(default=0, verbose_name=_('Display order'))
+
+    class Meta:
+        verbose_name = _('Customer type')
+        verbose_name_plural = _('Customer types')
+        ordering = ['orden', 'nombre']
+
+    @property
+    def nombre_traducido(self):
+        if get_language() == 'en' and self.nombre_en:
+            return self.nombre_en
+        return self.nombre
+
+    def __str__(self):
+        return self.nombre_traducido
+
 
 class Cliente(models.Model):
 
@@ -130,6 +168,16 @@ class Cliente(models.Model):
         choices=PRICE_TIER_CHOICES,
         blank=True,
         default=PRICE_TIER_UNASSIGNED,
+    )
+
+    tipo_cliente = models.ForeignKey(
+        TipoCliente,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='clientes',
+        verbose_name=_('Customer type'),
+        help_text=_('Segment used to target promotions (e.g. Supermarkets, Distributors).'),
     )
 
     estado_revision = models.CharField(

@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n pagination_tags %}
+{% load i18n static pagination_tags %}
 
 {% block title %}
 {% trans "Promotions" %}
@@ -23,15 +23,17 @@
         autocomplete="off"
       >
     </div>
-    <div class="col-12 col-md-4">
-      <select id="filtroProductoPromo" name="producto" class="form-select">
-        <option value="">{% trans "All products" %}</option>
-        {% for producto in productos %}
-        <option value="{{ producto.id }}" {% if filter_producto == producto.id|stringformat:"s" %}selected{% endif %}>
-          {{ producto.nombre }}
-        </option>
-        {% endfor %}
-      </select>
+    <div class="col-12 col-md-4 position-relative" id="promoListProductSearchRoot" data-search-url="{{ producto_search_url }}">
+      <input
+        type="text"
+        id="filtroProductoPromoBuscador"
+        class="form-control"
+        autocomplete="off"
+        placeholder="{% trans 'Filter by product…' %}"
+        value="{{ filter_producto_nombre }}"
+      >
+      <input type="hidden" id="filtroProductoPromo" name="producto" value="{{ filter_producto }}">
+      <div id="filtroProductoPromoResultados" class="list-group position-absolute w-100 shadow-sm" style="z-index: 1000;" hidden></div>
     </div>
     <div class="col-12 col-md-4">
       <select id="filtroTipoPromo" name="tipo" class="form-select">
@@ -90,8 +92,8 @@
 <th>{% trans "Name" %}</th>
 <th>{% trans "Product" %}</th>
 <th>{% trans "Presentation" %}</th>
-<th>{% trans "Min. qty" %}</th>
-<th>{% trans "Benefit" %}</th>
+<th>{% trans "Customer types" %}</th>
+<th>{% trans "Scales" %}</th>
 <th>{% trans "Validity" %}</th>
 <th>{% trans "Status" %}</th>
 <th>{% trans "Actions" %}</th>
@@ -114,13 +116,19 @@
 <span class="text-muted">{% trans "Any presentation" %}</span>
 {% endif %}
 </td>
-<td>{{ promo.cantidad_minima }}</td>
 <td>
-{% if promo.tipo_beneficio == 'PERCENT' %}
-{{ promo.valor_beneficio }}%
-{% else %}
-${{ promo.valor_beneficio }}
-{% endif %}
+{% for tipo_cliente in promo.tipos_cliente.all %}
+<span class="badge text-bg-info">{{ tipo_cliente.nombre_traducido }}</span>
+{% empty %}
+<span class="text-muted small">{% trans "All customer types" %}</span>
+{% endfor %}
+</td>
+<td class="small">
+{% for escala in promo.escalas.all %}
+<div>{{ escala.cantidad_minima }}+ &rarr; {{ escala.texto_beneficio }}</div>
+{% empty %}
+<span class="text-muted">—</span>
+{% endfor %}
 </td>
 <td class="small">
 {% if promo.fecha_inicio or promo.fecha_fin %}
@@ -177,7 +185,7 @@ ${{ promo.valor_beneficio }}
 document.addEventListener('DOMContentLoaded', function () {
   const form = document.getElementById('promociones-filter-form');
   const buscador = document.getElementById('buscadorPromociones');
-  const filtroProducto = document.getElementById('filtroProductoPromo');
+  const filtroProductoHidden = document.getElementById('filtroProductoPromo');
   const filtroTipo = document.getElementById('filtroTipoPromo');
 
   function submitFilters() {
@@ -190,8 +198,77 @@ document.addEventListener('DOMContentLoaded', function () {
     buscador.addEventListener('change', submitFilters);
   }
 
-  if (filtroProducto) filtroProducto.addEventListener('change', submitFilters);
   if (filtroTipo) filtroTipo.addEventListener('change', submitFilters);
+
+  // Product filter: same lightweight AJAX search used on the create/edit form,
+  // so this list never has to preload the full product catalog either.
+  const searchRoot = document.getElementById('promoListProductSearchRoot');
+  const searchInput = document.getElementById('filtroProductoPromoBuscador');
+  const resultsBox = document.getElementById('filtroProductoPromoResultados');
+  if (searchRoot && searchInput && resultsBox && filtroProductoHidden) {
+    const searchUrl = searchRoot.dataset.searchUrl;
+    let debounceTimer = null;
+    let lastResults = [];
+
+    function hideResults() {
+      resultsBox.hidden = true;
+      resultsBox.innerHTML = '';
+      lastResults = [];
+    }
+
+    function renderResults(results) {
+      lastResults = results;
+      if (!results.length) {
+        hideResults();
+        return;
+      }
+      resultsBox.innerHTML = results.map((item, index) => (
+        '<button type="button" class="list-group-item list-group-item-action" data-result-index="' + index + '">' +
+          item.label.replace(/</g, '&lt;') +
+        '</button>'
+      )).join('');
+      resultsBox.hidden = false;
+    }
+
+    searchInput.addEventListener('input', function () {
+      filtroProductoHidden.value = '';
+      const query = searchInput.value.trim();
+      if (query.length < 2) {
+        hideResults();
+        if (!query) {
+          submitFilters();
+        }
+        return;
+      }
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function () {
+        const url = new URL(searchUrl, window.location.origin);
+        url.searchParams.set('q', query);
+        fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+          .then((response) => (response.ok ? response.json() : { results: [] }))
+          .then((data) => renderResults(data.results || []))
+          .catch(hideResults);
+      }, 250);
+    });
+
+    resultsBox.addEventListener('click', function (event) {
+      const button = event.target.closest('[data-result-index]');
+      if (!button) return;
+      const item = lastResults[Number(button.dataset.resultIndex)];
+      if (item) {
+        filtroProductoHidden.value = String(item.id);
+        searchInput.value = item.label;
+        hideResults();
+        submitFilters();
+      }
+    });
+
+    document.addEventListener('click', function (event) {
+      if (!searchRoot.contains(event.target)) {
+        hideResults();
+      }
+    });
+  }
 });
 </script>
 

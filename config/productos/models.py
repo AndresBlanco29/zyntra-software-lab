@@ -507,11 +507,27 @@ class ConfiguracionDescuentos(models.Model):
 
 
 class Promocion(models.Model):
+    """
+    Promotion "header": what product/presentation it targets, which customer
+    types can see it, and when it is valid.
+
+    The actual discount rules live in ``PromocionEscala`` (one-to-many) so a
+    single promotion can offer several quantity tiers (e.g. buy 12 -> 5%,
+    buy 24 -> 10%) without duplicating the product/dates/client-type setup
+    for every tier.
+    """
+
+    # Kept here (rather than only on PromocionEscala) so old imports/choices lookups
+    # that only need the benefit-type vocabulary keep working without reaching into escalas.
     TIPO_PERCENT = 'PERCENT'
     TIPO_FIXED = 'FIXED'
+    TIPO_FREE_UNITS = 'FREE_UNITS'
+    TIPO_PRECIO_ESPECIAL = 'PRECIO_ESPECIAL'
     TIPO_BENEFICIO_CHOICES = (
         (TIPO_PERCENT, _('Percentage')),
-        (TIPO_FIXED, _('Fixed dollars')),
+        (TIPO_FIXED, _('Fixed dollars per unit')),
+        (TIPO_FREE_UNITS, _('Free units')),
+        (TIPO_PRECIO_ESPECIAL, _('Special unit price')),
     )
 
     nombre = models.CharField(max_length=150, verbose_name=_('Name'))
@@ -536,21 +552,12 @@ class Promocion(models.Model):
         verbose_name=_('Presentation'),
         help_text=_('Leave empty to apply to any presentation of the product.'),
     )
-    cantidad_minima = models.PositiveIntegerField(
-        default=1,
-        verbose_name=_('Minimum quantity'),
-    )
-    tipo_beneficio = models.CharField(
-        max_length=10,
-        choices=TIPO_BENEFICIO_CHOICES,
-        default=TIPO_PERCENT,
-        verbose_name=_('Benefit type'),
-    )
-    valor_beneficio = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        verbose_name=_('Benefit value'),
-        help_text=_('Percentage (e.g. 15) or dollars per unit (e.g. 2.00), depending on type.'),
+    tipos_cliente = models.ManyToManyField(
+        'clientes.TipoCliente',
+        blank=True,
+        related_name='promociones',
+        verbose_name=_('Customer types'),
+        help_text=_('Leave empty to apply to every customer type.'),
     )
     fecha_inicio = models.DateTimeField(null=True, blank=True, verbose_name=_('Start date'))
     fecha_fin = models.DateTimeField(null=True, blank=True, verbose_name=_('End date'))
@@ -567,14 +574,6 @@ class Promocion(models.Model):
         return self.nombre
 
     def clean(self):
-        if self.cantidad_minima is None or self.cantidad_minima < 1:
-            raise ValidationError({'cantidad_minima': _('Minimum quantity must be at least 1.')})
-        valor = _quantize_money(self.valor_beneficio or 0)
-        if valor <= 0:
-            raise ValidationError({'valor_beneficio': _('Benefit value must be greater than zero.')})
-        if self.tipo_beneficio == self.TIPO_PERCENT and valor > Decimal('100'):
-            raise ValidationError({'valor_beneficio': _('Percentage benefit cannot exceed 100.')})
-        self.valor_beneficio = valor
         if self.presentacion_id and self.producto_id and self.presentacion.producto_id != self.producto_id:
             raise ValidationError({'presentacion': _('The presentation must belong to the selected product.')})
         if self.fecha_inicio and self.fecha_fin and self.fecha_fin < self.fecha_inicio:
@@ -582,3 +581,104 @@ class Promocion(models.Model):
 
     def texto_catalogo(self):
         return (self.descripcion or self.nombre or '').strip()
+
+    def aplica_a_cliente(self, cliente):
+        """A promotion with no configured customer types applies to everyone."""
+        tipo_id = getattr(cliente, 'tipo_cliente_id', None) if cliente is not None else None
+        tipos_ids = {tc.id for tc in self.tipos_cliente.all()}
+        if not tipos_ids:
+            return True
+        return tipo_id is not None and tipo_id in tipos_ids
+
+    @property
+    def escala_minima(self):
+        """Lowest quantity tier, used for catalog badges (e.g. "Minimum: 5 units")."""
+        return min(self.escalas.all(), key=lambda escala: escala.cantidad_minima, default=None)
+
+
+class PromocionEscala(models.Model):
+    """One quantity tier ("scale") of a Promocion, e.g. "buy 24 -> 10% off"."""
+
+    TIPO_PERCENT = Promocion.TIPO_PERCENT
+    TIPO_FIXED = Promocion.TIPO_FIXED
+    TIPO_FREE_UNITS = Promocion.TIPO_FREE_UNITS
+    TIPO_PRECIO_ESPECIAL = Promocion.TIPO_PRECIO_ESPECIAL
+    TIPO_BENEFICIO_CHOICES = Promocion.TIPO_BENEFICIO_CHOICES
+
+    promocion = models.ForeignKey(
+        Promocion,
+        on_delete=models.CASCADE,
+        related_name='escalas',
+        verbose_name=_('Promotion'),
+    )
+    cantidad_minima = models.PositiveIntegerField(
+        default=1,
+        verbose_name=_('Minimum quantity'),
+    )
+    tipo_beneficio = models.CharField(
+        max_length=20,
+        choices=TIPO_BENEFICIO_CHOICES,
+        default=TIPO_PERCENT,
+        verbose_name=_('Benefit type'),
+    )
+    valor_beneficio = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        verbose_name=_('Benefit value'),
+        help_text=_(
+            'Percentage (e.g. 15), dollars per unit (e.g. 2.00), or special unit price, '
+            'depending on the benefit type. Not used for Free units.'
+        ),
+    )
+    unidades_gratis = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name=_('Free units'),
+        help_text=_('Only used when the benefit type is "Free units", e.g. buy 10 -> 1 free.'),
+    )
+    orden = models.PositiveSmallIntegerField(default=0, verbose_name=_('Display order'))
+
+    class Meta:
+        verbose_name = _('Promotion scale')
+        verbose_name_plural = _('Promotion scales')
+        ordering = ['cantidad_minima']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['promocion', 'cantidad_minima'],
+                name='uniq_promocion_escala_cantidad',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.promocion.nombre} - {self.cantidad_minima}+ -> {self.texto_beneficio()}'
+
+    def clean(self):
+        if self.cantidad_minima is None or self.cantidad_minima < 1:
+            raise ValidationError({'cantidad_minima': _('Minimum quantity must be at least 1.')})
+
+        if self.tipo_beneficio == self.TIPO_FREE_UNITS:
+            if not self.unidades_gratis or self.unidades_gratis < 1:
+                raise ValidationError({'unidades_gratis': _('Enter how many free units are granted.')})
+            self.valor_beneficio = None
+            return
+
+        self.unidades_gratis = None
+        valor = _quantize_money(self.valor_beneficio or 0)
+        if valor <= 0:
+            raise ValidationError({'valor_beneficio': _('Benefit value must be greater than zero.')})
+        if self.tipo_beneficio == self.TIPO_PERCENT and valor > Decimal('100'):
+            raise ValidationError({'valor_beneficio': _('Percentage benefit cannot exceed 100.')})
+        self.valor_beneficio = valor
+
+    def texto_beneficio(self):
+        if self.tipo_beneficio == self.TIPO_PERCENT:
+            return f'{self.valor_beneficio}% {_("off")}'
+        if self.tipo_beneficio == self.TIPO_FIXED:
+            return f'${self.valor_beneficio} {_("off per unit")}'
+        if self.tipo_beneficio == self.TIPO_FREE_UNITS:
+            return str(_('%(units)s free unit(s)') % {'units': self.unidades_gratis})
+        if self.tipo_beneficio == self.TIPO_PRECIO_ESPECIAL:
+            return str(_('Special price: $%(price)s') % {'price': self.valor_beneficio})
+        return ''

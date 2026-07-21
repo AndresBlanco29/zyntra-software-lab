@@ -15,6 +15,15 @@ from config.productos.promotions import (
 )
 from config.productos.views import _hydrate_productos
 from django.views.decorators.http import require_POST
+
+
+def _cliente_from_take_order_session(request):
+    cliente_id = request.session.get("cliente_id")
+    if not cliente_id:
+        return None
+    return Cliente.objects.filter(id=cliente_id).first()
+
+
 import uuid
 import json
 import re
@@ -664,7 +673,7 @@ def catalogo_vendedor(request, cliente_id):
     filter_params = _catalogo_vendedor_filter_params(request)
     paginator = Paginator(_catalogo_vendedor_queryset(request), VENDEDOR_CATALOGO_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get('page'))
-    productos = adjuntar_promociones_a_productos(_hydrate_productos(list(page_obj.object_list)))
+    productos = adjuntar_promociones_a_productos(_hydrate_productos(list(page_obj.object_list)), cliente=cliente)
     _attach_recent_customer_order_history(cliente=cliente, productos=productos)
 
     categorias = Categoria.objects.all()
@@ -711,6 +720,7 @@ def agregar_producto_pedido(request):
 
     if request.method == "POST":
 
+        cliente = _cliente_from_take_order_session(request)
         presentacion_id = request.POST.get("presentacion_id")
         cantidad = int(request.POST.get("cantidad"))
 
@@ -752,7 +762,7 @@ def agregar_producto_pedido(request):
                 carrito_item["precio_key"] = precio_key
             carrito[presentacion_id] = carrito_item
 
-        aplicar_promocion_en_item_sesion(carrito[presentacion_id], precio_unitario=precio)
+        aplicar_promocion_en_item_sesion(carrito[presentacion_id], precio_unitario=precio, cliente=cliente)
 
         request.session["pedido"] = carrito
         persist_session_take_order_cart(request)
@@ -808,7 +818,7 @@ def ver_pedido(request):
         if float(item.get("precio", 0) or 0) != precio:
             carrito[key]["precio"] = precio
 
-        aplicar_promocion_en_item_sesion(carrito[key], precio_unitario=precio)
+        aplicar_promocion_en_item_sesion(carrito[key], precio_unitario=precio, cliente=cliente)
         item = carrito[key]
         subtotal = _cart_item_subtotal(item)
 
@@ -930,6 +940,7 @@ def actualizar_cantidad_pedido(request):
     if denied:
         return denied
 
+    cliente = _cliente_from_take_order_session(request)
     producto_id = request.POST.get("producto_id")
     accion = request.POST.get("accion")
 
@@ -1011,6 +1022,7 @@ def actualizar_cantidad_pedido(request):
             aplicar_promocion_en_item_sesion(
                 carrito[producto_id],
                 precio_unitario=carrito[producto_id].get("precio"),
+                cliente=cliente,
             )
 
     # Guardar sesión + borrador persistente
@@ -1069,7 +1081,7 @@ def enviar_pedido(request):
     for item in carrito.values():
 
         presentacion = Presentacion.objects.get(id=item["presentacion_id"])
-        aplicar_promocion_en_item_sesion(item, precio_unitario=item.get("precio"))
+        aplicar_promocion_en_item_sesion(item, precio_unitario=item.get("precio"), cliente=cliente)
         items_payload.append({
             "presentacion": presentacion,
             "cantidad": item["cantidad"],
@@ -1161,7 +1173,7 @@ def crear_cotizacion_desde_toma(request):
     items_payload = []
     for item in carrito.values():
         presentacion = Presentacion.objects.get(id=item["presentacion_id"])
-        aplicar_promocion_en_item_sesion(item, precio_unitario=item.get("precio"))
+        aplicar_promocion_en_item_sesion(item, precio_unitario=item.get("precio"), cliente=cliente)
         items_payload.append({
             "presentacion": presentacion,
             "cantidad": item["cantidad"],

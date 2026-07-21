@@ -1,5 +1,6 @@
 from django.core.cache import cache
 from django.core.paginator import Paginator
+import functools
 import json
 from django.db.models import Prefetch, Q
 from django.db.utils import IntegrityError
@@ -13,8 +14,10 @@ from .models import (
     ConfiguracionPrecios,
     ConfiguracionDescuentos,
     Promocion,
+    PromocionEscala,
     normalize_codigo_barras,
 )
+from .forms import PromocionForm, PromocionEscalaFormSet
 from .promotions import (
     adjuntar_promociones_a_productos,
     opciones_monto_fijo_promocion,
@@ -388,7 +391,7 @@ def _catalogo_public_filter_params(request):
     return params
 
 
-def _catalogo_public_productos_queryset(request):
+def _catalogo_public_productos_queryset(request, cliente=None):
     queryset = (
         Producto.objects.filter(activo=True)
         .select_related('categoria', 'marca')
@@ -417,7 +420,7 @@ def _catalogo_public_productos_queryset(request):
     if filters.get('marca'):
         queryset = queryset.filter(marca_id=filters['marca'])
     if filters.get('promociones'):
-        promo_product_ids = promociones_activas_queryset().values('producto_id')
+        promo_product_ids = promociones_activas_queryset(cliente=cliente).values('producto_id')
         queryset = queryset.filter(id__in=promo_product_ids)
     return queryset
 
@@ -457,10 +460,10 @@ def catalogo(request):
     promociones_url = f"{promociones_url}?{'&'.join(promociones_query)}"
 
     filter_params = _catalogo_public_filter_params(request)
-    promociones_disponibles = promociones_activas_queryset().exists()
-    paginator = Paginator(_catalogo_public_productos_queryset(request), CATALOGO_PAGE_SIZE)
+    promociones_disponibles = promociones_activas_queryset(cliente=cliente).exists()
+    paginator = Paginator(_catalogo_public_productos_queryset(request, cliente=cliente), CATALOGO_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get('page'))
-    productos = adjuntar_promociones_a_productos(_hydrate_productos(list(page_obj.object_list)))
+    productos = adjuntar_promociones_a_productos(_hydrate_productos(list(page_obj.object_list)), cliente=cliente)
     categorias = _sort_catalog_categorias(_get_cached_catalogo_categorias())
     marcas = _sort_catalog_marcas(_get_cached_catalogo_marcas())
     carrito_session = request.session.get('carrito', {}) or {}
@@ -480,7 +483,7 @@ def catalogo(request):
         productos_favoritos = load_cliente_favorite_productos(
             cliente=cliente,
             hydrate_fn=_hydrate_productos,
-            attach_promos_fn=adjuntar_promociones_a_productos,
+            attach_promos_fn=functools.partial(adjuntar_promociones_a_productos, cliente=cliente),
         )
 
     context = {
@@ -1081,119 +1084,54 @@ def parse_packaging_from_name(request):
     return JsonResponse({"ok": True, "defaults": parsed})
 
 
-def _parse_optional_datetime(value):
-    text = str(value or "").strip()
-    if not text:
-        return None
-    # HTML datetime-local: YYYY-MM-DDTHH:MM
-    from datetime import datetime
-
-    from django.utils import timezone as dj_timezone
-
-    for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
-        try:
-            parsed = datetime.strptime(text, fmt)
-            if dj_timezone.is_naive(parsed):
-                return dj_timezone.make_aware(parsed, dj_timezone.get_current_timezone())
-            return parsed
-        except ValueError:
-            continue
-    raise ValidationError(_("Enter a valid date/time."))
+PRODUCTO_SEARCH_RESULTS_LIMIT = 20
 
 
-def _promocion_form_context(promocion=None, *, post=None, error=None):
-    productos = Producto.objects.filter(activo=True).order_by("nombre")
-    presentaciones = Presentacion.objects.select_related("producto").order_by("producto__nombre", "nombre")
-    data = {
-        "nombre": "",
-        "descripcion": "",
-        "producto_id": "",
-        "presentacion_id": "",
-        "cantidad_minima": "1",
-        "tipo_beneficio": Promocion.TIPO_PERCENT,
-        "valor_beneficio": "",
-        "fecha_inicio": "",
-        "fecha_fin": "",
-        "activa": True,
-    }
-    if promocion is not None:
-        data.update({
-            "nombre": promocion.nombre,
-            "descripcion": promocion.descripcion,
-            "producto_id": str(promocion.producto_id),
-            "presentacion_id": str(promocion.presentacion_id or ""),
-            "cantidad_minima": str(promocion.cantidad_minima),
-            "tipo_beneficio": promocion.tipo_beneficio,
-            "valor_beneficio": format(promocion.valor_beneficio, ".2f"),
-            "fecha_inicio": promocion.fecha_inicio.strftime("%Y-%m-%dT%H:%M") if promocion.fecha_inicio else "",
-            "fecha_fin": promocion.fecha_fin.strftime("%Y-%m-%dT%H:%M") if promocion.fecha_fin else "",
-            "activa": promocion.activa,
-        })
-    if post is not None:
-        data.update({
-            "nombre": (post.get("nombre") or "").strip(),
-            "descripcion": (post.get("descripcion") or "").strip(),
-            "producto_id": (post.get("producto") or "").strip(),
-            "presentacion_id": (post.get("presentacion") or "").strip(),
-            "cantidad_minima": (post.get("cantidad_minima") or "1").strip(),
-            "tipo_beneficio": (post.get("tipo_beneficio") or Promocion.TIPO_PERCENT).strip(),
-            "valor_beneficio": (post.get("valor_beneficio") or "").strip(),
-            "fecha_inicio": (post.get("fecha_inicio") or "").strip(),
-            "fecha_fin": (post.get("fecha_fin") or "").strip(),
-            "activa": bool(post.get("activa")),
-        })
+@login_required
+@internal_permission_required("admin.products.view", "admin.products.manage")
+def buscar_productos_promocion(request):
+    """
+    Lightweight, paginated product search for the Promotions admin.
 
-    valor_actual = data.get("valor_beneficio") or None
-    return {
-        "promocion": promocion,
-        "productos": productos,
-        "presentaciones": presentaciones,
-        "tipos_beneficio": Promocion.TIPO_BENEFICIO_CHOICES,
-        "percentage_preset_options": opciones_porcentaje_promocion(valor_actual),
-        "fixed_preset_options": opciones_monto_fijo_promocion(valor_actual),
-        "error": error,
-        **data,
-    }
+    Returns at most PRODUCTO_SEARCH_RESULTS_LIMIT matches instead of the full
+    product catalog, so the Promotions form never has to load 1000+ options.
+    Matches by name (ES/EN) or barcode/code.
+    """
+    query = (request.GET.get("q") or "").strip()
+    if len(query) < 2:
+        return JsonResponse({"results": []})
+
+    filtros = Q(nombre__icontains=query) | Q(nombre_en__icontains=query) | Q(codigo_barras__icontains=query)
+    if query.isdigit():
+        filtros |= Q(id=int(query))
+
+    productos = (
+        Producto.objects.filter(activo=True)
+        .filter(filtros)
+        .order_by("nombre")[:PRODUCTO_SEARCH_RESULTS_LIMIT]
+    )
+
+    results = [
+        {
+            "id": producto.id,
+            "label": producto.nombre,
+            "codigo_barras": producto.codigo_barras or "",
+        }
+        for producto in productos
+    ]
+    return JsonResponse({"results": results})
 
 
-def _build_promocion_from_post(post, promocion=None):
-    promocion = promocion or Promocion()
-    promocion.nombre = (post.get("nombre") or "").strip()
-    promocion.descripcion = (post.get("descripcion") or "").strip()
-    producto_id = (post.get("producto") or "").strip()
-    presentacion_id = (post.get("presentacion") or "").strip()
-    if not producto_id:
-        raise ValidationError(_("Product is required."))
-    promocion.producto = get_object_or_404(Producto, id=producto_id)
-    promocion.presentacion = get_object_or_404(Presentacion, id=presentacion_id) if presentacion_id else None
-    try:
-        promocion.cantidad_minima = int(post.get("cantidad_minima") or 1)
-    except (TypeError, ValueError) as exc:
-        raise ValidationError(_("Minimum quantity must be a whole number.")) from exc
-    promocion.tipo_beneficio = (post.get("tipo_beneficio") or Promocion.TIPO_PERCENT).strip()
-    if promocion.tipo_beneficio not in {Promocion.TIPO_PERCENT, Promocion.TIPO_FIXED}:
-        raise ValidationError(_("Invalid benefit type."))
-    valor_raw = (post.get("valor_beneficio") or "").strip()
-    if not valor_raw:
-        raise ValidationError(_("Benefit value is required."))
-    promocion.valor_beneficio = _parse_decimal(valor_raw, "0")
-    if promocion.tipo_beneficio == Promocion.TIPO_PERCENT:
-        # Only preset % values are allowed; when editing, keep a legacy/custom value selectable.
-        legacy_value = None
-        if promocion.pk:
-            legacy_value = (
-                Promocion.objects.filter(pk=promocion.pk)
-                .values_list("valor_beneficio", flat=True)
-                .first()
-            )
-        allowed = {option["value"] for option in opciones_porcentaje_promocion(legacy_value)}
-        if format(promocion.valor_beneficio, ".2f") not in allowed:
-            raise ValidationError(_("Select one of the configured percentage discounts."))
-    promocion.fecha_inicio = _parse_optional_datetime(post.get("fecha_inicio"))
-    promocion.fecha_fin = _parse_optional_datetime(post.get("fecha_fin"))
-    promocion.activa = bool(post.get("activa"))
-    promocion.full_clean()
-    return promocion
+@login_required
+@internal_permission_required("admin.products.view", "admin.products.manage")
+def producto_presentaciones_promocion(request, producto_id):
+    """Presentations of a single product (usually a handful), for the Promotions form."""
+    presentaciones = list(
+        Presentacion.objects.filter(producto_id=producto_id)
+        .order_by("nombre")
+        .values("id", "nombre")
+    )
+    return JsonResponse({"results": presentaciones})
 
 
 ADMIN_PROMOCIONES_PAGE_SIZE = 50
@@ -1215,7 +1153,7 @@ def _promociones_admin_filter_params(request):
         params["producto"] = producto_id
 
     tipo = str(request.GET.get("tipo") or "").strip().upper()
-    if tipo in {Promocion.TIPO_PERCENT, Promocion.TIPO_FIXED}:
+    if tipo in {choice for choice, _label in Promocion.TIPO_BENEFICIO_CHOICES}:
         params["tipo"] = tipo
 
     return params
@@ -1225,6 +1163,7 @@ def _promociones_admin_queryset(request):
     filters = _promociones_admin_filter_params(request)
     queryset = (
         Promocion.objects.select_related("producto", "presentacion")
+        .prefetch_related("escalas", "tipos_cliente")
         .order_by("-creada_en", "id")
     )
 
@@ -1247,9 +1186,9 @@ def _promociones_admin_queryset(request):
         queryset = queryset.filter(producto_id=filters["producto"])
 
     if filters.get("tipo"):
-        queryset = queryset.filter(tipo_beneficio=filters["tipo"])
+        queryset = queryset.filter(escalas__tipo_beneficio=filters["tipo"])
 
-    return queryset, filters
+    return queryset.distinct(), filters
 
 
 def _promociones_list_redirect(request, *, estado=None):
@@ -1273,6 +1212,15 @@ def lista_promociones(request):
     active_count = Promocion.objects.filter(activa=True).count()
     inactive_count = Promocion.objects.filter(activa=False).count()
 
+    filter_producto_nombre = ""
+    if filter_params.get("producto"):
+        filter_producto_nombre = (
+            Producto.objects.filter(id=filter_params["producto"])
+            .values_list("nombre", flat=True)
+            .first()
+            or ""
+        )
+
     return render(request, "admin/promociones.html", {
         "promociones": page_obj.object_list,
         "page_obj": page_obj,
@@ -1280,31 +1228,70 @@ def lista_promociones(request):
         "filter_q": filter_params.get("q", ""),
         "filter_estado": filter_params.get("estado", "activas"),
         "filter_producto": filter_params.get("producto", ""),
+        "filter_producto_nombre": filter_producto_nombre,
         "filter_tipo": filter_params.get("tipo", ""),
         "active_count": active_count,
         "inactive_count": inactive_count,
-        "productos": Producto.objects.only("id", "nombre").order_by("nombre"),
         "tipos_beneficio": Promocion.TIPO_BENEFICIO_CHOICES,
+        "producto_search_url": reverse("buscar_productos_promocion"),
     })
+
+
+def _promocion_escalas_formset_context(request=None, instance=None):
+    if request is not None and request.method == "POST":
+        return PromocionEscalaFormSet(request.POST, instance=instance, prefix="escalas")
+    return PromocionEscalaFormSet(instance=instance, prefix="escalas")
+
+
+def _promocion_form_render_context(request, form, formset, promocion=None):
+    producto_seleccionado = None
+    presentacion_seleccionada = None
+    if form.is_bound:
+        producto_id = form.data.get("producto")
+        if producto_id:
+            producto_seleccionado = Producto.objects.filter(id=producto_id).first()
+        presentacion_id = form.data.get("presentacion")
+        if presentacion_id:
+            presentacion_seleccionada = Presentacion.objects.filter(id=presentacion_id).first()
+    elif promocion is not None:
+        producto_seleccionado = promocion.producto
+        presentacion_seleccionada = promocion.presentacion
+
+    return {
+        "promocion": promocion,
+        "form": form,
+        "escalas_formset": formset,
+        "tipos_beneficio": Promocion.TIPO_BENEFICIO_CHOICES,
+        "percentage_preset_options": opciones_porcentaje_promocion(),
+        "fixed_preset_options": opciones_monto_fijo_promocion(),
+        "producto_seleccionado": producto_seleccionado,
+        "presentacion_seleccionada": presentacion_seleccionada,
+        "producto_search_url": reverse("buscar_productos_promocion"),
+        "producto_presentaciones_url_template": reverse("producto_presentaciones_promocion", args=[0]).replace("/0/", "/__ID__/"),
+    }
 
 
 @login_required
 @internal_permission_required("admin.products.manage")
 def crear_promocion(request):
     if request.method == "POST":
-        try:
-            promocion = _build_promocion_from_post(request.POST)
-            promocion.save()
+        form = PromocionForm(request.POST)
+        formset = _promocion_escalas_formset_context(request, instance=form.instance)
+        if form.is_valid() and formset.is_valid():
+            promocion = form.save()
+            formset.instance = promocion
+            formset.save()
             messages.success(request, _("Promotion created successfully."))
             return redirect("lista_promociones")
-        except ValidationError as exc:
-            error = exc.messages[0] if getattr(exc, "messages", None) else str(exc)
-            return render(
-                request,
-                "admin/promocion_form.html",
-                _promocion_form_context(post=request.POST, error=error),
-            )
-    return render(request, "admin/promocion_form.html", _promocion_form_context())
+        messages.error(request, _("Please fix the errors below."))
+    else:
+        form = PromocionForm()
+        formset = _promocion_escalas_formset_context(instance=None)
+    return render(
+        request,
+        "admin/promocion_form.html",
+        _promocion_form_render_context(request, form, formset),
+    )
 
 
 @login_required
@@ -1312,19 +1299,22 @@ def crear_promocion(request):
 def editar_promocion(request, promocion_id):
     promocion = get_object_or_404(Promocion, id=promocion_id)
     if request.method == "POST":
-        try:
-            promocion = _build_promocion_from_post(request.POST, promocion=promocion)
-            promocion.save()
+        form = PromocionForm(request.POST, instance=promocion)
+        formset = _promocion_escalas_formset_context(request, instance=promocion)
+        if form.is_valid() and formset.is_valid():
+            form.save()
+            formset.save()
             messages.success(request, _("Promotion updated successfully."))
             return redirect("lista_promociones")
-        except ValidationError as exc:
-            error = exc.messages[0] if getattr(exc, "messages", None) else str(exc)
-            return render(
-                request,
-                "admin/promocion_form.html",
-                _promocion_form_context(promocion, post=request.POST, error=error),
-            )
-    return render(request, "admin/promocion_form.html", _promocion_form_context(promocion))
+        messages.error(request, _("Please fix the errors below."))
+    else:
+        form = PromocionForm(instance=promocion)
+        formset = _promocion_escalas_formset_context(instance=promocion)
+    return render(
+        request,
+        "admin/promocion_form.html",
+        _promocion_form_render_context(request, form, formset, promocion=promocion),
+    )
 
 
 @login_required

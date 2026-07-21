@@ -1,4 +1,23 @@
-"""Active product promotions and per-line discount resolution."""
+"""Active product promotions and per-line discount resolution.
+
+Architecture
+------------
+A ``Promocion`` is the "header" (product/presentation, customer types,
+validity window). The actual discount rules are ``PromocionEscala`` rows
+(quantity tiers such as "buy 12 -> 5%", "buy 24 -> 10%", "buy 10 -> 1 free
+unit"). Every resolver below works in two layers:
+
+- ``resolver_escala_*`` functions return ``(promocion, escala, monto)`` and
+  are the source of truth (they know which tier matched and why).
+- ``resolver_promocion_para_linea`` / ``resolver_promocion_disponible_para_linea``
+  are thin ``(promocion, monto)`` wrappers kept for the call sites (cart,
+  quotes, orders) that only care about the money, not which tier applied.
+
+Customer-type scoping is optional and additive: every public resolver takes
+an optional ``cliente`` kwarg. When it is omitted (internal/BackOffice
+contexts that don't have a shopping customer) promotions are not filtered by
+customer type, matching the previous behaviour.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +26,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.db.models import Q
 from django.utils import timezone
 
-from config.productos.models import Promocion
+from config.productos.models import Promocion, PromocionEscala
 
 
 DESCUENTO_ORIGEN_PROMOCION = 'promocion'
@@ -99,14 +118,36 @@ def _quantize_money(value):
     return _to_decimal(value, '0').quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
-def promociones_activas_queryset(now=None):
+def _filtrar_por_tipo_cliente(queryset, cliente):
+    """
+    Scope a Promocion queryset to a customer's type.
+
+    A promotion with no ``tipos_cliente`` configured applies to every
+    customer type (this is also what keeps promotions created before this
+    feature existed working unchanged). When ``cliente`` is None (no
+    shopping customer in context, e.g. BackOffice/admin previews) no
+    filtering is applied at all.
+    """
+    if cliente is None:
+        return queryset
+
+    tipo_cliente_id = getattr(cliente, 'tipo_cliente_id', None)
+    if tipo_cliente_id:
+        return queryset.filter(
+            Q(tipos_cliente__isnull=True) | Q(tipos_cliente_id=tipo_cliente_id)
+        ).distinct()
+    return queryset.filter(tipos_cliente__isnull=True).distinct()
+
+
+def promociones_activas_queryset(now=None, cliente=None):
     now = now or timezone.now()
-    return (
+    queryset = (
         Promocion.objects.filter(activa=True)
         .filter(Q(fecha_inicio__isnull=True) | Q(fecha_inicio__lte=now))
         .filter(Q(fecha_fin__isnull=True) | Q(fecha_fin__gte=now))
         .select_related('producto', 'presentacion')
     )
+    return _filtrar_por_tipo_cliente(queryset, cliente)
 
 
 def precio_referencia_presentacion(presentacion, precio_unitario=None):
@@ -128,41 +169,213 @@ def precio_referencia_presentacion(presentacion, precio_unitario=None):
     return Decimal('0.00')
 
 
-def calcular_descuento_monto_promocion(promocion, precio_unitario, *, presentacion=None):
+def calcular_descuento_monto_escala(escala, precio_unitario, *, presentacion=None, cantidad=None):
     """
-    Return per-unit discount dollars for a promotion.
+    Return the per-unit discount dollars granted by one PromocionEscala tier.
 
-    Fixed-dollar promos apply even when the line price is still $0 (BackOffice often
-    sets the selling price later). Percentage promos use the line price, or a list
-    price fallback from the presentation when the line is still unpriced.
+    Fixed-dollar and special-price tiers apply even when the line price is
+    still $0 (BackOffice often sets the selling price later); percentage and
+    free-unit tiers use the line price, or a list price fallback from the
+    presentation when the line is still unpriced.
     """
     precio = _quantize_money(precio_unitario)
-    valor = _quantize_money(promocion.valor_beneficio)
-    if promocion.tipo_beneficio == Promocion.TIPO_PERCENT:
+    valor = _quantize_money(escala.valor_beneficio or 0)
+
+    if escala.tipo_beneficio == PromocionEscala.TIPO_PERCENT:
         base = precio_referencia_presentacion(presentacion, precio)
         if base <= 0:
             return Decimal('0.00')
         monto = _quantize_money(base * valor / Decimal('100'))
-        # Cap only against the real line price when it is already known.
         if precio > 0 and monto > precio:
             monto = precio
-    else:
+
+    elif escala.tipo_beneficio == PromocionEscala.TIPO_PRECIO_ESPECIAL:
+        base = precio_referencia_presentacion(presentacion, precio)
+        if base <= 0:
+            return Decimal('0.00')
+        monto = _quantize_money(base - valor)
+
+    elif escala.tipo_beneficio == PromocionEscala.TIPO_FREE_UNITS:
+        base = precio_referencia_presentacion(presentacion, precio)
+        unidades = int(escala.unidades_gratis or 0)
+        try:
+            qty = int(cantidad) if cantidad else int(escala.cantidad_minima)
+        except (TypeError, ValueError):
+            qty = int(escala.cantidad_minima)
+        qty = max(qty, 1)
+        if base <= 0 or unidades <= 0:
+            return Decimal('0.00')
+        # Free units are modelled as an equivalent per-unit discount spread across the
+        # purchased quantity, rather than physically adding extra units to the order.
+        monto = _quantize_money((base * unidades) / Decimal(qty))
+        if precio > 0 and monto > precio:
+            monto = precio
+
+    else:  # TIPO_FIXED
         monto = valor
         if precio > 0 and monto > precio:
             monto = precio
+
     if monto < 0:
         monto = Decimal('0.00')
     return monto
 
 
-def promociones_por_producto_ids(producto_ids, now=None):
+def _mejor_escala(candidatos, *, precio, presentacion, cantidad, preferir_menor_cantidad_minima):
+    best_escala = None
+    best_promo = None
+    best_monto = Decimal('0.00')
+    for escala in candidatos:
+        monto = calcular_descuento_monto_escala(escala, precio, presentacion=presentacion, cantidad=cantidad)
+        if monto <= 0:
+            continue
+        if best_escala is None or monto > best_monto:
+            best_escala, best_promo, best_monto = escala, escala.promocion, monto
+            continue
+        if monto != best_monto:
+            continue
+        if preferir_menor_cantidad_minima and escala.cantidad_minima != best_escala.cantidad_minima:
+            if escala.cantidad_minima < best_escala.cantidad_minima:
+                best_escala, best_promo, best_monto = escala, escala.promocion, monto
+            continue
+        if escala.promocion_id < best_promo.id:
+            best_escala, best_promo, best_monto = escala, escala.promocion, monto
+    return best_promo, best_escala, best_monto
+
+
+def resolver_escala_disponible_para_linea(
+    *,
+    producto_id,
+    presentacion_id,
+    precio_unitario,
+    now=None,
+    presentacion=None,
+    cliente=None,
+):
+    """Return (promocion, escala, monto) for the most attractive tier even before its minimum is met."""
+    if not producto_id:
+        return None, None, Decimal('0.00')
+
+    presentacion_id = int(presentacion_id) if presentacion_id else None
+    precio = _quantize_money(precio_unitario)
+    if presentacion is None and presentacion_id:
+        from config.productos.models import Presentacion
+        presentacion = Presentacion.objects.filter(id=presentacion_id).first()
+
+    promos = promociones_activas_queryset(now=now, cliente=cliente).filter(
+        producto_id=int(producto_id),
+    ).filter(
+        Q(presentacion__isnull=True) | Q(presentacion_id=presentacion_id)
+    )
+    candidatos = PromocionEscala.objects.filter(promocion__in=promos).select_related('promocion')
+
+    return _mejor_escala(
+        candidatos,
+        precio=precio,
+        presentacion=presentacion,
+        cantidad=None,
+        preferir_menor_cantidad_minima=True,
+    )
+
+
+def resolver_escala_para_linea(
+    *,
+    producto_id,
+    presentacion_id,
+    cantidad,
+    precio_unitario,
+    now=None,
+    presentacion=None,
+    cliente=None,
+):
+    """
+    Return (promocion, escala, descuento_monto_per_unit) for the best qualifying tier.
+    Best = greatest per-unit savings among every tier whose minimum quantity is met.
+    """
+    try:
+        qty = int(cantidad or 0)
+    except (TypeError, ValueError):
+        qty = 0
+    if qty < 1 or not producto_id:
+        return None, None, Decimal('0.00')
+
+    presentacion_id = int(presentacion_id) if presentacion_id else None
+    precio = _quantize_money(precio_unitario)
+    if presentacion is None and presentacion_id:
+        from config.productos.models import Presentacion
+        presentacion = Presentacion.objects.filter(id=presentacion_id).first()
+
+    promos = promociones_activas_queryset(now=now, cliente=cliente).filter(
+        producto_id=int(producto_id),
+    ).filter(
+        Q(presentacion__isnull=True) | Q(presentacion_id=presentacion_id)
+    )
+    candidatos = PromocionEscala.objects.filter(
+        promocion__in=promos,
+        cantidad_minima__lte=qty,
+    ).select_related('promocion')
+
+    return _mejor_escala(
+        candidatos,
+        precio=precio,
+        presentacion=presentacion,
+        cantidad=qty,
+        preferir_menor_cantidad_minima=False,
+    )
+
+
+def resolver_promocion_disponible_para_linea(
+    *,
+    producto_id,
+    presentacion_id,
+    precio_unitario,
+    now=None,
+    presentacion=None,
+    cliente=None,
+):
+    """Return (promocion_or_None, descuento_monto_per_unit) for the most attractive active promo."""
+    promo, _escala, monto = resolver_escala_disponible_para_linea(
+        producto_id=producto_id,
+        presentacion_id=presentacion_id,
+        precio_unitario=precio_unitario,
+        now=now,
+        presentacion=presentacion,
+        cliente=cliente,
+    )
+    return promo, monto
+
+
+def resolver_promocion_para_linea(
+    *,
+    producto_id,
+    presentacion_id,
+    cantidad,
+    precio_unitario,
+    now=None,
+    presentacion=None,
+    cliente=None,
+):
+    """Return (promocion_or_None, descuento_monto_per_unit) for the best qualifying promo/tier."""
+    promo, _escala, monto = resolver_escala_para_linea(
+        producto_id=producto_id,
+        presentacion_id=presentacion_id,
+        cantidad=cantidad,
+        precio_unitario=precio_unitario,
+        now=now,
+        presentacion=presentacion,
+        cliente=cliente,
+    )
+    return promo, monto
+
+
+def promociones_por_producto_ids(producto_ids, now=None, cliente=None):
     """Return {producto_id: best display Promocion} for catalog badges."""
     ids = {int(pid) for pid in (producto_ids or []) if pid}
     if not ids:
         return {}
 
     mapping = {}
-    for promo in promociones_activas_queryset(now=now).filter(producto_id__in=ids).order_by('id'):
+    for promo in promociones_activas_queryset(now=now, cliente=cliente).filter(producto_id__in=ids).order_by('id'):
         current = mapping.get(promo.producto_id)
         if current is None:
             mapping[promo.producto_id] = promo
@@ -173,14 +386,16 @@ def promociones_por_producto_ids(producto_ids, now=None):
     return mapping
 
 
-def adjuntar_promociones_a_productos(productos, now=None):
+def adjuntar_promociones_a_productos(productos, now=None, cliente=None):
     productos = list(productos or [])
-    mapping = promociones_por_producto_ids([p.id for p in productos], now=now)
+    mapping = promociones_por_producto_ids([p.id for p in productos], now=now, cliente=cliente)
     for producto in productos:
         promo = mapping.get(producto.id)
+        escala_minima = promo.escala_minima if promo else None
         producto.promocion_activa = promo
         producto.promocion_texto = promo.texto_catalogo() if promo else ''
-        producto.promocion_cantidad_minima = promo.cantidad_minima if promo else None
+        producto.promocion_escala_minima = escala_minima
+        producto.promocion_cantidad_minima = escala_minima.cantidad_minima if escala_minima else None
         producto.promocion_presentacion_id = promo.presentacion_id if promo else None
         producto.promocion_presentacion_nombre = (
             promo.presentacion.nombre if promo and promo.presentacion_id else ''
@@ -191,48 +406,6 @@ def adjuntar_promociones_a_productos(productos, now=None):
     return productos
 
 
-def resolver_promocion_disponible_para_linea(
-    *,
-    producto_id,
-    presentacion_id,
-    precio_unitario,
-    now=None,
-    presentacion=None,
-):
-    """Return the most attractive active promo even before its minimum is met."""
-    if not producto_id:
-        return None, Decimal('0.00')
-
-    presentacion_id = int(presentacion_id) if presentacion_id else None
-    precio = _quantize_money(precio_unitario)
-    if presentacion is None and presentacion_id:
-        from config.productos.models import Presentacion
-        presentacion = Presentacion.objects.filter(id=presentacion_id).first()
-
-    candidates = promociones_activas_queryset(now=now).filter(
-        producto_id=int(producto_id),
-    ).filter(
-        Q(presentacion__isnull=True) | Q(presentacion_id=presentacion_id)
-    )
-
-    best_promo = None
-    best_monto = Decimal('0.00')
-    for promo in candidates:
-        monto = calcular_descuento_monto_promocion(promo, precio, presentacion=presentacion)
-        if monto <= 0:
-            continue
-        if best_promo is None or monto > best_monto:
-            best_promo = promo
-            best_monto = monto
-        elif monto == best_monto:
-            if promo.cantidad_minima < best_promo.cantidad_minima:
-                best_promo = promo
-            elif promo.cantidad_minima == best_promo.cantidad_minima and promo.id < best_promo.id:
-                best_promo = promo
-
-    return best_promo, best_monto
-
-
 def estado_promocion_para_linea(
     *,
     producto_id,
@@ -241,6 +414,7 @@ def estado_promocion_para_linea(
     precio_unitario,
     now=None,
     presentacion=None,
+    cliente=None,
 ):
     """Build serializable UI state for an active promotion on a cart line."""
     try:
@@ -248,24 +422,27 @@ def estado_promocion_para_linea(
     except (TypeError, ValueError):
         qty = 0
 
-    applied_promo, applied_amount = resolver_promocion_para_linea(
+    applied_promo, applied_escala, applied_amount = resolver_escala_para_linea(
         producto_id=producto_id,
         presentacion_id=presentacion_id,
         cantidad=qty,
         precio_unitario=precio_unitario,
         now=now,
         presentacion=presentacion,
+        cliente=cliente,
     )
-    available_promo, available_amount = resolver_promocion_disponible_para_linea(
+    available_promo, available_escala, available_amount = resolver_escala_disponible_para_linea(
         producto_id=producto_id,
         presentacion_id=presentacion_id,
         precio_unitario=precio_unitario,
         now=now,
         presentacion=presentacion,
+        cliente=cliente,
     )
     promo = applied_promo or available_promo
+    escala = applied_escala if applied_promo else available_escala
     amount = applied_amount if applied_promo else available_amount
-    if promo is None:
+    if promo is None or escala is None:
         return {
             'available': False,
             'applied': False,
@@ -277,7 +454,7 @@ def estado_promocion_para_linea(
             'discount_amount': '0.00',
         }
 
-    minimum = int(promo.cantidad_minima)
+    minimum = int(escala.cantidad_minima)
     return {
         'available': True,
         'applied': applied_promo is not None,
@@ -290,56 +467,6 @@ def estado_promocion_para_linea(
     }
 
 
-def resolver_promocion_para_linea(
-    *,
-    producto_id,
-    presentacion_id,
-    cantidad,
-    precio_unitario,
-    now=None,
-    presentacion=None,
-):
-    """
-    Return (promocion_or_None, descuento_monto_per_unit) for the best qualifying promo.
-    Best = greatest per-unit savings.
-    """
-    try:
-        qty = int(cantidad or 0)
-    except (TypeError, ValueError):
-        qty = 0
-    if qty < 1 or not producto_id:
-        return None, Decimal('0.00')
-
-    presentacion_id = int(presentacion_id) if presentacion_id else None
-    precio = _quantize_money(precio_unitario)
-    if presentacion is None and presentacion_id:
-        from config.productos.models import Presentacion
-        presentacion = Presentacion.objects.filter(id=presentacion_id).first()
-
-    candidates = promociones_activas_queryset(now=now).filter(
-        producto_id=int(producto_id),
-        cantidad_minima__lte=qty,
-    ).filter(
-        Q(presentacion__isnull=True) | Q(presentacion_id=presentacion_id)
-    )
-
-    best_promo = None
-    best_monto = Decimal('0.00')
-    for promo in candidates:
-        monto = calcular_descuento_monto_promocion(promo, precio, presentacion=presentacion)
-        if monto <= 0:
-            continue
-        if best_promo is None or monto > best_monto:
-            best_promo = promo
-            best_monto = monto
-        elif monto == best_monto and promo.id < best_promo.id:
-            best_promo = promo
-
-    if best_promo is None:
-        return None, Decimal('0.00')
-    return best_promo, best_monto
-
-
 def _clear_promo_fields(item):
     item['descuento_aplicado'] = False
     item['descuento_monto'] = 0
@@ -350,7 +477,7 @@ def _clear_promo_fields(item):
     return item
 
 
-def aplicar_promocion_en_item_sesion(item, *, precio_unitario=None, respect_manual=True, presentacion=None):
+def aplicar_promocion_en_item_sesion(item, *, precio_unitario=None, respect_manual=True, presentacion=None, cliente=None):
     """
     Mutate a session cart line with the best active promotion discount.
 
@@ -372,6 +499,7 @@ def aplicar_promocion_en_item_sesion(item, *, precio_unitario=None, respect_manu
         cantidad=item.get('cantidad'),
         precio_unitario=precio,
         presentacion=presentacion,
+        cliente=cliente,
     )
     if promo is None:
         if origen == DESCUENTO_ORIGEN_PROMOCION or not item.get('descuento_aplicado'):
@@ -387,7 +515,7 @@ def aplicar_promocion_en_item_sesion(item, *, precio_unitario=None, respect_manu
     return item
 
 
-def aplicar_promocion_a_item_persistido(item, *, only_if_missing=True):
+def aplicar_promocion_a_item_persistido(item, *, only_if_missing=True, cliente=None):
     """
     Apply the best qualifying promotion onto a CotizacionItem or PedidoItem.
 
@@ -411,6 +539,7 @@ def aplicar_promocion_a_item_persistido(item, *, only_if_missing=True):
         cantidad=item.cantidad,
         precio_unitario=item.precio,
         presentacion=presentacion,
+        cliente=cliente,
     )
     if promo is None:
         return False
@@ -427,13 +556,14 @@ def asegurar_promociones_en_cotizacion(cotizacion, *, only_if_missing=True):
     """Persist missing promotion discounts onto quote lines that already qualify."""
     from config.cotizaciones.models import CotizacionItem
 
+    cliente = getattr(cotizacion, 'cliente', None)
     changed = False
     items = list(
         CotizacionItem.objects.filter(cotizacion=cotizacion)
         .select_related('presentacion__producto')
     )
     for item in items:
-        if aplicar_promocion_a_item_persistido(item, only_if_missing=only_if_missing):
+        if aplicar_promocion_a_item_persistido(item, only_if_missing=only_if_missing, cliente=cliente):
             item.save(update_fields=['descuento_aplicado', 'descuento_monto', 'subtotal'])
             changed = True
 
@@ -448,13 +578,14 @@ def asegurar_promociones_en_pedido(pedido, *, only_if_missing=True):
     """Persist missing promotion discounts onto order lines that already qualify."""
     from config.pedidos.models import PedidoItem
 
+    cliente = getattr(pedido, 'cliente', None)
     changed = False
     items = list(
         PedidoItem.objects.filter(pedido=pedido)
         .select_related('presentacion__producto')
     )
     for item in items:
-        if aplicar_promocion_a_item_persistido(item, only_if_missing=only_if_missing):
+        if aplicar_promocion_a_item_persistido(item, only_if_missing=only_if_missing, cliente=cliente):
             item.save(update_fields=['descuento_aplicado', 'descuento_monto', 'subtotal'])
             changed = True
 

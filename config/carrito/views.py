@@ -11,6 +11,14 @@ from django.shortcuts import render
 from django.utils.translation import gettext as _
 
 
+def _cliente_from_request(request):
+    if not getattr(request.user, "is_authenticated", False):
+        return None
+    if getattr(request.user, "role", "") != "cliente":
+        return None
+    return Cliente.objects.only("nivel_precio", "estado_revision", "tipo_cliente").filter(usuario=request.user).first()
+
+
 def _get_request_price_tier(request):
     if not getattr(request.user, "is_authenticated", False):
         return 1
@@ -36,6 +44,7 @@ def _get_request_price_for_presentacion(request, presentacion):
 
 def ver_cotizacion(request):
 
+    cliente = _cliente_from_request(request)
     carrito = request.session.get("carrito", {})
     carrito_items = []
     total = 0
@@ -44,7 +53,7 @@ def ver_cotizacion(request):
 
         producto = Producto.objects.get(id=producto_id)
         item["producto_id"] = producto.id
-        aplicar_promocion_en_item_sesion(item, precio_unitario=item.get("precio", 0))
+        aplicar_promocion_en_item_sesion(item, precio_unitario=item.get("precio", 0), cliente=cliente)
 
         precio = item.get("precio", 0)
         subtotal = float(calcular_subtotal_item_pedido(
@@ -81,6 +90,7 @@ def ver_cotizacion(request):
 @require_POST
 def actualizar_cantidad(request):
 
+    cliente = _cliente_from_request(request)
     producto_id = request.POST.get("producto_id")
     accion = request.POST.get("accion")
 
@@ -113,6 +123,7 @@ def actualizar_cantidad(request):
         aplicar_promocion_en_item_sesion(
             carrito[producto_id],
             precio_unitario=carrito[producto_id].get("precio", 0),
+            cliente=cliente,
         )
 
         precio = carrito[producto_id].get("precio", 0)
@@ -136,6 +147,7 @@ def actualizar_cantidad(request):
         presentacion_id=item.get("presentacion_id"),
         cantidad=item.get("cantidad"),
         precio_unitario=item.get("precio", 0),
+        cliente=cliente,
     )
     return JsonResponse({
         "success": True,
@@ -149,6 +161,7 @@ def actualizar_cantidad(request):
 @require_POST
 def cambiar_presentacion(request):
 
+    cliente = _cliente_from_request(request)
     producto_id = request.POST.get("producto_id")
     presentacion_id = request.POST.get("presentacion_id")
 
@@ -168,7 +181,7 @@ def cambiar_presentacion(request):
         carrito[producto_id]["presentacion_id"] = presentacion.id
         carrito[producto_id]["producto_id"] = presentacion.producto_id
         carrito[producto_id]["precio"] = precio_actual
-        aplicar_promocion_en_item_sesion(carrito[producto_id], precio_unitario=precio_actual)
+        aplicar_promocion_en_item_sesion(carrito[producto_id], precio_unitario=precio_actual, cliente=cliente)
 
         cantidad = carrito[producto_id]["cantidad"]
         subtotal = float(calcular_subtotal_item_pedido(
@@ -196,6 +209,7 @@ def cambiar_presentacion(request):
             presentacion_id=carrito[producto_id].get("presentacion_id"),
             cantidad=carrito[producto_id].get("cantidad"),
             precio_unitario=carrito[producto_id].get("precio", 0),
+            cliente=cliente,
         )
         return JsonResponse({
             "precio": precio_actual,
@@ -230,6 +244,7 @@ def eliminar_producto(request):
 @require_POST
 def agregar_carrito(request):
 
+    cliente = _cliente_from_request(request)
     producto_id = request.POST.get("producto_id")
     presentacion_id = request.POST.get("presentacion_id")
     cantidad = int(request.POST.get("cantidad"))
@@ -264,7 +279,7 @@ def agregar_carrito(request):
             "cantidad": cantidad,
         }
 
-    aplicar_promocion_en_item_sesion(carrito[producto_id], precio_unitario=precio_actual)
+    aplicar_promocion_en_item_sesion(carrito[producto_id], precio_unitario=precio_actual, cliente=cliente)
     carrito[producto_id]["subtotal"] = float(calcular_subtotal_item_pedido(
         precio=carrito[producto_id]["precio"],
         cantidad=carrito[producto_id]["cantidad"],

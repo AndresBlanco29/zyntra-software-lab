@@ -12,15 +12,21 @@
 <form method="get" id="productos-filter-form" class="admin-toolbar-filters admin-toolbar-filters-wide">
   <div class="row g-2">
     <div class="col-12 col-md-4">
-      <input
-        type="search"
-        id="buscador"
-        name="q"
-        value="{{ filter_q }}"
-        class="form-control"
-        placeholder="{% trans 'Buscar...' %}"
-        autocomplete="off"
-      >
+      <div class="input-group admin-search-group">
+        <input
+          type="search"
+          id="buscador"
+          name="q"
+          value="{{ filter_q }}"
+          class="form-control"
+          placeholder="{% trans 'Buscar...' %}"
+          autocomplete="off"
+          enterkeyhint="search"
+        >
+        <button type="submit" class="btn btn-outline-primary admin-search-submit" aria-label="{% trans 'Search' %}">
+          <i class="bi bi-search" aria-hidden="true"></i>
+        </button>
+      </div>
     </div>
     <div class="col-12 col-md-4">
       <select id="filtroCategoria" name="categoria" class="form-select">
@@ -217,11 +223,20 @@ document.addEventListener('DOMContentLoaded', function() {
   const filtroMarca = document.getElementById('filtroMarca');
 
   function submitFilters() {
+    if (window.PreserveSearchFocus && buscador) {
+      window.PreserveSearchFocus.remember(buscador);
+    }
     form.submit();
   }
 
-  if (window.PreserveSearchFocus) {
-    window.PreserveSearchFocus.bindDebouncedSearch(buscador, submitFilters);
+  form.addEventListener('submit', function () {
+    if (window.PreserveSearchFocus && buscador) {
+      window.PreserveSearchFocus.remember(buscador);
+    }
+  });
+
+  if (window.PreserveSearchFocus && buscador) {
+    window.PreserveSearchFocus.bindEnterOnlySearch(buscador, submitFilters);
   }
 
   filtroCategoria.addEventListener('change', submitFilters);

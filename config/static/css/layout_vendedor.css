@@ -739,6 +739,23 @@ box-sizing:border-box;
     max-width: 30%;
 }
 
+.admin-search-group .admin-search-submit {
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.admin-search-group .form-control[type="search"] {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.admin-search-group .admin-search-submit {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
 /* WIDGET IDIOMA */
 .language-widget {
     position: fixed;

@@ -1,5 +1,6 @@
 body {
     background-color: #f4f6f9;
+    overflow-x: hidden;
 }
 
 .cart-promo-row {
@@ -480,9 +481,11 @@ transform:translateY(0);
     .main-content {
         margin-left: 0;
         width: 100%;
+        max-width: 100%;
         height: auto;
         min-height: calc(100vh - 70px);
         padding: 20px;
+        overflow-x: hidden;
     }
 
     .sidebar {
@@ -510,18 +513,105 @@ transform:translateY(0);
         display: block;
     }
 
-    .table-responsive {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
+    .navbar-custom .container-fluid {
+        flex-wrap: wrap;
+        gap: 0.35rem;
     }
 
-    .table-responsive .table {
-        min-width: 760px;
+    .navbar-custom .ms-auto {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        max-width: 100%;
     }
 
     /* Panel derecho: cuando apila encima de la tabla en móvil */
     .col-lg-3 .card.custom-card {
         margin-bottom: 1.25rem;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .table-responsive {
+        overflow-x: visible;
+    }
+
+    #tablaProductos {
+        min-width: 0;
+        width: 100%;
+    }
+
+    #tablaProductos thead {
+        display: none;
+    }
+
+    #tablaProductos tbody tr {
+        display: block;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        background: #fff;
+    }
+
+    #tablaProductos tbody tr.cart-promo-row {
+        border-color: #fdba74;
+        background: linear-gradient(180deg, #fffaf0 0%, #fff 100%);
+    }
+
+    #tablaProductos tbody td {
+        display: block;
+        width: 100%;
+        padding: 0.65rem 0;
+        border: none;
+        white-space: normal;
+    }
+
+    #tablaProductos tbody td::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 0.35rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #64748b;
+    }
+
+    #tablaProductos tbody td:first-child {
+        padding-top: 0;
+    }
+
+    #tablaProductos tbody td:last-child {
+        padding-bottom: 0;
+    }
+
+    .cart-promo-message {
+        max-width: 100%;
+    }
+
+    .nombre-producto {
+        flex-direction: row;
+        align-items: flex-start !important;
+    }
+
+    .nombre-producto img {
+        flex-shrink: 0;
+    }
+
+    .nombre-producto > div {
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .product-shipment-summary .invoice-summary-box {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.35rem;
+    }
+
+    .product-shipment-summary .invoice-summary-box__label {
+        min-width: 0;
+        width: 100%;
     }
 }
 
@@ -558,11 +648,6 @@ transform:translateY(0);
     .navbar-custom .ms-auto .btn {
         padding: 4px 8px !important;
         font-size: 12px !important;
-    }
-
-    /* Tabla más estrecha en telefono pequeño */
-    .table-responsive .table {
-        min-width: 520px;
     }
 
     /* Panel resumen: padding reducido */

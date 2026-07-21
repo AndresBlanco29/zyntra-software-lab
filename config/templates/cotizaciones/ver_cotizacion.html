@@ -141,7 +141,7 @@ La Tortilla Grocery
 {% for item in carrito %}
 <tr data-id="{{ item.id }}" {% if item.promocion_estado.available %}class="cart-promo-row"{% endif %}>
 
-<td>
+<td data-label="{% trans 'Product' %}">
 <div class="d-flex align-items-start gap-3 nombre-producto">
 
 {% if item.producto.imagen %}
@@ -182,7 +182,7 @@ alt="{% trans 'No product image' %}">
 </td>
 
 
-<td>
+<td data-label="{% trans 'Presentation' %}">
 
 <select class="form-select form-select-sm presentacion-select">
 
@@ -221,7 +221,7 @@ data-tipo="{{ p.tipo_contenido_traducido|lower }}"
 </td>
 
 
-<td>
+<td data-label="{% trans 'Quantity' %}">
 
 <div class="d-flex align-items-center gap-2">
 
@@ -245,7 +245,7 @@ aria-label="{% trans 'Quantity' %}"
 </td>
 
 
-<td>
+<td data-label="{% trans 'Actions' %}">
 
 <button class="btn btn-sm btn-danger eliminar-btn">
 🗑

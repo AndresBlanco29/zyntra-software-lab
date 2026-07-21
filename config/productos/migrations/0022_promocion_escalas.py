@@ -6,7 +6,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('clientes', '0015_tipocliente'),
-        ('productos', '0021_presentacion_pallet_fields'),
+        ('productos', '0022_promocion'),
     ]
 
     operations = [

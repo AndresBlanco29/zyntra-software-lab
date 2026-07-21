@@ -34,8 +34,32 @@
     placeholder="{% trans 'Search by order #, customer, selector, or status' %}"
     autocomplete="off"
   >
+  {% if view_mode == 'sent-to-driver' %}
+  <input
+    type="date"
+    name="date_from"
+    value="{{ date_from }}"
+    class="form-control"
+    style="max-width: 180px;"
+    aria-label="{% trans 'Sent from' %}"
+    title="{% trans 'Sent from' %}"
+  >
+  <input
+    type="date"
+    name="date_to"
+    value="{{ date_to }}"
+    class="form-control"
+    style="max-width: 180px;"
+    aria-label="{% trans 'Sent to' %}"
+    title="{% trans 'Sent to' %}"
+  >
+  <select name="sort" class="form-select" style="max-width: 220px;" aria-label="{% trans 'Sort by sent date' %}">
+    <option value="desc"{% if sort_dir == 'desc' %} selected{% endif %}>{% trans "Newest sent first" %}</option>
+    <option value="asc"{% if sort_dir == 'asc' %} selected{% endif %}>{% trans "Oldest sent first" %}</option>
+  </select>
+  {% endif %}
   <button type="submit" class="btn btn-outline-primary">{% trans "Search" %}</button>
-  {% if search_query %}
+  {% if search_query or date_from or date_to or sort_dir == 'asc' %}
   <a href="{% url 'backoffice_pedidos' %}?view={{ view_mode }}" class="btn btn-outline-secondary">{% trans "Clear" %}</a>
   {% endif %}
 </form>
@@ -60,7 +84,7 @@
           <th>{% trans "Origin" %}</th>
           <th>{% trans "Status" %}</th>
           <th>{% trans "Total" %}</th>
-          <th>{% trans "Date" %}</th>
+          <th>{% if view_mode == 'sent-to-driver' %}{% trans "Sent to driver" %}{% else %}{% trans "Date" %}{% endif %}</th>
           <th>{% trans "Action" %}</th>
         </tr>
       </thead>
@@ -96,7 +120,7 @@
             </div>
           </td>
           <td data-label="{% trans 'Total' %}">${{ row.total }}</td>
-          <td data-label="{% trans 'Date' %}">{{ row.date|date:"m/d/Y H:i" }}</td>
+          <td data-label="{% if view_mode == 'sent-to-driver' %}{% trans 'Sent to driver' %}{% else %}{% trans 'Date' %}{% endif %}">{{ row.date|date:"m/d/Y H:i" }}</td>
           <td data-label="{% trans 'Action' %}" class="mobile-stack-table__action">
             <a href="{{ row.detail_url }}" class="btn btn-sm btn-warning">{% trans "Manage" %}</a>
           </td>
@@ -110,7 +134,7 @@
     </table>
   </div>
 
-  {% pagination_controls page_obj aria_label=_('Order pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0 px-3 pb-3" view=view_mode q=search_query %}
+  {% pagination_controls page_obj aria_label=_('Order pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0 px-3 pb-3" view=view_mode q=search_query sort=sort_dir date_from=date_from date_to=date_to %}
 </div>
 
 <style>

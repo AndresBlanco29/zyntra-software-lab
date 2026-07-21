@@ -946,7 +946,7 @@ def _invoice_pdf_response(invoice):
 	item_rows = _build_invoice_pdf_item_data(invoice)
 	item_column_widths = _invoice_pdf_item_table_column_widths(content_width)
 	left_footer_width = item_column_widths[0] + item_column_widths[1]
-	document_date = format_local_date(resolve_invoice_sale_reference_date(invoice)) or format_local_date(invoice.creada_en)
+	document_date = format_local_datetime(timezone.now())
 
 	content = []
 	meta_table = Table([

@@ -459,11 +459,16 @@ def ensure_delivery_for_invoice(invoice):
 	if invoice.metodo_entrega != 'RUTA_DRIVER':
 		return None
 	if hasattr(invoice, 'delivery'):
-		return invoice.delivery
+		delivery = invoice.delivery
+		if delivery.sent_to_driver_at is None:
+			delivery.sent_to_driver_at = timezone.now()
+			delivery.save(update_fields=['sent_to_driver_at', 'updated_at'])
+		return delivery
 	cliente = invoice.cliente
 	return Delivery.objects.create(
 		invoice=invoice,
 		driver=invoice.driver,
+		sent_to_driver_at=timezone.now(),
 		delivery_address=cliente.direccion,
 		delivery_city=cliente.ciudad,
 		delivery_state=cliente.estado,

@@ -3927,9 +3927,8 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(response['Content-Type'], 'application/pdf')
 		self.assertGreater(len(response.content), 500)
 		self.assertIn(b'%PDF', response.content[:8])
-		from config.core.datetime_formats import format_local_date
-		from config.facturacion.services import resolve_invoice_sale_reference_date
-		expected_date = format_local_date(resolve_invoice_sale_reference_date(invoice))
+		from config.core.datetime_formats import format_local_datetime
+		expected_date = format_local_datetime(timezone.now())
 		self.assertTrue(expected_date)
 		# Shipment labels are covered by the dedicated summary-table unit test;
 		# this asserts the full invoice PDF still builds with a document date.

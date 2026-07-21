@@ -283,6 +283,7 @@ class Delivery(models.Model):
 	)
 	client_unlocked_at = models.DateTimeField(blank=True, null=True)
 	estimated_delivery_at = models.DateTimeField(blank=True, null=True)
+	sent_to_driver_at = models.DateTimeField(blank=True, null=True, db_index=True)
 	route_started_at = models.DateTimeField(blank=True, null=True)
 	delivered_at = models.DateTimeField(blank=True, null=True)
 	notifications_sent_at = models.DateTimeField(blank=True, null=True)

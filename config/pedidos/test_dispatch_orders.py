@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.test import TestCase
+from django.utils import timezone
 
 from config.clientes.models import Cliente
 from config.facturacion.models import Delivery, Invoice
@@ -182,6 +183,78 @@ class DispatchOrderClassificationTests(TestCase):
 		self.assertEqual(verified_row.status_label, 'Picking adjusted and returned')
 		self.assertEqual(driver_row.status_label, 'Sent to driver')
 		self.assertEqual(driver_row.workflow_badge['label'], self.driver.username)
+
+	def test_sent_to_driver_tab_uses_sent_to_driver_timestamp(self):
+		older_pedido = self._create_verified_pedido()
+		newer_pedido = self._create_verified_pedido()
+		older_invoice = generar_invoice_desde_picking(
+			pedido=older_pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		newer_invoice = generar_invoice_desde_picking(
+			pedido=newer_pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		older_delivery = ensure_delivery_for_invoice(older_invoice)
+		newer_delivery = ensure_delivery_for_invoice(newer_invoice)
+		older_sent_at = timezone.now() - timezone.timedelta(days=2)
+		newer_sent_at = timezone.now() - timezone.timedelta(hours=1)
+		Delivery.objects.filter(id=older_delivery.id).update(sent_to_driver_at=older_sent_at)
+		Delivery.objects.filter(id=newer_delivery.id).update(sent_to_driver_at=newer_sent_at)
+		newer_delivery.refresh_from_db()
+
+		_, page_obj = build_dispatch_order_page(view_mode='sent-to-driver', page_number=1, page_size=50)
+		order_rows = [row for row in page_obj if row.record_type == 'order']
+		self.assertGreaterEqual(len(order_rows), 2)
+		self.assertEqual(order_rows[0].source_id, newer_pedido.id)
+		self.assertEqual(order_rows[0].date, newer_delivery.sent_to_driver_at)
+
+		_, asc_page = build_dispatch_order_page(
+			view_mode='sent-to-driver',
+			page_number=1,
+			page_size=50,
+			sort_dir='asc',
+		)
+		asc_rows = [row for row in asc_page if row.record_type == 'order']
+		self.assertEqual(asc_rows[0].source_id, older_pedido.id)
+
+	def test_sent_to_driver_tab_filters_by_sent_date_range(self):
+		in_range_pedido = self._create_verified_pedido()
+		out_of_range_pedido = self._create_verified_pedido()
+		in_range_invoice = generar_invoice_desde_picking(
+			pedido=in_range_pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		out_of_range_invoice = generar_invoice_desde_picking(
+			pedido=out_of_range_pedido,
+			metodo_entrega='RUTA_DRIVER',
+			driver=self.driver,
+			usuario=self.backoffice,
+		)
+		in_range_delivery = ensure_delivery_for_invoice(in_range_invoice)
+		out_of_range_delivery = ensure_delivery_for_invoice(out_of_range_invoice)
+		in_range_sent_at = timezone.localtime().replace(hour=10, minute=0, second=0, microsecond=0)
+		out_of_range_sent_at = in_range_sent_at - timezone.timedelta(days=10)
+		Delivery.objects.filter(id=in_range_delivery.id).update(sent_to_driver_at=in_range_sent_at)
+		Delivery.objects.filter(id=out_of_range_delivery.id).update(sent_to_driver_at=out_of_range_sent_at)
+
+		filter_day = in_range_sent_at.date().isoformat()
+		_, page_obj = build_dispatch_order_page(
+			view_mode='sent-to-driver',
+			page_number=1,
+			page_size=50,
+			date_from=filter_day,
+			date_to=filter_day,
+		)
+		order_ids = {row.source_id for row in page_obj if row.record_type == 'order'}
+		self.assertIn(in_range_pedido.id, order_ids)
+		self.assertNotIn(out_of_range_pedido.id, order_ids)
 
 	def test_completed_dispatch_order_shows_completed_status(self):
 		pedido = self._create_verified_pedido()

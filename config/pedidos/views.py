@@ -427,11 +427,19 @@ def backoffice_dashboard(request):
 @internal_permission_required('backoffice.orders.view')
 def backoffice_pedidos(request):
 	search_query = (request.GET.get('q') or '').strip()
+	sort_dir = (request.GET.get('sort') or 'desc').strip().lower()
+	if sort_dir not in {'asc', 'desc'}:
+		sort_dir = 'desc'
+	date_from = (request.GET.get('date_from') or '').strip()
+	date_to = (request.GET.get('date_to') or '').strip()
 	view_mode, page_obj = build_dispatch_order_page(
 		view_mode=request.GET.get('view'),
 		page_number=request.GET.get('page'),
 		page_size=BACKOFFICE_PEDIDOS_PAGE_SIZE,
 		search_term=search_query,
+		sort_dir=sort_dir,
+		date_from=date_from,
+		date_to=date_to,
 	)
 	counts = get_dispatch_order_counts()
 	return render(request, 'backoffice/pedidos_lista.html', {
@@ -439,6 +447,9 @@ def backoffice_pedidos(request):
 		'page_obj': page_obj,
 		'view_mode': view_mode,
 		'search_query': search_query,
+		'sort_dir': sort_dir,
+		'date_from': date_from,
+		'date_to': date_to,
 		**counts,
 	})
 
@@ -1396,7 +1407,7 @@ def backoffice_picking_pdf(request, pedido_id):
 	styles = getSampleStyleSheet()
 	summary_label_style = ParagraphStyle('PickingSummaryLabel', parent=styles['BodyText'], fontName='Helvetica-Bold', fontSize=9, textColor=BRAND_MUTED_TEXT, leading=11)
 	summary_value_style = ParagraphStyle('PickingSummaryValue', parent=styles['BodyText'], fontSize=10, textColor=BRAND_TEXT, leading=12)
-	document_date = format_local_date(pedido.picking_verificado_en or pedido.creada_en) or format_local_date(timezone.now())
+	document_date = format_local_datetime(timezone.now())
 
 	content = [
 		build_pdf_brand_banner(
@@ -1507,7 +1518,7 @@ def backoffice_inventory_needs_pdf(request, pedido_id):
 		id=pedido_id,
 	)
 	analysis = build_pedido_inventory_needs_analysis(pedido=pedido)
-	document_date = format_local_date(timezone.now()) or '-'
+	document_date = format_local_datetime(timezone.now()) or '-'
 
 	buffer = BytesIO()
 	document = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36)

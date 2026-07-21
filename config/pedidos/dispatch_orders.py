@@ -1,10 +1,12 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime, time
 from decimal import Decimal
 from typing import Optional
 
 from django.core.paginator import Paginator
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django.utils.translation import gettext as _
 
 from config.core.workflow_badges import build_order_workflow_badge, build_quote_workflow_badge
@@ -160,6 +162,24 @@ def _get_pedido_delivery(pedido):
 
 	invoice = _safe_related(pedido, 'invoice')
 	return _safe_related(invoice, 'delivery')
+
+
+def _pedido_sent_to_driver_at(pedido):
+	delivery = _get_pedido_delivery(pedido)
+	if delivery and delivery.sent_to_driver_at:
+		return delivery.sent_to_driver_at
+	if delivery and delivery.created_at:
+		return delivery.created_at
+	invoice = getattr(pedido, 'invoice', None)
+	if invoice and invoice.creada_en:
+		return invoice.creada_en
+	return pedido.creada_en
+
+
+def _pedido_row_date(pedido, *, bucket):
+	if bucket == 'sent-to-driver':
+		return _pedido_sent_to_driver_at(pedido)
+	return pedido.creada_en
 
 
 def _pedido_manage_url(pedido):
@@ -376,7 +396,7 @@ def _pedido_rows_from_pedidos(*, pedidos, bucket):
 				status_label=status_label,
 				status_badge_class=status_badge_class,
 				total=pedido.total,
-				date=pedido.creada_en,
+				date=_pedido_row_date(pedido, bucket=bucket),
 				detail_url=_pedido_manage_url(pedido),
 				workflow_badge=build_order_workflow_badge(pedido),
 				display_ref=pedido.numero_display,
@@ -460,7 +480,52 @@ def _filter_dispatch_rows(rows, *, search_term):
 	return [row for row in rows if _matches_dispatch_search(row, search_term)]
 
 
-def build_dispatch_order_page(*, view_mode, page_number, page_size, search_term=''):
+def _parse_dispatch_date_filter(value):
+	parsed = parse_date((value or '').strip())
+	return parsed
+
+
+def _filter_dispatch_rows_by_date(rows, *, date_from='', date_to=''):
+	start = _parse_dispatch_date_filter(date_from)
+	end = _parse_dispatch_date_filter(date_to)
+	if not start and not end:
+		return rows
+
+	tz = timezone.get_current_timezone()
+	start_dt = timezone.make_aware(datetime.combine(start, time.min), tz) if start else None
+	end_dt = timezone.make_aware(datetime.combine(end, time.max), tz) if end else None
+
+	filtered_rows = []
+	for row in rows:
+		row_date = row.date
+		if row_date is None:
+			continue
+		if timezone.is_naive(row_date):
+			row_date = timezone.make_aware(row_date, tz)
+		local_row_date = timezone.localtime(row_date)
+		if start_dt and local_row_date < start_dt:
+			continue
+		if end_dt and local_row_date > end_dt:
+			continue
+		filtered_rows.append(row)
+	return filtered_rows
+
+
+def _sort_dispatch_rows(rows, *, view_mode, sort_dir=''):
+	reverse = (sort_dir or 'desc') != 'asc'
+	min_date = timezone.make_aware(datetime.min, timezone.get_current_timezone())
+
+	def sort_key(row):
+		return row.date or min_date
+
+	if view_mode == 'sent-to-driver':
+		rows.sort(key=sort_key, reverse=reverse)
+	else:
+		rows.sort(key=sort_key, reverse=True)
+	return rows
+
+
+def build_dispatch_order_page(*, view_mode, page_number, page_size, search_term='', sort_dir='', date_from='', date_to=''):
 	view_mode = _normalize_dispatch_view_mode(view_mode)
 	pedidos = list(_pedido_base_queryset())
 	quotes = _load_open_quotes()
@@ -470,6 +535,8 @@ def build_dispatch_order_page(*, view_mode, page_number, page_size, search_term=
 	rows.extend(_quote_rows_from_quotes(quotes=selected_bucket['quotes'], bucket=view_mode))
 
 	rows = _filter_dispatch_rows(rows, search_term=search_term)
-	rows.sort(key=lambda row: row.date, reverse=True)
+	if view_mode == 'sent-to-driver':
+		rows = _filter_dispatch_rows_by_date(rows, date_from=date_from, date_to=date_to)
+	rows = _sort_dispatch_rows(rows, view_mode=view_mode, sort_dir=sort_dir)
 	page_obj = Paginator(rows, page_size).get_page(page_number)
 	return view_mode, page_obj

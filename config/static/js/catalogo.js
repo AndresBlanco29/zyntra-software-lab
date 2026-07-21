@@ -95,6 +95,67 @@ document.addEventListener('DOMContentLoaded', function() {
         window.setInterval(tickPromoCountdowns, 1000);
     }
 
+    function applyPromoDiscountsPanelPlacement(panel) {
+        const useSidePanel = window.matchMedia('(min-width: 768px)').matches;
+        panel.classList.remove('offcanvas-bottom', 'offcanvas-end');
+        panel.classList.add(useSidePanel ? 'offcanvas-end' : 'offcanvas-bottom');
+    }
+
+    function initPromoDiscountsPanel() {
+        const panel = document.getElementById('promoDiscountsPanel');
+        const panelTitle = document.getElementById('promoDiscountsPanelTitle');
+        const panelDesc = document.getElementById('promoDiscountsPanelDesc');
+        const panelList = document.getElementById('promoDiscountsPanelList');
+        const buttons = document.querySelectorAll('.js-promo-discounts-btn');
+
+        if (!panel || !panelTitle || !panelDesc || !panelList || !buttons.length) {
+            return;
+        }
+
+        const baseTitle = document.body.dataset.promoDiscountsTitle || 'Available discounts';
+        let offcanvasInstance = null;
+
+        function getOffcanvasInstance() {
+            if (!offcanvasInstance) {
+                offcanvasInstance = bootstrap.Offcanvas.getOrCreateInstance(panel);
+            }
+            return offcanvasInstance;
+        }
+
+        buttons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                const template = button.parentElement.querySelector('.js-promo-discounts-template');
+                if (!template) {
+                    return;
+                }
+
+                const productName = (button.dataset.productName || '').trim();
+                panelTitle.textContent = productName
+                    ? baseTitle + ' · ' + productName
+                    : baseTitle;
+
+                const description = (button.dataset.promoDescription || '').trim();
+                if (description) {
+                    panelDesc.textContent = description;
+                    panelDesc.hidden = false;
+                } else {
+                    panelDesc.textContent = '';
+                    panelDesc.hidden = true;
+                }
+
+                panelList.innerHTML = template.innerHTML.trim();
+                applyPromoDiscountsPanelPlacement(panel);
+                getOffcanvasInstance().show();
+            });
+        });
+
+        window.addEventListener('resize', function () {
+            if (panel.classList.contains('show')) {
+                applyPromoDiscountsPanelPlacement(panel);
+            }
+        });
+    }
+
     function submitCatalogFilters() {
         const form = document.getElementById('catalogo-filter-form');
         if (form) {
@@ -276,4 +337,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
     syncMyOrderAttention(document.body.dataset.cartCount || 0);
     initPromoCountdowns();
+    initPromoDiscountsPanel();
 });

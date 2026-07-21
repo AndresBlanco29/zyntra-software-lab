@@ -33,7 +33,8 @@ data-countdown-days="{% trans 'days' %}"
 data-countdown-hours="{% trans 'hours' %}"
 data-countdown-minutes="{% trans 'minutes' %}"
 data-countdown-seconds="{% trans 'seconds' %}"
-data-countdown-ended="{% trans 'Promotion ended' %}">
+data-countdown-ended="{% trans 'Promotion ended' %}"
+data-promo-discounts-title="{% trans 'Available discounts' %}">
 
     <!-- NAVBAR -->
     <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
@@ -306,6 +307,23 @@ data-countdown-ended="{% trans 'Promotion ended' %}">
 
         </div>
     </div>
+
+    <div
+      class="offcanvas offcanvas-bottom promo-discounts-offcanvas"
+      tabindex="-1"
+      id="promoDiscountsPanel"
+      aria-labelledby="promoDiscountsPanelTitle"
+    >
+      <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="promoDiscountsPanelTitle">{% trans "Available discounts" %}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="{% trans 'Close' %}"></button>
+      </div>
+      <div class="offcanvas-body">
+        <p class="promo-discounts-description small mb-3" id="promoDiscountsPanelDesc" hidden></p>
+        <div id="promoDiscountsPanelList"></div>
+      </div>
+    </div>
+
     <script src="{% static 'js/preserve-search-focus.js' %}"></script>
     <script src="{% static 'js/catalog_quantity.js' %}"></script>
     <script src="{% static 'js/catalogo.js' %}"></script>

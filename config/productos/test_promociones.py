@@ -475,7 +475,7 @@ class PromocionPersistenceTests(TestCase):
         self.assertContains(response, 'Promotion')
         self.assertContains(response, 'Buy 5 get 20%')
         self.assertContains(response, 'Add Promotion to Order')
-        self.assertContains(response, 'Minimum: 5 units')
+        self.assertContains(response, 'View discounts')
         self.assertContains(response, 'There are products on promotion!')
 
     def test_catalogo_shows_all_promotion_tiers(self):
@@ -493,8 +493,9 @@ class PromocionPersistenceTests(TestCase):
         client.force_login(self.user)
         response = client.get(reverse('catalogo'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Minimum: 10 units')
-        self.assertContains(response, 'Minimum: 20 units')
+        self.assertContains(response, 'View discounts')
+        self.assertContains(response, '10+ units')
+        self.assertContains(response, '20+ units')
         self.assertContains(response, 'Get USD 0.25 off/unit.')
         self.assertContains(response, 'Get USD 0.50 off/unit.')
 

@@ -1,0 +1,17 @@
+{% load i18n %}
+<li class="promo-discounts-list__item">
+  <span class="promo-discounts-list__qty">
+    {% blocktrans with minimum=escala.cantidad_minima %}{{ minimum }}+ units{% endblocktrans %}
+  </span>
+  <span class="promo-discounts-list__benefit">
+    {% if escala.tipo_beneficio == 'PERCENT' %}
+      {% blocktrans with value=escala.valor_beneficio %}Get {{ value }}% off.{% endblocktrans %}
+    {% elif escala.tipo_beneficio == 'FREE_UNITS' %}
+      {% blocktrans with value=escala.unidades_gratis %}Get {{ value }} free unit(s).{% endblocktrans %}
+    {% elif escala.tipo_beneficio == 'PRECIO_ESPECIAL' %}
+      {% blocktrans with value=escala.valor_beneficio %}Special price: USD {{ value }}/unit.{% endblocktrans %}
+    {% else %}
+      {% blocktrans with value=escala.valor_beneficio %}Get USD {{ value }} off/unit.{% endblocktrans %}
+    {% endif %}
+  </span>
+</li>

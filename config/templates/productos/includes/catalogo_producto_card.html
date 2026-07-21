@@ -38,52 +38,24 @@
       </div>
 
       {% if producto.promocion_activa %}
-      <div class="promo-offer-panel mb-3">
-          {% for escala in producto.promocion_escalas %}
-          <div class="promo-tier{% if not forloop.first %} promo-tier--stacked{% endif %}">
-              <div class="promo-minimum promo-minimum--compact">
-                  <i class="bi bi-cart-check-fill" aria-hidden="true"></i>
-                  {% blocktrans with minimum=escala.cantidad_minima %}
-                  Minimum: {{ minimum }} units
-                  {% endblocktrans %}
-              </div>
-              <div class="promo-detail promo-detail--compact">
-                  {% if escala.tipo_beneficio == 'PERCENT' %}
-                      {% blocktrans with value=escala.valor_beneficio %}
-                      Get {{ value }}% off.
-                      {% endblocktrans %}
-                  {% elif escala.tipo_beneficio == 'FREE_UNITS' %}
-                      {% blocktrans with value=escala.unidades_gratis %}
-                      Get {{ value }} free unit(s).
-                      {% endblocktrans %}
-                  {% elif escala.tipo_beneficio == 'PRECIO_ESPECIAL' %}
-                      {% blocktrans with value=escala.valor_beneficio %}
-                      Special price: USD {{ value }}/unit.
-                      {% endblocktrans %}
-                  {% else %}
-                      {% blocktrans with value=escala.valor_beneficio %}
-                      Get USD {{ value }} off/unit.
-                      {% endblocktrans %}
-                  {% endif %}
-              </div>
-          </div>
-          {% endfor %}
-
-          {% if producto.promocion_texto != producto.promocion_activa.nombre %}
+      <div class="promo-discount-trigger-wrap mb-2">
           <button
             type="button"
-            class="btn btn-link btn-sm promo-view-btn p-0 mt-2"
-            data-bs-toggle="collapse"
-            data-bs-target="#promoDetails-{{ card_prefix|default:'cat' }}-{{ producto.id }}"
-            aria-expanded="false"
-            aria-controls="promoDetails-{{ card_prefix|default:'cat' }}-{{ producto.id }}"
+            class="btn btn-sm promo-discounts-btn w-100 js-promo-discounts-btn"
+            data-product-name="{{ producto.nombre_traducido|escape }}"
+            data-promo-description="{{ producto.promocion_texto|escape }}"
+            aria-controls="promoDiscountsPanel"
           >
-            {% trans "View promotion" %}
+              <i class="bi bi-tags-fill" aria-hidden="true"></i>
+              {% trans "View discounts" %}
           </button>
-          <div class="collapse mt-2" id="promoDetails-{{ card_prefix|default:'cat' }}-{{ producto.id }}">
-            <div class="promo-description">{{ producto.promocion_texto }}</div>
-          </div>
-          {% endif %}
+          <template class="js-promo-discounts-template">
+              <ul class="promo-discounts-list list-unstyled mb-0">
+                  {% for escala in producto.promocion_escalas %}
+                  {% include "productos/includes/catalogo_promo_escala_item.html" %}
+                  {% endfor %}
+              </ul>
+          </template>
       </div>
       {% endif %}
 

@@ -375,7 +375,12 @@ def promociones_por_producto_ids(producto_ids, now=None, cliente=None):
         return {}
 
     mapping = {}
-    for promo in promociones_activas_queryset(now=now, cliente=cliente).filter(producto_id__in=ids).order_by('id'):
+    for promo in (
+        promociones_activas_queryset(now=now, cliente=cliente)
+        .filter(producto_id__in=ids)
+        .prefetch_related('escalas')
+        .order_by('id')
+    ):
         current = mapping.get(promo.producto_id)
         if current is None:
             mapping[promo.producto_id] = promo
@@ -391,9 +396,11 @@ def adjuntar_promociones_a_productos(productos, now=None, cliente=None):
     mapping = promociones_por_producto_ids([p.id for p in productos], now=now, cliente=cliente)
     for producto in productos:
         promo = mapping.get(producto.id)
-        escala_minima = promo.escala_minima if promo else None
+        escalas = list(promo.escalas.all()) if promo else []
+        escala_minima = escalas[0] if escalas else None
         producto.promocion_activa = promo
         producto.promocion_texto = promo.texto_catalogo() if promo else ''
+        producto.promocion_escalas = escalas
         producto.promocion_escala_minima = escala_minima
         producto.promocion_cantidad_minima = escala_minima.cantidad_minima if escala_minima else None
         producto.promocion_presentacion_id = promo.presentacion_id if promo else None

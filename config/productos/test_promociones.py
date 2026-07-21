@@ -205,6 +205,18 @@ class PromocionResolverTests(TestCase):
         self.assertIsNotNone(productos[0].promocion_activa)
         self.assertEqual(productos[0].promocion_texto, 'Special deal')
         self.assertEqual(productos[0].promocion_cantidad_minima, 1)
+        self.assertEqual(len(productos[0].promocion_escalas), 1)
+
+    def test_catalog_attaches_all_promotion_scales(self):
+        promo = Promocion.objects.create(nombre='Tiered catalog promo', producto=self.producto, activa=True)
+        _crear_escala(promo, cantidad_minima=10, tipo_beneficio=PromocionEscala.TIPO_FIXED, valor_beneficio=Decimal('0.25'))
+        _crear_escala(promo, cantidad_minima=20, tipo_beneficio=PromocionEscala.TIPO_FIXED, valor_beneficio=Decimal('0.50'))
+
+        productos = adjuntar_promociones_a_productos([self.producto])
+        escalas = productos[0].promocion_escalas
+        self.assertEqual(len(escalas), 2)
+        self.assertEqual(escalas[0].cantidad_minima, 10)
+        self.assertEqual(escalas[1].cantidad_minima, 20)
 
     def test_session_item_clears_promo_below_threshold(self):
         promo = Promocion.objects.create(nombre='Threshold', producto=self.producto, activa=True)
@@ -465,6 +477,26 @@ class PromocionPersistenceTests(TestCase):
         self.assertContains(response, 'Add Promotion to Order')
         self.assertContains(response, 'Minimum: 5 units')
         self.assertContains(response, 'There are products on promotion!')
+
+    def test_catalogo_shows_all_promotion_tiers(self):
+        Promocion.objects.filter(producto=self.producto).delete()
+        promo = Promocion.objects.create(
+            nombre='PRUEBA PROMOCION',
+            descripcion='10 CS $10 OFF',
+            producto=self.producto,
+            activa=True,
+        )
+        _crear_escala(promo, cantidad_minima=10, tipo_beneficio=PromocionEscala.TIPO_FIXED, valor_beneficio=Decimal('0.25'))
+        _crear_escala(promo, cantidad_minima=20, tipo_beneficio=PromocionEscala.TIPO_FIXED, valor_beneficio=Decimal('0.50'))
+
+        client = DjangoClient()
+        client.force_login(self.user)
+        response = client.get(reverse('catalogo'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Minimum: 10 units')
+        self.assertContains(response, 'Minimum: 20 units')
+        self.assertContains(response, 'Get USD 0.25 off/unit.')
+        self.assertContains(response, 'Get USD 0.50 off/unit.')
 
     def test_catalogo_shows_countdown_and_my_order_attention_with_cart(self):
         Promocion.objects.filter(producto=self.producto).update(fecha_fin=timezone.now() + timedelta(days=2, hours=3))

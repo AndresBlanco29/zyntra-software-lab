@@ -45,7 +45,13 @@ from config.productos.promotions import (
 from config.usuarios.permissions import internal_permission_required, user_has_permission
 
 from .models import Cotizacion, CotizacionItem
-from .services import user_can_manage_cotizacion, user_can_view_cotizacion
+from .services import (
+    cliente_tiene_email as _cliente_tiene_email_registrado,
+    notificar_backoffice_solicitud_cotizacion,
+    notificar_cliente_solicitud_cotizacion,
+    user_can_manage_cotizacion,
+    user_can_view_cotizacion,
+)
 from django.utils.translation import gettext as _
 
 
@@ -628,34 +634,88 @@ def guardar_cotizacion(request):
         url=reverse('backoffice_cotizacion_detalle', args=[cotizacion.id]),
     )
 
-    html_content = render_to_string(
-        "emails/cotizacion_cliente.html",
-        {
-            "cliente": cliente,
-            "items": items,
-            "nota": nota
-        }
-    )
-
-    email = EmailMultiAlternatives(
-        subject=f"New order request #{cotizacion.id}",
-        body=_("A new order request has been received."),
-        from_email=settings.DEFAULT_FROM_EMAIL or settings.EMAIL_HOST_USER,
-        to=[settings.ORDERS_NOTIFICATION_EMAIL]
-    )
+    backoffice_email_ok = True
+    cliente_email_sent = False
+    tiene_email = _cliente_tiene_email_registrado(cliente)
 
     try:
-        email.attach_alternative(html_content, "text/html")
-        email.send(fail_silently=False)
-        messages.success(request, _('Your order request was sent successfully.'), extra_tags='client-only')
+        notificar_backoffice_solicitud_cotizacion(
+            cotizacion=cotizacion,
+            cliente=cliente,
+            items=items,
+            nota=nota,
+        )
     except Exception as exc:
         logger.exception("Error enviando correo de cotización %s: %s", cotizacion.id, exc)
-        messages.warning(
-            request,
-            _('The order request was saved, but the notification email could not be sent.')
-        )
+        backoffice_email_ok = False
+
+    if tiene_email:
+        try:
+            cliente_email_sent = notificar_cliente_solicitud_cotizacion(
+                cotizacion,
+                include_prices=False,
+            )
+        except Exception as exc:
+            logger.exception(
+                "Error enviando copia de solicitud al cliente para cotizacion %s: %s",
+                cotizacion.id,
+                exc,
+            )
+            cliente_email_sent = False
 
     request.session['carrito'] = {}
+
+    if request.POST.get('ajax') == '1':
+        if cliente_email_sent:
+            email_notice = _(
+                'A copy of your order was sent to your registered email address without prices.'
+            )
+        elif not tiene_email:
+            email_notice = _(
+                'Your order request was received, but no confirmation email was sent because there is no email address on file for your account.'
+            )
+        else:
+            email_notice = _(
+                'Your order request was saved, but the confirmation email could not be sent.'
+            )
+        return JsonResponse({
+            'success': True,
+            'cotizacion_id': cotizacion.id,
+            'cliente_email_sent': cliente_email_sent,
+            'cliente_tiene_email': tiene_email,
+            'backoffice_email_ok': backoffice_email_ok,
+            'email_notice': email_notice,
+            'message': _('Your order request was sent successfully.'),
+        })
+
+    if backoffice_email_ok:
+        messages.success(request, _('Your order request was sent successfully.'), extra_tags='client-only')
+    else:
+        messages.warning(
+            request,
+            _('The order request was saved, but the notification email could not be sent.'),
+        )
+
+    if cliente_email_sent:
+        messages.info(
+            request,
+            _('A copy of your order was sent to your registered email address without prices.'),
+            extra_tags='client-only',
+        )
+    elif not tiene_email:
+        messages.warning(
+            request,
+            _(
+                'Your order request was received, but no confirmation email was sent because there is no email address on file for your account.'
+            ),
+            extra_tags='client-only',
+        )
+    else:
+        messages.warning(
+            request,
+            _('Your order request was saved, but the confirmation email could not be sent.'),
+            extra_tags='client-only',
+        )
 
     return redirect('catalogo')
 

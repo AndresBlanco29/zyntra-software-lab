@@ -356,6 +356,12 @@ aria-label="{% trans 'Quantity' %}"
             {% trans "Your order request has been received successfully." %}
           </p>
         </div>
+        <div id="cotizacionEmailNotice" class="d-none" style="background: #fff7ed; border-left: 4px solid #f59e0b; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; text-align: left;">
+          <p style="color: #9a3412; font-weight: 600; margin: 0 0 0.5rem 0;">
+            📧 {% trans "Email notice" %}
+          </p>
+          <p id="cotizacionEmailNoticeText" style="color: #475569; font-size: 14px; margin: 0;"></p>
+        </div>
         <div style="background: #f0f7ff; border-left: 4px solid #ffd400; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; text-align: left;">
           <p style="color: #1e4fa8; font-weight: 600; margin: 0 0 0.5rem 0;">
             📋 {% trans "Important information" %}
@@ -433,12 +439,34 @@ document.addEventListener('DOMContentLoaded', function() {
         method: 'POST',
         headers: {
           'X-CSRFToken': csrf,
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json'
         },
-        body: 'nota=' + encodeURIComponent(nota)
+        body: 'nota=' + encodeURIComponent(nota) + '&ajax=1'
       })
-      .then(response => {
-        if (response.ok) {
+      .then(async response => {
+        let data = {};
+        try {
+          data = await response.json();
+        } catch (error) {
+          data = {};
+        }
+        if (response.ok && data.success) {
+          const noticeBox = document.getElementById('cotizacionEmailNotice');
+          const noticeText = document.getElementById('cotizacionEmailNoticeText');
+          if (noticeBox && noticeText && data.email_notice) {
+            noticeText.textContent = data.email_notice;
+            noticeBox.classList.remove('d-none');
+            if (data.cliente_email_sent) {
+              noticeBox.style.background = '#f0fdf4';
+              noticeBox.style.borderLeftColor = '#22c55e';
+              noticeBox.querySelector('p').style.color = '#166534';
+            } else {
+              noticeBox.style.background = '#fff7ed';
+              noticeBox.style.borderLeftColor = '#f59e0b';
+              noticeBox.querySelector('p').style.color = '#9a3412';
+            }
+          }
           const modal = new bootstrap.Modal(document.getElementById('cotizacionExitoModal'));
           modal.show();
         } else {

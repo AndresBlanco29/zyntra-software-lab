@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.urls import reverse
@@ -169,3 +170,93 @@ class ClienteQuoteDiscountDisplayTests(TestCase):
 		self.assertEqual(row['precio_unitario_neto'], Decimal('46.99'))
 		self.assertEqual(row['subtotal'], Decimal('469.90'))
 		self.assertEqual(response.context['current_total'], Decimal('469.90'))
+
+
+class GuardarCotizacionEmailTests(TestCase):
+	def setUp(self):
+		self.categoria = Categoria.objects.create(nombre='Email Cat')
+		self.marca = Marca.objects.create(nombre='Email Brand')
+		self.producto = Producto.objects.create(
+			nombre='Email Product',
+			categoria=self.categoria,
+			marca=self.marca,
+		)
+		self.presentacion = Presentacion.objects.create(
+			producto=self.producto,
+			nombre='Caja',
+			unidades=12,
+			tipo_contenido='unidades',
+			costo=Decimal('10.00'),
+			precio_1=Decimal('15.00'),
+		)
+
+	def _login_cliente(self, *, email='cliente@test.com'):
+		user = Usuario.objects.create_user(
+			username=f'cliente-email-{email or "none"}',
+			password='secret123',
+			role='cliente',
+			email=email or '',
+		)
+		cliente = Cliente.objects.create(
+			usuario=user,
+			nombre_empresa='Email Test Customer',
+			telefono='5550003333',
+			direccion='100 Test St',
+			ciudad='Dallas',
+			estado='TX',
+			codigo_postal='75001',
+			pais='USA',
+			estado_revision=Cliente.REVIEW_STATUS_APPROVED,
+			aprobado=True,
+		)
+		self.client.force_login(user)
+		session = self.client.session
+		session['carrito'] = {
+			str(self.presentacion.id): {
+				'producto_id': self.producto.id,
+				'presentacion_id': self.presentacion.id,
+				'nombre': self.producto.nombre,
+				'cantidad': 2,
+				'precio': 15.0,
+			}
+		}
+		session.save()
+		return cliente
+
+	@patch('config.cotizaciones.views.notificar_cliente_solicitud_cotizacion')
+	@patch('config.cotizaciones.views.notificar_backoffice_solicitud_cotizacion')
+	def test_guardar_cotizacion_sends_customer_copy_without_prices(self, mock_backoffice, mock_cliente):
+		mock_backoffice.return_value = True
+		mock_cliente.return_value = True
+		self._login_cliente(email='cliente@test.com')
+
+		response = self.client.post(
+			reverse('guardar_cotizacion'),
+			{'nota': 'Need delivery tomorrow', 'ajax': '1'},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(payload['success'])
+		self.assertTrue(payload['cliente_email_sent'])
+		mock_cliente.assert_called_once()
+		self.assertFalse(mock_cliente.call_args.kwargs.get('include_prices', True))
+
+	@patch('config.cotizaciones.views.notificar_cliente_solicitud_cotizacion')
+	@patch('config.cotizaciones.views.notificar_backoffice_solicitud_cotizacion')
+	def test_guardar_cotizacion_warns_when_customer_has_no_email(self, mock_backoffice, mock_cliente):
+		mock_backoffice.return_value = True
+		self._login_cliente(email='')
+
+		response = self.client.post(
+			reverse('guardar_cotizacion'),
+			{'nota': 'No email customer', 'ajax': '1'},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(payload['success'])
+		self.assertFalse(payload['cliente_tiene_email'])
+		self.assertFalse(payload['cliente_email_sent'])
+		mock_cliente.assert_not_called()
+		self.assertIn('no email address on file', payload['email_notice'].lower())

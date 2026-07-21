@@ -1,47 +1,28 @@
 {% extends "emails/base_email.html" %}
 {% load i18n %}
 
-{% block preheader %}{% blocktrans with company=cliente.nombre_empresa %}New quote request sent by {{ company }}.{% endblocktrans %}{% endblock %}
-{% block header_title %}{% trans "New quote request" %}{% endblock %}
-{% block header_subtitle %}{% trans "Review the customer data and validate prices and availability." %}{% endblock %}
+{% block preheader %}{% blocktrans with order_id=cotizacion.id customer=cliente.nombre_empresa %}New order request #{{ order_id }} from {{ customer }}.{% endblocktrans %}{% endblock %}
+{% block header_title %}{% trans "New order request" %}{% endblock %}
+{% block header_subtitle %}{% blocktrans with order_id=cotizacion.id %}Request #{{ order_id }}{% endblocktrans %}{% endblock %}
 
 {% block content %}
-<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px 18px; margin-bottom:22px;">
-    <div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-bottom:10px;">{% trans "Customer" %}</div>
-    <table width="100%" cellspacing="0" cellpadding="0" role="presentation" style="font-size:14px; color:#1e293b;">
-        <tr><td style="padding:6px 0; width:120px;"><strong>{% trans "Customer:" %}</strong></td><td>{{ cliente.usuario.first_name }} {{ cliente.usuario.last_name }}</td></tr>
-        <tr><td style="padding:6px 0;"><strong>{% trans "Company:" %}</strong></td><td>{{ cliente.nombre_empresa }}</td></tr>
-        <tr><td style="padding:6px 0;"><strong>{% trans "Phone:" %}</strong></td><td>{{ cliente.telefono }}</td></tr>
-        <tr><td style="padding:6px 0;"><strong>{% trans "Email:" %}</strong></td><td>{{ cliente.usuario.email }}</td></tr>
-    </table>
-</div>
+<p style="font-size:15px; line-height:1.6; color:#1e293b; margin:0 0 18px;">
+  {% blocktrans with customer=cliente.nombre_empresa %}A customer submitted a new order request from the catalog.{% endblocktrans %}
+</p>
 
-<div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-bottom:10px;">{% trans "Requested products" %}</div>
-<table width="100%" cellpadding="10" cellspacing="0" role="presentation" style="border-collapse:collapse; font-size:14px; border:1px solid #cbd5e1; border-radius:12px; overflow:hidden;">
-    <tr style="background:#0b3d91; color:#ffffff;">
-        <th align="left">{% trans "Product" %}</th>
-        <th align="left">{% trans "Description" %}</th>
-        <th align="center">{% trans "Presentation" %}</th>
-        <th align="center">{% trans "Quantity" %}</th>
-    </tr>
-    {% for item in items %}
-    <tr style="border-bottom:1px solid #e2e8f0; background:{% cycle '#ffffff' '#f8fafc' %};">
-        <td><strong>{{ item.presentacion.producto.nombre }}</strong></td>
-        <td>{{ item.presentacion.producto.descripcion|default:"-" }}</td>
-        <td align="center">{{ item.presentacion.nombre }}<br><span style="font-size:12px; color:#64748b;">{{ item.presentacion.unidades }} {{ item.presentacion.tipo_contenido }}</span></td>
-        <td align="center">{{ item.cantidad }}</td>
-    </tr>
-    {% endfor %}
-</table>
+<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px 16px; margin-bottom:18px;">
+  <table width="100%" cellspacing="0" cellpadding="0" role="presentation" style="font-size:14px; color:#1e293b;">
+    <tr><td style="padding:6px 0; width:160px;"><strong>{% trans "Customer" %}:</strong></td><td>{{ cliente.nombre_empresa }}</td></tr>
+    <tr><td style="padding:6px 0;"><strong>{% trans "Request" %}:</strong></td><td>#{{ cotizacion.id }}</td></tr>
+  </table>
+</div>
 
 {% if nota %}
-<div style="margin-top:22px; background:#fff9db; border:1px solid #fde68a; border-radius:12px; padding:16px 18px;">
-    <div style="font-size:12px; color:#92400e; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; margin-bottom:8px;">{% trans "Customer note" %}</div>
-    <div style="font-size:14px; color:#1e293b; line-height:1.6;">{{ nota }}</div>
+<div style="background:#fff7ed; border:1px solid #fdba74; border-radius:12px; padding:14px 16px; margin-bottom:18px;">
+  <div style="font-size:13px; font-weight:700; color:#9a3412; margin-bottom:6px;">{% trans "Customer note" %}</div>
+  <div style="font-size:14px; line-height:1.6; color:#7c2d12; white-space:pre-wrap;">{{ nota }}</div>
 </div>
 {% endif %}
-{% endblock %}
 
-{% block footer_note %}
-{% trans "This request was sent from the La Tortilla Grocery ordering system. Contact the customer to validate prices and availability." %}
+{% include "emails/includes/customer_order_items_table.html" %}
 {% endblock %}

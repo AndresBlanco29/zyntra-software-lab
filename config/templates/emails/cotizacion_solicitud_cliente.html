@@ -1,0 +1,25 @@
+{% extends "emails/base_email.html" %}
+{% load i18n %}
+
+{% block preheader %}{% blocktrans with order_id=cotizacion.id %}Copy of your order request #{{ order_id }}.{% endblocktrans %}{% endblock %}
+{% block header_title %}{% trans "Order request received" %}{% endblock %}
+{% block header_subtitle %}{% blocktrans with order_id=cotizacion.id %}Request #{{ order_id }}{% endblocktrans %}{% endblock %}
+
+{% block content %}
+<p style="font-size:15px; line-height:1.6; color:#1e293b; margin:0 0 18px;">
+  {% blocktrans with customer=cliente.nombre_empresa %}Hello {{ customer }}, we received your order request. Below is a copy of the products you requested.{% endblocktrans %}
+</p>
+
+{% if nota %}
+<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px 16px; margin-bottom:18px;">
+  <div style="font-size:13px; font-weight:700; color:#0b3d91; margin-bottom:6px;">{% trans "Your note" %}</div>
+  <div style="font-size:14px; line-height:1.6; color:#475569; white-space:pre-wrap;">{{ nota }}</div>
+</div>
+{% endif %}
+
+{% include "emails/includes/customer_order_items_table.html" %}
+
+<p style="font-size:14px; line-height:1.6; color:#475569; margin:18px 0 0;">
+  {% trans "Our team will review your request and contact you if any adjustment is needed before processing." %}
+</p>
+{% endblock %}

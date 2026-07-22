@@ -13,6 +13,7 @@ from .models import (
     Presentacion,
     ConfiguracionPrecios,
     ConfiguracionDescuentos,
+    ConfiguracionLandedCost,
     Promocion,
     PromocionEscala,
     PromocionProducto,
@@ -116,6 +117,8 @@ def _parse_new_presentacion_rows_from_post(request):
     pesos = _post_list(request, "presentacion_nueva_peso_por_caja")
     pallet_ties = _post_list(request, "presentacion_nueva_pallet_tie")
     pallet_highs = _post_list(request, "presentacion_nueva_pallet_high")
+    landed_tipos = _post_list(request, "presentacion_nueva_landed_cost_override_tipo")
+    landed_valores = _post_list(request, "presentacion_nueva_landed_cost_override_valor")
 
     rows = []
     for index, raw_nombre in enumerate(nombres):
@@ -127,10 +130,14 @@ def _parse_new_presentacion_rows_from_post(request):
         peso_raw = (pesos[index] if index < len(pesos) else "").strip()
         pallet_tie_raw = (pallet_ties[index] if index < len(pallet_ties) else "").strip()
         pallet_high_raw = (pallet_highs[index] if index < len(pallet_highs) else "").strip()
+        landed_tipo = (landed_tipos[index] if index < len(landed_tipos) else "").strip().upper()
+        landed_valor_raw = (landed_valores[index] if index < len(landed_valores) else "").strip()
 
-        if not any([nombre, unidades_raw, costo_raw, stock_raw, peso_raw, pallet_tie_raw, pallet_high_raw]):
+        if not any([nombre, unidades_raw, costo_raw, stock_raw, peso_raw, pallet_tie_raw, pallet_high_raw, landed_valor_raw]):
             continue
 
+        if landed_tipo not in {'PERCENT', 'FIXED'}:
+            landed_tipo = ''
         rows.append({
             "nombre": nombre or _("Presentation %(number)s") % {"number": len(rows) + 1},
             "tipo_contenido": tipo_contenido,
@@ -139,6 +146,8 @@ def _parse_new_presentacion_rows_from_post(request):
             "peso_por_caja": _parse_optional_decimal(peso_raw),
             "pallet_tie": _parse_optional_positive_int(pallet_tie_raw),
             "pallet_high": _parse_optional_positive_int(pallet_high_raw),
+            "landed_cost_override_tipo": landed_tipo,
+            "landed_cost_override_valor": _parse_optional_decimal(landed_valor_raw) if landed_tipo else None,
             "stock_inicial": _parse_non_negative_int(stock_raw, default=0),
         })
     return rows
@@ -744,6 +753,26 @@ def _get_discount_preset_values(configuracion=None):
 
 @login_required
 @internal_permission_required('admin.products.manage')
+def configurar_landed_cost(request):
+    configuracion = ConfiguracionLandedCost.obtener()
+    if request.method == 'POST':
+        tipo = (request.POST.get('tipo') or ConfiguracionLandedCost.TIPO_PERCENT).strip().upper()
+        if tipo not in {ConfiguracionLandedCost.TIPO_PERCENT, ConfiguracionLandedCost.TIPO_FIXED}:
+            tipo = ConfiguracionLandedCost.TIPO_PERCENT
+        configuracion.tipo = tipo
+        configuracion.valor = _parse_decimal(request.POST.get('valor'), configuracion.valor)
+        try:
+            configuracion.save()
+        except ValidationError as exc:
+            messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+            return render(request, 'admin/configurar_landed_cost.html', {'configuracion': configuracion})
+        messages.success(request, _('Global Landed Cost updated successfully.'))
+        return redirect('configurar_landed_cost')
+    return render(request, 'admin/configurar_landed_cost.html', {'configuracion': configuracion})
+
+
+@login_required
+@internal_permission_required('admin.products.manage')
 def configurar_descuentos(request):
     configuracion = _get_discount_preset_config()
     discount_presets = _get_discount_preset_values(configuracion)
@@ -1056,6 +1085,16 @@ def editar_producto(request, producto_id):
 
             if f"pallet_high_{presentacion.id}" in request.POST:
                 presentacion.pallet_high = _parse_optional_positive_int(request.POST.get(f"pallet_high_{presentacion.id}"))
+
+            if f"landed_cost_override_tipo_{presentacion.id}" in request.POST:
+                landed_tipo = (request.POST.get(f"landed_cost_override_tipo_{presentacion.id}") or "").strip().upper()
+                if landed_tipo not in {'PERCENT', 'FIXED'}:
+                    landed_tipo = ''
+                presentacion.landed_cost_override_tipo = landed_tipo
+                presentacion.landed_cost_override_valor = (
+                    _parse_optional_decimal(request.POST.get(f"landed_cost_override_valor_{presentacion.id}"))
+                    if landed_tipo else None
+                )
 
             presentacion.save()
 

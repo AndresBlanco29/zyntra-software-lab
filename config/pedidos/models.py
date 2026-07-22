@@ -162,6 +162,18 @@ class PedidoItem(models.Model):
 	descuento_aplicado = models.BooleanField(default=False)
 	descuento_monto = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 	subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+	es_regalo = models.BooleanField(
+		default=False,
+		verbose_name='Free / gift line',
+		help_text='True when this line was added automatically by a Free units cross-product promotion.',
+	)
+	regalo_origen_item = models.ForeignKey(
+		'self',
+		on_delete=models.CASCADE,
+		null=True,
+		blank=True,
+		related_name='lineas_regalo',
+	)
 
 	def __str__(self):
 		return f"{self.presentacion.producto.nombre} x {self.cantidad}"

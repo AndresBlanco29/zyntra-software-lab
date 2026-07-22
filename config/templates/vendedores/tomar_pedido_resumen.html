@@ -103,15 +103,20 @@ La Tortilla Grocery
   <h3 class="fw-bold mb-0">
   {% trans "Resumen del Pedido" %}
   </h3>
-  {% if cliente_id %}
-  <a
-    href="{% url 'catalogo_vendedor' cliente_id %}"
-    class="btn btn-outline-secondary pedido-back-to-catalog"
-    id="pedidoVolverCatalogoBtn"
-  >
-    ← {% trans "Back to catalog" %}
-  </a>
-  {% endif %}
+  <div class="d-flex flex-wrap gap-2">
+    <button type="button" class="btn btn-outline-dark" id="clientModeToggleBtn" aria-pressed="false">
+      {% trans "Client Mode" %}
+    </button>
+    {% if cliente_id %}
+    <a
+      href="{% url 'catalogo_vendedor' cliente_id %}"
+      class="btn btn-outline-secondary pedido-back-to-catalog"
+      id="pedidoVolverCatalogoBtn"
+    >
+      ← {% trans "Back to catalog" %}
+    </a>
+    {% endif %}
+  </div>
 </div>
 
 <div class="order-comment-panel mb-3">
@@ -232,7 +237,7 @@ La Tortilla Grocery
 <th>{% trans "Descuento" %}</th>
 <th>{% trans "Pagas" %}</th>
 <th>{% trans "Subtotal" %}</th>
-<th>{% trans "Profit" %}</th>
+<th class="js-internal-only">{% trans "Margin" %}</th>
 <th>{% trans "Acción" %}</th>
 
 </tr>
@@ -247,7 +252,9 @@ La Tortilla Grocery
 
 <td class="fw-bold" data-label="{% trans "Producto" %}">
 {{ item.nombre }}
-{% if item.descuento_origen == 'promocion' and item.descuento_aplicado %}
+{% if item.es_regalo %}
+<div class="mt-1"><span class="badge text-bg-success">{% trans "FREE" %}</span></div>
+{% elif item.descuento_origen == 'promocion' and item.descuento_aplicado %}
 <div class="mt-1">
 <span class="badge text-bg-warning">
 {% trans "Promo applied" %}: {{ item.promocion_descripcion|default:item.promocion_nombre }}
@@ -351,7 +358,7 @@ min="1"
 </div>
 <div class="descuento-fields-wrap {% if not item.descuento_aplicado %}d-none{% endif %}">
 <select class="form-select form-select-sm mb-2 descuento-preset no-search-select" data-id="{{ item.id }}">
-<option value="">{% trans "Manual discount" %}</option>
+<option value="">{% trans "Custom discount" %}</option>
 {% for option in discount_preset_options %}
 <option value="{{ option.value|unlocalize }}" data-discount-key="{{ option.key }}" {% if item.selected_discount_preset_key == option.key %}selected{% endif %}>{{ option.label }}</option>
 {% endfor %}
@@ -366,6 +373,19 @@ min="1"
   data-id="{{ item.id }}"
   value="{{ item.descuento_monto|floatformat:2 }}">
 </div>
+<div class="input-group input-group-sm mb-1 descuento-percent-wrap js-internal-only">
+<span class="input-group-text">%</span>
+<input
+  type="number"
+  min="0"
+  max="100"
+  step="0.01"
+  class="form-control descuento-porcentaje"
+  data-id="{{ item.id }}"
+  placeholder="{% trans 'Custom %' %}"
+  aria-label="{% trans 'Custom percentage discount' %}">
+</div>
+<div class="form-text js-internal-only">{% trans "Enter any custom %; it converts to dollars per unit from the line price." %}</div>
 </div>
 <div class="small text-muted descuento-resumen" data-id="{{ item.id }}"></div>
 </td>
@@ -381,10 +401,10 @@ min="1"
 ${{ item.subtotal|floatformat:2 }}
 </td>
 
-<td data-label="{% trans "Profit" %}">
-<div class="fw-semibold line-profit {% if item.profit.line_profit_amount is not None and item.profit.line_profit_amount < 0 %}text-danger{% elif item.profit.line_profit_amount is not None %}text-success{% else %}text-muted{% endif %}" data-id="{{ item.id }}">
-{% if item.profit.line_profit_amount is not None %}
-${{ item.profit.line_profit_amount|floatformat:2 }} ({{ item.profit.line_profit_percent|floatformat:1 }}%)
+<td data-label="{% trans "Margin" %}" class="js-internal-only">
+<div class="fw-semibold line-profit {% if item.profit.line_profit_percent is not None and item.profit.line_profit_percent < 0 %}text-danger{% elif item.profit.line_profit_percent is not None %}text-success{% else %}text-muted{% endif %}" data-id="{{ item.id }}">
+{% if item.profit.line_profit_percent is not None %}
+{{ item.profit.line_profit_percent|floatformat:1 }}%
 {% else %}
 —
 {% endif %}
@@ -490,13 +510,13 @@ ${{ item.profit.line_profit_amount|floatformat:2 }} ({{ item.profit.line_profit_
 
 <hr>
 
-<div class="d-flex justify-content-between {% if order_profit_summary.total_profit_amount is not None and order_profit_summary.total_profit_amount < 0 %}text-danger{% elif order_profit_summary.total_profit_amount is not None %}text-success{% else %}text-muted{% endif %}">
+<div class="d-flex justify-content-between js-internal-only {% if order_profit_summary.total_profit_percent is not None and order_profit_summary.total_profit_percent < 0 %}text-danger{% elif order_profit_summary.total_profit_percent is not None %}text-success{% else %}text-muted{% endif %}">
 
-<span>{% trans "Total profit" %}:</span>
+<span>{% trans "Total margin" %}:</span>
 
 <strong id="totalProfit">
-{% if order_profit_summary.total_profit_amount is not None %}
-${{ order_profit_summary.total_profit_amount|floatformat:2 }} ({{ order_profit_summary.total_profit_percent|floatformat:1 }}%)
+{% if order_profit_summary.total_profit_percent is not None %}
+{{ order_profit_summary.total_profit_percent|floatformat:1 }}%
 {% else %}
 —
 {% endif %}
@@ -533,7 +553,24 @@ ${{ order_profit_summary.total_profit_amount|floatformat:2 }} ({{ order_profit_s
 </div>
 
 
+<style>
+body.client-mode .js-internal-only,
+body.client-mode .bulk-price-tier-panel,
+body.client-mode .precio-resumen-preset,
+body.client-mode .line-profit,
+body.client-mode #totalProfit {
+  display: none !important;
+}
+body.client-mode .precio-resumen-manual-wrap .input-group-text {
+  display: none;
+}
+#clientModeToggleBtn.is-active {
+  background: #111827;
+  color: #fff;
+}
+</style>
 <script src="{% static 'js/order_profit.js' %}"></script>
+<script src="{% static 'js/take_order_client_mode.js' %}"></script>
 <script src="{% static 'js/pedido_resumen.js' %}"></script>
 
 <script>

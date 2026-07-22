@@ -237,6 +237,7 @@
     var tipoSelect = row.querySelector('[name$="-tipo_beneficio"]');
     var valorWrap = row.querySelector('[data-escala-field="valor_beneficio"]');
     var unidadesWrap = row.querySelector('[data-escala-field="unidades_gratis"]');
+    var regaloWrap = row.querySelector('[data-escala-field="presentacion_regalo"]');
     var presetInput = row.querySelector('[data-preset-input="percent"]');
     if (!tipoSelect) {
       return;
@@ -248,13 +249,157 @@
     if (unidadesWrap) {
       unidadesWrap.hidden = !isFree;
     }
+    if (regaloWrap) {
+      regaloWrap.hidden = !isFree;
+    }
     if (presetInput) {
       presetInput.setAttribute('list', tipoSelect.value === TIPO_PERCENT ? 'promoPercentPresets' : 'promoFixedPresets');
     }
   }
 
+  function bindGiftSearch(row) {
+    var root = row.querySelector('[data-gift-search-root]');
+    if (!root) {
+      return;
+    }
+    var searchInput = root.querySelector('.promo-gift-buscador');
+    var resultsBox = root.querySelector('.promo-gift-resultados');
+    var presentacionSelect = root.querySelector('.promo-gift-presentacion');
+    var hiddenProducto = root.querySelector('.promo-gift-producto-id');
+    var hiddenPresentacion = root.querySelector('[name$="-presentacion_regalo"]');
+    var searchUrl = root.dataset.searchUrl;
+    var presentacionesUrlTemplate = root.dataset.presentacionesUrlTemplate;
+    if (!searchInput || !resultsBox || !presentacionSelect || !hiddenPresentacion || !searchUrl) {
+      return;
+    }
+
+    var debounceTimer = null;
+    var lastResults = [];
+
+    function hideResults() {
+      resultsBox.hidden = true;
+      resultsBox.innerHTML = '';
+      lastResults = [];
+    }
+
+    function clearGift() {
+      if (hiddenProducto) {
+        hiddenProducto.value = '';
+      }
+      hiddenPresentacion.value = '';
+      presentacionSelect.innerHTML = '<option value="">Same product (discount)</option>';
+      presentacionSelect.disabled = true;
+    }
+
+    function loadPresentaciones(productoId, preselectId) {
+      presentacionSelect.innerHTML = '<option value="">Same product (discount)</option>';
+      presentacionSelect.disabled = true;
+      if (!productoId || !presentacionesUrlTemplate) {
+        return;
+      }
+      var url = presentacionesUrlTemplate.replace('__ID__', String(productoId));
+      fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+        .then(function (response) { return response.ok ? response.json() : { results: [] }; })
+        .then(function (data) {
+          (data.results || []).forEach(function (presentacion) {
+            var option = document.createElement('option');
+            option.value = presentacion.id;
+            option.textContent = presentacion.nombre;
+            presentacionSelect.appendChild(option);
+          });
+          if (preselectId) {
+            presentacionSelect.value = String(preselectId);
+            hiddenPresentacion.value = String(preselectId);
+          } else if ((data.results || []).length === 1) {
+            presentacionSelect.value = String(data.results[0].id);
+            hiddenPresentacion.value = String(data.results[0].id);
+          } else {
+            hiddenPresentacion.value = '';
+          }
+          presentacionSelect.disabled = false;
+        })
+        .catch(function () {
+          presentacionSelect.disabled = false;
+        });
+    }
+
+    function selectProduct(item) {
+      if (hiddenProducto) {
+        hiddenProducto.value = String(item.id);
+      }
+      searchInput.value = item.label;
+      hideResults();
+      loadPresentaciones(item.id, null);
+    }
+
+    searchInput.addEventListener('input', function () {
+      clearGift();
+      var rawValue = searchInput.value || '';
+      if (rawValue.endsWith(' ')) {
+        return;
+      }
+      var query = rawValue.trim();
+      clearTimeout(debounceTimer);
+      if (query.length < 2) {
+        hideResults();
+        return;
+      }
+      debounceTimer = setTimeout(function () {
+        var url = new URL(searchUrl, window.location.origin);
+        url.searchParams.set('q', query);
+        fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+          .then(function (response) { return response.ok ? response.json() : { results: [] }; })
+          .then(function (data) {
+            lastResults = data.results || [];
+            if (!lastResults.length) {
+              resultsBox.innerHTML = '<div class="list-group-item text-muted">No matching products.</div>';
+              resultsBox.hidden = false;
+              return;
+            }
+            resultsBox.innerHTML = lastResults.map(function (item, index) {
+              var extra = item.codigo_barras ? ' — ' + escapeHtml(item.codigo_barras) : '';
+              return (
+                '<button type="button" class="list-group-item list-group-item-action" data-result-index="' + index + '">' +
+                  escapeHtml(item.label) + extra +
+                '</button>'
+              );
+            }).join('');
+            resultsBox.hidden = false;
+          })
+          .catch(function () { hideResults(); });
+      }, debounceMs());
+    });
+
+    resultsBox.addEventListener('click', function (event) {
+      var button = event.target.closest('[data-result-index]');
+      if (!button) {
+        return;
+      }
+      var index = parseInt(button.getAttribute('data-result-index'), 10);
+      if (!Number.isFinite(index) || !lastResults[index]) {
+        return;
+      }
+      selectProduct(lastResults[index]);
+    });
+
+    presentacionSelect.addEventListener('change', function () {
+      hiddenPresentacion.value = presentacionSelect.value || '';
+    });
+
+    document.addEventListener('click', function (event) {
+      if (!root.contains(event.target)) {
+        hideResults();
+      }
+    });
+
+    if (hiddenProducto && hiddenProducto.value) {
+      loadPresentaciones(hiddenProducto.value, hiddenPresentacion.value || null);
+    }
+  }
+
   function bindEscalaRow(row) {
     toggleEscalaRowFields(row);
+    bindGiftSearch(row);
     var tipoSelect = row.querySelector('[name$="-tipo_beneficio"]');
     if (tipoSelect) {
       tipoSelect.addEventListener('change', function () { toggleEscalaRowFields(row); });

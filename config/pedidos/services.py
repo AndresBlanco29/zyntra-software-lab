@@ -383,6 +383,12 @@ def crear_pedido_desde_items(
             descuento_aplicado=descuento_aplicado,
             descuento_monto=descuento_monto,
         )
+        es_regalo = bool(payload.get('es_regalo'))
+        if es_regalo:
+            precio = Decimal('0.00')
+            descuento_aplicado = True
+            descuento_monto = Decimal('0.00')
+            subtotal = Decimal('0.00')
         pedido_items.append(
             PedidoItem(
                 pedido=pedido,
@@ -393,6 +399,7 @@ def crear_pedido_desde_items(
                 descuento_aplicado=descuento_aplicado,
                 descuento_monto=descuento_monto,
                 subtotal=subtotal,
+                es_regalo=es_regalo,
             )
         )
         total += subtotal
@@ -401,8 +408,11 @@ def crear_pedido_desde_items(
     if created_items and any(item.pk is None for item in created_items):
         created_items = list(PedidoItem.objects.filter(pedido=pedido).order_by('id'))
 
-    pedido.total = _quantize_money(total)
-    pedido.save(update_fields=['total', 'actualizada_en'])
+    from config.productos.promotions import sincronizar_regalos_promocion_en_pedido
+
+    sincronizar_regalos_promocion_en_pedido(pedido)
+    created_items = list(PedidoItem.objects.filter(pedido=pedido).order_by('id'))
+    pedido.refresh_from_db(fields=['total'])
 
     if reservar_inventario and created_items:
         reservar_stock_para_pedido_items(pedido=pedido, pedido_items=created_items, creado_por=vendedor)

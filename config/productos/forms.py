@@ -130,9 +130,24 @@ PromocionProductoFormSet = forms.inlineformset_factory(
 
 
 class PromocionEscalaForm(forms.ModelForm):
+    presentacion_regalo = forms.ModelChoiceField(
+        queryset=Presentacion.objects.none(),
+        required=False,
+        widget=forms.HiddenInput(),
+        label=_('Free product presentation'),
+        help_text=_('Optional. Leave empty for same-product free units discount.'),
+    )
+
     class Meta:
         model = PromocionEscala
-        fields = ['cantidad_minima', 'tipo_beneficio', 'valor_beneficio', 'unidades_gratis', 'orden']
+        fields = [
+            'cantidad_minima',
+            'tipo_beneficio',
+            'valor_beneficio',
+            'unidades_gratis',
+            'presentacion_regalo',
+            'orden',
+        ]
         widgets = {
             'cantidad_minima': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'step': 1}),
             'tipo_beneficio': forms.Select(attrs={'class': 'form-select'}),
@@ -140,6 +155,43 @@ class PromocionEscalaForm(forms.ModelForm):
             'unidades_gratis': forms.NumberInput(attrs={'class': 'form-control', 'min': 1, 'step': 1}),
             'orden': forms.HiddenInput(),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        selected_ids = []
+        instance_gift = getattr(self.instance, 'presentacion_regalo_id', None)
+        if instance_gift:
+            selected_ids.append(int(instance_gift))
+        raw = None
+        if self.is_bound:
+            raw = self.data.get(self.add_prefix('presentacion_regalo'))
+        if raw not in (None, ''):
+            try:
+                selected_ids.append(int(raw))
+            except (TypeError, ValueError):
+                pass
+        if selected_ids:
+            self.fields['presentacion_regalo'].queryset = (
+                Presentacion.objects.select_related('producto')
+                .filter(id__in=selected_ids)
+            )
+        else:
+            self.fields['presentacion_regalo'].queryset = Presentacion.objects.none()
+
+        self.gift_producto_id = ''
+        self.gift_producto_label = ''
+        gift = None
+        if instance_gift:
+            gift = getattr(self.instance, 'presentacion_regalo', None)
+            if gift is None:
+                gift = (
+                    Presentacion.objects.select_related('producto')
+                    .filter(id=instance_gift)
+                    .first()
+                )
+        if gift is not None:
+            self.gift_producto_id = str(gift.producto_id)
+            self.gift_producto_label = gift.producto.nombre
 
     def clean(self):
         cleaned = super().clean()
@@ -157,8 +209,8 @@ class PromocionEscalaForm(forms.ModelForm):
             elif tipo == PromocionEscala.TIPO_PERCENT and valor > 100:
                 self.add_error('valor_beneficio', _('Percentage benefit cannot exceed 100.'))
             cleaned['unidades_gratis'] = None
+            cleaned['presentacion_regalo'] = None
         return cleaned
-
 
 PromocionEscalaFormSet = forms.inlineformset_factory(
     Promocion,

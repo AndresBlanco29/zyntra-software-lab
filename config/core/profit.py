@@ -103,10 +103,27 @@ def build_order_line_profit(
     }
 
 
+def resolve_line_cost(presentacion):
+    """Prefer RCost + Landed Cost when a presentation is available."""
+    if presentacion is None:
+        return None
+    effective = getattr(presentacion, 'effective_cost', None)
+    if callable(effective):
+        try:
+            return effective()
+        except Exception:
+            pass
+    if effective is not None:
+        return effective
+    from config.productos.landed_cost import resolve_effective_cost
+
+    return resolve_effective_cost(presentacion)
+
+
 def attach_profit_to_order_item(item):
     presentacion = getattr(item, 'presentacion', None)
     profit = build_order_line_profit(
-        cost=getattr(presentacion, 'costo', None) if presentacion is not None else None,
+        cost=resolve_line_cost(presentacion),
         list_price=getattr(item, 'precio', 0),
         quantity=getattr(item, 'cantidad', 0),
         descuento_aplicado=bool(getattr(item, 'descuento_aplicado', False)),

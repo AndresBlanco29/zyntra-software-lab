@@ -869,6 +869,19 @@
                     placeholder="0.00"
                     {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
                 </div>
+                <div class="input-group input-group-sm mb-1">
+                  <span class="input-group-text">%</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    class="form-control pedido-item-discount-percent"
+                    data-target-input="descuento_monto_{{ item.id }}"
+                    data-item-id="{{ item.id }}"
+                    placeholder="{% trans 'Custom %' %}"
+                    {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+                </div>
               </div>
               <div class="small text-muted pedido-item-discount-summary" data-item-id="{{ item.id }}"></div>
             </td>
@@ -1530,6 +1543,34 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     syncPedidoDiscountPresetFromInput(presetSelect, amountInput);
+  });
+
+  document.querySelectorAll('.pedido-item-discount-percent').forEach((percentInput) => {
+    percentInput.addEventListener('change', function () {
+      const itemId = percentInput.dataset.itemId;
+      const amountInput = document.getElementById(percentInput.dataset.targetInput);
+      const priceInput = document.getElementById(`precio_${itemId}`);
+      const toggle = document.querySelector(`.pedido-item-discount-toggle[data-item-id="${itemId}"]`);
+      const presetSelect = document.querySelector(`.pedido-item-discount-preset[data-item-id="${itemId}"]`);
+      if (!amountInput || !priceInput) {
+        return;
+      }
+      const percent = Number(String(percentInput.value || '').replace(',', '.'));
+      const price = Number(String(priceInput.value || '').replace(',', '.'));
+      if (!Number.isFinite(percent) || !Number.isFinite(price) || percent < 0) {
+        return;
+      }
+      const capped = Math.min(percent, 100);
+      amountInput.value = ((price * capped) / 100).toFixed(2);
+      if (presetSelect) {
+        presetSelect.value = '';
+      }
+      if (toggle && !toggle.checked) {
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      refreshPedidoItemDiscountRow(itemId);
+    });
   });
 
   if (applyBulkDiscountButton && bulkDiscountPresetSelect) {

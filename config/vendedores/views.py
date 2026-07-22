@@ -9,6 +9,8 @@ from config.clientes.phone import normalize_stored_phone_number
 from config.usuarios.models import Usuario
 from config.productos.models import Producto, Presentacion, Categoria, Marca, ConfiguracionPrecios, ConfiguracionDescuentos
 from config.core.profit import build_order_line_profit, summarize_order_profit
+from config.productos.landed_cost import resolve_effective_cost
+from config.pedidos.client_history import load_cliente_favorite_productos
 from config.productos.promotions import (
     aplicar_promocion_en_item_sesion,
     marcar_descuento_manual_en_item,
@@ -686,6 +688,7 @@ def catalogo_vendedor(request, cliente_id):
     _attach_recent_customer_order_history(cliente=cliente, productos=productos)
 
     combos = []
+    productos_favoritos = []
     if (
         page_obj.number == 1
         and not filter_params.get('q')
@@ -693,6 +696,12 @@ def catalogo_vendedor(request, cliente_id):
         and not filter_params.get('marca')
     ):
         combos = combos_para_catalogo(cliente=cliente)
+        productos_favoritos = load_cliente_favorite_productos(
+            cliente=cliente,
+            hydrate_fn=_hydrate_productos,
+            attach_promos_fn=lambda rows: adjuntar_promociones_a_productos(rows, cliente=cliente),
+        )
+        _attach_recent_customer_order_history(cliente=cliente, productos=productos_favoritos)
 
     categorias = Categoria.objects.all()
     marcas = Marca.objects.filter(activo=True)
@@ -708,6 +717,7 @@ def catalogo_vendedor(request, cliente_id):
     context = {
         'cliente': cliente,
         'productos': productos,
+        'productos_favoritos': productos_favoritos,
         'combos': combos,
         'page_obj': page_obj,
         'filter_q': filter_params.get('q', ''),
@@ -938,8 +948,9 @@ def ver_pedido(request):
         subtotal = _cart_item_subtotal(item)
 
         total += subtotal
+        effective_cost = resolve_effective_cost(presentacion)
         profit = build_order_line_profit(
-            cost=presentacion.costo,
+            cost=effective_cost,
             list_price=precio,
             quantity=item["cantidad"],
             descuento_aplicado=bool(item.get("descuento_aplicado")),
@@ -950,7 +961,7 @@ def ver_pedido(request):
             "id": key,
             "nombre": item["nombre"],
             "presentacion_id": item["presentacion_id"],
-            "costo": presentacion.costo,
+            "costo": effective_cost,
             "precio": precio,
             "precio_key": precio_key,
             "cantidad": item["cantidad"],
@@ -959,6 +970,7 @@ def ver_pedido(request):
             "descuento_origen": item.get("descuento_origen") or "",
             "promocion_nombre": item.get("promocion_nombre") or "",
             "promocion_descripcion": item.get("promocion_descripcion") or "",
+            "es_regalo": bool(item.get("es_regalo")),
             "selected_discount_preset_key": (
                 _match_discount_preset_key(discount_options, item.get("descuento_monto", 0))
                 if item.get("descuento_aplicado")
@@ -1202,12 +1214,17 @@ def enviar_pedido(request):
 
     cliente = Cliente.objects.get(id=cliente_id)
 
+    from config.productos.promotions import reaplicar_promociones_en_lineas_sesion
+
+    reaplicar_promociones_en_lineas_sesion(carrito, cliente=cliente)
+    request.session['pedido'] = carrito
+
     items_payload = []
 
     for item in carrito.values():
-
+        if item.get('es_regalo'):
+            continue
         presentacion = Presentacion.objects.get(id=item["presentacion_id"])
-        aplicar_promocion_en_item_sesion(item, precio_unitario=item.get("precio"), cliente=cliente)
         items_payload.append({
             "presentacion": presentacion,
             "cantidad": item["cantidad"],

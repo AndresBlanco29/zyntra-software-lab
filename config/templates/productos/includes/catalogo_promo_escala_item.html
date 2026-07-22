@@ -13,7 +13,11 @@
       {% if escala.tipo_beneficio == 'PERCENT' %}
         {% blocktrans with value=escala.valor_beneficio %}Get {{ value }}% off.{% endblocktrans %}
       {% elif escala.tipo_beneficio == 'FREE_UNITS' %}
-        {% blocktrans with value=escala.unidades_gratis %}Get {{ value }} free unit(s).{% endblocktrans %}
+        {% if escala.presentacion_regalo_id %}
+          {% blocktrans with value=escala.unidades_gratis product=escala.presentacion_regalo.producto.nombre %}Get {{ value }} free {{ product }}.{% endblocktrans %}
+        {% else %}
+          {% blocktrans with value=escala.unidades_gratis %}Get {{ value }} free unit(s).{% endblocktrans %}
+        {% endif %}
       {% elif escala.tipo_beneficio == 'PRECIO_ESPECIAL' %}
         {% blocktrans with value=escala.valor_beneficio %}Special price: USD {{ value }}/unit.{% endblocktrans %}
       {% else %}

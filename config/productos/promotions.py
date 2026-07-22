@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
 
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from config.productos.models import Promocion, PromocionEscala, PromocionProducto
@@ -131,12 +131,15 @@ def _filtrar_por_tipo_cliente(queryset, cliente):
     if cliente is None:
         return queryset
 
+    # Count is more reliable than tipos_cliente__isnull for empty M2M sets.
+    queryset = queryset.annotate(_tipos_cliente_count=Count('tipos_cliente', distinct=True))
     tipo_cliente_id = getattr(cliente, 'tipo_cliente_id', None)
     if tipo_cliente_id:
         return queryset.filter(
-            Q(tipos_cliente__isnull=True) | Q(tipos_cliente__id=tipo_cliente_id)
+            Q(_tipos_cliente_count=0) | Q(tipos_cliente__id=tipo_cliente_id)
         ).distinct()
-    return queryset.filter(tipos_cliente__isnull=True).distinct()
+    # Customer without a type only receives unrestricted promotions.
+    return queryset.filter(_tipos_cliente_count=0)
 
 
 def promociones_activas_queryset(now=None, cliente=None):
@@ -155,10 +158,14 @@ def _normalizar_linea_promocion(item):
     if item is None:
         return None
     if isinstance(item, dict):
+        if item.get('es_regalo'):
+            return None
         producto_id = item.get('producto_id')
         presentacion_id = item.get('presentacion_id')
         cantidad = item.get('cantidad', 0)
     else:
+        if getattr(item, 'es_regalo', False):
+            return None
         presentacion = getattr(item, 'presentacion', None)
         producto_id = getattr(presentacion, 'producto_id', None) if presentacion is not None else None
         presentacion_id = getattr(item, 'presentacion_id', None)
@@ -240,7 +247,14 @@ def _promociones_para_linea(*, producto_id, presentacion_id, now=None, cliente=N
 
     return (
         base.filter(id__in=promo_ids)
-        .prefetch_related('escalas', 'productos_grupo', 'productos_grupo__producto', 'productos_grupo__presentacion')
+        .prefetch_related(
+            'escalas',
+            'escalas__presentacion_regalo',
+            'escalas__presentacion_regalo__producto',
+            'productos_grupo',
+            'productos_grupo__producto',
+            'productos_grupo__presentacion',
+        )
         .order_by('id')
     )
 
@@ -284,6 +298,7 @@ def _resolver_mejor_escala_linea(
     best_promo = None
     best_escala = None
     best_monto = Decimal('0.00')
+    best_compare = Decimal('0.00')
 
     for promo in promos:
         if not _linea_coincide_promocion(promo, producto_id, presentacion_id):
@@ -305,19 +320,43 @@ def _resolver_mejor_escala_linea(
             cantidad=qty_eval,
             preferir_menor_cantidad_minima=preferir_menor_cantidad_minima,
         )
-        if escala_result is None or monto <= 0:
+        if escala_result is None:
             continue
-        if best_escala is None or monto > best_monto:
-            best_promo, best_escala, best_monto = promo_result, escala_result, monto
+        # Cross-product Free Units grant a separate FREE line ($0/unit on the
+        # trigger SKU). Compare total savings so gifts compete fairly with
+        # per-unit discounts (monto * qty vs estimated gift list value).
+        is_cross_gift = (
+            escala_result.tipo_beneficio == PromocionEscala.TIPO_FREE_UNITS
+            and getattr(escala_result, 'presentacion_regalo_id', None)
+        )
+        if is_cross_gift:
+            compare = _valor_comparacion_escala(
+                escala_result,
+                precio=precio,
+                presentacion=presentacion,
+                cantidad=qty_eval,
+            )
+        else:
+            compare = _quantize_money(monto * Decimal(str(max(int(qty_eval or 0), 1))))
+        if compare <= 0:
             continue
-        if monto != best_monto:
+        if best_escala is None or compare > best_compare:
+            best_promo, best_escala, best_monto, best_compare = (
+                promo_result, escala_result, monto, compare
+            )
+            continue
+        if compare != best_compare:
             continue
         if preferir_menor_cantidad_minima and escala_result.cantidad_minima != best_escala.cantidad_minima:
             if escala_result.cantidad_minima < best_escala.cantidad_minima:
-                best_promo, best_escala, best_monto = promo_result, escala_result, monto
+                best_promo, best_escala, best_monto, best_compare = (
+                    promo_result, escala_result, monto, compare
+                )
             continue
         if promo.id < best_promo.id:
-            best_promo, best_escala, best_monto = promo_result, escala_result, monto
+            best_promo, best_escala, best_monto, best_compare = (
+                promo_result, escala_result, monto, compare
+            )
 
     return best_promo, best_escala, best_monto
 
@@ -368,20 +407,23 @@ def calcular_descuento_monto_escala(escala, precio_unitario, *, presentacion=Non
         monto = _quantize_money(base - valor)
 
     elif escala.tipo_beneficio == PromocionEscala.TIPO_FREE_UNITS:
-        base = precio_referencia_presentacion(presentacion, precio)
-        unidades = int(escala.unidades_gratis or 0)
-        try:
-            qty = int(cantidad) if cantidad else int(escala.cantidad_minima)
-        except (TypeError, ValueError):
-            qty = int(escala.cantidad_minima)
-        qty = max(qty, 1)
-        if base <= 0 or unidades <= 0:
-            return Decimal('0.00')
-        # Free units are modelled as an equivalent per-unit discount spread across the
-        # purchased quantity, rather than physically adding extra units to the order.
-        monto = _quantize_money((base * unidades) / Decimal(qty))
-        if precio > 0 and monto > precio:
-            monto = precio
+        # Cross-product free goods are separate FREE lines (no $/unit discount on A).
+        if getattr(escala, 'presentacion_regalo_id', None):
+            monto = Decimal('0.00')
+        else:
+            base = precio_referencia_presentacion(presentacion, precio)
+            unidades = int(escala.unidades_gratis or 0)
+            try:
+                qty = int(cantidad) if cantidad else int(escala.cantidad_minima)
+            except (TypeError, ValueError):
+                qty = int(escala.cantidad_minima)
+            qty = max(qty, 1)
+            if base <= 0 or unidades <= 0:
+                return Decimal('0.00')
+            # Same-product free units: equivalent per-unit discount on purchased qty.
+            monto = _quantize_money((base * unidades) / Decimal(qty))
+            if precio > 0 and monto > precio:
+                monto = precio
 
     else:  # TIPO_FIXED
         monto = valor
@@ -393,27 +435,64 @@ def calcular_descuento_monto_escala(escala, precio_unitario, *, presentacion=Non
     return monto
 
 
+def calcular_unidades_regalo_escala(escala, cantidad):
+    """How many free gift units apply for a purchased quantity."""
+    if escala is None or escala.tipo_beneficio != PromocionEscala.TIPO_FREE_UNITS:
+        return 0
+    if not getattr(escala, 'presentacion_regalo_id', None):
+        return 0
+    unidades = int(escala.unidades_gratis or 0)
+    minimo = max(int(escala.cantidad_minima or 1), 1)
+    try:
+        qty = int(cantidad or 0)
+    except (TypeError, ValueError):
+        qty = 0
+    if unidades <= 0 or qty < minimo:
+        return 0
+    return (qty // minimo) * unidades
+
+
+def _valor_comparacion_escala(escala, *, precio, presentacion, cantidad):
+    """Score used to pick the best scale (discount $ or estimated gift value)."""
+    if (
+        escala.tipo_beneficio == PromocionEscala.TIPO_FREE_UNITS
+        and getattr(escala, 'presentacion_regalo_id', None)
+    ):
+        gift_units = calcular_unidades_regalo_escala(escala, cantidad)
+        if gift_units <= 0:
+            return Decimal('0.00')
+        gift = getattr(escala, 'presentacion_regalo', None)
+        gift_price = Decimal('0.00')
+        if gift is not None:
+            gift_price = _quantize_money(getattr(gift, 'precio_1', 0) or 0)
+        # Prefer catalog gift value; if the gift SKU has no list price yet, still
+        # treat the free-goods award as a winning benefit so the FREE line is created.
+        estimated = _quantize_money(gift_price * Decimal(str(gift_units)))
+        return estimated if estimated > 0 else Decimal(str(gift_units))
+    return calcular_descuento_monto_escala(escala, precio, presentacion=presentacion, cantidad=cantidad)
+
 def _mejor_escala(candidatos, *, precio, presentacion, cantidad, preferir_menor_cantidad_minima):
     best_escala = None
     best_promo = None
     best_monto = Decimal('0.00')
+    best_score = Decimal('0.00')
     for escala in candidatos:
+        score = _valor_comparacion_escala(escala, precio=precio, presentacion=presentacion, cantidad=cantidad)
+        if score <= 0:
+            continue
         monto = calcular_descuento_monto_escala(escala, precio, presentacion=presentacion, cantidad=cantidad)
-        if monto <= 0:
+        if best_escala is None or score > best_score:
+            best_escala, best_promo, best_monto, best_score = escala, escala.promocion, monto, score
             continue
-        if best_escala is None or monto > best_monto:
-            best_escala, best_promo, best_monto = escala, escala.promocion, monto
-            continue
-        if monto != best_monto:
+        if score != best_score:
             continue
         if preferir_menor_cantidad_minima and escala.cantidad_minima != best_escala.cantidad_minima:
             if escala.cantidad_minima < best_escala.cantidad_minima:
-                best_escala, best_promo, best_monto = escala, escala.promocion, monto
+                best_escala, best_promo, best_monto, best_score = escala, escala.promocion, monto, score
             continue
         if escala.promocion_id < best_promo.id:
-            best_escala, best_promo, best_monto = escala, escala.promocion, monto
+            best_escala, best_promo, best_monto, best_score = escala, escala.promocion, monto, score
     return best_promo, best_escala, best_monto
-
 
 def resolver_escala_disponible_para_linea(
     *,
@@ -711,6 +790,13 @@ def _clear_promo_fields(item):
     return item
 
 
+def _clear_gift_fields(item):
+    item.pop('promocion_regalo_presentacion_id', None)
+    item.pop('promocion_regalo_cantidad', None)
+    item.pop('promocion_escala_id', None)
+    return item
+
+
 def aplicar_promocion_en_item_sesion(
     item,
     *,
@@ -729,13 +815,15 @@ def aplicar_promocion_en_item_sesion(
     """
     if not isinstance(item, dict):
         return item
+    if item.get('es_regalo'):
+        return item
 
     origen = str(item.get('descuento_origen') or '').strip().lower()
     if respect_manual and origen == DESCUENTO_ORIGEN_MANUAL:
         return item
 
     precio = precio_unitario if precio_unitario is not None else item.get('precio', 0)
-    promo, monto = resolver_promocion_para_linea(
+    promo, escala, monto = resolver_escala_para_linea(
         producto_id=item.get('producto_id'),
         presentacion_id=item.get('presentacion_id'),
         cantidad=item.get('cantidad'),
@@ -745,30 +833,113 @@ def aplicar_promocion_en_item_sesion(
         lineas_context=lineas_context,
     )
     if promo is None:
+        _clear_gift_fields(item)
         if origen == DESCUENTO_ORIGEN_PROMOCION or not item.get('descuento_aplicado'):
             return _clear_promo_fields(item)
         return item
 
+    gift_units = calcular_unidades_regalo_escala(escala, item.get('cantidad'))
+    if gift_units > 0 and getattr(escala, 'presentacion_regalo_id', None):
+        item['descuento_aplicado'] = False
+        item['descuento_monto'] = 0
+        item['descuento_origen'] = DESCUENTO_ORIGEN_PROMOCION
+        item['promocion_id'] = promo.id
+        item['promocion_nombre'] = promo.nombre
+        item['promocion_descripcion'] = promo.texto_catalogo()
+        item['promocion_escala_id'] = escala.id
+        item['promocion_regalo_presentacion_id'] = escala.presentacion_regalo_id
+        item['promocion_regalo_cantidad'] = gift_units
+        return item
+
+    _clear_gift_fields(item)
     item['descuento_aplicado'] = True
     item['descuento_monto'] = float(monto)
     item['descuento_origen'] = DESCUENTO_ORIGEN_PROMOCION
     item['promocion_id'] = promo.id
     item['promocion_nombre'] = promo.nombre
     item['promocion_descripcion'] = promo.texto_catalogo()
+    item['promocion_escala_id'] = escala.id if escala is not None else None
     return item
+
+
+def sincronizar_regalos_en_sesion(lineas, *, cliente=None):
+    """Ensure session cart contains FREE gift lines for cross-product Free units."""
+    if not isinstance(lineas, dict):
+        return lineas
+
+    from config.productos.models import Presentacion
+
+    desired = {}
+    paid_keys = []
+    for key, item in list(lineas.items()):
+        if item.get('es_regalo'):
+            continue
+        paid_keys.append(key)
+        gift_presentation_id = item.get('promocion_regalo_presentacion_id')
+        gift_qty = int(item.get('promocion_regalo_cantidad') or 0)
+        if not gift_presentation_id or gift_qty <= 0:
+            continue
+        desired[str(key)] = {
+            'trigger_key': str(key),
+            'presentacion_id': int(gift_presentation_id),
+            'cantidad': gift_qty,
+            'promocion_id': item.get('promocion_id'),
+            'promocion_nombre': item.get('promocion_nombre'),
+            'promocion_descripcion': item.get('promocion_descripcion'),
+        }
+
+    for key in list(lineas.keys()):
+        item = lineas[key]
+        if not item.get('es_regalo'):
+            continue
+        trigger_key = str(item.get('regalo_de_presentacion_key') or '')
+        plan = desired.get(trigger_key)
+        if not plan:
+            del lineas[key]
+            continue
+        if int(item.get('presentacion_id') or 0) != plan['presentacion_id'] or int(item.get('cantidad') or 0) != plan['cantidad']:
+            del lineas[key]
+            continue
+        desired.pop(trigger_key, None)
+
+    for trigger_key, plan in desired.items():
+        presentacion = Presentacion.objects.select_related('producto').filter(id=plan['presentacion_id']).first()
+        if presentacion is None:
+            continue
+        gift_key = f'gift:{trigger_key}:{presentacion.id}'
+        lineas[gift_key] = {
+            'presentacion_id': presentacion.id,
+            'producto_id': presentacion.producto_id,
+            'nombre': presentacion.producto.nombre,
+            'presentacion_nombre': presentacion.nombre_empaque_cliente,
+            'precio': 0,
+            'cantidad': plan['cantidad'],
+            'descuento_aplicado': True,
+            'descuento_monto': 0,
+            'descuento_origen': DESCUENTO_ORIGEN_PROMOCION,
+            'promocion_id': plan.get('promocion_id'),
+            'promocion_nombre': plan.get('promocion_nombre'),
+            'promocion_descripcion': plan.get('promocion_descripcion') or 'FREE',
+            'es_regalo': True,
+            'regalo_de_presentacion_key': trigger_key,
+            'precio_key': '',
+        }
+    return lineas
 
 
 def reaplicar_promociones_en_lineas_sesion(lineas, *, cliente=None):
     """Re-evaluate promotions for every session/cart line sharing combo quantity totals."""
     if not isinstance(lineas, dict):
         return lineas
-    contexto = list(lineas.values())
+    contexto = [item for item in lineas.values() if not item.get('es_regalo')]
     for item in lineas.values():
+        if item.get('es_regalo'):
+            continue
         if str(item.get('descuento_origen') or '').strip().lower() == DESCUENTO_ORIGEN_MANUAL:
             continue
         aplicar_promocion_en_item_sesion(item, cliente=cliente, lineas_context=contexto)
+    sincronizar_regalos_en_sesion(lineas, cliente=cliente)
     return lineas
-
 
 def aplicar_promocion_a_item_persistido(item, *, only_if_missing=True, cliente=None, lineas_context=None):
     """
@@ -780,6 +951,8 @@ def aplicar_promocion_a_item_persistido(item, *, only_if_missing=True, cliente=N
     """
     if item is None:
         return False
+    if getattr(item, 'es_regalo', False):
+        return False
     if only_if_missing and item.descuento_aplicado and _quantize_money(item.descuento_monto) > 0:
         return False
 
@@ -788,7 +961,7 @@ def aplicar_promocion_a_item_persistido(item, *, only_if_missing=True, cliente=N
     if not producto_id:
         return False
 
-    promo, monto = resolver_promocion_para_linea(
+    promo, escala, monto = resolver_escala_para_linea(
         producto_id=producto_id,
         presentacion_id=getattr(item, 'presentacion_id', None),
         cantidad=item.cantidad,
@@ -800,13 +973,16 @@ def aplicar_promocion_a_item_persistido(item, *, only_if_missing=True, cliente=N
     if promo is None:
         return False
 
+    # Cross-product free goods are materialized as separate FREE lines.
+    if calcular_unidades_regalo_escala(escala, item.cantidad) > 0:
+        return False
+
     item.descuento_aplicado = True
     item.descuento_monto = monto
     item.subtotal = _quantize_money(
         max(Decimal('0.00'), _quantize_money(item.precio) - monto) * Decimal(str(item.cantidad or 0))
     )
     return True
-
 
 def asegurar_promociones_en_cotizacion(cotizacion, *, only_if_missing=True):
     """Persist missing promotion discounts onto quote lines that already qualify."""
@@ -835,6 +1011,97 @@ def asegurar_promociones_en_cotizacion(cotizacion, *, only_if_missing=True):
     return changed
 
 
+def sincronizar_regalos_promocion_en_pedido(pedido):
+    """Create/update/remove FREE PedidoItem gift lines for cross-product Free units."""
+    from config.pedidos.models import PedidoItem
+    from config.productos.models import Presentacion
+
+    cliente = getattr(pedido, 'cliente', None)
+    paid_items = list(
+        PedidoItem.objects.filter(pedido=pedido, es_regalo=False)
+        .select_related('presentacion__producto')
+        .prefetch_related('lineas_regalo')
+    )
+    desired = []
+    for item in paid_items:
+        promo, escala, _monto = resolver_escala_para_linea(
+            producto_id=item.presentacion.producto_id,
+            presentacion_id=item.presentacion_id,
+            cantidad=item.cantidad,
+            precio_unitario=item.precio,
+            presentacion=item.presentacion,
+            cliente=cliente,
+            lineas_context=paid_items,
+        )
+        if promo is None or escala is None:
+            continue
+        gift_units = calcular_unidades_regalo_escala(escala, item.cantidad)
+        if gift_units <= 0 or not escala.presentacion_regalo_id:
+            continue
+        desired.append({
+            'origen': item,
+            'presentacion_id': escala.presentacion_regalo_id,
+            'cantidad': gift_units,
+        })
+
+    existing_gifts = list(PedidoItem.objects.filter(pedido=pedido, es_regalo=True).select_related('presentacion'))
+    keep_ids = set()
+    created = []
+    for plan in desired:
+        match = next(
+            (
+                gift for gift in existing_gifts
+                if gift.regalo_origen_item_id == plan['origen'].id
+                and gift.presentacion_id == plan['presentacion_id']
+            ),
+            None,
+        )
+        if match:
+            if match.cantidad != plan['cantidad'] or match.cantidad_solicitada != plan['cantidad']:
+                match.cantidad = plan['cantidad']
+                match.cantidad_solicitada = plan['cantidad']
+                match.precio = Decimal('0.00')
+                match.descuento_aplicado = True
+                match.descuento_monto = Decimal('0.00')
+                match.subtotal = Decimal('0.00')
+                match.save(update_fields=[
+                    'cantidad', 'cantidad_solicitada', 'precio',
+                    'descuento_aplicado', 'descuento_monto', 'subtotal',
+                ])
+            keep_ids.add(match.id)
+            continue
+        presentacion = Presentacion.objects.filter(id=plan['presentacion_id']).first()
+        if presentacion is None:
+            continue
+        gift = PedidoItem.objects.create(
+            pedido=pedido,
+            presentacion=presentacion,
+            cantidad_solicitada=plan['cantidad'],
+            cantidad=plan['cantidad'],
+            precio=Decimal('0.00'),
+            descuento_aplicado=True,
+            descuento_monto=Decimal('0.00'),
+            subtotal=Decimal('0.00'),
+            es_regalo=True,
+            regalo_origen_item=plan['origen'],
+        )
+        created.append(gift)
+        keep_ids.add(gift.id)
+
+    for gift in existing_gifts:
+        if gift.id not in keep_ids:
+            gift.delete()
+
+    items = list(PedidoItem.objects.filter(pedido=pedido))
+    total = sum((_quantize_money(row.subtotal) for row in items), Decimal('0.00'))
+    pedido.total = _quantize_money(total)
+    update_fields = ['total']
+    if hasattr(pedido, 'actualizada_en'):
+        update_fields.append('actualizada_en')
+    pedido.save(update_fields=update_fields)
+    return created
+
+
 def asegurar_promociones_en_pedido(pedido, *, only_if_missing=True):
     """Persist missing promotion discounts onto order lines that already qualify."""
     from config.pedidos.models import PedidoItem
@@ -842,7 +1109,7 @@ def asegurar_promociones_en_pedido(pedido, *, only_if_missing=True):
     cliente = getattr(pedido, 'cliente', None)
     changed = False
     items = list(
-        PedidoItem.objects.filter(pedido=pedido)
+        PedidoItem.objects.filter(pedido=pedido, es_regalo=False)
         .select_related('presentacion__producto')
     )
     for item in items:
@@ -855,7 +1122,11 @@ def asegurar_promociones_en_pedido(pedido, *, only_if_missing=True):
             item.save(update_fields=['descuento_aplicado', 'descuento_monto', 'subtotal'])
             changed = True
 
+    sincronizar_regalos_promocion_en_pedido(pedido)
+    changed = True
+
     if changed:
+        items = list(PedidoItem.objects.filter(pedido=pedido))
         total = sum((_quantize_money(row.subtotal) for row in items), Decimal('0.00'))
         pedido.total = _quantize_money(total)
         update_fields = ['total']
@@ -863,7 +1134,6 @@ def asegurar_promociones_en_pedido(pedido, *, only_if_missing=True):
             update_fields.append('actualizada_en')
         pedido.save(update_fields=update_fields)
     return changed
-
 
 def marcar_descuento_manual_en_item(item):
     if not isinstance(item, dict):

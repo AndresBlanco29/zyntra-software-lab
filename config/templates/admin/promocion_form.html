@@ -231,9 +231,32 @@
           {{ escala_form.valor_beneficio }}
           <input type="text" class="form-control form-control-sm mt-1" list="promoPercentPresets" placeholder="{% trans 'Quick % presets…' %}" data-preset-input="percent">
         </div>
-        <div class="col-md-3" data-escala-field="unidades_gratis">
+        <div class="col-md-2" data-escala-field="unidades_gratis">
           <label class="form-label small">{% trans "Free units" %}</label>
           {{ escala_form.unidades_gratis }}
+        </div>
+        <div
+          class="col-md-3"
+          data-escala-field="presentacion_regalo"
+          data-gift-search-root
+          data-search-url="{{ producto_search_url }}"
+          data-presentaciones-url-template="{{ producto_presentaciones_url_template }}">
+          <label class="form-label small">{% trans "Free product (optional)" %}</label>
+          <div class="position-relative">
+            <input
+              type="text"
+              class="form-control promo-gift-buscador"
+              autocomplete="off"
+              placeholder="{% trans 'Search product…' %}"
+              value="{{ escala_form.gift_producto_label }}">
+            <div class="list-group position-absolute w-100 shadow-sm promo-gift-resultados" style="z-index: 1000;" hidden></div>
+          </div>
+          <select class="form-select form-select-sm mt-1 promo-gift-presentacion" {% if not escala_form.gift_producto_id %}disabled{% endif %}>
+            <option value="">{% trans "Same product (discount)" %}</option>
+          </select>
+          <input type="hidden" class="promo-gift-producto-id" value="{{ escala_form.gift_producto_id }}">
+          {{ escala_form.presentacion_regalo }}
+          <div class="form-text">{% trans "Leave empty for same-product discount. Search a product to auto-add a FREE line (e.g. Product B)." %}</div>
         </div>
         <div class="col-md-1 text-end">
           <div class="d-none">{{ escala_form.DELETE }}</div>
@@ -267,9 +290,26 @@
           {{ escalas_formset.empty_form.valor_beneficio }}
           <input type="text" class="form-control form-control-sm mt-1" list="promoPercentPresets" placeholder="{% trans 'Quick % presets…' %}" data-preset-input="percent">
         </div>
-        <div class="col-md-3" data-escala-field="unidades_gratis">
+        <div class="col-md-2" data-escala-field="unidades_gratis">
           <label class="form-label small">{% trans "Free units" %}</label>
           {{ escalas_formset.empty_form.unidades_gratis }}
+        </div>
+        <div
+          class="col-md-3"
+          data-escala-field="presentacion_regalo"
+          data-gift-search-root
+          data-search-url="{{ producto_search_url }}"
+          data-presentaciones-url-template="{{ producto_presentaciones_url_template }}">
+          <label class="form-label small">{% trans "Free product (optional)" %}</label>
+          <div class="position-relative">
+            <input type="text" class="form-control promo-gift-buscador" autocomplete="off" placeholder="{% trans 'Search product…' %}">
+            <div class="list-group position-absolute w-100 shadow-sm promo-gift-resultados" style="z-index: 1000;" hidden></div>
+          </div>
+          <select class="form-select form-select-sm mt-1 promo-gift-presentacion" disabled>
+            <option value="">{% trans "Same product (discount)" %}</option>
+          </select>
+          <input type="hidden" class="promo-gift-producto-id" value="">
+          {{ escalas_formset.empty_form.presentacion_regalo }}
         </div>
         <div class="col-md-1 text-end">
           {{ escalas_formset.empty_form.DELETE }}

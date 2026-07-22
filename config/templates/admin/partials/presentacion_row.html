@@ -44,12 +44,13 @@
 </div>
 
 <div class="col-md-2 mb-3">
-<label class="form-label">{% trans "Costo" %}</label>
+<label class="form-label">{% trans "RCost" %}</label>
 {% if presentacion %}
 <input type="number" step="0.01" min="0" name="costo_{{ presentacion.id }}" class="form-control" value="{% if presentacion.costo is not None %}{{ presentacion.costo|stringformat:'f' }}{% endif %}" data-cost-input>
 {% else %}
 <input type="number" step="0.01" min="0" name="presentacion_nueva_costo" class="form-control" value="{{ default_costo|default:'' }}" data-cost-input>
 {% endif %}
+<small class="text-muted">{% trans "Real cost from QuickBooks." %}</small>
 </div>
 
 <div class="col-md-2 mb-3">
@@ -111,6 +112,25 @@
 <input type="number" step="0.01" class="form-control" value="" readonly placeholder="-">
 {% endif %}
 <small class="text-muted">{% trans "Sales Price from QuickBooks." %}</small>
+</div>
+<div class="col-md-2 mb-3">
+<label class="form-label">{% trans "Landed Cost override" %}</label>
+{% if presentacion %}
+<select name="landed_cost_override_tipo_{{ presentacion.id }}" class="form-select form-select-sm mb-1">
+  <option value="" {% if not presentacion.landed_cost_override_tipo %}selected{% endif %}>{% trans "Use global" %}</option>
+  <option value="PERCENT" {% if presentacion.landed_cost_override_tipo == 'PERCENT' %}selected{% endif %}>{% trans "Percent" %}</option>
+  <option value="FIXED" {% if presentacion.landed_cost_override_tipo == 'FIXED' %}selected{% endif %}>{% trans "Fixed $" %}</option>
+</select>
+<input type="number" step="0.01" min="0" name="landed_cost_override_valor_{{ presentacion.id }}" class="form-control" value="{% if presentacion.landed_cost_override_valor is not None %}{{ presentacion.landed_cost_override_valor|stringformat:'f' }}{% endif %}" placeholder="{% trans 'Value' %}">
+{% else %}
+<select name="presentacion_nueva_landed_cost_override_tipo" class="form-select form-select-sm mb-1">
+  <option value="" selected>{% trans "Use global" %}</option>
+  <option value="PERCENT">{% trans "Percent" %}</option>
+  <option value="FIXED">{% trans "Fixed $" %}</option>
+</select>
+<input type="number" step="0.01" min="0" name="presentacion_nueva_landed_cost_override_valor" class="form-control" value="" placeholder="{% trans 'Value' %}">
+{% endif %}
+<small class="text-muted">{% trans "Logistics cost on top of RCost." %}</small>
 </div>
 </div>
 

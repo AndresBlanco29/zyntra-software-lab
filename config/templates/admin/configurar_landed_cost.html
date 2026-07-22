@@ -1,0 +1,37 @@
+{% extends "bases/base_vendedor.html" %}
+{% load static i18n %}
+
+{% block title %}{% trans "Configure Landed Cost" %}{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">{% trans "Configure Landed Cost" %}</h2>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      <p class="text-muted">
+        {% trans "Global logistics cost applied on top of each product RCost (QuickBooks real cost). Margin uses RCost + Landed Cost. Sellers only see the final commercial margin, never the Landed Cost breakdown." %}
+      </p>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{% trans "Type" %}</label>
+          <select name="tipo" class="form-select">
+            <option value="PERCENT" {% if configuracion.tipo == 'PERCENT' %}selected{% endif %}>{% trans "Percent of RCost" %}</option>
+            <option value="FIXED" {% if configuracion.tipo == 'FIXED' %}selected{% endif %}>{% trans "Fixed dollars per unit" %}</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">{% trans "Value" %}</label>
+          <input type="number" step="0.01" min="0" name="valor" class="form-control" value="{{ configuracion.valor|stringformat:'f' }}">
+        </div>
+      </div>
+      <div class="mt-4 d-flex flex-wrap gap-2">
+        <button type="submit" class="btn btn-success">{% trans "Save Landed Cost" %}</button>
+        <a href="{% url 'lista_productos' %}" class="btn btn-secondary">{% trans "Back" %}</a>
+        <a href="{% url 'configurar_precios' %}" class="btn btn-outline-primary">{% trans "Price margins" %}</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

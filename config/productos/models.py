@@ -258,7 +258,39 @@ class Presentacion(models.Model):
     tipo_contenido = models.CharField(max_length=50, default="unidades")
     tipo_contenido_en = models.CharField(max_length=50, blank=True)
 
-    costo = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    costo = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        verbose_name=_('RCost'),
+        help_text=_('Real cost from QuickBooks / catalog cost used as the base RCost.'),
+    )
+
+    LANDED_OVERRIDE_NONE = ''
+    LANDED_OVERRIDE_PERCENT = 'PERCENT'
+    LANDED_OVERRIDE_FIXED = 'FIXED'
+    LANDED_OVERRIDE_CHOICES = (
+        (LANDED_OVERRIDE_NONE, _('Use global Landed Cost')),
+        (LANDED_OVERRIDE_PERCENT, _('Percent override')),
+        (LANDED_OVERRIDE_FIXED, _('Fixed $ override')),
+    )
+
+    landed_cost_override_tipo = models.CharField(
+        max_length=20,
+        choices=LANDED_OVERRIDE_CHOICES,
+        blank=True,
+        default=LANDED_OVERRIDE_NONE,
+        verbose_name=_('Landed Cost override type'),
+    )
+    landed_cost_override_valor = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        verbose_name=_('Landed Cost override value'),
+        help_text=_('Percent or fixed dollars depending on the override type. Leave empty to use the global Landed Cost.'),
+    )
 
     qb_price = models.DecimalField(
         max_digits=10,
@@ -364,10 +396,70 @@ class Presentacion(models.Model):
             return _calculate_price_from_margin(self.costo, porcentajes[normalized_tier - 1])
         return getattr(self, f'precio_{normalized_tier}', self.precio_1)
 
+    @property
+    def rcost(self):
+        """Alias for the real QuickBooks / catalog unit cost."""
+        return self.costo
+
+    @property
+    def landed_cost_amount(self):
+        from config.productos.landed_cost import resolve_landed_cost_amount
+
+        return resolve_landed_cost_amount(self)
+
+    @property
+    def effective_cost(self):
+        from config.productos.landed_cost import resolve_effective_cost
+
+        return resolve_effective_cost(self)
+
     def save(self, *args, **kwargs):
         self.recalcular_precios()
         self.recalcular_pallet_quantity()
         super().save(*args, **kwargs)
+
+
+class ConfiguracionLandedCost(models.Model):
+    TIPO_PERCENT = 'PERCENT'
+    TIPO_FIXED = 'FIXED'
+    TIPO_CHOICES = (
+        (TIPO_PERCENT, _('Percent of RCost')),
+        (TIPO_FIXED, _('Fixed dollars per unit')),
+    )
+
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default=TIPO_PERCENT)
+    valor = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0.00'))
+
+    class Meta:
+        verbose_name = _('Landed Cost configuration')
+        verbose_name_plural = _('Landed Cost configuration')
+
+    def clean(self):
+        amount = _quantize_money(self.valor or 0)
+        if amount < 0:
+            raise ValidationError({'valor': _('Landed Cost must be zero or greater.')})
+        if self.tipo == self.TIPO_PERCENT and amount > Decimal('100'):
+            raise ValidationError({'valor': _('Landed Cost percentage cannot exceed 100.')})
+        self.valor = amount
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        return
+
+    @classmethod
+    def obtener(cls):
+        configuracion, _ = cls.objects.get_or_create(
+            pk=1,
+            defaults={'tipo': cls.TIPO_PERCENT, 'valor': Decimal('0.00')},
+        )
+        return configuracion
+
+    def __str__(self):
+        return _('Landed Cost configuration')
 
 
 class ConfiguracionPrecios(models.Model):
@@ -709,6 +801,19 @@ class PromocionEscala(models.Model):
         verbose_name=_('Free units'),
         help_text=_('Only used when the benefit type is "Free units", e.g. buy 10 -> 1 free.'),
     )
+    presentacion_regalo = models.ForeignKey(
+        'Presentacion',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='promociones_escala_regalo',
+        verbose_name=_('Free product presentation'),
+        help_text=_(
+            'Optional. When set, Free units grants this presentation as a FREE line '
+            '(e.g. buy 120 of product A, receive 1 free case of product B). '
+            'When empty, Free units stays as an equivalent discount on the same product.'
+        ),
+    )
     orden = models.PositiveSmallIntegerField(default=0, verbose_name=_('Display order'))
 
     class Meta:
@@ -736,6 +841,7 @@ class PromocionEscala(models.Model):
             return
 
         self.unidades_gratis = None
+        self.presentacion_regalo = None
         valor = _quantize_money(self.valor_beneficio or 0)
         if valor <= 0:
             raise ValidationError({'valor_beneficio': _('Benefit value must be greater than zero.')})
@@ -749,6 +855,13 @@ class PromocionEscala(models.Model):
         if self.tipo_beneficio == self.TIPO_FIXED:
             return f'${self.valor_beneficio} {_("off per unit")}'
         if self.tipo_beneficio == self.TIPO_FREE_UNITS:
+            if self.presentacion_regalo_id:
+                gift = self.presentacion_regalo
+                gift_label = f'{gift.producto.nombre} ({gift.nombre_empaque_cliente})'
+                return str(_('%(units)s free %(product)s') % {
+                    'units': self.unidades_gratis,
+                    'product': gift_label,
+                })
             return str(_('%(units)s free unit(s)') % {'units': self.unidades_gratis})
         if self.tipo_beneficio == self.TIPO_PRECIO_ESPECIAL:
             return str(_('Special price: $%(price)s') % {'price': self.valor_beneficio})

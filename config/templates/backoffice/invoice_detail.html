@@ -498,7 +498,14 @@
         <tbody>
           {% for item in invoice_items %}
           <tr>
-            <td data-label="{% trans 'Description' %}">{{ item.producto_nombre }}</td>
+            <td data-label="{% trans 'Description' %}">
+              {{ item.producto_nombre }}
+              {% if item.pedido_item_id and item.pedido_item.es_regalo %}
+              <span class="badge text-bg-success ms-1">{% trans "FREE" %}</span>
+              {% elif item.precio_unitario == 0 %}
+              <span class="badge text-bg-success ms-1">{% trans "FREE" %}</span>
+              {% endif %}
+            </td>
             <td data-label="{% trans 'U/M' %}">{{ item.presentacion_nombre_display }}</td>
             <td data-label="{% trans 'Requested qty.' %}">{% if item.pedido_item_id %}{{ item.pedido_item.cantidad_solicitada_documentada }}{% else %}{{ item.cantidad_facturada }}{% endif %}</td>
             <td data-label="{% trans 'Dispatched qty.' %}">{{ item.cantidad_despachada_neta }}</td>

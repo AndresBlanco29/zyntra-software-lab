@@ -334,6 +334,26 @@ function persistPrice(id) {
     return applyPriceChange(id, controls.priceInput.value, resolvePriceKey(controls.presetSelect))
 }
 
+function applyCustomPercentDiscount(id) {
+    const percentInput = document.querySelector(`.descuento-porcentaje[data-id="${id}"]`)
+    const amountInput = document.querySelector(`.descuento-monto[data-id="${id}"]`)
+    const priceInput = document.querySelector(`.precio-resumen-manual[data-id="${id}"]`)
+    if (!percentInput || !amountInput || !priceInput) {
+        return
+    }
+    const percent = parseDecimalValue(percentInput.value)
+    const price = parseDecimalValue(priceInput.value)
+    if (percent === null || price === null || percent < 0) {
+        return
+    }
+    const capped = Math.min(percent, 100)
+    amountInput.value = formatMoney((price * capped) / 100)
+    const presetSelect = document.querySelector(`.descuento-preset[data-id="${id}"]`)
+    if (presetSelect) {
+        presetSelect.value = ''
+    }
+}
+
 function persistDiscount(id) {
     const toggle = document.querySelector(`.descuento-toggle[data-id="${id}"]`)
     const amountInput = document.querySelector(`.descuento-monto[data-id="${id}"]`)
@@ -803,6 +823,22 @@ document.querySelectorAll('.descuento-preset').forEach(presetSelect => {
 document.querySelectorAll('.descuento-monto').forEach(input => {
     input.addEventListener('change', function () {
         persistDiscount(this.dataset.id)
+    })
+})
+
+document.querySelectorAll('.descuento-porcentaje').forEach(input => {
+    input.addEventListener('change', function () {
+        const id = this.dataset.id
+        applyCustomPercentDiscount(id)
+        const toggle = document.querySelector(`.descuento-toggle[data-id="${id}"]`)
+        if (toggle && !toggle.checked) {
+            toggle.checked = true
+            const fieldsWrap = document.querySelector(`.pedido-discount-cell[data-id="${id}"] .descuento-fields-wrap`)
+            if (fieldsWrap) {
+                fieldsWrap.classList.remove('d-none')
+            }
+        }
+        persistDiscount(id)
     })
 })
 

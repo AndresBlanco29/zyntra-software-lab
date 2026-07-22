@@ -63,7 +63,11 @@ class="vendedor-catalogo-page"
 La Tortilla Grocery
 </a>
 
-<div class="ms-auto">
+<div class="ms-auto d-flex align-items-center gap-2">
+
+<button type="button" class="btn btn-outline-light" id="clientModeToggleBtn" aria-pressed="false" data-label-enter="{% trans 'Client Mode' %}" data-label-exit="{% trans 'Exit Client Mode' %}">
+{% trans "Client Mode" %}
+</button>
 
 <a href="{% url 'ver_pedido' %}" class="btn btn-outline-light">
 
@@ -248,7 +252,7 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 </select>
 </div>
 
-<div class="card shadow-sm mb-3 bulk-price-tier-panel">
+<div class="card shadow-sm mb-3 bulk-price-tier-panel js-internal-only">
 <div class="card-body py-2 px-3">
 <div class="row g-2 align-items-end">
 <div class="col-md-8 col-lg-7">
@@ -274,6 +278,25 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 
 <!-- PRODUCTOS -->
 
+{% if productos_favoritos and page_obj.number == 1 %}
+<div class="favorites-section mb-4">
+    <div class="favorites-section__header">
+        <div>
+            <h2 class="favorites-section__title">{% trans "Favorite products" %}</h2>
+            <p class="favorites-section__subtitle mb-0">
+                {% blocktrans with customer=cliente.nombre_empresa %}Products {{ customer }} buys often — add them again in one tap.{% endblocktrans %}
+            </p>
+        </div>
+    </div>
+    <div class="row g-4 catalog-products-row justify-content-center favorites-section__grid">
+        {% for producto in productos_favoritos %}
+        <div class="col-12 col-sm-6 col-md-4 col-lg-3 catalog-product-col">
+            {% include "vendedores/includes/tomar_pedido_producto_card.html" %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 {% if combos and page_obj.number == 1 %}
 <div class="combos-section mb-4">
     <div class="favorites-section__header">
@@ -298,256 +321,10 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 <div class="row g-4 catalog-products-row justify-content-center">
 
 {% for producto in productos %}
-
 <div class="col-12 col-sm-6 col-md-4 col-lg-3 catalog-product-col">
-
-<div
-class="producto-card text-center"
-data-producto-id="{{ producto.id }}"
-data-nombre="{{ producto.nombre }}"
-data-categoria="{{ producto.categoria.id }}"
-data-marca="{{ producto.marca.id }}"
-data-costo="{{ producto.presentaciones.first.costo|default:'0' }}"
->
-
-{% if producto.promocion_activa %}
-{% if producto.promocion_es_grupo %}
-<div class="promo-badge promo-badge--combo" title="{{ producto.promocion_texto }}">
-📦 {% trans "COMBO" %}
+{% include "vendedores/includes/tomar_pedido_producto_card.html" %}
 </div>
-{% else %}
-<div class="promo-badge" title="{{ producto.promocion_texto }}">
-★ {% trans "Promotion" %}
-</div>
-{% endif %}
-{% endif %}
-
-<div class="producto-img-wrap mb-3">
-{% include "productos/includes/producto_imagen.html" with img_extra_class="mb-0" %}
-</div>
-
-<div class="product-name">
-
-{{ producto.nombre }}
-
-</div>
-
-{% if producto.promocion_es_grupo %}
-<div class="promo-combo-note mb-2">
-<div class="promo-combo-note__title">📦 {% trans "Combo discount" %}</div>
-<p class="promo-combo-note__text">
-{% blocktrans with minimum=producto.promocion_cantidad_minima %}Quantities of these products add up together. Buy {{ minimum }}+ units in total to unlock the discount:{% endblocktrans %}
-</p>
-<ul class="promo-combo-note__list">
-{% for nombre in producto.promocion_combo_productos %}
-<li>✓ {{ nombre }}</li>
 {% endfor %}
-</ul>
-</div>
-{% elif producto.promocion_texto %}
-<div class="promo-detail mb-2">
-{{ producto.promocion_texto }}
-</div>
-{% endif %}
-
-
-{% with p=producto.presentaciones.first %}
-
-<div class="units-text mb-2 info-presentacion">
-
-{% if p %}
-
-{{ p.descripcion_empaque_cliente }}
-
-{% endif %}
-
-</div>
-
-{% endwith %}
-
-
-<div class="mb-2">
-
-<label class="fw-bold small">
-
-{% trans "Presentación:" %}
-
-</label>
-
-<select class="form-select form-select-sm presentacion-select">
-
-{% for p in producto.presentaciones.all %}
-
-<option
-value="{{ p.id }}"
-data-unidades="{{ p.unidades }}"
-data-tipo="{{ p.tipo_contenido_traducido }}"
-data-costo="{{ p.costo|default:'0' }}"
-data-precio1="{{ p.precio_1 }}"
-data-precio2="{{ p.precio_2 }}"
-data-precio3="{{ p.precio_3 }}"
-data-precio4="{{ p.precio_4 }}"
-data-precio5="{{ p.precio_5 }}"
-data-summary="{{ p.descripcion_empaque_cliente }}"
->
-
-{{ p.nombre_empaque_cliente }}
-
-</option>
-
-{% endfor %}
-
-</select>
-
-</div>
-
-
-<div class="precios-vendedor mb-3">
-
-<div class="border rounded-3 bg-light-subtle p-3 mb-3 order-history-panel">
-
-<div class="d-flex justify-content-between align-items-center gap-2 mb-2">
-
-<label class="fw-bold small mb-0">
-{% trans "Historial últimos 3 pedidos:" %}
-</label>
-
-<span class="small text-muted" data-order-history-current-label>
-{{ producto.presentaciones.first.nombre_traducido }}
-</span>
-
-</div>
-
-{% for p in producto.presentaciones.all %}
-
-<div class="order-history-list {% if not forloop.first %}d-none{% endif %}" data-order-history-list data-presentacion-id="{{ p.id }}">
-
-{% if p.recent_customer_sales %}
-
-<div class="d-flex flex-wrap gap-2">
-
-{% for invoice_item in p.recent_customer_sales %}
-
-<div class="border rounded-3 bg-white px-2 py-2 small flex-fill order-history-entry">
-<div class="fw-semibold">{{ invoice_item.sale_reference_date|date:"m/d/Y" }}</div>
-<div>{% blocktrans with quantity=invoice_item.cantidad_facturada price=invoice_item.precio_unitario|floatformat:2 %}{{ quantity }} @ ${{ price }}{% endblocktrans %}</div>
-</div>
-
-{% endfor %}
-
-</div>
-
-{% else %}
-
-<div class="small text-muted">{% trans "Sin ventas recientes para esta presentación." %}</div>
-
-{% endif %}
-
-</div>
-
-{% endfor %}
-
-</div>
-
-<label class="fw-bold small">
-
-{% trans "Precio:" %}
-
-</label>
-
-<div class="precio-select-shell"
-  data-label-default="{% trans 'Mantén oprimido 1 segundo para elegir precio' %}"
-  data-label-selected="{% trans 'Precio seleccionado' %}"
-  data-hold-label="{% trans 'Mantén oprimido 1 segundo para elegir precio' %}"
-  data-picker-title="{% trans 'Seleccionar precio' %}">
-
-<select class="form-select form-select-sm precio-select" aria-label="{% trans 'Seleccionar precio del producto' %}">
-
-<option value="">
-{% trans "Seleccionar precio" %}
-</option>
-
-{% with p=producto.presentaciones.first %}
-{% if p.precio_1 and p.precio_1 != "0.00" %}
-<option value="{{ p.precio_1 }}" data-price-key="precio_1" data-margin="{{ price_margin_percentages.0 }}">
-{% trans "Price" %} 1 - ${{ p.precio_1 }}
-</option>
-{% endif %}
-{% if p.precio_2 and p.precio_2 != "0.00" %}
-<option value="{{ p.precio_2 }}" data-price-key="precio_2" data-margin="{{ price_margin_percentages.1 }}">
-{% trans "Price" %} 2 - ${{ p.precio_2 }}
-</option>
-{% endif %}
-{% if p.precio_3 and p.precio_3 != "0.00" %}
-<option value="{{ p.precio_3 }}" data-price-key="precio_3" data-margin="{{ price_margin_percentages.2 }}">
-{% trans "Price" %} 3 - ${{ p.precio_3 }}
-</option>
-{% endif %}
-{% if p.precio_4 and p.precio_4 != "0.00" %}
-<option value="{{ p.precio_4 }}" data-price-key="precio_4" data-margin="{{ price_margin_percentages.3 }}">
-{% trans "Price" %} 4 - ${{ p.precio_4 }}
-</option>
-{% endif %}
-{% if p.precio_5 and p.precio_5 != "0.00" %}
-<option value="{{ p.precio_5 }}" data-price-key="precio_5" data-margin="{{ price_margin_percentages.4 }}">
-{% trans "Price" %} 5 - ${{ p.precio_5 }}
-</option>
-{% endif %}
-{% endwith %}
-
-</select>
-
-<button type="button" class="precio-hold-trigger" aria-label="{% trans 'Mantén oprimido para mostrar los precios' %}"></button>
-
-<span class="precio-select-mask" aria-hidden="true">{% trans "Mantén oprimido 1 segundo para elegir precio" %}</span>
-
-</div>
-
-<div class="precio-manual-wrap mt-2">
-<label class="small text-muted mb-1 d-block">{% trans "Manual price" %}</label>
-<div class="input-group input-group-sm">
-<span class="input-group-text">$</span>
-<input type="number" step="0.01" min="0.01" class="form-control precio-manual-input" placeholder="0.00" inputmode="decimal" aria-label="{% trans 'Manual price' %}">
-<button type="button" class="btn btn-outline-primary precio-manual-apply">{% trans "Apply" %}</button>
-</div>
-</div>
-
-<div class="precio-margin-hint small text-success fw-semibold mt-1 d-none" aria-live="polite"></div>
-
-</div>
-
-
-<div class="mb-3">
-
-<label class="fw-bold small">
-{% trans "Cantidad:" %}
-</label>
-
-<div class="d-flex justify-content-center align-items-center gap-2 mt-1">
-
-<button type="button" class="qty-btn restar">-</button>
-
-<input type="number" min="1" step="1" class="cantidad-input cantidad" value="1" inputmode="numeric" aria-label="{% trans 'Cantidad:' %}">
-
-<button type="button" class="qty-btn sumar">+</button>
-
-</div>
-
-</div>
-
-
-<button type="button" class="btn btn-yellow w-100 agregar-btn">
-
-{% trans "Agregar al Pedido" %}
-
-</button>
-
-</div>
-
-</div>
-
-{% endfor %}
-
 </div>
 
 {% pagination_controls page_obj aria_label=_('Product pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-2" q=filter_q categoria=filter_categoria marca=filter_marca %}
@@ -711,6 +488,23 @@ $<span id="pedidoTotal">{{ total }}</span>
 </div>
 
 <script src="{% static 'js/catalog_quantity.js' %}"></script>
+<style>
+body.client-mode .js-internal-only,
+body.client-mode .bulk-price-tier-panel,
+body.client-mode .precio-margin-hint,
+body.client-mode .order-history-panel,
+body.client-mode .precio-manual-wrap {
+  display: none !important;
+}
+body.client-mode .precio-select option {
+  /* Keep final prices; JS labels still show $ amounts */
+}
+#clientModeToggleBtn.is-active {
+  background: #fff;
+  color: #111827;
+}
+</style>
+<script src="{% static 'js/take_order_client_mode.js' %}"></script>
 <script src="{% static 'js/tomar_pedido_catalogo.js' %}"></script>
 
 <script>

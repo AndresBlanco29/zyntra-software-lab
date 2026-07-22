@@ -9,6 +9,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from config.clientes.models import Cliente
+from config.facturacion.models import Invoice, InvoiceItem
 from config.facturacion.services import generar_invoice_desde_picking, start_delivery_route, complete_driver_delivery
 from config.inventario.services import registrar_entrada_manual
 from config.pedidos.models import Pedido, PedidoItem
@@ -112,6 +113,73 @@ class ReportsDashboardTests(TestCase):
 			cheque_image_file=self.cheque_image,
 		)
 		return invoice
+
+	def _create_quickbooks_imported_invoice(self, *, total='9999.00', quantity=10):
+		"""Mimic a QuickBooks accounting document pulled into the local DB."""
+		pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='BACKOFFICE',
+			canal_toma='QUICKBOOKS_IMPORT',
+			estado='INVOICE_GENERADA',
+			total=Decimal(total),
+		)
+		PedidoItem.objects.create(
+			pedido=pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=quantity,
+			cantidad=quantity,
+			precio=Decimal(total) / Decimal(quantity),
+			subtotal=Decimal(total),
+		)
+		invoice = Invoice.objects.create(
+			pedido=pedido,
+			cliente=self.cliente,
+			metodo_entrega='LTG',
+			subtotal=Decimal(total),
+			total_neto=Decimal(total),
+			saldo_cliente=Decimal('0.00'),
+			quickbooks_id='QB-IMPORT-1',
+		)
+		InvoiceItem.objects.create(
+			invoice=invoice,
+			presentacion=self.presentacion,
+			producto_nombre='QuickBooks Only Product',
+			presentacion_nombre='QB Case',
+			cantidad_facturada=quantity,
+			precio_unitario=Decimal(total) / Decimal(quantity),
+			subtotal=Decimal(total),
+		)
+		return invoice
+
+	def test_quickbooks_imported_sales_are_excluded_from_reports(self):
+		system_invoice = self._create_paid_delivery()
+		qb_invoice = self._create_quickbooks_imported_invoice()
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('reportes_dashboard'), {'period': 'all'})
+
+		self.assertEqual(response.status_code, 200)
+		# Only the system invoice is counted, never the QuickBooks-imported one.
+		self.assertEqual(response.context['summary_cards'][1]['value'], 1)
+		gross_sales_card = next(card for card in response.context['summary_cards'] if card['label'] == 'Gross sales')
+		self.assertEqual(gross_sales_card['value'], system_invoice.total_neto)
+		product_names = [row['name'] for row in response.context['product_rows_full']]
+		self.assertNotIn('QuickBooks Only Product', product_names)
+		# The always-on strip (including the new "all time" card) ignores QB sales.
+		for item in response.context['period_sales']:
+			self.assertNotEqual(item['value'], qb_invoice.total_neto)
+		all_time_card = next(item for item in response.context['period_sales'] if item['key'] == 'all')
+		self.assertEqual(all_time_card['value'], system_invoice.total_neto)
+
+	def test_all_time_period_reports_since_first_system_sale(self):
+		self._create_paid_delivery()
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('reportes_dashboard'), {'period': 'all'})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context['period']['preset'], 'all')
+		self.assertEqual(response.context['summary_cards'][1]['value'], 1)
 
 	def test_reports_dashboard_renders_with_metrics(self):
 		invoice = self._create_paid_delivery()

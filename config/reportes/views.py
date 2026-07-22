@@ -43,6 +43,10 @@ from config.usuarios.permissions import internal_permission_required
 
 
 DECIMAL_ZERO = Decimal('0.00')
+# Orders/invoices pulled from QuickBooks are tagged with this take channel. The
+# Reports Center only reflects sales generated inside this system, so these are
+# always excluded (same convention used by dispatch orders and the invoices list).
+QUICKBOOKS_IMPORT_CHANNEL = 'QUICKBOOKS_IMPORT'
 PAYMENT_METHOD_ORDER = ('CASH', 'CHEQUE', 'TARJETA', 'TRANSFERENCIA', 'ZELLE', 'ACH')
 PAYMENT_METHOD_LABELS = {
 	'CASH': _('Cash'),
@@ -58,6 +62,7 @@ PERIOD_CHOICES = (
 	('biweekly', _('Last 14 days')),
 	('month', _('This month')),
 	('year', _('This year')),
+	('all', _('All time (since we started)')),
 	('custom', _('Custom range')),
 )
 TREND_CHART_WIDTH = Decimal('100')
@@ -113,6 +118,30 @@ def _format_number(value):
 	return str(value)
 
 
+def _earliest_system_activity_date():
+	"""Oldest local date with a system-generated (non-QuickBooks) order or invoice."""
+	today = timezone.localdate()
+	earliest = None
+	candidates = (
+		Invoice.objects.filter(estado='GENERADA')
+		.exclude(pedido__canal_toma=QUICKBOOKS_IMPORT_CHANNEL)
+		.order_by('creada_en')
+		.values_list('creada_en', flat=True)
+		.first(),
+		Pedido.objects.exclude(canal_toma=QUICKBOOKS_IMPORT_CHANNEL)
+		.order_by('creada_en')
+		.values_list('creada_en', flat=True)
+		.first(),
+	)
+	for value in candidates:
+		if value is None:
+			continue
+		local_date = timezone.localtime(value).date()
+		if earliest is None or local_date < earliest:
+			earliest = local_date
+	return earliest or today
+
+
 def _parse_range(request):
 	data = request.POST if request.method == 'POST' else request.GET
 	today = timezone.localdate()
@@ -122,6 +151,10 @@ def _parse_range(request):
 
 	if preset == 'custom' and start_date and end_date and start_date <= end_date:
 		label = _('Custom range')
+	elif preset == 'all':
+		start_date = _earliest_system_activity_date()
+		end_date = today
+		label = _('All time (since we started)')
 	elif preset == 'week':
 		start_date = today - timedelta(days=today.weekday())
 		end_date = today
@@ -1049,30 +1082,44 @@ def _collect_filter_options(raw_data):
 def _collect_report_data(period, filters=None):
 	filters = filters or {}
 	completed_statuses = {'ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'}
-	orders_queryset = Pedido.objects.select_related('cliente', 'vendedor').filter(
+	# Only sales generated inside this system: never count QuickBooks-imported
+	# orders/invoices (they are historical accounting records pulled from QB).
+	orders_queryset = Pedido.objects.select_related('cliente', 'vendedor').exclude(
+			canal_toma=QUICKBOOKS_IMPORT_CHANNEL,
+		).filter(
 			creada_en__gte=period['start_datetime'],
 			creada_en__lt=period['end_datetime'],
 		)
-	invoices_queryset = Invoice.objects.select_related('cliente', 'pedido__vendedor', 'creada_por').prefetch_related('items').filter(
+	invoices_queryset = Invoice.objects.select_related('cliente', 'pedido__vendedor', 'creada_por').prefetch_related('items').exclude(
+			pedido__canal_toma=QUICKBOOKS_IMPORT_CHANNEL,
+		).filter(
 			estado='GENERADA',
 			creada_en__gte=period['start_datetime'],
 			creada_en__lt=period['end_datetime'],
 		)
-	deliveries_queryset = Delivery.objects.select_related('driver', 'invoice__cliente', 'invoice__pedido__vendedor', 'invoice__creada_por').prefetch_related('payments', 'invoice__items').filter(
+	deliveries_queryset = Delivery.objects.select_related('driver', 'invoice__cliente', 'invoice__pedido__vendedor', 'invoice__creada_por').prefetch_related('payments', 'invoice__items').exclude(
+			invoice__pedido__canal_toma=QUICKBOOKS_IMPORT_CHANNEL,
+		).filter(
 			estado__in=completed_statuses,
 			delivered_at__gte=period['start_datetime'],
 			delivered_at__lt=period['end_datetime'],
 		)
-	comparison_orders_queryset = Pedido.objects.filter(
+	comparison_orders_queryset = Pedido.objects.exclude(
+		canal_toma=QUICKBOOKS_IMPORT_CHANNEL,
+	).filter(
 		creada_en__gte=period['comparison_start_datetime'],
 		creada_en__lt=period['comparison_end_datetime'],
 	)
-	comparison_invoices_queryset = Invoice.objects.filter(
+	comparison_invoices_queryset = Invoice.objects.exclude(
+		pedido__canal_toma=QUICKBOOKS_IMPORT_CHANNEL,
+	).filter(
 		estado='GENERADA',
 		creada_en__gte=period['comparison_start_datetime'],
 		creada_en__lt=period['comparison_end_datetime'],
 	)
-	comparison_deliveries_queryset = Delivery.objects.select_related('invoice').prefetch_related('payments').filter(
+	comparison_deliveries_queryset = Delivery.objects.select_related('invoice').prefetch_related('payments').exclude(
+		invoice__pedido__canal_toma=QUICKBOOKS_IMPORT_CHANNEL,
+	).filter(
 		estado__in=completed_statuses,
 		delivered_at__gte=period['comparison_start_datetime'],
 		delivered_at__lt=period['comparison_end_datetime'],
@@ -1117,7 +1164,9 @@ def _collect_report_data(period, filters=None):
 	today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()), timezone_info)
 	tomorrow_start = timezone.make_aware(datetime.combine(today + timedelta(days=1), datetime.min.time()), timezone_info)
 	today_deliveries = list(
-		Delivery.objects.select_related('driver', 'invoice__cliente').prefetch_related('payments', 'invoice__items').filter(
+		Delivery.objects.select_related('driver', 'invoice__cliente').prefetch_related('payments', 'invoice__items').exclude(
+			invoice__pedido__canal_toma=QUICKBOOKS_IMPORT_CHANNEL,
+		).filter(
 			estado__in=completed_statuses,
 			delivered_at__gte=today_start,
 			delivered_at__lt=tomorrow_start,

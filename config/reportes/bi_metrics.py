@@ -485,20 +485,27 @@ def build_never_sold_products(*, sold_names, limit=25):
 
 
 def build_period_sales_strip(*, invoice_model):
-	"""Always-on sales snapshots for day / week / month / year (local dates)."""
+	"""Always-on sales snapshots for day / week / month / year / all time.
+
+	Only sales generated inside this system are counted; QuickBooks-imported
+	invoices (``pedido.canal_toma == 'QUICKBOOKS_IMPORT'``) are always excluded so
+	the strip reflects our own sales, not historical accounting records from QB.
+	"""
 	today = timezone.localdate()
 	timezone_info = timezone.get_current_timezone()
 	from datetime import datetime, timedelta
 
 	def _range_sum(start_date, end_date):
-		start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()), timezone_info)
-		end_dt = timezone.make_aware(datetime.combine(end_date + timedelta(days=1), datetime.min.time()), timezone_info)
-		total = (
-			invoice_model.objects.filter(estado='GENERADA', creada_en__gte=start_dt, creada_en__lt=end_dt).aggregate(
-				total=Sum('total_neto')
-			)['total']
+		base = invoice_model.objects.filter(estado='GENERADA').exclude(
+			pedido__canal_toma='QUICKBOOKS_IMPORT'
 		)
-		return _as_money(total)
+		if start_date is not None:
+			start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()), timezone_info)
+			base = base.filter(creada_en__gte=start_dt)
+		if end_date is not None:
+			end_dt = timezone.make_aware(datetime.combine(end_date + timedelta(days=1), datetime.min.time()), timezone_info)
+			base = base.filter(creada_en__lt=end_dt)
+		return _as_money(base.aggregate(total=Sum('total_neto'))['total'])
 
 	week_start = today - timedelta(days=today.weekday())
 	month_start = today.replace(day=1)
@@ -508,6 +515,7 @@ def build_period_sales_strip(*, invoice_model):
 		{'key': 'week', 'label': _('Sales this week'), 'value': _range_sum(week_start, today)},
 		{'key': 'month', 'label': _('Sales this month'), 'value': _range_sum(month_start, today)},
 		{'key': 'year', 'label': _('Sales this year'), 'value': _range_sum(year_start, today)},
+		{'key': 'all', 'label': _('Sales all time'), 'value': _range_sum(None, None)},
 	]
 
 

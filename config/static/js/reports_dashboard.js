@@ -244,7 +244,7 @@
   }
 
   function bindTableFilters() {
-    var debounceMs = (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 250;
+    var debounceMs = (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 1000;
     document.querySelectorAll('.reports-table-filter').forEach(function (input) {
       var timer = null;
       input.addEventListener('input', function () {

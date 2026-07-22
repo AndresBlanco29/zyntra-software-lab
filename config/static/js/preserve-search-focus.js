@@ -2,7 +2,7 @@
     'use strict';
 
     var STORAGE_KEY = 'preserveSearchFocusState';
-    var DEFAULT_DEBOUNCE_MS = 250;
+    var DEFAULT_DEBOUNCE_MS = 1000;
     var BOUND_ATTR = 'data-search-bound';
     var LAST_QUERY_ATTR = 'data-search-last-query';
 
@@ -17,6 +17,14 @@
 
     function normalizeSearchQuery(value) {
         return (value || '').replace(/^\s+|\s+$/g, '');
+    }
+
+    function shouldDeferSearch(value, force) {
+        if (force) {
+            return false;
+        }
+        // On mobile, a trailing space usually means the user is still typing the next word.
+        return (value || '').endsWith(' ');
     }
 
     function rememberSearchFocus(input) {
@@ -167,7 +175,12 @@
         input.setAttribute(BOUND_ATTR, 'true');
 
         function submitWithFocus(force) {
-            var normalized = normalizeSearchQuery(input.value);
+            var rawValue = input.value || '';
+            if (shouldDeferSearch(rawValue, force)) {
+                return;
+            }
+
+            var normalized = normalizeSearchQuery(rawValue);
             var lastQuery = input.getAttribute(LAST_QUERY_ATTR) || '';
 
             if (!force && normalized === lastQuery) {
@@ -175,7 +188,6 @@
             }
 
             input.setAttribute(LAST_QUERY_ATTR, normalized);
-            input.value = normalized;
             rememberSearchFocus(input);
             submitFn(normalized, input);
         }
@@ -212,7 +224,11 @@
         input.addEventListener('input', function () {
             clearTimeout(timer);
             timer = setTimeout(function () {
-                handler(input, normalizeSearchQuery(input.value));
+                var rawValue = input.value || '';
+                if (shouldDeferSearch(rawValue, false)) {
+                    return;
+                }
+                handler(input, normalizeSearchQuery(rawValue));
             }, delay);
         });
     }

@@ -327,7 +327,7 @@
         window.clearTimeout(debounceTimer);
         debounceTimer = window.setTimeout(function () {
           renderProductResults(root, searchInput.value);
-        }, 180);
+        }, (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 1000);
       });
 
       searchInput.addEventListener('focus', function () {

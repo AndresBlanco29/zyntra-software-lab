@@ -111,13 +111,17 @@
 
     searchInput.addEventListener('input', function () {
       hiddenProducto.value = '';
-      var query = searchInput.value.trim();
+      var rawValue = searchInput.value || '';
+      if (rawValue.endsWith(' ')) {
+        return;
+      }
+      var query = rawValue.trim();
       if (query.length < 2) {
         hideResults();
         return;
       }
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(function () { fetchResults(query); }, (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 250);
+      debounceTimer = setTimeout(function () { fetchResults(query); }, (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 1000);
     });
 
     resultsBox.addEventListener('click', function (event) {

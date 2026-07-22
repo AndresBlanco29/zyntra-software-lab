@@ -258,7 +258,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   searchInput.addEventListener('input', function () {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(runSearch, (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 250);
+    searchTimer = setTimeout(runSearch, (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 1000);
   });
   searchInput.addEventListener('focus', function () {
     if ((searchInput.value || '').trim().length >= 2) {

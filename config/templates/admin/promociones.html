@@ -241,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function () {
           .then((response) => (response.ok ? response.json() : { results: [] }))
           .then((data) => renderResults(data.results || []))
           .catch(hideResults);
-      }, (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 250);
+      }, (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 1000);
     });
 
     resultsBox.addEventListener('click', function (event) {

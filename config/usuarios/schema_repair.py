@@ -268,6 +268,34 @@ def _create_missing_tables(connection, table_names):
         pending_models = remaining_models
 
 
+def _drop_promocion_legacy_columns(connection, table_names):
+    """Drop pre-escala promotion columns left behind when 0024 did not run on MySQL."""
+    table_name = 'productos_promocion'
+    if table_name not in table_names:
+        return
+
+    legacy_columns = ('cantidad_minima', 'tipo_beneficio', 'valor_beneficio')
+    try:
+        with connection.cursor() as cursor:
+            existing_columns = {
+                column.name
+                for column in connection.introspection.get_table_description(cursor, table_name)
+            }
+    except ProgrammingError:
+        return
+
+    for column_name in legacy_columns:
+        if column_name not in existing_columns:
+            continue
+        with connection.cursor() as cursor:
+            cursor.execute(f'ALTER TABLE `{table_name}` DROP COLUMN `{column_name}`')
+        logger.warning(
+            'Runtime schema repair dropped legacy column %s.%s',
+            table_name,
+            column_name,
+        )
+
+
 def _clear_placeholder_product_barcodes(connection, table_names):
     """Convert literal placeholder barcodes like 'None' to NULL so edits do not hit unique collisions."""
     table_name = 'productos_producto'
@@ -340,6 +368,7 @@ def ensure_runtime_schema():
                 )
 
         _clear_placeholder_product_barcodes(connection, table_names)
+        _drop_promocion_legacy_columns(connection, table_names)
 
         with _schema_repair_lock:
             _schema_repair_completed = True

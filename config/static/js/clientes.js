@@ -536,23 +536,28 @@ window.abrirModalLimiteCreditoCliente = abrirModalLimiteCreditoCliente;
 window.guardarLimiteCreditoCliente = guardarLimiteCreditoCliente;
 
 function resetAccesoPasswordVisibility() {
-    const passwordInput = document.getElementById('accesoPassword');
-    const toggleBtn = document.getElementById('accesoPasswordToggle');
-    if (passwordInput) {
-        passwordInput.type = 'password';
-    }
-    if (toggleBtn) {
+    ['accesoPassword', 'accesoPasswordConfirm'].forEach(function (inputId) {
+        const passwordInput = document.getElementById(inputId);
+        if (passwordInput) {
+            passwordInput.type = 'password';
+        }
+    });
+    ['accesoPasswordToggle', 'accesoPasswordConfirmToggle'].forEach(function (toggleId) {
+        const toggleBtn = document.getElementById(toggleId);
+        if (!toggleBtn) {
+            return;
+        }
         toggleBtn.setAttribute('aria-label', customerMessages.accessShowPassword);
         const icon = toggleBtn.querySelector('i');
         if (icon) {
             icon.className = 'bi bi-eye';
         }
-    }
+    });
 }
 
-function toggleAccesoPasswordVisibility() {
-    const passwordInput = document.getElementById('accesoPassword');
-    const toggleBtn = document.getElementById('accesoPasswordToggle');
+function toggleAccesoPasswordVisibility(inputId, toggleId) {
+    const passwordInput = document.getElementById(inputId || 'accesoPassword');
+    const toggleBtn = document.getElementById(toggleId || 'accesoPasswordToggle');
     if (!passwordInput || !toggleBtn) {
         return;
     }
@@ -567,6 +572,7 @@ function toggleAccesoPasswordVisibility() {
         icon.className = showing ? 'bi bi-eye' : 'bi bi-eye-slash';
     }
 }
+window.toggleAccesoPasswordVisibility = toggleAccesoPasswordVisibility;
 
 function setAccesoModalMode(mode) {
     const modeInput = document.getElementById('accesoMode');

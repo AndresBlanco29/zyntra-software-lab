@@ -695,7 +695,7 @@ def guardar_cotizacion(request):
     if request.POST.get('ajax') == '1':
         if cliente_email_sent:
             email_notice = _(
-                'A copy of your order was sent to your registered email address without prices.'
+                'A copy of your order was sent to your registered email address.'
             )
         elif not tiene_email:
             email_notice = _(
@@ -726,7 +726,7 @@ def guardar_cotizacion(request):
     if cliente_email_sent:
         messages.info(
             request,
-            _('A copy of your order was sent to your registered email address without prices.'),
+            _('A copy of your order was sent to your registered email address.'),
             extra_tags='client-only',
         )
     elif not tiene_email:

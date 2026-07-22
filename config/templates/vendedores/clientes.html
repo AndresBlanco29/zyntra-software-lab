@@ -639,7 +639,7 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
             <label class="form-label fw-bold" for="accesoPassword">{% trans "Contraseña" %}</label>
             <div class="input-group">
               <input type="password" class="form-control" id="accesoPassword" name="password" autocomplete="new-password" required>
-              <button type="button" class="btn btn-outline-secondary" id="accesoPasswordToggle" onclick="toggleAccesoPasswordVisibility()" aria-label="{% trans 'Show password' %}">
+              <button type="button" class="btn btn-outline-secondary" id="accesoPasswordToggle" onclick="toggleAccesoPasswordVisibility('accesoPassword', 'accesoPasswordToggle')" aria-label="{% trans 'Show password' %}">
                 <i class="bi bi-eye" aria-hidden="true"></i>
               </button>
             </div>
@@ -647,7 +647,12 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 
           <div class="mb-3" id="accesoPasswordConfirmWrap">
             <label class="form-label fw-bold" for="accesoPasswordConfirm">{% trans "Confirmar contraseña" %}</label>
-            <input type="password" class="form-control" id="accesoPasswordConfirm" name="password_confirm" autocomplete="new-password" required>
+            <div class="input-group">
+              <input type="password" class="form-control" id="accesoPasswordConfirm" name="password_confirm" autocomplete="new-password" required>
+              <button type="button" class="btn btn-outline-secondary" id="accesoPasswordConfirmToggle" onclick="toggleAccesoPasswordVisibility('accesoPasswordConfirm', 'accesoPasswordConfirmToggle')" aria-label="{% trans 'Show password' %}">
+                <i class="bi bi-eye" aria-hidden="true"></i>
+              </button>
+            </div>
           </div>
 
           <ul class="access-password-rules" id="accesoPasswordRules" aria-live="polite">

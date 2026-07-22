@@ -1496,6 +1496,18 @@ box-sizing:border-box;
         font-size: 14px;
     }
 
+    /* Keep search input + action button on one row when an input-group is used. */
+    .admin-toolbar-filters .admin-search-group {
+        flex-wrap: nowrap;
+    }
+
+    .admin-toolbar-filters .admin-search-group > .form-control {
+        width: 1%;
+        flex: 1 1 auto;
+        min-width: 0;
+        font-size: 14px;
+    }
+
     .admin-toolbar-filters select.form-select {
         width: 100%;
         font-size: 14px;

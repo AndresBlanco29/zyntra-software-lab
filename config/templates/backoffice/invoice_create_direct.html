@@ -256,12 +256,34 @@ document.addEventListener('DOMContentLoaded', function () {
       });
   }
 
+  // Search-as-you-type with a short debounce (no Enter required).
+  const DIRECT_INVOICE_SEARCH_DEBOUNCE_MS = 250;
   searchInput.addEventListener('input', function () {
+    clearSelection();
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(runSearch, (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 1000);
+    const query = (searchInput.value || '').trim();
+    if (query.length < 2) {
+      if (!query) {
+        resultsBox.hidden = true;
+        resultsBox.innerHTML = '';
+      } else {
+        resultsBox.innerHTML = '<div class="list-group-item text-muted">' + minCharsMessage + '</div>';
+        resultsBox.hidden = false;
+      }
+      return;
+    }
+    searchTimer = setTimeout(runSearch, DIRECT_INVOICE_SEARCH_DEBOUNCE_MS);
   });
   searchInput.addEventListener('focus', function () {
     if ((searchInput.value || '').trim().length >= 2) {
+      runSearch();
+    }
+  });
+  searchInput.addEventListener('keydown', function (event) {
+    // Keep typing fluid on mobile/desktop; Enter only hides the keyboard hint path.
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      clearTimeout(searchTimer);
       runSearch();
     }
   });

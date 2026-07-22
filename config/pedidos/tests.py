@@ -1826,6 +1826,28 @@ class PickingVerificationFlowTests(TestCase):
 		matched = next(result for result in response.json()['results'] if result['id'] == self.presentacion.id)
 		self.assertNotIn('cost', matched)
 
+	def test_invoice_manage_without_orders_view_can_search_presentaciones(self):
+		driver = Usuario.objects.create_user(
+			username='driver-invoice-search',
+			password='secret123',
+			role='driver',
+			permission_overrides={
+				'backoffice.invoices.view': True,
+				'backoffice.invoices.manage': True,
+				'backoffice.orders.view': False,
+			},
+		)
+		self.client.force_login(driver)
+		response = self.client.get(reverse('backoffice_buscar_presentaciones'), {
+			'q': 'Producto test',
+			'cliente_id': str(self.cliente.id),
+		})
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		matched = next(result for result in payload['results'] if result['id'] == self.presentacion.id)
+		self.assertTrue(matched['prices'])
+		self.assertNotIn('cost', matched)
+
 	def test_searchable_selects_script_uses_dropdown_input_plugin(self):
 		from pathlib import Path
 

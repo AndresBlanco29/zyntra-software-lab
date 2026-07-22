@@ -28,11 +28,10 @@ data-msg-added="{% trans 'Added' %} ✔"
 data-auth="{{ can_quote|yesno:'true,false' }}"
 data-page="catalog"
 data-cart-count="{{ carrito_total_items|default:0 }}"
-data-countdown-prefix="{% trans 'Promotion ends in:' %}"
+data-countdown-prefix="{% trans 'Ends in' %}"
 data-countdown-days="{% trans 'days' %}"
 data-countdown-hours="{% trans 'hours' %}"
 data-countdown-minutes="{% trans 'minutes' %}"
-data-countdown-seconds="{% trans 'seconds' %}"
 data-countdown-ended="{% trans 'Promotion ended' %}"
 data-promo-discounts-title="{% trans 'Available discounts' %}"
 data-promo-add-select-title="{% trans 'Which promotion would you like to add?' %}"
@@ -185,7 +184,11 @@ data-combo-presentation-label="{% trans 'Presentation' %}">
                             {% trans "There are products on promotion!" %}
                         </h2>
                         <p class="promo-welcome-banner__text">
+                            {% if filter_promociones %}
+                            {% trans "Promotional products appear first. Keep scrolling to browse the full catalog without leaving this page." %}
+                            {% else %}
                             {% trans "Take advantage of discounts and special offers available for a limited time." %}
+                            {% endif %}
                         </p>
                         <form method="get" class="promo-search-form">
                             {% if guest_mode %}<input type="hidden" name="guest" value="1">{% endif %}
@@ -315,6 +318,32 @@ data-combo-presentation-label="{% trans 'Presentation' %}">
                 <div class="row g-4 catalog-product-grid">
 
                     {% for producto in productos %}
+                        {% if filter_promociones and forloop.first and producto.promocion_activa %}
+                        <div class="col-12">
+                            <div class="promo-catalog-split promo-catalog-split--promos">
+                                <h3 class="promo-catalog-split__title">
+                                    <i class="bi bi-stars" aria-hidden="true"></i>
+                                    {% trans "Products on promotion" %}
+                                </h3>
+                                <p class="promo-catalog-split__text mb-0">
+                                    {% trans "These offers appear first. After them, the full catalog continues on this same page." %}
+                                </p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% if filter_promociones and promo_catalog_continue_index is not None and forloop.counter0 == promo_catalog_continue_index %}
+                        <div class="col-12">
+                            <div class="promo-catalog-split promo-catalog-split--catalog">
+                                <h3 class="promo-catalog-split__title">
+                                    <i class="bi bi-grid-3x3-gap-fill" aria-hidden="true"></i>
+                                    {% trans "Continue with the full catalog" %}
+                                </h3>
+                                <p class="promo-catalog-split__text mb-0">
+                                    {% trans "Keep browsing and ordering without changing screens." %}
+                                </p>
+                            </div>
+                        </div>
+                        {% endif %}
                         {% include "productos/includes/catalogo_producto_card.html" with card_prefix="cat" %}
                     {% empty %}
                         <div class="col-12">

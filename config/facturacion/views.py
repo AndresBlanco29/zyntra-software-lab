@@ -32,7 +32,7 @@ from config.clientes.models import Cliente
 from config.core.datetime_formats import format_local_date, format_local_datetime
 from config.core.product_ordering import order_invoice_items_for_display
 from config.core.workflow_badges import build_delivery_workflow_badge
-from config.productos.models import Presentacion
+from config.productos.models import ConfiguracionDescuentos, Presentacion
 from config.core.pdf_branding import (
 	BRAND_BORDER,
 	BRAND_MUTED_TEXT,
@@ -1600,6 +1600,7 @@ def backoffice_create_direct_invoice(request):
 		'drivers': drivers,
 		'form_state': form_state,
 		'posted_lines': _direct_invoice_posted_lines(request.POST) if request.method == 'POST' else [],
+		'discount_presets': ConfiguracionDescuentos.obtener().opciones_activas(),
 	})
 
 

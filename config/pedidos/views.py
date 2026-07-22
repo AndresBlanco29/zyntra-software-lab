@@ -1137,7 +1137,7 @@ def _enrich_pedido_items_with_price_options(*, pedido, pedido_items):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.view')
+@internal_permission_required('backoffice.orders.view', 'backoffice.invoices.manage')
 def backoffice_buscar_presentaciones(request):
 	query = (request.GET.get('q') or '').strip()
 	if len(query) < 2:
@@ -1171,10 +1171,18 @@ def backoffice_buscar_presentaciones(request):
 
 	results = []
 	for presentacion in presentaciones:
-		price_options, default_price_key, default_price = _build_catalog_presentacion_price_options(
-			presentacion=presentacion,
-			pedido=pedido,
-		)
+		# Prefer customer-aware options (invoice sale / special prices + price lists)
+		# when a customer context is available so Create Invoice matches BackOffice tools.
+		if pedido is not None and getattr(pedido, 'cliente', None) is not None:
+			price_options, default_price_key, default_price = _build_presentacion_price_options(
+				presentacion=presentacion,
+				pedido=pedido,
+			)
+		else:
+			price_options, default_price_key, default_price = _build_catalog_presentacion_price_options(
+				presentacion=presentacion,
+				pedido=pedido,
+			)
 		result = {
 			'id': presentacion.id,
 			'label': f'{presentacion.producto.nombre} - {presentacion.nombre_empaque_cliente}',

@@ -3013,6 +3013,10 @@ class InvoiceFlowTests(TestCase):
 		get_response = self.client.get(reverse('backoffice_create_direct_invoice'))
 		self.assertEqual(get_response.status_code, 200)
 		self.assertContains(get_response, 'Create direct invoice')
+		self.assertContains(get_response, 'System discount')
+		self.assertContains(get_response, 'directInvoiceDiscountPreset')
+		self.assertContains(get_response, reverse('backoffice_buscar_presentaciones'))
+		self.assertTrue(get_response.context['discount_presets'])
 
 		response = self.client.post(reverse('backoffice_create_direct_invoice'), {
 			'cliente_id': str(self.cliente.id),
@@ -3093,6 +3097,50 @@ class InvoiceFlowTests(TestCase):
 		self.client.force_login(viewer)
 		response = self.client.get(reverse('backoffice_create_direct_invoice'))
 		self.assertEqual(response.status_code, 302)
+
+	def test_non_backoffice_with_invoice_manage_can_open_create_direct_invoice(self):
+		driver = Usuario.objects.create_user(
+			username='driver-create-invoice',
+			password='secret123',
+			role='driver',
+			permission_overrides={
+				'backoffice.invoices.view': True,
+				'backoffice.invoices.manage': True,
+				'backoffice.orders.view': False,
+			},
+		)
+		self.cliente.aprobado = True
+		self.cliente.save(update_fields=['aprobado'])
+		self.client.force_login(driver)
+
+		response = self.client.get(reverse('backoffice_create_direct_invoice'))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Create direct invoice')
+		self.assertContains(response, 'System discount')
+		self.assertContains(response, 'Custom %')
+		self.assertContains(response, 'search-select-enhanced')
+		self.assertContains(response, 'Select a price')
+		self.assertContains(response, reverse('backoffice_buscar_presentaciones'))
+		self.assertContains(response, self.cliente.nombre_empresa)
+		self.assertContains(
+			response,
+			'Select a customer first to load special prices and price lists.',
+		)
+		self.assertTrue(response.context['discount_presets'])
+		self.assertTrue(any(customer.id == self.cliente.id for customer in response.context['customers']))
+
+		product_name = self.presentacion.producto.nombre
+		search = self.client.get(reverse('backoffice_buscar_presentaciones'), {
+			'q': product_name[:max(2, min(8, len(product_name)))],
+			'cliente_id': str(self.cliente.id),
+		})
+		self.assertEqual(search.status_code, 200)
+		matched = next(
+			(result for result in search.json().get('results', []) if result['id'] == self.presentacion.id),
+			None,
+		)
+		self.assertIsNotNone(matched)
+		self.assertTrue(matched['prices'])
 
 	def test_backoffice_adjustment_notes_list_can_filter_by_customer_creator_and_invoice_query(self):
 		invoice = generar_invoice_desde_picking(

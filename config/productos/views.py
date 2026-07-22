@@ -2,7 +2,7 @@ from django.core.cache import cache
 from django.core.paginator import Paginator
 import functools
 import json
-from django.db.models import Prefetch, Q
+from django.db.models import Case, IntegerField, Prefetch, Q, When
 from django.db.utils import IntegrityError
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -25,6 +25,7 @@ from .promotions import (
     combos_para_catalogo,
     opciones_monto_fijo_promocion,
     opciones_porcentaje_promocion,
+    producto_ids_con_promocion_individual_activa,
     promociones_activas_queryset,
 )
 from django.contrib.auth.decorators import login_required
@@ -431,8 +432,17 @@ def _catalogo_public_productos_queryset(request, cliente=None):
     if filters.get('marca'):
         queryset = queryset.filter(marca_id=filters['marca'])
     if filters.get('promociones'):
-        promo_product_ids = promociones_activas_queryset(cliente=cliente).values('producto_id')
-        queryset = queryset.filter(id__in=promo_product_ids)
+        # Promo-first mode: keep the full catalog and surface active promotions first
+        # so shoppers can continue browsing without leaving the page.
+        promo_product_ids = list(producto_ids_con_promocion_individual_activa(cliente=cliente))
+        if promo_product_ids:
+            queryset = queryset.annotate(
+                _promo_first=Case(
+                    When(id__in=promo_product_ids, then=0),
+                    default=1,
+                    output_field=IntegerField(),
+                )
+            ).order_by('_promo_first', 'nombre', 'id')
     return queryset
 
 
@@ -475,6 +485,14 @@ def catalogo(request):
     paginator = Paginator(_catalogo_public_productos_queryset(request, cliente=cliente), CATALOGO_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get('page'))
     productos = adjuntar_promociones_a_productos(_hydrate_productos(list(page_obj.object_list)), cliente=cliente)
+    # In promo-first mode, mark where the promotional block ends so the template
+    # can show a seamless "continue browsing" divider before the rest of the catalog.
+    promo_catalog_continue_index = None
+    if filter_params.get('promociones'):
+        for index, producto in enumerate(productos):
+            if not getattr(producto, 'promocion_activa', None):
+                promo_catalog_continue_index = index
+                break
     categorias = _sort_catalog_categorias(_get_cached_catalogo_categorias())
     marcas = _sort_catalog_marcas(_get_cached_catalogo_marcas())
     carrito_session = request.session.get('carrito', {}) or {}
@@ -515,6 +533,7 @@ def catalogo(request):
         'filter_categoria': filter_params.get('categoria', ''),
         'filter_marca': filter_params.get('marca', ''),
         'filter_promociones': filter_params.get('promociones', ''),
+        'promo_catalog_continue_index': promo_catalog_continue_index,
         'categorias': categorias,
         'marcas': marcas,
         'guest_mode': force_guest_mode,

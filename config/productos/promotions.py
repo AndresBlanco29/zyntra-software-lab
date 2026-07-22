@@ -603,6 +603,21 @@ def resolver_promocion_para_linea(
     return promo, monto
 
 
+def producto_ids_con_promocion_individual_activa(now=None, cliente=None):
+    """
+    Product IDs that should sort first in "View promotional products" mode.
+
+    Only individual promotions count here; combo members stay in the normal
+    catalog order because combos are shown in their own section.
+    """
+    return set(
+        promociones_activas_queryset(now=now, cliente=cliente)
+        .filter(alcance=Promocion.ALCANCE_INDIVIDUAL)
+        .exclude(producto_id__isnull=True)
+        .values_list('producto_id', flat=True)
+    )
+
+
 def promociones_por_producto_ids(producto_ids, now=None, cliente=None):
     """
     Return {producto_id: best display Promocion} for catalog badges.

@@ -9,8 +9,9 @@
 <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
   <div>
     <h2 class="mb-1">{% trans "Create direct invoice" %}</h2>
-    <p class="text-muted mb-0">{% trans "Use this flow when a customer buys directly at the warehouse and BackOffice must invoice immediately without picking or driver workflow." %}</p>
+    <p class="text-muted mb-0">{% trans "Use this flow when a customer buys directly at the warehouse and must be invoiced immediately without picking or driver workflow." %}</p>
     <p class="small text-muted mb-0 mt-1">{% trans "Inventory is discounted immediately when the invoice is created." %}</p>
+    <p class="small text-muted mb-0 mt-1">{% trans "Select a customer first to load special prices and price lists. Product search, system discounts, and price options are available to any user with invoice create permission." %}</p>
   </div>
   <a href="{% url 'backoffice_invoices_list' %}" class="btn btn-outline-secondary">{% trans "Back to invoices" %}</a>
 </div>
@@ -27,7 +28,7 @@
     <div class="row g-3 mb-4">
       <div class="col-lg-6">
         <label class="form-label fw-semibold" for="directInvoiceCustomer">{% trans "Customer" %}</label>
-        <select name="cliente_id" id="directInvoiceCustomer" class="form-select" required>
+        <select name="cliente_id" id="directInvoiceCustomer" class="form-select search-select-enhanced" required>
           <option value="">{% trans "Select a customer" %}</option>
           {% for customer in customers %}
           <option value="{{ customer.id }}" {% if form_state.cliente_id == customer.id|stringformat:"s" %}selected{% endif %}>{{ customer.nombre_empresa }}</option>
@@ -43,33 +44,43 @@
     <div class="border rounded-3 p-3 mb-4">
       <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <h5 class="mb-0">{% trans "Invoice lines" %}</h5>
-        <span class="small text-muted">{% trans "Search a product, choose quantity and price, then add the line." %}</span>
+        <span class="small text-muted">{% trans "Search a product, choose quantity, pick a price list/special price or enter a price, apply a system discount, then add the line." %}</span>
       </div>
       <div class="row g-2 align-items-end mb-3">
-        <div class="col-lg-5">
+        <div class="col-lg-4">
           <label class="form-label fw-semibold" for="directInvoiceProductSearch">{% trans "Search product" %}</label>
           <div
             class="product-search-field position-relative"
             id="directInvoiceSearchRoot"
             data-search-url="{% url 'backoffice_buscar_presentaciones' %}"
             data-empty-message="{% trans 'No products found.'|escapejs %}"
-            data-min-chars-message="{% trans 'Type at least 2 characters to search.'|escapejs %}">
+            data-min-chars-message="{% trans 'Type at least 2 characters to search.'|escapejs %}"
+            data-permission-message="{% trans 'You do not have permission to search products.'|escapejs %}">
             <input type="search" id="directInvoiceProductSearch" class="form-control" placeholder="{% trans 'Search products by full name...' %}" autocomplete="off">
             <input type="hidden" id="directInvoicePresentacionId" value="">
             <div id="directInvoiceSearchResults" class="product-search-results list-group shadow-sm" hidden></div>
             <div id="directInvoiceSelectedLabel" class="small text-success fw-semibold mt-1" hidden></div>
           </div>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-1">
           <label class="form-label fw-semibold" for="directInvoiceQty">{% trans "Qty." %}</label>
           <input type="number" min="1" step="1" id="directInvoiceQty" class="form-control" value="1">
         </div>
         <div class="col-md-2">
           <label class="form-label fw-semibold" for="directInvoicePricePreset">{% trans "Price" %}</label>
-          <select id="directInvoicePricePreset" class="form-select form-select-sm mb-2" disabled>
+          <select id="directInvoicePricePreset" class="form-select form-select-sm mb-2 no-search-select" disabled>
             <option value="">{% trans "Select a price" %}</option>
           </select>
           <input type="number" min="0.01" step="0.01" id="directInvoicePrice" class="form-control form-control-sm" placeholder="{% trans 'Price' %}" disabled>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label fw-semibold" for="directInvoiceDiscountPreset">{% trans "System discount" %}</label>
+          <select id="directInvoiceDiscountPreset" class="form-select form-select-sm no-search-select">
+            <option value="">{% trans "Custom %" %}</option>
+            {% for preset in discount_presets %}
+            <option value="{{ preset.value }}">{{ preset.label }}</option>
+            {% endfor %}
+          </select>
         </div>
         <div class="col-md-2">
           <label class="form-label fw-semibold" for="directInvoiceDiscount">{% trans "Discount %" %}</label>
@@ -156,6 +167,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const pricePreset = document.getElementById('directInvoicePricePreset');
   const priceInput = document.getElementById('directInvoicePrice');
   const qtyInput = document.getElementById('directInvoiceQty');
+  const discountPreset = document.getElementById('directInvoiceDiscountPreset');
   const discountInput = document.getElementById('directInvoiceDiscount');
   const addButton = document.getElementById('directInvoiceAddLine');
   const linesBody = document.getElementById('directInvoiceLinesBody');
@@ -165,6 +177,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const driverSelect = document.getElementById('directInvoiceDriver');
   const emptyMessage = searchRoot.dataset.emptyMessage || 'No products found.';
   const minCharsMessage = searchRoot.dataset.minCharsMessage || 'Type at least 2 characters to search.';
+  const permissionMessage = searchRoot.dataset.permissionMessage || 'You do not have permission to search products.';
   const searchUrl = searchRoot.dataset.searchUrl;
   let searchTimer = null;
   let selectedProductLabel = '';
@@ -248,12 +261,36 @@ document.addEventListener('DOMContentLoaded', function () {
       params.set('cliente_id', customerSelect.value);
     }
     fetch(searchUrl + '?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-      .then(function (response) { return response.json(); })
+      .then(function (response) {
+        if (response.status === 403) {
+          throw new Error('permission');
+        }
+        if (!response.ok) {
+          throw new Error('request');
+        }
+        return response.json();
+      })
       .then(function (data) { renderResults(data.results || []); })
-      .catch(function () {
-        resultsBox.innerHTML = '<div class="list-group-item text-danger">{% trans "An error occurred while processing the request."|escapejs %}</div>';
+      .catch(function (error) {
+        const message = error && error.message === 'permission'
+          ? permissionMessage
+          : '{% trans "An error occurred while processing the request."|escapejs %}';
+        resultsBox.innerHTML = '<div class="list-group-item text-danger">' + message + '</div>';
         resultsBox.hidden = false;
       });
+  }
+
+  function applyDiscountPresetToPercent() {
+    if (!discountPreset || !discountPreset.value) {
+      return;
+    }
+    const amount = parseFloat(discountPreset.value || '0');
+    const price = parseFloat(priceInput.value || '0');
+    if (!(amount > 0) || !(price > 0)) {
+      return;
+    }
+    const percent = Math.min(99.99, (amount / price) * 100);
+    discountInput.value = percent.toFixed(2);
   }
 
   // Search-as-you-type with a short debounce (no Enter required).
@@ -297,7 +334,12 @@ document.addEventListener('DOMContentLoaded', function () {
     if (pricePreset.value && pricePreset.value !== '__manual__') {
       priceInput.value = pricePreset.value;
     }
+    applyDiscountPresetToPercent();
   });
+  priceInput.addEventListener('input', applyDiscountPresetToPercent);
+  if (discountPreset) {
+    discountPreset.addEventListener('change', applyDiscountPresetToPercent);
+  }
 
   function removeEmptyRow() {
     const emptyRow = linesBody.querySelector('.direct-invoice-empty-row');
@@ -350,6 +392,9 @@ document.addEventListener('DOMContentLoaded', function () {
     searchInput.value = '';
     qtyInput.value = '1';
     discountInput.value = '0';
+    if (discountPreset) {
+      discountPreset.value = '';
+    }
   });
 
   document.getElementById('directInvoiceForm').addEventListener('submit', function (event) {

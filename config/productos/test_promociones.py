@@ -530,12 +530,36 @@ class PromocionPersistenceTests(TestCase):
         self.assertContains(response, 'id="contadorCarrito">10')
         self.assertEqual(response.context['carrito_total_items'], 10)
 
-    def test_promotions_filter_and_search_only_return_active_promo_products(self):
+    def test_promotions_mode_shows_promo_products_first_then_full_catalog(self):
         client = DjangoClient()
-        response = client.get(reverse('catalogo'), {'promociones': '1', 'q': 'Persist'})
+        response = client.get(reverse('catalogo'), {'promociones': '1'})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.producto.nombre)
-        self.assertNotContains(response, self.producto_sin_promo.nombre)
+        self.assertContains(response, self.producto_sin_promo.nombre)
+        self.assertEqual(response.context['filter_promociones'], '1')
+        self.assertContains(
+            response,
+            'Promotional products appear first. Keep scrolling to browse the full catalog without leaving this page.',
+        )
+        self.assertContains(response, 'Products on promotion')
+        self.assertContains(response, 'Continue with the full catalog')
+        self.assertIsNotNone(response.context['promo_catalog_continue_index'])
+        productos = list(response.context['productos'])
+        promo_names = {self.producto.nombre}
+        first_non_promo_index = next(
+            (index for index, product in enumerate(productos) if product.nombre not in promo_names),
+            None,
+        )
+        self.assertIsNotNone(first_non_promo_index)
+        self.assertEqual(response.context['promo_catalog_continue_index'], first_non_promo_index)
+        for product in productos[:first_non_promo_index]:
+            self.assertTrue(getattr(product, 'promocion_activa', None))
+
+    def test_promotions_mode_keeps_search_across_full_catalog(self):
+        client = DjangoClient()
+        response = client.get(reverse('catalogo'), {'promociones': '1', 'q': self.producto_sin_promo.nombre})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.producto_sin_promo.nombre)
         self.assertEqual(response.context['filter_promociones'], '1')
 
     def test_cart_quantity_response_warns_below_minimum_and_applies_at_threshold(self):

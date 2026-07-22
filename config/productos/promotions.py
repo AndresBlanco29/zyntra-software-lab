@@ -531,7 +531,9 @@ def promociones_por_producto_ids(producto_ids, now=None, cliente=None):
         return {}
 
     mapping = {}
-    base = promociones_activas_queryset(now=now, cliente=cliente).prefetch_related('escalas', 'productos_grupo')
+    base = promociones_activas_queryset(now=now, cliente=cliente).prefetch_related(
+        'escalas', 'productos_grupo', 'productos_grupo__producto'
+    )
 
     for promo in base.filter(
         Q(alcance=Promocion.ALCANCE_INDIVIDUAL, producto_id__in=ids)
@@ -572,7 +574,16 @@ def adjuntar_promociones_a_productos(productos, now=None, cliente=None):
         producto.promocion_presentacion_nombre = (
             promo.presentacion.nombre if promo and promo.presentacion_id else ''
         )
-        producto.promocion_es_grupo = bool(promo and promo.alcance == Promocion.ALCANCE_GRUPO)
+        es_grupo = bool(promo and promo.alcance == Promocion.ALCANCE_GRUPO)
+        producto.promocion_es_grupo = es_grupo
+        combo_nombres = []
+        if es_grupo:
+            for pp in promo.productos_grupo.all():
+                if pp.producto_id:
+                    nombre = getattr(pp.producto, 'nombre_traducido', None) or pp.producto.nombre
+                    combo_nombres.append(nombre)
+        producto.promocion_combo_productos = combo_nombres
+        producto.promocion_combo_total = len(combo_nombres)
         producto.promocion_fecha_fin_iso = (
             promo.fecha_fin.isoformat() if promo and promo.fecha_fin else ''
         )

@@ -927,6 +927,36 @@ class PromocionComboTests(TestCase):
         self.assertEqual(state['group_total'], 10)
         self.assertTrue(state['applied'])
 
+    def test_catalog_attaches_combo_to_every_member_product(self):
+        productos = adjuntar_promociones_a_productos([
+            self.producto_a, self.producto_b, self.producto_c,
+        ])
+        for producto in productos:
+            self.assertIsNotNone(producto.promocion_activa, producto.nombre)
+            self.assertTrue(producto.promocion_es_grupo, producto.nombre)
+            self.assertEqual(producto.promocion_combo_total, 3)
+            self.assertCountEqual(
+                producto.promocion_combo_productos,
+                ['Jarrito Fresa', 'Jarrito Mango', 'Jarrito Limon'],
+            )
+
+    def test_catalog_combo_card_and_panel_render_combo_labels(self):
+        user = Usuario.objects.create_user(username='combo-catalog', password='secret123', role='cliente')
+        Cliente.objects.create(
+            usuario=user, nombre_empresa='Combo Cat Co', telefono='5551112222',
+            direccion='1 St', ciudad='Atlanta', estado='GA', codigo_postal='30301', pais='USA',
+            sales_tax_number='TX-COMBO', certificado_tax='certificados/test.pdf',
+            nivel_precio=1, estado_revision=Cliente.REVIEW_STATUS_APPROVED, aprobado=True,
+        )
+        client = DjangoClient()
+        client.force_login(user)
+        response = client.get(reverse('catalogo'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'promo-badge--combo')
+        self.assertContains(response, 'Combo discount')
+        self.assertContains(response, 'This is a combo promotion')
+        self.assertContains(response, 'Jarrito Mango')
+
     def test_create_combo_promotion_via_admin(self):
         otro_a = Producto.objects.create(nombre='Combo Admin A', categoria=self.categoria, marca=self.marca, activo=True)
         otro_b = Producto.objects.create(nombre='Combo Admin B', categoria=self.categoria, marca=self.marca, activo=True)

@@ -12,10 +12,17 @@
       {% endif %}>
 
       {% if producto.promocion_activa %}
+      {% if producto.promocion_es_grupo %}
+      <div class="promo-badge promo-badge--combo" title="{{ producto.promocion_texto }}">
+          <i class="bi bi-box-seam-fill" aria-hidden="true"></i>
+          {% trans "COMBO" %}
+      </div>
+      {% else %}
       <div class="promo-badge" title="{{ producto.promocion_texto }}">
           <i class="bi bi-star-fill" aria-hidden="true"></i>
           {% trans "Promotion" %}
       </div>
+      {% endif %}
       {% endif %}
 
       {% if producto.promocion_fecha_fin_iso %}
@@ -38,6 +45,23 @@
           {{ producto.nombre_traducido }}
       </div>
 
+      {% if producto.promocion_es_grupo %}
+      <div class="promo-combo-note mb-2">
+          <div class="promo-combo-note__title">
+              <i class="bi bi-box-seam-fill" aria-hidden="true"></i>
+              {% trans "Combo discount" %}
+          </div>
+          <p class="promo-combo-note__text">
+              {% blocktrans with minimum=producto.promocion_cantidad_minima count counter=producto.promocion_combo_total %}Mix these products and buy {{ minimum }}+ units in total to unlock the discount:{% plural %}Mix these {{ counter }} products and buy {{ minimum }}+ units in total to unlock the discount:{% endblocktrans %}
+          </p>
+          <ul class="promo-combo-note__list">
+              {% for nombre in producto.promocion_combo_productos %}
+              <li><i class="bi bi-check-circle-fill" aria-hidden="true"></i> {{ nombre }}</li>
+              {% endfor %}
+          </ul>
+      </div>
+      {% endif %}
+
       {% if producto.promocion_activa %}
       <div class="promo-discount-trigger-wrap mb-2">
           <button
@@ -51,6 +75,22 @@
               {% trans "View discounts" %}
           </button>
           <template class="js-promo-discounts-template">
+              {% if producto.promocion_es_grupo %}
+              <div class="promo-combo-panel-note">
+                  <div class="promo-combo-panel-note__title">
+                      <i class="bi bi-box-seam-fill" aria-hidden="true"></i>
+                      {% trans "This is a combo promotion" %}
+                  </div>
+                  <p class="promo-combo-panel-note__text">
+                      {% blocktrans with minimum=producto.promocion_cantidad_minima %}The quantities of ALL these products add up together. Reach {{ minimum }}+ units in total and every product below gets the discount:{% endblocktrans %}
+                  </p>
+                  <ul class="promo-combo-panel-note__list">
+                      {% for nombre in producto.promocion_combo_productos %}
+                      <li><i class="bi bi-check-circle-fill" aria-hidden="true"></i> {{ nombre }}</li>
+                      {% endfor %}
+                  </ul>
+              </div>
+              {% endif %}
               <ul class="promo-discounts-list list-unstyled mb-0">
                   {% for escala in producto.promocion_escalas %}
                   {% include "productos/includes/catalogo_promo_escala_item.html" %}

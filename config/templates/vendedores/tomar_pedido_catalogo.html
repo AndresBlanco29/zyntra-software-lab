@@ -274,9 +274,15 @@ data-costo="{{ producto.presentaciones.first.costo|default:'0' }}"
 >
 
 {% if producto.promocion_activa %}
+{% if producto.promocion_es_grupo %}
+<div class="promo-badge promo-badge--combo" title="{{ producto.promocion_texto }}">
+📦 {% trans "COMBO" %}
+</div>
+{% else %}
 <div class="promo-badge" title="{{ producto.promocion_texto }}">
 ★ {% trans "Promotion" %}
 </div>
+{% endif %}
 {% endif %}
 
 <div class="producto-img-wrap mb-3">
@@ -289,7 +295,19 @@ data-costo="{{ producto.presentaciones.first.costo|default:'0' }}"
 
 </div>
 
-{% if producto.promocion_texto %}
+{% if producto.promocion_es_grupo %}
+<div class="promo-combo-note mb-2">
+<div class="promo-combo-note__title">📦 {% trans "Combo discount" %}</div>
+<p class="promo-combo-note__text">
+{% blocktrans with minimum=producto.promocion_cantidad_minima %}Quantities of these products add up together. Buy {{ minimum }}+ units in total to unlock the discount:{% endblocktrans %}
+</p>
+<ul class="promo-combo-note__list">
+{% for nombre in producto.promocion_combo_productos %}
+<li>✓ {{ nombre }}</li>
+{% endfor %}
+</ul>
+</div>
+{% elif producto.promocion_texto %}
 <div class="promo-detail mb-2">
 {{ producto.promocion_texto }}
 </div>

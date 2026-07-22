@@ -41,6 +41,7 @@ from config.productos.promotions import (
     aplicar_promocion_en_item_sesion,
     asegurar_promociones_en_cotizacion,
     estado_promocion_para_linea,
+    reaplicar_promociones_en_lineas_sesion,
 )
 from config.usuarios.permissions import internal_permission_required, user_has_permission
 
@@ -475,7 +476,10 @@ def agregar_a_cotizacion(request):
                 "precio": float(precio),
             }
 
-        aplicar_promocion_en_item_sesion(carrito[key], precio_unitario=precio, presentacion=presentacion, cliente=cliente)
+        carrito[key]["producto_id"] = producto.id
+        # Re-evaluate every line so combo promotions can sum quantities across
+        # the different products that make up the combo.
+        reaplicar_promociones_en_lineas_sesion(carrito, cliente=cliente)
 
         request.session["carrito"] = carrito
 
@@ -493,25 +497,37 @@ def ver_cotizacion(request):
     carrito_session = request.session.get("carrito", {})
     carrito = []
     cliente = _cliente_from_user(request.user)
-    dirty = False
 
+    # First pass: resolve current price and product id for every line so that
+    # combo promotions can correctly sum quantities across all of them.
+    presentaciones_cache = {}
     for presentacion_id, item in list(carrito_session.items()):
-
         try:
             presentacion = Presentacion.objects.get(id=presentacion_id)
         except Presentacion.DoesNotExist:
+            del carrito_session[presentacion_id]
             continue
 
-        producto = presentacion.producto
+        presentaciones_cache[presentacion_id] = presentacion
         precio = _quote_item_price_for_customer(
             cliente=cliente,
             presentacion=presentacion,
             session_price=item.get("precio", 0),
         )
-        item["producto_id"] = producto.id
+        item["producto_id"] = presentacion.producto_id
         item["presentacion_id"] = presentacion.id
         item["precio"] = float(precio)
-        aplicar_promocion_en_item_sesion(item, precio_unitario=precio, presentacion=presentacion, cliente=cliente)
+
+    # Apply promotions across ALL lines together (combo aggregation).
+    reaplicar_promociones_en_lineas_sesion(carrito_session, cliente=cliente)
+    lineas_context = list(carrito_session.values())
+
+    for presentacion_id, item in list(carrito_session.items()):
+        presentacion = presentaciones_cache.get(presentacion_id)
+        if presentacion is None:
+            continue
+        producto = presentacion.producto
+        precio = item.get("precio", 0)
         promocion_estado = estado_promocion_para_linea(
             producto_id=producto.id,
             presentacion_id=presentacion.id,
@@ -519,9 +535,8 @@ def ver_cotizacion(request):
             precio_unitario=precio,
             presentacion=presentacion,
             cliente=cliente,
+            lineas_context=lineas_context,
         )
-        carrito_session[presentacion_id] = item
-        dirty = True
 
         carrito.append({
             "id": presentacion_id,
@@ -536,8 +551,7 @@ def ver_cotizacion(request):
             "promocion_estado": promocion_estado,
         })
 
-    if dirty:
-        request.session["carrito"] = carrito_session
+    request.session["carrito"] = carrito_session
 
     return render(request, "cotizaciones/ver_cotizacion.html", {
         "carrito": carrito,
@@ -585,10 +599,12 @@ def guardar_cotizacion(request):
 
     total = Decimal('0')
 
-    for item in carrito.values():
-
+    # First pass: resolve fresh prices and product ids for every line so that
+    # combo promotions can sum quantities across all products before saving.
+    presentaciones_cache = {}
+    for key, item in list(carrito.items()):
         presentacion = Presentacion.objects.get(id=item["presentacion_id"])
-        cantidad = item["cantidad"]
+        presentaciones_cache[key] = presentacion
         precio = _quote_item_price_for_customer(
             cliente=cliente,
             presentacion=presentacion,
@@ -596,8 +612,19 @@ def guardar_cotizacion(request):
         )
         item["producto_id"] = presentacion.producto_id
         item["presentacion_id"] = presentacion.id
-        item["cantidad"] = cantidad
-        aplicar_promocion_en_item_sesion(item, precio_unitario=precio, presentacion=presentacion, cliente=cliente)
+        item["precio"] = float(precio)
+
+    reaplicar_promociones_en_lineas_sesion(carrito, cliente=cliente)
+
+    for key, item in carrito.items():
+
+        presentacion = presentaciones_cache[key]
+        cantidad = item["cantidad"]
+        precio = _quote_item_price_for_customer(
+            cliente=cliente,
+            presentacion=presentacion,
+            session_price=item.get("precio", 0),
+        )
         descuento_aplicado = bool(item.get("descuento_aplicado"))
         descuento_monto = _parse_decimal(item.get("descuento_monto", 0), 0) if descuento_aplicado else Decimal('0.00')
         subtotal = calcular_subtotal_item_pedido(

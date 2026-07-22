@@ -830,6 +830,16 @@ class PromocionComboTests(TestCase):
         PromocionProducto.objects.create(promocion=self.promo, producto=self.producto_c)
         _crear_escala(self.promo, cantidad_minima=10, tipo_beneficio=PromocionEscala.TIPO_PERCENT, valor_beneficio=Decimal('10'))
 
+    def _crear_cliente(self, username='combo-client'):
+        user = Usuario.objects.create_user(username=username, password='secret123', role='cliente')
+        Cliente.objects.create(
+            usuario=user, nombre_empresa=f'{username} Co', telefono='5551110000',
+            direccion='1 St', ciudad='Atlanta', estado='GA', codigo_postal='30301', pais='USA',
+            sales_tax_number=f'TX-{username}', certificado_tax='certificados/test.pdf',
+            nivel_precio=1, estado_revision=Cliente.REVIEW_STATUS_APPROVED, aprobado=True,
+        )
+        return user
+
     def _carrito_combo(self):
         return {
             str(self.presentacion_a.id): {
@@ -956,6 +966,85 @@ class PromocionComboTests(TestCase):
         self.assertContains(response, 'Combo discount')
         self.assertContains(response, 'This is a combo promotion')
         self.assertContains(response, 'Jarrito Mango')
+        # Combo builder entry point + modal must be present for members to be picked.
+        self.assertContains(response, 'js-combo-add-btn')
+        self.assertContains(response, 'Build combo and add')
+        self.assertContains(response, 'id="comboModal"')
+        self.assertContains(response, 'data-combo-url-template')
+        self.assertContains(response, 'data-promo-combo="1"')
+
+    def test_combo_miembros_endpoint_returns_all_members(self):
+        user = self._crear_cliente('combo-endpoint')
+        client = DjangoClient()
+        client.force_login(user)
+        response = client.get(reverse('combo_promocion_miembros', args=[self.promo.id]))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['minimum'], 10)
+        self.assertEqual(len(data['miembros']), 3)
+        nombres = {m['nombre'] for m in data['miembros']}
+        self.assertEqual(nombres, {'Jarrito Fresa', 'Jarrito Mango', 'Jarrito Limon'})
+        for miembro in data['miembros']:
+            self.assertTrue(miembro['presentaciones'])
+            self.assertEqual(miembro['presentaciones'][0]['precio'], 20.0)
+
+    def test_combo_miembros_endpoint_rejects_individual_promo(self):
+        individual = Promocion.objects.create(nombre='Solo', producto=self.producto_a, activa=True)
+        _crear_escala(individual, cantidad_minima=5, valor_beneficio=Decimal('10'))
+        user = self._crear_cliente('combo-endpoint-2')
+        client = DjangoClient()
+        client.force_login(user)
+        response = client.get(reverse('combo_promocion_miembros', args=[individual.id]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_distributed_combo_applies_discount_through_quote_flow(self):
+        user = self._crear_cliente('combo-flow')
+        client = DjangoClient()
+        client.force_login(user)
+
+        # Distribute 5 + 3 + 2 = 10 units across the three combo products.
+        for presentacion, cantidad in [
+            (self.presentacion_a, 5), (self.presentacion_b, 3), (self.presentacion_c, 2),
+        ]:
+            resp = client.post(reverse('agregar_a_cotizacion'), {
+                'presentacion_id': str(presentacion.id),
+                'cantidad': str(cantidad),
+            })
+            self.assertEqual(resp.status_code, 200)
+
+        # The My Order page must show the combo discount applied on every line.
+        ver = client.get(reverse('ver_cotizacion'))
+        self.assertEqual(ver.status_code, 200)
+        for row in ver.context['carrito']:
+            self.assertTrue(row['promocion_estado']['applied'], row['producto'].nombre)
+            self.assertEqual(row['promocion_estado']['group_total'], 10)
+
+        # Saving the order persists the discount on every combo line.
+        guardar = client.post(reverse('guardar_cotizacion'), {'nota': 'combo'})
+        self.assertEqual(guardar.status_code, 302)
+        items = CotizacionItem.objects.filter(presentacion__in=[
+            self.presentacion_a, self.presentacion_b, self.presentacion_c,
+        ])
+        self.assertEqual(items.count(), 3)
+        for item in items:
+            self.assertTrue(item.descuento_aplicado)
+            self.assertEqual(item.descuento_monto, Decimal('2.00'))
+
+    def test_below_minimum_distributed_combo_does_not_apply(self):
+        user = self._crear_cliente('combo-flow-low')
+        client = DjangoClient()
+        client.force_login(user)
+        for presentacion, cantidad in [
+            (self.presentacion_a, 3), (self.presentacion_b, 2), (self.presentacion_c, 2),
+        ]:
+            client.post(reverse('agregar_a_cotizacion'), {
+                'presentacion_id': str(presentacion.id),
+                'cantidad': str(cantidad),
+            })
+        ver = client.get(reverse('ver_cotizacion'))
+        for row in ver.context['carrito']:
+            self.assertFalse(row['promocion_estado']['applied'])
+            self.assertEqual(row['promocion_estado']['group_total'], 7)
 
     def test_create_combo_promotion_via_admin(self):
         otro_a = Producto.objects.create(nombre='Combo Admin A', categoria=self.categoria, marca=self.marca, activo=True)

@@ -1135,6 +1135,58 @@ def producto_presentaciones_promocion(request, producto_id):
     return JsonResponse({"results": presentaciones})
 
 
+@login_required
+def combo_promocion_miembros(request, promocion_id):
+    """
+    Members of a combo (group) promotion, used by the catalog combo picker so a
+    customer can choose how many units of each product they want. The quantities
+    of every member add up together to reach the promotion minimum.
+    """
+    promo = get_object_or_404(
+        Promocion.objects.prefetch_related(
+            "escalas", "productos_grupo", "productos_grupo__producto"
+        ),
+        id=promocion_id,
+        alcance=Promocion.ALCANCE_GRUPO,
+        activa=True,
+    )
+    tier = _get_cliente_price_tier(request.user)
+    escalas = sorted(promo.escalas.all(), key=lambda escala: escala.cantidad_minima)
+    minimum = escalas[0].cantidad_minima if escalas else 0
+
+    miembros = []
+    for pp in promo.productos_grupo.all():
+        producto = pp.producto
+        if producto is None or not producto.activo:
+            continue
+        presentaciones = []
+        for presentacion in Presentacion.objects.filter(producto=producto).order_by("id"):
+            if pp.presentacion_id and presentacion.id != pp.presentacion_id:
+                continue
+            presentacion.producto = producto
+            precio = presentacion.get_price_for_tier(tier) if tier else None
+            presentaciones.append({
+                "id": presentacion.id,
+                "nombre": presentacion.nombre_empaque_cliente,
+                "precio": float(precio) if precio is not None else None,
+            })
+        if not presentaciones:
+            continue
+        miembros.append({
+            "producto_id": producto.id,
+            "nombre": _catalog_display_name(nombre=producto.nombre, nombre_en=producto.nombre_en),
+            "presentaciones": presentaciones,
+        })
+
+    return JsonResponse({
+        "promocion_id": promo.id,
+        "nombre": promo.nombre,
+        "descripcion": promo.texto_catalogo(),
+        "minimum": minimum,
+        "miembros": miembros,
+    })
+
+
 ADMIN_PROMOCIONES_PAGE_SIZE = 50
 
 

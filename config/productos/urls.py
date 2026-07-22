@@ -23,11 +23,13 @@ from .views import (
     eliminar_promocion,
     buscar_productos_promocion,
     producto_presentaciones_promocion,
+    combo_promocion_miembros,
 )
 
 
 urlpatterns = [
     path('catalogo/', catalogo, name='catalogo'),
+    path('catalogo/combo/<int:promocion_id>/miembros/', combo_promocion_miembros, name='combo_promocion_miembros'),
     path('panel-admin/productos/', lista_productos, name='lista_productos'),
     path('panel-admin/marcas/', lista_marcas, name='lista_marcas'),
     path('panel-admin/productos/crear/', crear_producto, name='crear_producto'),

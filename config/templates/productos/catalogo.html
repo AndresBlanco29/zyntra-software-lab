@@ -37,7 +37,17 @@ data-countdown-ended="{% trans 'Promotion ended' %}"
 data-promo-discounts-title="{% trans 'Available discounts' %}"
 data-promo-add-select-title="{% trans 'Which promotion would you like to add?' %}"
 data-promo-tier-hint="{% trans 'Tap a discount to set the quantity.' %}"
-data-promo-add-tier-hint="{% trans 'Select a promotion to add it to your order.' %}">
+data-promo-add-tier-hint="{% trans 'Select a promotion to add it to your order.' %}"
+data-combo-url-template="{% url 'combo_promocion_miembros' 0 %}"
+data-combo-title="{% trans 'Build your combo' %}"
+data-combo-need-label="{% trans 'units in total to unlock the discount' %}"
+data-combo-total-label="{% trans 'Combo total' %}"
+data-combo-ready-label="{% trans 'The combo discount will be applied!' %}"
+data-combo-missing-label="{% trans 'Add more units to reach the combo' %}"
+data-combo-add-label="{% trans 'Add combo to my order' %}"
+data-combo-added-label="{% trans 'Combo added' %} ✔"
+data-combo-qty-label="{% trans 'Quantity' %}"
+data-combo-presentation-label="{% trans 'Presentation' %}">
 
     <!-- NAVBAR -->
     <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
@@ -325,6 +335,35 @@ data-promo-add-tier-hint="{% trans 'Select a promotion to add it to your order.'
         <p class="promo-discounts-hint small mb-2" id="promoDiscountsPanelHint"></p>
         <p class="promo-discounts-description small mb-3" id="promoDiscountsPanelDesc" hidden></p>
         <div id="promoDiscountsPanelList"></div>
+      </div>
+    </div>
+
+    <!-- COMBO BUILDER MODAL -->
+    <div class="modal fade" id="comboModal" tabindex="-1" aria-labelledby="comboModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content combo-modal">
+          <div class="modal-header combo-modal__header">
+            <h5 class="modal-title" id="comboModalTitle">
+              <i class="bi bi-box-seam-fill" aria-hidden="true"></i>
+              <span data-role="combo-title">{% trans "Build your combo" %}</span>
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+          </div>
+          <div class="modal-body">
+            <p class="combo-modal__hint" data-role="combo-hint"></p>
+            <div data-role="combo-members"></div>
+            <div class="combo-modal__loading text-center py-4" data-role="combo-loading" hidden>
+              <div class="spinner-border text-primary" role="status"></div>
+            </div>
+          </div>
+          <div class="modal-footer combo-modal__footer">
+            <div class="combo-modal__progress w-100" data-role="combo-progress" aria-live="polite"></div>
+            <div class="d-flex gap-2 w-100">
+              <button type="button" class="btn btn-outline-secondary flex-fill" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+              <button type="button" class="btn btn-yellow flex-fill" data-role="combo-add" disabled>{% trans "Add combo to my order" %}</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 

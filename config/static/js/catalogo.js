@@ -360,6 +360,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.querySelectorAll(".promo-add-btn").forEach(btn => {
         btn.addEventListener("click", function () {
+            if (this.classList.contains('js-combo-add-btn')) {
+                return;
+            }
             const card = this.closest(".producto-card");
             const tierCount = getPromoTierCount(card);
 
@@ -379,6 +382,214 @@ document.addEventListener('DOMContentLoaded', function() {
             addCardToCart(card, this, { ensurePromotionMinimum: true });
         });
     });
+
+    /* CONSTRUCTOR DE COMBO (elegir cuántos de cada producto) */
+    (function initComboBuilder() {
+        const modalEl = document.getElementById('comboModal');
+        if (!modalEl) {
+            return;
+        }
+        const comboUrlTemplate = document.body.dataset.comboUrlTemplate || '';
+        const titleEl = modalEl.querySelector('[data-role="combo-title"]');
+        const hintEl = modalEl.querySelector('[data-role="combo-hint"]');
+        const membersEl = modalEl.querySelector('[data-role="combo-members"]');
+        const loadingEl = modalEl.querySelector('[data-role="combo-loading"]');
+        const progressEl = modalEl.querySelector('[data-role="combo-progress"]');
+        const addBtn = modalEl.querySelector('[data-role="combo-add"]');
+
+        const needLabel = document.body.dataset.comboNeedLabel || 'units in total to unlock the discount';
+        const totalLabel = document.body.dataset.comboTotalLabel || 'Combo total';
+        const readyLabel = document.body.dataset.comboReadyLabel || 'The combo discount will be applied!';
+        const missingLabel = document.body.dataset.comboMissingLabel || 'Add more units to reach the combo';
+        const addLabel = document.body.dataset.comboAddLabel || 'Add combo to my order';
+        const addedLabel = document.body.dataset.comboAddedLabel || 'Combo added ✔';
+        const qtyLabel = document.body.dataset.comboQtyLabel || 'Quantity';
+        const presentationLabel = document.body.dataset.comboPresentationLabel || 'Presentation';
+
+        let modalInstance = null;
+        let currentData = null;
+
+        function getModal() {
+            if (!modalInstance) {
+                modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+            }
+            return modalInstance;
+        }
+
+        function esc(text) {
+            return String(text == null ? '' : text)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function currentTotal() {
+            let total = 0;
+            membersEl.querySelectorAll('.combo-member__qty').forEach(function (input) {
+                total += Math.max(0, parseInt(input.value, 10) || 0);
+            });
+            return total;
+        }
+
+        function refreshProgress() {
+            if (!currentData) {
+                return;
+            }
+            const total = currentTotal();
+            const minimum = currentData.minimum || 0;
+            const ready = total >= minimum && minimum > 0;
+            const missing = Math.max(0, minimum - total);
+            progressEl.classList.toggle('combo-modal__progress--ready', ready);
+            if (ready) {
+                progressEl.innerHTML = '<i class="bi bi-check-circle-fill"></i> ' +
+                    esc(totalLabel) + ': <strong>' + total + '</strong> — ' + esc(readyLabel);
+            } else {
+                progressEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i> ' +
+                    esc(totalLabel) + ': <strong>' + total + '</strong> / ' + minimum + ' ' +
+                    esc(needLabel) + ' (' + esc(missingLabel) + ': <strong>' + missing + '</strong>)';
+            }
+            addBtn.disabled = !ready;
+        }
+
+        function renderMembers(data) {
+            const rows = (data.miembros || []).map(function (miembro, index) {
+                const options = (miembro.presentaciones || []).map(function (p) {
+                    const priceTxt = (p.precio != null) ? ' — $' + p.precio : '';
+                    return '<option value="' + p.id + '" data-price="' + (p.precio != null ? p.precio : '') + '">' +
+                        esc(p.nombre) + priceTxt + '</option>';
+                }).join('');
+                return '' +
+                '<div class="combo-member" data-producto-id="' + miembro.producto_id + '">' +
+                    '<div class="combo-member__name"><i class="bi bi-check-circle-fill"></i> ' + esc(miembro.nombre) + '</div>' +
+                    '<div class="combo-member__controls">' +
+                        '<div class="combo-member__field">' +
+                            '<label class="combo-member__label">' + esc(presentationLabel) + '</label>' +
+                            '<select class="form-select form-select-sm combo-member__presentation">' + options + '</select>' +
+                        '</div>' +
+                        '<div class="combo-member__field combo-member__field--qty">' +
+                            '<label class="combo-member__label">' + esc(qtyLabel) + '</label>' +
+                            '<div class="combo-member__stepper">' +
+                                '<button type="button" class="qty-btn combo-member__minus">-</button>' +
+                                '<input type="number" min="0" step="1" value="0" inputmode="numeric" class="cantidad-input combo-member__qty">' +
+                                '<button type="button" class="qty-btn combo-member__plus">+</button>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
+            membersEl.innerHTML = rows;
+
+            membersEl.querySelectorAll('.combo-member').forEach(function (row) {
+                const input = row.querySelector('.combo-member__qty');
+                row.querySelector('.combo-member__minus').addEventListener('click', function () {
+                    input.value = String(Math.max(0, (parseInt(input.value, 10) || 0) - 1));
+                    refreshProgress();
+                });
+                row.querySelector('.combo-member__plus').addEventListener('click', function () {
+                    input.value = String(Math.max(0, (parseInt(input.value, 10) || 0) + 1));
+                    refreshProgress();
+                });
+                input.addEventListener('input', refreshProgress);
+            });
+        }
+
+        function openCombo(promoId) {
+            const url = comboUrlTemplate.replace(/\/0\/miembros\/$/, '/' + promoId + '/miembros/');
+            currentData = null;
+            membersEl.innerHTML = '';
+            progressEl.innerHTML = '';
+            addBtn.disabled = true;
+            addBtn.textContent = addLabel;
+            loadingEl.hidden = false;
+            getModal().show();
+
+            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (data) {
+                    loadingEl.hidden = true;
+                    if (!data) {
+                        membersEl.innerHTML = '<p class="text-danger">Error</p>';
+                        return;
+                    }
+                    currentData = data;
+                    if (titleEl) titleEl.textContent = data.nombre || (document.body.dataset.comboTitle || 'Build your combo');
+                    if (hintEl) {
+                        hintEl.textContent = (data.descripcion ? data.descripcion + ' · ' : '') +
+                            (data.minimum || 0) + ' ' + needLabel + '.';
+                    }
+                    renderMembers(data);
+                    refreshProgress();
+                })
+                .catch(function () {
+                    loadingEl.hidden = true;
+                    membersEl.innerHTML = '<p class="text-danger">Error</p>';
+                });
+        }
+
+        function submitCombo() {
+            const rows = Array.prototype.slice.call(membersEl.querySelectorAll('.combo-member'));
+            const payloads = [];
+            rows.forEach(function (row) {
+                const qty = Math.max(0, parseInt(row.querySelector('.combo-member__qty').value, 10) || 0);
+                if (qty <= 0) {
+                    return;
+                }
+                const select = row.querySelector('.combo-member__presentation');
+                payloads.push({
+                    producto_id: row.dataset.productoId,
+                    presentacion_id: select.value,
+                    cantidad: qty,
+                });
+            });
+            if (!payloads.length) {
+                return;
+            }
+            addBtn.disabled = true;
+
+            const requests = payloads.map(function (p) {
+                return fetch(agregarUrl, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: new URLSearchParams(p).toString(),
+                }).then(function (r) { return r.json(); });
+            });
+
+            Promise.all(requests).then(function (results) {
+                let lastTotal = null;
+                results.forEach(function (data) {
+                    if (data && typeof data.total_items !== 'undefined') {
+                        lastTotal = data.total_items;
+                    }
+                });
+                if (lastTotal != null) {
+                    syncMyOrderAttention(lastTotal);
+                }
+                addBtn.textContent = addedLabel;
+                setTimeout(function () {
+                    getModal().hide();
+                    addBtn.textContent = addLabel;
+                }, 900);
+            }).catch(function () {
+                addBtn.disabled = false;
+            });
+        }
+
+        addBtn.addEventListener('click', submitCombo);
+
+        document.querySelectorAll('.js-combo-add-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const isAuthenticated = document.body.dataset.auth === 'true';
+                if (!isAuthenticated) {
+                    const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+                    loginModal.show();
+                    return;
+                }
+                const promoId = this.dataset.promoId;
+                if (promoId) {
+                    openCombo(promoId);
+                }
+            });
+        });
+    })();
 
     /* BOTÓN LOGIN PARA INVITADOS */
     document.querySelectorAll(".agregar-btn-login").forEach(btn => {

@@ -9,6 +9,10 @@
       data-promo-minimum="{{ producto.promocion_cantidad_minima }}"
       data-promo-presentation="{{ producto.promocion_presentacion_id|default:'' }}"
       data-promo-tier-count="{{ producto.promocion_escalas|length }}"
+      {% if producto.promocion_es_grupo %}
+      data-promo-combo="1"
+      data-promo-id="{{ producto.promocion_activa.id }}"
+      {% endif %}
       {% endif %}>
 
       {% if producto.promocion_activa %}
@@ -151,7 +155,12 @@
       </div>
 
       {% if can_quote %}
-      {% if producto.promocion_activa %}
+      {% if producto.promocion_es_grupo %}
+      <button type="button" class="btn promo-add-btn promo-add-btn--combo w-100 mb-2 js-combo-add-btn" data-promo-id="{{ producto.promocion_activa.id }}">
+          <i class="bi bi-box-seam-fill" aria-hidden="true"></i>
+          {% trans "Build combo and add" %}
+      </button>
+      {% elif producto.promocion_activa %}
       <button type="button" class="btn promo-add-btn w-100 mb-2">
           <i class="bi bi-cart-plus-fill" aria-hidden="true"></i>
           {% trans "Add Promotion to Order" %}

@@ -406,6 +406,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const qtyLabel = document.body.dataset.comboQtyLabel || 'Quantity';
         const presentationLabel = document.body.dataset.comboPresentationLabel || 'Presentation';
 
+        const totalInput = modalEl.querySelector('[data-role="combo-total-input"]');
+        const distributeBtn = modalEl.querySelector('[data-role="combo-distribute-btn"]');
+        const tiersEl = modalEl.querySelector('[data-role="combo-tiers"]');
+
         let modalInstance = null;
         let currentData = null;
 
@@ -448,6 +452,55 @@ document.addEventListener('DOMContentLoaded', function() {
                     esc(needLabel) + ' (' + esc(missingLabel) + ': <strong>' + missing + '</strong>)';
             }
             addBtn.disabled = !ready;
+        }
+
+        function distributeEqually(total) {
+            const rows = Array.prototype.slice.call(membersEl.querySelectorAll('.combo-member'));
+            const n = rows.length;
+            if (!n || !(total > 0)) {
+                return;
+            }
+            const base = Math.floor(total / n);
+            let remainder = total - (base * n);
+            rows.forEach(function (row) {
+                const input = row.querySelector('.combo-member__qty');
+                let qty = base;
+                if (remainder > 0) {
+                    qty += 1;
+                    remainder -= 1;
+                }
+                input.value = String(qty);
+            });
+            refreshProgress();
+        }
+
+        function renderTiers(escalas) {
+            if (!tiersEl) {
+                return;
+            }
+            if (!escalas || !escalas.length) {
+                tiersEl.innerHTML = '';
+                return;
+            }
+            tiersEl.innerHTML = escalas.map(function (e) {
+                return '<button type="button" class="combo-tier-chip" data-min="' + e.minimo + '">' +
+                    '<span class="combo-tier-chip__min">' + e.minimo + '+</span>' +
+                    '<span class="combo-tier-chip__benefit">' + esc(e.beneficio) + '</span>' +
+                    '</button>';
+            }).join('');
+            tiersEl.querySelectorAll('.combo-tier-chip').forEach(function (chip) {
+                chip.addEventListener('click', function () {
+                    const min = parseInt(this.dataset.min, 10) || 0;
+                    if (totalInput) {
+                        totalInput.value = String(min);
+                    }
+                    tiersEl.querySelectorAll('.combo-tier-chip').forEach(function (c) {
+                        c.classList.remove('combo-tier-chip--active');
+                    });
+                    this.classList.add('combo-tier-chip--active');
+                    distributeEqually(min);
+                });
+            });
         }
 
         function renderMembers(data) {
@@ -517,6 +570,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             (data.minimum || 0) + ' ' + needLabel + '.';
                     }
                     renderMembers(data);
+                    renderTiers(data.escalas);
+                    if (totalInput) {
+                        totalInput.value = String(data.minimum || 0);
+                    }
                     refreshProgress();
                 })
                 .catch(function () {
@@ -574,6 +631,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         addBtn.addEventListener('click', submitCombo);
+
+        if (distributeBtn) {
+            distributeBtn.addEventListener('click', function () {
+                distributeEqually(parseInt(totalInput ? totalInput.value : '0', 10) || 0);
+            });
+        }
 
         document.querySelectorAll('.js-combo-add-btn').forEach(function (btn) {
             btn.addEventListener('click', function () {

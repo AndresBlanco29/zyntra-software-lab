@@ -723,6 +723,85 @@ z-index:9999;
     margin-bottom: 1rem;
 }
 
+/* Build-a-pallet: pick a discount tier and split the total evenly */
+.combo-distribute {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 12px;
+    padding: 0.7rem 0.8rem;
+    margin-bottom: 1rem;
+}
+
+.combo-distribute__tiers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 0.6rem;
+}
+
+.combo-tier-chip {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+    background: #fff;
+    border: 1px solid #f59e0b;
+    border-radius: 10px;
+    padding: 0.35rem 0.6rem;
+    cursor: pointer;
+    line-height: 1.15;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.combo-tier-chip:hover {
+    background: #fef3c7;
+}
+
+.combo-tier-chip--active {
+    background: #f59e0b;
+    border-color: #d97706;
+    color: #fff;
+    transform: translateY(-1px);
+}
+
+.combo-tier-chip__min {
+    font-weight: 800;
+    font-size: 0.9rem;
+}
+
+.combo-tier-chip__benefit {
+    font-size: 0.72rem;
+    font-weight: 600;
+    opacity: 0.9;
+}
+
+.combo-distribute__label {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #92400e;
+    margin-bottom: 0.4rem;
+}
+
+.combo-distribute__controls {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.combo-distribute__input {
+    max-width: 110px;
+    text-align: center;
+    font-weight: 700;
+}
+
+.combo-distribute__btn {
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
 .combo-member {
     border: 1px solid #e5e7eb;
     border-radius: 12px;

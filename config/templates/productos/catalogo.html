@@ -370,13 +370,24 @@ data-combo-presentation-label="{% trans 'Presentation' %}">
             </h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
           </div>
-          <div class="modal-body">
-            <p class="combo-modal__hint" data-role="combo-hint"></p>
-            <div data-role="combo-members"></div>
-            <div class="combo-modal__loading text-center py-4" data-role="combo-loading" hidden>
-              <div class="spinner-border text-primary" role="status"></div>
-            </div>
+      <div class="modal-body">
+        <p class="combo-modal__hint" data-role="combo-hint"></p>
+        <div class="combo-distribute" data-role="combo-distribute-wrap">
+          <div class="combo-distribute__tiers" data-role="combo-tiers"></div>
+          <label class="combo-distribute__label">{% trans "Build a pallet: enter the total and split it evenly across the flavors" %}</label>
+          <div class="combo-distribute__controls">
+            <input type="number" min="0" step="1" class="form-control form-control-sm combo-distribute__input" data-role="combo-total-input" placeholder="0">
+            <button type="button" class="btn btn-sm btn-primary combo-distribute__btn" data-role="combo-distribute-btn">
+              <i class="bi bi-diagram-3-fill" aria-hidden="true"></i>
+              {% trans "Split equally" %}
+            </button>
           </div>
+        </div>
+        <div data-role="combo-members"></div>
+        <div class="combo-modal__loading text-center py-4" data-role="combo-loading" hidden>
+          <div class="spinner-border text-primary" role="status"></div>
+        </div>
+      </div>
           <div class="modal-footer combo-modal__footer">
             <div class="combo-modal__progress w-100" data-role="combo-progress" aria-live="polite"></div>
             <div class="d-flex gap-2 w-100">

@@ -874,6 +874,10 @@ def combo_pedido_miembros(request, promocion_id):
         'nombre': promo.nombre,
         'descripcion': promo.texto_catalogo(),
         'minimum': minimum,
+        'escalas': [
+            {'minimo': escala.cantidad_minima, 'beneficio': escala.texto_beneficio()}
+            for escala in escalas
+        ],
         'miembros': miembros,
     })
 

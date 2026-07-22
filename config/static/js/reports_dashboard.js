@@ -228,6 +228,13 @@
     }
 
     go.addEventListener('click', run);
+    if (window.PreserveSearchFocus) {
+      window.PreserveSearchFocus.bindDebouncedInput(input, function () {
+        run();
+      });
+    } else {
+      input.addEventListener('input', run);
+    }
     input.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -237,14 +244,19 @@
   }
 
   function bindTableFilters() {
+    var debounceMs = (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 250;
     document.querySelectorAll('.reports-table-filter').forEach(function (input) {
+      var timer = null;
       input.addEventListener('input', function () {
-        var table = document.querySelector(input.getAttribute('data-target'));
-        if (!table) return;
-        var q = (input.value || '').toLowerCase();
-        table.querySelectorAll('tbody tr').forEach(function (row) {
-          row.style.display = !q || row.textContent.toLowerCase().indexOf(q) !== -1 ? '' : 'none';
-        });
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+          var table = document.querySelector(input.getAttribute('data-target'));
+          if (!table) return;
+          var q = (input.value || '').trim().toLowerCase();
+          table.querySelectorAll('tbody tr').forEach(function (row) {
+            row.style.display = !q || row.textContent.toLowerCase().indexOf(q) !== -1 ? '' : 'none';
+          });
+        }, debounceMs);
       });
     });
   }

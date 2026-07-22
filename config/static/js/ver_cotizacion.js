@@ -28,24 +28,25 @@ console.log("URL presentación:", presentacionURL);
 
 const buscadorInput = document.getElementById("buscador");
 if (buscadorInput) {
-    buscadorInput.addEventListener("keyup", function() {
+    function filterProductRows(query) {
+        const filtro = (query || "").toLowerCase();
+        const filas = document.querySelectorAll("#tablaProductos tbody tr");
 
-    let filtro = this.value.toLowerCase();
-    let filas = document.querySelectorAll("#tablaProductos tbody tr");
+        filas.forEach(function (fila) {
+            const nombre = fila.querySelector(".nombre-producto").textContent.toLowerCase();
+            fila.style.display = nombre.includes(filtro) ? "" : "none";
+        });
+    }
 
-    filas.forEach(function(fila) {
-
-        let nombre = fila.querySelector(".nombre-producto").textContent.toLowerCase();
-
-        if (nombre.includes(filtro)) {
-            fila.style.display = "";
-        } else {
-            fila.style.display = "none";
-        }
-
-    });
-
-    });
+    if (window.PreserveSearchFocus) {
+        window.PreserveSearchFocus.bindDebouncedInput(buscadorInput, function (_input, query) {
+            filterProductRows(query);
+        });
+    } else {
+        buscadorInput.addEventListener("input", function () {
+            filterProductRows(this.value);
+        });
+    }
 }
 
 function actualizarEstadoPromocion(productoId, promo) {

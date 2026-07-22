@@ -11,7 +11,7 @@
 <span>{% trans "Vendedores" %}</span>
 <div class="admin-toolbar-filters admin-toolbar-filters-narrow">
   <input 
-    type="text" 
+    type="search" 
     id="buscador" 
     class="form-control" 
     placeholder="{% trans 'Buscar por nombre o email...' %}"
@@ -169,7 +169,7 @@ function abrirConfirmacionVendedor(nombreCompleto, actionUrl, accion) {
 
 document.addEventListener('DOMContentLoaded', function() {
   function filtrarVendedores() {
-    let texto = document.getElementById("buscador").value.toLowerCase();
+    let texto = (document.getElementById("buscador").value || '').trim().toLowerCase();
     let vendedores = document.querySelectorAll(".vendedor-row:not(#noVendedores)");
     let visibleCount = 0;
 
@@ -196,7 +196,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  document.getElementById("buscador").addEventListener("keyup", filtrarVendedores);
+  const buscadorVendedores = document.getElementById("buscador");
+  if (buscadorVendedores && window.PreserveSearchFocus) {
+    window.PreserveSearchFocus.bindDebouncedInput(buscadorVendedores, function () {
+      filtrarVendedores();
+    });
+  } else if (buscadorVendedores) {
+    buscadorVendedores.addEventListener("input", filtrarVendedores);
+  }
 
   const successNode = document.getElementById("vendedorSuccessMessage");
   if (successNode) {

@@ -1826,7 +1826,7 @@
             return;
           }
           runServerSearch(query);
-        }, 280);
+        }, (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 250);
       }
 
       if (searchInput) {

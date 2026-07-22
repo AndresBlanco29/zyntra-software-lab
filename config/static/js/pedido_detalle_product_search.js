@@ -406,7 +406,7 @@
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(function () {
         fetchResults(query);
-      }, 250);
+      }, (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 250);
     });
 
     resultsBox.addEventListener('click', function (event) {

@@ -184,18 +184,11 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const form = document.getElementById('promociones-filter-form');
-  const buscador = document.getElementById('buscadorPromociones');
   const filtroProductoHidden = document.getElementById('filtroProductoPromo');
   const filtroTipo = document.getElementById('filtroTipoPromo');
 
   function submitFilters() {
     if (form) form.submit();
-  }
-
-  if (window.PreserveSearchFocus && buscador) {
-    window.PreserveSearchFocus.bindDebouncedSearch(buscador, submitFilters);
-  } else if (buscador) {
-    buscador.addEventListener('change', submitFilters);
   }
 
   if (filtroTipo) filtroTipo.addEventListener('change', submitFilters);
@@ -248,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function () {
           .then((response) => (response.ok ? response.json() : { results: [] }))
           .then((data) => renderResults(data.results || []))
           .catch(hideResults);
-      }, 250);
+      }, (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 250);
     });
 
     resultsBox.addEventListener('click', function (event) {

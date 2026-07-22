@@ -235,10 +235,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
-  if (window.PreserveSearchFocus && buscador) {
-    window.PreserveSearchFocus.bindEnterOnlySearch(buscador, submitFilters);
-  }
-
   filtroCategoria.addEventListener('change', submitFilters);
   filtroMarca.addEventListener('change', submitFilters);
 

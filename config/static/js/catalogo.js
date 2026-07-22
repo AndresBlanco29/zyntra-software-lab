@@ -248,13 +248,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    const buscador = document.getElementById('buscador');
     const filtroCategoria = document.getElementById('filtroCategoria');
     const filtroMarca = document.getElementById('filtroMarca');
-
-    if (buscador && window.PreserveSearchFocus) {
-        window.PreserveSearchFocus.bindEnterOnlySearch(buscador, submitCatalogFilters);
-    }
 
     function syncCatalogSearchStickyTop() {
         var nav = document.querySelector('.navbar-custom');

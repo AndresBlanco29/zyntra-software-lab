@@ -169,47 +169,6 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  const searchInput = document.getElementById('vendorNoteCustomerSearch');
-  const customerSelect = document.getElementById('vendorNoteCustomerSelect');
-  const optionsNode = document.getElementById('vendor-note-customer-options');
-  if (searchInput && customerSelect && optionsNode) {
-    let allOptions = [];
-    try {
-      allOptions = JSON.parse(optionsNode.textContent).map(function (customer) {
-        return { value: String(customer.id), text: customer.nombre_empresa };
-      });
-    } catch (error) {
-      allOptions = [];
-    }
-
-    function filterCustomerOptions(query) {
-      const normalized = String(query || '').trim().toLowerCase();
-      const selectedValue = customerSelect.value;
-      customerSelect.innerHTML = '';
-      const placeholder = document.createElement('option');
-      placeholder.value = '';
-      placeholder.textContent = "{% trans 'Select customer...'|escapejs %}";
-      customerSelect.appendChild(placeholder);
-      allOptions.forEach(function (optionData) {
-        const matches = !normalized || optionData.text.toLowerCase().includes(normalized);
-        if (!matches && optionData.value !== selectedValue) {
-          return;
-        }
-        const option = document.createElement('option');
-        option.value = optionData.value;
-        option.textContent = optionData.text;
-        if (optionData.value === selectedValue) {
-          option.selected = true;
-        }
-        customerSelect.appendChild(option);
-      });
-    }
-
-    searchInput.addEventListener('input', function () {
-      filterCustomerOptions(searchInput.value);
-    });
-  }
-
   function recalculateAmount(lineId) {
     const packageInput = document.querySelector('.js-adjustment-package-qty[data-line-id="' + lineId + '"]');
     const unitInput = document.querySelector('.js-adjustment-unit-qty[data-line-id="' + lineId + '"]');

@@ -1,18 +1,13 @@
 document.addEventListener("DOMContentLoaded", function () {
     const form = document.getElementById("clientes-filter-form");
-    const buscador = document.getElementById("buscadorClientes");
     const filtroEstado = document.getElementById("filtroEstado");
 
-    if (!form || !buscador || !filtroEstado) {
+    if (!form || !filtroEstado) {
         return;
     }
 
     function submitFilters() {
         form.submit();
-    }
-
-    if (window.PreserveSearchFocus) {
-        window.PreserveSearchFocus.bindDebouncedSearch(buscador, submitFilters);
     }
 
     filtroEstado.addEventListener("change", submitFilters);

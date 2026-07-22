@@ -1626,6 +1626,7 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(matched['prices'][0]['value'], format(self.presentacion.precio_1, '.2f'))
 		self.assertIn('default_price_key', matched)
 		self.assertEqual(matched['default_price_key'], 'precio_1')
+		self.assertEqual(matched['cost'], '10.00')
 
 		self.presentacion.qb_price = Decimal('42.99')
 		self.presentacion.save(update_fields=['qb_price'])
@@ -1637,6 +1638,51 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(len(matched['prices']), 6)
 		self.assertEqual(matched['prices'][-1]['key'], 'qb_price')
 		self.assertEqual(matched['prices'][-1]['value'], '42.99')
+
+	def test_backoffice_detail_shows_real_cost_for_backoffice_and_admin(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'pedido-item-real-cost')
+		self.assertContains(response, 'Real cost: $10.00')
+		self.assertContains(response, 'pedido-presentation-cost-map')
+		self.assertContains(response, 'data-show-cost="true"', html=False)
+
+		admin_user = Usuario.objects.create_user(username='admin-cost', password='secret123', role='admin')
+		self.client.force_login(admin_user)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Real cost: $10.00')
+
+	def test_backoffice_detail_hides_real_cost_for_non_backoffice_roles(self):
+		vendedor = Usuario.objects.create_user(
+			username='vendor-cost',
+			password='secret123',
+			role='vendedor',
+			permission_overrides={'backoffice.orders.view': True, 'backoffice.orders.manage': True},
+		)
+		self.client.force_login(vendedor)
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+		self.assertEqual(response.status_code, 200)
+		self.assertNotContains(response, 'Real cost: $10.00')
+		self.assertNotContains(response, 'pedido-presentation-cost-map')
+		self.assertContains(response, 'data-show-cost="false"', html=False)
+
+	def test_backoffice_search_hides_cost_for_non_backoffice_roles(self):
+		vendedor = Usuario.objects.create_user(
+			username='vendor-search-cost',
+			password='secret123',
+			role='vendedor',
+			permission_overrides={'backoffice.orders.view': True},
+		)
+		self.client.force_login(vendedor)
+		response = self.client.get(reverse('backoffice_buscar_presentaciones'), {
+			'q': 'Producto test',
+			'pedido_id': self.pedido.id,
+		})
+		self.assertEqual(response.status_code, 200)
+		matched = next(result for result in response.json()['results'] if result['id'] == self.presentacion.id)
+		self.assertNotIn('cost', matched)
 
 	def test_searchable_selects_script_uses_dropdown_input_plugin(self):
 		from pathlib import Path

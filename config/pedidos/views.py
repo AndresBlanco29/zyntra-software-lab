@@ -782,6 +782,12 @@ def backoffice_pedido_detalle(request, pedido_id):
 		'bulk_price_options': _build_bulk_pedido_price_options(),
 		'discount_preset_options': _build_pedido_discount_preset_options(),
 		'presentation_price_map': _build_pedido_presentation_price_map(pedido=pedido, pedido_items=pedido_items),
+		'can_view_product_cost': _is_backoffice_user(request.user),
+		'presentation_cost_map': (
+			_build_pedido_presentation_cost_map(pedido_items=pedido_items)
+			if _is_backoffice_user(request.user)
+			else {}
+		),
 		'default_price_key': _default_presentacion_price_key_for_pedido(pedido=pedido),
 		'order_profit_summary': summarize_order_profit(pedido_items),
 		'credit_limit_evaluation': evaluate_customer_credit_limit(cliente=pedido.cliente, additional_amount=pedido.total),
@@ -1083,6 +1089,20 @@ def _build_pedido_presentation_price_map(*, pedido, pedido_items):
 	return price_map
 
 
+def _build_pedido_presentation_cost_map(*, pedido_items):
+	presentation_ids = set()
+	for item in pedido_items:
+		for presentation in item.presentation_options:
+			presentation_ids.add(presentation.id)
+
+	cost_map = {}
+	for presentation in Presentacion.objects.filter(id__in=presentation_ids).only('id', 'costo'):
+		cost_map[str(presentation.id)] = (
+			format(presentation.costo, '.2f') if presentation.costo is not None else None
+		)
+	return cost_map
+
+
 def _enrich_pedido_items_with_price_options(*, pedido, pedido_items):
 	discount_options = _build_pedido_discount_preset_options()
 	history_by_presentation = {}
@@ -1146,13 +1166,18 @@ def backoffice_buscar_presentaciones(request):
 			presentacion=presentacion,
 			pedido=pedido,
 		)
-		results.append({
+		result = {
 			'id': presentacion.id,
 			'label': f'{presentacion.producto.nombre} - {presentacion.nombre_empaque_cliente}',
 			'price': default_price,
 			'default_price_key': default_price_key,
 			'prices': price_options,
-		})
+		}
+		if _is_backoffice_user(request.user):
+			result['cost'] = (
+				format(presentacion.costo, '.2f') if presentacion.costo is not None else None
+			)
+		results.append(result)
 
 	return JsonResponse({'results': results})
 

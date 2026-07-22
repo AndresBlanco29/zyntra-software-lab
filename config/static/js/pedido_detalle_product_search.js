@@ -54,12 +54,44 @@
     var addPriceMessage = root.dataset.addPriceMessage || 'Enter a valid price.';
     var pendingLabel = root.dataset.pendingLabel || 'Pending';
     var removeLabel = root.dataset.removeLabel || 'Remove';
+    var showCost = root.dataset.showCost === 'true';
+    var realCostLabel = root.dataset.realCostLabel || 'Real cost';
+    var realCostMissingLabel = root.dataset.realCostMissingLabel || 'Real cost: not configured';
+    var realCostDisplay = document.getElementById('newProductRealCost');
     var priceLocked = (pricePresetSelect && pricePresetSelect.dataset.locked === 'true')
       || (priceInput && priceInput.dataset.locked === 'true');
 
     var debounceTimer = null;
     var activeIndex = -1;
     var lastResults = [];
+    var selectedCost = null;
+
+    function formatRealCostLabel(costValue) {
+      if (costValue === null || costValue === undefined || costValue === '') {
+        return realCostMissingLabel;
+      }
+      return realCostLabel + ': $' + formatMoney(costValue);
+    }
+
+    function updateRealCostDisplay(costValue) {
+      if (!showCost || !realCostDisplay) {
+        return;
+      }
+      if (costValue === null || costValue === undefined || costValue === '') {
+        realCostDisplay.textContent = realCostMissingLabel;
+      } else {
+        realCostDisplay.textContent = formatRealCostLabel(costValue);
+      }
+      realCostDisplay.classList.remove('d-none');
+    }
+
+    function hideRealCostDisplay() {
+      selectedCost = null;
+      if (realCostDisplay) {
+        realCostDisplay.textContent = '';
+        realCostDisplay.classList.add('d-none');
+      }
+    }
 
     function hideResults() {
       resultsBox.hidden = true;
@@ -83,6 +115,7 @@
 
       priceInput.value = '';
       priceInput.disabled = true;
+      hideRealCostDisplay();
     }
 
     function clearStagingFields() {
@@ -186,7 +219,9 @@
       searchInput.value = item.label;
       selectedLabel.textContent = item.label;
       selectedLabel.hidden = false;
+      selectedCost = item.cost !== undefined ? item.cost : null;
       populatePriceFields(item);
+      updateRealCostDisplay(selectedCost);
       hideResults();
       if (qtyInput && !qtyInput.value) {
         qtyInput.value = '1';
@@ -263,7 +298,11 @@
       totalDisplay.textContent = formatMoney(total);
     }
 
-    function buildPendingProductRow(presentationId, label, quantity, price) {
+    function buildPendingProductRow(presentationId, label, quantity, price, costValue) {
+      var costMarkup = '';
+      if (showCost) {
+        costMarkup = '<div class="small text-muted mt-1">' + escapeHtml(formatRealCostLabel(costValue)) + '</div>';
+      }
       var row = document.createElement('tr');
       row.className = 'table-success';
       row.setAttribute('data-pending-product-row', 'true');
@@ -280,6 +319,7 @@
         '</td>' +
         '<td>' +
           '<input type="number" min="0.01" step="0.01" class="form-control form-control-sm" name="precio_nuevo[]" value="' + escapeHtml(formatMoney(price)) + '" data-pending-price>' +
+          costMarkup +
         '</td>' +
         '<td class="small text-muted">—</td>' +
         '<td data-pending-pay>$' + escapeHtml(formatMoney(price)) + '</td>' +
@@ -319,7 +359,7 @@
         return;
       }
 
-      var row = buildPendingProductRow(presentationId, label, Math.round(quantity), price);
+      var row = buildPendingProductRow(presentationId, label, Math.round(quantity), price, selectedCost);
       tableBody.appendChild(row);
       updatePendingRowSubtotal(row);
       clearStagingFields();

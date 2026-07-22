@@ -808,7 +808,16 @@
                 <option value="{{ option.value|unlocalize }}" data-price-key="{{ option.key }}" {% if item.selected_price_key == option.key %}selected{% endif %}>{{ option.label }}</option>
                 {% endfor %}
               </select>
-              <input type="number" min="0" step="0.01" class="form-control form-control-sm pedido-item-list-price" id="precio_{{ item.id }}" name="precio_{{ item.id }}" value="{{ item.precio|unlocalize }}" data-item-id="{{ item.id }}" data-cost="{% if item.presentacion.costo is not None %}{{ item.presentacion.costo|unlocalize }}{% endif %}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+              <input type="number" min="0" step="0.01" class="form-control form-control-sm pedido-item-list-price" id="precio_{{ item.id }}" name="precio_{{ item.id }}" value="{{ item.precio|unlocalize }}" data-item-id="{{ item.id }}"{% if can_view_product_cost and item.presentacion.costo is not None %} data-cost="{{ item.presentacion.costo|unlocalize }}"{% endif %} {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+              {% if can_view_product_cost %}
+              <div class="small text-muted mt-1 pedido-item-real-cost" data-item-id="{{ item.id }}">
+                {% if item.presentacion.costo is not None %}
+                  {% blocktrans with amount=item.presentacion.costo|floatformat:2 %}Real cost: ${{ amount }}{% endblocktrans %}
+                {% else %}
+                  {% trans "Real cost: not configured" %}
+                {% endif %}
+              </div>
+              {% endif %}
               {% if item.profit.has_cost and item.profit.unit_profit_amount is not None %}
               <div class="small text-muted mt-1 pedido-unit-profit-hint">{% blocktrans with amount=item.profit.unit_profit_amount percentage=item.profit.profit_percent %}Unit profit: ${{ amount }} ({{ percentage }}%){% endblocktrans %}</div>
               {% else %}
@@ -915,7 +924,10 @@
           data-add-qty-message="{% trans 'Enter a quantity of at least 1.'|escapejs %}"
           data-add-price-message="{% trans 'Enter a valid price.'|escapejs %}"
           data-pending-label="{% trans 'Pending'|escapejs %}"
-          data-remove-label="{% trans 'Remove'|escapejs %}">
+          data-remove-label="{% trans 'Remove'|escapejs %}"
+          data-show-cost="{% if can_view_product_cost %}true{% else %}false{% endif %}"
+          data-real-cost-label="{% trans 'Real cost'|escapejs %}"
+          data-real-cost-missing-label="{% trans 'Real cost: not configured'|escapejs %}">
           <input
             type="search"
             id="buscadorProductoPedido"
@@ -938,6 +950,9 @@
           <option value="">{% trans "Manual price" %}</option>
         </select>
         <input type="number" min="0.01" step="0.01" id="precioNuevoPedido" class="form-control form-control-sm" placeholder="{% trans 'Price' %}" disabled {% if lineas_bloqueadas_para_picking %}data-locked="true"{% endif %}>
+        {% if can_view_product_cost %}
+        <div id="newProductRealCost" class="small text-muted mt-1 d-none"></div>
+        {% endif %}
       </div>
       <div class="col-md-2 d-grid">
         <button type="button" class="btn btn-success" id="addPendingProductBtn" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
@@ -1076,6 +1091,9 @@
 </div>
 
 {{ presentation_price_map|json_script:"pedido-presentation-price-map" }}
+{% if can_view_product_cost %}
+{{ presentation_cost_map|json_script:"pedido-presentation-cost-map" }}
+{% endif %}
 
 <script src="{% static 'js/order_profit.js' %}"></script>
 <script>
@@ -1307,6 +1325,37 @@ document.addEventListener('DOMContentLoaded', function () {
 
   const presentationPriceMapNode = document.getElementById('pedido-presentation-price-map');
   const presentationPriceMap = presentationPriceMapNode ? JSON.parse(presentationPriceMapNode.textContent) : {};
+  {% if can_view_product_cost %}
+  const presentationCostMapNode = document.getElementById('pedido-presentation-cost-map');
+  const presentationCostMap = presentationCostMapNode ? JSON.parse(presentationCostMapNode.textContent) : {};
+  const realCostLabel = '{% trans "Real cost"|escapejs %}';
+  const realCostMissingLabel = '{% trans "Real cost: not configured"|escapejs %}';
+
+  function formatRealCostLabel(costValue) {
+    if (costValue === null || costValue === undefined || costValue === '') {
+      return realCostMissingLabel;
+    }
+    return `${realCostLabel}: $${formatNumber(costValue)}`;
+  }
+
+  function updatePedidoItemRealCostDisplay(row, presentationId, itemId) {
+    const costElement = row?.querySelector(`.pedido-item-real-cost[data-item-id="${itemId}"]`);
+    const priceInput = row?.querySelector(`.pedido-item-list-price[data-item-id="${itemId}"]`);
+    if (!costElement) {
+      return;
+    }
+    const costValue = presentationCostMap[presentationId];
+    costElement.textContent = formatRealCostLabel(costValue);
+    if (priceInput) {
+      if (costValue === null || costValue === undefined || costValue === '') {
+        priceInput.dataset.cost = '';
+      } else {
+        priceInput.dataset.cost = String(costValue);
+      }
+    }
+  }
+  {% endif %}
+
   const defaultPriceKey = orderForm?.dataset.defaultPriceKey || 'precio_1';
   const bulkPriceTierSelect = document.getElementById('bulkPriceTierSelect');
   const applyBulkPriceTierButton = document.getElementById('applyBulkPriceTierButton');
@@ -1389,6 +1438,9 @@ document.addEventListener('DOMContentLoaded', function () {
       priceInput.value = matchingOption.value;
       presetSelect.value = matchingOption.value;
     }
+    {% if can_view_product_cost %}
+    updatePedidoItemRealCostDisplay(row, presentationId, itemId);
+    {% endif %}
     refreshPedidoItemDiscountRow(itemId);
   }
 

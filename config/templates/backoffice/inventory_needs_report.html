@@ -1,0 +1,119 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "General Inventory Analysis" %}{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <h2 class="mb-1">{% trans "General Inventory Analysis" %}</h2>
+    <p class="text-muted mb-0">
+      {% blocktrans count counter=analysis.pedido_count %}
+      Purchase plan for {{ counter }} selected order.
+      {% plural %}
+      Purchase plan for {{ counter }} selected orders.
+      {% endblocktrans %}
+    </p>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{% url 'backoffice_pedidos' %}?view={{ view_mode|default:'pending' }}" class="btn btn-outline-secondary">{% trans "Back to orders" %}</a>
+    <form method="post" action="{% url 'backoffice_inventory_needs_report' %}">
+      {% csrf_token %}
+      <input type="hidden" name="view" value="{{ view_mode|default:'pending' }}">
+      <input type="hidden" name="format" value="pdf">
+      {% for pedido in pedidos %}
+      <input type="hidden" name="pedido_ids" value="{{ pedido.id }}">
+      {% endfor %}
+      <button type="submit" class="btn btn-primary">{% trans "Download PDF" %}</button>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">{% trans "Orders analyzed" %}</div>
+        <div class="fs-3 fw-bold">{{ analysis.pedido_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">{% trans "Products to purchase" %}</div>
+        <div class="fs-3 fw-bold text-danger">{{ analysis.needs_purchase_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small">{% trans "Total CS to buy" %}</div>
+        <div class="fs-3 fw-bold text-warning">{{ analysis.total_to_buy }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-header bg-white">
+    <strong>{% trans "Selected orders" %}</strong>
+  </div>
+  <div class="card-body py-2">
+    <div class="d-flex flex-wrap gap-2">
+      {% for pedido in pedidos %}
+      <a href="{% url 'backoffice_pedido_detalle' pedido.id %}" class="badge text-bg-light border text-decoration-none">
+        #{{ pedido.numero_display }} · {{ pedido.cliente.nombre_empresa }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-striped align-middle mb-0">
+      <thead>
+        <tr>
+          <th>{% trans "Product" %}</th>
+          <th>{% trans "SKU" %}</th>
+          <th>{% trans "Requested" %}</th>
+          <th>{% trans "Available stock" %}</th>
+          <th>{% trans "To buy" %}</th>
+          <th>{% trans "Orders" %}</th>
+          <th>{% trans "Status" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in analysis.rows %}
+        <tr class="{% if row.status == 'out_of_stock' %}table-danger{% elif row.status == 'insufficient' %}table-warning{% endif %}">
+          <td>
+            <div class="fw-semibold">{{ row.product_name }}</div>
+            <div class="small text-muted">{{ row.presentation_name }}</div>
+          </td>
+          <td>{% if row.sku %}{{ row.sku }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+          <td>{{ row.requested_quantity }} CS</td>
+          <td>{{ row.available_stock }} CS</td>
+          <td class="fw-bold">{% if row.to_buy_quantity %}{{ row.to_buy_quantity }} CS{% else %}-{% endif %}</td>
+          <td>{{ row.order_count }}</td>
+          <td>
+            {% if row.status == 'out_of_stock' %}
+            <span class="badge text-bg-danger">{{ row.status_label }}</span>
+            {% elif row.status == 'insufficient' %}
+            <span class="badge text-bg-warning text-dark">{{ row.status_label }}</span>
+            {% else %}
+            <span class="badge text-bg-success">{{ row.status_label }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-4">{% trans "No products found on the selected orders." %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

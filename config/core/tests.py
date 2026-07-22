@@ -68,6 +68,35 @@ class VisiblePageWindowTests(TestCase):
 		self.assertEqual(get_visible_page_numbers(1, 1), [])
 
 
+class ContinuousPaginationControlsTests(TestCase):
+	def test_last_page_next_wraps_to_first_page(self):
+		from django.core.paginator import Paginator
+		from django.template import Context, Template
+
+		paginator = Paginator(list(range(1, 101)), 10)
+		page_obj = paginator.page(10)
+		rendered = Template(
+			'{% load pagination_tags %}{% pagination_controls page_obj %}'
+		).render(Context({'page_obj': page_obj}))
+
+		self.assertIn('page=1', rendered)
+		self.assertIn('Next (wrap to first page)', rendered)
+		self.assertNotIn('page-item disabled"><span class="page-link" aria-hidden="true">&rsaquo;', rendered)
+
+	def test_first_page_previous_wraps_to_last_page(self):
+		from django.core.paginator import Paginator
+		from django.template import Context, Template
+
+		paginator = Paginator(list(range(1, 101)), 10)
+		page_obj = paginator.page(1)
+		rendered = Template(
+			'{% load pagination_tags %}{% pagination_controls page_obj %}'
+		).render(Context({'page_obj': page_obj}))
+
+		self.assertIn('page=10', rendered)
+		self.assertIn('Previous (wrap to last page)', rendered)
+
+
 class BackofficeSpanishTranslationsTests(TestCase):
 	def setUp(self):
 		self.backoffice = Usuario.objects.create_user(

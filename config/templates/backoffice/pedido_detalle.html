@@ -1031,6 +1031,25 @@
             <button type="button" class="btn btn-outline-secondary w-100" disabled>{{ picking_send_button_label }}</button>
           </div>
         </div>
+        {% if pedido.estado == 'PARA_VERIFICAR' and can_manage_pedido and not invoice %}
+        <form method="post" action="{% url 'backoffice_devolver_desde_picking' pedido.id %}" class="mt-3 p-3 border rounded-3 bg-white" onsubmit="return confirm('{% trans "Return this order from picking to the previous step? The change will be saved in the audit history." %}');">
+          {% csrf_token %}
+          <div class="row g-2 align-items-end">
+            <div class="col-md-8">
+              <label class="form-label fw-semibold mb-1">{% trans "Return from picking" %}</label>
+              <select name="destino" class="form-select">
+                <option value="LISTO_PARA_PICKING" selected>{% trans "Ready for picking" %}</option>
+                <option value="EN_GESTION">{% trans "In progress" %}</option>
+                <option value="RECIBIDO">{% trans "Received" %}</option>
+              </select>
+              <div class="form-text">{% trans "Use this if the order was sent to picking by mistake. Selector assignment is cleared and the action is logged." %}</div>
+            </div>
+            <div class="col-md-4">
+              <button type="submit" class="btn btn-outline-danger w-100">{% trans "Return to previous step" %}</button>
+            </div>
+          </div>
+        </form>
+        {% endif %}
         {% if pedido.estado == 'VERIFICADO_AJUSTADO' and not invoice %}
         <div class="form-text mt-2">{% trans "Picking was already completed. Review the order and generate the invoice when ready." %}</div>
         {% endif %}

@@ -11,7 +11,9 @@
     </li>
     {% else %}
     <li class="page-item disabled"><span class="page-link" aria-hidden="true">&laquo;</span></li>
-    <li class="page-item disabled"><span class="page-link" aria-hidden="true">&lsaquo;</span></li>
+    <li class="page-item">
+      <a class="page-link" href="?{% for key, value in query_params.items %}{{ key }}={{ value|urlencode }}&{% endfor %}page={{ page_obj.paginator.num_pages }}" aria-label="{% trans 'Previous' %}" title="{% trans 'Previous (wrap to last page)' %}">&lsaquo;</a>
+    </li>
     {% endif %}
 
     {% for page_number in page_numbers %}
@@ -34,7 +36,9 @@
       <a class="page-link" href="?{% for key, value in query_params.items %}{{ key }}={{ value|urlencode }}&{% endfor %}page={{ page_obj.paginator.num_pages }}" aria-label="{% trans 'Last page' %}" title="{% trans 'Last page' %}">&raquo;</a>
     </li>
     {% else %}
-    <li class="page-item disabled"><span class="page-link" aria-hidden="true">&rsaquo;</span></li>
+    <li class="page-item">
+      <a class="page-link" href="?{% for key, value in query_params.items %}{{ key }}={{ value|urlencode }}&{% endfor %}page=1" aria-label="{% trans 'Next' %}" title="{% trans 'Next (wrap to first page)' %}">&rsaquo;</a>
+    </li>
     <li class="page-item disabled"><span class="page-link" aria-hidden="true">&raquo;</span></li>
     {% endif %}
   </ul>

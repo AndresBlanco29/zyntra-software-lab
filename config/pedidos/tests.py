@@ -17,11 +17,14 @@ from config.inventario.models import StockPresentacion
 from config.inventario.services import registrar_entrada_manual
 from config.notificaciones.models import Notificacion
 from config.pedidos.models import Pedido, PedidoEditLock, PedidoItem
+from config.auditoria.models import AuditLog
 from config.pedidos.services import (
 	PEDIDO_EDIT_LOCK_TIMEOUT,
 	acquire_pedido_edit_lock,
 	asignar_picking_a_seleccionador,
+	build_multi_pedido_inventory_needs_analysis,
 	build_pedido_inventory_needs_analysis,
+	devolver_pedido_desde_picking,
 	evaluar_stock_fisico_verificacion_picking,
 	guardar_verificacion_picking,
 	resolver_bloqueo_picking_desde_backoffice,
@@ -174,6 +177,108 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(response['Content-Type'], 'application/pdf')
 		self.assertIn(f'inventory-needs-order-{self.pedido.id}.pdf', response['Content-Disposition'])
 		self.assertTrue(response.content.startswith(b'%PDF'))
+
+	def test_multi_pedido_inventory_needs_aggregates_without_double_counting_stock(self):
+		other_pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='LISTO_PARA_PICKING',
+			total=Decimal('36.00'),
+		)
+		PedidoItem.objects.create(
+			pedido=other_pedido,
+			presentacion=self.presentacion,
+			cantidad=3,
+			cantidad_solicitada=3,
+			precio=Decimal('12.00'),
+			subtotal=Decimal('36.00'),
+		)
+		self.item.cantidad_reservada_inventario = 0
+		self.item.save(update_fields=['cantidad_reservada_inventario'])
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(
+			stock_fisico=4,
+			stock_reservado=0,
+			stock_disponible=4,
+		)
+
+		analysis = build_multi_pedido_inventory_needs_analysis(pedidos=[self.pedido, other_pedido])
+		self.assertEqual(analysis['pedido_count'], 2)
+		self.assertEqual(analysis['needs_purchase_count'], 1)
+		row = analysis['rows'][0]
+		self.assertEqual(row['requested_quantity'], 5)
+		self.assertEqual(row['available_stock'], 4)
+		self.assertEqual(row['to_buy_quantity'], 1)
+		self.assertEqual(row['order_count'], 2)
+
+	def test_backoffice_inventory_needs_report_from_selected_orders(self):
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(
+			stock_fisico=0,
+			stock_reservado=2,
+			stock_disponible=0,
+		)
+		self.client.force_login(self.backoffice)
+		response = self.client.post(
+			reverse('backoffice_inventory_needs_report'),
+			{'pedido_ids': [self.pedido.id], 'view': 'pending'},
+		)
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'General Inventory Analysis')
+		self.assertContains(response, 'Out of stock')
+		self.assertContains(response, f'#{self.pedido.numero_display}')
+
+	def test_devolver_pedido_desde_picking_clears_assignment_and_logs_history(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.pedido.picking_progress = {'draft': True}
+		self.pedido.picking_progress_saved_at = timezone.now()
+		self.pedido.save(update_fields=['picking_progress', 'picking_progress_saved_at', 'actualizada_en'])
+
+		devolver_pedido_desde_picking(
+			pedido=self.pedido,
+			usuario=self.backoffice,
+			destino='LISTO_PARA_PICKING',
+		)
+		self.pedido.refresh_from_db()
+
+		self.assertEqual(self.pedido.estado, 'LISTO_PARA_PICKING')
+		self.assertIsNone(self.pedido.seleccionador_id)
+		self.assertIsNone(self.pedido.picking_asignado_en)
+		self.assertEqual(self.pedido.picking_progress, {})
+		self.assertIsNone(self.pedido.picking_progress_saved_at)
+		log = AuditLog.objects.filter(
+			entity_type='Pedido',
+			entity_id=str(self.pedido.id),
+		).order_by('-id').first()
+		self.assertIsNotNone(log)
+		self.assertEqual((log.metadata or {}).get('action'), 'return_from_picking')
+		self.assertIn('Returned order', str(log.action_label))
+
+	def test_backoffice_can_return_order_from_picking_via_post(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.backoffice)
+		detail = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+		self.assertContains(detail, 'Return from picking')
+		self.assertContains(detail, reverse('backoffice_devolver_desde_picking', args=[self.pedido.id]))
+
+		response = self.client.post(
+			reverse('backoffice_devolver_desde_picking', args=[self.pedido.id]),
+			{'destino': 'EN_GESTION'},
+		)
+		self.assertEqual(response.status_code, 302)
+		self.pedido.refresh_from_db()
+		self.assertEqual(self.pedido.estado, 'EN_GESTION')
+		self.assertIsNone(self.pedido.seleccionador_id)
+
+	def test_selector_picking_detail_add_product_button_is_at_end_and_styled(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+		response = self.client.get(reverse('selector_picking_detail', args=[self.pedido.id]))
+		self.assertEqual(response.status_code, 200)
+		content = response.content.decode()
+		button_pos = content.find('id="addProductRowButton"')
+		tbody_end = content.find('</tbody>', content.find('id="pickerItemsTableBody"'))
+		self.assertGreater(button_pos, tbody_end)
+		self.assertIn('picker-add-product-btn', content)
+		self.assertIn('picker-add-pulse', content)
 
 	def test_backoffice_detail_shows_order_comment(self):
 		self.pedido.nota_cliente = 'Leave at back door'

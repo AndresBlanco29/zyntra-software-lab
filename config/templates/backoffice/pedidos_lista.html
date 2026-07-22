@@ -72,11 +72,33 @@
 </p>
 {% endif %}
 
+{% if view_mode == 'pending' or view_mode == 'purchase-order' or view_mode == 'sent-to-picking' %}
+<form method="post" action="{% url 'backoffice_inventory_needs_report' %}" id="inventoryNeedsReportForm">
+  {% csrf_token %}
+  <input type="hidden" name="view" value="{{ view_mode }}">
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="inventorySelectVisible">{% trans "Select visible orders" %}</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="inventoryClearSelection">{% trans "Clear selection" %}</button>
+    <button type="submit" class="btn btn-sm btn-warning" id="inventoryGenerateReport" disabled>
+      {% trans "Generate inventory analysis" %}
+    </button>
+    <button type="submit" name="format" value="pdf" class="btn btn-sm btn-outline-warning" id="inventoryGeneratePdf" disabled>
+      {% trans "Download inventory PDF" %}
+    </button>
+    <span class="small text-muted" id="inventorySelectionCount">{% trans "0 orders selected" %}</span>
+  </div>
+{% endif %}
+
 <div class="card shadow-sm">
   <div class="table-responsive mobile-stack-responsive">
     <table class="table table-striped align-middle mb-0 mobile-stack-table mobile-stack-table--list">
       <thead>
         <tr>
+          {% if view_mode == 'pending' or view_mode == 'purchase-order' or view_mode == 'sent-to-picking' %}
+          <th style="width: 42px;">
+            <span class="visually-hidden">{% trans "Select" %}</span>
+          </th>
+          {% endif %}
           <th>{% trans "Ref." %}</th>
           <th>{% trans "Type" %}</th>
           <th>{% trans "Customer" %}</th>
@@ -91,6 +113,15 @@
       <tbody>
         {% for row in dispatch_orders %}
         <tr>
+          {% if view_mode == 'pending' or view_mode == 'purchase-order' or view_mode == 'sent-to-picking' %}
+          <td data-label="{% trans 'Select' %}">
+            {% if row.record_type == 'order' %}
+            <input type="checkbox" class="form-check-input js-inventory-order-check" name="pedido_ids" value="{{ row.source_id }}" aria-label="{% blocktrans with ref=row.display_ref|default:row.source_id %}Select order #{{ ref }}{% endblocktrans %}">
+            {% else %}
+            <span class="text-muted">-</span>
+            {% endif %}
+          </td>
+          {% endif %}
           <td data-label="{% trans 'Ref.' %}">#{{ row.display_ref|default:row.source_id }}</td>
           <td data-label="{% trans 'Type' %}">
             {% if row.record_type == 'quote' %}
@@ -127,7 +158,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="9" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No orders have been registered yet." %}</td>
+          <td colspan="{% if view_mode == 'pending' or view_mode == 'purchase-order' or view_mode == 'sent-to-picking' %}10{% else %}9{% endif %}" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No orders have been registered yet." %}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -136,6 +167,55 @@
 
   {% pagination_controls page_obj aria_label=_('Order pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0 px-3 pb-3" view=view_mode q=search_query sort=sort_dir date_from=date_from date_to=date_to %}
 </div>
+
+{% if view_mode == 'pending' or view_mode == 'purchase-order' or view_mode == 'sent-to-picking' %}
+</form>
+<script>
+(function () {
+  var form = document.getElementById('inventoryNeedsReportForm');
+  if (!form) return;
+  var checks = function () { return Array.prototype.slice.call(form.querySelectorAll('.js-inventory-order-check')); };
+  var countLabel = document.getElementById('inventorySelectionCount');
+  var generateBtn = document.getElementById('inventoryGenerateReport');
+  var pdfBtn = document.getElementById('inventoryGeneratePdf');
+  var oneLabel = '{% trans "1 order selected" %}';
+  var manyLabel = '{% trans "%(count)s orders selected" %}';
+
+  function syncSelection() {
+    var selected = checks().filter(function (el) { return el.checked; }).length;
+    if (countLabel) {
+      countLabel.textContent = selected === 1
+        ? oneLabel
+        : manyLabel.replace('%(count)s', String(selected));
+    }
+    if (generateBtn) generateBtn.disabled = selected === 0;
+    if (pdfBtn) pdfBtn.disabled = selected === 0;
+  }
+
+  form.addEventListener('change', function (event) {
+    if (event.target && event.target.classList.contains('js-inventory-order-check')) {
+      syncSelection();
+    }
+  });
+
+  var selectVisible = document.getElementById('inventorySelectVisible');
+  if (selectVisible) {
+    selectVisible.addEventListener('click', function () {
+      checks().forEach(function (el) { el.checked = true; });
+      syncSelection();
+    });
+  }
+  var clearSelection = document.getElementById('inventoryClearSelection');
+  if (clearSelection) {
+    clearSelection.addEventListener('click', function () {
+      checks().forEach(function (el) { el.checked = false; });
+      syncSelection();
+    });
+  }
+  syncSelection();
+})();
+</script>
+{% endif %}
 
 <style>
   .dispatch-process-tabs .btn {

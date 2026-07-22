@@ -561,22 +561,24 @@
       }
     });
 
-    addProductRowButton.addEventListener('click', function () {
-      var row = buildAddedProductRow();
-      pickerItemsTableBody.appendChild(row);
-      initProductSearchRoot(row.querySelector('[data-picker-product-search-root]'));
-      initQuantityStepper(row.querySelector('[data-quantity-stepper]'));
-      var addedReviewCheckbox = row.querySelector('.picker-line-reviewed');
-      if (addedReviewCheckbox) {
-        addedReviewCheckbox.addEventListener('change', syncReviewRowHighlights);
-      }
-      syncAddedProductRow(row);
-      updateFormState();
-      var searchInput = row.querySelector('[data-picker-product-search]');
-      if (searchInput) {
-        searchInput.focus();
-      }
-    });
+    if (addProductRowButton) {
+      addProductRowButton.addEventListener('click', function () {
+        var row = buildAddedProductRow();
+        pickerItemsTableBody.appendChild(row);
+        initProductSearchRoot(row.querySelector('[data-picker-product-search-root]'));
+        initQuantityStepper(row.querySelector('[data-quantity-stepper]'));
+        var addedReviewCheckbox = row.querySelector('.picker-line-reviewed');
+        if (addedReviewCheckbox) {
+          addedReviewCheckbox.addEventListener('change', syncReviewRowHighlights);
+        }
+        syncAddedProductRow(row);
+        updateFormState();
+        var searchInput = row.querySelector('[data-picker-product-search]');
+        if (searchInput) {
+          searchInput.focus();
+        }
+      });
+    }
 
     updateFormState();
   });

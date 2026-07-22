@@ -63,15 +63,17 @@ from .services import (
 	anular_pedido_desde_backoffice,
 	asignar_picking_a_seleccionador,
 	build_pedido_edit_lock_context,
+	build_multi_pedido_inventory_needs_analysis,
+	build_pedido_inventory_needs_analysis,
 	calcular_precio_unitario_neto_item,
 	calcular_subtotal_item_pedido,
 	crear_pedido_parcial,
+	devolver_pedido_desde_picking,
 	eliminar_linea_pedido_desde_backoffice,
 	eliminar_pedido_desde_backoffice,
 	ensure_pedido_edit_lock_owner,
 	evaluar_stock_fisico_verificacion_picking,
 	guardar_verificacion_picking,
-	build_pedido_inventory_needs_analysis,
 	normalizar_descuento_item_pedido,
 	parse_lineas_parcial_desde_payload,
 	pedido_puede_crear_parcial,
@@ -1291,6 +1293,190 @@ def backoffice_asignar_picking(request, pedido_id):
 		messages.success(request, _('Picking ticket sent to selector successfully.'))
 
 	return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+
+@login_required
+@internal_permission_required('backoffice.orders.manage')
+@require_POST
+def backoffice_devolver_desde_picking(request, pedido_id):
+	pedido = get_object_or_404(Pedido.objects.select_related('cliente__usuario', 'seleccionador', 'invoice'), id=pedido_id)
+	destino = (request.POST.get('destino') or 'LISTO_PARA_PICKING').strip().upper()
+	try:
+		ensure_pedido_edit_lock_owner(pedido=pedido, user=request.user)
+		devolver_pedido_desde_picking(pedido=pedido, usuario=request.user, destino=destino)
+	except ValidationError as exc:
+		messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+	else:
+		release_pedido_edit_lock(pedido=pedido, user=request.user)
+		messages.success(request, _('Order returned from picking. The change was saved in the audit history.'))
+	return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
+
+@login_required
+@internal_permission_required('backoffice.orders.view')
+@require_POST
+def backoffice_inventory_needs_report(request):
+	raw_ids = request.POST.getlist('pedido_ids')
+	pedido_ids = []
+	for value in raw_ids:
+		try:
+			pedido_ids.append(int(value))
+		except (TypeError, ValueError):
+			continue
+	pedido_ids = sorted(set(pedido_ids))
+	if not pedido_ids:
+		messages.error(request, _('Select at least one order to generate the inventory analysis report.'))
+		return redirect(request.META.get('HTTP_REFERER') or reverse('backoffice_pedidos'))
+
+	pedidos = list(
+		Pedido.objects.filter(id__in=pedido_ids)
+		.select_related('cliente')
+		.prefetch_related('items__presentacion__producto', 'items__presentacion__stock_operativo')
+		.order_by('id')
+	)
+	if not pedidos:
+		messages.error(request, _('No valid orders were found for the inventory analysis.'))
+		return redirect('backoffice_pedidos')
+
+	analysis = build_multi_pedido_inventory_needs_analysis(pedidos=pedidos)
+	as_pdf = (request.POST.get('format') or '').strip().lower() == 'pdf'
+	if as_pdf:
+		return _render_multi_inventory_needs_pdf(analysis=analysis, pedidos=pedidos)
+
+	return render(request, 'backoffice/inventory_needs_report.html', {
+		'analysis': analysis,
+		'pedidos': pedidos,
+		'view_mode': (request.POST.get('view') or request.GET.get('view') or 'pending').strip(),
+	})
+
+
+def _render_multi_inventory_needs_pdf(*, analysis, pedidos):
+	document_date = format_local_datetime(timezone.now()) or '-'
+	order_refs = ', '.join(f'#{pedido.numero_display}' for pedido in pedidos)
+
+	buffer = BytesIO()
+	document = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36)
+	styles = getSampleStyleSheet()
+	summary_label_style = ParagraphStyle(
+		'MultiInventoryNeedsSummaryLabel',
+		parent=styles['BodyText'],
+		fontName='Helvetica-Bold',
+		fontSize=9,
+		textColor=BRAND_MUTED_TEXT,
+		leading=11,
+	)
+	summary_value_style = ParagraphStyle(
+		'MultiInventoryNeedsSummaryValue',
+		parent=styles['BodyText'],
+		fontSize=10,
+		textColor=BRAND_TEXT,
+		leading=12,
+	)
+	header_cell_style = ParagraphStyle(
+		'MultiInventoryNeedsHeaderCell',
+		parent=summary_label_style,
+		textColor=colors.white,
+		fontSize=8,
+	)
+	item_cell_style = ParagraphStyle(
+		'MultiInventoryNeedsItemCell',
+		parent=styles['BodyText'],
+		fontSize=8,
+		leading=10,
+		textColor=BRAND_TEXT,
+		wordWrap='CJK',
+	)
+
+	content = [
+		build_pdf_brand_banner(
+			styles=styles,
+			title=_('General Inventory Analysis'),
+			subtitle=_('%(count)s selected orders') % {'count': analysis['pedido_count']},
+			document_date=document_date,
+			total_width=540,
+		),
+		Spacer(1, 12),
+		Table([
+			[Paragraph(_('Orders'), summary_label_style), Paragraph(escape(order_refs), summary_value_style)],
+			[Paragraph(_('Date'), summary_label_style), Paragraph(document_date, summary_value_style)],
+			[
+				Paragraph(_('Products to purchase'), summary_label_style),
+				Paragraph(str(analysis['needs_purchase_count']), summary_value_style),
+			],
+			[
+				Paragraph(_('Total CS to buy'), summary_label_style),
+				Paragraph(str(analysis['total_to_buy']), summary_value_style),
+			],
+		], colWidths=[140, 364]),
+		Spacer(1, 16),
+	]
+	content[2].setStyle(TableStyle([
+		('BOX', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('INNERGRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('BACKGROUND', (0, 0), (-1, -1), BRAND_SURFACE),
+		('LEFTPADDING', (0, 0), (-1, -1), 10),
+		('RIGHTPADDING', (0, 0), (-1, -1), 10),
+		('TOPPADDING', (0, 0), (-1, -1), 8),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+	]))
+
+	rows = [[
+		Paragraph(escape(_('Product')), header_cell_style),
+		Paragraph(escape(_('SKU')), header_cell_style),
+		Paragraph(escape(_('Requested')), header_cell_style),
+		Paragraph(escape(_('Stock')), header_cell_style),
+		Paragraph(escape(_('To buy')), header_cell_style),
+		Paragraph(escape(_('Orders')), header_cell_style),
+		Paragraph(escape(_('Status')), header_cell_style),
+	]]
+	for row in analysis['rows']:
+		rows.append([
+			Paragraph(
+				escape(f"{row['product_name']} — {row['presentation_name']}"),
+				item_cell_style,
+			),
+			Paragraph(escape(row['sku'] or '-'), item_cell_style),
+			Paragraph(escape(f"{row['requested_quantity']} CS"), item_cell_style),
+			Paragraph(escape(f"{row['available_stock']} CS"), item_cell_style),
+			Paragraph(escape(f"{row['to_buy_quantity']} CS"), item_cell_style),
+			Paragraph(escape(str(row['order_count'])), item_cell_style),
+			Paragraph(escape(str(row['status_label'])), item_cell_style),
+		])
+
+	table = Table(rows, colWidths=[150, 65, 50, 50, 50, 45, 94])
+	table_style = [
+		('BACKGROUND', (0, 0), (-1, 0), BRAND_PRIMARY),
+		('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
+		('VALIGN', (0, 0), (-1, -1), 'TOP'),
+		('LEFTPADDING', (0, 0), (-1, -1), 5),
+		('RIGHTPADDING', (0, 0), (-1, -1), 5),
+		('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+		('TOPPADDING', (0, 0), (-1, -1), 6),
+	]
+	for index, row in enumerate(analysis['rows'], start=1):
+		if row['status'] == 'out_of_stock':
+			table_style.append(('BACKGROUND', (0, index), (-1, index), colors.Color(1, 0.92, 0.92)))
+		elif row['status'] == 'insufficient':
+			table_style.append(('BACKGROUND', (0, index), (-1, index), colors.Color(1, 0.96, 0.88)))
+		else:
+			table_style.append(('BACKGROUND', (0, index), (-1, index), colors.white if index % 2 else BRAND_SURFACE))
+	table.setStyle(TableStyle(table_style))
+	content.append(table)
+	content.append(Spacer(1, 10))
+	content.append(
+		Paragraph(
+			escape(_('Use this report to purchase the missing packages and update inventory before dispatch.')),
+			ParagraphStyle('MultiInventoryNeedsFooter', parent=styles['BodyText'], fontSize=8, textColor=BRAND_MUTED_TEXT),
+		)
+	)
+
+	document.build(content)
+	pdf = buffer.getvalue()
+	buffer.close()
+
+	response = HttpResponse(pdf, content_type='application/pdf')
+	response['Content-Disposition'] = 'attachment; filename="inventory-needs-general.pdf"'
+	return response
 
 
 @login_required

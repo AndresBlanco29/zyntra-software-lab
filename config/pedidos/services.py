@@ -721,6 +721,170 @@ def build_pedido_inventory_needs_analysis(*, pedido, pedido_items=None):
 	}
 
 
+def build_multi_pedido_inventory_needs_analysis(*, pedidos):
+	"""Aggregate inventory shortages across several orders for purchase planning.
+
+	Stock is evaluated once per presentation so the same physical packages are
+	not double-counted when multiple selected orders need the same SKU.
+	"""
+	pedido_list = list(pedidos)
+	if not pedido_list:
+		return {
+			'rows': [],
+			'needs_purchase_count': 0,
+			'has_needs': False,
+			'total_to_buy': 0,
+			'pedido_ids': [],
+			'pedido_count': 0,
+		}
+
+	items = list(
+		PedidoItem.objects.filter(pedido_id__in=[pedido.id for pedido in pedido_list])
+		.select_related('presentacion__producto', 'presentacion__stock_operativo', 'pedido')
+	)
+	aggregated = {}
+	for item in items:
+		presentacion = item.presentacion
+		presentacion_id = presentacion.id
+		requested = int(
+			getattr(item, 'cantidad_solicitada_documentada', None)
+			or item.cantidad_solicitada
+			or item.cantidad
+			or 0
+		)
+		reserved = max(int(item.cantidad_reservada_inventario or 0), 0)
+		bucket = aggregated.get(presentacion_id)
+		if bucket is None:
+			stock = getattr(presentacion, 'stock_operativo', None)
+			stock_fisico = int(getattr(stock, 'stock_fisico', 0) or 0)
+			stock_reservado = int(getattr(stock, 'stock_reservado', 0) or 0)
+			bucket = {
+				'presentacion_id': presentacion_id,
+				'product_name': presentacion.producto.nombre,
+				'presentation_name': presentacion.nombre_empaque_cliente,
+				'sku': (presentacion.producto.codigo_barras or '').strip(),
+				'requested_quantity': 0,
+				'reserved_by_selection': 0,
+				'stock_fisico': stock_fisico,
+				'stock_reservado': stock_reservado,
+				'order_ids': set(),
+			}
+			aggregated[presentacion_id] = bucket
+		bucket['requested_quantity'] += max(requested, 0)
+		bucket['reserved_by_selection'] += reserved
+		bucket['order_ids'].add(item.pedido_id)
+
+	rows = []
+	for bucket in aggregated.values():
+		# Packages reserved by the selected orders are usable for fulfilling them.
+		available = max(
+			bucket['stock_fisico'] - bucket['stock_reservado'] + bucket['reserved_by_selection'],
+			0,
+		)
+		requested = bucket['requested_quantity']
+		to_buy = max(requested - available, 0)
+		if requested <= 0:
+			status = 'sufficient'
+			status_label = _('Sufficient stock')
+		elif available <= 0:
+			status = 'out_of_stock'
+			status_label = _('Out of stock')
+		elif to_buy > 0:
+			status = 'insufficient'
+			status_label = _('Insufficient stock')
+		else:
+			status = 'sufficient'
+			status_label = _('Sufficient stock')
+		rows.append({
+			'presentacion_id': bucket['presentacion_id'],
+			'product_name': bucket['product_name'],
+			'presentation_name': bucket['presentation_name'],
+			'sku': bucket['sku'],
+			'requested_quantity': requested,
+			'available_stock': available,
+			'to_buy_quantity': to_buy,
+			'status': status,
+			'status_label': status_label,
+			'needs_purchase': to_buy > 0,
+			'order_count': len(bucket['order_ids']),
+			'order_ids': sorted(bucket['order_ids']),
+		})
+
+	rows.sort(key=lambda row: (0 if row['needs_purchase'] else 1, row['product_name'].casefold(), row['presentacion_id']))
+	needs_purchase_count = sum(1 for row in rows if row['needs_purchase'])
+	pedido_ids = sorted(pedido.id for pedido in pedido_list)
+	return {
+		'rows': rows,
+		'needs_purchase_count': needs_purchase_count,
+		'has_needs': needs_purchase_count > 0,
+		'total_to_buy': sum(row['to_buy_quantity'] for row in rows),
+		'pedido_ids': pedido_ids,
+		'pedido_count': len(pedido_ids),
+	}
+
+
+@transaction.atomic
+def devolver_pedido_desde_picking(*, pedido, usuario, destino='LISTO_PARA_PICKING'):
+	"""Return an order that was sent to picking by mistake to a pre-picking status."""
+	destino = (destino or 'LISTO_PARA_PICKING').strip().upper()
+	if destino not in {'RECIBIDO', 'EN_GESTION', 'LISTO_PARA_PICKING'}:
+		destino = 'LISTO_PARA_PICKING'
+	if pedido.estado != 'PARA_VERIFICAR':
+		raise ValidationError(_('Only orders currently in picking can be returned to the previous step.'))
+	if hasattr(pedido, 'invoice'):
+		raise ValidationError(_('This order already has an invoice and cannot be returned from picking.'))
+
+	estado_anterior = pedido.estado
+	selector_anterior = pedido.seleccionador
+	selector_label = ''
+	if selector_anterior:
+		selector_label = selector_anterior.get_full_name() or selector_anterior.username
+
+	pedido.seleccionador = None
+	pedido.picking_asignado_en = None
+	pedido.picking_progress = {}
+	pedido.picking_progress_saved_at = None
+	pedido.estado = destino
+	pedido.save(update_fields=[
+		'seleccionador',
+		'picking_asignado_en',
+		'picking_progress',
+		'picking_progress_saved_at',
+		'estado',
+		'actualizada_en',
+	])
+
+	from config.auditoria.business_events import log_business_event
+	from config.auditoria.models import AuditLog
+
+	log_business_event(
+		usuario,
+		action_label=_('Returned order #%(id)s from picking to %(status)s') % {
+			'id': pedido.id,
+			'status': destino,
+		},
+		action_category=AuditLog.CATEGORY_ACTION,
+		entity_type='Pedido',
+		entity_id=str(pedido.id),
+		entity_label=_('Order #%(id)s') % {'id': pedido.id},
+		changes=[
+			{'field': 'Status', 'before': estado_anterior, 'after': destino},
+			{
+				'field': 'Selector',
+				'before': selector_label or '-',
+				'after': '-',
+			},
+		],
+		metadata={
+			'estado_anterior': estado_anterior,
+			'estado_nuevo': destino,
+			'selector_anterior_id': getattr(selector_anterior, 'id', None),
+			'action': 'return_from_picking',
+		},
+	)
+	return pedido
+
+
 @transaction.atomic
 def asignar_picking_a_seleccionador(*, pedido, seleccionador, asignado_por=None):
     if getattr(seleccionador, 'role', '') != 'seleccionador':

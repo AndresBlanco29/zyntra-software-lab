@@ -1277,6 +1277,13 @@ z-index:9999;
     height: 28px;
     border-radius: 6px;
     font-weight: bold;
+    /* iOS Safari: prevent a fast double-tap on +/- from triggering page zoom,
+       and remove the 300ms tap delay so it feels native. Only affects these
+       controls, so global pinch-zoom stays enabled. */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .cantidad-input {
@@ -1285,6 +1292,7 @@ z-index:9999;
     border: 1px solid #d6d9de;
     border-radius: 10px;
     padding: 6px 8px;
+    touch-action: manipulation;
 }
 
 .cantidad-input:focus {

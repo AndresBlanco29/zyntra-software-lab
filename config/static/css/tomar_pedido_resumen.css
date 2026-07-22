@@ -156,6 +156,11 @@ body::-webkit-scrollbar,
     background: #1f4fa3;
     color: #fff;
     font-weight: 700;
+    /* iOS Safari: block double-tap zoom on the +/- controls only. */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .cantidad-input {
@@ -164,6 +169,7 @@ body::-webkit-scrollbar,
     border: 1px solid #d6d9de;
     border-radius: 10px;
     padding: 6px 8px;
+    touch-action: manipulation;
 }
 
 .presentacion-resumen,

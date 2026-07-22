@@ -434,7 +434,7 @@ def backoffice_pedidos(request):
 		sort_dir = 'desc'
 	date_from = (request.GET.get('date_from') or '').strip()
 	date_to = (request.GET.get('date_to') or '').strip()
-	view_mode, page_obj = build_dispatch_order_page(
+	view_mode, page_obj, archive_groups = build_dispatch_order_page(
 		view_mode=request.GET.get('view'),
 		page_number=request.GET.get('page'),
 		page_size=BACKOFFICE_PEDIDOS_PAGE_SIZE,
@@ -448,6 +448,8 @@ def backoffice_pedidos(request):
 		'dispatch_orders': page_obj,
 		'page_obj': page_obj,
 		'view_mode': view_mode,
+		'archive_view': view_mode == 'completed',
+		'archive_groups': archive_groups,
 		'search_query': search_query,
 		'sort_dir': sort_dir,
 		'date_from': date_from,
@@ -810,6 +812,11 @@ def backoffice_pedido_detalle(request, pedido_id):
 		'show_credit_limit_alert_modal': request.GET.get('credit_limit_alert') == '1',
 		**edit_lock_context,
 	}
+	from config.auditoria.document_timeline import get_pedido_audit_timeline
+	context['document_audit_timeline'] = get_pedido_audit_timeline(pedido)
+	context['audit_trail_url'] = (
+		f"{reverse('audit_log_list')}?entity_type=Pedido&entity_id={pedido.id}"
+	)
 	return render(request, 'backoffice/pedido_detalle.html', context)
 
 

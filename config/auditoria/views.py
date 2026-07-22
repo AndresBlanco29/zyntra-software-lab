@@ -57,6 +57,7 @@ def _parse_filters(request):
         'action_category': (data.get('action_category') or '').strip(),
         'http_method': (data.get('http_method') or '').strip().upper(),
         'entity_type': (data.get('entity_type') or '').strip(),
+        'entity_id': (data.get('entity_id') or '').strip(),
         'module': (data.get('module') or '').strip(),
         'ip_address': (data.get('ip_address') or '').strip(),
         'result': result,
@@ -100,6 +101,8 @@ def _apply_filters(queryset, filters):
         queryset = queryset.filter(http_method=filters['http_method'])
     if filters['entity_type']:
         queryset = queryset.filter(entity_type__icontains=filters['entity_type'])
+    if filters.get('entity_id'):
+        queryset = queryset.filter(entity_id=filters['entity_id'])
     if filters['module']:
         queryset = queryset.filter(module__icontains=filters['module'])
     if filters['ip_address']:

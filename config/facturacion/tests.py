@@ -3193,13 +3193,15 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(response.context['summary']['total'], 1)
 		self.assertEqual(response.context['selected_creator_role'], 'driver')
 
-	def test_backoffice_invoice_list_shows_quickbooks_imported_invoices_in_ready(self):
+	def test_backoffice_invoice_list_excludes_quickbooks_imported_from_ready(self):
 		local_invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total='10.00')
 		local_invoice.despachador_notificado = False
 		local_invoice.save(update_fields=['despachador_notificado'])
 
+		ready_invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total='15.00')
+
 		imported_invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total='20.00')
-		imported_invoice.despachador_notificado = False
+		imported_invoice.despachador_notificado = True
 		imported_invoice.save(update_fields=['despachador_notificado'])
 		imported_invoice.pedido.canal_toma = 'QUICKBOOKS_IMPORT'
 		imported_invoice.pedido.save(update_fields=['canal_toma'])
@@ -3212,7 +3214,28 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual([invoice.id for invoice in pending_response.context['page_obj']], [local_invoice.id])
 		self.assertEqual(pending_response.context['pending_count'], 1)
 		self.assertEqual(ready_response.context['ready_count'], 1)
-		self.assertEqual([invoice.id for invoice in ready_response.context['page_obj']], [imported_invoice.id])
+		self.assertEqual([invoice.id for invoice in ready_response.context['page_obj']], [ready_invoice.id])
+		self.assertNotIn(imported_invoice.id, [invoice.id for invoice in ready_response.context['page_obj']])
+
+	def test_backoffice_invoice_list_moves_exported_invoices_to_closed_tab(self):
+		exported_invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total='25.00')
+		exported_invoice.cierre_liberada = True
+		exported_invoice.quickbooks_id = 'QB-INV-100'
+		exported_invoice.sync_status = 'SYNCED'
+		exported_invoice.save(update_fields=['cierre_liberada', 'quickbooks_id', 'sync_status'])
+
+		self.client.force_login(self.backoffice)
+		ready_response = self.client.get(reverse('backoffice_invoices_list'), {'view': 'ready'})
+		exported_response = self.client.get(reverse('backoffice_invoices_list'), {'view': 'exported'})
+
+		self.assertEqual(ready_response.context['ready_count'], 0)
+		self.assertEqual(exported_response.context['exported_count'], 1)
+		self.assertEqual(
+			[invoice.id for invoice in exported_response.context['page_obj']],
+			[exported_invoice.id],
+		)
+		self.assertTrue(exported_response.context['archive_view'])
+		self.assertTrue(exported_response.context['archive_groups'])
 
 	def test_backoffice_invoice_list_defaults_to_pending_dispatch(self):
 		pending_invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', total='10.00')

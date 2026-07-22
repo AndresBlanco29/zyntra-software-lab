@@ -286,6 +286,7 @@ def liberar_items_cierre(*, cierre, item_ids=None, usuario=None, liberar_todas_l
 		raise ValidationError(_('No ready invoices available to release.'))
 
 	now = timezone.now()
+	released_invoice_ids = []
 	for item in items:
 		invoice = item.invoice
 		if invoice.quickbooks_id or invoice.estado == 'ANULADA':
@@ -299,8 +300,29 @@ def liberar_items_cierre(*, cierre, item_ids=None, usuario=None, liberar_todas_l
 		item.estado = 'LIBERADA'
 		item.liberado_en = now
 		item.save(update_fields=['estado', 'liberado_en', 'actualizado_en'])
+		released_invoice_ids.append(invoice.id)
 
 	recalcular_totales_cierre(cierre)
+
+	from config.auditoria.business_events import log_business_event
+	from config.auditoria.models import AuditLog
+
+	for invoice_id in released_invoice_ids:
+		log_business_event(
+			usuario,
+			action_label=_('Released invoice #%(id)s for QuickBooks export') % {'id': invoice_id},
+			action_category=AuditLog.CATEGORY_ACTION,
+			entity_type='Invoice',
+			entity_id=str(invoice_id),
+			entity_label=_('Invoice #%(id)s') % {'id': invoice_id},
+			metadata={
+				'cierre_id': cierre.id,
+				'cierre_fecha': str(cierre.fecha),
+				'action': 'daily_closing_release',
+			},
+			module='Invoices',
+		)
+
 	return items
 
 
@@ -317,6 +339,20 @@ def cerrar_cierre_diario(*, cierre, usuario=None):
 	cierre.cerrado_por = usuario
 	cierre.cerrado_en = timezone.now()
 	cierre.save(update_fields=['estado', 'cerrado_por', 'cerrado_en', 'actualizado_en'])
+
+	from config.auditoria.business_events import log_business_event
+	from config.auditoria.models import AuditLog
+
+	log_business_event(
+		usuario,
+		action_label=_('Closed daily closing for %(fecha)s') % {'fecha': cierre.fecha},
+		action_category=AuditLog.CATEGORY_ACTION,
+		entity_type='CierreDiario',
+		entity_id=str(cierre.id),
+		entity_label=_('Daily closing %(fecha)s') % {'fecha': cierre.fecha},
+		metadata={'action': 'daily_closing_close', 'fecha': str(cierre.fecha)},
+		module='Invoices',
+	)
 	return cierre
 
 

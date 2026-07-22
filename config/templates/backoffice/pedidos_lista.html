@@ -89,6 +89,74 @@
   </div>
 {% endif %}
 
+{% if archive_view %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h5 class="mb-1">{% trans "Completed archive" %}</h5>
+    <p class="text-muted small mb-3">{% trans "Completed orders grouped by day (this month), month (earlier this year), or year. Always available for consultation." %}</p>
+    {% if archive_groups %}
+      {% regroup archive_groups by kind_heading as archive_sections %}
+      {% for section in archive_sections %}
+      <div class="mb-3">
+        <h6 class="text-muted text-uppercase small fw-semibold mb-2">{{ section.grouper }}</h6>
+        <div class="accordion" id="orderArchive-{{ forloop.counter }}">
+          {% for group in section.list %}
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="orderArchiveHeading-{{ group.key }}">
+              <button class="accordion-button {% if not forloop.first or not forloop.parentloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#orderArchiveCollapse-{{ group.key }}" aria-expanded="{% if forloop.first and forloop.parentloop.first %}true{% else %}false{% endif %}">
+                {{ group.label }}
+                <span class="badge text-bg-secondary ms-2">{{ group.count }}</span>
+              </button>
+            </h2>
+            <div id="orderArchiveCollapse-{{ group.key }}" class="accordion-collapse collapse {% if forloop.first and forloop.parentloop.first %}show{% endif %}">
+              <div class="accordion-body p-0">
+                <div class="table-responsive">
+                  <table class="table table-striped align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>{% trans "Ref." %}</th>
+                        <th>{% trans "Type" %}</th>
+                        <th>{% trans "Customer" %}</th>
+                        <th>{% trans "Status" %}</th>
+                        <th>{% trans "Total" %}</th>
+                        <th>{% trans "Date" %}</th>
+                        <th>{% trans "Action" %}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for row in group.items %}
+                      <tr>
+                        <td>#{{ row.display_ref|default:row.source_id }}</td>
+                        <td>
+                          {% if row.record_type == 'quote' %}
+                            <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle">{% trans "Request" %}</span>
+                          {% else %}
+                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">{% trans "Dispatch" %}</span>
+                          {% endif %}
+                        </td>
+                        <td>{{ row.customer_name }}</td>
+                        <td><span class="badge {{ row.status_badge_class }}">{{ row.status_label }}</span></td>
+                        <td>${{ row.total }}</td>
+                        <td>{{ row.date|date:"m/d/Y H:i" }}</td>
+                        <td><a href="{{ row.detail_url }}" class="btn btn-sm btn-outline-primary">{% trans "Open" %}</a></td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-muted text-center py-4 mb-0">{% trans "No completed orders in the archive yet." %}</p>
+    {% endif %}
+  </div>
+</div>
+{% else %}
 <div class="card shadow-sm">
   <div class="table-responsive mobile-stack-responsive">
     <table class="table table-striped align-middle mb-0 mobile-stack-table mobile-stack-table--list">
@@ -167,6 +235,7 @@
 
   {% pagination_controls page_obj aria_label=_('Order pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0 px-3 pb-3" view=view_mode q=search_query sort=sort_dir date_from=date_from date_to=date_to %}
 </div>
+{% endif %}
 
 {% if view_mode == 'pending' or view_mode == 'purchase-order' or view_mode == 'sent-to-picking' %}
 </form>

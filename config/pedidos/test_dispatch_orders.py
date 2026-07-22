@@ -61,7 +61,7 @@ class DispatchOrderClassificationTests(TestCase):
 		return pedido
 
 	def _order_ids_for_view(self, view_mode):
-		_, page_obj = build_dispatch_order_page(view_mode=view_mode, page_number=1, page_size=50)
+		_, page_obj, _archive = build_dispatch_order_page(view_mode=view_mode, page_number=1, page_size=50)
 		return [row.source_id for row in page_obj if row.record_type == 'order']
 
 	def test_deleted_invoice_order_moves_to_cancelled_tab(self):
@@ -150,7 +150,7 @@ class DispatchOrderClassificationTests(TestCase):
 		self.assertEqual(len(counts['process_stages']), 9)
 
 	def _order_row_for_pedido(self, pedido_id, view_mode='sent-to-picking'):
-		_, page_obj = build_dispatch_order_page(view_mode=view_mode, page_number=1, page_size=50)
+		_, page_obj, _archive = build_dispatch_order_page(view_mode=view_mode, page_number=1, page_size=50)
 		for row in page_obj:
 			if row.record_type == 'order' and row.source_id == pedido_id:
 				return row
@@ -175,9 +175,9 @@ class DispatchOrderClassificationTests(TestCase):
 		driver_delivery.estado = 'ASIGNADA'
 		driver_delivery.save(update_fields=['estado', 'updated_at'])
 
-		picking_row = self._order_row_for_pedido(picking_pedido.id)
-		verified_row = self._order_row_for_pedido(verified_pedido.id)
-		driver_row = self._order_row_for_pedido(driver_pedido.id)
+		picking_row = self._order_row_for_pedido(picking_pedido.id, view_mode='sent-to-picking')
+		verified_row = self._order_row_for_pedido(verified_pedido.id, view_mode='picking-returned')
+		driver_row = self._order_row_for_pedido(driver_pedido.id, view_mode='sent-to-driver')
 
 		self.assertEqual(picking_row.status_label, 'Sent to picking')
 		self.assertEqual(verified_row.status_label, 'Picking adjusted and returned')
@@ -207,13 +207,13 @@ class DispatchOrderClassificationTests(TestCase):
 		Delivery.objects.filter(id=newer_delivery.id).update(sent_to_driver_at=newer_sent_at)
 		newer_delivery.refresh_from_db()
 
-		_, page_obj = build_dispatch_order_page(view_mode='sent-to-driver', page_number=1, page_size=50)
+		_, page_obj, _archive = build_dispatch_order_page(view_mode='sent-to-driver', page_number=1, page_size=50)
 		order_rows = [row for row in page_obj if row.record_type == 'order']
 		self.assertGreaterEqual(len(order_rows), 2)
 		self.assertEqual(order_rows[0].source_id, newer_pedido.id)
 		self.assertEqual(order_rows[0].date, newer_delivery.sent_to_driver_at)
 
-		_, asc_page = build_dispatch_order_page(
+		_, asc_page, _archive = build_dispatch_order_page(
 			view_mode='sent-to-driver',
 			page_number=1,
 			page_size=50,
@@ -245,7 +245,7 @@ class DispatchOrderClassificationTests(TestCase):
 		Delivery.objects.filter(id=out_of_range_delivery.id).update(sent_to_driver_at=out_of_range_sent_at)
 
 		filter_day = in_range_sent_at.date().isoformat()
-		_, page_obj = build_dispatch_order_page(
+		_, page_obj, _archive = build_dispatch_order_page(
 			view_mode='sent-to-driver',
 			page_number=1,
 			page_size=50,
@@ -300,7 +300,7 @@ class DispatchOrderClassificationTests(TestCase):
 		pedido.estado = 'DESPACHADO'
 		pedido.save(update_fields=['estado', 'actualizada_en'])
 
-		_, page_obj = build_dispatch_order_page(
+		_, page_obj, _archive = build_dispatch_order_page(
 			view_mode='completed',
 			page_number=1,
 			page_size=50,

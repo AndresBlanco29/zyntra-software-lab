@@ -9,9 +9,11 @@
     <div>
     <h2 class="mb-1">{% trans "Invoices" %}</h2>
     {% if view_mode == 'ready' %}
-      <p class="text-muted mb-0">{% trans "Review the invoices already released for dispatch or pickup." %}</p>
+      <p class="text-muted mb-0">{% trans "Local invoices released for dispatch or pickup. QuickBooks imports are excluded." %}</p>
     {% elif view_mode == 'delivered' %}
-      <p class="text-muted mb-0">{% trans "Review all invoices already completed by the driver." %}</p>
+      <p class="text-muted mb-0">{% trans "Delivered invoices archived by day, month, or year. Always available for consultation." %}</p>
+    {% elif view_mode == 'exported' %}
+      <p class="text-muted mb-0">{% trans "Invoices successfully exported to QuickBooks after daily closing, archived for consultation." %}</p>
     {% elif view_mode == 'cancelled' %}
       <p class="text-muted mb-0">{% trans "Review invoices cancelled after generation and keep them as reference." %}</p>
     {% else %}
@@ -85,6 +87,10 @@
       <a href="?view=delivered{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_customer_id %}&cliente_id={{ selected_customer_id|urlencode }}{% endif %}{% if selected_delivery_method %}&metodo_entrega={{ selected_delivery_method|urlencode }}{% endif %}{% if selected_driver_id %}&driver_id={{ selected_driver_id|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from|urlencode }}{% endif %}{% if date_to %}&date_to={{ date_to|urlencode }}{% endif %}" class="btn {% if view_mode == 'delivered' %}btn-primary{% else %}btn-outline-primary{% endif %}">
         {% trans "Delivered Invoices" %}
         <span class="badge text-bg-light ms-1">{{ delivered_count }}</span>
+      </a>
+      <a href="?view=exported{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_customer_id %}&cliente_id={{ selected_customer_id|urlencode }}{% endif %}{% if selected_delivery_method %}&metodo_entrega={{ selected_delivery_method|urlencode }}{% endif %}{% if selected_driver_id %}&driver_id={{ selected_driver_id|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from|urlencode }}{% endif %}{% if date_to %}&date_to={{ date_to|urlencode }}{% endif %}" class="btn {% if view_mode == 'exported' %}btn-dark{% else %}btn-outline-dark{% endif %}">
+        {% trans "Closed / Exported Invoices" %}
+        <span class="badge text-bg-light ms-1">{{ exported_count }}</span>
       </a>
       <a href="?view=cancelled{% if query %}&q={{ query|urlencode }}{% endif %}{% if selected_customer_id %}&cliente_id={{ selected_customer_id|urlencode }}{% endif %}{% if selected_delivery_method %}&metodo_entrega={{ selected_delivery_method|urlencode }}{% endif %}{% if selected_driver_id %}&driver_id={{ selected_driver_id|urlencode }}{% endif %}{% if date_from %}&date_from={{ date_from|urlencode }}{% endif %}{% if date_to %}&date_to={{ date_to|urlencode }}{% endif %}" class="btn {% if view_mode == 'cancelled' %}btn-primary{% else %}btn-outline-primary{% endif %}">
         {% trans "Cancelled Invoices" %}
@@ -203,18 +209,82 @@
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
       <div>
-        <h5 class="mb-1">{% trans "Results" %}</h5>
+        <h5 class="mb-1">{% if archive_view %}{% trans "Archive" %}{% else %}{% trans "Results" %}{% endif %}</h5>
         {% if page_obj.paginator.count %}
         <div class="small text-muted">
-          {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
-          Showing {{ start }}-{{ end }} of {{ total }} invoices.
-          {% endblocktrans %}
+          {% if archive_view %}
+            {% blocktrans count counter=page_obj.paginator.count %}
+            {{ counter }} archived invoice available for consultation.
+            {% plural %}
+            {{ counter }} archived invoices available for consultation.
+            {% endblocktrans %}
+          {% else %}
+            {% blocktrans with start=page_obj.start_index end=page_obj.end_index total=page_obj.paginator.count %}
+            Showing {{ start }}-{{ end }} of {{ total }} invoices.
+            {% endblocktrans %}
+          {% endif %}
         </div>
         {% endif %}
       </div>
       <span class="badge text-bg-light">{{ page_obj.paginator.count }} {% trans "invoices" %}</span>
     </div>
 
+    {% if archive_view %}
+      {% if archive_groups %}
+        {% regroup archive_groups by kind_heading as archive_sections %}
+        {% for section in archive_sections %}
+        <div class="mb-3">
+          <h6 class="text-muted text-uppercase small fw-semibold mb-2">{{ section.grouper }}</h6>
+          <div class="accordion" id="invoiceArchive-{{ forloop.counter }}">
+            {% for group in section.list %}
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="invoiceArchiveHeading-{{ group.key }}">
+                <button class="accordion-button {% if not forloop.first or not forloop.parentloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#invoiceArchiveCollapse-{{ group.key }}" aria-expanded="{% if forloop.first and forloop.parentloop.first %}true{% else %}false{% endif %}" aria-controls="invoiceArchiveCollapse-{{ group.key }}">
+                  {{ group.label }}
+                  <span class="badge text-bg-secondary ms-2">{{ group.count }}</span>
+                </button>
+              </h2>
+              <div id="invoiceArchiveCollapse-{{ group.key }}" class="accordion-collapse collapse {% if forloop.first and forloop.parentloop.first %}show{% endif %}" aria-labelledby="invoiceArchiveHeading-{{ group.key }}">
+                <div class="accordion-body p-0">
+                  <div class="table-responsive mobile-stack-responsive">
+                    <table class="table align-middle mb-0 mobile-stack-table mobile-stack-table--list">
+                      <thead>
+                        <tr>
+                          <th>{% trans "Invoice" %}</th>
+                          <th>{% trans "Order" %}</th>
+                          <th>{% trans "Customer" %}</th>
+                          <th>{% trans "Delivery method" %}</th>
+                          <th>{% trans "Driver" %}</th>
+                          <th>{% trans "Dispatch" %}</th>
+                          <th>{% trans "QuickBooks status" %}</th>
+                          <th>{% trans "Balance" %}</th>
+                          <th class="text-end">{% trans "Actions" %}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for invoice in group.items %}
+                          {% include "backoffice/includes/invoice_list_row.html" with invoice=invoice %}
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="text-muted text-center py-4 mb-0">
+          {% if view_mode == 'exported' %}
+            {% trans "No closed / exported invoices yet." %}
+          {% else %}
+            {% trans "No delivered invoices are available yet." %}
+          {% endif %}
+        </p>
+      {% endif %}
+    {% else %}
     <div class="table-responsive mobile-stack-responsive">
       <table class="table align-middle mb-0 mobile-stack-table mobile-stack-table--list">
         <thead>
@@ -232,92 +302,12 @@
         </thead>
         <tbody>
           {% for invoice in page_obj %}
-          <tr>
-            <td data-label="{% trans 'Invoice' %}">
-              <strong>{{ invoice.numero }}</strong>
-              <div class="small text-muted">{{ invoice.creada_en|date:"m/d/Y H:i" }}</div>
-            </td>
-            <td data-label="{% trans 'Order' %}">#{{ invoice.pedido_id }}</td>
-            <td data-label="{% trans 'Customer' %}">{{ invoice.cliente.nombre_empresa }}</td>
-            <td data-label="{% trans 'Delivery method' %}">{{ invoice.get_metodo_entrega_display }}</td>
-            <td data-label="{% trans 'Driver' %}">{% if invoice.driver %}{% firstof invoice.driver.get_full_name invoice.driver.username %}{% else %}-{% endif %}</td>
-            <td data-label="{% trans 'Dispatch' %}">
-              {% if invoice.estado == 'ANULADA' %}
-                <span class="badge bg-danger">{% trans "Cancelled" %}</span>
-              {% elif invoice.delivery and invoice.delivery.estado == 'ENTREGADA_PAGADA' %}
-                <span class="badge bg-success">{% trans "Paid" %}</span>
-              {% elif invoice.delivery and invoice.delivery.estado == 'ENTREGADA_SIN_PAGO' %}
-                <span class="badge bg-warning text-dark">{% trans "Unpaid" %}</span>
-              {% elif invoice.pedido.canal_toma == 'QUICKBOOKS_IMPORT' %}
-                <span class="badge bg-info text-dark">{% trans "QuickBooks import" %}</span>
-              {% elif invoice.despachador_notificado %}
-                <span class="badge bg-success">{% trans "Ready" %}</span>
-              {% else %}
-                <span class="badge bg-secondary">{% trans "Pending" %}</span>
-              {% endif %}
-            </td>
-            <td data-label="{% trans 'QuickBooks status' %}">
-              {% if invoice.quickbooks_id and invoice.qb_payment_status %}
-                <span class="badge bg-{{ invoice.qb_status_badge_class }}">{{ invoice.get_qb_payment_status_display_label }}</span>
-                {% with substatus=invoice.get_qb_email_substatus_label %}
-                {% if substatus %}
-                <div class="small text-muted mt-1">{{ substatus }}</div>
-                {% endif %}
-                {% endwith %}
-              {% else %}
-                <span class="text-muted">-</span>
-              {% endif %}
-            </td>
-            <td data-label="{% trans 'Balance' %}">${{ invoice.saldo_cliente }}</td>
-            <td data-label="{% trans 'Actions' %}" class="text-end mobile-stack-table__action">
-              <div class="d-inline-flex align-items-center justify-content-end gap-1 flex-wrap invoice-list-actions">
-                {% if request.user|has_internal_permission:'backoffice.orders.manage' %}
-                  {% if invoice.can_void_from_backoffice or invoice.can_delete_from_backoffice %}
-                  <div class="btn-group">
-                    <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{% trans 'Invoice actions' %} {{ invoice.numero }}">
-                      {% trans "Actions" %}
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                      {% if invoice.can_void_from_backoffice %}
-                      <li>
-                        <button
-                          type="button"
-                          class="dropdown-item text-warning invoice-void-trigger"
-                          data-void-url="{% url 'backoffice_invoice_void' invoice.id %}"
-                          data-invoice-numero="{{ invoice.numero }}"
-                        >
-                          {% trans "Void" %}
-                        </button>
-                      </li>
-                      {% endif %}
-                      {% if invoice.can_delete_from_backoffice %}
-                      <li>
-                        <button
-                          type="button"
-                          class="dropdown-item text-danger invoice-delete-trigger"
-                          data-delete-url="{% url 'backoffice_invoice_delete' invoice.id %}"
-                          data-invoice-numero="{{ invoice.numero }}"
-                          data-requires-confirmation="{% if invoice.requires_delete_confirmation_phrase %}true{% else %}false{% endif %}"
-                        >
-                          {% trans "Delete" %}
-                        </button>
-                      </li>
-                      {% endif %}
-                    </ul>
-                  </div>
-                  {% endif %}
-                {% endif %}
-                <a href="{% url 'backoffice_invoice_detail' invoice.id %}" class="btn btn-sm btn-outline-primary">{% trans "Open" %}</a>
-              </div>
-            </td>
-          </tr>
+            {% include "backoffice/includes/invoice_list_row.html" with invoice=invoice %}
           {% empty %}
           <tr>
             <td colspan="9" class="text-center text-muted py-4 mobile-stack-table__empty">
               {% if view_mode == 'ready' %}
                 {% trans "No ready invoices are available right now." %}
-              {% elif view_mode == 'delivered' %}
-                {% trans "No delivered invoices are available yet." %}
               {% elif view_mode == 'cancelled' %}
                 {% trans "No cancelled invoices are registered yet." %}
               {% else %}
@@ -331,6 +321,7 @@
     </div>
 
     {% pagination_controls page_obj aria_label=_('Invoice pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-0" view=view_mode q=query cliente_id=selected_customer_id metodo_entrega=selected_delivery_method driver_id=selected_driver_id date_from=date_from date_to=date_to qb_status=selected_qb_status %}
+    {% endif %}
   </div>
 </div>
 

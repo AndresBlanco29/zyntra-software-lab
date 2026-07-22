@@ -976,6 +976,19 @@ def guardar_verificacion_picking(
     additional_items = additional_items or []
 
     items = list(pedido.items.select_related('presentacion__producto').all())
+    before_items = [
+        {
+            'item_id': item.id,
+            'producto': item.presentacion.producto.nombre,
+            'presentacion': item.presentacion.nombre_empaque_cliente,
+            'cantidad': item.cantidad,
+            'precio': str(item.precio),
+            'descuento_aplicado': bool(item.descuento_aplicado),
+            'descuento_monto': str(item.descuento_monto),
+            'subtotal': str(item.subtotal),
+        }
+        for item in items
+    ]
 
     for item in items:
         nueva_presentacion_id = presentacion_updates.get(item.id)
@@ -1077,8 +1090,23 @@ def guardar_verificacion_picking(
         )
 
     from config.auditoria.business_events import log_business_event
+    from config.auditoria.enrichment import build_line_item_changes
     from config.auditoria.models import AuditLog
 
+    after_items = [
+        {
+            'item_id': item.id,
+            'producto': item.presentacion.producto.nombre,
+            'presentacion': item.presentacion.nombre_empaque_cliente,
+            'cantidad': item.cantidad,
+            'precio': str(item.precio),
+            'descuento_aplicado': bool(item.descuento_aplicado),
+            'descuento_monto': str(item.descuento_monto),
+            'subtotal': str(item.subtotal),
+        }
+        for item in pedido.items.select_related('presentacion__producto')
+    ]
+    changes = build_line_item_changes(before_items, after_items)
     log_business_event(
         seleccionador,
         action_label=_('Completed picking verification for order #%(id)s') % {'id': pedido.id},
@@ -1090,7 +1118,13 @@ def guardar_verificacion_picking(
             'estado': pedido.estado,
             'has_stock_shortage': has_stock_shortage,
             'nota_resuelta': pedido.nota_seleccionador_resuelta,
+            'selector_id': seleccionador.id,
+            'line_items_before': before_items,
+            'line_items': after_items,
+            'action': 'picking_verification',
         },
+        changes=changes,
+        module='Orders',
     )
 
     return pedido

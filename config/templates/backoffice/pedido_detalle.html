@@ -1122,6 +1122,8 @@
   <a class="btn btn-outline-primary" href="{% url 'backoffice_inventory_needs_pdf' pedido.id %}">{% trans "Export Inventory Report" %}</a>
 </div>
 
+{% include "backoffice/includes/document_audit_timeline.html" %}
+
 {{ presentation_price_map|json_script:"pedido-presentation-price-map" }}
 {% if can_view_product_cost %}
 {{ presentation_cost_map|json_script:"pedido-presentation-cost-map" }}

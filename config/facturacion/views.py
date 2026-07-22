@@ -1199,6 +1199,15 @@ def _get_operable_delivery_or_404(delivery_id, user, *, select_related=None, pre
 INVOICES_LIST_PAGE_SIZE = 50
 
 QUICKBOOKS_IMPORTED_PEDIDO = Q(pedido__canal_toma='QUICKBOOKS_IMPORT')
+# Released in daily closing and successfully pushed to QuickBooks.
+INVOICE_CLOSED_EXPORTED = (
+	Q(estado='GENERADA')
+	& Q(cierre_liberada=True)
+	& Q(quickbooks_id__isnull=False)
+	& ~Q(quickbooks_id='')
+	& ~QUICKBOOKS_IMPORTED_PEDIDO
+)
+DELIVERED_DELIVERY_ESTADOS = ['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO']
 
 INVOICE_QB_STATUS_FILTERS = {
 	'due': Q(qb_payment_status__in=['DUE', 'DUE_TODAY']),
@@ -1233,19 +1242,29 @@ def _invoice_list_view_querysets(*, base_queryset=None):
 		).exclude(
 			QUICKBOOKS_IMPORTED_PEDIDO,
 		).exclude(
-			delivery__estado__in=['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'],
+			INVOICE_CLOSED_EXPORTED,
+		).exclude(
+			delivery__estado__in=DELIVERED_DELIVERY_ESTADOS,
 		),
+		# Ready Invoices = local invoices released for dispatch only.
+		# QuickBooks imports must never inflate this indicator.
 		'ready': queryset.filter(
 			estado='GENERADA',
-		).filter(
-			Q(despachador_notificado=True) | QUICKBOOKS_IMPORTED_PEDIDO,
+			despachador_notificado=True,
 		).exclude(
-			delivery__estado__in=['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'],
+			QUICKBOOKS_IMPORTED_PEDIDO,
+		).exclude(
+			INVOICE_CLOSED_EXPORTED,
+		).exclude(
+			delivery__estado__in=DELIVERED_DELIVERY_ESTADOS,
 		),
 		'delivered': queryset.filter(
 			estado='GENERADA',
-			delivery__estado__in=['ENTREGADA_PAGADA', 'ENTREGADA_SIN_PAGO'],
+			delivery__estado__in=DELIVERED_DELIVERY_ESTADOS,
+		).exclude(
+			INVOICE_CLOSED_EXPORTED,
 		),
+		'exported': queryset.filter(INVOICE_CLOSED_EXPORTED),
 		'cancelled': queryset.filter(estado='ANULADA'),
 	}
 
@@ -1311,6 +1330,8 @@ def _apply_invoice_list_filters(queryset, request):
 @login_required
 @internal_permission_required('backoffice.invoices.view')
 def backoffice_invoices_list(request):
+	from config.core.archive_grouping import archive_kind_heading, group_records_for_archive
+
 	view_mode = (request.GET.get('view') or 'pending').strip()
 	querysets = _invoice_list_view_querysets()
 	if view_mode not in querysets:
@@ -1323,8 +1344,27 @@ def backoffice_invoices_list(request):
 		'driver',
 		'creada_por',
 		'delivery',
+		'cierre_liberada_por',
 	)
-	page_obj = Paginator(filtered_queryset, INVOICES_LIST_PAGE_SIZE).get_page(request.GET.get('page'))
+	archive_view = view_mode in {'delivered', 'exported'}
+	archive_groups = []
+	if archive_view:
+		# Archive tabs keep everything consultable, grouped by day/month/year.
+		archive_invoices = list(filtered_queryset.order_by('-creada_en', '-id')[:2000])
+		archive_groups = group_records_for_archive(
+			archive_invoices,
+			date_getter=lambda invoice: (
+				invoice.last_synced_at
+				or invoice.cierre_liberada_en
+				or getattr(getattr(invoice, 'delivery', None), 'delivered_at', None)
+				or invoice.creada_en
+			),
+		)
+		for group in archive_groups:
+			group['kind_heading'] = archive_kind_heading(group['kind'])
+		page_obj = Paginator(archive_invoices, max(len(archive_invoices), 1)).get_page(1)
+	else:
+		page_obj = Paginator(filtered_queryset, INVOICES_LIST_PAGE_SIZE).get_page(request.GET.get('page'))
 
 	count_querysets = _invoice_list_view_querysets()
 	customers = Cliente.objects.filter(invoices__isnull=False).distinct().order_by('nombre_empresa')
@@ -1340,9 +1380,12 @@ def backoffice_invoices_list(request):
 		'page_obj': page_obj,
 		'invoices': page_obj,
 		'view_mode': view_mode,
+		'archive_view': archive_view,
+		'archive_groups': archive_groups,
 		'pending_count': count_querysets['pending'].count(),
 		'ready_count': count_querysets['ready'].count(),
 		'delivered_count': count_querysets['delivered'].count(),
+		'exported_count': count_querysets['exported'].count(),
 		'cancelled_count': count_querysets['cancelled'].count(),
 		'recent_cancelled_invoices': recent_cancelled_invoices,
 		'qb_status_counts': qb_status_counts,
@@ -1731,6 +1774,7 @@ def backoffice_invoice_detail(request, invoice_id):
 	attach_invoice_item_net_dispatched_quantities(invoice, list(invoice.items.all()))
 	customer_overdue_balance = resolve_customer_overdue_balance(cliente=invoice.cliente)
 	customer_open_balance = resolve_customer_open_balance(cliente=invoice.cliente)
+	from config.auditoria.document_timeline import get_invoice_audit_timeline
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
 		'customer_company_name': resolve_customer_company_name(invoice.cliente),
@@ -1755,6 +1799,8 @@ def backoffice_invoice_detail(request, invoice_id):
 		'can_complete_pickup': can_complete_pickup,
 		'pickup_form_draft': get_workflow_draft(request.session, INVOICE_PICKUP_DRAFT_SCOPE, invoice.id),
 		'adjustment_note_form_draft': get_workflow_draft(request.session, INVOICE_ADJUSTMENT_DRAFT_SCOPE, invoice.id),
+		'document_audit_timeline': get_invoice_audit_timeline(invoice),
+		'audit_trail_url': f"{reverse('audit_log_list')}?entity_type=Invoice&entity_id={invoice.id}",
 	})
 
 

@@ -1,0 +1,84 @@
+{% load i18n permissions_tags %}
+<tr>
+  <td data-label="{% trans 'Invoice' %}">
+    <strong>{{ invoice.numero }}</strong>
+    <div class="small text-muted">{{ invoice.creada_en|date:"m/d/Y H:i" }}</div>
+  </td>
+  <td data-label="{% trans 'Order' %}">#{{ invoice.pedido_id }}</td>
+  <td data-label="{% trans 'Customer' %}">{{ invoice.cliente.nombre_empresa }}</td>
+  <td data-label="{% trans 'Delivery method' %}">{{ invoice.get_metodo_entrega_display }}</td>
+  <td data-label="{% trans 'Driver' %}">{% if invoice.driver %}{% firstof invoice.driver.get_full_name invoice.driver.username %}{% else %}-{% endif %}</td>
+  <td data-label="{% trans 'Dispatch' %}">
+    {% if invoice.estado == 'ANULADA' %}
+      <span class="badge bg-danger">{% trans "Cancelled" %}</span>
+    {% elif invoice.cierre_liberada and invoice.quickbooks_id %}
+      <span class="badge bg-dark">{% trans "Exported" %}</span>
+    {% elif invoice.delivery and invoice.delivery.estado == 'ENTREGADA_PAGADA' %}
+      <span class="badge bg-success">{% trans "Paid" %}</span>
+    {% elif invoice.delivery and invoice.delivery.estado == 'ENTREGADA_SIN_PAGO' %}
+      <span class="badge bg-warning text-dark">{% trans "Unpaid" %}</span>
+    {% elif invoice.pedido.canal_toma == 'QUICKBOOKS_IMPORT' %}
+      <span class="badge bg-info text-dark">{% trans "QuickBooks import" %}</span>
+    {% elif invoice.despachador_notificado %}
+      <span class="badge bg-success">{% trans "Ready" %}</span>
+    {% else %}
+      <span class="badge bg-secondary">{% trans "Pending" %}</span>
+    {% endif %}
+  </td>
+  <td data-label="{% trans 'QuickBooks status' %}">
+    {% if invoice.quickbooks_id and invoice.qb_payment_status %}
+      <span class="badge bg-{{ invoice.qb_status_badge_class }}">{{ invoice.get_qb_payment_status_display_label }}</span>
+      {% with substatus=invoice.get_qb_email_substatus_label %}
+      {% if substatus %}
+      <div class="small text-muted mt-1">{{ substatus }}</div>
+      {% endif %}
+      {% endwith %}
+    {% elif invoice.quickbooks_id %}
+      <span class="badge bg-secondary">{% trans "Synced" %}</span>
+    {% else %}
+      <span class="text-muted">-</span>
+    {% endif %}
+  </td>
+  <td data-label="{% trans 'Balance' %}">${{ invoice.saldo_cliente }}</td>
+  <td data-label="{% trans 'Actions' %}" class="text-end mobile-stack-table__action">
+    <div class="d-inline-flex align-items-center justify-content-end gap-1 flex-wrap invoice-list-actions">
+      {% if request.user|has_internal_permission:'backoffice.orders.manage' %}
+        {% if invoice.can_void_from_backoffice or invoice.can_delete_from_backoffice %}
+        <div class="btn-group">
+          <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" aria-label="{% trans 'Invoice actions' %} {{ invoice.numero }}">
+            {% trans "Actions" %}
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            {% if invoice.can_void_from_backoffice %}
+            <li>
+              <button
+                type="button"
+                class="dropdown-item text-warning invoice-void-trigger"
+                data-void-url="{% url 'backoffice_invoice_void' invoice.id %}"
+                data-invoice-numero="{{ invoice.numero }}"
+              >
+                {% trans "Void" %}
+              </button>
+            </li>
+            {% endif %}
+            {% if invoice.can_delete_from_backoffice %}
+            <li>
+              <button
+                type="button"
+                class="dropdown-item text-danger invoice-delete-trigger"
+                data-delete-url="{% url 'backoffice_invoice_delete' invoice.id %}"
+                data-invoice-numero="{{ invoice.numero }}"
+                data-requires-confirmation="{% if invoice.requires_delete_confirmation_phrase %}true{% else %}false{% endif %}"
+              >
+                {% trans "Delete" %}
+              </button>
+            </li>
+            {% endif %}
+          </ul>
+        </div>
+        {% endif %}
+      {% endif %}
+      <a href="{% url 'backoffice_invoice_detail' invoice.id %}" class="btn btn-sm btn-outline-primary">{% trans "Open" %}</a>
+    </div>
+  </td>
+</tr>

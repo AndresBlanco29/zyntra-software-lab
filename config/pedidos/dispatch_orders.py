@@ -32,7 +32,7 @@ DISPATCH_PROCESS_STAGES = (
 	('picking-returned', _('Picking adjusted and returned'), 'info'),
 	('sent-to-driver', _('Sent to driver'), 'primary'),
 	('customer-pickup', _('Customer pick up'), 'info'),
-	('completed', _('Completed orders'), 'success'),
+	('completed', _('Completed / Archive'), 'success'),
 	('cancelled', _('Cancelled orders'), 'secondary'),
 )
 
@@ -526,6 +526,8 @@ def _sort_dispatch_rows(rows, *, view_mode, sort_dir=''):
 
 
 def build_dispatch_order_page(*, view_mode, page_number, page_size, search_term='', sort_dir='', date_from='', date_to=''):
+	from config.core.archive_grouping import archive_kind_heading, group_records_for_archive
+
 	view_mode = _normalize_dispatch_view_mode(view_mode)
 	pedidos = list(_pedido_base_queryset())
 	quotes = _load_open_quotes()
@@ -538,5 +540,13 @@ def build_dispatch_order_page(*, view_mode, page_number, page_size, search_term=
 	if view_mode == 'sent-to-driver':
 		rows = _filter_dispatch_rows_by_date(rows, date_from=date_from, date_to=date_to)
 	rows = _sort_dispatch_rows(rows, view_mode=view_mode, sort_dir=sort_dir)
-	page_obj = Paginator(rows, page_size).get_page(page_number)
-	return view_mode, page_obj
+
+	archive_groups = []
+	if view_mode == 'completed':
+		archive_groups = group_records_for_archive(rows, date_getter=lambda row: row.date)
+		for group in archive_groups:
+			group['kind_heading'] = archive_kind_heading(group['kind'])
+		page_obj = Paginator(rows, max(len(rows), 1)).get_page(1)
+	else:
+		page_obj = Paginator(rows, page_size).get_page(page_number)
+	return view_mode, page_obj, archive_groups

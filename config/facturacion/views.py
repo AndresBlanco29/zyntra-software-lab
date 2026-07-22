@@ -1309,7 +1309,7 @@ def _apply_invoice_list_filters(queryset, request):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.view')
+@internal_permission_required('backoffice.invoices.view')
 def backoffice_invoices_list(request):
 	view_mode = (request.GET.get('view') or 'pending').strip()
 	querysets = _invoice_list_view_querysets()
@@ -1349,13 +1349,13 @@ def backoffice_invoices_list(request):
 		'customers': customers,
 		'drivers': drivers,
 		'delivery_method_choices': Invoice.DELIVERY_METHOD_CHOICES,
-		'can_create_direct_invoice': request.user.has_internal_permission('backoffice.orders.manage'),
+		'can_create_direct_invoice': request.user.has_internal_permission('backoffice.invoices.manage'),
 		**filter_context,
 	})
 
 
 @login_required
-@internal_permission_required('backoffice.orders.view')
+@internal_permission_required('backoffice.invoices.view')
 def backoffice_adjustment_notes_list(request):
 	query = (request.GET.get('q') or '').strip()
 	selected_customer_id = (request.GET.get('cliente_id') or '').strip()
@@ -1435,7 +1435,7 @@ def backoffice_adjustment_notes_list(request):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 def backoffice_adjustment_note_create(request):
 	selected_client_id = request.GET.get('cliente_id') or request.POST.get('cliente_id') or ''
 	selected_invoice_id = request.GET.get('invoice_id') or request.POST.get('invoice_id') or ''
@@ -1485,7 +1485,7 @@ def backoffice_adjustment_note_create(request):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 def backoffice_create_direct_invoice(request):
 	customers = Cliente.objects.filter(aprobado=True).order_by('nombre_empresa')
 	drivers = Usuario.objects.filter(role='driver', is_active=True).order_by('first_name', 'last_name', 'username')
@@ -1627,7 +1627,7 @@ def _parse_direct_invoice_items_payload(post_data):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 def backoffice_generate_invoice(request, pedido_id):
 	pedido = get_object_or_404(Pedido.objects.select_related('cliente__usuario').prefetch_related('items__presentacion__producto'), id=pedido_id)
 	if request.method != 'POST':
@@ -1697,7 +1697,7 @@ def backoffice_generate_invoice(request, pedido_id):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.view')
+@internal_permission_required('backoffice.invoices.view')
 def backoffice_invoice_detail(request, invoice_id):
 	invoice = get_object_or_404(
 		Invoice.objects.select_related('pedido__cliente__usuario', 'driver', 'creada_por').prefetch_related('items__presentacion__producto', 'items__pedido_item__movimientos_inventario', 'items__pedido_item', 'notas_ajuste__items__presentacion', 'notas_ajuste__evidence_photos', 'notas_ajuste__creada_por', 'notas_ajuste__aprobada_por', 'delivery__evidence_photos', 'delivery__notification_logs'),
@@ -1714,7 +1714,7 @@ def backoffice_invoice_detail(request, invoice_id):
 		pickup_delivery = ensure_customer_pickup_delivery_for_invoice(invoice)
 		invoice.refresh_from_db()
 		if pickup_delivery and not pickup_delivery.is_completed:
-			can_complete_pickup = request.user.has_internal_permission('backoffice.orders.manage')
+			can_complete_pickup = request.user.has_internal_permission('backoffice.invoices.manage')
 			show_customer_pickup_completion = can_complete_pickup
 			pickup_collectible_balance = calculate_delivery_collectible_balance(delivery=pickup_delivery)
 	Notificacion.objects.filter(
@@ -1759,7 +1759,7 @@ def backoffice_invoice_detail(request, invoice_id):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.view')
+@internal_permission_required('backoffice.invoices.view')
 def backoffice_invoice_live_tracking(request, invoice_id):
 	invoice = get_object_or_404(
 		Invoice.objects.select_related('pedido__cliente__usuario', 'driver', 'delivery__driver'),
@@ -1776,7 +1776,7 @@ def backoffice_invoice_live_tracking(request, invoice_id):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.view')
+@internal_permission_required('backoffice.invoices.view')
 def backoffice_invoice_tracking_data(request, invoice_id):
 	invoice = get_object_or_404(
 		Invoice.objects.select_related('delivery__driver'),
@@ -1788,7 +1788,7 @@ def backoffice_invoice_tracking_data(request, invoice_id):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.view')
+@internal_permission_required('backoffice.invoices.view')
 def backoffice_live_drivers(request):
 	deliveries = list(_live_driver_deliveries_queryset())
 	return render(request, 'backoffice/live_drivers.html', {
@@ -1798,7 +1798,7 @@ def backoffice_live_drivers(request):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.view')
+@internal_permission_required('backoffice.invoices.view')
 def backoffice_live_drivers_data(request):
 	deliveries = list(_live_driver_deliveries_queryset())
 	return JsonResponse({
@@ -1808,7 +1808,7 @@ def backoffice_live_drivers_data(request):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 def backoffice_invoice_create_note(request, invoice_id):
 	invoice = get_object_or_404(Invoice.objects.prefetch_related('items__presentacion__producto'), id=invoice_id)
 	if request.method != 'POST':
@@ -1868,7 +1868,7 @@ def backoffice_invoice_create_note(request, invoice_id):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 @transaction.atomic
 def backoffice_invoice_complete_pickup(request, invoice_id):
 	invoice = get_object_or_404(
@@ -1930,7 +1930,7 @@ def backoffice_invoice_complete_pickup(request, invoice_id):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 def backoffice_invoice_approve_note(request, note_id):
 	nota = get_object_or_404(NotaAjuste.objects.select_related('invoice', 'cliente'), id=note_id)
 	if request.method != 'POST':
@@ -1951,7 +1951,7 @@ def backoffice_invoice_approve_note(request, note_id):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 def backoffice_invoice_cancel_note(request, note_id):
 	nota = get_object_or_404(NotaAjuste.objects.select_related('invoice', 'cliente'), id=note_id)
 	if request.method != 'POST':
@@ -1978,7 +1978,7 @@ def backoffice_invoice_cancel_note(request, note_id):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 def backoffice_invoice_delete_note(request, note_id):
 	nota = get_object_or_404(NotaAjuste.objects.select_related('invoice', 'cliente'), id=note_id)
 	if request.method != 'POST':
@@ -2003,7 +2003,7 @@ def backoffice_invoice_delete_note(request, note_id):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 def backoffice_invoice_void(request, invoice_id):
 	invoice = get_object_or_404(Invoice.objects.select_related('pedido', 'cliente'), id=invoice_id)
 	if request.method != 'POST':
@@ -2037,7 +2037,7 @@ def _resolve_invoice_delete_force_quickbooks(request, invoice):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 def backoffice_invoice_delete(request, invoice_id):
 	invoice = get_object_or_404(Invoice.objects.select_related('pedido', 'cliente'), id=invoice_id)
 	if request.method != 'POST':
@@ -2059,7 +2059,7 @@ def backoffice_invoice_delete(request, invoice_id):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.view')
+@internal_permission_required('backoffice.invoices.view')
 def backoffice_void_records_list(request):
 	registros = (
 		FacturacionRegistroAnulacion.objects
@@ -2070,14 +2070,14 @@ def backoffice_void_records_list(request):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.view')
+@internal_permission_required('backoffice.invoices.view')
 def backoffice_invoice_pdf(request, invoice_id):
 	invoice = get_object_or_404(Invoice.objects.select_related('pedido__cliente', 'driver', 'delivery').prefetch_related('items__presentacion__producto', 'items__pedido_item__movimientos_inventario', 'items__pedido_item', 'notas_ajuste'), id=invoice_id)
 	return _invoice_pdf_response(invoice)
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 def backoffice_unlock_delivery_client(request, delivery_id):
 	delivery = get_object_or_404(Delivery.objects.select_related('invoice__cliente'), id=delivery_id)
 	if request.method != 'POST':
@@ -2088,7 +2088,7 @@ def backoffice_unlock_delivery_client(request, delivery_id):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 def backoffice_mark_delivery_unpaid(request, delivery_id):
 	delivery = get_object_or_404(Delivery.objects.select_related('invoice__cliente'), id=delivery_id)
 	if request.method != 'POST':

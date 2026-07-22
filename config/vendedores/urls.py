@@ -22,6 +22,7 @@ urlpatterns = [
     path('desactivar-cliente/', views.desactivar_cliente, name='desactivar_cliente'),
     path('activar-cliente/', views.activar_cliente, name='activar_cliente'),
     path('configurar-acceso-cliente/', views.configurar_acceso_cliente, name='configurar_acceso_cliente'),
+    path('acceso-cliente/<int:cliente_id>/', views.obtener_acceso_cliente, name='obtener_acceso_cliente'),
     path('notas/', views.vendedor_notes_list, name='vendedor_notes_list'),
     path('notas/credit-memo/', views.vendedor_credit_memo_create, name='vendedor_credit_memo_create'),
     path('notas/return/', views.vendedor_return_create, name='vendedor_return_create'),

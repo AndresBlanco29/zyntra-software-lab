@@ -3085,7 +3085,10 @@ class InvoiceFlowTests(TestCase):
 			username='bo-view-only',
 			password='secret123',
 			role='backoffice',
-			permission_overrides={'backoffice.orders.manage': False},
+			permission_overrides={
+				'backoffice.orders.manage': False,
+				'backoffice.invoices.manage': False,
+			},
 		)
 		self.client.force_login(viewer)
 		response = self.client.get(reverse('backoffice_create_direct_invoice'))

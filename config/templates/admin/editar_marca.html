@@ -36,11 +36,16 @@
 <div>
 {% if marca.logo %}
 <img src="{{ marca.logo.url }}" alt="{{ marca.nombre }}" style="width: 70px; height: 70px; object-fit: contain;" class="mb-2">
+<div class="form-check mb-2">
+<input class="form-check-input" type="checkbox" name="eliminar_logo" value="1" id="eliminarLogo">
+<label class="form-check-label" for="eliminarLogo">{% trans "Remove logo (leave brand without image)" %}</label>
+</div>
 {% else %}
 <p class="text-muted mb-2">{% trans "Sin logo" %}</p>
 {% endif %}
 </div>
 <input type="file" name="logo" class="form-control" accept="image/*">
+<small class="text-muted">{% trans "Upload a new file to replace the current logo." %}</small>
 </div>
 
 <div class="mb-3">

@@ -606,10 +606,18 @@ def lista_productos(request):
 @internal_permission_required('admin.products.view')
 def lista_marcas(request):
 
-    marcas = Marca.objects.all().prefetch_related('categorias')
+    marcas_qs = Marca.objects.all().prefetch_related('categorias').order_by('nombre')
+    marcas_activas = list(marcas_qs.filter(activo=True))
+    marcas_inactivas = list(marcas_qs.filter(activo=False))
+    tab = (request.GET.get('tab') or 'active').strip().lower()
+    if tab not in {'active', 'inactive'}:
+        tab = 'active'
 
     return render(request, 'admin/marcas.html', {
-        'marcas': marcas,
+        'marcas': marcas_inactivas if tab == 'inactive' else marcas_activas,
+        'marcas_activas': marcas_activas,
+        'marcas_inactivas': marcas_inactivas,
+        'tab': tab,
     })
 
 @login_required
@@ -905,7 +913,11 @@ def editar_marca(request, marca_id):
 
         marca.nombre = nombre
         marca.nombre_en = nombre_en
-        if logo:
+        remove_logo = bool(request.POST.get('eliminar_logo'))
+        if remove_logo and marca.logo:
+            marca.logo.delete(save=False)
+            marca.logo = None
+        elif logo:
             if marca.logo:
                 marca.logo.delete(save=False)
             marca.logo = logo

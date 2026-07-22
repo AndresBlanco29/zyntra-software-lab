@@ -96,6 +96,16 @@ PERMISSION_SECTIONS = (
                 'description': _('Update order status, edit line items and prepare picking workflows.'),
             },
             {
+                'code': 'backoffice.invoices.view',
+                'label': _('Invoices'),
+                'description': _('View invoices, daily closing and credit/debit notes.'),
+            },
+            {
+                'code': 'backoffice.invoices.manage',
+                'label': _('Manage invoices'),
+                'description': _('Create and update invoices, complete pickup/delivery billing and manage credit/debit notes.'),
+            },
+            {
                 'code': 'backoffice.reports.view',
                 'label': _('Reports dashboard'),
                 'description': _('View daily closing, revenue trends, driver reconciliation and commercial performance metrics.'),
@@ -224,6 +234,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         'backoffice.quotes.manage',
         'backoffice.orders.view',
         'backoffice.orders.manage',
+        'backoffice.invoices.view',
+        'backoffice.invoices.manage',
         'backoffice.reports.view',
         'backoffice.customers.assign',
         'vendor.customers.view',
@@ -353,6 +365,7 @@ def get_redirect_url_for_user(user):
         ('admin.dashboard.view', 'panel_admin'),
         ('admin.users.view', 'lista_usuarios_internos'),
         ('backoffice.dashboard.view', 'backoffice_dashboard'),
+        ('backoffice.invoices.view', 'backoffice_invoices_list'),
         ('backoffice.reports.view', 'reportes_dashboard'),
         ('driver.delivery.view', 'driver_delivery_list'),
         ('selector.picking.view', 'selector_picking_list'),

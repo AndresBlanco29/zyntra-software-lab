@@ -21,6 +21,21 @@ Marcas
 </a>
 </div>
 
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item" role="presentation">
+    <a class="nav-link {% if tab != 'inactive' %}active{% endif %}" href="?tab=active">
+      {% trans "Active" %}
+      <span class="badge text-bg-success ms-1">{{ marcas_activas|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item" role="presentation">
+    <a class="nav-link {% if tab == 'inactive' %}active{% endif %}" href="?tab=inactive">
+      {% trans "Inactive" %}
+      <span class="badge text-bg-secondary ms-1">{{ marcas_inactivas|length }}</span>
+    </a>
+  </li>
+</ul>
+
 <div class="table-responsive">
 
 <table class="table table-striped">
@@ -93,7 +108,13 @@ Marcas
 </tr>
 {% empty %}
 <tr>
-<td colspan="6" class="text-center text-muted py-4">{% trans "No hay marcas registradas" %}</td>
+<td colspan="6" class="text-center text-muted py-4">
+{% if tab == 'inactive' %}
+{% trans "No inactive brands" %}
+{% else %}
+{% trans "No active brands" %}
+{% endif %}
+</td>
 </tr>
 {% endfor %}
 

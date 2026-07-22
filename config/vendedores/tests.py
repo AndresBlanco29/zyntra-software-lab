@@ -763,6 +763,9 @@ class VendedorEditarClienteTests(TestCase):
 		self.assertContains(response, 'Acceso pendiente')
 
 	def test_vendor_can_configure_web_access_for_imported_customer(self):
+		from config.clientes.assignment import ensure_cliente_assigned_to_vendedor
+
+		ensure_cliente_assigned_to_vendedor(cliente=self.customer, vendedor=self.vendor)
 		self.customer_user.set_unusable_password()
 		self.customer_user.save(update_fields=['password'])
 		self.client.force_login(self.vendor)
@@ -781,9 +784,43 @@ class VendedorEditarClienteTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertJSONEqual(response.content, {'success': True, 'message': 'Web access configured successfully.'})
 		self.customer_user.refresh_from_db()
+		self.customer.refresh_from_db()
 		self.assertEqual(self.customer_user.username, 'lilasmarket')
 		self.assertTrue(self.customer_user.has_usable_password())
 		self.assertTrue(self.customer_user.check_password('TempAccess123!'))
+		self.assertEqual(self.customer.web_access_password, 'TempAccess123!')
+
+	def test_admin_can_view_stored_customer_web_password(self):
+		self.customer_user.set_password('TempAccess123!')
+		self.customer_user.save(update_fields=['password'])
+		self.customer.web_access_password = 'TempAccess123!'
+		self.customer.save(update_fields=['web_access_password'])
+
+		admin = Usuario.objects.create_user(
+			username='admin-access-view',
+			password='pass',
+			role='admin',
+			is_staff=True,
+		)
+		self.client.force_login(admin)
+		response = self.client.get(reverse('obtener_acceso_cliente', args=[self.customer.id]))
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(payload['success'])
+		self.assertEqual(payload['username'], self.customer_user.username)
+		self.assertEqual(payload['password'], 'TempAccess123!')
+		self.assertTrue(payload['password_available'])
+
+	def test_vendor_cannot_view_stored_customer_web_password(self):
+		self.customer_user.set_password('TempAccess123!')
+		self.customer_user.save(update_fields=['password'])
+		self.customer.web_access_password = 'TempAccess123!'
+		self.customer.save(update_fields=['web_access_password'])
+
+		self.client.force_login(self.vendor)
+		response = self.client.get(reverse('obtener_acceso_cliente', args=[self.customer.id]))
+		self.assertEqual(response.status_code, 403)
 
 	def test_configure_web_access_rejects_mismatched_passwords(self):
 		self.customer_user.set_unusable_password()

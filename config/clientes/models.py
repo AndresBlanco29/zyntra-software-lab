@@ -244,6 +244,16 @@ class Cliente(models.Model):
         default=False
     )
 
+    # Recoverable copy of the portal password so Admin/BackOffice can view it.
+    # Auth still uses the hashed Django password on Usuario; this field is only
+    # for authorized staff display and is updated whenever staff sets access.
+    web_access_password = models.CharField(
+        max_length=128,
+        blank=True,
+        default='',
+        help_text='Plaintext copy of the customer web password for authorized staff display.',
+    )
+
     credit_limit = models.DecimalField(
         max_digits=12,
         decimal_places=2,

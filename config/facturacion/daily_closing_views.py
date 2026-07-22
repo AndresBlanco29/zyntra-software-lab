@@ -29,7 +29,7 @@ def _parse_bool(value):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.view')
+@internal_permission_required('backoffice.invoices.view')
 def backoffice_daily_closing_list(request):
 	cierres = CierreDiario.objects.select_related('creado_por', 'cerrado_por').order_by('-fecha', '-id')
 	page_obj = Paginator(cierres, 25).get_page(request.GET.get('page'))
@@ -37,12 +37,12 @@ def backoffice_daily_closing_list(request):
 		'page_obj': page_obj,
 		'cierres': page_obj,
 		'today': timezone.localdate(),
-		'can_manage': request.user.has_internal_permission('backoffice.orders.manage'),
+		'can_manage': request.user.has_internal_permission('backoffice.invoices.manage'),
 	})
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 @require_POST
 def backoffice_daily_closing_create(request):
 	fecha = parse_date((request.POST.get('fecha') or '').strip()) or timezone.localdate()
@@ -53,7 +53,7 @@ def backoffice_daily_closing_create(request):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.view')
+@internal_permission_required('backoffice.invoices.view')
 def backoffice_daily_closing_detail(request, cierre_id):
 	cierre = get_object_or_404(
 		CierreDiario.objects.select_related('creado_por', 'cerrado_por'),
@@ -69,7 +69,7 @@ def backoffice_daily_closing_detail(request, cierre_id):
 	)
 	search = (request.GET.get('q') or '').strip()
 	elegibles = []
-	if cierre.is_editable and request.user.has_internal_permission('backoffice.orders.manage'):
+	if cierre.is_editable and request.user.has_internal_permission('backoffice.invoices.manage'):
 		elegibles = list(invoices_elegibles_para_cierre(search=search)[:80])
 
 	return render(request, 'backoffice/daily_closing_detail.html', {
@@ -77,13 +77,13 @@ def backoffice_daily_closing_detail(request, cierre_id):
 		'items': items,
 		'elegibles': elegibles,
 		'search_query': search,
-		'can_manage': request.user.has_internal_permission('backoffice.orders.manage'),
+		'can_manage': request.user.has_internal_permission('backoffice.invoices.manage'),
 		'quickbooks_center_url': reverse('quickbooks_center'),
 	})
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 @require_POST
 def backoffice_daily_closing_add_invoices(request, cierre_id):
 	cierre = get_object_or_404(CierreDiario, id=cierre_id)
@@ -104,7 +104,7 @@ def backoffice_daily_closing_add_invoices(request, cierre_id):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.view')
+@internal_permission_required('backoffice.invoices.view')
 def backoffice_daily_closing_item_review(request, cierre_id, item_id):
 	cierre = get_object_or_404(CierreDiario, id=cierre_id)
 	item = get_object_or_404(
@@ -125,7 +125,7 @@ def backoffice_daily_closing_item_review(request, cierre_id, item_id):
 		NotaAjuste.objects.filter(invoice=invoice, tipo_documento='CREDITO').order_by('-id')[:10]
 	)
 	can_manage = (
-		request.user.has_internal_permission('backoffice.orders.manage')
+		request.user.has_internal_permission('backoffice.invoices.manage')
 		and cierre.is_editable
 		and item.estado != 'LIBERADA'
 	)
@@ -168,7 +168,7 @@ def backoffice_daily_closing_item_review(request, cierre_id, item_id):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 @require_POST
 def backoffice_daily_closing_release(request, cierre_id):
 	cierre = get_object_or_404(CierreDiario, id=cierre_id)
@@ -192,7 +192,7 @@ def backoffice_daily_closing_release(request, cierre_id):
 
 
 @login_required
-@internal_permission_required('backoffice.orders.manage')
+@internal_permission_required('backoffice.invoices.manage')
 @require_POST
 def backoffice_daily_closing_close(request, cierre_id):
 	cierre = get_object_or_404(CierreDiario, id=cierre_id)

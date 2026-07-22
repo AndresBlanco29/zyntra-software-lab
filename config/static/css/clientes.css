@@ -312,6 +312,19 @@ transform:translateY(-1px);
     color: #fff;
 }
 
+.vendor-access-view-btn {
+    background: linear-gradient(to right, #1d4ed8, #3b82f6);
+    border: none;
+    color: #fff;
+    font-weight: 700;
+}
+
+.vendor-access-view-btn:hover,
+.vendor-access-view-btn:focus {
+    background: linear-gradient(to right, #1e40af, #2563eb);
+    color: #fff;
+}
+
 .vendor-access-save-btn {
     background: linear-gradient(to right, #b45309, #f59e0b);
     border: none;

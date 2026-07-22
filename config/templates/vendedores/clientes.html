@@ -48,6 +48,19 @@
   data-msg-username-required="{% trans 'Username is required.' %}"
   data-msg-username-invalid="{% trans 'Username can only use letters, numbers, dots, underscores and hyphens (min 3 characters).' %}"
   data-can-change-username="{% if can_change_customer_username %}1{% else %}0{% endif %}"
+  data-can-view-web-password="{% if can_view_customer_web_password %}1{% else %}0{% endif %}"
+  data-msg-access-view-error-prefix="{% trans 'Error loading access:' %}"
+  data-msg-access-password-unavailable="{% trans 'The password was set before this feature. Enter a new password below to update it and make it visible.' %}"
+  data-msg-access-update-success-title="{% trans 'Access updated' %}"
+  data-msg-access-update-success-body="{% trans 'The customer web access credentials were updated successfully.' %}"
+  data-msg-access-show-password="{% trans 'Show password' %}"
+  data-msg-access-hide-password="{% trans 'Hide password' %}"
+  data-msg-access-view-title="{% trans 'View web access' %}"
+  data-msg-access-view-hint="{% trans 'Username and password currently configured for this customer. You can update them below.' %}"
+  data-msg-access-update-button="{% trans 'Update access' %}"
+  data-msg-access-create-title="{% trans 'Configurar acceso web' %}"
+  data-msg-access-create-hint="{% trans 'Define the username and password the customer will use to sign in on the website.' %}"
+  data-msg-access-create-button="{% trans 'Guardar acceso' %}"
 >
 
 <section class="vendor-hero vendor-hero--customers mb-4">
@@ -287,7 +300,21 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
     onclick="abrirModalAccesoCliente({{ cliente.id }}, '{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa|escapejs }}')">
     {% trans "Acceso pendiente" %}
   </button>
+  {% elif can_view_customer_web_password %}
+  <button
+    type="button"
+    class="btn btn-sm vendor-access-view-btn"
+    onclick="abrirModalVerAccesoCliente({{ cliente.id }})">
+    {% trans "Ver acceso" %}
+  </button>
   {% endif %}
+{% elif can_view_customer_web_password and cliente.usuario.has_usable_password %}
+  <button
+    type="button"
+    class="btn btn-sm vendor-access-view-btn"
+    onclick="abrirModalVerAccesoCliente({{ cliente.id }})">
+    {% trans "Ver acceso" %}
+  </button>
 {% endif %}
 
 {% if request.user.is_superuser or request.user.role == 'admin' %}
@@ -589,16 +616,18 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
     <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);">
       <div class="modal-header border-0" style="background: linear-gradient(135deg, #b45309, #f59e0b); border-radius: 12px 12px 0 0;">
         <div>
-          <h5 class="modal-title text-white fw-bold mb-1">{% trans "Configurar acceso web" %}</h5>
+          <h5 class="modal-title text-white fw-bold mb-1" id="accesoModalTitle">{% trans "Configurar acceso web" %}</h5>
           <p class="text-white-50 small mb-0" id="accesoClienteNombre"></p>
         </div>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body p-4">
-        <p class="text-muted small">{% trans "Define the username and password the customer will use to sign in on the website." %}</p>
+        <p class="text-muted small" id="accesoModalHint">{% trans "Define the username and password the customer will use to sign in on the website." %}</p>
+        <div class="alert alert-warning small d-none" id="accesoPasswordUnavailable" role="alert"></div>
         <form id="formConfigurarAccesoCliente" onsubmit="return false;">
           {% csrf_token %}
           <input type="hidden" id="accesoClienteId" name="cliente_id">
+          <input type="hidden" id="accesoMode" value="create">
 
           <div class="mb-3">
             <label class="form-label fw-bold" for="accesoUsername">{% trans "Usuario" %}</label>
@@ -608,10 +637,15 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 
           <div class="mb-3">
             <label class="form-label fw-bold" for="accesoPassword">{% trans "Contraseña" %}</label>
-            <input type="password" class="form-control" id="accesoPassword" name="password" autocomplete="new-password" required>
+            <div class="input-group">
+              <input type="password" class="form-control" id="accesoPassword" name="password" autocomplete="new-password" required>
+              <button type="button" class="btn btn-outline-secondary" id="accesoPasswordToggle" onclick="toggleAccesoPasswordVisibility()" aria-label="{% trans 'Show password' %}">
+                <i class="bi bi-eye" aria-hidden="true"></i>
+              </button>
+            </div>
           </div>
 
-          <div class="mb-3">
+          <div class="mb-3" id="accesoPasswordConfirmWrap">
             <label class="form-label fw-bold" for="accesoPasswordConfirm">{% trans "Confirmar contraseña" %}</label>
             <input type="password" class="form-control" id="accesoPasswordConfirm" name="password_confirm" autocomplete="new-password" required>
           </div>
@@ -627,7 +661,7 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
       </div>
       <div class="modal-footer border-0">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Cancelar" %}</button>
-        <button type="button" class="btn vendor-access-save-btn" onclick="guardarAccesoCliente()">{% trans "Guardar acceso" %}</button>
+        <button type="button" class="btn vendor-access-save-btn" id="accesoSaveButton" onclick="guardarAccesoCliente()">{% trans "Guardar acceso" %}</button>
       </div>
     </div>
   </div>

@@ -478,9 +478,9 @@ body.vendedor-catalogo-page .col-md-10 {
         inset: 0 2.4rem 0 0.75rem;
         display: flex;
         align-items: center;
-        color: #6c757d;
+        color: #c2410c;
         font-size: 0.875rem;
-        font-weight: 500;
+        font-weight: 700;
         pointer-events: none;
         white-space: nowrap;
         overflow: hidden;
@@ -491,11 +491,12 @@ body.vendedor-catalogo-page .col-md-10 {
 
     .precio-select-shell[data-state="selected"] .precio-select-mask {
         color: #1f2937;
+        font-weight: 600;
     }
 
     .precio-select-shell[data-pressing="true"] .precio-select-mask {
-        color: #0b3d91;
-        font-weight: 700;
+        color: #9a3412;
+        font-weight: 800;
     }
 
     body.vendedor-catalogo-page .pedido-bar {

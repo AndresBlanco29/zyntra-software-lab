@@ -17,7 +17,7 @@ from config.productos.promotions import (
     reaplicar_promociones_en_lineas_sesion,
 )
 from config.productos.views import _hydrate_productos
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 
 def _cliente_from_take_order_session(request):
@@ -526,6 +526,7 @@ def clientes(request):
         'us_locations_json': json.dumps(US_STATE_CITIES),
         'us_states': sorted(US_STATE_CITIES.keys()),
         'can_change_customer_username': _can_change_customer_username(request.user),
+        'can_view_customer_web_password': _can_view_customer_web_password(request.user),
     }
 
     return render(request, 'vendedores/clientes.html', context)
@@ -537,6 +538,11 @@ def _can_change_customer_username(user):
     if user.is_superuser:
         return True
     return getattr(user, 'role', '') in {'admin', 'backoffice'}
+
+
+def _can_view_customer_web_password(user):
+    """Admin / BackOffice / superuser can view stored customer portal passwords."""
+    return _can_change_customer_username(user)
 
 
 def _normalize_customer_login_username(raw_username):
@@ -1568,7 +1574,7 @@ def configurar_limite_credito_cliente(request):
 @internal_permission_required('vendor.customers.manage')
 @require_POST
 def configurar_acceso_cliente(request):
-    """Assign username and password to imported customers without web access."""
+    """Assign or update username/password for customer web access."""
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
@@ -1578,6 +1584,7 @@ def configurar_acceso_cliente(request):
     username = str(data.get('username') or '').strip().lower()
     password = data.get('password') or ''
     password_confirm = data.get('password_confirm') or ''
+    can_update_existing = _can_view_customer_web_password(request.user)
 
     if not cliente_id:
         return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
@@ -1601,7 +1608,8 @@ def configurar_acceso_cliente(request):
         return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
 
     usuario = cliente.usuario
-    if usuario.has_usable_password():
+    already_configured = usuario.has_usable_password()
+    if already_configured and not can_update_existing:
         return JsonResponse(
             {'success': False, 'message': _('This customer already has web access configured.')},
             status=400,
@@ -1627,14 +1635,51 @@ def configurar_acceso_cliente(request):
             usuario.is_active = True
         usuario.save(update_fields=['username', 'password', 'is_active'])
 
-        update_fields = []
+        update_fields = ['web_access_password']
+        cliente.web_access_password = password
         if not cliente.aprobado:
             cliente.aprobado = True
             update_fields.append('aprobado')
-        if update_fields:
-            cliente.save(update_fields=update_fields)
+        cliente.save(update_fields=update_fields)
 
+    if already_configured:
+        return JsonResponse({'success': True, 'message': _('Web access updated successfully.')})
     return JsonResponse({'success': True, 'message': _('Web access configured successfully.')})
+
+
+@login_required
+@require_GET
+def obtener_acceso_cliente(request, cliente_id):
+    """Return stored username/password for Admin and BackOffice staff."""
+    if not _can_view_customer_web_password(request.user):
+        return JsonResponse(
+            {'success': False, 'message': _('You do not have permission to view customer passwords.')},
+            status=403,
+        )
+
+    try:
+        cliente = filter_clientes_for_vendedor(
+            Cliente.objects.select_related('usuario'),
+            request.user,
+        ).get(id=cliente_id)
+    except Cliente.DoesNotExist:
+        return JsonResponse({'success': False, 'message': _('Customer not found.')}, status=404)
+
+    usuario = cliente.usuario
+    if not usuario.has_usable_password():
+        return JsonResponse(
+            {'success': False, 'message': _('This customer does not have web access configured yet.')},
+            status=400,
+        )
+
+    return JsonResponse({
+        'success': True,
+        'username': usuario.username,
+        'password': cliente.web_access_password or '',
+        'password_available': bool(cliente.web_access_password),
+        'customer_name': usuario.get_full_name() or cliente.nombre_empresa,
+    })
+
 
 VENDOR_NOTE_MODE_CREDIT_MEMO = 'credit_memo'
 VENDOR_NOTE_MODE_RETURN = 'return'

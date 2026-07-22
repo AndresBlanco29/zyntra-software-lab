@@ -44,9 +44,21 @@ function getCustomerPageMessages() {
         accessFillAllFields: dataset.msgAccessFillAllFields || 'Please complete username and both password fields.',
         accessPasswordMismatch: dataset.msgAccessPasswordMismatch || 'Passwords do not match.',
         accessErrorPrefix: dataset.msgAccessErrorPrefix || 'Error configuring access:',
+        accessViewErrorPrefix: dataset.msgAccessViewErrorPrefix || 'Error loading access:',
+        accessPasswordUnavailable: dataset.msgAccessPasswordUnavailable || 'The password was set before this feature. Enter a new password below to update it and make it visible.',
         accessSuccessTitle: dataset.msgAccessSuccessTitle || 'Access configured',
         accessSuccessBody: dataset.msgAccessSuccessBody || 'The customer can now sign in with the username and password you set.',
+        accessUpdateSuccessTitle: dataset.msgAccessUpdateSuccessTitle || 'Access updated',
+        accessUpdateSuccessBody: dataset.msgAccessUpdateSuccessBody || 'The customer web access credentials were updated successfully.',
         accessPasswordRules: dataset.msgAccessPasswordRules || 'The password must meet all requirements listed below.',
+        accessShowPassword: dataset.msgAccessShowPassword || 'Show password',
+        accessHidePassword: dataset.msgAccessHidePassword || 'Hide password',
+        accessViewTitle: dataset.msgAccessViewTitle || 'View web access',
+        accessViewHint: dataset.msgAccessViewHint || 'Username and password currently configured for this customer. You can update them below.',
+        accessUpdateButton: dataset.msgAccessUpdateButton || 'Update access',
+        accessCreateTitle: dataset.msgAccessCreateTitle || 'Configurar acceso web',
+        accessCreateHint: dataset.msgAccessCreateHint || 'Define the username and password the customer will use to sign in on the website.',
+        accessCreateButton: dataset.msgAccessCreateButton || 'Guardar acceso',
         termsErrorPrefix: dataset.msgTermsErrorPrefix || 'Error saving payment terms:',
         termsSuccessTitle: dataset.msgTermsSuccessTitle || 'Payment terms updated',
         termsSuccessBody: dataset.msgTermsSuccessBody || 'The customer payment terms were saved successfully.',
@@ -57,7 +69,8 @@ function getCustomerPageMessages() {
         creditLimitInvalid: dataset.msgCreditLimitInvalid || 'Enter a valid credit limit amount.',
         usernameRequired: dataset.msgUsernameRequired || 'Username is required.',
         usernameInvalid: dataset.msgUsernameInvalid || 'Username can only use letters, numbers, dots, underscores and hyphens (min 3 characters).',
-        canChangeUsername: dataset.canChangeUsername === '1'
+        canChangeUsername: dataset.canChangeUsername === '1',
+        canViewWebPassword: dataset.canViewWebPassword === '1'
     };
 }
 
@@ -522,12 +535,85 @@ document.addEventListener('DOMContentLoaded', function () {
 window.abrirModalLimiteCreditoCliente = abrirModalLimiteCreditoCliente;
 window.guardarLimiteCreditoCliente = guardarLimiteCreditoCliente;
 
+function resetAccesoPasswordVisibility() {
+    const passwordInput = document.getElementById('accesoPassword');
+    const toggleBtn = document.getElementById('accesoPasswordToggle');
+    if (passwordInput) {
+        passwordInput.type = 'password';
+    }
+    if (toggleBtn) {
+        toggleBtn.setAttribute('aria-label', customerMessages.accessShowPassword);
+        const icon = toggleBtn.querySelector('i');
+        if (icon) {
+            icon.className = 'bi bi-eye';
+        }
+    }
+}
+
+function toggleAccesoPasswordVisibility() {
+    const passwordInput = document.getElementById('accesoPassword');
+    const toggleBtn = document.getElementById('accesoPasswordToggle');
+    if (!passwordInput || !toggleBtn) {
+        return;
+    }
+    const showing = passwordInput.type === 'text';
+    passwordInput.type = showing ? 'password' : 'text';
+    toggleBtn.setAttribute(
+        'aria-label',
+        showing ? customerMessages.accessShowPassword : customerMessages.accessHidePassword
+    );
+    const icon = toggleBtn.querySelector('i');
+    if (icon) {
+        icon.className = showing ? 'bi bi-eye' : 'bi bi-eye-slash';
+    }
+}
+
+function setAccesoModalMode(mode) {
+    const modeInput = document.getElementById('accesoMode');
+    const title = document.getElementById('accesoModalTitle');
+    const hint = document.getElementById('accesoModalHint');
+    const saveBtn = document.getElementById('accesoSaveButton');
+    const unavailable = document.getElementById('accesoPasswordUnavailable');
+
+    if (modeInput) {
+        modeInput.value = mode;
+    }
+    if (unavailable) {
+        unavailable.classList.add('d-none');
+        unavailable.textContent = '';
+    }
+
+    if (mode === 'view') {
+        if (title) {
+            title.textContent = customerMessages.accessViewTitle;
+        }
+        if (hint) {
+            hint.textContent = customerMessages.accessViewHint;
+        }
+        if (saveBtn) {
+            saveBtn.textContent = customerMessages.accessUpdateButton;
+        }
+    } else {
+        if (title) {
+            title.textContent = customerMessages.accessCreateTitle;
+        }
+        if (hint) {
+            hint.textContent = customerMessages.accessCreateHint;
+        }
+        if (saveBtn) {
+            saveBtn.textContent = customerMessages.accessCreateButton;
+        }
+    }
+}
+
 function abrirModalAccesoCliente(clienteId, nombreCliente) {
     document.getElementById('accesoClienteId').value = clienteId;
     document.getElementById('accesoClienteNombre').textContent = nombreCliente || customerMessages.customerFallbackName;
     document.getElementById('accesoUsername').value = '';
     document.getElementById('accesoPassword').value = '';
     document.getElementById('accesoPasswordConfirm').value = '';
+    setAccesoModalMode('create');
+    resetAccesoPasswordVisibility();
 
     bindAccessPasswordValidation();
     updateAccessPasswordRules();
@@ -536,11 +622,58 @@ function abrirModalAccesoCliente(clienteId, nombreCliente) {
     modal.show();
 }
 
+function abrirModalVerAccesoCliente(clienteId) {
+    if (!customerMessages.canViewWebPassword) {
+        return;
+    }
+
+    fetch('/vendedores/acceso-cliente/' + encodeURIComponent(clienteId) + '/', {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(function (response) { return response.json(); })
+    .then(function (data) {
+        if (!data.success) {
+            alert((customerMessages.accessViewErrorPrefix || '') + ' ' + (data.message || customerMessages.unknownError));
+            return;
+        }
+
+        document.getElementById('accesoClienteId').value = clienteId;
+        document.getElementById('accesoClienteNombre').textContent = data.customer_name || customerMessages.customerFallbackName;
+        document.getElementById('accesoUsername').value = data.username || '';
+        document.getElementById('accesoPassword').value = data.password || '';
+        document.getElementById('accesoPasswordConfirm').value = data.password || '';
+        setAccesoModalMode('view');
+        resetAccesoPasswordVisibility();
+
+        const unavailable = document.getElementById('accesoPasswordUnavailable');
+        if (unavailable && !data.password_available) {
+            unavailable.textContent = customerMessages.accessPasswordUnavailable;
+            unavailable.classList.remove('d-none');
+            document.getElementById('accesoPassword').value = '';
+            document.getElementById('accesoPasswordConfirm').value = '';
+        }
+
+        bindAccessPasswordValidation();
+        updateAccessPasswordRules();
+
+        const modal = new bootstrap.Modal(document.getElementById('configurarAccesoClienteModal'));
+        modal.show();
+    })
+    .catch(function (error) {
+        console.error('Error:', error);
+        alert(customerMessages.requestError);
+    });
+}
+
 function guardarAccesoCliente() {
     const clienteId = document.getElementById('accesoClienteId').value;
     const username = document.getElementById('accesoUsername').value.trim().toLowerCase();
     const password = document.getElementById('accesoPassword').value;
     const passwordConfirm = document.getElementById('accesoPasswordConfirm').value;
+    const mode = (document.getElementById('accesoMode') || {}).value || 'create';
 
     if (!clienteId || !username || !password || !passwordConfirm) {
         alert(customerMessages.accessFillAllFields);
@@ -578,8 +711,13 @@ function guardarAccesoCliente() {
             modalAcceso.hide();
         }
 
-        document.getElementById('tituloExitoAccesoCliente').textContent = customerMessages.accessSuccessTitle;
-        document.getElementById('textoExitoAccesoCliente').textContent = customerMessages.accessSuccessBody;
+        const isUpdate = mode === 'view';
+        document.getElementById('tituloExitoAccesoCliente').textContent = isUpdate
+            ? customerMessages.accessUpdateSuccessTitle
+            : customerMessages.accessSuccessTitle;
+        document.getElementById('textoExitoAccesoCliente').textContent = isUpdate
+            ? customerMessages.accessUpdateSuccessBody
+            : customerMessages.accessSuccessBody;
 
         const modalExito = new bootstrap.Modal(document.getElementById('exitoAccesoClienteModal'));
         modalExito.show();
@@ -595,7 +733,9 @@ function guardarAccesoCliente() {
 }
 
 window.abrirModalAccesoCliente = abrirModalAccesoCliente;
+window.abrirModalVerAccesoCliente = abrirModalVerAccesoCliente;
 window.guardarAccesoCliente = guardarAccesoCliente;
+window.toggleAccesoPasswordVisibility = toggleAccesoPasswordVisibility;
 
 const telefonoInput = document.getElementById('telefonoCliente');
 if (telefonoInput) {

@@ -1749,6 +1749,9 @@ def selector_picking_detail(request, pedido_id):
 			item.id: _parse_non_negative_quantity(request.POST.get(f'cantidad_real_{item.id}'), 0)
 			for item in pedido.items.all()
 		}
+		# POST is the source of truth for added products. Discard draft-seeded
+		# rows so a second "Save progress" does not append the same lines again.
+		additional_item_rows = []
 		additional_items = []
 		posted_new_presentations = request.POST.getlist('presentacion_nueva[]')
 		posted_new_quantities = request.POST.getlist('cantidad_nueva[]')

@@ -1169,6 +1169,43 @@ class PickingVerificationFlowTests(TestCase):
 		pending_list = self.client.get(reverse('selector_picking_list'))
 		self.assertNotContains(pending_list, reverse('selector_picking_detail', args=[self.pedido.id]))
 
+	def test_save_progress_does_not_duplicate_additional_items_on_second_save(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+
+		first_save = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'submit_action': 'save_progress',
+			'cantidad_pallets': '1',
+			f'presentacion_{self.item.id}': str(self.presentacion.id),
+			f'cantidad_real_{self.item.id}': '1',
+			f'linea_revisada_{self.item.id}': 'on',
+			'presentacion_nueva[]': str(self.presentacion_extra.id),
+			'cantidad_nueva[]': '1',
+			'linea_revisada_adicional[]': 'on',
+		})
+		self.assertRedirects(first_save, reverse('selector_picking_detail', args=[self.pedido.id]))
+		self.pedido.refresh_from_db()
+		self.assertEqual(len(self.pedido.picking_progress.get('additional_items') or []), 1)
+
+		# Second save simulates the restored form posting the same added product again
+		# (plus Reviewed checked), which previously appended onto the draft and duplicated.
+		second_save = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'submit_action': 'save_progress',
+			'cantidad_pallets': '1',
+			f'presentacion_{self.item.id}': str(self.presentacion.id),
+			f'cantidad_real_{self.item.id}': '1',
+			f'linea_revisada_{self.item.id}': 'on',
+			'presentacion_nueva[]': str(self.presentacion_extra.id),
+			'cantidad_nueva[]': '1',
+			'linea_revisada_adicional[]': 'on',
+		})
+		self.assertRedirects(second_save, reverse('selector_picking_detail', args=[self.pedido.id]))
+		self.pedido.refresh_from_db()
+		additional_items = self.pedido.picking_progress.get('additional_items') or []
+		self.assertEqual(len(additional_items), 1)
+		self.assertEqual(str(additional_items[0]['presentacion_id']), str(self.presentacion_extra.id))
+		self.assertTrue(additional_items[0].get('reviewed'))
+
 	def test_selector_picking_products_are_sorted_by_case_weight_descending(self):
 		self.presentacion.peso_por_caja = Decimal('5.000')
 		self.presentacion.save(update_fields=['peso_por_caja'])

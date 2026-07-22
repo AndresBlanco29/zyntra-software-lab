@@ -7,12 +7,13 @@ from django.utils import timezone
 
 from config.clientes.models import Cliente, TipoCliente
 from config.cotizaciones.models import CotizacionItem
-from config.productos.models import Categoria, Marca, Presentacion, Producto, Promocion, PromocionEscala
+from config.productos.models import Categoria, Marca, Presentacion, Producto, Promocion, PromocionEscala, PromocionProducto
 from config.productos.promotions import (
     adjuntar_promociones_a_productos,
     aplicar_promocion_en_item_sesion,
     estado_promocion_para_linea,
     promociones_activas_queryset,
+    reaplicar_promociones_en_lineas_sesion,
     resolver_promocion_para_linea,
 )
 from config.usuarios.models import Usuario
@@ -794,3 +795,173 @@ class PromocionAdminCrudTests(TestCase):
         delete_response = client.post(reverse('eliminar_promocion', args=[inactive.id]))
         self.assertEqual(delete_response.status_code, 302)
         self.assertFalse(Promocion.objects.filter(id=inactive.id).exists())
+
+
+class PromocionComboTests(TestCase):
+    def setUp(self):
+        self.categoria = Categoria.objects.create(nombre='Combo Cat')
+        self.marca = Marca.objects.create(nombre='Combo Brand')
+        self.producto_a = Producto.objects.create(nombre='Jarrito Fresa', categoria=self.categoria, marca=self.marca, activo=True)
+        self.producto_b = Producto.objects.create(nombre='Jarrito Mango', categoria=self.categoria, marca=self.marca, activo=True)
+        self.producto_c = Producto.objects.create(nombre='Jarrito Limon', categoria=self.categoria, marca=self.marca, activo=True)
+        self.presentacion_a = Presentacion.objects.create(producto=self.producto_a, nombre='Case A', unidades=12, tipo_contenido='unidad')
+        self.presentacion_b = Presentacion.objects.create(producto=self.producto_b, nombre='Case B', unidades=12, tipo_contenido='unidad')
+        self.presentacion_c = Presentacion.objects.create(producto=self.producto_c, nombre='Case C', unidades=12, tipo_contenido='unidad')
+        Presentacion.objects.filter(id__in=[self.presentacion_a.id, self.presentacion_b.id, self.presentacion_c.id]).update(
+            precio_1=Decimal('20.00'), precio_2=Decimal('20.00'), precio_3=Decimal('20.00'),
+            precio_4=Decimal('20.00'), precio_5=Decimal('20.00'),
+        )
+        self.presentacion_a.refresh_from_db()
+        self.presentacion_b.refresh_from_db()
+        self.presentacion_c.refresh_from_db()
+
+        self.promo = Promocion.objects.create(
+            nombre='Combo Jarritos',
+            descripcion='Buy 10 mixed units get 10% off',
+            alcance=Promocion.ALCANCE_GRUPO,
+            producto=self.producto_a,
+            activa=True,
+        )
+        PromocionProducto.objects.create(promocion=self.promo, producto=self.producto_a)
+        PromocionProducto.objects.create(promocion=self.promo, producto=self.producto_b)
+        PromocionProducto.objects.create(promocion=self.promo, producto=self.producto_c)
+        _crear_escala(self.promo, cantidad_minima=10, tipo_beneficio=PromocionEscala.TIPO_PERCENT, valor_beneficio=Decimal('10'))
+
+    def _carrito_combo(self):
+        return {
+            str(self.presentacion_a.id): {
+                'producto_id': self.producto_a.id,
+                'presentacion_id': self.presentacion_a.id,
+                'cantidad': 5,
+                'precio': 20.0,
+            },
+            str(self.presentacion_b.id): {
+                'producto_id': self.producto_b.id,
+                'presentacion_id': self.presentacion_b.id,
+                'cantidad': 3,
+                'precio': 20.0,
+            },
+            str(self.presentacion_c.id): {
+                'producto_id': self.producto_c.id,
+                'presentacion_id': self.presentacion_c.id,
+                'cantidad': 2,
+                'precio': 20.0,
+            },
+        }
+
+    def test_combo_sums_quantities_before_applying_discount(self):
+        carrito = self._carrito_combo()
+        reaplicar_promociones_en_lineas_sesion(carrito)
+        for item in carrito.values():
+            self.assertTrue(item['descuento_aplicado'])
+            self.assertEqual(float(item['descuento_monto']), 2.0)
+
+        carrito[str(self.presentacion_c.id)]['cantidad'] = 1
+        reaplicar_promociones_en_lineas_sesion(carrito)
+        for item in carrito.values():
+            self.assertFalse(item['descuento_aplicado'])
+
+    def test_combo_percent_respects_each_line_price(self):
+        Presentacion.objects.filter(id=self.presentacion_b.id).update(precio_1=Decimal('30.00'))
+        carrito = {
+            str(self.presentacion_a.id): {
+                'producto_id': self.producto_a.id,
+                'presentacion_id': self.presentacion_a.id,
+                'cantidad': 5,
+                'precio': 20.0,
+            },
+            str(self.presentacion_b.id): {
+                'producto_id': self.producto_b.id,
+                'presentacion_id': self.presentacion_b.id,
+                'cantidad': 5,
+                'precio': 30.0,
+            },
+        }
+        reaplicar_promociones_en_lineas_sesion(carrito)
+        self.assertEqual(float(carrito[str(self.presentacion_a.id)]['descuento_monto']), 2.0)
+        self.assertEqual(float(carrito[str(self.presentacion_b.id)]['descuento_monto']), 3.0)
+
+    def test_combo_fixed_discount_per_unit(self):
+        Promocion.objects.all().delete()
+        promo = Promocion.objects.create(
+            nombre='Combo fixed',
+            alcance=Promocion.ALCANCE_GRUPO,
+            producto=self.producto_a,
+            activa=True,
+        )
+        PromocionProducto.objects.create(promocion=promo, producto=self.producto_a)
+        PromocionProducto.objects.create(promocion=promo, producto=self.producto_b)
+        _crear_escala(promo, cantidad_minima=10, tipo_beneficio=PromocionEscala.TIPO_FIXED, valor_beneficio=Decimal('1.50'))
+
+        carrito = {
+            str(self.presentacion_a.id): {
+                'producto_id': self.producto_a.id,
+                'presentacion_id': self.presentacion_a.id,
+                'cantidad': 6,
+                'precio': 20.0,
+            },
+            str(self.presentacion_b.id): {
+                'producto_id': self.producto_b.id,
+                'presentacion_id': self.presentacion_b.id,
+                'cantidad': 4,
+                'precio': 25.0,
+            },
+        }
+        reaplicar_promociones_en_lineas_sesion(carrito)
+        self.assertEqual(float(carrito[str(self.presentacion_a.id)]['descuento_monto']), 1.5)
+        self.assertEqual(float(carrito[str(self.presentacion_b.id)]['descuento_monto']), 1.5)
+
+    def test_estado_promocion_reports_group_total(self):
+        carrito = self._carrito_combo()
+        state = estado_promocion_para_linea(
+            producto_id=self.producto_a.id,
+            presentacion_id=self.presentacion_a.id,
+            cantidad=5,
+            precio_unitario=Decimal('20.00'),
+            lineas_context=list(carrito.values()),
+        )
+        self.assertTrue(state['grouped'])
+        self.assertEqual(state['group_total'], 10)
+        self.assertTrue(state['applied'])
+
+    def test_create_combo_promotion_via_admin(self):
+        otro_a = Producto.objects.create(nombre='Combo Admin A', categoria=self.categoria, marca=self.marca, activo=True)
+        otro_b = Producto.objects.create(nombre='Combo Admin B', categoria=self.categoria, marca=self.marca, activo=True)
+        admin = Usuario.objects.create_user(username='combo-admin', password='secret123', role='admin')
+        client = DjangoClient()
+        client.force_login(admin)
+        payload = {
+            'nombre': 'Admin combo promo',
+            'descripcion': 'Mixed 10 units',
+            'alcance': Promocion.ALCANCE_GRUPO,
+            'producto': '',
+            'presentacion': '',
+            'fecha_inicio': '',
+            'fecha_fin': '',
+            'activa': '1',
+            'productos-TOTAL_FORMS': '2',
+            'productos-INITIAL_FORMS': '0',
+            'productos-MIN_NUM_FORMS': '0',
+            'productos-MAX_NUM_FORMS': '1000',
+            'productos-0-id': '',
+            'productos-0-producto': str(otro_a.id),
+            'productos-0-presentacion': '',
+            'productos-1-id': '',
+            'productos-1-producto': str(otro_b.id),
+            'productos-1-presentacion': '',
+            'escalas-TOTAL_FORMS': '1',
+            'escalas-INITIAL_FORMS': '0',
+            'escalas-MIN_NUM_FORMS': '1',
+            'escalas-MAX_NUM_FORMS': '1000',
+            'escalas-0-id': '',
+            'escalas-0-cantidad_minima': '10',
+            'escalas-0-tipo_beneficio': PromocionEscala.TIPO_PERCENT,
+            'escalas-0-valor_beneficio': '10',
+            'escalas-0-unidades_gratis': '',
+            'escalas-0-orden': '0',
+        }
+        response = client.post(reverse('crear_promocion'), payload)
+        self.assertEqual(response.status_code, 302, response.content.decode() if response.status_code != 302 else '')
+        promo = Promocion.objects.get(nombre='Admin combo promo')
+        self.assertEqual(promo.alcance, Promocion.ALCANCE_GRUPO)
+        self.assertEqual(promo.productos_grupo.count(), 2)

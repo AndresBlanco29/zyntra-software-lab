@@ -15,9 +15,10 @@ from .models import (
     ConfiguracionDescuentos,
     Promocion,
     PromocionEscala,
+    PromocionProducto,
     normalize_codigo_barras,
 )
-from .forms import PromocionForm, PromocionEscalaFormSet
+from .forms import PromocionForm, PromocionEscalaFormSet, PromocionProductoFormSet
 from .promotions import (
     adjuntar_promociones_a_productos,
     opciones_monto_fijo_promocion,
@@ -1163,7 +1164,7 @@ def _promociones_admin_queryset(request):
     filters = _promociones_admin_filter_params(request)
     queryset = (
         Promocion.objects.select_related("producto", "presentacion")
-        .prefetch_related("escalas", "tipos_cliente")
+        .prefetch_related("escalas", "tipos_cliente", "productos_grupo", "productos_grupo__producto", "productos_grupo__presentacion")
         .order_by("-creada_en", "id")
     )
 
@@ -1180,10 +1181,15 @@ def _promociones_admin_queryset(request):
             | Q(producto__nombre__icontains=query)
             | Q(producto__nombre_en__icontains=query)
             | Q(presentacion__nombre__icontains=query)
+            | Q(productos_grupo__producto__nombre__icontains=query)
+            | Q(productos_grupo__producto__nombre_en__icontains=query)
         )
 
     if filters.get("producto"):
-        queryset = queryset.filter(producto_id=filters["producto"])
+        queryset = queryset.filter(
+            Q(producto_id=filters["producto"])
+            | Q(productos_grupo__producto_id=filters["producto"])
+        ).distinct()
 
     if filters.get("tipo"):
         queryset = queryset.filter(escalas__tipo_beneficio=filters["tipo"])
@@ -1243,9 +1249,47 @@ def _promocion_escalas_formset_context(request=None, instance=None):
     return PromocionEscalaFormSet(instance=instance, prefix="escalas")
 
 
-def _promocion_form_render_context(request, form, formset, promocion=None):
+def _promocion_productos_formset_context(request=None, instance=None):
+    if request is not None and request.method == "POST":
+        return PromocionProductoFormSet(request.POST, instance=instance, prefix="productos")
+    return PromocionProductoFormSet(instance=instance, prefix="productos")
+
+
+def _validar_promocion_grupo(productos_formset):
+    activos = [
+        form.cleaned_data
+        for form in productos_formset.forms
+        if form.cleaned_data and not form.cleaned_data.get("DELETE") and form.cleaned_data.get("producto")
+    ]
+    if len(activos) < 2:
+        productos_formset._non_form_errors = productos_formset.error_class([
+            _("Add at least two products for a combo promotion."),
+        ])
+        return False
+    return True
+
+
+def _sincronizar_promocion_producto_representativo(promocion):
+    if promocion.alcance == Promocion.ALCANCE_GRUPO:
+        primer = promocion.productos_grupo.select_related("producto", "presentacion").order_by("id").first()
+        if primer is not None:
+            promocion.producto_id = primer.producto_id
+            promocion.presentacion_id = primer.presentacion_id
+            promocion.save(update_fields=["producto", "presentacion", "actualizada_en"])
+        return
+    if promocion.producto_id:
+        promocion.productos_grupo.exclude(producto_id=promocion.producto_id).delete()
+        PromocionProducto.objects.update_or_create(
+            promocion_id=promocion.id,
+            producto_id=promocion.producto_id,
+            defaults={"presentacion_id": promocion.presentacion_id},
+        )
+
+
+def _promocion_form_render_context(request, form, formset, productos_formset, promocion=None):
     producto_seleccionado = None
     presentacion_seleccionada = None
+    productos_grupo = []
     if form.is_bound:
         producto_id = form.data.get("producto")
         if producto_id:
@@ -1256,12 +1300,19 @@ def _promocion_form_render_context(request, form, formset, promocion=None):
     elif promocion is not None:
         producto_seleccionado = promocion.producto
         presentacion_seleccionada = promocion.presentacion
+        productos_grupo = list(
+            promocion.productos_grupo.select_related("producto", "presentacion").order_by("id")
+        )
 
     return {
         "promocion": promocion,
         "form": form,
         "escalas_formset": formset,
+        "productos_formset": productos_formset,
+        "productos_grupo": productos_grupo,
         "tipos_beneficio": Promocion.TIPO_BENEFICIO_CHOICES,
+        "alcance_individual": Promocion.ALCANCE_INDIVIDUAL,
+        "alcance_grupo": Promocion.ALCANCE_GRUPO,
         "percentage_preset_options": opciones_porcentaje_promocion(),
         "fixed_preset_options": opciones_monto_fijo_promocion(),
         "producto_seleccionado": producto_seleccionado,
@@ -1277,20 +1328,29 @@ def crear_promocion(request):
     if request.method == "POST":
         form = PromocionForm(request.POST)
         formset = _promocion_escalas_formset_context(request, instance=form.instance)
-        if form.is_valid() and formset.is_valid():
+        productos_formset = _promocion_productos_formset_context(request, instance=form.instance)
+        productos_valid = True
+        if form.is_valid() and form.cleaned_data.get("alcance") == Promocion.ALCANCE_GRUPO:
+            productos_valid = productos_formset.is_valid() and _validar_promocion_grupo(productos_formset)
+        if form.is_valid() and formset.is_valid() and productos_valid:
             promocion = form.save()
             formset.instance = promocion
             formset.save()
+            if promocion.alcance == Promocion.ALCANCE_GRUPO:
+                productos_formset.instance = promocion
+                productos_formset.save()
+            _sincronizar_promocion_producto_representativo(promocion)
             messages.success(request, _("Promotion created successfully."))
             return redirect("lista_promociones")
         messages.error(request, _("Please fix the errors below."))
     else:
         form = PromocionForm()
         formset = _promocion_escalas_formset_context(instance=None)
+        productos_formset = _promocion_productos_formset_context(instance=None)
     return render(
         request,
         "admin/promocion_form.html",
-        _promocion_form_render_context(request, form, formset),
+        _promocion_form_render_context(request, form, formset, productos_formset),
     )
 
 
@@ -1301,19 +1361,27 @@ def editar_promocion(request, promocion_id):
     if request.method == "POST":
         form = PromocionForm(request.POST, instance=promocion)
         formset = _promocion_escalas_formset_context(request, instance=promocion)
-        if form.is_valid() and formset.is_valid():
-            form.save()
+        productos_formset = _promocion_productos_formset_context(request, instance=promocion)
+        productos_valid = True
+        if form.is_valid() and form.cleaned_data.get("alcance") == Promocion.ALCANCE_GRUPO:
+            productos_valid = productos_formset.is_valid() and _validar_promocion_grupo(productos_formset)
+        if form.is_valid() and formset.is_valid() and productos_valid:
+            promocion = form.save()
             formset.save()
+            if promocion.alcance == Promocion.ALCANCE_GRUPO:
+                productos_formset.save()
+            _sincronizar_promocion_producto_representativo(promocion)
             messages.success(request, _("Promotion updated successfully."))
             return redirect("lista_promociones")
         messages.error(request, _("Please fix the errors below."))
     else:
         form = PromocionForm(instance=promocion)
         formset = _promocion_escalas_formset_context(instance=promocion)
+        productos_formset = _promocion_productos_formset_context(instance=promocion)
     return render(
         request,
         "admin/promocion_form.html",
-        _promocion_form_render_context(request, form, formset, promocion=promocion),
+        _promocion_form_render_context(request, form, formset, productos_formset, promocion=promocion),
     )
 
 

@@ -21,6 +21,10 @@
 <div class="alert alert-danger">{{ escalas_formset.non_form_errors }}</div>
 {% endif %}
 
+{% if productos_formset.non_form_errors %}
+<div class="alert alert-danger">{{ productos_formset.non_form_errors }}</div>
+{% endif %}
+
 <form method="POST" id="promoForm">
 {% csrf_token %}
 
@@ -37,6 +41,20 @@
 {% if form.descripcion.errors %}<div class="text-danger small">{{ form.descripcion.errors|striptags }}</div>{% endif %}
 </div>
 
+<div class="mb-4">
+<label class="form-label d-block">{% trans "Promotion type" %}</label>
+<div class="d-flex flex-wrap gap-3">
+{% for radio in form.alcance %}
+<div class="form-check">
+  {{ radio.tag }}
+  <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+</div>
+{% endfor %}
+</div>
+{% if form.alcance.errors %}<div class="text-danger small">{{ form.alcance.errors|striptags }}</div>{% endif %}
+</div>
+
+<div id="promoIndividualSection">
 <div class="row">
 <div class="col-md-6 mb-3" id="promoProductSearchRoot" data-search-url="{{ producto_search_url }}" data-presentaciones-url-template="{{ producto_presentaciones_url_template }}">
 <label class="form-label">{% trans "Product" %}</label>
@@ -66,6 +84,82 @@
 {{ form.presentacion }}
 {% if form.presentacion.errors %}<div class="text-danger small">{{ form.presentacion.errors|striptags }}</div>{% endif %}
 </div>
+</div>
+</div>
+
+<div id="promoComboSection" class="mb-4" hidden>
+<div class="d-flex justify-content-between align-items-center mb-2">
+<h5 class="mb-0">{% trans "Combo products" %}</h5>
+<button type="button" id="promoAddComboProductBtn" class="btn btn-sm btn-outline-primary">{% trans "+ Add product" %}</button>
+</div>
+<p class="text-muted small">
+{% trans "Quantities are summed across these products to reach each scale. The same per-unit discount applies to every qualifying line." %}
+</p>
+{{ productos_formset.management_form }}
+<div id="promoComboProductosContainer">
+{% for prod_form in productos_formset %}
+  <div class="card mb-2 promo-combo-row" data-combo-row>
+    <div class="card-body py-3">
+      <div class="row align-items-end g-2">
+        <div class="col-md-6" data-combo-search-root data-search-url="{{ producto_search_url }}" data-presentaciones-url-template="{{ producto_presentaciones_url_template }}">
+          <label class="form-label small">{% trans "Product" %}</label>
+          <div class="position-relative">
+            <input type="text" class="form-control promo-combo-buscador" autocomplete="off" placeholder="{% trans 'Search product…' %}" value="{% if prod_form.instance.producto_id %}{{ prod_form.instance.producto.nombre }}{% endif %}">
+            <div class="list-group position-absolute w-100 shadow-sm promo-combo-resultados" style="z-index: 1000;" hidden></div>
+          </div>
+          {{ prod_form.producto }}
+        </div>
+        <div class="col-md-5">
+          <label class="form-label small">{% trans "Presentation (optional)" %}</label>
+          <select class="form-select promo-combo-presentacion" {% if not prod_form.instance.producto_id %}disabled{% endif %}>
+            <option value="">{% trans "Any presentation" %}</option>
+            {% if prod_form.instance.presentacion_id %}
+            <option value="{{ prod_form.instance.presentacion_id }}" selected>{{ prod_form.instance.presentacion.nombre }}</option>
+            {% endif %}
+          </select>
+          {{ prod_form.presentacion }}
+        </div>
+        <div class="col-md-1 text-end">
+          <div class="d-none">{{ prod_form.DELETE }}</div>
+          <button type="button" class="btn btn-sm btn-outline-danger" data-remove-combo-product>&times;</button>
+        </div>
+      </div>
+      {{ prod_form.id }}
+      {% if prod_form.errors %}
+      <div class="text-danger small mt-2">{{ prod_form.errors|striptags }}</div>
+      {% endif %}
+    </div>
+  </div>
+{% endfor %}
+</div>
+<template id="promoComboProductEmptyTemplate">
+  <div class="card mb-2 promo-combo-row" data-combo-row>
+    <div class="card-body py-3">
+      <div class="row align-items-end g-2">
+        <div class="col-md-6" data-combo-search-root data-search-url="{{ producto_search_url }}" data-presentaciones-url-template="{{ producto_presentaciones_url_template }}">
+          <label class="form-label small">{% trans "Product" %}</label>
+          <div class="position-relative">
+            <input type="text" class="form-control promo-combo-buscador" autocomplete="off" placeholder="{% trans 'Search product…' %}">
+            <div class="list-group position-absolute w-100 shadow-sm promo-combo-resultados" style="z-index: 1000;" hidden></div>
+          </div>
+          {{ productos_formset.empty_form.producto }}
+        </div>
+        <div class="col-md-5">
+          <label class="form-label small">{% trans "Presentation (optional)" %}</label>
+          <select class="form-select promo-combo-presentacion" disabled>
+            <option value="">{% trans "Any presentation" %}</option>
+          </select>
+          {{ productos_formset.empty_form.presentacion }}
+        </div>
+        <div class="col-md-1 text-end">
+          {{ productos_formset.empty_form.DELETE }}
+          <button type="button" class="btn btn-sm btn-outline-danger" data-remove-combo-product>&times;</button>
+        </div>
+      </div>
+      {{ productos_formset.empty_form.id }}
+    </div>
+  </div>
+</template>
 </div>
 
 <div class="mb-4">
@@ -205,6 +299,9 @@
 document.addEventListener('DOMContentLoaded', function () {
   window.PromocionForm.init({
     formPrefix: '{{ escalas_formset.prefix }}',
+    productosPrefix: '{{ productos_formset.prefix }}',
+    alcanceIndividual: '{{ alcance_individual }}',
+    alcanceGrupo: '{{ alcance_grupo }}',
   });
 });
 </script>

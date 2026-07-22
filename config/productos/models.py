@@ -515,7 +515,18 @@ class Promocion(models.Model):
     single promotion can offer several quantity tiers (e.g. buy 12 -> 5%,
     buy 24 -> 10%) without duplicating the product/dates/client-type setup
     for every tier.
+
+    ``alcance`` controls whether the promotion applies to a single product
+    (INDIVIDUAL) or to a combo of products whose line quantities are summed
+    before evaluating scales (GRUPO).
     """
+
+    ALCANCE_INDIVIDUAL = 'INDIVIDUAL'
+    ALCANCE_GRUPO = 'GRUPO'
+    ALCANCE_CHOICES = (
+        (ALCANCE_INDIVIDUAL, _('Single product')),
+        (ALCANCE_GRUPO, _('Product combo (sum quantities)')),
+    )
 
     # Kept here (rather than only on PromocionEscala) so old imports/choices lookups
     # that only need the benefit-type vocabulary keep working without reaching into escalas.
@@ -537,11 +548,19 @@ class Promocion(models.Model):
         verbose_name=_('Customer description'),
         help_text=_('Short text shown in the catalog, e.g. "Buy 10 cases and get 15% off".'),
     )
+    alcance = models.CharField(
+        max_length=20,
+        choices=ALCANCE_CHOICES,
+        default=ALCANCE_INDIVIDUAL,
+        verbose_name=_('Scope'),
+    )
     producto = models.ForeignKey(
         Producto,
         on_delete=models.CASCADE,
         related_name='promociones',
         verbose_name=_('Product'),
+        null=True,
+        blank=True,
     )
     presentacion = models.ForeignKey(
         Presentacion,
@@ -574,10 +593,16 @@ class Promocion(models.Model):
         return self.nombre
 
     def clean(self):
+        if self.alcance == self.ALCANCE_INDIVIDUAL and not self.producto_id:
+            raise ValidationError({'producto': _('Select a product for an individual promotion.')})
         if self.presentacion_id and self.producto_id and self.presentacion.producto_id != self.producto_id:
             raise ValidationError({'presentacion': _('The presentation must belong to the selected product.')})
         if self.fecha_inicio and self.fecha_fin and self.fecha_fin < self.fecha_inicio:
             raise ValidationError({'fecha_fin': _('End date cannot be earlier than start date.')})
+
+    @property
+    def es_grupo(self):
+        return self.alcance == self.ALCANCE_GRUPO
 
     def texto_catalogo(self):
         return (self.descripcion or self.nombre or '').strip()
@@ -594,6 +619,52 @@ class Promocion(models.Model):
     def escala_minima(self):
         """Lowest quantity tier, used for catalog badges (e.g. "Minimum: 5 units")."""
         return min(self.escalas.all(), key=lambda escala: escala.cantidad_minima, default=None)
+
+
+class PromocionProducto(models.Model):
+    """One product (and optional presentation) included in a combo promotion."""
+
+    promocion = models.ForeignKey(
+        Promocion,
+        on_delete=models.CASCADE,
+        related_name='productos_grupo',
+        verbose_name=_('Promotion'),
+    )
+    producto = models.ForeignKey(
+        Producto,
+        on_delete=models.CASCADE,
+        related_name='promociones_grupo',
+        verbose_name=_('Product'),
+    )
+    presentacion = models.ForeignKey(
+        Presentacion,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='promociones_grupo',
+        verbose_name=_('Presentation'),
+        help_text=_('Leave empty to include every presentation of this product.'),
+    )
+
+    class Meta:
+        verbose_name = _('Promotion product')
+        verbose_name_plural = _('Promotion products')
+        ordering = ['id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['promocion', 'producto', 'presentacion'],
+                name='uniq_promocion_grupo_producto_presentacion',
+            ),
+        ]
+
+    def __str__(self):
+        if self.presentacion_id:
+            return f'{self.producto.nombre} ({self.presentacion.nombre})'
+        return self.producto.nombre
+
+    def clean(self):
+        if self.presentacion_id and self.presentacion.producto_id != self.producto_id:
+            raise ValidationError({'presentacion': _('The presentation must belong to the selected product.')})
 
 
 class PromocionEscala(models.Model):

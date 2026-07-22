@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 
 from config.clientes.models import TipoCliente
 
-from .models import Presentacion, Producto, Promocion, PromocionEscala
+from .models import Presentacion, Producto, Promocion, PromocionEscala, PromocionProducto
 
 
 def _make_aware_if_naive(value):
@@ -25,9 +25,9 @@ class PromocionForm(forms.ModelForm):
 
     producto = forms.ModelChoiceField(
         queryset=Producto.objects.all(),
+        required=False,
         widget=forms.HiddenInput(),
         error_messages={
-            'required': _('Search and select a product.'),
             'invalid_choice': _('Select a valid product.'),
         },
     )
@@ -52,14 +52,18 @@ class PromocionForm(forms.ModelForm):
 
     class Meta:
         model = Promocion
-        fields = ['nombre', 'descripcion', 'producto', 'presentacion', 'tipos_cliente', 'fecha_inicio', 'fecha_fin', 'activa']
+        fields = ['nombre', 'descripcion', 'alcance', 'producto', 'presentacion', 'tipos_cliente', 'fecha_inicio', 'fecha_fin', 'activa']
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'maxlength': 150}),
             'descripcion': forms.TextInput(attrs={'class': 'form-control', 'maxlength': 255}),
+            'alcance': forms.RadioSelect(attrs={'class': 'form-check-input'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['alcance'].required = False
+        if not self.initial.get('alcance') and not getattr(self.instance, 'pk', None):
+            self.fields['alcance'].initial = Promocion.ALCANCE_INDIVIDUAL
         for name in ('fecha_inicio', 'fecha_fin'):
             self.fields[name].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%d %H:%M', '%Y-%m-%d']
             self.fields[name].widget = forms.DateTimeInput(
@@ -75,8 +79,12 @@ class PromocionForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        alcance = cleaned.get('alcance') or Promocion.ALCANCE_INDIVIDUAL
+        cleaned['alcance'] = alcance
         producto = cleaned.get('producto')
         presentacion = cleaned.get('presentacion')
+        if alcance == Promocion.ALCANCE_INDIVIDUAL and not producto:
+            self.add_error('producto', _('Search and select a product.'))
         if producto and presentacion and presentacion.producto_id != producto.id:
             self.add_error('presentacion', _('The presentation must belong to the selected product.'))
         fecha_inicio = cleaned.get('fecha_inicio')
@@ -84,6 +92,41 @@ class PromocionForm(forms.ModelForm):
         if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
             self.add_error('fecha_fin', _('End date cannot be earlier than start date.'))
         return cleaned
+
+
+class PromocionProductoForm(forms.ModelForm):
+    class Meta:
+        model = PromocionProducto
+        fields = ['producto', 'presentacion']
+        widgets = {
+            'producto': forms.HiddenInput(),
+            'presentacion': forms.HiddenInput(),
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.cleaned_data.get('DELETE'):
+            return cleaned
+        producto = cleaned.get('producto')
+        presentacion = cleaned.get('presentacion')
+        if not producto:
+            if self.instance.pk:
+                raise forms.ValidationError(_('Select a product for this combo line.'))
+            return cleaned
+        if presentacion and presentacion.producto_id != producto.id:
+            self.add_error('presentacion', _('The presentation must belong to the selected product.'))
+        return cleaned
+
+
+PromocionProductoFormSet = forms.inlineformset_factory(
+    Promocion,
+    PromocionProducto,
+    form=PromocionProductoForm,
+    extra=1,
+    can_delete=True,
+    min_num=0,
+    validate_min=False,
+)
 
 
 class PromocionEscalaForm(forms.ModelForm):

@@ -108,9 +108,24 @@
 <div class="small text-muted">{{ promo.descripcion }}</div>
 {% endif %}
 </td>
-<td>{{ promo.producto.nombre }}</td>
 <td>
-{% if promo.presentacion %}
+{% if promo.es_grupo %}
+<span class="badge text-bg-primary mb-1">{% trans "Combo" %}</span>
+{% for pp in promo.productos_grupo.all %}
+<div class="small">{{ pp.producto.nombre }}</div>
+{% empty %}
+<span class="text-muted">—</span>
+{% endfor %}
+{% elif promo.producto %}
+{{ promo.producto.nombre }}
+{% else %}
+<span class="text-muted">—</span>
+{% endif %}
+</td>
+<td>
+{% if promo.es_grupo %}
+<span class="text-muted small">{% trans "Per product" %}</span>
+{% elif promo.presentacion %}
 {{ promo.presentacion.nombre }}
 {% else %}
 <span class="text-muted">{% trans "Any presentation" %}</span>

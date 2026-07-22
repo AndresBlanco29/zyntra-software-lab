@@ -26,7 +26,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from django.db.models import Q
 from django.utils import timezone
 
-from config.productos.models import Promocion, PromocionEscala
+from config.productos.models import Promocion, PromocionEscala, PromocionProducto
 
 
 DESCUENTO_ORIGEN_PROMOCION = 'promocion'
@@ -146,8 +146,180 @@ def promociones_activas_queryset(now=None, cliente=None):
         .filter(Q(fecha_inicio__isnull=True) | Q(fecha_inicio__lte=now))
         .filter(Q(fecha_fin__isnull=True) | Q(fecha_fin__gte=now))
         .select_related('producto', 'presentacion')
+        .prefetch_related('productos_grupo', 'productos_grupo__producto', 'productos_grupo__presentacion')
     )
     return _filtrar_por_tipo_cliente(queryset, cliente)
+
+
+def _normalizar_linea_promocion(item):
+    if item is None:
+        return None
+    if isinstance(item, dict):
+        producto_id = item.get('producto_id')
+        presentacion_id = item.get('presentacion_id')
+        cantidad = item.get('cantidad', 0)
+    else:
+        presentacion = getattr(item, 'presentacion', None)
+        producto_id = getattr(presentacion, 'producto_id', None) if presentacion is not None else None
+        presentacion_id = getattr(item, 'presentacion_id', None)
+        cantidad = getattr(item, 'cantidad', 0)
+    try:
+        qty = int(cantidad or 0)
+    except (TypeError, ValueError):
+        qty = 0
+    if not producto_id:
+        return None
+    return {
+        'producto_id': int(producto_id),
+        'presentacion_id': int(presentacion_id) if presentacion_id else None,
+        'cantidad': max(qty, 0),
+    }
+
+
+def _lineas_promocion_desde_contexto(lineas_context):
+    lineas = []
+    for item in lineas_context or []:
+        normalizada = _normalizar_linea_promocion(item)
+        if normalizada is not None:
+            lineas.append(normalizada)
+    return lineas
+
+
+def _linea_coincide_alcance_individual(promo, producto_id, presentacion_id):
+    if promo.producto_id != int(producto_id):
+        return False
+    if promo.presentacion_id and promo.presentacion_id != int(presentacion_id or 0):
+        return False
+    return True
+
+
+def _linea_coincide_alcance_grupo(promo, producto_id, presentacion_id):
+    presentacion_id = int(presentacion_id) if presentacion_id else None
+    for alcance in promo.productos_grupo.all():
+        if alcance.producto_id != int(producto_id):
+            continue
+        if alcance.presentacion_id is None or alcance.presentacion_id == presentacion_id:
+            return True
+    return False
+
+
+def _linea_coincide_promocion(promo, producto_id, presentacion_id):
+    if promo.alcance == Promocion.ALCANCE_GRUPO:
+        return _linea_coincide_alcance_grupo(promo, producto_id, presentacion_id)
+    return _linea_coincide_alcance_individual(promo, producto_id, presentacion_id)
+
+
+def _cantidad_agregada_promocion(promo, lineas):
+    total = 0
+    for linea in lineas:
+        if _linea_coincide_promocion(promo, linea['producto_id'], linea['presentacion_id']):
+            total += linea['cantidad']
+    return total
+
+
+def _promociones_para_linea(*, producto_id, presentacion_id, now=None, cliente=None):
+    if not producto_id:
+        return Promocion.objects.none()
+
+    producto_id = int(producto_id)
+    presentacion_id = int(presentacion_id) if presentacion_id else None
+    base = promociones_activas_queryset(now=now, cliente=cliente)
+
+    individual = base.filter(alcance=Promocion.ALCANCE_INDIVIDUAL, producto_id=producto_id).filter(
+        Q(presentacion__isnull=True) | Q(presentacion_id=presentacion_id)
+    )
+
+    grupo = base.filter(alcance=Promocion.ALCANCE_GRUPO, productos_grupo__producto_id=producto_id).filter(
+        Q(productos_grupo__presentacion__isnull=True)
+        | Q(productos_grupo__presentacion_id=presentacion_id)
+    ).distinct()
+
+    promo_ids = set(individual.values_list('id', flat=True)) | set(grupo.values_list('id', flat=True))
+    if not promo_ids:
+        return Promocion.objects.none()
+
+    return (
+        base.filter(id__in=promo_ids)
+        .prefetch_related('escalas', 'productos_grupo', 'productos_grupo__producto', 'productos_grupo__presentacion')
+        .order_by('id')
+    )
+
+
+def _cantidad_evaluacion_promocion(promo, *, cantidad_linea, lineas):
+    if promo.alcance == Promocion.ALCANCE_GRUPO and lineas:
+        return _cantidad_agregada_promocion(promo, lineas)
+    return int(cantidad_linea or 0)
+
+
+def _resolver_mejor_escala_linea(
+    *,
+    producto_id,
+    presentacion_id,
+    cantidad_linea,
+    precio_unitario,
+    now=None,
+    presentacion=None,
+    cliente=None,
+    lineas_context=None,
+    requiere_cantidad_minima=True,
+    preferir_menor_cantidad_minima=False,
+):
+    if not producto_id:
+        return None, None, Decimal('0.00')
+
+    presentacion_id = int(presentacion_id) if presentacion_id else None
+    precio = _quantize_money(precio_unitario)
+    if presentacion is None and presentacion_id:
+        from config.productos.models import Presentacion
+        presentacion = Presentacion.objects.filter(id=presentacion_id).first()
+
+    lineas = _lineas_promocion_desde_contexto(lineas_context)
+    promos = list(_promociones_para_linea(
+        producto_id=producto_id,
+        presentacion_id=presentacion_id,
+        now=now,
+        cliente=cliente,
+    ))
+
+    best_promo = None
+    best_escala = None
+    best_monto = Decimal('0.00')
+
+    for promo in promos:
+        if not _linea_coincide_promocion(promo, producto_id, presentacion_id):
+            continue
+        qty_eval = _cantidad_evaluacion_promocion(promo, cantidad_linea=cantidad_linea, lineas=lineas)
+        if requiere_cantidad_minima and qty_eval < 1:
+            continue
+
+        escalas = list(promo.escalas.all())
+        if requiere_cantidad_minima:
+            escalas = [escala for escala in escalas if escala.cantidad_minima <= qty_eval]
+        if not escalas:
+            continue
+
+        promo_result, escala_result, monto = _mejor_escala(
+            escalas,
+            precio=precio,
+            presentacion=presentacion,
+            cantidad=qty_eval,
+            preferir_menor_cantidad_minima=preferir_menor_cantidad_minima,
+        )
+        if escala_result is None or monto <= 0:
+            continue
+        if best_escala is None or monto > best_monto:
+            best_promo, best_escala, best_monto = promo_result, escala_result, monto
+            continue
+        if monto != best_monto:
+            continue
+        if preferir_menor_cantidad_minima and escala_result.cantidad_minima != best_escala.cantidad_minima:
+            if escala_result.cantidad_minima < best_escala.cantidad_minima:
+                best_promo, best_escala, best_monto = promo_result, escala_result, monto
+            continue
+        if promo.id < best_promo.id:
+            best_promo, best_escala, best_monto = promo_result, escala_result, monto
+
+    return best_promo, best_escala, best_monto
 
 
 def precio_referencia_presentacion(presentacion, precio_unitario=None):
@@ -251,29 +423,19 @@ def resolver_escala_disponible_para_linea(
     now=None,
     presentacion=None,
     cliente=None,
+    lineas_context=None,
 ):
     """Return (promocion, escala, monto) for the most attractive tier even before its minimum is met."""
-    if not producto_id:
-        return None, None, Decimal('0.00')
-
-    presentacion_id = int(presentacion_id) if presentacion_id else None
-    precio = _quantize_money(precio_unitario)
-    if presentacion is None and presentacion_id:
-        from config.productos.models import Presentacion
-        presentacion = Presentacion.objects.filter(id=presentacion_id).first()
-
-    promos = promociones_activas_queryset(now=now, cliente=cliente).filter(
-        producto_id=int(producto_id),
-    ).filter(
-        Q(presentacion__isnull=True) | Q(presentacion_id=presentacion_id)
-    )
-    candidatos = PromocionEscala.objects.filter(promocion__in=promos).select_related('promocion')
-
-    return _mejor_escala(
-        candidatos,
-        precio=precio,
+    return _resolver_mejor_escala_linea(
+        producto_id=producto_id,
+        presentacion_id=presentacion_id,
+        cantidad_linea=1,
+        precio_unitario=precio_unitario,
+        now=now,
         presentacion=presentacion,
-        cantidad=None,
+        cliente=cliente,
+        lineas_context=lineas_context,
+        requiere_cantidad_minima=False,
         preferir_menor_cantidad_minima=True,
     )
 
@@ -287,6 +449,7 @@ def resolver_escala_para_linea(
     now=None,
     presentacion=None,
     cliente=None,
+    lineas_context=None,
 ):
     """
     Return (promocion, escala, descuento_monto_per_unit) for the best qualifying tier.
@@ -299,27 +462,16 @@ def resolver_escala_para_linea(
     if qty < 1 or not producto_id:
         return None, None, Decimal('0.00')
 
-    presentacion_id = int(presentacion_id) if presentacion_id else None
-    precio = _quantize_money(precio_unitario)
-    if presentacion is None and presentacion_id:
-        from config.productos.models import Presentacion
-        presentacion = Presentacion.objects.filter(id=presentacion_id).first()
-
-    promos = promociones_activas_queryset(now=now, cliente=cliente).filter(
-        producto_id=int(producto_id),
-    ).filter(
-        Q(presentacion__isnull=True) | Q(presentacion_id=presentacion_id)
-    )
-    candidatos = PromocionEscala.objects.filter(
-        promocion__in=promos,
-        cantidad_minima__lte=qty,
-    ).select_related('promocion')
-
-    return _mejor_escala(
-        candidatos,
-        precio=precio,
+    return _resolver_mejor_escala_linea(
+        producto_id=producto_id,
+        presentacion_id=presentacion_id,
+        cantidad_linea=qty,
+        precio_unitario=precio_unitario,
+        now=now,
         presentacion=presentacion,
-        cantidad=qty,
+        cliente=cliente,
+        lineas_context=lineas_context,
+        requiere_cantidad_minima=True,
         preferir_menor_cantidad_minima=False,
     )
 
@@ -332,6 +484,7 @@ def resolver_promocion_disponible_para_linea(
     now=None,
     presentacion=None,
     cliente=None,
+    lineas_context=None,
 ):
     """Return (promocion_or_None, descuento_monto_per_unit) for the most attractive active promo."""
     promo, _escala, monto = resolver_escala_disponible_para_linea(
@@ -341,6 +494,7 @@ def resolver_promocion_disponible_para_linea(
         now=now,
         presentacion=presentacion,
         cliente=cliente,
+        lineas_context=lineas_context,
     )
     return promo, monto
 
@@ -354,6 +508,7 @@ def resolver_promocion_para_linea(
     now=None,
     presentacion=None,
     cliente=None,
+    lineas_context=None,
 ):
     """Return (promocion_or_None, descuento_monto_per_unit) for the best qualifying promo/tier."""
     promo, _escala, monto = resolver_escala_para_linea(
@@ -364,6 +519,7 @@ def resolver_promocion_para_linea(
         now=now,
         presentacion=presentacion,
         cliente=cliente,
+        lineas_context=lineas_context,
     )
     return promo, monto
 
@@ -375,19 +531,28 @@ def promociones_por_producto_ids(producto_ids, now=None, cliente=None):
         return {}
 
     mapping = {}
-    for promo in (
-        promociones_activas_queryset(now=now, cliente=cliente)
-        .filter(producto_id__in=ids)
-        .prefetch_related('escalas')
-        .order_by('id')
-    ):
-        current = mapping.get(promo.producto_id)
-        if current is None:
-            mapping[promo.producto_id] = promo
-            continue
-        # Prefer product-wide promo for badge, else keep first seen.
-        if current.presentacion_id and not promo.presentacion_id:
-            mapping[promo.producto_id] = promo
+    base = promociones_activas_queryset(now=now, cliente=cliente).prefetch_related('escalas', 'productos_grupo')
+
+    for promo in base.filter(
+        Q(alcance=Promocion.ALCANCE_INDIVIDUAL, producto_id__in=ids)
+        | Q(alcance=Promocion.ALCANCE_GRUPO, productos_grupo__producto_id__in=ids)
+    ).distinct().order_by('id'):
+        target_ids = ids if promo.alcance == Promocion.ALCANCE_GRUPO else {promo.producto_id}
+        if promo.alcance == Promocion.ALCANCE_GRUPO:
+            target_ids = {
+                alcance.producto_id
+                for alcance in promo.productos_grupo.all()
+                if alcance.producto_id in ids
+            }
+        for producto_id in target_ids:
+            current = mapping.get(producto_id)
+            if current is None:
+                mapping[producto_id] = promo
+                continue
+            if current.alcance == Promocion.ALCANCE_INDIVIDUAL and current.presentacion_id and not promo.presentacion_id:
+                mapping[producto_id] = promo
+            elif promo.alcance == Promocion.ALCANCE_GRUPO and current.alcance != Promocion.ALCANCE_GRUPO:
+                mapping[producto_id] = promo
     return mapping
 
 
@@ -407,6 +572,7 @@ def adjuntar_promociones_a_productos(productos, now=None, cliente=None):
         producto.promocion_presentacion_nombre = (
             promo.presentacion.nombre if promo and promo.presentacion_id else ''
         )
+        producto.promocion_es_grupo = bool(promo and promo.alcance == Promocion.ALCANCE_GRUPO)
         producto.promocion_fecha_fin_iso = (
             promo.fecha_fin.isoformat() if promo and promo.fecha_fin else ''
         )
@@ -422,6 +588,7 @@ def estado_promocion_para_linea(
     now=None,
     presentacion=None,
     cliente=None,
+    lineas_context=None,
 ):
     """Build serializable UI state for an active promotion on a cart line."""
     try:
@@ -437,6 +604,7 @@ def estado_promocion_para_linea(
         now=now,
         presentacion=presentacion,
         cliente=cliente,
+        lineas_context=lineas_context,
     )
     available_promo, available_escala, available_amount = resolver_escala_disponible_para_linea(
         producto_id=producto_id,
@@ -445,6 +613,7 @@ def estado_promocion_para_linea(
         now=now,
         presentacion=presentacion,
         cliente=cliente,
+        lineas_context=lineas_context,
     )
     promo = applied_promo or available_promo
     escala = applied_escala if applied_promo else available_escala
@@ -459,18 +628,27 @@ def estado_promocion_para_linea(
             'name': '',
             'description': '',
             'discount_amount': '0.00',
+            'grouped': False,
+            'group_total': qty,
         }
 
     minimum = int(escala.cantidad_minima)
+    lineas = _lineas_promocion_desde_contexto(lineas_context)
+    if promo.alcance == Promocion.ALCANCE_GRUPO and lineas:
+        current_qty = _cantidad_agregada_promocion(promo, lineas)
+    else:
+        current_qty = qty
     return {
         'available': True,
         'applied': applied_promo is not None,
         'minimum': minimum,
-        'current': qty,
-        'missing': max(0, minimum - qty),
+        'current': current_qty,
+        'missing': max(0, minimum - current_qty),
         'name': promo.nombre,
         'description': promo.texto_catalogo(),
         'discount_amount': format(amount, '.2f'),
+        'grouped': promo.alcance == Promocion.ALCANCE_GRUPO,
+        'group_total': current_qty,
     }
 
 
@@ -484,7 +662,15 @@ def _clear_promo_fields(item):
     return item
 
 
-def aplicar_promocion_en_item_sesion(item, *, precio_unitario=None, respect_manual=True, presentacion=None, cliente=None):
+def aplicar_promocion_en_item_sesion(
+    item,
+    *,
+    precio_unitario=None,
+    respect_manual=True,
+    presentacion=None,
+    cliente=None,
+    lineas_context=None,
+):
     """
     Mutate a session cart line with the best active promotion discount.
 
@@ -507,6 +693,7 @@ def aplicar_promocion_en_item_sesion(item, *, precio_unitario=None, respect_manu
         precio_unitario=precio,
         presentacion=presentacion,
         cliente=cliente,
+        lineas_context=lineas_context,
     )
     if promo is None:
         if origen == DESCUENTO_ORIGEN_PROMOCION or not item.get('descuento_aplicado'):
@@ -522,7 +709,19 @@ def aplicar_promocion_en_item_sesion(item, *, precio_unitario=None, respect_manu
     return item
 
 
-def aplicar_promocion_a_item_persistido(item, *, only_if_missing=True, cliente=None):
+def reaplicar_promociones_en_lineas_sesion(lineas, *, cliente=None):
+    """Re-evaluate promotions for every session/cart line sharing combo quantity totals."""
+    if not isinstance(lineas, dict):
+        return lineas
+    contexto = list(lineas.values())
+    for item in lineas.values():
+        if str(item.get('descuento_origen') or '').strip().lower() == DESCUENTO_ORIGEN_MANUAL:
+            continue
+        aplicar_promocion_en_item_sesion(item, cliente=cliente, lineas_context=contexto)
+    return lineas
+
+
+def aplicar_promocion_a_item_persistido(item, *, only_if_missing=True, cliente=None, lineas_context=None):
     """
     Apply the best qualifying promotion onto a CotizacionItem or PedidoItem.
 
@@ -547,6 +746,7 @@ def aplicar_promocion_a_item_persistido(item, *, only_if_missing=True, cliente=N
         precio_unitario=item.precio,
         presentacion=presentacion,
         cliente=cliente,
+        lineas_context=lineas_context,
     )
     if promo is None:
         return False
@@ -570,7 +770,12 @@ def asegurar_promociones_en_cotizacion(cotizacion, *, only_if_missing=True):
         .select_related('presentacion__producto')
     )
     for item in items:
-        if aplicar_promocion_a_item_persistido(item, only_if_missing=only_if_missing, cliente=cliente):
+        if aplicar_promocion_a_item_persistido(
+            item,
+            only_if_missing=only_if_missing,
+            cliente=cliente,
+            lineas_context=items,
+        ):
             item.save(update_fields=['descuento_aplicado', 'descuento_monto', 'subtotal'])
             changed = True
 
@@ -592,7 +797,12 @@ def asegurar_promociones_en_pedido(pedido, *, only_if_missing=True):
         .select_related('presentacion__producto')
     )
     for item in items:
-        if aplicar_promocion_a_item_persistido(item, only_if_missing=only_if_missing, cliente=cliente):
+        if aplicar_promocion_a_item_persistido(
+            item,
+            only_if_missing=only_if_missing,
+            cliente=cliente,
+            lineas_context=items,
+        ):
             item.save(update_fields=['descuento_aplicado', 'descuento_monto', 'subtotal'])
             changed = True
 

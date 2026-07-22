@@ -12,17 +12,20 @@
       .replace(/"/g, '&quot;');
   }
 
-  function initProductSearch() {
-    var root = document.getElementById('promoProductSearchRoot');
+  function debounceMs() {
+    return (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 1000;
+  }
+
+  function bindProductSearch(root, options) {
     if (!root) {
       return;
     }
 
-    var searchInput = document.getElementById('promoProductoBuscador');
-    var resultsBox = document.getElementById('promoProductoResultados');
-    var hiddenProducto = document.getElementById('id_producto');
-    var presentacionVisible = document.getElementById('promoPresentacionVisible');
-    var hiddenPresentacion = document.getElementById('id_presentacion');
+    var searchInput = options.searchInput || root.querySelector('.promo-combo-buscador, #promoProductoBuscador');
+    var resultsBox = options.resultsBox || root.querySelector('.promo-combo-resultados, #promoProductoResultados');
+    var hiddenProducto = options.hiddenProducto || root.querySelector('[name$="-producto"], #id_producto');
+    var presentacionVisible = options.presentacionVisible || root.querySelector('.promo-combo-presentacion, #promoPresentacionVisible');
+    var hiddenPresentacion = options.hiddenPresentacion || root.querySelector('[name$="-presentacion"], #id_presentacion');
     var searchUrl = root.dataset.searchUrl;
     var presentacionesUrlTemplate = root.dataset.presentacionesUrlTemplate;
 
@@ -121,7 +124,7 @@
         return;
       }
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(function () { fetchResults(query); }, (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 1000);
+      debounceTimer = setTimeout(function () { fetchResults(query); }, debounceMs());
     });
 
     resultsBox.addEventListener('click', function (event) {
@@ -148,6 +151,79 @@
         }
       });
     }
+  }
+
+  function initProductSearch() {
+    bindProductSearch(document.getElementById('promoProductSearchRoot'));
+  }
+
+  function bindComboRow(row) {
+    var searchRoot = row.querySelector('[data-combo-search-root]');
+    if (searchRoot) {
+      bindProductSearch(searchRoot, {
+        searchInput: row.querySelector('.promo-combo-buscador'),
+        resultsBox: row.querySelector('.promo-combo-resultados'),
+        hiddenProducto: row.querySelector('[name$="-producto"]'),
+        presentacionVisible: row.querySelector('.promo-combo-presentacion'),
+        hiddenPresentacion: row.querySelector('[name$="-presentacion"]'),
+      });
+    }
+    var removeBtn = row.querySelector('[data-remove-combo-product]');
+    if (removeBtn) {
+      removeBtn.addEventListener('click', function () {
+        var deleteCheckbox = row.querySelector('[name$="-DELETE"]');
+        if (deleteCheckbox) {
+          deleteCheckbox.checked = true;
+        }
+        row.hidden = true;
+      });
+    }
+  }
+
+  function initComboProducts(productosPrefix) {
+    var container = document.getElementById('promoComboProductosContainer');
+    var addButton = document.getElementById('promoAddComboProductBtn');
+    var template = document.getElementById('promoComboProductEmptyTemplate');
+    var totalFormsInput = document.getElementById('id_' + productosPrefix + '-TOTAL_FORMS');
+    if (!container) {
+      return;
+    }
+
+    Array.prototype.forEach.call(container.querySelectorAll('[data-combo-row]'), bindComboRow);
+
+    if (addButton && template && totalFormsInput) {
+      addButton.addEventListener('click', function () {
+        var index = parseInt(totalFormsInput.value, 10) || 0;
+        var html = template.innerHTML.split('__prefix__').join(String(index));
+        var wrapper = document.createElement('div');
+        wrapper.innerHTML = html.trim();
+        var newRow = wrapper.firstElementChild;
+        container.appendChild(newRow);
+        bindComboRow(newRow);
+        totalFormsInput.value = String(index + 1);
+      });
+    }
+  }
+
+  function initAlcanceToggle(alcanceIndividual, alcanceGrupo) {
+    var individualSection = document.getElementById('promoIndividualSection');
+    var comboSection = document.getElementById('promoComboSection');
+    var radios = document.querySelectorAll('input[name="alcance"]');
+    if (!individualSection || !comboSection || !radios.length) {
+      return;
+    }
+
+    function syncSections() {
+      var selected = document.querySelector('input[name="alcance"]:checked');
+      var isGrupo = selected && selected.value === alcanceGrupo;
+      individualSection.hidden = isGrupo;
+      comboSection.hidden = !isGrupo;
+    }
+
+    Array.prototype.forEach.call(radios, function (radio) {
+      radio.addEventListener('change', syncSections);
+    });
+    syncSections();
   }
 
   function toggleEscalaRowFields(row) {
@@ -224,8 +300,11 @@
 
   window.PromocionForm = {
     init: function (options) {
+      options = options || {};
       initProductSearch();
-      initEscalas((options && options.formPrefix) || 'escalas');
+      initEscalas(options.formPrefix || 'escalas');
+      initComboProducts(options.productosPrefix || 'productos');
+      initAlcanceToggle(options.alcanceIndividual || 'INDIVIDUAL', options.alcanceGrupo || 'GRUPO');
     },
   };
 })();

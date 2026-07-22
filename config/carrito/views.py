@@ -4,8 +4,8 @@ from config.clientes.models import Cliente
 from config.pedidos.services import calcular_subtotal_item_pedido
 from config.productos.models import Producto, Presentacion
 from config.productos.promotions import (
-    aplicar_promocion_en_item_sesion,
     estado_promocion_para_linea,
+    reaplicar_promociones_en_lineas_sesion,
 )
 from django.shortcuts import render
 from django.utils.translation import gettext as _
@@ -42,6 +42,17 @@ def _get_request_price_for_presentacion(request, presentacion):
         return None
     return presentacion.get_price_for_tier(price_tier)
 
+
+def _lineas_contexto_carrito(carrito):
+    if not isinstance(carrito, dict):
+        return []
+    return list(carrito.values())
+
+
+def _reaplicar_promociones_carrito(carrito, cliente):
+    reaplicar_promociones_en_lineas_sesion(carrito, cliente=cliente)
+    return carrito
+
 def ver_cotizacion(request):
 
     cliente = _cliente_from_request(request)
@@ -49,12 +60,12 @@ def ver_cotizacion(request):
     carrito_items = []
     total = 0
 
+    _reaplicar_promociones_carrito(carrito, cliente)
+
     for producto_id, item in carrito.items():
 
         producto = Producto.objects.get(id=producto_id)
         item["producto_id"] = producto.id
-        aplicar_promocion_en_item_sesion(item, precio_unitario=item.get("precio", 0), cliente=cliente)
-
         precio = item.get("precio", 0)
         subtotal = float(calcular_subtotal_item_pedido(
             precio=precio,
@@ -120,11 +131,7 @@ def actualizar_cantidad(request):
             if assigned_price is not None:
                 carrito[producto_id]["precio"] = float(assigned_price)
 
-        aplicar_promocion_en_item_sesion(
-            carrito[producto_id],
-            precio_unitario=carrito[producto_id].get("precio", 0),
-            cliente=cliente,
-        )
+        _reaplicar_promociones_carrito(carrito, cliente)
 
         precio = carrito[producto_id].get("precio", 0)
         cantidad = carrito[producto_id]["cantidad"]
@@ -142,12 +149,14 @@ def actualizar_cantidad(request):
     request.session["carrito"] = carrito
 
     item = carrito.get(producto_id) or {}
+    lineas_context = _lineas_contexto_carrito(carrito)
     promo_state = estado_promocion_para_linea(
         producto_id=item.get("producto_id"),
         presentacion_id=item.get("presentacion_id"),
         cantidad=item.get("cantidad"),
         precio_unitario=item.get("precio", 0),
         cliente=cliente,
+        lineas_context=lineas_context,
     )
     return JsonResponse({
         "success": True,
@@ -181,7 +190,7 @@ def cambiar_presentacion(request):
         carrito[producto_id]["presentacion_id"] = presentacion.id
         carrito[producto_id]["producto_id"] = presentacion.producto_id
         carrito[producto_id]["precio"] = precio_actual
-        aplicar_promocion_en_item_sesion(carrito[producto_id], precio_unitario=precio_actual, cliente=cliente)
+        _reaplicar_promociones_carrito(carrito, cliente)
 
         cantidad = carrito[producto_id]["cantidad"]
         subtotal = float(calcular_subtotal_item_pedido(
@@ -210,6 +219,7 @@ def cambiar_presentacion(request):
             cantidad=carrito[producto_id].get("cantidad"),
             precio_unitario=carrito[producto_id].get("precio", 0),
             cliente=cliente,
+            lineas_context=_lineas_contexto_carrito(carrito),
         )
         return JsonResponse({
             "precio": precio_actual,
@@ -225,6 +235,7 @@ def cambiar_presentacion(request):
 @require_POST
 def eliminar_producto(request):
 
+    cliente = _cliente_from_request(request)
     producto_id = request.POST.get("producto_id")
 
     carrito = request.session.get("carrito", {})
@@ -232,6 +243,7 @@ def eliminar_producto(request):
     if producto_id in carrito:
         del carrito[producto_id]
 
+    _reaplicar_promociones_carrito(carrito, cliente)
     request.session["carrito"] = carrito
 
     total_items = sum(item["cantidad"] for item in carrito.values())
@@ -279,7 +291,7 @@ def agregar_carrito(request):
             "cantidad": cantidad,
         }
 
-    aplicar_promocion_en_item_sesion(carrito[producto_id], precio_unitario=precio_actual, cliente=cliente)
+    _reaplicar_promociones_carrito(carrito, cliente)
     carrito[producto_id]["subtotal"] = float(calcular_subtotal_item_pedido(
         precio=carrito[producto_id]["precio"],
         cantidad=carrito[producto_id]["cantidad"],

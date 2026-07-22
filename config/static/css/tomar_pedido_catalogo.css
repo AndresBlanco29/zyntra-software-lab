@@ -205,10 +205,6 @@ transform:scale(1.05);
     width: 100%;
 }
 
-.catalog-filter-bar {
-    width: 100%;
-}
-
 .catalog-search-row {
     display: flex;
     gap: 0.5rem;
@@ -272,8 +268,20 @@ transform:scale(1.05);
 
 body.vendedor-catalogo-page {
     --catalog-sticky-top: 60px;
+    /* `clip` (with `hidden` fallback for old Safari) prevents horizontal
+       overflow WITHOUT turning the body into a scroll container, so the
+       search bar's `position: sticky` keeps working like the client catalog. */
     overflow-x: hidden;
+    overflow-x: clip;
     max-width: 100vw;
+}
+
+/* Search bar stays pinned under the fixed navbar while scrolling the whole
+   catalog (same behavior as the client catalog). The top offset is synced to
+   the live navbar height via the --catalog-sticky-top variable set in JS. */
+body.vendedor-catalogo-page .catalog-search-sticky {
+    top: var(--catalog-sticky-top, 70px);
+    z-index: 990;
 }
 
 body.vendedor-catalogo-page .container-fluid,
@@ -357,6 +365,7 @@ body.vendedor-catalogo-page .col-md-10 {
         --panel-content-top-gap: 0px;
         --catalog-sticky-top: 60px;
         overflow-x: hidden;
+        overflow-x: clip;
     }
 
     #vendedorCatalogSidebarColumn {
@@ -409,19 +418,6 @@ body.vendedor-catalogo-page .col-md-10 {
 
     .catalog-header .subtitle {
         font-size: 0.9rem;
-    }
-
-    /* Stay in normal layout (like before). Stick under navbar only while scrolling. */
-    .catalog-filter-bar {
-        position: sticky;
-        top: var(--catalog-sticky-top, 60px);
-        z-index: 40;
-        width: 100%;
-        box-sizing: border-box;
-        background: #f4f6f9;
-        padding: 0.35rem 0 0.55rem;
-        margin: 0 0 0.85rem;
-        border-bottom: 1px solid #e5e7eb;
     }
 
     .catalog-filter-form {

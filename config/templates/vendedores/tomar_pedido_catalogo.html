@@ -92,10 +92,17 @@ La Tortilla Grocery
     root.style.setProperty('--panel-navbar-offset', stickyTop + 'px');
     root.style.setProperty('--panel-content-top-gap', '0px');
     root.style.setProperty('--catalog-sticky-top', stickyTop + 'px');
+    // The body re-declares --catalog-sticky-top in CSS, which would shadow the
+    // value set on <html>. Set it on <body> too so the live navbar height wins
+    // and the sticky search bar pins right below the navbar.
+    if (document.body) {
+      document.body.style.setProperty('--catalog-sticky-top', stickyTop + 'px');
+    }
   }
   syncPanelNavbarOffset();
   window.addEventListener('load', syncPanelNavbarOffset);
   window.addEventListener('resize', syncPanelNavbarOffset);
+  window.addEventListener('orientationchange', syncPanelNavbarOffset);
 })();
 </script>
 
@@ -171,9 +178,9 @@ Showing {{ start }}-{{ end }} of {{ total }} products
 
 </div>
 
-<div class="catalog-filter-bar mb-3">
-<form method="get" id="catalogo-vendedor-filter-form" class="catalog-filter-form">
+<form method="get" id="catalogo-vendedor-filter-form" class="catalog-filter-form mb-3">
 
+<div class="catalog-search-sticky">
 <div class="catalog-search-row">
   <div class="catalog-search-field">
     <input
@@ -197,6 +204,7 @@ Showing {{ start }}-{{ end }} of {{ total }} products
   <button type="submit" class="btn btn-primary catalog-search-submit" id="catalogoSearchButton">
     {% trans "Search" %}
   </button>
+</div>
 </div>
 
 <div class="catalog-filter-selects">
@@ -238,9 +246,6 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 {% endfor %}
 
 </select>
-</div>
-
-</form>
 </div>
 
 <div class="card shadow-sm mb-3 bulk-price-tier-panel">
@@ -531,7 +536,7 @@ data-summary="{{ p.descripcion_empaque_cliente }}"
 </div>
 
 
-<button class="btn btn-yellow w-100 agregar-btn">
+<button type="button" class="btn btn-yellow w-100 agregar-btn">
 
 {% trans "Agregar al Pedido" %}
 
@@ -546,6 +551,8 @@ data-summary="{{ p.descripcion_empaque_cliente }}"
 </div>
 
 {% pagination_controls page_obj aria_label=_('Product pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-2" q=filter_q categoria=filter_categoria marca=filter_marca %}
+
+</form>
 
 </div>
 

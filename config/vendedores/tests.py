@@ -579,7 +579,7 @@ class VendedorPedidoTests(TestCase):
 		self.assertContains(response, 'Unique Catalog Search Product')
 		self.assertContains(response, 'catalogoSearchButton')
 		self.assertContains(response, 'catalogoSearchClear')
-		self.assertContains(response, 'catalog-filter-bar')
+		self.assertContains(response, 'catalog-search-sticky')
 
 	def test_catalogo_vendedor_search_preserves_trailing_space_in_input(self):
 		self.client.force_login(self.vendor)

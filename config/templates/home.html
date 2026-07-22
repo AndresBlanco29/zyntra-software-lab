@@ -50,9 +50,12 @@ La Tortilla Grocery
 
 </a>
 
-<button class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#menu">
+<div class="navbar-mobile-actions ms-auto d-lg-none">
+<button class="login-btn login-btn--header" type="button" data-bs-toggle="modal" data-bs-target="#loginModal">{% trans "Login" %}</button>
+<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#menu" aria-controls="menu" aria-expanded="false" aria-label="{% trans 'Toggle navigation' %}">
 <span class="navbar-toggler-icon"></span>
 </button>
+</div>
 
 <div class="collapse navbar-collapse justify-content-center" id="menu">
 
@@ -82,7 +85,7 @@ La Tortilla Grocery
 <a class="nav-link" href="{% url 'catalogo' %}?guest=1">{% trans "Catálogo" %}</a>
 </li>
 
-<li class="nav-item">
+<li class="nav-item d-none d-lg-block">
 <button class="nav-link login-btn" type="button" data-bs-toggle="modal" data-bs-target="#loginModal">{% trans "Login" %}</button>
 </li>
 

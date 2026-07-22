@@ -163,11 +163,28 @@ overflow-x: hidden;
         white-space: nowrap;
     }
 
+    .navbar-home .navbar-mobile-actions {
+        margin-left: auto !important;
+        gap: 8px;
+    }
+
+    .navbar-home .navbar-mobile-actions .navbar-toggler {
+        margin-left: 0 !important;
+        padding: 4px 8px !important;
+        border: none !important;
+        opacity: 1 !important;
+    }
+
     .navbar-home .navbar-toggler {
         margin-left: auto !important;
         padding: 4px 8px !important;
         border: none !important;
         opacity: 1 !important;
+    }
+
+    .login-btn--header {
+        padding: 7px 12px !important;
+        font-size: 0.8rem !important;
     }
 
     .navbar-home .navbar-toggler:focus {
@@ -227,6 +244,31 @@ overflow-x: hidden;
     border: 1px solid rgba(255, 255, 255, .6);
     padding: 6px 16px;
     border-radius: 6px;
+}
+
+.navbar-mobile-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.login-btn--header {
+    background: linear-gradient(to right, #ffe600, #c7c700);
+    color: #1e293b;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    padding: 8px 14px;
+    white-space: nowrap;
+}
+
+.login-btn--header:hover,
+.login-btn--header:focus {
+    background: linear-gradient(to right, #ffc700, #b3a600);
+    color: #1e293b;
 }
 
 /* WIDGET IDIOMA */
@@ -521,6 +563,16 @@ background:#f3f4f6;
 
     .navbar-toggler {
         padding: 0.25rem 0.5rem;
+    }
+
+    .navbar-mobile-actions {
+        margin-left: auto;
+        gap: 10px;
+    }
+
+    .login-btn--header {
+        padding: 7px 14px;
+        font-size: 0.82rem;
     }
 
     .login-btn {
@@ -2748,6 +2800,20 @@ opacity:.6;
 
     .navbar-toggler {
         margin-left: auto;
+    }
+
+    .navbar-mobile-actions {
+        margin-left: auto;
+        gap: 12px;
+    }
+
+    .navbar-mobile-actions .navbar-toggler {
+        margin-left: 0;
+    }
+
+    .login-btn--header {
+        padding: 8px 16px;
+        font-size: 0.9rem;
     }
 
     .navbar-divider {

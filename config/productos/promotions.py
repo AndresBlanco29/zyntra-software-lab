@@ -134,7 +134,7 @@ def _filtrar_por_tipo_cliente(queryset, cliente):
     tipo_cliente_id = getattr(cliente, 'tipo_cliente_id', None)
     if tipo_cliente_id:
         return queryset.filter(
-            Q(tipos_cliente__isnull=True) | Q(tipos_cliente_id=tipo_cliente_id)
+            Q(tipos_cliente__isnull=True) | Q(tipos_cliente__id=tipo_cliente_id)
         ).distinct()
     return queryset.filter(tipos_cliente__isnull=True).distinct()
 

@@ -71,8 +71,11 @@ class PromocionEscalaModelTests(TestCase):
             promocion=self.promocion, cantidad_minima=10,
             tipo_beneficio=PromocionEscala.TIPO_PERCENT, valor_beneficio=Decimal('7'),
         )
+        # The uniqueness of (promocion, cantidad_minima) is enforced by a
+        # Meta UniqueConstraint, which Django validates via validate_constraints()
+        # (validate_unique() only covers unique=True / unique_together).
         with self.assertRaises(Exception):
-            dup.validate_unique()
+            dup.validate_constraints()
 
 
 class PromocionResolverTests(TestCase):

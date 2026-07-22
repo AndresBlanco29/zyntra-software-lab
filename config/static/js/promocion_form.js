@@ -20,6 +20,7 @@
     if (!root) {
       return;
     }
+    options = options || {};
 
     var searchInput = options.searchInput || root.querySelector('.promo-combo-buscador, #promoProductoBuscador');
     var resultsBox = options.resultsBox || root.querySelector('.promo-combo-resultados, #promoProductoResultados');
@@ -154,7 +155,13 @@
   }
 
   function initProductSearch() {
-    bindProductSearch(document.getElementById('promoProductSearchRoot'));
+    bindProductSearch(document.getElementById('promoProductSearchRoot'), {
+      searchInput: document.getElementById('promoProductoBuscador'),
+      resultsBox: document.getElementById('promoProductoResultados'),
+      hiddenProducto: document.getElementById('id_producto'),
+      presentacionVisible: document.getElementById('promoPresentacionVisible'),
+      hiddenPresentacion: document.getElementById('id_presentacion'),
+    });
   }
 
   function bindComboRow(row) {

@@ -13,6 +13,7 @@
 <link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
 
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 <link rel="stylesheet" href="{% static 'css/layout_vendedor.css' %}" />
 <link rel="stylesheet" href="{% static 'css/catalogo.css' %}" />
 <link rel="stylesheet" href="{% static 'css/tomar_pedido_catalogo.css' %}">
@@ -35,6 +36,16 @@ data-price-margins="{{ price_margin_percentages|join:',' }}"
 data-label-margin="{% trans 'Margin' %}"
 data-label-manual-price="{% trans 'Manual price' %}"
 data-label-use-manual-price="{% trans 'Use manual price' %}"
+data-combo-url-template="{% url 'combo_pedido_miembros' 0 %}"
+data-combo-title="{% trans 'Build your combo' %}"
+data-combo-need-label="{% trans 'units in total to unlock the discount' %}"
+data-combo-total-label="{% trans 'Combo total' %}"
+data-combo-ready-label="{% trans 'The combo discount will be applied!' %}"
+data-combo-missing-label="{% trans 'Add more units to reach the combo' %}"
+data-combo-add-label="{% trans 'Add combo to the order' %}"
+data-combo-added-label="{% trans 'Combo added' %} ✔"
+data-combo-qty-label="{% trans 'Quantity' %}"
+data-combo-presentation-label="{% trans 'Presentation' %}"
 class="vendedor-catalogo-page"
 >
 
@@ -257,6 +268,27 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 
 
 <!-- PRODUCTOS -->
+
+{% if combos and page_obj.number == 1 %}
+<div class="combos-section mb-4">
+    <div class="favorites-section__header">
+        <div>
+            <h2 class="favorites-section__title">
+                <i class="bi bi-box-seam-fill" aria-hidden="true"></i>
+                {% trans "Combo deals" %}
+            </h2>
+            <p class="favorites-section__subtitle mb-0">
+                {% trans "Mix the products in a combo and reach the minimum to unlock the discount." %}
+            </p>
+        </div>
+    </div>
+    <div class="row g-4 catalog-products-row justify-content-center combos-section__grid">
+        {% for combo in combos %}
+            {% include "productos/includes/catalogo_combo_card.html" with can_quote=True %}
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 
 <div class="row g-4 catalog-products-row justify-content-center">
 
@@ -630,6 +662,35 @@ $<span id="pedidoTotal">{{ total }}</span>
     min-width: 112px;
   }
 </style>
+
+<!-- COMBO BUILDER MODAL -->
+<div class="modal fade" id="comboModal" tabindex="-1" aria-labelledby="comboModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content combo-modal">
+      <div class="modal-header combo-modal__header">
+        <h5 class="modal-title" id="comboModalTitle">
+          <i class="bi bi-box-seam-fill" aria-hidden="true"></i>
+          <span data-role="combo-title">{% trans "Build your combo" %}</span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+      </div>
+      <div class="modal-body">
+        <p class="combo-modal__hint" data-role="combo-hint"></p>
+        <div data-role="combo-members"></div>
+        <div class="combo-modal__loading text-center py-4" data-role="combo-loading" hidden>
+          <div class="spinner-border text-primary" role="status"></div>
+        </div>
+      </div>
+      <div class="modal-footer combo-modal__footer">
+        <div class="combo-modal__progress w-100" data-role="combo-progress" aria-live="polite"></div>
+        <div class="d-flex gap-2 w-100">
+          <button type="button" class="btn btn-outline-secondary flex-fill" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+          <button type="button" class="btn btn-yellow flex-fill" data-role="combo-add" disabled>{% trans "Add combo to the order" %}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="{% static 'js/catalog_quantity.js' %}"></script>
 <script src="{% static 'js/tomar_pedido_catalogo.js' %}"></script>

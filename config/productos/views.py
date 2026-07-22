@@ -21,6 +21,7 @@ from .models import (
 from .forms import PromocionForm, PromocionEscalaFormSet, PromocionProductoFormSet
 from .promotions import (
     adjuntar_promociones_a_productos,
+    combos_para_catalogo,
     opciones_monto_fijo_promocion,
     opciones_porcentaje_promocion,
     promociones_activas_queryset,
@@ -487,9 +488,19 @@ def catalogo(request):
             attach_promos_fn=functools.partial(adjuntar_promociones_a_productos, cliente=cliente),
         )
 
+    combos = []
+    if (
+        page_obj.number == 1
+        and not filter_params.get('q')
+        and not filter_params.get('categoria')
+        and not filter_params.get('marca')
+    ):
+        combos = combos_para_catalogo(cliente=cliente)
+
     context = {
         'productos': productos,
         'productos_favoritos': productos_favoritos,
+        'combos': combos,
         'page_obj': page_obj,
         'filter_q': filter_params.get('q', ''),
         'filter_categoria': filter_params.get('categoria', ''),

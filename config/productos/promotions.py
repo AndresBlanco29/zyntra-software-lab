@@ -525,37 +525,75 @@ def resolver_promocion_para_linea(
 
 
 def promociones_por_producto_ids(producto_ids, now=None, cliente=None):
-    """Return {producto_id: best display Promocion} for catalog badges."""
+    """
+    Return {producto_id: best display Promocion} for catalog badges.
+
+    Only INDIVIDUAL promotions are attached to product cards. Combo (GROUP)
+    promotions are intentionally excluded here so that each member product keeps
+    its normal, standalone card (the customer can still order it below the combo
+    threshold). Combos are surfaced separately as their own catalog cards via
+    ``combos_para_catalogo``.
+    """
     ids = {int(pid) for pid in (producto_ids or []) if pid}
     if not ids:
         return {}
 
     mapping = {}
-    base = promociones_activas_queryset(now=now, cliente=cliente).prefetch_related(
-        'escalas', 'productos_grupo', 'productos_grupo__producto'
-    )
+    base = promociones_activas_queryset(now=now, cliente=cliente).prefetch_related('escalas')
 
     for promo in base.filter(
-        Q(alcance=Promocion.ALCANCE_INDIVIDUAL, producto_id__in=ids)
-        | Q(alcance=Promocion.ALCANCE_GRUPO, productos_grupo__producto_id__in=ids)
+        alcance=Promocion.ALCANCE_INDIVIDUAL, producto_id__in=ids
     ).distinct().order_by('id'):
-        target_ids = ids if promo.alcance == Promocion.ALCANCE_GRUPO else {promo.producto_id}
-        if promo.alcance == Promocion.ALCANCE_GRUPO:
-            target_ids = {
-                alcance.producto_id
-                for alcance in promo.productos_grupo.all()
-                if alcance.producto_id in ids
-            }
-        for producto_id in target_ids:
-            current = mapping.get(producto_id)
-            if current is None:
-                mapping[producto_id] = promo
-                continue
-            if current.alcance == Promocion.ALCANCE_INDIVIDUAL and current.presentacion_id and not promo.presentacion_id:
-                mapping[producto_id] = promo
-            elif promo.alcance == Promocion.ALCANCE_GRUPO and current.alcance != Promocion.ALCANCE_GRUPO:
-                mapping[producto_id] = promo
+        producto_id = promo.producto_id
+        current = mapping.get(producto_id)
+        if current is None:
+            mapping[producto_id] = promo
+            continue
+        if current.presentacion_id and not promo.presentacion_id:
+            mapping[producto_id] = promo
     return mapping
+
+
+def combos_para_catalogo(now=None, cliente=None):
+    """
+    Active combo (GROUP) promotions rendered as their own catalog cards.
+
+    Each entry carries the promotion name, description, quantity threshold,
+    benefit text and the list of member products so the catalog can show a
+    dedicated, self-explanatory combo card with the "build combo" action.
+    """
+    now = now or timezone.now()
+    combos = []
+    queryset = (
+        promociones_activas_queryset(now=now, cliente=cliente)
+        .filter(alcance=Promocion.ALCANCE_GRUPO)
+        .prefetch_related('escalas')
+        .distinct()
+        .order_by('id')
+    )
+    for promo in queryset:
+        escalas = sorted(promo.escalas.all(), key=lambda escala: escala.cantidad_minima)
+        if not escalas:
+            continue
+        miembros = []
+        for pp in promo.productos_grupo.all():
+            if pp.producto_id:
+                nombre = getattr(pp.producto, 'nombre_traducido', None) or pp.producto.nombre
+                miembros.append(nombre)
+        if len(miembros) < 2:
+            continue
+        escala_min = escalas[0]
+        combos.append({
+            'id': promo.id,
+            'nombre': promo.nombre,
+            'descripcion': promo.texto_catalogo(),
+            'minimo': escala_min.cantidad_minima,
+            'beneficio': escala_min.texto_beneficio(),
+            'miembros': miembros,
+            'total_miembros': len(miembros),
+            'fecha_fin_iso': promo.fecha_fin.isoformat() if promo.fecha_fin else '',
+        })
+    return combos
 
 
 def adjuntar_promociones_a_productos(productos, now=None, cliente=None):

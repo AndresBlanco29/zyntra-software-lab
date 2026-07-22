@@ -220,6 +220,27 @@ data-combo-presentation-label="{% trans 'Presentation' %}">
                 </section>
                 {% endif %}
 
+                {% if combos and page_obj.number == 1 %}
+                <section class="combos-section mb-4" aria-labelledby="combosTitle">
+                    <div class="favorites-section__header">
+                        <div>
+                            <h2 id="combosTitle" class="favorites-section__title">
+                                <i class="bi bi-box-seam-fill" aria-hidden="true"></i>
+                                {% trans "Combo deals" %}
+                            </h2>
+                            <p class="favorites-section__subtitle mb-0">
+                                {% trans "Mix the products in a combo and reach the minimum to unlock the discount." %}
+                            </p>
+                        </div>
+                    </div>
+                    <div class="row g-4 catalog-product-grid combos-section__grid">
+                        {% for combo in combos %}
+                            {% include "productos/includes/catalogo_combo_card.html" %}
+                        {% endfor %}
+                    </div>
+                </section>
+                {% endif %}
+
                 {% if productos_favoritos and page_obj.number == 1 %}
                 <section class="favorites-section mb-4" aria-labelledby="favoritesTitle">
                     <div class="favorites-section__header">

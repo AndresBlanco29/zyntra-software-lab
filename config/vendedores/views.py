@@ -13,6 +13,8 @@ from config.productos.promotions import (
     aplicar_promocion_en_item_sesion,
     marcar_descuento_manual_en_item,
     adjuntar_promociones_a_productos,
+    combos_para_catalogo,
+    reaplicar_promociones_en_lineas_sesion,
 )
 from config.productos.views import _hydrate_productos
 from django.views.decorators.http import require_POST
@@ -677,6 +679,15 @@ def catalogo_vendedor(request, cliente_id):
     productos = adjuntar_promociones_a_productos(_hydrate_productos(list(page_obj.object_list)), cliente=cliente)
     _attach_recent_customer_order_history(cliente=cliente, productos=productos)
 
+    combos = []
+    if (
+        page_obj.number == 1
+        and not filter_params.get('q')
+        and not filter_params.get('categoria')
+        and not filter_params.get('marca')
+    ):
+        combos = combos_para_catalogo(cliente=cliente)
+
     categorias = Categoria.objects.all()
     marcas = Marca.objects.filter(activo=True)
 
@@ -691,6 +702,7 @@ def catalogo_vendedor(request, cliente_id):
     context = {
         'cliente': cliente,
         'productos': productos,
+        'combos': combos,
         'page_obj': page_obj,
         'filter_q': filter_params.get('q', ''),
         'filter_categoria': filter_params.get('categoria', ''),
@@ -763,7 +775,10 @@ def agregar_producto_pedido(request):
                 carrito_item["precio_key"] = precio_key
             carrito[presentacion_id] = carrito_item
 
-        aplicar_promocion_en_item_sesion(carrito[presentacion_id], precio_unitario=precio, cliente=cliente)
+        carrito[presentacion_id]["producto_id"] = presentacion.producto.id
+        # Re-evaluate all lines so combo promotions can sum quantities across the
+        # different products that make up the combo.
+        reaplicar_promociones_en_lineas_sesion(carrito, cliente=cliente)
 
         request.session["pedido"] = carrito
         persist_session_take_order_cart(request)
@@ -776,6 +791,92 @@ def agregar_producto_pedido(request):
             "total_items": total_items,
             "total": total
         })
+
+
+def _combo_default_precio(presentacion, tier):
+    """Pick a default price + tier key for a combo member (client tier first)."""
+    order = []
+    try:
+        tier_int = int(tier) if tier else None
+    except (TypeError, ValueError):
+        tier_int = None
+    if tier_int and 1 <= tier_int <= 5:
+        order.append(tier_int)
+    order += [index for index in range(1, 6) if index not in order]
+    for index in order:
+        value = getattr(presentacion, f'precio_{index}', None)
+        if value and float(value) > 0:
+            return float(value), f'precio_{index}'
+    return None, ''
+
+
+@login_required
+@internal_permission_required(
+    'vendor.orders.view',
+    'backoffice.orders.view',
+    'vendor.quotes.view',
+    'backoffice.quotes.view',
+)
+def combo_pedido_miembros(request, promocion_id):
+    """
+    Members of a combo promotion for the vendor catalog combo picker.
+
+    Prices default to the target customer's price tier so the vendor can build
+    the combo in one step (and still adjust prices later in the order summary).
+    """
+    denied = _ensure_take_flow_access(request, manage=False)
+    if denied:
+        return denied
+
+    from config.productos.models import Promocion
+
+    promo = get_object_or_404(
+        Promocion.objects.prefetch_related(
+            'escalas', 'productos_grupo', 'productos_grupo__producto'
+        ),
+        id=promocion_id,
+        alcance=Promocion.ALCANCE_GRUPO,
+        activa=True,
+    )
+    cliente = _cliente_from_take_order_session(request)
+    tier = getattr(cliente, 'nivel_precio', None) if cliente is not None else None
+
+    escalas = sorted(promo.escalas.all(), key=lambda escala: escala.cantidad_minima)
+    minimum = escalas[0].cantidad_minima if escalas else 0
+
+    miembros = []
+    for pp in promo.productos_grupo.all():
+        producto = pp.producto
+        if producto is None or not producto.activo:
+            continue
+        presentaciones = []
+        for presentacion in Presentacion.objects.filter(producto=producto).order_by('id'):
+            if pp.presentacion_id and presentacion.id != pp.presentacion_id:
+                continue
+            presentacion.producto = producto
+            precio, precio_key = _combo_default_precio(presentacion, tier)
+            presentaciones.append({
+                'id': presentacion.id,
+                'nombre': presentacion.nombre_empaque_cliente,
+                'precio': precio,
+                'precio_key': precio_key,
+            })
+        if not presentaciones:
+            continue
+        miembros.append({
+            'producto_id': producto.id,
+            'nombre': getattr(producto, 'nombre_traducido', None) or producto.nombre,
+            'presentaciones': presentaciones,
+        })
+
+    return JsonResponse({
+        'promocion_id': promo.id,
+        'nombre': promo.nombre,
+        'descripcion': promo.texto_catalogo(),
+        'minimum': minimum,
+        'miembros': miembros,
+    })
+
 
 @login_required
 @internal_permission_required(
@@ -803,6 +904,9 @@ def ver_pedido(request):
     productos = []
     discount_options = _build_order_summary_discount_preset_options()
 
+    # Shared context so combo promotions can sum quantities across all lines.
+    lineas_context = list(carrito.values())
+
     for key, item in carrito.items():
 
         producto = Producto.objects.get(id=item["producto_id"])
@@ -819,7 +923,7 @@ def ver_pedido(request):
         if float(item.get("precio", 0) or 0) != precio:
             carrito[key]["precio"] = precio
 
-        aplicar_promocion_en_item_sesion(carrito[key], precio_unitario=precio, cliente=cliente)
+        aplicar_promocion_en_item_sesion(carrito[key], precio_unitario=precio, cliente=cliente, lineas_context=lineas_context)
         item = carrito[key]
         subtotal = _cart_item_subtotal(item)
 
@@ -1034,6 +1138,7 @@ def actualizar_cantidad_pedido(request):
                 carrito[producto_id],
                 precio_unitario=carrito[producto_id].get("precio"),
                 cliente=cliente,
+                lineas_context=list(carrito.values()),
             )
 
     # Guardar sesión + borrador persistente

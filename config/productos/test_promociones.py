@@ -11,6 +11,7 @@ from config.productos.models import Categoria, Marca, Presentacion, Producto, Pr
 from config.productos.promotions import (
     adjuntar_promociones_a_productos,
     aplicar_promocion_en_item_sesion,
+    combos_para_catalogo,
     estado_promocion_para_linea,
     promociones_activas_queryset,
     reaplicar_promociones_en_lineas_sesion,
@@ -937,20 +938,29 @@ class PromocionComboTests(TestCase):
         self.assertEqual(state['group_total'], 10)
         self.assertTrue(state['applied'])
 
-    def test_catalog_attaches_combo_to_every_member_product(self):
+    def test_catalog_does_not_attach_combo_to_member_products(self):
+        # Combos must NOT hijack the member product cards: each product keeps its
+        # own standalone card so it can be ordered normally, below the threshold.
         productos = adjuntar_promociones_a_productos([
             self.producto_a, self.producto_b, self.producto_c,
         ])
         for producto in productos:
-            self.assertIsNotNone(producto.promocion_activa, producto.nombre)
-            self.assertTrue(producto.promocion_es_grupo, producto.nombre)
-            self.assertEqual(producto.promocion_combo_total, 3)
-            self.assertCountEqual(
-                producto.promocion_combo_productos,
-                ['Jarrito Fresa', 'Jarrito Mango', 'Jarrito Limon'],
-            )
+            self.assertIsNone(producto.promocion_activa, producto.nombre)
+            self.assertFalse(producto.promocion_es_grupo, producto.nombre)
 
-    def test_catalog_combo_card_and_panel_render_combo_labels(self):
+    def test_combos_para_catalogo_lists_combo_with_all_members(self):
+        combos = combos_para_catalogo()
+        self.assertEqual(len(combos), 1)
+        combo = combos[0]
+        self.assertEqual(combo['nombre'], 'Combo Jarritos')
+        self.assertEqual(combo['minimo'], 10)
+        self.assertEqual(combo['total_miembros'], 3)
+        self.assertCountEqual(
+            combo['miembros'],
+            ['Jarrito Fresa', 'Jarrito Mango', 'Jarrito Limon'],
+        )
+
+    def test_catalog_renders_combo_card_and_keeps_members_normal(self):
         user = Usuario.objects.create_user(username='combo-catalog', password='secret123', role='cliente')
         Cliente.objects.create(
             usuario=user, nombre_empresa='Combo Cat Co', telefono='5551112222',
@@ -962,16 +972,16 @@ class PromocionComboTests(TestCase):
         client.force_login(user)
         response = client.get(reverse('catalogo'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'promo-badge--combo')
-        self.assertContains(response, 'Combo discount')
-        self.assertContains(response, 'This is a combo promotion')
-        self.assertContains(response, 'Jarrito Mango')
-        # Combo builder entry point + modal must be present for members to be picked.
+        # A dedicated combo card is rendered with its name and the build action.
+        self.assertContains(response, 'combos-section')
+        self.assertContains(response, 'combo-card')
+        self.assertContains(response, 'Combo Jarritos')
         self.assertContains(response, 'js-combo-add-btn')
         self.assertContains(response, 'Build combo and add')
         self.assertContains(response, 'id="comboModal"')
         self.assertContains(response, 'data-combo-url-template')
-        self.assertContains(response, 'data-promo-combo="1"')
+        # Member products must NOT carry the combo flag on their own card.
+        self.assertNotContains(response, 'data-promo-combo="1"')
 
     def test_combo_miembros_endpoint_returns_all_members(self):
         user = self._crear_cliente('combo-endpoint')

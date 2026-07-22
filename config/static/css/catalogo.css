@@ -655,6 +655,43 @@ z-index:9999;
     box-shadow: 0 7px 16px rgba(79, 70, 229, 0.28);
 }
 
+/* Dedicated combo cards in the catalog */
+.combos-section__grid {
+    margin-top: 0.5rem;
+}
+
+.combo-card {
+    border: 2px solid #ddd6fe;
+    background: linear-gradient(180deg, #faf5ff 0%, #ffffff 60%);
+    display: flex;
+    flex-direction: column;
+}
+
+.combo-card__icon {
+    font-size: 2.6rem;
+    color: #7c3aed;
+    margin: 0.4rem 0 0.6rem;
+    line-height: 1;
+}
+
+.combo-card__name {
+    color: #4c1d95;
+}
+
+.combo-card__desc {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-bottom: 0.6rem;
+}
+
+.combo-card .promo-combo-note {
+    margin-top: auto;
+}
+
+.combo-card .promo-add-btn--combo {
+    margin-top: 0.6rem;
+}
+
 /* Combo builder modal */
 .combo-modal {
     border: 0;

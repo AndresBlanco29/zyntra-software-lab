@@ -10,6 +10,7 @@ urlpatterns = [
     path('pedido/catalogo/<int:cliente_id>/', views.catalogo_vendedor, name='catalogo_vendedor'),
     path('pedido/resumen/',views.ver_pedido,name='ver_pedido'),
     path('pedido/agregar/',views.agregar_producto_pedido,name='agregar_producto_pedido'),
+    path('pedido/combo/<int:promocion_id>/miembros/', views.combo_pedido_miembros, name='combo_pedido_miembros'),
     path("pedido/enviar/", views.enviar_pedido, name="enviar_pedido"),
     path("pedido/crear-cotizacion/", views.crear_cotizacion_desde_toma, name="crear_cotizacion_desde_toma"),
     path("pedido/nota/", views.guardar_nota_pedido, name="guardar_nota_pedido"),

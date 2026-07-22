@@ -10,7 +10,16 @@ from config.facturacion.models import Invoice, InvoiceItem, NotaAjuste
 from config.facturacion.services import crear_nota_ajuste, generar_invoice_desde_picking
 from config.inventario.services import registrar_entrada_manual
 from config.pedidos.models import Pedido, PedidoItem
-from config.productos.models import Categoria, ConfiguracionDescuentos, Marca, Presentacion, Producto
+from config.productos.models import (
+	Categoria,
+	ConfiguracionDescuentos,
+	Marca,
+	Presentacion,
+	Producto,
+	Promocion,
+	PromocionEscala,
+	PromocionProducto,
+)
 from config.usuarios.models import Usuario
 from config.usuarios.permissions import get_redirect_url_for_user
 
@@ -1521,3 +1530,107 @@ class VendorHomeAndNotesTests(TestCase):
 		self.assertIn(response.status_code, {302, 403})
 		nota.refresh_from_db()
 		self.assertEqual(nota.estado, 'BORRADOR')
+
+
+class VendedorComboTests(TestCase):
+	def setUp(self):
+		self.vendor = Usuario.objects.create_user(
+			username='vendor-combo-test', password='secret123', role='vendedor',
+		)
+		self.customer_user = Usuario.objects.create_user(
+			username='customer-combo-test', password='secret123', role='cliente',
+		)
+		self.customer = Cliente.objects.create(
+			usuario=self.customer_user,
+			nombre_empresa='Cliente Combo Test',
+			telefono='5551234567',
+			direccion='123 Test St',
+			ciudad='Atlanta', estado='GA', codigo_postal='30301', pais='USA',
+			sales_tax_number='TX-COMBO-V', certificado_tax='certificados/test.pdf',
+			aprobado=True, nivel_precio=1, vendedor_asignado=self.vendor,
+		)
+		ClienteVendedorAsignacion.objects.get_or_create(cliente=self.customer, vendedor=self.vendor)
+
+		categoria = Categoria.objects.create(nombre='Combo Bebidas')
+		marca = Marca.objects.create(nombre='Combo Marca V')
+		self.producto_a = Producto.objects.create(nombre='Jarrito A', categoria=categoria, marca=marca)
+		self.producto_b = Producto.objects.create(nombre='Jarrito B', categoria=categoria, marca=marca)
+		self.producto_c = Producto.objects.create(nombre='Jarrito C', categoria=categoria, marca=marca)
+		self.pres_a = Presentacion.objects.create(producto=self.producto_a, nombre='Case A', unidades=1, tipo_contenido='caja', precio_1=Decimal('20.00'))
+		self.pres_b = Presentacion.objects.create(producto=self.producto_b, nombre='Case B', unidades=1, tipo_contenido='caja', precio_1=Decimal('20.00'))
+		self.pres_c = Presentacion.objects.create(producto=self.producto_c, nombre='Case C', unidades=1, tipo_contenido='caja', precio_1=Decimal('20.00'))
+
+		self.promo = Promocion.objects.create(
+			nombre='Combo Vendedor', descripcion='Buy 10 mixed, 10% off',
+			alcance=Promocion.ALCANCE_GRUPO, producto=self.producto_a, activa=True,
+		)
+		PromocionProducto.objects.create(promocion=self.promo, producto=self.producto_a)
+		PromocionProducto.objects.create(promocion=self.promo, producto=self.producto_b)
+		PromocionProducto.objects.create(promocion=self.promo, producto=self.producto_c)
+		PromocionEscala.objects.create(
+			promocion=self.promo, cantidad_minima=10,
+			tipo_beneficio=PromocionEscala.TIPO_PERCENT, valor_beneficio=Decimal('10'),
+		)
+
+	def test_combo_pedido_miembros_returns_members_with_tier_price(self):
+		self.client.force_login(self.vendor)
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session.save()
+
+		response = self.client.get(reverse('combo_pedido_miembros', args=[self.promo.id]))
+		self.assertEqual(response.status_code, 200)
+		data = response.json()
+		self.assertEqual(data['minimum'], 10)
+		self.assertEqual(len(data['miembros']), 3)
+		for miembro in data['miembros']:
+			pres = miembro['presentaciones'][0]
+			self.assertEqual(pres['precio'], 20.0)
+			self.assertEqual(pres['precio_key'], 'precio_1')
+
+	def test_combo_pedido_miembros_rejects_individual_promo(self):
+		individual = Promocion.objects.create(nombre='Solo V', producto=self.producto_a, activa=True)
+		PromocionEscala.objects.create(promocion=individual, cantidad_minima=5, valor_beneficio=Decimal('10'))
+		self.client.force_login(self.vendor)
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session.save()
+		response = self.client.get(reverse('combo_pedido_miembros', args=[individual.id]))
+		self.assertEqual(response.status_code, 404)
+
+	def test_distributed_combo_applies_discount_in_vendor_order(self):
+		self.client.force_login(self.vendor)
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session.save()
+
+		for pres, cantidad in [(self.pres_a, 5), (self.pres_b, 3), (self.pres_c, 2)]:
+			resp = self.client.post(reverse('agregar_producto_pedido'), {
+				'presentacion_id': pres.id,
+				'cantidad': cantidad,
+				'precio': str(pres.precio_1),
+				'precio_key': 'precio_1',
+			})
+			self.assertEqual(resp.status_code, 200)
+
+		summary = self.client.get(reverse('ver_pedido'))
+		self.assertEqual(summary.status_code, 200)
+
+		pedido = self.client.session['pedido']
+		self.assertEqual(len(pedido), 3)
+		for item in pedido.values():
+			self.assertTrue(item.get('descuento_aplicado'), item.get('nombre'))
+			self.assertEqual(float(item.get('descuento_monto')), 2.0)
+
+	def test_combo_card_rendered_in_vendor_catalog(self):
+		self.client.force_login(self.vendor)
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session.save()
+		response = self.client.get(reverse('catalogo_vendedor', args=[self.customer.id]))
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'combos-section')
+		self.assertContains(response, 'combo-card')
+		self.assertContains(response, 'Combo Vendedor')
+		self.assertContains(response, 'js-combo-add-btn')
+		self.assertContains(response, 'id="comboModal"')

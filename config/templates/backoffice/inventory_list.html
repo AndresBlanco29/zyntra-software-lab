@@ -1,209 +1,234 @@
-{% extends "bases/base_vendedor.html" %}
-{% load i18n %}
-
-{% block title %}{% trans "Operational Inventory" %}{% endblock %}
-
-{% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 inventory-list-header">
-  <div>
-    <h2 class="mb-1">{% trans "Operational Inventory" %}</h2>
-    <p class="text-muted mb-0">{% trans "Review physical, reserved and available stock per presentation. Main stock is counted in packages (CS); loose units appear in the partial stock section below." %}</p>
-  </div>
-  <form method="get" class="d-flex flex-wrap gap-2 align-items-center inventory-list-search-form">
-    <input type="search" name="q" value="{{ search_term }}" class="form-control" placeholder="{% trans 'Search product or presentation' %}">
-    {% if stock_filter %}
-    <input type="hidden" name="stock" value="{{ stock_filter }}">
-    {% endif %}
-    <button type="submit" class="btn btn-outline-secondary flex-shrink-0">{% trans "Search" %}</button>
-  </form>
-</div>
-
-<div class="d-flex flex-wrap gap-2 mb-3 inventory-stock-filters" role="group" aria-label="{% trans 'Stock status filters' %}">
-  <a href="{% url 'backoffice_inventory_list' %}{% if search_term %}?q={{ search_term|urlencode }}{% endif %}"
-     class="btn btn-sm {% if not stock_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
-    {% trans "All" %} ({{ product_count }})
-  </a>
-  <a href="{% url 'backoffice_inventory_list' %}?stock=out{% if search_term %}&amp;q={{ search_term|urlencode }}{% endif %}"
-     class="btn btn-sm {% if stock_filter == 'out' %}btn-danger{% else %}btn-outline-danger{% endif %}">
-    {% trans "Out of stock" %} ({{ zero_stock_count }})
-  </a>
-  <a href="{% url 'backoffice_inventory_list' %}?stock=low{% if search_term %}&amp;q={{ search_term|urlencode }}{% endif %}"
-     class="btn btn-sm {% if stock_filter == 'low' %}btn-warning{% else %}btn-outline-warning{% endif %}">
-    {% trans "Low stock" %} ({{ low_stock_count }})
-  </a>
-  <a href="{% url 'backoffice_inventory_list' %}?stock=in{% if search_term %}&amp;q={{ search_term|urlencode }}{% endif %}"
-     class="btn btn-sm {% if stock_filter == 'in' %}btn-success{% else %}btn-outline-success{% endif %}">
-    {% trans "In stock" %} ({{ in_stock_count }})
-  </a>
-</div>
-{% if stock_filter %}
-<p class="text-muted small mb-3">
-  {% blocktrans with shown=filtered_product_count total=product_count %}Showing {{ shown }} of {{ total }} presentations for the selected stock filter.{% endblocktrans %}
-  {% blocktrans with threshold=low_stock_threshold %} Low stock means {{ threshold }} packages or fewer available.{% endblocktrans %}
-</p>
-{% else %}
-<p class="text-muted small mb-3">
-  {% blocktrans with threshold=low_stock_threshold %}Low stock means {{ threshold }} packages or fewer available.{% endblocktrans %}
-</p>
-{% endif %}
-
-<div class="row g-3 mb-4">
-  <div class="col-md-6 col-xl-3">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <div class="text-muted small text-uppercase">{% trans "Presentations" %}</div>
-        <div class="display-6 fw-semibold">{{ product_count }}</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-6 col-xl-3">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <div class="text-muted small text-uppercase">{% trans "Physical stock" %}</div>
-        <div class="display-6 fw-semibold">{{ total_fisico }}</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-6 col-xl-3">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <div class="text-muted small text-uppercase">{% trans "Reserved stock" %}</div>
-        <div class="display-6 fw-semibold">{{ total_reservado }}</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-6 col-xl-3">
-    <div class="card shadow-sm h-100 border-warning">
-      <div class="card-body">
-        <div class="text-muted small text-uppercase">{% trans "Low stock" %}</div>
-        <div class="display-6 fw-semibold">{{ low_stock_count }}</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-6 col-xl-3">
-    <div class="card shadow-sm h-100 border-danger">
-      <div class="card-body">
-        <div class="text-muted small text-uppercase">{% trans "Without stock" %}</div>
-        <div class="display-6 fw-semibold">{{ zero_stock_count }}</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-6 col-xl-3">
-    <div class="card shadow-sm h-100 border-success">
-      <div class="card-body">
-        <div class="text-muted small text-uppercase">{% trans "In stock" %}</div>
-        <div class="display-6 fw-semibold">{{ in_stock_count }}</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-6 col-xl-3">
-    <div class="card shadow-sm h-100 border-info">
-      <div class="card-body">
-        <div class="text-muted small text-uppercase">{% trans "Internal partial stock" %}</div>
-        <div class="display-6 fw-semibold">{{ total_fractional_stock }}</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="card shadow-sm">
-  <div class="table-responsive mobile-stack-responsive">
-    <table class="table table-striped align-middle mb-0 mobile-stack-table mobile-stack-table--list">
-      <thead>
-        <tr>
-          <th>{% trans "Product" %}</th>
-          <th>{% trans "Presentation" %}</th>
-          <th>{% trans "Physical" %}</th>
-          <th>{% trans "Reserved" %}</th>
-          <th>{% trans "Available" %}</th>
-          <th>{% trans "Status" %}</th>
-          <th>{% trans "Action" %}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in rows %}
-        <tr>
-          <td data-label="{% trans 'Product' %}">
-            <div class="fw-semibold">{{ row.presentacion.producto.nombre_traducido }}</div>
-            {% if row.presentacion.producto.categoria %}
-            <div class="text-muted small">{{ row.presentacion.producto.categoria.nombre_traducido }}</div>
-            {% endif %}
-          </td>
-          <td data-label="{% trans 'Presentation' %}">{{ row.presentation_label|capfirst }}</td>
-          <td data-label="{% trans 'Physical' %}">
-            <div class="fw-semibold">{{ row.stock_fisico }} {{ row.physical_summary }}</div>
-            {% if row.units_per_package > 1 %}
-            <div class="small text-muted">{% blocktrans with units=row.units_per_package content=row.content_type_label %}{{ units }} {{ content }} per package{% endblocktrans %}</div>
-            {% endif %}
-            {% if row.fractional_stock > 0 %}
-            <div class="small text-muted">+ {{ row.fractional_stock }} {{ row.fractional_content_label }} {% trans "partial" %}</div>
-            {% endif %}
-          </td>
-          <td data-label="{% trans 'Reserved' %}">{{ row.stock_reservado }} {{ row.physical_summary }}</td>
-          <td data-label="{% trans 'Available' %}">{{ row.stock_disponible }} {{ row.physical_summary }}</td>
-          <td data-label="{% trans 'Status' %}">
-            {% if row.stock_status == 'out' %}
-            <span class="badge bg-danger">{% trans "Out of stock" %}</span>
-            {% elif row.stock_status == 'low' %}
-            <span class="badge bg-warning text-dark">{% trans "Low stock" %}</span>
-            {% else %}
-            <span class="badge bg-success">{% trans "In stock" %}</span>
-            {% endif %}
-          </td>
-          <td data-label="{% trans 'Action' %}" class="mobile-stack-table__action">
-            <a href="{% url 'backoffice_inventory_detail' row.presentacion.id %}" class="btn btn-sm btn-outline-primary">{% trans "View detail" %}</a>
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="7" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No inventory presentations match the current filter." %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<div class="card shadow-sm mt-4">
-  <div class="card-body border-bottom">
-    <h5 class="mb-0">{% trans "Internal partial stock by product" %}</h5>
-  </div>
-  <div class="table-responsive mobile-stack-responsive">
-    <table class="table table-striped align-middle mb-0 mobile-stack-table mobile-stack-table--list">
-      <thead>
-        <tr>
-          <th>{% trans "Product" %}</th>
-          <th>{% trans "Content" %}</th>
-          <th>{% trans "Physical" %}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in fractional_rows %}
-        <tr>
-          <td data-label="{% trans 'Product' %}">{{ row.producto.nombre_traducido }}</td>
-          <td data-label="{% trans 'Content' %}">
-            {% if row.presentacion %}
-            {{ row.presentacion.nombre_traducido }}
-            <div class="small text-muted">{{ row.stock_fisico }} {{ row.contenido }}</div>
-            {% else %}
-            {{ row.contenido }}
-            {% endif %}
-          </td>
-          <td data-label="{% trans 'Physical' %}">
-            {% if row.presentacion %}
-            {{ row.stock_fisico }} {{ row.contenido }}
-            {% else %}
-            {{ row.stock_fisico }}
-          {% endif %}
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="3" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No internal partial stock has been recorded yet." %}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-{% endblock %}
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Operational Inventory" %}{% endblock %}
+
+{% block content %}
+<div class="mb-3 inventory-list-header">
+  <h2 class="mb-1">{% trans "Operational Inventory" %}</h2>
+  <p class="text-muted mb-0">{% trans "Review physical, reserved and available stock per presentation. Main stock is counted in packages (CS); loose units appear in the partial stock section below." %}</p>
+</div>
+
+<div class="inventory-toolbar-sticky">
+  <form method="get" class="d-flex flex-wrap gap-2 align-items-center inventory-list-search-form mb-3">
+    <input
+      type="search"
+      id="inventorySearchInput"
+      name="q"
+      value="{{ search_term }}"
+      class="form-control"
+      placeholder="{% trans 'Search product or presentation' %}"
+      autocomplete="off"
+      enterkeyhint="search"
+    >
+    {% if stock_filter %}
+    <input type="hidden" name="stock" value="{{ stock_filter }}">
+    {% endif %}
+    <button type="submit" class="btn btn-outline-secondary flex-shrink-0">{% trans "Search" %}</button>
+  </form>
+
+  <div class="d-flex flex-wrap gap-2 inventory-stock-filters" role="group" aria-label="{% trans 'Stock status filters' %}">
+    <a href="{% url 'backoffice_inventory_list' %}{% if search_term %}?q={{ search_term|urlencode }}{% endif %}"
+       class="btn btn-sm {% if not stock_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+      {% trans "All" %} ({{ product_count }})
+    </a>
+    <a href="{% url 'backoffice_inventory_list' %}?stock=out{% if search_term %}&amp;q={{ search_term|urlencode }}{% endif %}"
+       class="btn btn-sm {% if stock_filter == 'out' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+      {% trans "Out of stock" %} ({{ zero_stock_count }})
+    </a>
+    <a href="{% url 'backoffice_inventory_list' %}?stock=low{% if search_term %}&amp;q={{ search_term|urlencode }}{% endif %}"
+       class="btn btn-sm {% if stock_filter == 'low' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+      {% trans "Low stock" %} ({{ low_stock_count }})
+    </a>
+    <a href="{% url 'backoffice_inventory_list' %}?stock=in{% if search_term %}&amp;q={{ search_term|urlencode }}{% endif %}"
+       class="btn btn-sm {% if stock_filter == 'in' %}btn-success{% else %}btn-outline-success{% endif %}">
+      {% trans "In stock" %} ({{ in_stock_count }})
+    </a>
+  </div>
+
+  {% if stock_filter %}
+  <p class="text-muted small mb-0 mt-3">
+    {% blocktrans with shown=filtered_product_count total=product_count %}Showing {{ shown }} of {{ total }} presentations for the selected stock filter.{% endblocktrans %}
+    {% blocktrans with threshold=low_stock_threshold %} Low stock means {{ threshold }} packages or fewer available.{% endblocktrans %}
+  </p>
+  {% else %}
+  <p class="text-muted small mb-0 mt-3">
+    {% blocktrans with threshold=low_stock_threshold %}Low stock means {{ threshold }} packages or fewer available.{% endblocktrans %}
+  </p>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">{% trans "Presentations" %}</div>
+        <div class="display-6 fw-semibold">{{ product_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">{% trans "Physical stock" %}</div>
+        <div class="display-6 fw-semibold">{{ total_fisico }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">{% trans "Reserved stock" %}</div>
+        <div class="display-6 fw-semibold">{{ total_reservado }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100 border-warning">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">{% trans "Low stock" %}</div>
+        <div class="display-6 fw-semibold">{{ low_stock_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100 border-danger">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">{% trans "Without stock" %}</div>
+        <div class="display-6 fw-semibold">{{ zero_stock_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100 border-success">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">{% trans "In stock" %}</div>
+        <div class="display-6 fw-semibold">{{ in_stock_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100 border-info">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">{% trans "Internal partial stock" %}</div>
+        <div class="display-6 fw-semibold">{{ total_fractional_stock }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive mobile-stack-responsive">
+    <table class="table table-striped align-middle mb-0 mobile-stack-table mobile-stack-table--list">
+      <thead>
+        <tr>
+          <th>{% trans "Product" %}</th>
+          <th>{% trans "Presentation" %}</th>
+          <th>{% trans "Physical" %}</th>
+          <th>{% trans "Reserved" %}</th>
+          <th>{% trans "Available" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th>{% trans "Action" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td data-label="{% trans 'Product' %}">
+            <div class="fw-semibold">{{ row.presentacion.producto.nombre_traducido }}</div>
+            {% if row.presentacion.producto.categoria %}
+            <div class="text-muted small">{{ row.presentacion.producto.categoria.nombre_traducido }}</div>
+            {% endif %}
+          </td>
+          <td data-label="{% trans 'Presentation' %}">{{ row.presentation_label|capfirst }}</td>
+          <td data-label="{% trans 'Physical' %}">
+            <div class="fw-semibold">{{ row.stock_fisico }} {{ row.physical_summary }}</div>
+            {% if row.units_per_package > 1 %}
+            <div class="small text-muted">{% blocktrans with units=row.units_per_package content=row.content_type_label %}{{ units }} {{ content }} per package{% endblocktrans %}</div>
+            {% endif %}
+            {% if row.fractional_stock > 0 %}
+            <div class="small text-muted">+ {{ row.fractional_stock }} {{ row.fractional_content_label }} {% trans "partial" %}</div>
+            {% endif %}
+          </td>
+          <td data-label="{% trans 'Reserved' %}">{{ row.stock_reservado }} {{ row.physical_summary }}</td>
+          <td data-label="{% trans 'Available' %}">{{ row.stock_disponible }} {{ row.physical_summary }}</td>
+          <td data-label="{% trans 'Status' %}">
+            {% if row.stock_status == 'out' %}
+            <span class="badge bg-danger">{% trans "Out of stock" %}</span>
+            {% elif row.stock_status == 'low' %}
+            <span class="badge bg-warning text-dark">{% trans "Low stock" %}</span>
+            {% else %}
+            <span class="badge bg-success">{% trans "In stock" %}</span>
+            {% endif %}
+          </td>
+          <td data-label="{% trans 'Action' %}" class="mobile-stack-table__action">
+            <a href="{% url 'backoffice_inventory_detail' row.presentacion.id %}" class="btn btn-sm btn-outline-primary">{% trans "View detail" %}</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No inventory presentations match the current filter." %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card shadow-sm mt-4">
+  <div class="card-body border-bottom">
+    <h5 class="mb-0">{% trans "Internal partial stock by product" %}</h5>
+  </div>
+  <div class="table-responsive mobile-stack-responsive">
+    <table class="table table-striped align-middle mb-0 mobile-stack-table mobile-stack-table--list">
+      <thead>
+        <tr>
+          <th>{% trans "Product" %}</th>
+          <th>{% trans "Content" %}</th>
+          <th>{% trans "Physical" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in fractional_rows %}
+        <tr>
+          <td data-label="{% trans 'Product' %}">{{ row.producto.nombre_traducido }}</td>
+          <td data-label="{% trans 'Content' %}">
+            {% if row.presentacion %}
+            {{ row.presentacion.nombre_traducido }}
+            <div class="small text-muted">{{ row.stock_fisico }} {{ row.contenido }}</div>
+            {% else %}
+            {{ row.contenido }}
+            {% endif %}
+          </td>
+          <td data-label="{% trans 'Physical' %}">
+            {% if row.presentacion %}
+            {{ row.stock_fisico }} {{ row.contenido }}
+            {% else %}
+            {{ row.stock_fisico }}
+          {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="3" class="text-center text-muted py-4 mobile-stack-table__empty">{% trans "No internal partial stock has been recorded yet." %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var searchInput = document.getElementById('inventorySearchInput');
+  var searchForm = searchInput ? searchInput.closest('form') : null;
+  if (searchForm) {
+    searchForm.addEventListener('submit', function () {
+      if (window.PreserveSearchFocus && searchInput) {
+        window.PreserveSearchFocus.remember(searchInput);
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

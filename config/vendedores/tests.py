@@ -1625,6 +1625,81 @@ class VendedorComboTests(TestCase):
 			self.assertEqual(pres['precio'], 20.0)
 			self.assertEqual(pres['precio_key'], 'precio_1')
 
+	def test_combo_pedido_miembros_includes_free_gift_metadata(self):
+		gift_promo = Promocion.objects.create(
+			nombre='Combo Free Gift',
+			alcance=Promocion.ALCANCE_GRUPO,
+			activa=True,
+		)
+		PromocionProducto.objects.create(promocion=gift_promo, producto=self.producto_a)
+		PromocionProducto.objects.create(promocion=gift_promo, producto=self.producto_b)
+		PromocionEscala.objects.create(
+			promocion=gift_promo,
+			cantidad_minima=20,
+			tipo_beneficio=PromocionEscala.TIPO_PERCENT,
+			valor_beneficio=Decimal('5'),
+		)
+		PromocionEscala.objects.create(
+			promocion=gift_promo,
+			cantidad_minima=100,
+			tipo_beneficio=PromocionEscala.TIPO_FREE_UNITS,
+			unidades_gratis=1,
+			presentacion_regalo=self.pres_b,
+		)
+		self.client.force_login(self.vendor)
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session.save()
+
+		response = self.client.get(reverse('combo_pedido_miembros', args=[gift_promo.id]))
+		self.assertEqual(response.status_code, 200)
+		data = response.json()
+		free_tier = next(row for row in data['escalas'] if row['minimo'] == 100)
+		self.assertEqual(free_tier['tipo_beneficio'], PromocionEscala.TIPO_FREE_UNITS)
+		self.assertEqual(free_tier['unidades_gratis'], 1)
+		self.assertIsNotNone(free_tier['regalo'])
+		self.assertEqual(free_tier['regalo']['presentacion_id'], self.pres_b.id)
+		self.assertEqual(free_tier['regalo']['producto_id'], self.producto_b.id)
+
+	def test_distributed_combo_with_free_gift_adds_regalo_line_to_cart(self):
+		self.promo.activa = False
+		self.promo.save(update_fields=['activa'])
+		gift_promo = Promocion.objects.create(
+			nombre='Combo Free Gift Cart',
+			alcance=Promocion.ALCANCE_GRUPO,
+			activa=True,
+		)
+		PromocionProducto.objects.create(promocion=gift_promo, producto=self.producto_a)
+		PromocionProducto.objects.create(promocion=gift_promo, producto=self.producto_b)
+		PromocionProducto.objects.create(promocion=gift_promo, producto=self.producto_c)
+		PromocionEscala.objects.create(
+			promocion=gift_promo,
+			cantidad_minima=100,
+			tipo_beneficio=PromocionEscala.TIPO_FREE_UNITS,
+			unidades_gratis=1,
+			presentacion_regalo=self.pres_b,
+		)
+		self.client.force_login(self.vendor)
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session.save()
+
+		for pres, cantidad in [(self.pres_a, 34), (self.pres_b, 33), (self.pres_c, 33)]:
+			resp = self.client.post(reverse('agregar_producto_pedido'), {
+				'presentacion_id': pres.id,
+				'cantidad': cantidad,
+				'precio': str(pres.precio_1),
+				'precio_key': 'precio_1',
+			})
+			self.assertEqual(resp.status_code, 200)
+
+		pedido = self.client.session['pedido']
+		gift_lines = [item for item in pedido.values() if item.get('es_regalo')]
+		self.assertEqual(len(gift_lines), 1)
+		self.assertEqual(gift_lines[0]['presentacion_id'], self.pres_b.id)
+		self.assertEqual(gift_lines[0]['cantidad'], 1)
+		self.assertEqual(float(gift_lines[0]['precio']), 0.0)
+
 	def test_combo_pedido_miembros_rejects_individual_promo(self):
 		individual = Promocion.objects.create(nombre='Solo V', producto=self.producto_a, activa=True)
 		PromocionEscala.objects.create(promocion=individual, cantidad_minima=5, valor_beneficio=Decimal('10'))

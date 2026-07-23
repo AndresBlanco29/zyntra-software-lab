@@ -854,7 +854,11 @@ def combo_pedido_miembros(request, promocion_id):
 
     promo = get_object_or_404(
         Promocion.objects.prefetch_related(
-            'escalas', 'productos_grupo', 'productos_grupo__producto'
+            'escalas',
+            'escalas__presentacion_regalo',
+            'escalas__presentacion_regalo__producto',
+            'productos_grupo',
+            'productos_grupo__producto',
         ),
         id=promocion_id,
         alcance=Promocion.ALCANCE_GRUPO,
@@ -891,15 +895,14 @@ def combo_pedido_miembros(request, promocion_id):
             'presentaciones': presentaciones,
         })
 
+    from config.productos.promotions import escala_combo_api_payload
+
     return JsonResponse({
         'promocion_id': promo.id,
         'nombre': promo.nombre,
         'descripcion': promo.texto_catalogo(),
         'minimum': minimum,
-        'escalas': [
-            {'minimo': escala.cantidad_minima, 'beneficio': escala.texto_beneficio()}
-            for escala in escalas
-        ],
+        'escalas': [escala_combo_api_payload(escala) for escala in escalas],
         'miembros': miembros,
     })
 

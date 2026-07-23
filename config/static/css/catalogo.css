@@ -875,6 +875,56 @@ z-index:9999;
     text-align: center;
 }
 
+.combo-gifts__heading {
+    margin: 0.15rem 0 0.55rem;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #15803d;
+}
+
+.combo-gifts__preview-note {
+    margin: 0.45rem 0 0;
+    font-size: 0.78rem;
+    color: #166534;
+    font-weight: 600;
+}
+
+.combo-member--gift {
+    border-color: #86efac;
+    background: #f0fdf4;
+}
+
+.combo-member--gift-preview {
+    opacity: 0.92;
+    border-style: dashed;
+}
+
+.combo-member--gift .combo-member__name i {
+    color: #15803d;
+}
+
+.combo-gift-badge {
+    display: inline-block;
+    margin-left: 0.35rem;
+    padding: 0.12rem 0.55rem;
+    border-radius: 999px;
+    background: #15803d;
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    vertical-align: middle;
+}
+
+.combo-member__stepper--readonly .combo-member__qty {
+    background: #ecfdf5;
+    border-color: #86efac;
+    font-weight: 800;
+    color: #166534;
+}
+
 .combo-modal__footer {
     flex-direction: column;
     gap: 0.6rem;

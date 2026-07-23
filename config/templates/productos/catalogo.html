@@ -46,7 +46,10 @@ data-combo-missing-label="{% trans 'Add more units to reach the combo' %}"
 data-combo-add-label="{% trans 'Add combo to my order' %}"
 data-combo-added-label="{% trans 'Combo added' %} ✔"
 data-combo-qty-label="{% trans 'Quantity' %}"
-data-combo-presentation-label="{% trans 'Presentation' %}">
+data-combo-presentation-label="{% trans 'Presentation' %}"
+data-combo-free-label="{% trans 'FREE' %}"
+data-combo-free-section-label="{% trans 'Free product' %}"
+data-combo-free-preview-label="{% trans 'Included when you reach this tier' %}">
 
     <!-- NAVBAR -->
     <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
@@ -413,6 +416,7 @@ data-combo-presentation-label="{% trans 'Presentation' %}">
           </div>
         </div>
         <div data-role="combo-members"></div>
+        <div data-role="combo-gifts" hidden></div>
         <div class="combo-modal__loading text-center py-4" data-role="combo-loading" hidden>
           <div class="spinner-border text-primary" role="status"></div>
         </div>
@@ -430,6 +434,7 @@ data-combo-presentation-label="{% trans 'Presentation' %}">
 
     <script src="{% static 'js/preserve-search-focus.js' %}"></script>
     <script src="{% static 'js/catalog_quantity.js' %}"></script>
+    <script src="{% static 'js/combo_builder.js' %}"></script>
     <script src="{% static 'js/catalogo.js' %}"></script>
 
     <script>

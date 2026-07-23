@@ -452,6 +452,34 @@ def calcular_unidades_regalo_escala(escala, cantidad):
     return (qty // minimo) * unidades
 
 
+def escala_combo_api_payload(escala, *, gift_product_name=None):
+    """JSON tier row for the combo builder modal (includes FREE gift metadata)."""
+    payload = {
+        'minimo': int(escala.cantidad_minima),
+        'beneficio': escala.texto_beneficio(),
+        'tipo_beneficio': escala.tipo_beneficio,
+        'unidades_gratis': int(escala.unidades_gratis or 0),
+        'regalo': None,
+    }
+    if (
+        escala.tipo_beneficio == PromocionEscala.TIPO_FREE_UNITS
+        and getattr(escala, 'presentacion_regalo_id', None)
+    ):
+        gift = getattr(escala, 'presentacion_regalo', None)
+        if gift is not None:
+            producto = gift.producto
+            nombre = gift_product_name
+            if nombre is None and producto is not None:
+                nombre = getattr(producto, 'nombre_traducido', None) or producto.nombre
+            payload['regalo'] = {
+                'presentacion_id': gift.id,
+                'producto_id': producto.id if producto is not None else None,
+                'nombre': nombre or '',
+                'presentacion_nombre': gift.nombre_empaque_cliente,
+            }
+    return payload
+
+
 def _valor_comparacion_escala(escala, *, precio, presentacion, cantidad):
     """Score used to pick the best scale (discount $ or estimated gift value)."""
     if (

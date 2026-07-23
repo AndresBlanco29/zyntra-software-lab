@@ -46,6 +46,9 @@ data-combo-add-label="{% trans 'Add combo to the order' %}"
 data-combo-added-label="{% trans 'Combo added' %} ✔"
 data-combo-qty-label="{% trans 'Quantity' %}"
 data-combo-presentation-label="{% trans 'Presentation' %}"
+data-combo-free-label="{% trans 'FREE' %}"
+data-combo-free-section-label="{% trans 'Free product' %}"
+data-combo-free-preview-label="{% trans 'Included when you reach this tier' %}"
 class="vendedor-catalogo-page"
 >
 
@@ -472,6 +475,7 @@ $<span id="pedidoTotal">{{ total }}</span>
           </div>
         </div>
         <div data-role="combo-members"></div>
+        <div data-role="combo-gifts" hidden></div>
         <div class="combo-modal__loading text-center py-4" data-role="combo-loading" hidden>
           <div class="spinner-border text-primary" role="status"></div>
         </div>
@@ -527,6 +531,7 @@ body.client-mode .precio-select option {
 }
 </style>
 <script src="{% static 'js/take_order_client_mode.js' %}"></script>
+<script src="{% static 'js/combo_builder.js' %}"></script>
 <script src="{% static 'js/tomar_pedido_catalogo.js' %}"></script>
 
 <script>

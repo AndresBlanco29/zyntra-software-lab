@@ -502,9 +502,15 @@ def _build_invoice_pdf_item_data(invoice):
 			line_discount_amount = (discount_amount_unit * Decimal(str(item.cantidad_facturada or 0))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 		elif discount_percentage > 0 and list_price_value is not None:
 			line_discount_amount = ((list_price_value - Decimal(str(item.precio_unitario or 0))) * Decimal(str(item.cantidad_facturada or 0))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+		is_free = bool(getattr(item, 'es_regalo', False) or (
+			item.pedido_item_id and getattr(item.pedido_item, 'es_regalo', False)
+		) or Decimal(str(item.precio_unitario or 0)) == 0)
+		product_name = item.producto_nombre
+		if is_free and 'FREE' not in product_name.upper():
+			product_name = f'{product_name} (FREE)'
 		items.append({
 			'barcode': barcode,
-			'product_name': item.producto_nombre,
+			'product_name': product_name,
 			'pack_size': INVOICE_PDF_UNIT_OF_MEASURE,
 			'requested_quantity': str(requested_quantity),
 			'dispatched_quantity': str(item.cantidad_despachada_neta),

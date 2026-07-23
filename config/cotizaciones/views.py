@@ -498,37 +498,59 @@ def ver_cotizacion(request):
     carrito = []
     cliente = _cliente_from_user(request.user)
 
-    # First pass: resolve current price and product id for every line so that
+    # First pass: resolve current price and product id for every paid line so that
     # combo promotions can correctly sum quantities across all of them.
+    # FREE gift keys look like "gift:{trigger}:{presentacion_id}" and must be kept.
     presentaciones_cache = {}
-    for presentacion_id, item in list(carrito_session.items()):
+    for key, item in list(carrito_session.items()):
+        presentacion_id = item.get("presentacion_id") or (key if str(key).isdigit() else None)
+        if not presentacion_id:
+            del carrito_session[key]
+            continue
         try:
-            presentacion = Presentacion.objects.get(id=presentacion_id)
+            presentacion = Presentacion.objects.select_related("producto").get(id=presentacion_id)
         except Presentacion.DoesNotExist:
-            del carrito_session[presentacion_id]
+            del carrito_session[key]
             continue
 
-        presentaciones_cache[presentacion_id] = presentacion
+        presentaciones_cache[str(key)] = presentacion
+        item["producto_id"] = presentacion.producto_id
+        item["presentacion_id"] = presentacion.id
+        if item.get("es_regalo"):
+            item["precio"] = 0
+            item["descuento_aplicado"] = True
+            item["descuento_monto"] = 0
+            continue
         precio = _quote_item_price_for_customer(
             cliente=cliente,
             presentacion=presentacion,
             session_price=item.get("precio", 0),
         )
-        item["producto_id"] = presentacion.producto_id
-        item["presentacion_id"] = presentacion.id
         item["precio"] = float(precio)
 
-    # Apply promotions across ALL lines together (combo aggregation).
+    # Apply promotions across ALL lines together (combo aggregation + FREE gifts).
     reaplicar_promociones_en_lineas_sesion(carrito_session, cliente=cliente)
-    lineas_context = list(carrito_session.values())
+    lineas_context = [row for row in carrito_session.values() if not row.get("es_regalo")]
 
-    for presentacion_id, item in list(carrito_session.items()):
-        presentacion = presentaciones_cache.get(presentacion_id)
+    for key, item in list(carrito_session.items()):
+        presentacion = presentaciones_cache.get(str(key))
         if presentacion is None:
-            continue
+            presentacion_id = item.get("presentacion_id")
+            if not presentacion_id:
+                continue
+            try:
+                presentacion = Presentacion.objects.select_related("producto").get(id=presentacion_id)
+            except Presentacion.DoesNotExist:
+                continue
+            presentaciones_cache[str(key)] = presentacion
         producto = presentacion.producto
-        precio = item.get("precio", 0)
-        promocion_estado = estado_promocion_para_linea(
+        precio = 0 if item.get("es_regalo") else item.get("precio", 0)
+        promocion_estado = {
+            "available": False,
+            "applied": True,
+            "minimum": 0,
+            "current": item.get("cantidad", 0),
+        } if item.get("es_regalo") else estado_promocion_para_linea(
             producto_id=producto.id,
             presentacion_id=presentacion.id,
             cantidad=item["cantidad"],
@@ -539,9 +561,10 @@ def ver_cotizacion(request):
         )
 
         carrito.append({
-            "id": presentacion_id,
+            "id": key,
             "producto": producto,
             "presentacion": presentacion,
+            "presentacion_id": presentacion.id,
             "cantidad": item["cantidad"],
             "descuento_aplicado": bool(item.get("descuento_aplicado")),
             "descuento_monto": item.get("descuento_monto", 0),
@@ -549,6 +572,7 @@ def ver_cotizacion(request):
             "promocion_nombre": item.get("promocion_nombre") or "",
             "promocion_descripcion": item.get("promocion_descripcion") or "",
             "promocion_estado": promocion_estado,
+            "es_regalo": bool(item.get("es_regalo")),
         })
 
     request.session["carrito"] = carrito_session
@@ -599,10 +623,12 @@ def guardar_cotizacion(request):
 
     total = Decimal('0')
 
-    # First pass: resolve fresh prices and product ids for every line so that
-    # combo promotions can sum quantities across all products before saving.
+    # First pass: resolve fresh prices for paid lines only. FREE gift lines are
+    # recreated by asegurar_promociones_en_cotizacion after persistence.
     presentaciones_cache = {}
     for key, item in list(carrito.items()):
+        if item.get("es_regalo"):
+            continue
         presentacion = Presentacion.objects.get(id=item["presentacion_id"])
         presentaciones_cache[key] = presentacion
         precio = _quote_item_price_for_customer(
@@ -617,6 +643,8 @@ def guardar_cotizacion(request):
     reaplicar_promociones_en_lineas_sesion(carrito, cliente=cliente)
 
     for key, item in carrito.items():
+        if item.get("es_regalo"):
+            continue
 
         presentacion = presentaciones_cache[key]
         cantidad = item["cantidad"]
@@ -642,14 +670,14 @@ def guardar_cotizacion(request):
             subtotal=subtotal,
             descuento_aplicado=descuento_aplicado,
             descuento_monto=descuento_monto,
+            es_regalo=False,
         )
 
         total += subtotal
 
     cotizacion.total = total
     cotizacion.save(update_fields=['total'])
-    # Belt-and-suspenders: re-apply any qualifying promos that session math missed
-    # (e.g. $0 line price with a fixed-dollar or list-price-based % promo).
+    # Re-apply promos and materialize FREE gift lines on the saved quote.
     asegurar_promociones_en_cotizacion(cotizacion)
 
     items = cotizacion.items.all()

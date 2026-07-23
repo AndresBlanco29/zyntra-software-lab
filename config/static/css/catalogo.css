@@ -667,6 +667,19 @@ z-index:9999;
     flex-direction: column;
 }
 
+.combo-card__media {
+    min-height: 110px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.combo-card__media .producto-img {
+    max-height: 140px;
+    width: auto;
+    object-fit: contain;
+}
+
 .combo-card__icon {
     font-size: 2.6rem;
     color: #7c3aed;

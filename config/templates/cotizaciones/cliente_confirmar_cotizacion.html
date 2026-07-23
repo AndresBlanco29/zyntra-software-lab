@@ -138,7 +138,12 @@
               <tbody>
                 {% for row in quote_rows %}
                   <tr>
-                    <td data-label="{% trans 'Product' %}">{{ row.item.presentacion.producto.nombre }}</td>
+                    <td data-label="{% trans 'Product' %}">
+                      {{ row.item.presentacion.producto.nombre }}
+                      {% if row.item.es_regalo %}
+                      <span class="badge text-bg-success ms-1">{% trans "FREE" %}</span>
+                      {% endif %}
+                    </td>
                     <td data-label="{% trans 'Presentation' %}">{{ row.item.presentacion.nombre_traducido }}</td>
                     <td data-label="{% trans 'List price' %}" class="text-end">${{ row.list_price|floatformat:2 }}</td>
                     <td data-label="{% trans 'Discount' %}" class="text-end">

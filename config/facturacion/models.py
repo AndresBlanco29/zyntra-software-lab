@@ -560,6 +560,11 @@ class InvoiceItem(models.Model):
 	precio_venta_sugerido_unitario = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 	peso_por_caja = models.DecimalField(max_digits=10, decimal_places=3, null=True, blank=True)
 	subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+	es_regalo = models.BooleanField(
+		default=False,
+		verbose_name='Free / gift line',
+		help_text='True when this invoice line comes from a Free units promotional gift.',
+	)
 
 	class Meta:
 		ordering = ('id',)

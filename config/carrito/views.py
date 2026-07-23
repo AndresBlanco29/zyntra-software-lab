@@ -4,6 +4,7 @@ from config.clientes.models import Cliente
 from config.pedidos.services import calcular_subtotal_item_pedido
 from config.productos.models import Producto, Presentacion
 from config.productos.promotions import (
+    _gift_session_signature,
     estado_promocion_para_linea,
     reaplicar_promociones_en_lineas_sesion,
 )
@@ -106,8 +107,21 @@ def actualizar_cantidad(request):
     accion = request.POST.get("accion")
 
     carrito = request.session.get("carrito", {})
+    gifts_before = _gift_session_signature(carrito)
 
     if producto_id in carrito:
+        if carrito[producto_id].get("es_regalo") and accion in {"sumar", "restar", "set"}:
+            item = carrito[producto_id]
+            return JsonResponse({
+                "success": True,
+                "cantidad": item.get("cantidad", 0),
+                "subtotal": 0,
+                "promo_applied": True,
+                "promo_label": "FREE",
+                "promo": {"available": False, "applied": True, "minimum": 0, "current": item.get("cantidad", 0)},
+                "reload": False,
+                "es_regalo": True,
+            })
 
         if accion == "sumar":
             carrito[producto_id]["cantidad"] += 1
@@ -149,7 +163,7 @@ def actualizar_cantidad(request):
     request.session["carrito"] = carrito
 
     item = carrito.get(producto_id) or {}
-    lineas_context = _lineas_contexto_carrito(carrito)
+    lineas_context = [row for row in _lineas_contexto_carrito(carrito) if not row.get("es_regalo")]
     promo_state = estado_promocion_para_linea(
         producto_id=item.get("producto_id"),
         presentacion_id=item.get("presentacion_id"),
@@ -165,6 +179,8 @@ def actualizar_cantidad(request):
         "promo_applied": str(item.get("descuento_origen") or "") == "promocion",
         "promo_label": item.get("promocion_descripcion") or item.get("promocion_nombre") or "",
         "promo": promo_state,
+        "reload": _gift_session_signature(carrito) != gifts_before,
+        "es_regalo": bool(item.get("es_regalo")),
     })
 
 @require_POST

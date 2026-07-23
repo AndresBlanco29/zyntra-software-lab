@@ -19,8 +19,14 @@
       </div>
       {% endif %}
 
-      <div class="combo-card__icon" aria-hidden="true">
-          <i class="bi bi-box-seam-fill"></i>
+      <div class="producto-img-wrap mb-3 combo-card__media">
+        {% if combo.imagen_url %}
+        <img src="{{ combo.imagen_url }}" alt="{{ combo.nombre }}" class="producto-img">
+        {% else %}
+        <div class="combo-card__icon" aria-hidden="true">
+            <i class="bi bi-box-seam-fill"></i>
+        </div>
+        {% endif %}
       </div>
 
       <div class="product-name combo-card__name">

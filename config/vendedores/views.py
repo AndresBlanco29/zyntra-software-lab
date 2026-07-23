@@ -17,6 +17,7 @@ from config.productos.promotions import (
     adjuntar_promociones_a_productos,
     combos_para_catalogo,
     reaplicar_promociones_en_lineas_sesion,
+    _gift_session_signature,
 )
 from config.productos.views import _hydrate_productos
 from django.views.decorators.http import require_GET, require_POST
@@ -924,26 +925,31 @@ def ver_pedido(request):
     productos = []
     discount_options = _build_order_summary_discount_preset_options()
 
-    # Shared context so combo promotions can sum quantities across all lines.
-    lineas_context = list(carrito.values())
+    # Re-evaluate promotions and materialize FREE gift lines before rendering.
+    reaplicar_promociones_en_lineas_sesion(carrito, cliente=cliente)
 
     for key, item in carrito.items():
-
         producto = Producto.objects.get(id=item["producto_id"])
-
         presentaciones = Presentacion.objects.filter(producto=producto)
         presentacion = Presentacion.objects.get(id=item["presentacion_id"])
-        precio, precio_key = _resolve_cart_item_price(
-            presentacion=presentacion,
-            precio=item.get("precio", 0),
-            precio_key=item.get("precio_key", ''),
-        )
-        if precio_key and item.get("precio_key") != precio_key:
-            carrito[key]["precio_key"] = precio_key
-        if float(item.get("precio", 0) or 0) != precio:
-            carrito[key]["precio"] = precio
+        es_regalo = bool(item.get("es_regalo"))
+        if es_regalo:
+            precio = 0.0
+            precio_key = ''
+            carrito[key]["precio"] = 0
+            carrito[key]["descuento_aplicado"] = True
+            carrito[key]["descuento_monto"] = 0
+        else:
+            precio, precio_key = _resolve_cart_item_price(
+                presentacion=presentacion,
+                precio=item.get("precio", 0),
+                precio_key=item.get("precio_key", ''),
+            )
+            if precio_key and item.get("precio_key") != precio_key:
+                carrito[key]["precio_key"] = precio_key
+            if float(item.get("precio", 0) or 0) != precio:
+                carrito[key]["precio"] = precio
 
-        aplicar_promocion_en_item_sesion(carrito[key], precio_unitario=precio, cliente=cliente, lineas_context=lineas_context)
         item = carrito[key]
         subtotal = _cart_item_subtotal(item)
 
@@ -959,7 +965,7 @@ def ver_pedido(request):
 
         productos.append({
             "id": key,
-            "nombre": item["nombre"],
+            "nombre": item.get("nombre") or producto.nombre,
             "presentacion_id": item["presentacion_id"],
             "costo": effective_cost,
             "precio": precio,
@@ -970,10 +976,10 @@ def ver_pedido(request):
             "descuento_origen": item.get("descuento_origen") or "",
             "promocion_nombre": item.get("promocion_nombre") or "",
             "promocion_descripcion": item.get("promocion_descripcion") or "",
-            "es_regalo": bool(item.get("es_regalo")),
+            "es_regalo": es_regalo,
             "selected_discount_preset_key": (
                 _match_discount_preset_key(discount_options, item.get("descuento_monto", 0))
-                if item.get("descuento_aplicado")
+                if item.get("descuento_aplicado") and not es_regalo
                 else ''
             ),
             "precio_neto": calcular_precio_unitario_neto_item(
@@ -1082,8 +1088,27 @@ def actualizar_cantidad_pedido(request):
     accion = request.POST.get("accion")
 
     carrito = request.session.get("pedido", {})
+    gifts_before = _gift_session_signature(carrito)
 
     if producto_id in carrito:
+        # FREE gift lines are managed by the promotion engine; do not edit them manually.
+        if carrito[producto_id].get("es_regalo") and accion in {
+            "sumar", "restar", "set", "cambiar_precio", "cambiar_presentacion", "cambiar_descuento",
+        }:
+            pricing = _cart_item_pricing_payload(carrito[producto_id])
+            return JsonResponse({
+                "cantidad": carrito[producto_id]["cantidad"],
+                "subtotal": pricing["subtotal"],
+                "net_unit_price": pricing["net_unit_price"],
+                "discount_amount": pricing["discount_amount"],
+                "line_savings": pricing["line_savings"],
+                "discount_applied": pricing["discount_applied"],
+                "promo_applied": True,
+                "promo_label": "FREE",
+                "total": _money_string(_cart_total(carrito)),
+                "reload": False,
+                "es_regalo": True,
+            })
 
         # SUMAR
         if accion == "sumar":
@@ -1156,21 +1181,23 @@ def actualizar_cantidad_pedido(request):
             marcar_descuento_manual_en_item(carrito[producto_id])
 
         if accion in {"sumar", "restar", "set", "cambiar_precio", "cambiar_presentacion"}:
-            aplicar_promocion_en_item_sesion(
-                carrito[producto_id],
-                precio_unitario=carrito[producto_id].get("precio"),
-                cliente=cliente,
-                lineas_context=list(carrito.values()),
-            )
+            reaplicar_promociones_en_lineas_sesion(carrito, cliente=cliente)
 
     # Guardar sesión + borrador persistente
     request.session["pedido"] = carrito
     persist_session_take_order_cart(request)
 
-    cantidad = carrito[producto_id]["cantidad"]
-    pricing = _cart_item_pricing_payload(carrito[producto_id])
+    item = carrito.get(producto_id) or {}
+    cantidad = item.get("cantidad", 0)
+    pricing = _cart_item_pricing_payload(item) if item else {
+        "subtotal": "0.00",
+        "net_unit_price": "0.00",
+        "discount_amount": "0.00",
+        "line_savings": "0.00",
+        "discount_applied": False,
+    }
     total = _cart_total(carrito)
-    item = carrito[producto_id]
+    gifts_changed = _gift_session_signature(carrito) != gifts_before
 
     return JsonResponse({
         "cantidad": cantidad,
@@ -1181,7 +1208,9 @@ def actualizar_cantidad_pedido(request):
         "discount_applied": pricing["discount_applied"],
         "promo_applied": str(item.get("descuento_origen") or "") == "promocion",
         "promo_label": item.get("promocion_descripcion") or item.get("promocion_nombre") or "",
-        "total": _money_string(total)
+        "total": _money_string(total),
+        "reload": gifts_changed,
+        "es_regalo": bool(item.get("es_regalo")),
     })
 
 @login_required

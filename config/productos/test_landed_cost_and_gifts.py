@@ -17,6 +17,7 @@ from config.productos.models import (
 	Producto,
 	Promocion,
 	PromocionEscala,
+	PromocionProducto,
 )
 from config.productos.promotions import (
 	calcular_unidades_regalo_escala,
@@ -161,3 +162,124 @@ class FreeGiftPromotionTests(TestCase):
 		self.assertEqual(gift.cantidad, 1)
 		self.assertEqual(gift.precio, Decimal('0.00'))
 		self.assertEqual(gift.subtotal, Decimal('0.00'))
+
+	def test_session_cart_materializes_free_gift_line(self):
+		from config.productos.promotions import reaplicar_promociones_en_lineas_sesion
+
+		lineas = {
+			str(self.presentacion_a.id): {
+				'producto_id': self.presentacion_a.producto_id,
+				'presentacion_id': self.presentacion_a.id,
+				'nombre': 'Producto A',
+				'cantidad': 120,
+				'precio': 10.0,
+			}
+		}
+		reaplicar_promociones_en_lineas_sesion(lineas, cliente=self.cliente)
+		gift_lines = [item for item in lineas.values() if item.get('es_regalo')]
+		self.assertEqual(len(gift_lines), 1)
+		self.assertEqual(gift_lines[0]['presentacion_id'], self.presentacion_b.id)
+		self.assertEqual(gift_lines[0]['cantidad'], 1)
+		self.assertEqual(gift_lines[0]['precio'], 0)
+
+	def test_cotizacion_sync_creates_free_gift_line(self):
+		from config.cotizaciones.models import Cotizacion, CotizacionItem
+		from config.productos.promotions import asegurar_promociones_en_cotizacion
+
+		cotizacion = Cotizacion.objects.create(
+			cliente=self.cliente,
+			estado='ENVIADA',
+			total=Decimal('1200.00'),
+		)
+		CotizacionItem.objects.create(
+			cotizacion=cotizacion,
+			presentacion=self.presentacion_a,
+			cantidad=120,
+			precio=Decimal('10.00'),
+			subtotal=Decimal('1200.00'),
+		)
+		asegurar_promociones_en_cotizacion(cotizacion)
+		gift = CotizacionItem.objects.get(cotizacion=cotizacion, es_regalo=True)
+		self.assertEqual(gift.presentacion_id, self.presentacion_b.id)
+		self.assertEqual(gift.cantidad, 1)
+		self.assertEqual(gift.precio, Decimal('0.00'))
+		self.assertEqual(gift.subtotal, Decimal('0.00'))
+
+	def test_combo_catalog_includes_image_url(self):
+		from django.core.files.uploadedfile import SimpleUploadedFile
+		from config.productos.promotions import combos_para_catalogo
+
+		combo = Promocion.objects.create(
+			nombre='Combo image test',
+			alcance=Promocion.ALCANCE_GRUPO,
+			activa=True,
+			imagen=SimpleUploadedFile('combo.png', b'\x89PNG\r\n\x1a\n\x00', content_type='image/png'),
+		)
+		PromocionProducto.objects.create(promocion=combo, producto=self.presentacion_a.producto)
+		PromocionProducto.objects.create(promocion=combo, producto=self.presentacion_b.producto)
+		PromocionEscala.objects.create(
+			promocion=combo,
+			cantidad_minima=12,
+			tipo_beneficio=PromocionEscala.TIPO_FIXED,
+			valor_beneficio=Decimal('0.75'),
+		)
+		combos = combos_para_catalogo(cliente=self.cliente)
+		match = next(row for row in combos if row['id'] == combo.id)
+		self.assertTrue(match['imagen_url'])
+
+	def test_combo_free_gift_uses_group_total_once(self):
+		from config.productos.promotions import reaplicar_promociones_en_lineas_sesion
+
+		producto_c = Producto.objects.create(
+			nombre='Producto C',
+			categoria=self.presentacion_a.producto.categoria,
+			marca=self.presentacion_a.producto.marca,
+			activo=True,
+		)
+		presentacion_c = Presentacion.objects.create(
+			producto=producto_c, nombre='Caja C', unidades=1, tipo_contenido='caja',
+			costo=Decimal('3.00'), precio_1=Decimal('7.00'),
+		)
+		combo = Promocion.objects.create(
+			nombre='Combo free gift',
+			alcance=Promocion.ALCANCE_GRUPO,
+			activa=True,
+		)
+		PromocionProducto.objects.create(promocion=combo, producto=self.presentacion_a.producto)
+		PromocionProducto.objects.create(promocion=combo, producto=self.presentacion_b.producto)
+		PromocionProducto.objects.create(promocion=combo, producto=producto_c)
+		PromocionEscala.objects.create(
+			promocion=combo,
+			cantidad_minima=100,
+			tipo_beneficio=PromocionEscala.TIPO_FREE_UNITS,
+			unidades_gratis=1,
+			presentacion_regalo=self.presentacion_b,
+		)
+		lineas = {
+			str(self.presentacion_a.id): {
+				'producto_id': self.presentacion_a.producto_id,
+				'presentacion_id': self.presentacion_a.id,
+				'nombre': 'A',
+				'cantidad': 34,
+				'precio': 10.0,
+			},
+			str(self.presentacion_b.id): {
+				'producto_id': self.presentacion_b.producto_id,
+				'presentacion_id': self.presentacion_b.id,
+				'nombre': 'B',
+				'cantidad': 33,
+				'precio': 8.0,
+			},
+			str(presentacion_c.id): {
+				'producto_id': producto_c.id,
+				'presentacion_id': presentacion_c.id,
+				'nombre': 'C',
+				'cantidad': 33,
+				'precio': 7.0,
+			},
+		}
+		reaplicar_promociones_en_lineas_sesion(lineas, cliente=self.cliente)
+		gift_lines = [item for item in lineas.values() if item.get('es_regalo')]
+		self.assertEqual(len(gift_lines), 1)
+		self.assertEqual(gift_lines[0]['presentacion_id'], self.presentacion_b.id)
+		self.assertEqual(gift_lines[0]['cantidad'], 1)

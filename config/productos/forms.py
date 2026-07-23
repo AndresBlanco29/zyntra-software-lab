@@ -52,11 +52,23 @@ class PromocionForm(forms.ModelForm):
 
     class Meta:
         model = Promocion
-        fields = ['nombre', 'descripcion', 'alcance', 'producto', 'presentacion', 'tipos_cliente', 'fecha_inicio', 'fecha_fin', 'activa']
+        fields = [
+            'nombre',
+            'descripcion',
+            'alcance',
+            'producto',
+            'presentacion',
+            'tipos_cliente',
+            'fecha_inicio',
+            'fecha_fin',
+            'activa',
+            'imagen',
+        ]
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-control', 'maxlength': 150}),
             'descripcion': forms.TextInput(attrs={'class': 'form-control', 'maxlength': 255}),
             'alcance': forms.RadioSelect(attrs={'class': 'form-check-input'}),
+            'imagen': forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
         }
 
     def __init__(self, *args, **kwargs):

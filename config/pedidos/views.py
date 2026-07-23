@@ -372,6 +372,7 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 		rows.append({
 			'id': item.id,
 			'product': item.presentacion.producto.nombre,
+			'es_regalo': bool(getattr(item, 'es_regalo', False)),
 			'presentation': item.presentacion.nombre_empaque_cliente,
 			'presentation_id': selected_presentation_id,
 			'baseline_presentation_id': item.presentacion_id,
@@ -1679,8 +1680,11 @@ def backoffice_picking_pdf(request, pedido_id):
 		wordWrap='CJK',
 	)
 	for item in order_pedido_items_for_display(pedido):
+		product_name = item.presentacion.producto.nombre
+		if getattr(item, 'es_regalo', False):
+			product_name = f'{product_name} (FREE)'
 		rows.append([
-			Paragraph(escape(item.presentacion.producto.nombre), item_cell_style),
+			Paragraph(escape(product_name), item_cell_style),
 			Paragraph(escape(item.presentacion.nombre_empaque_cliente), item_cell_style),
 			Paragraph(escape(str(item.cantidad)), item_cell_style),
 			Paragraph('______', item_cell_style),

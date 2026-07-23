@@ -654,10 +654,11 @@ def aplicar_verificacion_picking_inventario(*, pedido, pedido_item_ids, creado_p
 
         if delta_real:
             inventory_delta = inventory_packages_for_quantity(item.presentacion, abs(delta_real)) * (-1 if delta_real > 0 else 1)
+            is_free_gift = bool(getattr(item, 'es_regalo', False)) and delta_real > 0
             _apply_inventory_change(
                 stock=stock,
                 categoria='SALIDA' if delta_real > 0 else 'AJUSTE',
-                tipo='SALIDA_PICKING' if delta_real > 0 else 'AJUSTE_PICKING',
+                tipo='SALIDA_REGALO' if is_free_gift else ('SALIDA_PICKING' if delta_real > 0 else 'AJUSTE_PICKING'),
                 cantidad=abs(delta_real),
                 delta_fisico=inventory_delta,
                 delta_reservado=0,
@@ -666,6 +667,7 @@ def aplicar_verificacion_picking_inventario(*, pedido, pedido_item_ids, creado_p
                 pedido=pedido,
                 pedido_item=item,
                 creado_por=creado_por,
+                observacion='FREE promotional product' if is_free_gift else '',
             )
 
         item.cantidad_reservada_inventario = 0

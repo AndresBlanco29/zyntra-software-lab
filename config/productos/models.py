@@ -673,6 +673,13 @@ class Promocion(models.Model):
     fecha_inicio = models.DateTimeField(null=True, blank=True, verbose_name=_('Start date'))
     fecha_fin = models.DateTimeField(null=True, blank=True, verbose_name=_('End date'))
     activa = models.BooleanField(default=True, verbose_name=_('Active'))
+    imagen = models.ImageField(
+        upload_to='promociones/',
+        blank=True,
+        null=True,
+        verbose_name=_('Combo image'),
+        help_text=_('Optional representative image shown on combo cards in the catalog.'),
+    )
     creada_en = models.DateTimeField(auto_now_add=True)
     actualizada_en = models.DateTimeField(auto_now=True)
 

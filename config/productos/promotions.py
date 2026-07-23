@@ -677,6 +677,12 @@ def combos_para_catalogo(now=None, cliente=None):
         if len(miembros) < 2:
             continue
         escala_min = escalas[0]
+        imagen_url = ''
+        if getattr(promo, 'imagen', None):
+            try:
+                imagen_url = promo.imagen.url
+            except (ValueError, AttributeError):
+                imagen_url = ''
         combos.append({
             'id': promo.id,
             'nombre': promo.nombre,
@@ -686,6 +692,7 @@ def combos_para_catalogo(now=None, cliente=None):
             'miembros': miembros,
             'total_miembros': len(miembros),
             'fecha_fin_iso': promo.fecha_fin.isoformat() if promo.fecha_fin else '',
+            'imagen_url': imagen_url,
         })
     return combos
 
@@ -853,8 +860,28 @@ def aplicar_promocion_en_item_sesion(
             return _clear_promo_fields(item)
         return item
 
-    gift_units = calcular_unidades_regalo_escala(escala, item.get('cantidad'))
+    lineas = _lineas_promocion_desde_contexto(lineas_context)
+    qty_eval = _cantidad_evaluacion_promocion(
+        promo,
+        cantidad_linea=item.get('cantidad'),
+        lineas=lineas,
+    )
+    gift_units = calcular_unidades_regalo_escala(escala, qty_eval)
     if gift_units > 0 and getattr(escala, 'presentacion_regalo_id', None):
+        # For combo (group) Free gifts, only one member line should own the FREE award
+        # so we do not create one gift per flavor.
+        owns_gift = True
+        if promo.alcance == Promocion.ALCANCE_GRUPO and lineas:
+            member_ids = sorted(
+                int(row.get('presentacion_id') or 0)
+                for row in lineas
+                if _linea_coincide_promocion(
+                    promo,
+                    row.get('producto_id'),
+                    row.get('presentacion_id'),
+                )
+            )
+            owns_gift = bool(member_ids) and int(item.get('presentacion_id') or 0) == member_ids[0]
         item['descuento_aplicado'] = False
         item['descuento_monto'] = 0
         item['descuento_origen'] = DESCUENTO_ORIGEN_PROMOCION
@@ -862,8 +889,11 @@ def aplicar_promocion_en_item_sesion(
         item['promocion_nombre'] = promo.nombre
         item['promocion_descripcion'] = promo.texto_catalogo()
         item['promocion_escala_id'] = escala.id
-        item['promocion_regalo_presentacion_id'] = escala.presentacion_regalo_id
-        item['promocion_regalo_cantidad'] = gift_units
+        if owns_gift:
+            item['promocion_regalo_presentacion_id'] = escala.presentacion_regalo_id
+            item['promocion_regalo_cantidad'] = gift_units
+        else:
+            _clear_gift_fields(item)
         return item
 
     _clear_gift_fields(item)
@@ -894,14 +924,19 @@ def sincronizar_regalos_en_sesion(lineas, *, cliente=None):
         gift_qty = int(item.get('promocion_regalo_cantidad') or 0)
         if not gift_presentation_id or gift_qty <= 0:
             continue
-        desired[str(key)] = {
-            'trigger_key': str(key),
-            'presentacion_id': int(gift_presentation_id),
-            'cantidad': gift_qty,
-            'promocion_id': item.get('promocion_id'),
-            'promocion_nombre': item.get('promocion_nombre'),
-            'promocion_descripcion': item.get('promocion_descripcion'),
-        }
+        # Collapse duplicate combo awards (same promo + gift presentation).
+        identity = (item.get('promocion_id'), int(gift_presentation_id))
+        existing = desired.get(identity)
+        if existing is None or gift_qty > existing['cantidad']:
+            desired[identity] = {
+                'trigger_key': str(key),
+                'presentacion_id': int(gift_presentation_id),
+                'cantidad': gift_qty,
+                'promocion_id': item.get('promocion_id'),
+                'promocion_nombre': item.get('promocion_nombre'),
+                'promocion_descripcion': item.get('promocion_descripcion'),
+            }
+    desired = {plan['trigger_key']: plan for plan in desired.values()}
 
     for key in list(lineas.keys()):
         item = lineas[key]
@@ -999,6 +1034,113 @@ def aplicar_promocion_a_item_persistido(item, *, only_if_missing=True, cliente=N
     )
     return True
 
+def _gift_session_signature(lineas):
+    """Stable signature of FREE gift lines so AJAX handlers can detect changes."""
+    if not isinstance(lineas, dict):
+        return ()
+    return tuple(
+        sorted(
+            (
+                str(key),
+                int(item.get('presentacion_id') or 0),
+                int(item.get('cantidad') or 0),
+            )
+            for key, item in lineas.items()
+            if item.get('es_regalo')
+        )
+    )
+
+
+def sincronizar_regalos_promocion_en_cotizacion(cotizacion):
+    """Create/update/remove FREE CotizacionItem gift lines for cross-product Free units."""
+    from config.cotizaciones.models import CotizacionItem
+    from config.productos.models import Presentacion
+
+    cliente = getattr(cotizacion, 'cliente', None)
+    paid_items = list(
+        CotizacionItem.objects.filter(cotizacion=cotizacion, es_regalo=False)
+        .select_related('presentacion__producto')
+    )
+    desired = {}
+    lineas = _lineas_promocion_desde_contexto(paid_items)
+    for item in paid_items:
+        promo, escala, _monto = resolver_escala_para_linea(
+            producto_id=item.presentacion.producto_id,
+            presentacion_id=item.presentacion_id,
+            cantidad=item.cantidad,
+            precio_unitario=item.precio,
+            presentacion=item.presentacion,
+            cliente=cliente,
+            lineas_context=paid_items,
+        )
+        if promo is None or escala is None:
+            continue
+        qty_eval = _cantidad_evaluacion_promocion(promo, cantidad_linea=item.cantidad, lineas=lineas)
+        gift_units = calcular_unidades_regalo_escala(escala, qty_eval)
+        if gift_units <= 0 or not escala.presentacion_regalo_id:
+            continue
+        identity = (promo.id, escala.presentacion_regalo_id)
+        previous = desired.get(identity)
+        if previous is None or gift_units > previous['cantidad']:
+            desired[identity] = {
+                'origen': item,
+                'presentacion_id': escala.presentacion_regalo_id,
+                'cantidad': gift_units,
+            }
+    desired = list(desired.values())
+
+    existing_gifts = list(
+        CotizacionItem.objects.filter(cotizacion=cotizacion, es_regalo=True).select_related('presentacion')
+    )
+    keep_ids = set()
+    for plan in desired:
+        match = next(
+            (
+                gift for gift in existing_gifts
+                if gift.regalo_origen_item_id == plan['origen'].id
+                and gift.presentacion_id == plan['presentacion_id']
+            ),
+            None,
+        )
+        if match:
+            if match.cantidad != plan['cantidad']:
+                match.cantidad = plan['cantidad']
+                match.precio = Decimal('0.00')
+                match.descuento_aplicado = True
+                match.descuento_monto = Decimal('0.00')
+                match.subtotal = Decimal('0.00')
+                match.save(update_fields=[
+                    'cantidad', 'precio', 'descuento_aplicado', 'descuento_monto', 'subtotal',
+                ])
+            keep_ids.add(match.id)
+            continue
+        presentacion = Presentacion.objects.filter(id=plan['presentacion_id']).first()
+        if presentacion is None:
+            continue
+        gift = CotizacionItem.objects.create(
+            cotizacion=cotizacion,
+            presentacion=presentacion,
+            cantidad=plan['cantidad'],
+            precio=Decimal('0.00'),
+            descuento_aplicado=True,
+            descuento_monto=Decimal('0.00'),
+            subtotal=Decimal('0.00'),
+            es_regalo=True,
+            regalo_origen_item=plan['origen'],
+        )
+        keep_ids.add(gift.id)
+
+    for gift in existing_gifts:
+        if gift.id not in keep_ids:
+            gift.delete()
+
+    items = list(CotizacionItem.objects.filter(cotizacion=cotizacion))
+    total = sum((_quantize_money(row.subtotal) for row in items), Decimal('0.00'))
+    cotizacion.total = _quantize_money(total)
+    cotizacion.save(update_fields=['total'])
+    return keep_ids
+
+
 def asegurar_promociones_en_cotizacion(cotizacion, *, only_if_missing=True):
     """Persist missing promotion discounts onto quote lines that already qualify."""
     from config.cotizaciones.models import CotizacionItem
@@ -1006,7 +1148,7 @@ def asegurar_promociones_en_cotizacion(cotizacion, *, only_if_missing=True):
     cliente = getattr(cotizacion, 'cliente', None)
     changed = False
     items = list(
-        CotizacionItem.objects.filter(cotizacion=cotizacion)
+        CotizacionItem.objects.filter(cotizacion=cotizacion, es_regalo=False)
         .select_related('presentacion__producto')
     )
     for item in items:
@@ -1019,7 +1161,11 @@ def asegurar_promociones_en_cotizacion(cotizacion, *, only_if_missing=True):
             item.save(update_fields=['descuento_aplicado', 'descuento_monto', 'subtotal'])
             changed = True
 
+    sincronizar_regalos_promocion_en_cotizacion(cotizacion)
+    changed = True
+
     if changed:
+        items = list(CotizacionItem.objects.filter(cotizacion=cotizacion))
         total = sum((_quantize_money(row.subtotal) for row in items), Decimal('0.00'))
         cotizacion.total = _quantize_money(total)
         cotizacion.save(update_fields=['total'])
@@ -1037,7 +1183,8 @@ def sincronizar_regalos_promocion_en_pedido(pedido):
         .select_related('presentacion__producto')
         .prefetch_related('lineas_regalo')
     )
-    desired = []
+    desired = {}
+    lineas = _lineas_promocion_desde_contexto(paid_items)
     for item in paid_items:
         promo, escala, _monto = resolver_escala_para_linea(
             producto_id=item.presentacion.producto_id,
@@ -1050,14 +1197,19 @@ def sincronizar_regalos_promocion_en_pedido(pedido):
         )
         if promo is None or escala is None:
             continue
-        gift_units = calcular_unidades_regalo_escala(escala, item.cantidad)
+        qty_eval = _cantidad_evaluacion_promocion(promo, cantidad_linea=item.cantidad, lineas=lineas)
+        gift_units = calcular_unidades_regalo_escala(escala, qty_eval)
         if gift_units <= 0 or not escala.presentacion_regalo_id:
             continue
-        desired.append({
-            'origen': item,
-            'presentacion_id': escala.presentacion_regalo_id,
-            'cantidad': gift_units,
-        })
+        identity = (promo.id, escala.presentacion_regalo_id)
+        previous = desired.get(identity)
+        if previous is None or gift_units > previous['cantidad']:
+            desired[identity] = {
+                'origen': item,
+                'presentacion_id': escala.presentacion_regalo_id,
+                'cantidad': gift_units,
+            }
+    desired = list(desired.values())
 
     existing_gifts = list(PedidoItem.objects.filter(pedido=pedido, es_regalo=True).select_related('presentacion'))
     keep_ids = set()

@@ -265,7 +265,7 @@ La Tortilla Grocery
 
 <td data-label="{% trans "Presentación" %}">
 
-<select class="presentacion-resumen" data-id="{{ item.id }}">
+<select class="presentacion-resumen" data-id="{{ item.id }}" {% if item.es_regalo %}disabled{% endif %}>
 
 {% for p in item.presentaciones %}
 
@@ -299,7 +299,7 @@ selected
 
 <div class="cantidad-control">
 
-<button class="qty-btn restar" data-id="{{ item.id }}">−</button>
+<button class="qty-btn restar" data-id="{{ item.id }}" {% if item.es_regalo %}disabled{% endif %}>−</button>
 
 <input
 type="number"
@@ -307,10 +307,10 @@ class="cantidad-input"
 data-id="{{ item.id }}"
 value="{{ item.cantidad }}"
 min="1"
-
+{% if item.es_regalo %}readonly{% endif %}
 >
 
-<button class="qty-btn sumar" data-id="{{ item.id }}">+</button>
+<button class="qty-btn sumar" data-id="{{ item.id }}" {% if item.es_regalo %}disabled{% endif %}>+</button>
 
 </div>
 
@@ -318,7 +318,7 @@ min="1"
 
 <td data-label="{% trans "Precio" %}" class="pedido-price-cell">
 
-<select class="form-select form-select-sm precio-resumen-preset no-search-select mb-1" data-id="{{ item.id }}">
+<select class="form-select form-select-sm precio-resumen-preset no-search-select mb-1" data-id="{{ item.id }}" {% if item.es_regalo %}disabled{% endif %}>
 <option value="">{% trans "Manual price" %}</option>
 {% for p in item.presentaciones %}
 {% if p.id|stringformat:"s" == item.presentacion_id|stringformat:"s" %}
@@ -341,12 +341,16 @@ min="1"
   data-id="{{ item.id }}"
   data-cost="{% if item.costo is not None %}{{ item.costo|unlocalize }}{% endif %}"
   value="{{ item.precio|floatformat:2 }}"
-  aria-label="{% trans 'Manual price' %}">
+  aria-label="{% trans 'Manual price' %}"
+  {% if item.es_regalo %}readonly{% endif %}>
 </div>
 
 </td>
 
 <td data-label="{% trans "Descuento" %}" class="pedido-discount-cell" data-id="{{ item.id }}">
+{% if item.es_regalo %}
+<span class="badge text-bg-success">{% trans "FREE" %}</span>
+{% else %}
 <div class="form-check discount-toggle-box mb-2">
 <input
   type="checkbox"
@@ -388,6 +392,7 @@ min="1"
 <div class="form-text js-internal-only">{% trans "Enter any custom %; it converts to dollars per unit from the line price." %}</div>
 </div>
 <div class="small text-muted descuento-resumen" data-id="{{ item.id }}"></div>
+{% endif %}
 </td>
 
 <td data-label="{% trans "Pagas" %}">

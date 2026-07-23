@@ -116,6 +116,10 @@ function actualizarCantidad(productoId, accion, cantidad) {
     })
     .then(res => res.json())
     .then(data => {
+        if (data && data.reload) {
+            window.location.reload();
+            return data;
+        }
         const input = document.querySelector(`.cantidad-input[data-id="${productoId}"]`);
         if (input) {
             input.value = data.cantidad;

@@ -766,6 +766,9 @@
           <tr class="{% if item.has_picker_stock_shortage or item.selector_has_changes %}table-danger{% endif %}" data-pedido-item-row="{{ item.id }}" {% if item.has_picker_stock_shortage %}data-stock-shortage="true"{% endif %}>
             <td>
               {{ item.presentacion.producto.nombre }}
+              {% if item.es_regalo %}
+              <div class="mt-1"><span class="badge text-bg-success">{% trans "FREE" %}</span></div>
+              {% endif %}
               <div class="small mt-1 {% if item.stock_fisico_packages <= 0 %}text-danger fw-semibold{% else %}text-success fw-semibold{% endif %}">
                 {% blocktrans with amount=item.stock_fisico_packages %}Available stock: {{ amount }} CS{% endblocktrans %}
               </div>

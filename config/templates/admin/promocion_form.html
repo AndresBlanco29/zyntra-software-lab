@@ -25,7 +25,7 @@
 <div class="alert alert-danger">{{ productos_formset.non_form_errors }}</div>
 {% endif %}
 
-<form method="POST" id="promoForm">
+<form method="POST" id="promoForm" enctype="multipart/form-data">
 {% csrf_token %}
 
 <div class="mb-3">
@@ -39,6 +39,18 @@
 {{ form.descripcion }}
 <div class="form-text">{% trans "Shown under the product name in the catalog." %}</div>
 {% if form.descripcion.errors %}<div class="text-danger small">{{ form.descripcion.errors|striptags }}</div>{% endif %}
+</div>
+
+<div class="mb-3" id="promoComboImageSection">
+<label class="form-label" for="{{ form.imagen.id_for_label }}">{% trans "Combo image" %}</label>
+{{ form.imagen }}
+<div class="form-text">{% trans "Optional. Shown on the combo card in the catalog, like a product photo." %}</div>
+{% if promocion and promocion.imagen %}
+<div class="mt-2">
+  <img src="{{ promocion.imagen.url }}" alt="{{ promocion.nombre }}" style="max-width:160px;max-height:160px;object-fit:contain;border:1px solid #e2e8f0;border-radius:8px;padding:6px;background:#fff;">
+</div>
+{% endif %}
+{% if form.imagen.errors %}<div class="text-danger small">{{ form.imagen.errors|striptags }}</div>{% endif %}
 </div>
 
 <div class="mb-4">

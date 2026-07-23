@@ -148,7 +148,7 @@ autocomplete="off">
 <tbody>
 
 {% for item in carrito %}
-<tr data-id="{{ item.id }}" {% if item.promocion_estado.available %}class="cart-promo-row"{% endif %}>
+<tr data-id="{{ item.id }}" {% if item.es_regalo %}class="cart-free-row"{% elif item.promocion_estado.available %}class="cart-promo-row"{% endif %}>
 
 <td data-label="{% trans 'Product' %}">
 <div class="d-flex align-items-start gap-3 nombre-producto">
@@ -165,6 +165,12 @@ alt="{% trans 'No product image' %}">
 
 <div>
 <span class="fw-bold d-block">{{ item.producto.nombre_traducido }}</span>
+{% if item.es_regalo %}
+<div class="mt-2">
+  <span class="badge text-bg-success">{% trans "FREE" %}</span>
+  <div class="small text-success mt-1">{% trans "Promotional free product included with your order." %}</div>
+</div>
+{% else %}
 <div class="cart-promo-status mt-2" data-role="promo-status">
 {% if item.promocion_estado.available %}
   <span class="cart-promo-label">
@@ -185,6 +191,7 @@ alt="{% trans 'No product image' %}">
   {% endif %}
 {% endif %}
 </div>
+{% endif %}
 </div>
 
 </div>
@@ -193,7 +200,7 @@ alt="{% trans 'No product image' %}">
 
 <td data-label="{% trans 'Presentation' %}">
 
-<select class="form-select form-select-sm presentacion-select">
+<select class="form-select form-select-sm presentacion-select" {% if item.es_regalo %}disabled{% endif %}>
 
 {% for p in item.producto.presentaciones.all %}
 
@@ -234,7 +241,7 @@ data-tipo="{{ p.tipo_contenido_traducido|lower }}"
 
 <div class="d-flex align-items-center gap-2">
 
-<button type="button" class="qty-btn restar" data-id="{{ item.id }}">-</button>
+<button type="button" class="qty-btn restar" data-id="{{ item.id }}" {% if item.es_regalo %}disabled{% endif %}>-</button>
 
 <input
 type="number"
@@ -245,9 +252,10 @@ data-id="{{ item.id }}"
 value="{{ item.cantidad }}"
 inputmode="numeric"
 aria-label="{% trans 'Quantity' %}"
+{% if item.es_regalo %}readonly{% endif %}
 >
 
-<button type="button" class="qty-btn sumar" data-id="{{ item.id }}">+</button>
+<button type="button" class="qty-btn sumar" data-id="{{ item.id }}" {% if item.es_regalo %}disabled{% endif %}>+</button>
 
 </div>
 
@@ -256,9 +264,13 @@ aria-label="{% trans 'Quantity' %}"
 
 <td data-label="{% trans 'Actions' %}">
 
+{% if not item.es_regalo %}
 <button class="btn btn-sm btn-danger eliminar-btn">
 🗑
 </button>
+{% else %}
+<span class="badge text-bg-success">{% trans "FREE" %}</span>
+{% endif %}
 
 </td>
 

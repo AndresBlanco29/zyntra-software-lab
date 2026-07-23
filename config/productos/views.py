@@ -1463,7 +1463,7 @@ def _promocion_form_render_context(request, form, formset, productos_formset, pr
 @internal_permission_required("admin.products.manage")
 def crear_promocion(request):
     if request.method == "POST":
-        form = PromocionForm(request.POST)
+        form = PromocionForm(request.POST, request.FILES)
         formset = _promocion_escalas_formset_context(request, instance=form.instance)
         productos_formset = _promocion_productos_formset_context(request, instance=form.instance)
         productos_valid = True
@@ -1496,13 +1496,16 @@ def crear_promocion(request):
 def editar_promocion(request, promocion_id):
     promocion = get_object_or_404(Promocion, id=promocion_id)
     if request.method == "POST":
-        form = PromocionForm(request.POST, instance=promocion)
+        form = PromocionForm(request.POST, request.FILES, instance=promocion)
         formset = _promocion_escalas_formset_context(request, instance=promocion)
         productos_formset = _promocion_productos_formset_context(request, instance=promocion)
         productos_valid = True
         if form.is_valid() and form.cleaned_data.get("alcance") == Promocion.ALCANCE_GRUPO:
             productos_valid = productos_formset.is_valid() and _validar_promocion_grupo(productos_formset)
         if form.is_valid() and formset.is_valid() and productos_valid:
+            clear_image = request.POST.get("imagen-clear") == "on"
+            if clear_image and promocion.imagen:
+                promocion.imagen.delete(save=False)
             promocion = form.save()
             formset.save()
             if promocion.alcance == Promocion.ALCANCE_GRUPO:

@@ -74,6 +74,7 @@ class InventarioMovimiento(models.Model):
 		('RESERVA_PEDIDO', _('Order reservation')),
 		('LIBERACION_PEDIDO', _('Order reservation release')),
 		('SALIDA_PICKING', _('Picking deduction')),
+		('SALIDA_REGALO', _('Free promotional product deduction')),
 		('AJUSTE_PICKING', _('Picking adjustment')),
 		('ENTRADA_NOTA_CREDITO', _('Credit note return')),
 		('REVERSO_NOTA_CREDITO', _('Credit note reversal')),

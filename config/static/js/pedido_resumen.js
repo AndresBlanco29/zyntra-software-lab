@@ -39,6 +39,14 @@ const notaField = document.getElementById('pedidoNotaCliente')
 let notaSaveTimer = null
 let lastSavedNota = notaField ? String(notaField.value || '') : ''
 
+function maybeReloadForFreeGifts(data) {
+    if (data && data.reload) {
+        window.location.reload()
+        return true
+    }
+    return false
+}
+
 function persistOrderNote(options) {
     const force = Boolean(options && options.force)
     const nota = notaField ? String(notaField.value || '') : ''
@@ -371,6 +379,9 @@ function persistDiscount(id) {
     })
     .then(res => res.json())
     .then(data => {
+        if (maybeReloadForFreeGifts(data)) {
+            return data
+        }
         document.getElementById(`subtotal-${id}`).innerText = '$' + formatMoney(data.subtotal)
         updateOrderTotals(data.total)
         refreshDiscountRow(id, data)
@@ -594,6 +605,9 @@ function applyPriceChange(id, precio, precioKey) {
     })
     .then(res => res.json())
     .then(data => {
+        if (maybeReloadForFreeGifts(data)) {
+            return data
+        }
         document.getElementById(`subtotal-${id}`).innerText = '$' + formatMoney(data.subtotal)
         updateOrderTotals(data.total)
         refreshDiscountRow(id, data)
@@ -747,6 +761,9 @@ body:`producto_id=${id}&accion=set&cantidad=${cantidad}`
 })
 .then(res=>res.json())
 .then(data=>{
+if (maybeReloadForFreeGifts(data)) {
+return
+}
 
 document.getElementById(`subtotal-${id}`).innerText = "$"+formatMoney(data.subtotal)
 updateOrderTotals(data.total)
@@ -777,6 +794,9 @@ body:`producto_id=${id}&accion=${accion}`
 })
 .then(res=>res.json())
 .then(data=>{
+if (maybeReloadForFreeGifts(data)) {
+return
+}
 
 document.querySelector(`.cantidad-input[data-id="${id}"]`).value = data.cantidad
 

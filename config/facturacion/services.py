@@ -783,6 +783,7 @@ def generar_invoice_desde_picking(
 			precio_unitario=final_unit_price,
 			precio_venta_sugerido_unitario=suggested_unit_price,
 			subtotal=line_total,
+			es_regalo=bool(getattr(item, 'es_regalo', False)),
 		))
 		total += line_total
 

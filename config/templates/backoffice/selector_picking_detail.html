@@ -166,23 +166,25 @@
       <div class="col-12">
         <label class="form-label fw-semibold">{% trans "Note" %}</label>
         <textarea name="nota_seleccionador" id="pickerNoteInput" class="form-control" rows="4" {% if form_has_stock_shortage %}required{% endif %}>{{ form_note }}</textarea>
-        <div class="form-text" id="pickerNoteHelp"
-          data-shortage-text="{% trans 'Physical stock is insufficient. A note is required and the order will remain blocked for BackOffice review.' %}"
-          data-normal-text="{% trans 'If physical stock is available, picker approval is required to save this verification as unlocked.' %}">
-          {% if form_has_stock_shortage %}
-            {% trans "Physical stock is insufficient. A note is required and the order will remain blocked for BackOffice review." %}
-          {% else %}
-            {% trans "If physical stock is available, picker approval is required to save this verification as unlocked." %}
-          {% endif %}
-        </div>
         <div class="alert alert-warning mt-3 mb-0 {% if not form_has_stock_shortage %}d-none{% endif %}" id="pickerStockAlert">
           {% trans "Insufficient physical stock detected. You can still save this verification so BackOffice can review and take action." %}
         </div>
       </div>
       <div class="col-12">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" id="notaResuelta" name="nota_seleccionador_resuelta" {% if form_note_resolved %}checked{% endif %} {% if form_has_stock_shortage %}disabled{% else %}required{% endif %}>
-          <label class="form-check-label" for="notaResuelta">{% trans "Approved by picker" %}</label>
+        <div class="picker-approval-box" id="pickerApprovalBox">
+          <p class="picker-approval-box__hint mb-2" id="pickerNoteHelp"
+            data-shortage-text="{% trans 'Physical stock is insufficient. A note is required and the order will remain blocked for BackOffice review.' %}"
+            data-normal-text="{% trans 'If physical stock is available, picker approval is required to save this verification as unlocked.' %}">
+            {% if form_has_stock_shortage %}
+              {% trans "Physical stock is insufficient. A note is required and the order will remain blocked for BackOffice review." %}
+            {% else %}
+              {% trans "If physical stock is available, picker approval is required to save this verification as unlocked." %}
+            {% endif %}
+          </p>
+          <div class="form-check picker-approval-check mb-0">
+            <input class="form-check-input" type="checkbox" id="notaResuelta" name="nota_seleccionador_resuelta" {% if form_note_resolved %}checked{% endif %} {% if form_has_stock_shortage %}disabled{% else %}required{% endif %}>
+            <label class="form-check-label" for="notaResuelta">{% trans "Approved by picker" %}</label>
+          </div>
         </div>
       </div>
     </div>
@@ -275,6 +277,103 @@
 
   @media (prefers-reduced-motion: reduce) {
     .picker-add-product-btn {
+      animation: none;
+    }
+  }
+
+  .picker-approval-box {
+    border: 3px solid #0d6efd;
+    border-radius: 0.85rem;
+    background: linear-gradient(180deg, #f3f8ff 0%, #e8f1ff 100%);
+    padding: 1rem 1.15rem;
+    box-shadow: 0 6px 18px rgba(13, 110, 253, 0.18);
+  }
+
+  .picker-approval-box__hint {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #0a3d91;
+    line-height: 1.4;
+  }
+
+  .picker-approval-check {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 2.75rem;
+    padding: 0.65rem 0.85rem;
+    border: 2px dashed rgba(13, 110, 253, 0.45);
+    border-radius: 0.65rem;
+    background: #fff;
+  }
+
+  .picker-approval-check .form-check-input {
+    width: 1.85rem;
+    height: 1.85rem;
+    margin: 0;
+    flex-shrink: 0;
+    border-width: 2px;
+    cursor: pointer;
+  }
+
+  .picker-approval-check .form-check-label {
+    font-size: 1.2rem;
+    font-weight: 800;
+    line-height: 1.25;
+    color: #0a3d91;
+    cursor: pointer;
+  }
+
+  .picker-approval-box:has(#notaResuelta:checked) {
+    border-color: #198754;
+    background: linear-gradient(180deg, #eefbf3 0%, #dff5e7 100%);
+    box-shadow: 0 6px 18px rgba(25, 135, 84, 0.2);
+  }
+
+  .picker-approval-box:has(#notaResuelta:checked) .picker-approval-box__hint {
+    color: #146c43;
+  }
+
+  .picker-approval-box:has(#notaResuelta:checked) .picker-approval-check {
+    border-color: rgba(25, 135, 84, 0.55);
+    border-style: solid;
+    background: #fff;
+  }
+
+  .picker-approval-box:has(#notaResuelta:checked) .form-check-label {
+    color: #146c43;
+  }
+
+  .picker-approval-box:has(#notaResuelta:not(:checked):not(:disabled)) {
+    animation: picker-approval-pulse 2s ease-in-out infinite;
+  }
+
+  .picker-approval-box:has(#notaResuelta:disabled) {
+    border-color: #adb5bd;
+    background: #f8f9fa;
+    box-shadow: none;
+    animation: none;
+    opacity: 0.9;
+  }
+
+  .picker-approval-box:has(#notaResuelta:disabled) .picker-approval-box__hint,
+  .picker-approval-box:has(#notaResuelta:disabled) .form-check-label {
+    color: #6c757d;
+  }
+
+  .picker-approval-box:has(#notaResuelta:disabled) .picker-approval-check {
+    border-color: #ced4da;
+    background: #fff;
+  }
+
+  @keyframes picker-approval-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.35); }
+    55% { box-shadow: 0 0 0 10px rgba(13, 110, 253, 0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .picker-approval-box:has(#notaResuelta:not(:checked):not(:disabled)) {
       animation: none;
     }
   }

@@ -9,11 +9,43 @@
     <h2 class="mb-1">{% trans "Operational Inventory" %}</h2>
     <p class="text-muted mb-0">{% trans "Review physical, reserved and available stock per presentation. Main stock is counted in packages (CS); loose units appear in the partial stock section below." %}</p>
   </div>
-  <form method="get" class="d-flex gap-2 align-items-center inventory-list-search-form flex-nowrap">
+  <form method="get" class="d-flex flex-wrap gap-2 align-items-center inventory-list-search-form">
     <input type="search" name="q" value="{{ search_term }}" class="form-control" placeholder="{% trans 'Search product or presentation' %}">
+    {% if stock_filter %}
+    <input type="hidden" name="stock" value="{{ stock_filter }}">
+    {% endif %}
     <button type="submit" class="btn btn-outline-secondary flex-shrink-0">{% trans "Search" %}</button>
   </form>
 </div>
+
+<div class="d-flex flex-wrap gap-2 mb-3 inventory-stock-filters" role="group" aria-label="{% trans 'Stock status filters' %}">
+  <a href="{% url 'backoffice_inventory_list' %}{% if search_term %}?q={{ search_term|urlencode }}{% endif %}"
+     class="btn btn-sm {% if not stock_filter %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+    {% trans "All" %} ({{ product_count }})
+  </a>
+  <a href="{% url 'backoffice_inventory_list' %}?stock=out{% if search_term %}&amp;q={{ search_term|urlencode }}{% endif %}"
+     class="btn btn-sm {% if stock_filter == 'out' %}btn-danger{% else %}btn-outline-danger{% endif %}">
+    {% trans "Out of stock" %} ({{ zero_stock_count }})
+  </a>
+  <a href="{% url 'backoffice_inventory_list' %}?stock=low{% if search_term %}&amp;q={{ search_term|urlencode }}{% endif %}"
+     class="btn btn-sm {% if stock_filter == 'low' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+    {% trans "Low stock" %} ({{ low_stock_count }})
+  </a>
+  <a href="{% url 'backoffice_inventory_list' %}?stock=in{% if search_term %}&amp;q={{ search_term|urlencode }}{% endif %}"
+     class="btn btn-sm {% if stock_filter == 'in' %}btn-success{% else %}btn-outline-success{% endif %}">
+    {% trans "In stock" %} ({{ in_stock_count }})
+  </a>
+</div>
+{% if stock_filter %}
+<p class="text-muted small mb-3">
+  {% blocktrans with shown=filtered_product_count total=product_count %}Showing {{ shown }} of {{ total }} presentations for the selected stock filter.{% endblocktrans %}
+  {% blocktrans with threshold=low_stock_threshold %} Low stock means {{ threshold }} packages or fewer available.{% endblocktrans %}
+</p>
+{% else %}
+<p class="text-muted small mb-3">
+  {% blocktrans with threshold=low_stock_threshold %}Low stock means {{ threshold }} packages or fewer available.{% endblocktrans %}
+</p>
+{% endif %}
 
 <div class="row g-3 mb-4">
   <div class="col-md-6 col-xl-3">
@@ -43,8 +75,24 @@
   <div class="col-md-6 col-xl-3">
     <div class="card shadow-sm h-100 border-warning">
       <div class="card-body">
+        <div class="text-muted small text-uppercase">{% trans "Low stock" %}</div>
+        <div class="display-6 fw-semibold">{{ low_stock_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100 border-danger">
+      <div class="card-body">
         <div class="text-muted small text-uppercase">{% trans "Without stock" %}</div>
         <div class="display-6 fw-semibold">{{ zero_stock_count }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="card shadow-sm h-100 border-success">
+      <div class="card-body">
+        <div class="text-muted small text-uppercase">{% trans "In stock" %}</div>
+        <div class="display-6 fw-semibold">{{ in_stock_count }}</div>
       </div>
     </div>
   </div>
@@ -94,12 +142,12 @@
           <td data-label="{% trans 'Reserved' %}">{{ row.stock_reservado }} {{ row.physical_summary }}</td>
           <td data-label="{% trans 'Available' %}">{{ row.stock_disponible }} {{ row.physical_summary }}</td>
           <td data-label="{% trans 'Status' %}">
-            {% if row.stock_disponible <= 0 %}
+            {% if row.stock_status == 'out' %}
             <span class="badge bg-danger">{% trans "Out of stock" %}</span>
-            {% elif row.stock_disponible <= 5 %}
+            {% elif row.stock_status == 'low' %}
             <span class="badge bg-warning text-dark">{% trans "Low stock" %}</span>
             {% else %}
-            <span class="badge bg-success">{% trans "Available" %}</span>
+            <span class="badge bg-success">{% trans "In stock" %}</span>
             {% endif %}
           </td>
           <td data-label="{% trans 'Action' %}" class="mobile-stack-table__action">

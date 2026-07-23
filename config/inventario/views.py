@@ -17,6 +17,42 @@ from .services import (
 	registrar_salida_manual,
 )
 
+LOW_STOCK_THRESHOLD = 5
+STOCK_FILTER_ALL = ''
+STOCK_FILTER_OUT = 'out'
+STOCK_FILTER_LOW = 'low'
+STOCK_FILTER_IN = 'in'
+STOCK_FILTER_CHOICES = (
+	STOCK_FILTER_ALL,
+	STOCK_FILTER_OUT,
+	STOCK_FILTER_LOW,
+	STOCK_FILTER_IN,
+)
+
+
+def _normalize_stock_filter(raw_value):
+	value = str(raw_value or '').strip().lower()
+	if value in STOCK_FILTER_CHOICES:
+		return value
+	return STOCK_FILTER_ALL
+
+
+def _stock_status(stock_disponible):
+	if stock_disponible <= 0:
+		return STOCK_FILTER_OUT
+	if stock_disponible <= LOW_STOCK_THRESHOLD:
+		return STOCK_FILTER_LOW
+	return STOCK_FILTER_IN
+
+
+def _inventory_list_filter_params(*, search_term='', stock_filter=''):
+	params = {}
+	if search_term:
+		params['q'] = search_term
+	if stock_filter:
+		params['stock'] = stock_filter
+	return params
+
 
 def _parse_required_positive_integer(raw_value, error_message):
 	try:
@@ -73,6 +109,7 @@ def _build_fractional_stock_summary(stock):
 @internal_permission_required('backoffice.orders.view')
 def backoffice_inventory_list(request):
 	search_term = (request.GET.get('q') or '').strip()
+	stock_filter = _normalize_stock_filter(request.GET.get('stock'))
 	presentaciones = Presentacion.objects.select_related('producto', 'producto__categoria', 'stock_operativo').filter(producto__activo=True).order_by('producto__nombre', 'nombre')
 	fractional_stocks = StockProductoFraccionado.objects.select_related('producto').order_by('producto__nombre', 'contenido')
 
@@ -90,10 +127,13 @@ def backoffice_inventory_list(request):
 		)
 
 	rows = []
+	all_rows = []
 	total_fisico = 0
 	total_reservado = 0
 	total_disponible = 0
 	zero_stock_count = 0
+	low_stock_count = 0
+	in_stock_count = 0
 	total_fractional_stock = 0
 	fractional_rows = []
 	fractional_by_presentacion_id = {}
@@ -112,37 +152,55 @@ def backoffice_inventory_list(request):
 		stock_fisico = stock.stock_fisico if stock else 0
 		stock_reservado = stock.stock_reservado if stock else 0
 		stock_disponible = stock.computed_stock_disponible() if stock else 0
-		if stock_disponible <= 0:
+		status = _stock_status(stock_disponible)
+		if status == STOCK_FILTER_OUT:
 			zero_stock_count += 1
+		elif status == STOCK_FILTER_LOW:
+			low_stock_count += 1
+		else:
+			in_stock_count += 1
 		fractional_match = fractional_by_presentacion_id.get(presentacion.id)
 		packaging = get_effective_packaging_for_display(presentacion)
 		presentation_label = packaging['presentation_name']
-		rows.append({
+		row = {
 			'presentacion': presentacion,
 			'stock_fisico': stock_fisico,
 			'stock_reservado': stock_reservado,
 			'stock_disponible': stock_disponible,
+			'stock_status': status,
 			'units_per_package': packaging['units'],
 			'content_type_label': packaging['content_type'],
 			'fractional_stock': fractional_match['stock_fisico'] if fractional_match else 0,
 			'fractional_content_label': fractional_match['contenido'] if fractional_match else '',
 			'physical_summary': presentation_label,
 			'presentation_label': presentation_label,
-		})
+		}
+		all_rows.append(row)
 		total_fisico += stock_fisico
 		total_reservado += stock_reservado
 		total_disponible += stock_disponible
+
+	if stock_filter:
+		rows = [row for row in all_rows if row['stock_status'] == stock_filter]
+	else:
+		rows = all_rows
 
 	context = {
 		'rows': rows,
 		'fractional_rows': fractional_rows,
 		'search_term': search_term,
+		'stock_filter': stock_filter,
+		'filter_params': _inventory_list_filter_params(search_term=search_term, stock_filter=stock_filter),
+		'low_stock_threshold': LOW_STOCK_THRESHOLD,
 		'total_fisico': total_fisico,
 		'total_reservado': total_reservado,
 		'total_disponible': total_disponible,
 		'total_fractional_stock': total_fractional_stock,
 		'zero_stock_count': zero_stock_count,
-		'product_count': len(rows),
+		'low_stock_count': low_stock_count,
+		'in_stock_count': in_stock_count,
+		'product_count': len(all_rows),
+		'filtered_product_count': len(rows),
 	}
 	return render(request, 'backoffice/inventory_list.html', context)
 

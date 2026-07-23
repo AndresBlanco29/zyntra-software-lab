@@ -452,3 +452,51 @@ class InventarioBackofficeViewsTests(TestCase):
 				delta_fisico=2,
 			).exists()
 		)
+
+
+class InventoryListFilterTests(TestCase):
+	def setUp(self):
+		self.backoffice = Usuario.objects.create_user(username='bo-inv-filters', password='secret123', role='backoffice')
+		categoria = Categoria.objects.create(nombre='Categoria Filtros')
+		marca = Marca.objects.create(nombre='Marca Filtros')
+
+		def _presentacion(nombre, qty):
+			producto = Producto.objects.create(nombre=nombre, categoria=categoria, marca=marca, activo=True)
+			presentacion = Presentacion.objects.create(
+				producto=producto,
+				nombre='CS',
+				unidades=1,
+				tipo_contenido='caja',
+				precio_1=Decimal('10.00'),
+			)
+			if qty:
+				registrar_entrada_manual(presentacion=presentacion, cantidad=qty, observacion='Seed stock', creado_por=self.backoffice)
+			return presentacion
+
+		self.out_of_stock = _presentacion('Producto Sin Stock', 0)
+		self.low_stock = _presentacion('Producto Low Stock', 3)
+		self.in_stock = _presentacion('Producto En Stock', 20)
+
+	def test_inventory_list_supports_out_of_stock_filter(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_inventory_list'), {'stock': 'out'})
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Producto Sin Stock')
+		self.assertNotContains(response, 'Producto Low Stock')
+		self.assertNotContains(response, 'Producto En Stock')
+
+	def test_inventory_list_supports_low_stock_filter(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_inventory_list'), {'stock': 'low'})
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Producto Low Stock')
+		self.assertNotContains(response, 'Producto Sin Stock')
+		self.assertNotContains(response, 'Producto En Stock')
+
+	def test_inventory_list_supports_in_stock_filter(self):
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_inventory_list'), {'stock': 'in'})
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Producto En Stock')
+		self.assertNotContains(response, 'Producto Sin Stock')
+		self.assertNotContains(response, 'Producto Low Stock')

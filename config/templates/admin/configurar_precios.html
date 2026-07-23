@@ -1,94 +1,49 @@
 {% extends "bases/base_vendedor.html" %}
 {% load static i18n %}
 
-{% block title %}
-{% trans "Configure price percentages" %}
-{% endblock %}
+{% block title %}{% trans "Configure price percentages" %}{% endblock %}
 
 {% block content %}
-
 <h2 class="mb-4">{% trans "Configure price percentages" %}</h2>
 
 <div class="card shadow-sm">
-<div class="card-body" data-price-formula data-price-margins="{{ price_margins|join:',' }}">
-
-<form method="POST">
-{% csrf_token %}
-
-<p class="text-muted">
-{% trans "These utility percentages apply to every presentation with a cost. When you save, existing prices are recalculated automatically using the same formula." %}
-</p>
-
-<p class="text-muted small">
-{% trans "Formula used in every price: final price = cost / (1 - percentage/100). Example: 30% = cost / 0.70, 20% = cost / 0.80." %}
-</p>
-
-<div class="row">
-<div class="col-md-2 mb-3">
-<label class="form-label">{% trans "Price 1 (%)" %}</label>
-<input type="number" step="0.01" min="0" name="porcentaje_1" class="form-control" value="{{ price_margins.0 }}">
+  <div class="card-body">
+    <form method="post">
+      {% csrf_token %}
+      <p class="text-muted">
+        {% trans "These percentages apply to every product with a cost. Saving will trigger an automatic recalculation of Price 1 through Price 5 using RCost + Landed Cost as the base." %}
+      </p>
+      <p class="small text-muted">
+        {% trans "Formula: final price = cost / (1 - percentage/100). Example: 30% margin -> cost / 0.70." %}
+      </p>
+      <div class="row g-3">
+        <div class="col-md-4 col-lg-2">
+          <label class="form-label fw-semibold">{% trans "Price 1 (%)" %}</label>
+          <input type="number" step="0.01" min="0" max="99.99" name="porcentaje_1" class="form-control" value="{{ price_margins.0 }}">
+        </div>
+        <div class="col-md-4 col-lg-2">
+          <label class="form-label fw-semibold">{% trans "Price 2 (%)" %}</label>
+          <input type="number" step="0.01" min="0" max="99.99" name="porcentaje_2" class="form-control" value="{{ price_margins.1 }}">
+        </div>
+        <div class="col-md-4 col-lg-2">
+          <label class="form-label fw-semibold">{% trans "Price 3 (%)" %}</label>
+          <input type="number" step="0.01" min="0" max="99.99" name="porcentaje_3" class="form-control" value="{{ price_margins.2 }}">
+        </div>
+        <div class="col-md-4 col-lg-2">
+          <label class="form-label fw-semibold">{% trans "Price 4 (%)" %}</label>
+          <input type="number" step="0.01" min="0" max="99.99" name="porcentaje_4" class="form-control" value="{{ price_margins.3 }}">
+        </div>
+        <div class="col-md-4 col-lg-2">
+          <label class="form-label fw-semibold">{% trans "Price 5 (%)" %}</label>
+          <input type="number" step="0.01" min="0" max="99.99" name="porcentaje_5" class="form-control" value="{{ price_margins.4 }}">
+        </div>
+      </div>
+      <div class="mt-4 d-flex flex-wrap gap-2">
+        <button type="submit" class="btn btn-success">{% trans "Save percentages" %}</button>
+        <a href="{% url 'lista_productos' %}" class="btn btn-secondary">{% trans "Back" %}</a>
+        <a href="{% url 'configurar_landed_cost' %}" class="btn btn-outline-primary">{% trans "Landed Cost" %}</a>
+      </div>
+    </form>
+  </div>
 </div>
-<div class="col-md-2 mb-3">
-<label class="form-label">{% trans "Price 2 (%)" %}</label>
-<input type="number" step="0.01" min="0" name="porcentaje_2" class="form-control" value="{{ price_margins.1 }}">
-</div>
-<div class="col-md-2 mb-3">
-<label class="form-label">{% trans "Price 3 (%)" %}</label>
-<input type="number" step="0.01" min="0" name="porcentaje_3" class="form-control" value="{{ price_margins.2 }}">
-</div>
-<div class="col-md-2 mb-3">
-<label class="form-label">{% trans "Price 4 (%)" %}</label>
-<input type="number" step="0.01" min="0" name="porcentaje_4" class="form-control" value="{{ price_margins.3 }}">
-</div>
-<div class="col-md-2 mb-3">
-<label class="form-label">{% trans "Price 5 (%)" %}</label>
-<input type="number" step="0.01" min="0" name="porcentaje_5" class="form-control" value="{{ price_margins.4 }}">
-</div>
-</div>
-
-<hr class="my-4">
-
-<h5 class="mb-3">{% trans "Preview" %}</h5>
-
-<div class="row align-items-end">
-<div class="col-md-3 mb-3">
-<label class="form-label">{% trans "Sample cost" %}</label>
-<input type="number" step="0.01" min="0" class="form-control" data-cost-input value="100">
-</div>
-<div class="col-md-9">
-<div class="row">
-<div class="col-md-2 mb-3">
-<label class="form-label" data-price-label="1" data-price-label-base="{% trans 'Precio 1' %}">{% trans "Precio 1" %} ({{ price_margins.0 }}%)</label>
-<input type="number" step="0.01" class="form-control" data-price-output="1" readonly>
-</div>
-<div class="col-md-2 mb-3">
-<label class="form-label" data-price-label="2" data-price-label-base="{% trans 'Precio 2' %}">{% trans "Precio 2" %} ({{ price_margins.1 }}%)</label>
-<input type="number" step="0.01" class="form-control" data-price-output="2" readonly>
-</div>
-<div class="col-md-2 mb-3">
-<label class="form-label" data-price-label="3" data-price-label-base="{% trans 'Precio 3' %}">{% trans "Precio 3" %} ({{ price_margins.2 }}%)</label>
-<input type="number" step="0.01" class="form-control" data-price-output="3" readonly>
-</div>
-<div class="col-md-2 mb-3">
-<label class="form-label" data-price-label="4" data-price-label-base="{% trans 'Precio 4' %}">{% trans "Precio 4" %} ({{ price_margins.3 }}%)</label>
-<input type="number" step="0.01" class="form-control" data-price-output="4" readonly>
-</div>
-<div class="col-md-2 mb-3">
-<label class="form-label" data-price-label="5" data-price-label-base="{% trans 'Precio 5' %}">{% trans "Precio 5" %} ({{ price_margins.4 }}%)</label>
-<input type="number" step="0.01" class="form-control" data-price-output="5" readonly>
-</div>
-</div>
-</div>
-</div>
-
-<button type="submit" class="btn btn-success">{% trans "Save percentages" %}</button>
-<a href="{% url 'lista_productos' %}" class="btn btn-secondary">{% trans "Back" %}</a>
-
-</form>
-
-</div>
-</div>
-
-<script src="{% static 'js/product-price-formula.js' %}"></script>
-
 {% endblock %}

@@ -735,7 +735,7 @@
         <select id="bulkDiscountPresetSelect" class="form-select form-select-sm no-search-select">
           <option value="">{% trans "Select one of the preset discounts" %}</option>
           {% for option in discount_preset_options %}
-          <option value="{{ option.value|unlocalize }}" data-discount-key="{{ option.key }}">{{ option.label }}</option>
+          <option value="{{ option.value|unlocalize }}" data-discount-key="{{ option.key }}" data-discount-type="{{ option.type|default:'amount' }}">{{ option.label }}</option>
           {% endfor %}
         </select>
         <div class="form-text">{% trans "This enables the discount on every line and applies the selected dollar amount." %} <a href="{% url 'configurar_descuentos' %}">{% trans "Configure preset discounts" %}</a></div>
@@ -855,7 +855,7 @@
                 <select class="form-select form-select-sm mb-1 pedido-item-discount-preset no-search-select" data-target-input="descuento_monto_{{ item.id }}" data-item-id="{{ item.id }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
                   <option value="">{% trans "Manual discount" %}</option>
                   {% for option in discount_preset_options %}
-                  <option value="{{ option.value|unlocalize }}" data-discount-key="{{ option.key }}" {% if item.selected_discount_preset_key == option.key %}selected{% endif %}>{{ option.label }}</option>
+                  <option value="{{ option.value|unlocalize }}" data-discount-key="{{ option.key }}" data-discount-type="{{ option.type|default:'amount' }}" {% if item.selected_discount_preset_key == option.key %}selected{% endif %}>{{ option.label }}</option>
                   {% endfor %}
                 </select>
                 <div class="input-group input-group-sm mb-1">

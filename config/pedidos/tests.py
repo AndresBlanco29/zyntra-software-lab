@@ -27,6 +27,7 @@ from config.pedidos.services import (
 	devolver_pedido_desde_picking,
 	evaluar_stock_fisico_verificacion_picking,
 	guardar_verificacion_picking,
+	_resolve_picker_added_item_price,
 	resolver_bloqueo_picking_desde_backoffice,
 	resolver_nota_cliente_desde_backoffice,
 	resolve_picking_send_ui_state,
@@ -959,6 +960,23 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertTrue(nuevo_item.selector_added_by_picker)
 		self.assertEqual(nuevo_item.cantidad, 1)
 		self.assertEqual(nuevo_item.cantidad_inventario_aplicada, 1)
+
+	def test_picker_added_product_price_uses_qb_price_then_price_3(self):
+		Presentacion.objects.filter(pk=self.presentacion_extra.pk).update(
+			qb_price=Decimal('99.99'),
+			precio_3=Decimal('77.00'),
+			precio_1=Decimal('55.00'),
+		)
+		self.presentacion_extra.refresh_from_db()
+		self.assertEqual(_resolve_picker_added_item_price(presentacion=self.presentacion_extra), Decimal('99.99'))
+
+		Presentacion.objects.filter(pk=self.presentacion_extra.pk).update(qb_price=None)
+		self.presentacion_extra.refresh_from_db()
+		self.assertEqual(_resolve_picker_added_item_price(presentacion=self.presentacion_extra), Decimal('77.00'))
+
+		Presentacion.objects.filter(pk=self.presentacion_extra.pk).update(precio_3=Decimal('0.00'))
+		self.presentacion_extra.refresh_from_db()
+		self.assertEqual(_resolve_picker_added_item_price(presentacion=self.presentacion_extra), Decimal('55.00'))
 
 	def test_selector_cannot_add_duplicate_product_already_on_order(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)

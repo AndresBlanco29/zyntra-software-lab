@@ -13,6 +13,7 @@ from .models import (
     Presentacion,
     ConfiguracionPrecios,
     ConfiguracionDescuentos,
+    ConfiguracionDescuentosPorcentaje,
     ConfiguracionLandedCost,
     Promocion,
     PromocionEscala,
@@ -574,6 +575,18 @@ def _productos_admin_filter_params(request):
 def _productos_admin_queryset(request):
     queryset = (
         Producto.objects.select_related('categoria', 'marca')
+        .prefetch_related(
+            Prefetch(
+                'presentaciones',
+                queryset=Presentacion.objects.only(
+                    'id',
+                    'producto_id',
+                    'costo',
+                    'landed_cost_override_tipo',
+                    'landed_cost_override_valor',
+                ).order_by('id'),
+            )
+        )
         .only(
             'id',
             'nombre',
@@ -761,6 +774,20 @@ def configurar_precios(request):
     })
 
 
+def _get_discount_percentage_preset_values(configuracion=None):
+    configuracion = configuracion or ConfiguracionDescuentosPorcentaje.obtener()
+    return [_format_decimal(amount) for amount in configuracion.descuentos_lista()]
+
+
+def _build_discount_preset_options():
+    options = []
+    for option in ConfiguracionDescuentos.obtener().opciones_activas():
+        options.append({**option, 'type': 'amount'})
+    for option in ConfiguracionDescuentosPorcentaje.obtener().opciones_activas():
+        options.append({**option, 'type': 'percent'})
+    return options
+
+
 def _get_discount_preset_config():
     return ConfiguracionDescuentos.obtener()
 
@@ -795,6 +822,8 @@ def configurar_landed_cost(request):
 def configurar_descuentos(request):
     configuracion = _get_discount_preset_config()
     discount_presets = _get_discount_preset_values(configuracion)
+    configuracion_porcentaje = ConfiguracionDescuentosPorcentaje.obtener()
+    discount_percentage_presets = _get_discount_percentage_preset_values(configuracion_porcentaje)
 
     if request.method == "POST":
         for index in range(1, 11):
@@ -804,14 +833,24 @@ def configurar_descuentos(request):
                 field_name,
                 _parse_decimal(request.POST.get(field_name), getattr(configuracion, field_name)),
             )
+            percentage_field = f"descuento_porcentaje_{index}"
+            setattr(
+                configuracion_porcentaje,
+                field_name,
+                _parse_decimal(request.POST.get(percentage_field), getattr(configuracion_porcentaje, field_name)),
+            )
         discount_presets = _get_discount_preset_values(configuracion)
+        discount_percentage_presets = _get_discount_percentage_preset_values(configuracion_porcentaje)
         try:
             configuracion.save()
+            configuracion_porcentaje.save()
         except ValidationError as exc:
             messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
             return render(request, "admin/configurar_descuentos.html", {
                 "configuracion": configuracion,
+                "configuracion_porcentaje": configuracion_porcentaje,
                 "discount_presets": discount_presets,
+                "discount_percentage_presets": discount_percentage_presets,
             })
 
         messages.success(request, _("Preset discounts updated successfully."))
@@ -819,18 +858,23 @@ def configurar_descuentos(request):
         from config.auditoria.models import AuditLog
         log_business_event(
             request.user,
-            action_label=_('Updated preset discount amounts'),
+            action_label=_('Updated preset discount amounts and percentages'),
             action_category=AuditLog.CATEGORY_UPDATE,
             entity_type='Pricing',
             entity_label=_('Preset discounts'),
-            metadata={'discount_presets': discount_presets},
+            metadata={
+                'discount_presets': discount_presets,
+                'discount_percentage_presets': discount_percentage_presets,
+            },
             request=request,
         )
         return redirect("configurar_descuentos")
 
     return render(request, "admin/configurar_descuentos.html", {
         "configuracion": configuracion,
+        "configuracion_porcentaje": configuracion_porcentaje,
         "discount_presets": discount_presets,
+        "discount_percentage_presets": discount_percentage_presets,
     })
 
 

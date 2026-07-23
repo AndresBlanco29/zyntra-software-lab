@@ -7,7 +7,7 @@ from config.clientes.models import Cliente
 from config.clientes.assignment import filter_clientes_for_vendedor
 from config.clientes.phone import normalize_stored_phone_number
 from config.usuarios.models import Usuario
-from config.productos.models import Producto, Presentacion, Categoria, Marca, ConfiguracionPrecios, ConfiguracionDescuentos
+from config.productos.models import Producto, Presentacion, Categoria, Marca, ConfiguracionPrecios, ConfiguracionDescuentos, ConfiguracionDescuentosPorcentaje
 from config.core.profit import build_order_line_profit, summarize_order_profit
 from config.productos.landed_cost import resolve_effective_cost
 from config.pedidos.client_history import load_cliente_favorite_productos
@@ -377,7 +377,12 @@ def _catalog_price_margin_percentages():
 
 
 def _build_order_summary_discount_preset_options():
-    return ConfiguracionDescuentos.obtener().opciones_activas()
+    options = []
+    for option in ConfiguracionDescuentos.obtener().opciones_activas():
+        options.append({**option, 'type': 'amount'})
+    for option in ConfiguracionDescuentosPorcentaje.obtener().opciones_activas():
+        options.append({**option, 'type': 'percent'})
+    return options
 
 
 def _match_discount_preset_key(discount_options, current_amount):

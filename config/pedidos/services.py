@@ -63,6 +63,18 @@ def _resolve_pedido_item_price(*, pedido, presentacion):
     return _quantize_money(price or 0)
 
 
+def _resolve_picker_added_item_price(*, presentacion):
+    qb_price = getattr(presentacion, 'qb_price', None)
+    if qb_price is not None and _quantize_money(qb_price) > 0:
+        return _quantize_money(qb_price)
+
+    price_3 = getattr(presentacion, 'precio_3', None)
+    if price_3 is not None and _quantize_money(price_3) > 0:
+        return _quantize_money(price_3)
+
+    return _quantize_money(getattr(presentacion, 'precio_1', 0) or 0)
+
+
 def calcular_precio_unitario_neto_item(*, precio, descuento_aplicado=False, descuento_monto=0):
     precio_decimal = _quantize_money(precio)
     if not descuento_aplicado:
@@ -1072,7 +1084,7 @@ def guardar_verificacion_picking(
     for payload in additional_items:
         presentacion = Presentacion.objects.select_related('producto').get(id=payload['presentacion_id'])
         cantidad = max(int(payload.get('cantidad') or 0), 1)
-        precio = _resolve_pedido_item_price(pedido=pedido, presentacion=presentacion)
+        precio = _resolve_picker_added_item_price(presentacion=presentacion)
         nuevo_item = PedidoItem.objects.create(
             pedido=pedido,
             presentacion=presentacion,

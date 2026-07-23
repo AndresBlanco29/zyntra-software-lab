@@ -286,6 +286,10 @@ function getPriceControls(id) {
 }
 
 function formatPriceTierLabel(tierNumber, amount) {
+    const helpers = window.LTGTakeOrderClientMode
+    if (helpers) {
+        return helpers.buildSummaryTierLabel(tierNumber, amount)
+    }
     return `PC${tierNumber} · $${formatMoney(amount)}`
 }
 
@@ -827,8 +831,18 @@ document.querySelectorAll('.descuento-preset').forEach(presetSelect => {
     }
 
     presetSelect.addEventListener('change', function () {
-        if (presetSelect.value) {
+        const selectedOption = presetSelect.selectedOptions[0]
+        const percentInput = document.querySelector(`.descuento-porcentaje[data-id="${id}"]`)
+        if (selectedOption && selectedOption.dataset.discountType === 'percent') {
+            if (percentInput) {
+                percentInput.value = presetSelect.value
+                applyCustomPercentDiscount(id)
+            }
+        } else if (presetSelect.value) {
             amountInput.value = presetSelect.value
+            if (percentInput) {
+                percentInput.value = ''
+            }
         }
         persistDiscount(id)
     })

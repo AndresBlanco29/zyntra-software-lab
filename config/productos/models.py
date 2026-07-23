@@ -369,13 +369,14 @@ class Presentacion(models.Model):
         return get_effective_packaging_for_display(self)['presentation_name']
 
     def recalcular_precios(self):
-        if self.costo is None:
+        base_cost = self.effective_cost
+        if base_cost is None:
             return
 
         porcentajes = ConfiguracionPrecios.obtener_porcentajes()
 
         precios = [
-            _calculate_price_from_margin(self.costo, porcentaje)
+            _calculate_price_from_margin(base_cost, porcentaje)
             for porcentaje in porcentajes
         ]
 
@@ -391,9 +392,10 @@ class Presentacion(models.Model):
         normalized_tier = normalize_price_tier(tier, default=None)
         if normalized_tier is None:
             return None
-        if self.costo is not None:
+        base_cost = self.effective_cost
+        if base_cost is not None:
             porcentajes = ConfiguracionPrecios.obtener_porcentajes()
-            return _calculate_price_from_margin(self.costo, porcentajes[normalized_tier - 1])
+            return _calculate_price_from_margin(base_cost, porcentajes[normalized_tier - 1])
         return getattr(self, f'precio_{normalized_tier}', self.precio_1)
 
     @property
@@ -596,6 +598,68 @@ class ConfiguracionDescuentos(models.Model):
 
     def __str__(self):
         return _("Discount configuration")
+
+
+class ConfiguracionDescuentosPorcentaje(models.Model):
+    descuento_1 = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    descuento_2 = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    descuento_3 = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    descuento_4 = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    descuento_5 = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    descuento_6 = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    descuento_7 = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    descuento_8 = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    descuento_9 = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+    descuento_10 = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0.00'))
+
+    class Meta:
+        verbose_name = _('Special discount percentage configuration')
+        verbose_name_plural = _('Special discount percentage configuration')
+
+    def clean(self):
+        for index in range(1, 11):
+            field_name = f'descuento_{index}'
+            percentage = Decimal(str(getattr(self, field_name) or 0))
+            if percentage < 0:
+                raise ValidationError(_('Discount percentages must be zero or greater.'))
+            if percentage >= 100:
+                raise ValidationError(_('Discount percentages must be less than 100.'))
+            setattr(self, field_name, percentage.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP))
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        return
+
+    @classmethod
+    def obtener(cls):
+        defaults = {f'descuento_{index}': Decimal('0.00') for index in range(1, 11)}
+        configuracion, _ = cls.objects.get_or_create(pk=1, defaults=defaults)
+        return configuracion
+
+    def descuentos_lista(self):
+        return [_quantize_money(getattr(self, f'descuento_{index}') or 0) for index in range(1, 11)]
+
+    def opciones_activas(self):
+        options = []
+        for index, percentage in enumerate(self.descuentos_lista(), start=1):
+            if percentage <= 0:
+                continue
+            options.append({
+                'key': f'descuento_porcentaje_{index}',
+                'value': format(percentage, '.2f'),
+                'label': str(_('Special discount %(number)s - %(amount)s%%') % {
+                    'number': index,
+                    'amount': format(percentage, '.2f'),
+                }),
+            })
+        return options
+
+    def __str__(self):
+        return _('Special discount percentage configuration')
 
 
 class Promocion(models.Model):

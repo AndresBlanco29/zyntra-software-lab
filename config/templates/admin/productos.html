@@ -103,6 +103,10 @@
 <tr>
 <th>{% trans "Imagen" %}</th>
 <th>{% trans "Nombre" %}</th>
+{% if request.user|has_internal_permission:'admin.products.manage' %}
+<th>{% trans "RCost" %}</th>
+<th>{% trans "Landed Cost" %}</th>
+{% endif %}
 <th>{% trans "Codigo de Barras" %}</th>
 <th>{% trans "Marca" %}</th>
 <th>{% trans "Categoria" %}</th>
@@ -132,6 +136,25 @@
     {{ producto.nombre }}
   {% endif %}
 </td>
+
+{% if request.user|has_internal_permission:'admin.products.manage' %}
+{% with presentation=producto.presentaciones.all|first %}
+<td>
+  {% if presentation and presentation.costo is not None %}
+  ${{ presentation.costo|floatformat:2 }}
+  {% else %}
+  <span class="text-muted">-</span>
+  {% endif %}
+</td>
+<td>
+  {% if presentation %}
+  ${{ presentation.landed_cost_amount|floatformat:2 }}
+  {% else %}
+  <span class="text-muted">-</span>
+  {% endif %}
+</td>
+{% endwith %}
+{% endif %}
 
 <td>
 {% if producto.codigo_barras %}

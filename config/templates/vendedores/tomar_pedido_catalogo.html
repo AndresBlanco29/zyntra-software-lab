@@ -493,11 +493,33 @@ body.client-mode .js-internal-only,
 body.client-mode .bulk-price-tier-panel,
 body.client-mode .precio-margin-hint,
 body.client-mode .order-history-panel,
-body.client-mode .precio-manual-wrap {
+body.client-mode .precio-manual-wrap,
+body.client-mode .precio-hold-trigger {
   display: none !important;
 }
+body.client-mode .precio-select-shell .precio-select {
+  pointer-events: none;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: #111827;
+  font-weight: 700;
+  padding-left: 0;
+}
+body.client-mode .precio-select-shell[data-state="selected"] .precio-select-mask {
+  display: block !important;
+  position: static;
+  transform: none;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #111827;
+}
 body.client-mode .precio-select option {
-  /* Keep final prices; JS labels still show $ amounts */
+  color: #111827;
 }
 #clientModeToggleBtn.is-active {
   background: #fff;

@@ -52,7 +52,7 @@ from config.facturacion.services import (
 from config.integrations.quickbooks.services import get_connection_status
 from config.integrations.quickbooks.views import get_dashboard_sync_context
 from config.notificaciones.models import Notificacion
-from config.productos.models import Presentacion, ConfiguracionDescuentos, ConfiguracionPrecios
+from config.productos.models import Presentacion, ConfiguracionDescuentos, ConfiguracionDescuentosPorcentaje, ConfiguracionPrecios
 from config.inventario.models import StockPresentacion
 
 from .models import Pedido, PedidoItem
@@ -1077,7 +1077,12 @@ def _build_bulk_pedido_price_options():
 
 
 def _build_pedido_discount_preset_options():
-	return ConfiguracionDescuentos.obtener().opciones_activas()
+	options = []
+	for option in ConfiguracionDescuentos.obtener().opciones_activas():
+		options.append({**option, 'type': 'amount'})
+	for option in ConfiguracionDescuentosPorcentaje.obtener().opciones_activas():
+		options.append({**option, 'type': 'percent'})
+	return options
 
 
 def _match_discount_preset_key(discount_options, current_amount):

@@ -36,7 +36,7 @@ from config.pedidos.services import (
     notificar_backoffice_pedido,
     notificar_cliente_pedido,
 )
-from config.productos.models import ConfiguracionDescuentos, ConfiguracionPrecios, Presentacion
+from config.productos.models import ConfiguracionDescuentos, ConfiguracionDescuentosPorcentaje, ConfiguracionPrecios, Presentacion
 from config.productos.promotions import (
     aplicar_promocion_en_item_sesion,
     asegurar_promociones_en_cotizacion,
@@ -155,7 +155,12 @@ def _validate_backoffice_quote_price(*, item=None, presentacion=None, price):
 
 
 def _build_quote_discount_preset_options():
-    return ConfiguracionDescuentos.obtener().opciones_activas()
+    options = []
+    for option in ConfiguracionDescuentos.obtener().opciones_activas():
+        options.append({**option, 'type': 'amount'})
+    for option in ConfiguracionDescuentosPorcentaje.obtener().opciones_activas():
+        options.append({**option, 'type': 'percent'})
+    return options
 
 
 def _match_discount_preset_key(discount_options, current_amount):

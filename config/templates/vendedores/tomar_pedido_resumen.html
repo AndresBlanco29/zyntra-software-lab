@@ -205,7 +205,7 @@ La Tortilla Grocery
         <select id="bulkDiscountPresetSelect" class="form-select form-select-sm no-search-select">
           <option value="">{% trans "Select one of the preset discounts" %}</option>
           {% for option in discount_preset_options %}
-          <option value="{{ option.value|unlocalize }}">{{ option.label }}</option>
+          <option value="{{ option.value|unlocalize }}" data-discount-type="{{ option.type|default:'amount' }}">{{ option.label }}</option>
           {% endfor %}
         </select>
         <div class="form-text mb-0">{% trans "This enables the discount on every line and applies the selected dollar amount." %}{% if request.user|has_internal_permission:'admin.products.view' %} <a href="{% url 'configurar_descuentos' %}">{% trans "Configure preset discounts" %}</a>{% endif %}</div>
@@ -364,7 +364,7 @@ min="1"
 <select class="form-select form-select-sm mb-2 descuento-preset no-search-select" data-id="{{ item.id }}">
 <option value="">{% trans "Custom discount" %}</option>
 {% for option in discount_preset_options %}
-<option value="{{ option.value|unlocalize }}" data-discount-key="{{ option.key }}" {% if item.selected_discount_preset_key == option.key %}selected{% endif %}>{{ option.label }}</option>
+<option value="{{ option.value|unlocalize }}" data-discount-key="{{ option.key }}" data-discount-type="{{ option.type|default:'amount' }}" {% if item.selected_discount_preset_key == option.key %}selected{% endif %}>{{ option.label }}</option>
 {% endfor %}
 </select>
 <div class="input-group input-group-sm mb-1 descuento-input-wrap">
@@ -563,11 +563,17 @@ body.client-mode .js-internal-only,
 body.client-mode .bulk-price-tier-panel,
 body.client-mode .precio-resumen-preset,
 body.client-mode .line-profit,
-body.client-mode #totalProfit {
+body.client-mode #totalProfit,
+body.client-mode .descuento-percent-wrap {
   display: none !important;
 }
 body.client-mode .precio-resumen-manual-wrap .input-group-text {
   display: none;
+}
+body.client-mode .precio-resumen-manual-wrap.client-mode-price-display .precio-resumen-manual {
+  pointer-events: none;
+  background: #f8fafc;
+  font-weight: 700;
 }
 #clientModeToggleBtn.is-active {
   background: #111827;

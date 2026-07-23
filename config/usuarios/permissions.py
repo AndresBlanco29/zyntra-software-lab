@@ -238,6 +238,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         'backoffice.invoices.manage',
         'backoffice.reports.view',
         'backoffice.customers.assign',
+        'admin.products.view',
+        'admin.products.manage',
         'vendor.customers.view',
         'vendor.customers.manage',
         'driver.delivery.view',

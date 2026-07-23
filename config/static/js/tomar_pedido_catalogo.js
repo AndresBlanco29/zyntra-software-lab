@@ -146,6 +146,23 @@ document.addEventListener('DOMContentLoaded', function() {
         modalPrecioManualMargin.classList.remove('d-none');
     }
 
+    function clientModeHelpers() {
+        return window.LTGTakeOrderClientMode || null;
+    }
+
+    function isClientModeEnabled() {
+        const helpers = clientModeHelpers();
+        return helpers ? helpers.isEnabled() : document.body.classList.contains('client-mode');
+    }
+
+    function buildTierOptionLabel(tierNumber, precio) {
+        const helpers = clientModeHelpers();
+        if (helpers) {
+            return helpers.buildTierOptionLabel(tierNumber, precio);
+        }
+        return `Precio ${tierNumber} - $${precio}`;
+    }
+
     function rebuildPrecioOptions(card, optionData) {
         const precioSelect = card.querySelector('.precio-select');
         const marginTiers = getPriceMarginTiers();
@@ -172,11 +189,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 const marginSuffix = Number.isFinite(margin) ? ` (${formatMarginPercent(margin)})` : '';
                 precioSelect.innerHTML += `
                     <option value="${precio}" data-price-key="${priceKey}"${marginAttr}>
-                    Precio ${index + 1} - $${precio}${marginSuffix}
+                    ${buildTierOptionLabel(index + 1, precio)}${isClientModeEnabled() ? '' : marginSuffix}
                     </option>
                 `;
             }
         });
+
+        if (isClientModeEnabled()) {
+            const helpers = clientModeHelpers();
+            if (helpers) {
+                helpers.applyPresentation(true);
+            }
+        }
 
         const manualInput = card.querySelector('.precio-manual-input');
         if (manualInput) {
@@ -262,9 +286,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
         shell.dataset.state = hasSelectedPrice ? 'selected' : 'empty';
         if (hasSelectedPrice) {
-            mask.textContent = marginSuffix
-                ? `$${precioSelect.value} · ${marginSuffix}`
-                : `${selectedLabel}: $${precioSelect.value}`;
+            const helpers = clientModeHelpers();
+            if (helpers) {
+                mask.textContent = helpers.buildMaskLabel(precioSelect.value, marginSuffix);
+            } else if (marginSuffix) {
+                mask.textContent = `$${precioSelect.value} · ${marginSuffix}`;
+            } else {
+                mask.textContent = `${selectedLabel}: $${precioSelect.value}`;
+            }
         } else {
             mask.textContent = defaultLabel;
         }
@@ -329,14 +358,17 @@ document.addEventListener('DOMContentLoaded', function() {
         precioSelectorOptions.innerHTML = options.map(option => {
             const isSelected = option.value === precioSelect.value ? ' precio-modal-option--selected' : '';
             const marginValue = resolveOptionMargin(option, cost);
-            const marginMarkup = marginValue === null
+            const marginMarkup = marginValue === null || isClientModeEnabled()
                 ? ''
                 : `<span class="precio-modal-option__margin">${buildMarginLabel(marginValue)}</span>`;
+            const optionTitle = isClientModeEnabled()
+                ? ((clientModeHelpers() && clientModeHelpers().formatPriceOnly(option.value)) || `$${option.value}`)
+                : option.text;
             return `
                 <button type="button" class="precio-modal-option${isSelected}" data-value="${option.value}">
-                    <span class="precio-modal-option__title">${option.text}</span>
+                    <span class="precio-modal-option__title">${optionTitle}</span>
                     ${marginMarkup}
-                    <span class="precio-modal-option__product">${productName}</span>
+                    <span class="precio-modal-option__product">${isClientModeEnabled() ? '' : productName}</span>
                 </button>
             `;
         }).join('');
@@ -1036,4 +1068,10 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     })();
+
+    document.addEventListener('ltg:client-mode-changed', function () {
+        document.querySelectorAll('.producto-card').forEach(function (card) {
+            syncPrecioMask(card);
+        });
+    });
 });

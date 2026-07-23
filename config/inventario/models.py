@@ -12,9 +12,10 @@ from config.productos.models import Presentacion, Producto
 
 class StockPresentacion(models.Model):
 	presentacion = models.OneToOneField(Presentacion, on_delete=models.CASCADE, related_name='stock_operativo')
-	stock_fisico = models.PositiveIntegerField(default=0, help_text=_('Physical stock counted in presentation packages (boxes).'))
+	# IntegerField (not Positive*) so QuickBooks oversold QtyOnHand can sync as negatives.
+	stock_fisico = models.IntegerField(default=0, help_text=_('Physical stock counted in presentation packages (boxes). May be negative when QuickBooks reports oversold quantity.'))
 	stock_reservado = models.PositiveIntegerField(default=0, help_text=_('Reserved stock counted in presentation packages (boxes).'))
-	stock_disponible = models.PositiveIntegerField(default=0, help_text=_('Available stock counted in presentation packages (boxes).'))
+	stock_disponible = models.IntegerField(default=0, help_text=_('Available stock counted in presentation packages (boxes). May be negative when physical stock is oversold.'))
 	actualizado_en = models.DateTimeField(auto_now=True)
 
 	class Meta:
@@ -24,18 +25,20 @@ class StockPresentacion(models.Model):
 		return f'{self.presentacion} | Fisico: {self.stock_fisico} | Disponible: {self.stock_disponible}'
 
 	def clean(self):
-		expected_available = self.stock_fisico - self.stock_reservado
-		if expected_available < 0:
+		fisico = int(self.stock_fisico or 0)
+		reservado = int(self.stock_reservado or 0)
+		if reservado > max(fisico, 0):
 			raise ValidationError(_('Reserved stock cannot exceed physical stock.'))
+		expected_available = fisico - reservado
 		if self.stock_disponible != expected_available:
 			raise ValidationError(_('Available stock must match physical stock minus reserved stock.'))
 
 	def save(self, *args, **kwargs):
-		self.stock_disponible = max(int(self.stock_fisico or 0) - int(self.stock_reservado or 0), 0)
+		self.stock_disponible = int(self.stock_fisico or 0) - int(self.stock_reservado or 0)
 		super().save(*args, **kwargs)
 
 	def computed_stock_disponible(self):
-		return max(int(self.stock_fisico or 0) - int(self.stock_reservado or 0), 0)
+		return int(self.stock_fisico or 0) - int(self.stock_reservado or 0)
 
 	def packages_available_for_picking(self, reserved_for_item=0):
 		reserved_for_item = max(int(reserved_for_item or 0), 0)
@@ -88,12 +91,12 @@ class InventarioMovimiento(models.Model):
 	cantidad = models.PositiveIntegerField(default=0)
 	delta_fisico = models.IntegerField(default=0)
 	delta_reservado = models.IntegerField(default=0)
-	stock_fisico_anterior = models.PositiveIntegerField(default=0)
-	stock_fisico_posterior = models.PositiveIntegerField(default=0)
+	stock_fisico_anterior = models.IntegerField(default=0)
+	stock_fisico_posterior = models.IntegerField(default=0)
 	stock_reservado_anterior = models.PositiveIntegerField(default=0)
 	stock_reservado_posterior = models.PositiveIntegerField(default=0)
-	stock_disponible_anterior = models.PositiveIntegerField(default=0)
-	stock_disponible_posterior = models.PositiveIntegerField(default=0)
+	stock_disponible_anterior = models.IntegerField(default=0)
+	stock_disponible_posterior = models.IntegerField(default=0)
 	referencia = models.CharField(max_length=120)
 	idempotency_key = models.CharField(max_length=160, blank=True, null=True, unique=True)
 	observacion = models.TextField(blank=True)

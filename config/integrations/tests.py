@@ -722,6 +722,54 @@ class QuickBooksItemCostSyncTests(TestCase):
         self.assertEqual(_extract_quickbooks_item_cost(result), Decimal('35.99'))
         mock_fetch.assert_called_once()
 
+    def test_extract_qty_on_hand_preserves_negative_values(self):
+        from config.integrations.quickbooks.sync import _extract_quickbooks_item_qty_on_hand
+
+        self.assertEqual(
+            _extract_quickbooks_item_qty_on_hand({
+                'Type': 'Inventory',
+                'QtyOnHand': -10,
+            }),
+            -10,
+        )
+        self.assertEqual(
+            _extract_quickbooks_item_qty_on_hand({
+                'Type': 'Inventory',
+                'QtyOnHand': '-10.0',
+            }),
+            -10,
+        )
+
+    def test_sync_stock_from_quickbooks_item_stores_negative_qty(self):
+        from config.integrations.quickbooks.sync import _sync_stock_from_quickbooks_item
+
+        categoria = Categoria.objects.create(nombre='Drinks Neg')
+        marca = Marca.objects.create(nombre='Jarritos Neg')
+        producto = Producto.objects.create(nombre='JARRITOS MANDARIN GLS 24', categoria=categoria, marca=marca)
+        presentacion = Presentacion.objects.create(
+            producto=producto,
+            nombre='CS',
+            unidades=24,
+            tipo_contenido='unidades',
+            quickbooks_id='QB-JARRITOS-NEG',
+        )
+        StockPresentacion.objects.create(
+            presentacion=presentacion,
+            stock_fisico=0,
+            stock_reservado=0,
+            stock_disponible=0,
+        )
+
+        updated = _sync_stock_from_quickbooks_item(
+            presentacion,
+            {'Type': 'Inventory', 'QtyOnHand': -10},
+        )
+
+        self.assertTrue(updated)
+        stock = StockPresentacion.objects.get(presentacion=presentacion)
+        self.assertEqual(stock.stock_fisico, -10)
+        self.assertEqual(stock.stock_disponible, -10)
+
     @patch('config.integrations.quickbooks.sync.import_quickbooks_items')
     @patch('config.integrations.quickbooks.sync.import_quickbooks_item_record')
     @patch('config.integrations.quickbooks.sync._fetch_quickbooks_items_map')

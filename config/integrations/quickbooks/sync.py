@@ -1048,7 +1048,7 @@ def _local_presentacion_qty_on_hand(presentacion):
         stock = StockPresentacion.objects.filter(presentacion_id=presentacion.pk).first()
     if stock is None:
         return 0
-    return max(int(stock.stock_fisico or 0), 0)
+    return int(stock.stock_fisico or 0)
 
 
 def _build_item_payload(
@@ -1865,6 +1865,7 @@ def _save_quickbooks_item_image(*, producto, payload, client=None, force=False, 
 
 def _extract_quickbooks_item_qty_on_hand(payload):
     # QuickBooks inventory/assembly items expose on-hand quantity; other types do not track stock.
+    # Negative QtyOnHand is valid in QuickBooks (oversold / adjustments) and must be preserved locally.
     item_type = str(payload.get('Type') or '').strip().lower()
     if item_type and item_type not in {'inventory', 'assembly'}:
         return None
@@ -1875,7 +1876,7 @@ def _extract_quickbooks_item_qty_on_hand(payload):
         if raw_value is None or raw_value == '':
             continue
         try:
-            return max(int(float(raw_value)), 0)
+            return int(float(raw_value))
         except (TypeError, ValueError):
             continue
     return None

@@ -619,6 +619,15 @@ def backoffice_pedido_detalle(request, pedido_id):
 						else:
 							item = reemplazar_presentacion_linea_pedido_sin_aplicar_inventario(item=item, nueva_presentacion=nueva_presentacion)
 
+					if item.es_regalo:
+						# FREE promo lines stay locked at $0; ignore posted price/discount edits.
+						item.precio = Decimal('0.00')
+						item.descuento_aplicado = True
+						item.descuento_monto = Decimal('0.00')
+						item.subtotal = Decimal('0.00')
+						item.save(update_fields=['precio', 'descuento_aplicado', 'descuento_monto', 'subtotal'])
+						continue
+
 					nueva_cantidad = _parse_non_negative_quantity(request.POST.get(f'cantidad_{item.id}'), item.cantidad)
 					if item.cantidad_inventario_aplicada:
 						item = ajustar_cantidad_item_pedido_despues_picking(item=item, nueva_cantidad=nueva_cantidad, creado_por=request.user)

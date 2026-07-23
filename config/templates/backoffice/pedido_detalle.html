@@ -738,7 +738,7 @@
         </thead>
         <tbody id="pedidoItemsTableBody">
           {% for item in pedido_items %}
-          <tr class="{% if item.has_picker_stock_shortage or item.selector_has_changes %}table-danger{% endif %}" data-pedido-item-row="{{ item.id }}" {% if item.has_picker_stock_shortage %}data-stock-shortage="true"{% endif %}>
+          <tr class="{% if item.has_picker_stock_shortage or item.selector_has_changes %}table-danger{% endif %}" data-pedido-item-row="{{ item.id }}" {% if item.has_picker_stock_shortage %}data-stock-shortage="true"{% endif %} {% if item.es_regalo %}data-free-promo-line="true"{% endif %}>
             <td>
               {{ item.presentacion.producto.nombre }}
               {% if item.es_regalo %}
@@ -780,6 +780,11 @@
               <input type="number" min="0" class="form-control form-control-sm {% if item.has_picker_stock_shortage or item.selector_changed_quantity %}border-danger text-danger fw-semibold{% endif %}" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
             </td>
             <td>
+              {% if item.es_regalo %}
+              <div class="fw-semibold text-success">{% trans "Free" %}</div>
+              <input type="hidden" name="precio_{{ item.id }}" value="0">
+              <div class="small text-muted mt-1">{% trans "Promotional gift. Price cannot be edited." %}</div>
+              {% else %}
               <select class="form-select form-select-sm mb-1 preset-price-select pedido-item-price-preset" data-target-input="precio_{{ item.id }}" data-item-id="{{ item.id }}" {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
                 <option value="">{% trans "Manual price" %}</option>
                 {% for option in item.price_options %}
@@ -801,8 +806,14 @@
               {% else %}
               <div class="small text-muted mt-1 pedido-unit-profit-hint d-none"></div>
               {% endif %}
+              {% endif %}
             </td>
             <td class="pedido-item-discount-cell" data-item-id="{{ item.id }}">
+              {% if item.es_regalo %}
+              <span class="badge text-bg-success">{% trans "FREE" %}</span>
+              <input type="hidden" name="descuento_aplicado_{{ item.id }}" value="on">
+              <input type="hidden" name="descuento_monto_{{ item.id }}" value="0">
+              {% else %}
               <div class="form-check mb-2">
                 <input
                   type="checkbox"
@@ -862,14 +873,25 @@
                 </div>
               </div>
               <div class="small text-muted pedido-item-discount-summary" data-item-id="{{ item.id }}"></div>
+              {% endif %}
             </td>
             <td>
+              {% if item.es_regalo %}
+              <div class="fw-semibold text-success pedido-item-net-price" data-item-id="{{ item.id }}">{% trans "Free" %}</div>
+              {% else %}
               <div class="fw-semibold pedido-item-net-price" data-item-id="{{ item.id }}">${{ item.precio_unitario_neto }}</div>
               <div class="small text-success pedido-item-savings {% if not item.descuento_aplicado %}d-none{% endif %}" data-item-id="{{ item.id }}">
                 {% blocktrans with amount=item.descuento_linea_total %}You save ${{ amount }}{% endblocktrans %}
               </div>
+              {% endif %}
             </td>
-            <td><span class="pedido-item-subtotal" data-item-id="{{ item.id }}">${{ item.subtotal }}</span></td>
+            <td>
+              {% if item.es_regalo %}
+              <span class="pedido-item-subtotal text-success" data-item-id="{{ item.id }}">{% trans "Free" %}</span>
+              {% else %}
+              <span class="pedido-item-subtotal" data-item-id="{{ item.id }}">${{ item.subtotal }}</span>
+              {% endif %}
+            </td>
             <td>
               <div class="fw-semibold pedido-item-line-profit {% if item.profit.line_profit_amount is not None and item.profit.line_profit_amount < 0 %}text-danger{% elif item.profit.line_profit_amount is not None %}text-success{% else %}text-muted{% endif %}" data-item-id="{{ item.id }}">
                 {% if item.profit.line_profit_amount is not None %}
@@ -879,7 +901,13 @@
                 {% endif %}
               </div>
             </td>
-            <td><input type="checkbox" class="form-check-input" name="eliminar_{{ item.id }}" {% if item.selector_has_changes %}data-picker-modified="true"{% endif %} {% if lineas_bloqueadas_para_picking %}disabled{% endif %}></td>
+            <td>
+              {% if item.es_regalo %}
+              <span class="text-muted small">—</span>
+              {% else %}
+              <input type="checkbox" class="form-check-input" name="eliminar_{{ item.id }}" {% if item.selector_has_changes %}data-picker-modified="true"{% endif %} {% if lineas_bloqueadas_para_picking %}disabled{% endif %}>
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>

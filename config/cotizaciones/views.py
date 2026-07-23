@@ -108,30 +108,55 @@ def _parse_quantity(value, default=1):
 from config.core.profit import build_order_line_profit, summarize_order_profit
 
 
+def _presentation_qb_unit_price(presentacion):
+    qb_price = getattr(presentacion, 'qb_price', None)
+    if qb_price is None:
+        return Decimal('0.00')
+    return _parse_decimal(qb_price, 0)
+
+
 def _default_backoffice_quote_price(item, cotizacion):
-    return _parse_decimal(item.precio, 0)
+    if getattr(item, 'es_regalo', False):
+        return Decimal('0.00')
+    current_price = _parse_decimal(item.precio, 0)
+    if current_price > 0:
+        return current_price
+    # Heal empty customer-request lines so BackOffice sees QB catalog price.
+    qb_price = _presentation_qb_unit_price(item.presentacion)
+    if qb_price > 0:
+        return qb_price
+    return current_price
 
 
 def _quote_item_price_for_customer(*, cliente, presentacion, session_price):
+    """Default unit price for customer order requests: QuickBooks catalog price first."""
     session_price_decimal = _parse_decimal(session_price, 0)
+    qb_price = _presentation_qb_unit_price(presentacion)
+    if qb_price > 0:
+        return qb_price
+
     if not cliente or cliente.estado_revision != Cliente.REVIEW_STATUS_APPROVED:
-        return session_price_decimal
+        if session_price_decimal > 0:
+            return session_price_decimal
+        return _parse_decimal(getattr(presentacion, 'precio_1', 0), 0)
 
     assigned_customer_tier = cliente.get_nivel_precio_normalizado()
-    if assigned_customer_tier is None:
+    if assigned_customer_tier is not None:
+        assigned_price = _parse_decimal(
+            presentacion.get_price_for_tier(assigned_customer_tier),
+            0,
+        )
+        if assigned_price > 0:
+            return assigned_price
+
+    if session_price_decimal > 0:
         return session_price_decimal
-
-    assigned_price = _parse_decimal(
-        presentacion.get_price_for_tier(assigned_customer_tier),
-        session_price_decimal,
-    )
-    if assigned_price > 0:
-        return assigned_price
-
-    return session_price_decimal
+    return _parse_decimal(getattr(presentacion, 'precio_1', 0), 0)
 
 
 def _validate_backoffice_quote_price(*, item=None, presentacion=None, price):
+    if item is not None and getattr(item, 'es_regalo', False):
+        return ''
     presentation = presentacion or (item.presentacion if item else None)
     if presentation is None:
         return _('Unable to validate the product price.')
@@ -315,12 +340,15 @@ def _eliminar_cotizacion_desde_backoffice(*, cotizacion):
 def _build_order_items_payload_from_quote(cotizacion):
     items_payload = []
     for item in cotizacion.items.select_related('presentacion__producto'):
+        is_gift = bool(getattr(item, 'es_regalo', False))
+        unit_price = Decimal('0.00') if is_gift else _default_backoffice_quote_price(item, cotizacion)
         items_payload.append({
             'presentacion': item.presentacion,
             'cantidad': item.cantidad,
-            'precio': item.precio,
-            'descuento_aplicado': item.descuento_aplicado,
-            'descuento_monto': item.descuento_monto,
+            'precio': unit_price,
+            'descuento_aplicado': True if is_gift else item.descuento_aplicado,
+            'descuento_monto': Decimal('0.00') if is_gift else item.descuento_monto,
+            'es_regalo': is_gift,
         })
     return items_payload
 
@@ -908,8 +936,15 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
             if item.id in deleted_ids:
                 continue
 
+            if item.es_regalo:
+                # FREE promo lines stay locked at $0; ignore posted price/discount edits.
+                updated_items.append((item, item.cantidad, Decimal('0.00'), True, Decimal('0.00')))
+                continue
+
             cantidad = _parse_quantity(request.POST.get(f'cantidad_{item.id}'), item.cantidad)
             precio = _parse_decimal(request.POST.get(f'precio_{item.id}'), item.precio)
+            if precio <= 0:
+                precio = _default_backoffice_quote_price(item, cotizacion)
             validation_error = _validate_backoffice_quote_price(item=item, price=precio)
             if validation_error:
                 break

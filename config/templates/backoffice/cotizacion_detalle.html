@@ -121,9 +121,13 @@
             <tbody>
               {% for row in cotizacion_item_rows %}
               {% with item=row.item %}
-              <tr data-quote-item-row="{{ item.id }}">
+              <tr data-quote-item-row="{{ item.id }}" {% if item.es_regalo %}data-free-promo-line="true"{% endif %}>
                 <td data-label="{% trans 'Product' %}">
                   <div>{{ item.presentacion.producto.nombre }}</div>
+                  {% if item.es_regalo %}
+                  <div class="mt-1"><span class="badge text-bg-success">{% trans "FREE" %}</span></div>
+                  <div class="small text-muted">{% trans "Promotional gift. Price and discount cannot be edited." %}</div>
+                  {% endif %}
                   {% if row.recent_customer_sales %}
                   <div class="quote-order-history mt-1">
                     {% for invoice_item in row.recent_customer_sales %}
@@ -137,9 +141,18 @@
                 </td>
                 <td data-label="{% trans 'Presentation' %}">{{ item.presentacion.nombre }}</td>
                 <td data-label="{% trans 'Quantity' %}" class="mobile-stack-table__input-cell">
+                  {% if item.es_regalo %}
+                  <div class="fw-semibold">{{ item.cantidad }}</div>
+                  <input type="hidden" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}">
+                  {% else %}
                   <input type="number" min="1" name="cantidad_{{ item.id }}" value="{{ item.cantidad }}" class="form-control form-control-sm quote-quantity-input" data-item-id="{{ item.id }}" {% if not can_manage_quote_lines %}disabled{% endif %}>
+                  {% endif %}
                 </td>
                 <td data-label="{% trans 'Customer price' %}" class="mobile-stack-table__input-cell">
+                  {% if item.es_regalo %}
+                  <div class="fw-semibold text-success">{% trans "Free" %}</div>
+                  <input type="hidden" name="precio_{{ item.id }}" value="0">
+                  {% else %}
                   <select class="form-select form-select-sm mb-2 preset-price-select" data-target-input="precio_{{ item.id }}" data-item-id="{{ item.id }}" {% if not can_manage_quote_lines %}disabled{% endif %}>
                     <option value="">{% trans "Manual price" %}</option>
                     {% for option in row.price_options %}
@@ -156,8 +169,14 @@
                       {% trans "Profit unavailable because this presentation has no cost configured." %}
                     {% endif %}
                   </div>
+                  {% endif %}
                 </td>
                 <td data-label="{% trans 'Discount' %}" class="quote-item-discount-cell mobile-stack-table__input-cell" data-item-id="{{ item.id }}">
+                  {% if item.es_regalo %}
+                  <span class="badge text-bg-success">{% trans "FREE" %}</span>
+                  <input type="hidden" name="descuento_aplicado_{{ item.id }}" value="on">
+                  <input type="hidden" name="descuento_monto_{{ item.id }}" value="0">
+                  {% else %}
                   <div class="form-check mb-2">
                     <input
                       type="checkbox"
@@ -204,17 +223,30 @@
                     </div>
                   </div>
                   <div class="small text-muted quote-item-discount-summary" data-item-id="{{ item.id }}"></div>
+                  {% endif %}
                 </td>
                 <td data-label="{% trans 'You pay' %}">
+                  {% if item.es_regalo %}
+                  <div class="fw-semibold text-success quote-item-net-price" data-item-id="{{ item.id }}">{% trans "Free" %}</div>
+                  {% else %}
                   <div class="fw-semibold quote-item-net-price" data-item-id="{{ item.id }}">${{ row.precio_unitario_neto }}</div>
                   <div class="small text-success quote-item-savings {% if not item.descuento_aplicado %}d-none{% endif %}" data-item-id="{{ item.id }}">
                     {% blocktrans with amount=row.descuento_linea_total %}You save ${{ amount }}{% endblocktrans %}
                   </div>
+                  {% endif %}
                 </td>
-                <td data-label="{% trans 'Subtotal' %}"><span class="quote-subtotal" data-item-id="{{ item.id }}">${{ row.display_subtotal }}</span></td>
+                <td data-label="{% trans 'Subtotal' %}">
+                  {% if item.es_regalo %}
+                  <span class="quote-subtotal text-success" data-item-id="{{ item.id }}">{% trans "Free" %}</span>
+                  {% else %}
+                  <span class="quote-subtotal" data-item-id="{{ item.id }}">${{ row.display_subtotal }}</span>
+                  {% endif %}
+                </td>
                 <td data-label="{% trans 'Profit' %}">
                   <div class="fw-semibold quote-item-line-profit {% if row.profit.line_profit_amount is not None and row.profit.line_profit_amount < 0 %}text-danger{% elif row.profit.line_profit_amount is not None %}text-success{% else %}text-muted{% endif %}" data-item-id="{{ item.id }}">
-                    {% if row.profit.line_profit_amount is not None %}
+                    {% if item.es_regalo %}
+                      —
+                    {% elif row.profit.line_profit_amount is not None %}
                       ${{ row.profit.line_profit_amount|floatformat:2 }} ({{ row.profit.line_profit_percent|floatformat:1 }}%)
                     {% else %}
                       —
@@ -222,7 +254,13 @@
                   </div>
                 </td>
                 {% if can_manage_quote_lines %}
-                <td data-label="{% trans 'Remove' %}"><input type="checkbox" class="form-check-input" name="eliminar_{{ item.id }}"></td>
+                <td data-label="{% trans 'Remove' %}">
+                  {% if item.es_regalo %}
+                  <span class="text-muted small">—</span>
+                  {% else %}
+                  <input type="checkbox" class="form-check-input" name="eliminar_{{ item.id }}">
+                  {% endif %}
+                </td>
                 {% endif %}
               </tr>
               {% endwith %}
@@ -728,6 +766,9 @@ document.addEventListener('DOMContentLoaded', function () {
       }
 
       document.querySelectorAll('[data-quote-item-row]').forEach(function (row) {
+        if (row.dataset.freePromoLine === 'true') {
+          return;
+        }
         const itemId = row.dataset.quoteItemRow;
         const toggle = row.querySelector(`.quote-item-discount-toggle[data-item-id="${itemId}"]`);
         const presetSelect = row.querySelector(`.quote-item-discount-preset[data-item-id="${itemId}"]`);

@@ -475,7 +475,7 @@
         }
       });
 
-      noteInput.required = hasShortage;
+      noteInput.required = false;
       approvedCheckbox.required = !hasShortage;
       approvedCheckbox.disabled = hasShortage;
 

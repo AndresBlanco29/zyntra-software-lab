@@ -464,18 +464,21 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertTrue(response.context['pedido_form_disabled'])
 		self.assertContains(response, 'Order lines are locked because this order already has an invoice generated.')
 
-	def test_verification_requires_note(self):
+	def test_verification_allows_empty_note_when_stock_is_insufficient(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=0)
 
-		with self.assertRaises(ValidationError):
-			guardar_verificacion_picking(
-				pedido=self.pedido,
-				seleccionador=self.selector,
-				cantidades_reales={self.item.id: 1},
-				nota='   ',
-				nota_resuelta=False,
-			)
+		guardar_verificacion_picking(
+			pedido=self.pedido,
+			seleccionador=self.selector,
+			cantidades_reales={self.item.id: 1},
+			nota='   ',
+			nota_resuelta=False,
+		)
+
+		self.pedido.refresh_from_db()
+		self.assertEqual(self.pedido.nota_seleccionador, '')
+		self.assertFalse(self.pedido.picking_bloqueado)
 
 	def test_verification_requires_picker_approval_when_stock_is_available(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)

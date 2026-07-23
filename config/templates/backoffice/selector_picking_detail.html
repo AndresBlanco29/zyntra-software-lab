@@ -164,8 +164,8 @@
 
     <div class="row g-3 mt-1">
       <div class="col-12">
-        <label class="form-label fw-semibold">{% trans "Note" %}</label>
-        <textarea name="nota_seleccionador" id="pickerNoteInput" class="form-control" rows="4" {% if form_has_stock_shortage %}required{% endif %}>{{ form_note }}</textarea>
+        <label class="form-label fw-semibold">{% trans "Note (optional)" %}</label>
+        <textarea name="nota_seleccionador" id="pickerNoteInput" class="form-control" rows="4">{{ form_note }}</textarea>
         <div class="alert alert-warning mt-3 mb-0 {% if not form_has_stock_shortage %}d-none{% endif %}" id="pickerStockAlert">
           {% trans "Insufficient physical stock detected. You can still save this verification so BackOffice can review and take action." %}
         </div>
@@ -173,10 +173,10 @@
       <div class="col-12">
         <div class="picker-approval-box" id="pickerApprovalBox">
           <p class="picker-approval-box__hint mb-2" id="pickerNoteHelp"
-            data-shortage-text="{% trans 'Physical stock is insufficient. A note is required and the order will remain blocked for BackOffice review.' %}"
+            data-shortage-text="{% trans 'Physical stock is insufficient. You may add an optional note and BackOffice will review this verification.' %}"
             data-normal-text="{% trans 'If physical stock is available, picker approval is required to save this verification as unlocked.' %}">
             {% if form_has_stock_shortage %}
-              {% trans "Physical stock is insufficient. A note is required and the order will remain blocked for BackOffice review." %}
+              {% trans "Physical stock is insufficient. You may add an optional note and BackOffice will review this verification." %}
             {% else %}
               {% trans "If physical stock is available, picker approval is required to save this verification as unlocked." %}
             {% endif %}

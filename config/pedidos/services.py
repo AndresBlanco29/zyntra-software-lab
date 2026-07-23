@@ -1028,8 +1028,6 @@ def guardar_verificacion_picking(
     has_stock_shortage = any(item_result['has_shortage'] for item_result in stock_evaluation.values())
 
     if has_stock_shortage:
-        if not nota_texto:
-            raise ValidationError(_('A picking note is required when physical stock is insufficient.'))
         nota_resuelta = False
     elif not nota_resuelta:
         raise ValidationError(_('Picker approval is required when physical stock is available.'))

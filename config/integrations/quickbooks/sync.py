@@ -1932,12 +1932,42 @@ def _sync_stock_from_quickbooks_item(presentacion, payload):
         defaults={'stock_fisico': qty_on_hand, 'stock_reservado': 0, 'stock_disponible': qty_on_hand},
     )
     if created:
+        stock.refresh_from_db()
+        if int(stock.stock_fisico) != int(qty_on_hand):
+            raise ValidationError(
+                _(
+                    'Could not store QuickBooks quantity %(qty)s for %(product)s. '
+                    'The database may still reject negative stock values; run inventory migrations and retry.'
+                )
+                % {
+                    'qty': qty_on_hand,
+                    'product': f'{presentacion.producto.nombre} / {presentacion.nombre}',
+                }
+            )
         return True
-    if stock.stock_fisico == qty_on_hand and stock.computed_stock_disponible() == stock.stock_disponible:
+
+    reserved = int(stock.stock_reservado or 0)
+    available = int(qty_on_hand) - reserved
+    if int(stock.stock_fisico) == int(qty_on_hand) and int(stock.stock_disponible) == available:
         return False
-    stock.stock_fisico = qty_on_hand
-    stock.stock_disponible = stock.computed_stock_disponible()
-    stock.save(update_fields=['stock_fisico', 'stock_disponible', 'actualizado_en'])
+
+    StockPresentacion.objects.filter(pk=stock.pk).update(
+        stock_fisico=qty_on_hand,
+        stock_disponible=available,
+        actualizado_en=timezone.now(),
+    )
+    stock.refresh_from_db()
+    if int(stock.stock_fisico) != int(qty_on_hand):
+        raise ValidationError(
+            _(
+                'Could not store QuickBooks quantity %(qty)s for %(product)s. '
+                'The database may still reject negative stock values; run inventory migrations and retry.'
+            )
+            % {
+                'qty': qty_on_hand,
+                'product': f'{presentacion.producto.nombre} / {presentacion.nombre}',
+            }
+        )
     return True
 
 
@@ -2056,7 +2086,11 @@ def _apply_quickbooks_item_to_local_record(
     try:
         _sync_stock_from_quickbooks_item(presentacion, payload)
     except Exception:
-        pass
+        logger.exception(
+            'Failed syncing stock from QuickBooks item %s for presentation %s',
+            quickbooks_id,
+            presentacion.pk,
+        )
     return presentacion
 
 
@@ -2782,7 +2816,12 @@ def import_quickbooks_inventory_quantities(*, limit=None, max_results=None, clie
 
         try:
             with transaction.atomic():
-                changed = _sync_stock_from_quickbooks_item(presentacion, payload)
+                # Only re-fetch the Item when QtyOnHand is missing from the list payload.
+                # Full enrich also pulls cost/active and is unnecessary (and costly) for quantity sync.
+                working_payload = payload
+                if _extract_quickbooks_item_qty_on_hand(working_payload) is None:
+                    working_payload = _enrich_quickbooks_item_payload(working_payload, client=client)
+                changed = _sync_stock_from_quickbooks_item(presentacion, working_payload)
         except Exception as exc:
             failed_count += 1
             results.append({

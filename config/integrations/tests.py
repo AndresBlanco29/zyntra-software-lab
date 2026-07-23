@@ -770,6 +770,47 @@ class QuickBooksItemCostSyncTests(TestCase):
         self.assertEqual(stock.stock_fisico, -10)
         self.assertEqual(stock.stock_disponible, -10)
 
+    @patch('config.integrations.quickbooks.sync._fetch_quickbooks_items_map')
+    def test_import_inventory_quantities_preserves_negative_qty_on_hand(self, mock_fetch_map):
+        categoria = Categoria.objects.create(nombre='Drinks Neg Qty')
+        marca = Marca.objects.create(nombre='Jarritos Neg Qty')
+        producto = Producto.objects.create(
+            nombre='JARRITOS MANDARIN GLS 24 QTY',
+            categoria=categoria,
+            marca=marca,
+            quickbooks_id='QB-JARRITOS-NEG-QTY',
+        )
+        presentacion = Presentacion.objects.create(
+            producto=producto,
+            nombre='CS',
+            unidades=24,
+            tipo_contenido='unidades',
+            quickbooks_id='QB-JARRITOS-NEG-QTY',
+        )
+        StockPresentacion.objects.create(
+            presentacion=presentacion,
+            stock_fisico=0,
+            stock_reservado=0,
+            stock_disponible=0,
+        )
+        mock_fetch_map.return_value = {
+            'QB-JARRITOS-NEG-QTY': {
+                'Id': 'QB-JARRITOS-NEG-QTY',
+                'Name': 'JARRITOS MANDARIN GLS 24/12.5OZ',
+                'Type': 'Inventory',
+                'QtyOnHand': -10,
+                'Active': True,
+            }
+        }
+
+        result = import_quickbooks_inventory_quantities(client=Mock())
+
+        self.assertEqual(result['updated_count'], 1)
+        self.assertEqual(result['failed_count'], 0)
+        stock = StockPresentacion.objects.get(presentacion=presentacion)
+        self.assertEqual(stock.stock_fisico, -10)
+        self.assertEqual(stock.stock_disponible, -10)
+
     @patch('config.integrations.quickbooks.sync.import_quickbooks_items')
     @patch('config.integrations.quickbooks.sync.import_quickbooks_item_record')
     @patch('config.integrations.quickbooks.sync._fetch_quickbooks_items_map')

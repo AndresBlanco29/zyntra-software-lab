@@ -643,10 +643,7 @@ def eliminar_pedido_desde_backoffice(*, pedido):
 
 @transaction.atomic
 def eliminar_linea_pedido_desde_backoffice(*, item, creado_por=None):
-    if int(item.cantidad_inventario_aplicada or 0) > 0:
-        eliminar_item_pedido_con_inventario(item=item, creado_por=creado_por)
-        return
-    item.delete()
+    eliminar_item_pedido_con_inventario(item=item, creado_por=creado_por)
 
 
 def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales):

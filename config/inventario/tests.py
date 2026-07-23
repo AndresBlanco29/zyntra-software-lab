@@ -8,7 +8,8 @@ from config.clientes.models import Cliente
 from config.facturacion.services import aprobar_nota_ajuste, anular_nota_ajuste, crear_nota_ajuste_desde_invoice, generar_invoice_desde_picking
 from config.integrations.models import QuickBooksImportConflict
 from config.pedidos.models import Pedido, PedidoItem
-from config.pedidos.services import crear_pedido_desde_items, guardar_verificacion_picking
+from config.pedidos.services import crear_pedido_desde_items, eliminar_linea_pedido_desde_backoffice, guardar_verificacion_picking
+from config.inventario.services import reservar_stock_para_pedido_items
 from config.productos.models import Categoria, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
 
@@ -45,6 +46,36 @@ class InventarioOperativoTests(TestCase):
 			precio_1=Decimal('10.00'),
 		)
 		registrar_entrada_manual(presentacion=self.presentacion, cantidad=100, observacion='Initial stock', creado_por=self.backoffice)
+
+	def test_backoffice_delete_line_releases_reserved_stock_before_picking(self):
+		pedido = crear_pedido_desde_items(
+			cliente=self.cliente,
+			items_payload=[{'presentacion': self.presentacion, 'cantidad': 1, 'precio': Decimal('10.00')}],
+			origen='CLIENTE',
+		)
+		item = pedido.items.get()
+		duplicate_item = PedidoItem.objects.create(
+			pedido=pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=1,
+			cantidad=1,
+			precio=Decimal('10.00'),
+			subtotal=Decimal('10.00'),
+		)
+		reservar_stock_para_pedido_items(pedido=pedido, pedido_items=[duplicate_item], creado_por=self.backoffice)
+
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		self.assertEqual(stock.stock_reservado, 2)
+
+		eliminar_linea_pedido_desde_backoffice(item=duplicate_item, creado_por=self.backoffice)
+
+		stock.refresh_from_db()
+		item.refresh_from_db()
+		self.assertFalse(PedidoItem.objects.filter(id=duplicate_item.id).exists())
+		self.assertEqual(stock.stock_fisico, 100)
+		self.assertEqual(stock.stock_reservado, 1)
+		self.assertEqual(stock.stock_disponible, 99)
+		self.assertEqual(item.cantidad_reservada_inventario, 1)
 
 	def test_order_creation_reserves_stock_and_prevents_oversell(self):
 		pedido = crear_pedido_desde_items(

@@ -337,14 +337,25 @@ def _annotate_selector_picking_rows(pedidos):
 
 
 def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentation_overrides=None):
+	from config.inventario.availability import availability_snapshot
+
 	rows = []
 	actual_quantity_overrides = actual_quantity_overrides or {}
 	presentation_overrides = presentation_overrides or {}
 	picking_verified = bool(pedido.picking_verificado_en)
-	for item in pedido.items.select_related('presentacion__producto').all():
+	items = list(pedido.items.select_related('presentacion__producto').all())
+	presentation_ids = set()
+	product_presentations_by_item = {}
+	for item in items:
 		product_presentations = list(
 			item.presentacion.producto.presentaciones.select_related('stock_operativo').order_by('nombre')
 		)
+		product_presentations_by_item[item.id] = product_presentations
+		presentation_ids.update(presentation.id for presentation in product_presentations)
+	ledger = availability_snapshot(presentation_ids, exclude_pedido_ids=[pedido.id])
+
+	for item in items:
+		product_presentations = product_presentations_by_item[item.id]
 		if item.id in actual_quantity_overrides:
 			actual_quantity = actual_quantity_overrides[item.id]
 		elif picking_verified:
@@ -356,19 +367,17 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 			(presentation for presentation in product_presentations if presentation.id == selected_presentation_id),
 			item.presentacion,
 		)
+		presentation_options = [
+			{
+				'id': presentation.id,
+				'label': presentation.nombre_traducido,
+				'stock_fisico': int(ledger.get(presentation.id, {}).get('available', 0) or 0),
+			}
+			for presentation in product_presentations
+		]
 		selected_stock = next(
-			(
-				option['stock_fisico']
-				for option in [
-					{
-						'id': presentation.id,
-						'stock_fisico': int(getattr(getattr(presentation, 'stock_operativo', None), 'stock_fisico', 0) or 0),
-					}
-					for presentation in product_presentations
-				]
-				if option['id'] == selected_presentation_id
-			),
-			int(getattr(getattr(item.presentacion, 'stock_operativo', None), 'stock_fisico', 0) or 0),
+			(option['stock_fisico'] for option in presentation_options if option['id'] == selected_presentation_id),
+			int(ledger.get(item.presentacion_id, {}).get('available', 0) or 0),
 		)
 		rows.append({
 			'id': item.id,
@@ -378,14 +387,7 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 			'presentation': item.presentacion.nombre_empaque_cliente,
 			'presentation_id': selected_presentation_id,
 			'baseline_presentation_id': item.presentacion_id,
-			'presentation_options': [
-				{
-					'id': presentation.id,
-					'label': presentation.nombre_traducido,
-					'stock_fisico': int(getattr(getattr(presentation, 'stock_operativo', None), 'stock_fisico', 0) or 0),
-				}
-				for presentation in product_presentations
-			],
+			'presentation_options': presentation_options,
 			'requested_quantity': item.cantidad_solicitada_documentada,
 			'actual_quantity': actual_quantity,
 			'baseline_quantity': (
@@ -566,7 +568,8 @@ def backoffice_pedido_detalle(request, pedido_id):
 			and item_evaluation['has_shortage']
 			and int(item.cantidad or 0) > 0
 		)
-		item.stock_fisico_packages = item_evaluation['stock_fisico']
+		# Template label is "Available stock"; dual-ledger Available excludes this order's demand.
+		item.stock_fisico_packages = item_evaluation['available_packages']
 	_enrich_pedido_items_with_price_options(pedido=pedido, pedido_items=pedido_items)
 	inventory_needs_analysis = build_pedido_inventory_needs_analysis(pedido=pedido, pedido_items=pedido_items)
 

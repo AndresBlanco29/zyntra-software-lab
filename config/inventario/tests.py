@@ -13,6 +13,7 @@ from config.inventario.services import reservar_stock_para_pedido_items
 from config.productos.models import Categoria, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
 
+from config.inventario.availability import availability_snapshot
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
 from config.inventario.services import _apply_fractional_inventory_change, _lock_fractional_stock_records, cancelar_pedido_con_inventario, registrar_entrada_manual
 
@@ -64,17 +65,20 @@ class InventarioOperativoTests(TestCase):
 		)
 		reservar_stock_para_pedido_items(pedido=pedido, pedido_items=[duplicate_item], creado_por=self.backoffice)
 
-		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
-		self.assertEqual(stock.stock_reservado, 2)
+		ledger = availability_snapshot([self.presentacion.id])[self.presentacion.id]
+		self.assertEqual(ledger['quick_inventory'], 100)
+		self.assertEqual(ledger['in_orders'], 2)
+		self.assertEqual(ledger['available'], 98)
 
 		eliminar_linea_pedido_desde_backoffice(item=duplicate_item, creado_por=self.backoffice)
 
-		stock.refresh_from_db()
+		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
 		item.refresh_from_db()
+		ledger = availability_snapshot([self.presentacion.id])[self.presentacion.id]
 		self.assertFalse(PedidoItem.objects.filter(id=duplicate_item.id).exists())
 		self.assertEqual(stock.stock_fisico, 100)
-		self.assertEqual(stock.stock_reservado, 1)
-		self.assertEqual(stock.stock_disponible, 99)
+		self.assertEqual(ledger['in_orders'], 1)
+		self.assertEqual(ledger['available'], 99)
 		self.assertEqual(item.cantidad_reservada_inventario, 1)
 
 	def test_order_creation_reserves_stock_and_prevents_oversell(self):
@@ -85,9 +89,10 @@ class InventarioOperativoTests(TestCase):
 		)
 		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
 		item = pedido.items.get()
+		ledger = availability_snapshot([self.presentacion.id])[self.presentacion.id]
 		self.assertEqual(stock.stock_fisico, 100)
-		self.assertEqual(stock.stock_reservado, 4)
-		self.assertEqual(stock.stock_disponible, 96)
+		self.assertEqual(ledger['in_orders'], 4)
+		self.assertEqual(ledger['available'], 96)
 		self.assertEqual(item.cantidad_reservada_inventario, 4)
 
 		with self.assertRaises(ValidationError):
@@ -107,11 +112,12 @@ class InventarioOperativoTests(TestCase):
 		)
 		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
 		item = pedido.items.get()
+		ledger = availability_snapshot([self.presentacion.id])[self.presentacion.id]
 
 		self.assertEqual(pedido.total, Decimal('150.00'))
 		self.assertEqual(stock.stock_fisico, 100)
-		self.assertEqual(stock.stock_reservado, 0)
-		self.assertEqual(stock.stock_disponible, 100)
+		self.assertEqual(ledger['in_orders'], 15)
+		self.assertEqual(ledger['available'], 85)
 		self.assertEqual(item.cantidad_reservada_inventario, 0)
 		self.assertEqual(item.cantidad_inventario_aplicada, 0)
 
@@ -136,9 +142,11 @@ class InventarioOperativoTests(TestCase):
 
 		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
 		item.refresh_from_db()
-		self.assertEqual(stock.stock_fisico, 97)
-		self.assertEqual(stock.stock_reservado, 0)
-		self.assertEqual(stock.stock_disponible, 70)
+		ledger = availability_snapshot([self.presentacion.id])[self.presentacion.id]
+		# Dual-ledger: picking does not mutate Quick Inventory; open order qty follows picked amount.
+		self.assertEqual(stock.stock_fisico, 100)
+		self.assertEqual(ledger['in_orders'], 3)
+		self.assertEqual(ledger['available'], 97)
 		self.assertEqual(item.cantidad_inventario_aplicada, 3)
 		self.assertEqual(item.cantidad_reservada_inventario, 0)
 
@@ -169,9 +177,10 @@ class InventarioOperativoTests(TestCase):
 
 		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
 		item.refresh_from_db()
-		self.assertEqual(stock.stock_fisico, 104)
-		self.assertEqual(stock.stock_reservado, 0)
-		self.assertEqual(stock.stock_disponible, 104)
+		ledger = availability_snapshot([self.presentacion.id])[self.presentacion.id]
+		self.assertEqual(stock.stock_fisico, 105)
+		self.assertEqual(ledger['in_orders'], 1)
+		self.assertEqual(ledger['available'], 104)
 		self.assertEqual(item.cantidad_reservada_inventario, 0)
 		self.assertEqual(item.cantidad_inventario_aplicada, 1)
 
@@ -194,12 +203,15 @@ class InventarioOperativoTests(TestCase):
 		)
 
 		cancelar_pedido_con_inventario(pedido=pedido, creado_por=self.backoffice)
+		pedido.estado = 'CANCELADO'
+		pedido.save(update_fields=['estado', 'actualizada_en'])
 		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
+		ledger = availability_snapshot([self.presentacion.id])[self.presentacion.id]
 		self.assertEqual(stock.stock_fisico, 100)
-		self.assertEqual(stock.stock_reservado, 0)
-		self.assertEqual(stock.stock_disponible, 100)
+		self.assertEqual(ledger['in_orders'], 0)
+		self.assertEqual(ledger['available'], 100)
 
-	def test_selling_one_case_deducts_units_per_package_from_inventory(self):
+	def test_selling_one_case_does_not_mutate_quick_inventory(self):
 		pedido = crear_pedido_desde_items(
 			cliente=self.cliente,
 			items_payload=[{'presentacion': self.presentacion, 'cantidad': 1, 'precio': Decimal('10.00')}],
@@ -217,7 +229,10 @@ class InventarioOperativoTests(TestCase):
 			nota_resuelta=True,
 		)
 		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
-		self.assertEqual(stock.stock_fisico, 99)
+		ledger = availability_snapshot([self.presentacion.id])[self.presentacion.id]
+		self.assertEqual(stock.stock_fisico, 100)
+		self.assertEqual(ledger['in_orders'], 1)
+		self.assertEqual(ledger['available'], 99)
 
 	def test_manual_entry_and_reservation_use_package_counts_when_presentation_has_multiple_units(self):
 		self.presentacion.unidades = 8
@@ -236,9 +251,10 @@ class InventarioOperativoTests(TestCase):
 		)
 
 		stock.refresh_from_db()
+		ledger = availability_snapshot([self.presentacion.id])[self.presentacion.id]
 		self.assertEqual(stock.stock_fisico, 32)
-		self.assertEqual(stock.stock_reservado, 20)
-		self.assertEqual(stock.stock_disponible, 12)
+		self.assertEqual(ledger['in_orders'], 20)
+		self.assertEqual(ledger['available'], 12)
 		self.assertEqual(pedido.items.get().cantidad_reservada_inventario, 20)
 
 	def test_credit_return_and_void_reverse_inventory(self):
@@ -341,13 +357,16 @@ class InventarioBackofficeViewsTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, 'Producto Vista Stock')
-		self.assertContains(response, self.presentacion.nombre_traducido)
-		self.assertContains(response, self.presentacion_sin_stock.nombre_traducido)
+		self.assertContains(response, 'CS')
+		self.assertContains(response, self.presentacion_sin_stock.nombre)
 		self.assertContains(response, 'Internal partial stock')
 		self.assertContains(response, 'unidades')
 		self.assertContains(response, '7')
 		self.assertContains(response, '6 CS')
 		self.assertContains(response, '7 unidades')
+		self.assertContains(response, 'Quick Inventory')
+		self.assertContains(response, 'Sales Pending Sync')
+		self.assertContains(response, 'In orders')
 
 	def test_inventory_detail_view_displays_fractional_stock_for_product(self):
 		self.client.force_login(self.backoffice)
@@ -402,8 +421,8 @@ class InventarioBackofficeViewsTests(TestCase):
 
 		self.assertEqual(response.status_code, 302)
 		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
-		self.assertEqual(stock.stock_fisico, 104)
-		self.assertEqual(stock.stock_disponible, 104)
+		self.assertEqual(stock.stock_fisico, 10)
+		self.assertEqual(stock.stock_disponible, 10)
 		self.assertTrue(
 			InventarioMovimiento.objects.filter(
 				presentacion=self.presentacion,
@@ -427,8 +446,8 @@ class InventarioBackofficeViewsTests(TestCase):
 
 		self.assertEqual(response.status_code, 302)
 		stock = StockPresentacion.objects.get(presentacion=self.presentacion)
-		self.assertEqual(stock.stock_fisico, 101)
-		self.assertEqual(stock.stock_disponible, 101)
+		self.assertEqual(stock.stock_fisico, 7)
+		self.assertEqual(stock.stock_disponible, 7)
 		self.assertTrue(
 			InventarioMovimiento.objects.filter(
 				presentacion=self.presentacion,

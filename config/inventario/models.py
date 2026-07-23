@@ -12,37 +12,56 @@ from config.productos.models import Presentacion, Producto
 
 class StockPresentacion(models.Model):
 	presentacion = models.OneToOneField(Presentacion, on_delete=models.CASCADE, related_name='stock_operativo')
-	# IntegerField (not Positive*) so QuickBooks oversold QtyOnHand can sync as negatives.
-	stock_fisico = models.IntegerField(default=0, help_text=_('Physical stock counted in presentation packages (boxes). May be negative when QuickBooks reports oversold quantity.'))
-	stock_reservado = models.PositiveIntegerField(default=0, help_text=_('Reserved stock counted in presentation packages (boxes).'))
-	stock_disponible = models.IntegerField(default=0, help_text=_('Available stock counted in presentation packages (boxes). May be negative when physical stock is oversold.'))
+	# Quick Inventory: packages imported from QuickBooks QtyOnHand. Never mutated by local sales.
+	stock_fisico = models.IntegerField(
+		default=0,
+		help_text=_('Quick Inventory from QuickBooks (packages). May be negative when QuickBooks reports oversold quantity.'),
+	)
+	# Legacy allocation counter; Available no longer uses this field.
+	stock_reservado = models.PositiveIntegerField(
+		default=0,
+		help_text=_('Legacy reserved packages counter (not used for Available).'),
+	)
+	# Legacy cached value; Available is computed via inventario.availability.
+	stock_disponible = models.IntegerField(
+		default=0,
+		help_text=_('Legacy cached available. Prefer dual-ledger Available from inventario.availability.'),
+	)
 	actualizado_en = models.DateTimeField(auto_now=True)
 
 	class Meta:
 		ordering = ('presentacion__producto__nombre', 'presentacion__nombre')
 
 	def __str__(self):
-		return f'{self.presentacion} | Fisico: {self.stock_fisico} | Disponible: {self.stock_disponible}'
+		return f'{self.presentacion} | QI: {self.stock_fisico} | Legacy disponible: {self.stock_disponible}'
+
+	@property
+	def quick_inventory(self):
+		return int(self.stock_fisico or 0)
 
 	def clean(self):
-		fisico = int(self.stock_fisico or 0)
-		reservado = int(self.stock_reservado or 0)
-		if reservado > max(fisico, 0):
-			raise ValidationError(_('Reserved stock cannot exceed physical stock.'))
-		expected_available = fisico - reservado
+		# Available is computed outside this model; keep legacy fields consistent for old rows.
+		expected_available = int(self.stock_fisico or 0) - int(self.stock_reservado or 0)
 		if self.stock_disponible != expected_available:
-			raise ValidationError(_('Available stock must match physical stock minus reserved stock.'))
+			raise ValidationError(_('Legacy available stock must match Quick Inventory minus legacy reserved.'))
 
 	def save(self, *args, **kwargs):
 		self.stock_disponible = int(self.stock_fisico or 0) - int(self.stock_reservado or 0)
 		super().save(*args, **kwargs)
 
 	def computed_stock_disponible(self):
+		"""Prefer dual-ledger Available; fall back to legacy QI - reserved for isolated use."""
+		from config.inventario.availability import available_for_presentacion
+
+		presentacion_id = getattr(self, 'presentacion_id', None)
+		if presentacion_id:
+			return available_for_presentacion(presentacion_id)
 		return int(self.stock_fisico or 0) - int(self.stock_reservado or 0)
 
 	def packages_available_for_picking(self, reserved_for_item=0):
+		"""Packages usable for this line: dual-ledger Available + this line's open-order qty."""
 		reserved_for_item = max(int(reserved_for_item or 0), 0)
-		return max(int(self.stock_fisico or 0) - int(self.stock_reservado or 0) + reserved_for_item, 0)
+		return max(self.computed_stock_disponible() + reserved_for_item, 0)
 
 
 class StockProductoFraccionado(models.Model):

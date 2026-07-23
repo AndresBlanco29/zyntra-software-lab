@@ -13,11 +13,11 @@
 </div>
 
 <div class="row g-3 mb-4">
-  <div class="col-md-4">
+  <div class="col-md-3">
     <div class="card shadow-sm h-100">
       <div class="card-body text-center">
-        <div class="text-muted small text-uppercase">{% trans "Physical stock" %}</div>
-        <div class="display-6 fw-semibold">{{ stock.stock_fisico }}</div>
+        <div class="text-muted small text-uppercase">{% trans "Quick Inventory" %}</div>
+        <div class="display-6 fw-semibold">{{ ledger.quick_inventory }}</div>
         <div class="small text-muted">{{ packaging.presentation_name|capfirst }}</div>
         {% if packaging.units > 1 %}
         <div class="small text-muted">{% blocktrans with units=packaging.units content=packaging.content_type %}{{ units }} {{ content }} per package{% endblocktrans %}</div>
@@ -25,25 +25,35 @@
       </div>
     </div>
   </div>
-  <div class="col-md-4">
+  <div class="col-md-3">
     <div class="card shadow-sm h-100">
       <div class="card-body text-center">
-        <div class="text-muted small text-uppercase">{% trans "Reserved stock" %}</div>
-        <div class="display-6 fw-semibold">{{ stock.stock_reservado }}</div>
+        <div class="text-muted small text-uppercase">{% trans "Sales Pending Sync" %}</div>
+        <div class="display-6 fw-semibold">{{ ledger.sales_pending_sync }}</div>
         <div class="small text-muted">{{ packaging.presentation_name|capfirst }}</div>
       </div>
     </div>
   </div>
-  <div class="col-md-4">
+  <div class="col-md-3">
     <div class="card shadow-sm h-100">
       <div class="card-body text-center">
-        <div class="text-muted small text-uppercase">{% trans "Available stock" %}</div>
-        <div class="display-6 fw-semibold">{{ stock.stock_disponible }}</div>
+        <div class="text-muted small text-uppercase">{% trans "In orders" %}</div>
+        <div class="display-6 fw-semibold">{{ ledger.in_orders }}</div>
+        <div class="small text-muted">{{ packaging.presentation_name|capfirst }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm h-100">
+      <div class="card-body text-center">
+        <div class="text-muted small text-uppercase">{% trans "Available" %}</div>
+        <div class="display-6 fw-semibold">{{ ledger.available }}</div>
         <div class="small text-muted">{{ packaging.presentation_name|capfirst }}</div>
       </div>
     </div>
   </div>
 </div>
+<p class="text-muted small mb-4">{% trans "Available = Quick Inventory − Sales Pending Sync − In orders. Quick Inventory is updated only from QuickBooks." %}</p>
 
 <div class="card shadow-sm mb-4">
   <div class="card-body">

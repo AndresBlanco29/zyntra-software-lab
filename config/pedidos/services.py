@@ -647,28 +647,27 @@ def eliminar_linea_pedido_desde_backoffice(*, item, creado_por=None):
 
 
 def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales):
-    stock_map = {
-        stock.presentacion_id: stock
-        for stock in StockPresentacion.objects.select_related('presentacion__producto').filter(
-            presentacion_id__in={item.presentacion_id for item in pedido_items}
-        )
-    }
+    from config.inventario.availability import availability_snapshot
+
+    presentacion_ids = {item.presentacion_id for item in pedido_items}
+    pedido_ids = {item.pedido_id for item in pedido_items if item.pedido_id}
+    # Exclude this order from In orders so its own demand is not double-counted.
+    ledger = availability_snapshot(presentacion_ids, exclude_pedido_ids=pedido_ids)
     evaluation = {}
     for item in pedido_items:
-        stock = stock_map.get(item.presentacion_id)
+        snapshot = ledger.get(item.presentacion_id, {
+            'quick_inventory': 0,
+            'sales_pending_sync': 0,
+            'in_orders': 0,
+            'available': 0,
+        })
         cantidad_real = max(int(cantidades_reales.get(item.id, item.cantidad) or 0), 0)
         cantidad_aplicada_previa = max(int(item.cantidad_inventario_aplicada or 0), 0)
         cantidad_pendiente_aplicar = max(cantidad_real - cantidad_aplicada_previa, 0)
-        reserved_packages_for_item = max(int(item.cantidad_reservada_inventario or 0), 0)
-        stock_fisico = int(getattr(stock, 'stock_fisico', 0) or 0)
-        stock_reservado = int(getattr(stock, 'stock_reservado', 0) or 0)
-        if stock is not None:
-            available_packages = stock.packages_available_for_picking(reserved_packages_for_item)
-            stock_disponible = stock.computed_stock_disponible()
-        else:
-            available_packages = 0
-            stock_reservado = 0
-            stock_disponible = 0
+        stock_fisico = int(snapshot['quick_inventory'])
+        stock_reservado = int(snapshot['in_orders'])
+        stock_disponible = int(snapshot['available'])
+        available_packages = max(stock_disponible, 0)
         shortage_packages = max(cantidad_pendiente_aplicar - available_packages, 0)
 
         evaluation[item.id] = {
@@ -676,6 +675,9 @@ def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales
             'stock_fisico': stock_fisico,
             'stock_disponible': stock_disponible,
             'stock_reservado': stock_reservado,
+            'quick_inventory': stock_fisico,
+            'sales_pending_sync': int(snapshot['sales_pending_sync']),
+            'in_orders': stock_reservado,
             'available_packages': available_packages,
             'cantidad_real': cantidad_real,
             'cantidad_aplicada_previa': cantidad_aplicada_previa,
@@ -687,24 +689,28 @@ def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales
 
 
 def build_pedido_inventory_needs_analysis(*, pedido, pedido_items=None):
-	"""Compare requested order quantities with available stock for purchase planning."""
+	"""Compare requested order quantities with dual-ledger Available for purchase planning."""
+	from config.inventario.availability import availability_snapshot
+
 	items = list(
 		pedido_items
 		if pedido_items is not None
 		else pedido.items.select_related('presentacion__producto', 'presentacion__stock_operativo')
 	)
-	stock_eval = evaluar_stock_fisico_verificacion_picking(
-		pedido_items=items,
-		cantidades_reales={
-			item.id: int(getattr(item, 'cantidad_solicitada_documentada', None) or item.cantidad_solicitada or item.cantidad or 0)
-			for item in items
-		},
+	ledger = availability_snapshot(
+		[item.presentacion_id for item in items],
+		exclude_pedido_ids=[pedido.id],
 	)
 	rows = []
 	for item in items:
-		evaluation = stock_eval[item.id]
+		snapshot = ledger.get(item.presentacion_id, {
+			'quick_inventory': 0,
+			'sales_pending_sync': 0,
+			'in_orders': 0,
+			'available': 0,
+		})
 		requested = int(getattr(item, 'cantidad_solicitada_documentada', None) or item.cantidad_solicitada or item.cantidad or 0)
-		available = int(evaluation['available_packages'])
+		available = max(int(snapshot['available']), 0)
 		to_buy = max(requested - available, 0)
 		if requested <= 0:
 			status = 'sufficient'
@@ -741,11 +747,9 @@ def build_pedido_inventory_needs_analysis(*, pedido, pedido_items=None):
 
 
 def build_multi_pedido_inventory_needs_analysis(*, pedidos):
-	"""Aggregate inventory shortages across several orders for purchase planning.
+	"""Aggregate shortages using dual-ledger Available across several orders."""
+	from config.inventario.availability import availability_snapshot
 
-	Stock is evaluated once per presentation so the same physical packages are
-	not double-counted when multiple selected orders need the same SKU.
-	"""
 	pedido_list = list(pedidos)
 	if not pedido_list:
 		return {
@@ -757,9 +761,14 @@ def build_multi_pedido_inventory_needs_analysis(*, pedidos):
 			'pedido_count': 0,
 		}
 
+	pedido_ids = [pedido.id for pedido in pedido_list]
 	items = list(
-		PedidoItem.objects.filter(pedido_id__in=[pedido.id for pedido in pedido_list])
+		PedidoItem.objects.filter(pedido_id__in=pedido_ids)
 		.select_related('presentacion__producto', 'presentacion__stock_operativo', 'pedido')
+	)
+	ledger = availability_snapshot(
+		[item.presentacion_id for item in items],
+		exclude_pedido_ids=pedido_ids,
 	)
 	aggregated = {}
 	for item in items:
@@ -771,35 +780,30 @@ def build_multi_pedido_inventory_needs_analysis(*, pedidos):
 			or item.cantidad
 			or 0
 		)
-		reserved = max(int(item.cantidad_reservada_inventario or 0), 0)
 		bucket = aggregated.get(presentacion_id)
 		if bucket is None:
-			stock = getattr(presentacion, 'stock_operativo', None)
-			stock_fisico = int(getattr(stock, 'stock_fisico', 0) or 0)
-			stock_reservado = int(getattr(stock, 'stock_reservado', 0) or 0)
+			snapshot = ledger.get(presentacion_id, {
+				'quick_inventory': 0,
+				'sales_pending_sync': 0,
+				'in_orders': 0,
+				'available': 0,
+			})
 			bucket = {
 				'presentacion_id': presentacion_id,
 				'product_name': presentacion.producto.nombre,
 				'presentation_name': presentacion.nombre_empaque_cliente,
 				'sku': (presentacion.producto.codigo_barras or '').strip(),
 				'requested_quantity': 0,
-				'reserved_by_selection': 0,
-				'stock_fisico': stock_fisico,
-				'stock_reservado': stock_reservado,
+				'available': max(int(snapshot['available']), 0),
 				'order_ids': set(),
 			}
 			aggregated[presentacion_id] = bucket
 		bucket['requested_quantity'] += max(requested, 0)
-		bucket['reserved_by_selection'] += reserved
 		bucket['order_ids'].add(item.pedido_id)
 
 	rows = []
 	for bucket in aggregated.values():
-		# Packages reserved by the selected orders are usable for fulfilling them.
-		available = max(
-			bucket['stock_fisico'] - bucket['stock_reservado'] + bucket['reserved_by_selection'],
-			0,
-		)
+		available = int(bucket['available'])
 		requested = bucket['requested_quantity']
 		to_buy = max(requested - available, 0)
 		if requested <= 0:
@@ -831,14 +835,14 @@ def build_multi_pedido_inventory_needs_analysis(*, pedidos):
 
 	rows.sort(key=lambda row: (0 if row['needs_purchase'] else 1, row['product_name'].casefold(), row['presentacion_id']))
 	needs_purchase_count = sum(1 for row in rows if row['needs_purchase'])
-	pedido_ids = sorted(pedido.id for pedido in pedido_list)
+	sorted_pedido_ids = sorted(pedido_ids)
 	return {
 		'rows': rows,
 		'needs_purchase_count': needs_purchase_count,
 		'has_needs': needs_purchase_count > 0,
 		'total_to_buy': sum(row['to_buy_quantity'] for row in rows),
-		'pedido_ids': pedido_ids,
-		'pedido_count': len(pedido_ids),
+		'pedido_ids': sorted_pedido_ids,
+		'pedido_count': len(sorted_pedido_ids),
 	}
 
 

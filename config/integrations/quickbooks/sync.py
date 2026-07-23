@@ -1924,6 +1924,7 @@ def _enrich_quickbooks_item_payload(payload, *, client=None):
 
 
 def _sync_stock_from_quickbooks_item(presentacion, payload):
+    """Update Quick Inventory (stock_fisico) only. Available/Pending/In orders are computed elsewhere."""
     qty_on_hand = _extract_quickbooks_item_qty_on_hand(payload)
     if qty_on_hand is None:
         return False
@@ -1946,14 +1947,13 @@ def _sync_stock_from_quickbooks_item(presentacion, payload):
             )
         return True
 
-    reserved = int(stock.stock_reservado or 0)
-    available = int(qty_on_hand) - reserved
-    if int(stock.stock_fisico) == int(qty_on_hand) and int(stock.stock_disponible) == available:
+    # Mirror QI into legacy stock_disponible for old readers; Available is computed via dual-ledger.
+    if int(stock.stock_fisico) == int(qty_on_hand) and int(stock.stock_disponible or 0) == int(qty_on_hand):
         return False
 
     StockPresentacion.objects.filter(pk=stock.pk).update(
         stock_fisico=qty_on_hand,
-        stock_disponible=available,
+        stock_disponible=qty_on_hand,
         actualizado_en=timezone.now(),
     )
     stock.refresh_from_db()

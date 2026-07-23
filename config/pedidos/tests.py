@@ -532,7 +532,6 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(self.pedido.total, Decimal('12.00'))
 		stock.refresh_from_db()
 		self.assertEqual(stock.stock_fisico, 0)
-		self.assertEqual(stock.stock_reservado, 2)
 		self.assertTrue(Notificacion.objects.filter(titulo__icontains='stock shortage').exists())
 
 	def test_selector_only_sees_assigned_picking_tickets(self):
@@ -1166,7 +1165,8 @@ class PickingVerificationFlowTests(TestCase):
 
 	def test_backoffice_unlock_after_zeroing_shortage_line_preserves_physical_stock(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
-		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=6, stock_disponible=4)
+		# Report a real shortage first (QI = 0), then restock QI without local deductions.
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=0, stock_disponible=0)
 		guardar_verificacion_picking(
 			pedido=self.pedido,
 			seleccionador=self.selector,
@@ -1174,6 +1174,7 @@ class PickingVerificationFlowTests(TestCase):
 			nota='Falta stock fisico',
 			nota_resuelta=False,
 		)
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(stock_fisico=6, stock_disponible=6)
 
 		self.client.force_login(self.backoffice)
 		self.client.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), {

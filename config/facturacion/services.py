@@ -1409,6 +1409,10 @@ def _apply_credit_note_inventory(*, nota, movement_type, delta_fisico, created_b
 				creado_por=created_by,
 			)
 			continue
+		# Quick Inventory for QB-linked products is owned by QuickBooks; skip local QI mutations.
+		from config.inventario.availability import presentacion_is_quickbooks_linked
+		if presentacion_is_quickbooks_linked(note_item.presentacion):
+			continue
 		stock = stock_map[note_item.presentacion_id]
 		_apply_inventory_change(
 			stock=stock,

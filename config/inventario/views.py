@@ -9,6 +9,7 @@ from config.productos.models import Presentacion
 from config.productos.packaging import get_effective_packaging_for_display
 from config.usuarios.permissions import internal_permission_required
 
+from .availability import availability_snapshot
 from .models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
 from .services import (
 	_resolve_fractional_rollup_presentacion,
@@ -128,8 +129,9 @@ def backoffice_inventory_list(request):
 
 	rows = []
 	all_rows = []
-	total_fisico = 0
-	total_reservado = 0
+	total_quick_inventory = 0
+	total_pending_sync = 0
+	total_in_orders = 0
 	total_disponible = 0
 	zero_stock_count = 0
 	low_stock_count = 0
@@ -147,11 +149,20 @@ def backoffice_inventory_list(request):
 		if summary['presentacion'] is not None:
 			fractional_by_presentacion_id[summary['presentacion'].id] = summary
 
-	for presentacion in presentaciones:
-		stock = getattr(presentacion, 'stock_operativo', None)
-		stock_fisico = stock.stock_fisico if stock else 0
-		stock_reservado = stock.stock_reservado if stock else 0
-		stock_disponible = stock.computed_stock_disponible() if stock else 0
+	presentacion_list = list(presentaciones)
+	ledger = availability_snapshot([presentacion.id for presentacion in presentacion_list])
+
+	for presentacion in presentacion_list:
+		snapshot = ledger.get(presentacion.id, {
+			'quick_inventory': 0,
+			'sales_pending_sync': 0,
+			'in_orders': 0,
+			'available': 0,
+		})
+		quick_inventory = int(snapshot['quick_inventory'])
+		sales_pending_sync = int(snapshot['sales_pending_sync'])
+		in_orders = int(snapshot['in_orders'])
+		stock_disponible = int(snapshot['available'])
 		status = _stock_status(stock_disponible)
 		if status == STOCK_FILTER_OUT:
 			zero_stock_count += 1
@@ -164,8 +175,11 @@ def backoffice_inventory_list(request):
 		presentation_label = packaging['presentation_name']
 		row = {
 			'presentacion': presentacion,
-			'stock_fisico': stock_fisico,
-			'stock_reservado': stock_reservado,
+			'quick_inventory': quick_inventory,
+			'sales_pending_sync': sales_pending_sync,
+			'in_orders': in_orders,
+			'stock_fisico': quick_inventory,
+			'stock_reservado': in_orders,
 			'stock_disponible': stock_disponible,
 			'stock_status': status,
 			'units_per_package': packaging['units'],
@@ -176,8 +190,9 @@ def backoffice_inventory_list(request):
 			'presentation_label': presentation_label,
 		}
 		all_rows.append(row)
-		total_fisico += stock_fisico
-		total_reservado += stock_reservado
+		total_quick_inventory += quick_inventory
+		total_pending_sync += sales_pending_sync
+		total_in_orders += in_orders
 		total_disponible += stock_disponible
 
 	if stock_filter:
@@ -192,8 +207,11 @@ def backoffice_inventory_list(request):
 		'stock_filter': stock_filter,
 		'filter_params': _inventory_list_filter_params(search_term=search_term, stock_filter=stock_filter),
 		'low_stock_threshold': LOW_STOCK_THRESHOLD,
-		'total_fisico': total_fisico,
-		'total_reservado': total_reservado,
+		'total_fisico': total_quick_inventory,
+		'total_quick_inventory': total_quick_inventory,
+		'total_pending_sync': total_pending_sync,
+		'total_in_orders': total_in_orders,
+		'total_reservado': total_in_orders,
 		'total_disponible': total_disponible,
 		'total_fractional_stock': total_fractional_stock,
 		'zero_stock_count': zero_stock_count,
@@ -261,9 +279,16 @@ def backoffice_inventory_detail(request, presentacion_id):
 	]
 	stock.refresh_from_db()
 	packaging = get_effective_packaging_for_display(presentacion)
+	ledger = availability_snapshot([presentacion.id]).get(presentacion.id, {
+		'quick_inventory': int(stock.stock_fisico or 0),
+		'sales_pending_sync': 0,
+		'in_orders': 0,
+		'available': int(stock.stock_fisico or 0),
+	})
 	context = {
 		'presentacion': presentacion,
 		'stock': stock,
+		'ledger': ledger,
 		'packaging': packaging,
 		'movements': movements,
 		'consolidation_movements': consolidation_movements,

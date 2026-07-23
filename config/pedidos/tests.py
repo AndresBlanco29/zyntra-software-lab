@@ -960,6 +960,64 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(nuevo_item.cantidad, 1)
 		self.assertEqual(nuevo_item.cantidad_inventario_aplicada, 1)
 
+	def test_selector_cannot_add_duplicate_product_already_on_order(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+
+		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'cantidad_pallets': '1.5',
+			f'presentacion_{self.item.id}': str(self.presentacion.id),
+			f'cantidad_real_{self.item.id}': '2',
+			'presentacion_nueva[]': str(self.presentacion.id),
+			'cantidad_nueva[]': '1',
+			'nota_seleccionador': 'Intento duplicado',
+			'nota_seleccionador_resuelta': 'on',
+			f'linea_revisada_{self.item.id}': 'on',
+			'linea_revisada_adicional[]': 'on',
+		})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'already on this picking list')
+		self.assertEqual(PedidoItem.objects.filter(pedido=self.pedido).count(), 1)
+
+	def test_selector_cannot_add_same_product_with_different_presentation(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+
+		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'cantidad_pallets': '1.5',
+			f'presentacion_{self.item.id}': str(self.presentacion.id),
+			f'cantidad_real_{self.item.id}': '2',
+			'presentacion_nueva[]': str(self.presentacion_unidad.id),
+			'cantidad_nueva[]': '1',
+			'nota_seleccionador': 'Intento duplicado por U/M',
+			'nota_seleccionador_resuelta': 'on',
+			f'linea_revisada_{self.item.id}': 'on',
+			'linea_revisada_adicional[]': 'on',
+		})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'already on this picking list')
+		self.assertEqual(PedidoItem.objects.filter(pedido=self.pedido).count(), 1)
+
+	def test_selector_cannot_save_progress_with_duplicate_added_products(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+
+		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'submit_action': 'save_progress',
+			'cantidad_pallets': '1.5',
+			f'presentacion_{self.item.id}': str(self.presentacion.id),
+			f'cantidad_real_{self.item.id}': '2',
+			'presentacion_nueva[]': [str(self.presentacion_extra.id), str(self.presentacion_extra.id)],
+			'cantidad_nueva[]': ['1', '2'],
+		})
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'already on this picking list')
+		self.pedido.refresh_from_db()
+		self.assertFalse(self.pedido.picking_progress)
+
 	def test_backoffice_detail_highlights_picker_um_changes_and_added_products(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		guardar_verificacion_picking(

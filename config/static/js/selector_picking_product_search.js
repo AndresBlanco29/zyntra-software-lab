@@ -51,7 +51,109 @@
     var labelReviewed = config.labelReviewed || 'I reviewed this added product';
     var labelProduct = config.labelProduct || 'Product';
     var labelReviewedCol = config.labelReviewedCol || 'Reviewed';
+    var duplicateProductMessage = config.duplicateProductMessage || 'This product is already on the picking list.';
     var availablePresentations = loadPresentations();
+
+    function collectUsedPickerProducts(excludeSearchRoot) {
+      var usedProductIds = new Set();
+      var usedPresentationIds = new Set();
+
+      document.querySelectorAll('[data-picker-order-line]').forEach(function (row) {
+        if (row.dataset.productId) {
+          usedProductIds.add(String(row.dataset.productId));
+        }
+        var select = row.querySelector('[data-picker-presentation-select]');
+        if (select && select.value) {
+          usedPresentationIds.add(String(select.value));
+        }
+      });
+
+      document.querySelectorAll('[data-added-product-row]').forEach(function (row) {
+        if (excludeSearchRoot && row.contains(excludeSearchRoot)) {
+          return;
+        }
+        var select = row.querySelector('[data-added-product-select]');
+        if (!select || !select.value) {
+          return;
+        }
+        usedPresentationIds.add(String(select.value));
+        var presentation = findPresentationById(select.value);
+        if (presentation && presentation.product_id) {
+          usedProductIds.add(String(presentation.product_id));
+        }
+      });
+
+      return {
+        usedProductIds: usedProductIds,
+        usedPresentationIds: usedPresentationIds,
+      };
+    }
+
+    function validatePresentationSelection(presentationId, excludeSearchRoot) {
+      var presentation = findPresentationById(presentationId);
+      if (!presentation) {
+        return { ok: true };
+      }
+
+      var used = collectUsedPickerProducts(excludeSearchRoot);
+      var productId = String(presentation.product_id || '');
+      var presentationKey = String(presentationId || '');
+
+      if (
+        used.usedProductIds.has(productId)
+        || used.usedPresentationIds.has(presentationKey)
+      ) {
+        return { ok: false, message: duplicateProductMessage };
+      }
+
+      return { ok: true };
+    }
+
+    function validateNoDuplicateAddedProducts() {
+      var usedProductIds = new Set();
+      var usedPresentationIds = new Set();
+      var duplicateMessage = duplicateProductMessage;
+
+      document.querySelectorAll('[data-picker-order-line]').forEach(function (row) {
+        if (row.dataset.productId) {
+          usedProductIds.add(String(row.dataset.productId));
+        }
+        var select = row.querySelector('[data-picker-presentation-select]');
+        if (select && select.value) {
+          usedPresentationIds.add(String(select.value));
+        }
+      });
+
+      var hasDuplicate = false;
+      document.querySelectorAll('[data-added-product-row]').forEach(function (row) {
+        if (hasDuplicate) {
+          return;
+        }
+        var select = row.querySelector('[data-added-product-select]');
+        if (!select || !select.value) {
+          return;
+        }
+        var presentation = findPresentationById(select.value);
+        if (!presentation) {
+          return;
+        }
+        var productId = String(presentation.product_id || '');
+        var presentationKey = String(select.value);
+        if (usedProductIds.has(productId) || usedPresentationIds.has(presentationKey)) {
+          hasDuplicate = true;
+          duplicateMessage = duplicateProductMessage;
+          return;
+        }
+        usedProductIds.add(productId);
+        usedPresentationIds.add(presentationKey);
+      });
+
+      if (hasDuplicate) {
+        window.alert(duplicateMessage);
+        return false;
+      }
+      return true;
+    }
 
     function findPresentationById(presentationId) {
       var id = String(presentationId || '');
@@ -243,6 +345,9 @@
         return tokens.every(function (token) {
           return label.indexOf(token) >= 0;
         });
+      }).filter(function (item) {
+        var used = collectUsedPickerProducts(null);
+        return !used.usedProductIds.has(String(item.product_id || ''));
       }).slice(0, 40);
     }
 
@@ -291,6 +396,19 @@
       if (!hiddenInput) {
         return;
       }
+
+      var validation = validatePresentationSelection(presentationId, root);
+      if (!validation.ok) {
+        window.alert(validation.message);
+        if (searchInput) {
+          searchInput.value = '';
+        }
+        hiddenInput.value = '';
+        hideProductResults(resultsBox);
+        hiddenInput.dispatchEvent(new Event('change', { bubbles: true }));
+        return;
+      }
+
       hiddenInput.value = presentationId || '';
       if (searchInput) {
         searchInput.value = presentationLabel || '';
@@ -506,6 +624,10 @@
     });
 
     form.addEventListener('submit', function (event) {
+      if (!validateNoDuplicateAddedProducts()) {
+        event.preventDefault();
+        return;
+      }
       if (event.submitter && event.submitter.value === 'save_progress') {
         return;
       }

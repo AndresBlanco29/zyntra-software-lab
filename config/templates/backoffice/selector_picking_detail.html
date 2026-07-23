@@ -65,7 +65,7 @@
         </thead>
         <tbody id="pickerItemsTableBody">
           {% for item in item_rows %}
-          <tr data-picker-order-line data-baseline-quantity="{{ item.baseline_quantity }}" data-baseline-presentation="{{ item.baseline_presentation_id }}">
+          <tr data-picker-order-line data-product-id="{{ item.product_id }}" data-baseline-quantity="{{ item.baseline_quantity }}" data-baseline-presentation="{{ item.baseline_presentation_id }}">
             <td data-label="{% trans 'Product' %}">
               {{ item.product }}
               {% if item.es_regalo %}
@@ -384,6 +384,7 @@
 {% for presentacion in available_presentations %}
   {
     "id": "{{ presentacion.id }}",
+    "product_id": "{{ presentacion.producto_id }}",
     "label": "{{ presentacion.producto.nombre|escapejs }} - {{ presentacion.nombre_traducido|escapejs }}",
     "stock_physical": {{ presentacion.stock_operativo.stock_fisico|default:0 }}
   }{% if not forloop.last %},{% endif %}
@@ -408,7 +409,8 @@
     labelRemove: "{% trans 'Remove'|escapejs %}",
     labelReviewed: "{% trans 'I reviewed this added product'|escapejs %}",
     labelProduct: "{% trans 'Product'|escapejs %}",
-    labelReviewedCol: "{% trans 'Reviewed'|escapejs %}"
+    labelReviewedCol: "{% trans 'Reviewed'|escapejs %}",
+    duplicateProductMessage: "{% trans 'This product is already on the picking list.'|escapejs %}"
   };
 </script>
 <script src="{% static 'js/selector_picking_product_search.js' %}"></script>

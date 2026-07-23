@@ -87,6 +87,7 @@ from .services import (
 	resolver_nota_cliente_desde_backoffice,
 	resolve_picking_send_ui_state,
 	validar_estado_backoffice_con_bloqueo,
+	validar_productos_duplicados_picking_por_picker,
 	notificar_cliente_pedido,
 )
 
@@ -372,6 +373,7 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 		rows.append({
 			'id': item.id,
 			'product': item.presentacion.producto.nombre,
+			'product_id': item.presentacion.producto_id,
 			'es_regalo': bool(getattr(item, 'es_regalo', False)),
 			'presentation': item.presentacion.nombre_empaque_cliente,
 			'presentation_id': selected_presentation_id,
@@ -1989,25 +1991,30 @@ def selector_picking_detail(request, pedido_id):
 			if request.POST.get(f'linea_revisada_{item.id}') == 'on'
 		}
 
-		if request.POST.get('submit_action') == 'save_progress':
-			reviewed_additional_count = len(request.POST.getlist('linea_revisada_adicional[]'))
-			for index, row in enumerate(additional_item_rows):
-				row['reviewed'] = index < reviewed_additional_count
-			pedido.picking_progress = {
-				'quantities': {str(item_id): quantity for item_id, quantity in cantidades_reales.items()},
-				'presentations': {str(item_id): presentation_id for item_id, presentation_id in posted_presentations.items()},
-				'reviewed_item_ids': sorted(reviewed_item_ids),
-				'additional_items': additional_item_rows,
-				'note': nota or '',
-				'note_resolved': nota_resuelta,
-				'pallets': str(request.POST.get('cantidad_pallets') or ''),
-			}
-			pedido.picking_progress_saved_at = timezone.now()
-			pedido.save(update_fields=['picking_progress', 'picking_progress_saved_at', 'actualizada_en'])
-			messages.success(request, _('Picking progress saved. You can continue this verification later.'))
-			return redirect('selector_picking_detail', pedido_id=pedido.id)
-
 		try:
+			validar_productos_duplicados_picking_por_picker(
+				pedido=pedido,
+				presentacion_updates=posted_presentations,
+				additional_presentation_ids=posted_new_presentations,
+			)
+			if request.POST.get('submit_action') == 'save_progress':
+				reviewed_additional_count = len(request.POST.getlist('linea_revisada_adicional[]'))
+				for index, row in enumerate(additional_item_rows):
+					row['reviewed'] = index < reviewed_additional_count
+				pedido.picking_progress = {
+					'quantities': {str(item_id): quantity for item_id, quantity in cantidades_reales.items()},
+					'presentations': {str(item_id): presentation_id for item_id, presentation_id in posted_presentations.items()},
+					'reviewed_item_ids': sorted(reviewed_item_ids),
+					'additional_items': additional_item_rows,
+					'note': nota or '',
+					'note_resolved': nota_resuelta,
+					'pallets': str(request.POST.get('cantidad_pallets') or ''),
+				}
+				pedido.picking_progress_saved_at = timezone.now()
+				pedido.save(update_fields=['picking_progress', 'picking_progress_saved_at', 'actualizada_en'])
+				messages.success(request, _('Picking progress saved. You can continue this verification later.'))
+				return redirect('selector_picking_detail', pedido_id=pedido.id)
+
 			_validate_selector_line_reviews(
 				request,
 				pedido=pedido,

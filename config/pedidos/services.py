@@ -955,6 +955,65 @@ def resolve_picking_send_ui_state(pedido):
     return False, _('Sent')
 
 
+def validar_productos_duplicados_picking_por_picker(
+    *,
+    pedido,
+    presentacion_updates=None,
+    additional_presentation_ids=None,
+):
+    presentacion_updates = presentacion_updates or {}
+    additional_presentation_ids = additional_presentation_ids or []
+
+    order_presentation_ids = [
+        int(presentacion_updates.get(item.id, item.presentacion_id))
+        for item in pedido.items.all()
+    ]
+    added_presentation_ids = [
+        int(str(presentation_id).strip())
+        for presentation_id in additional_presentation_ids
+        if str(presentation_id or '').strip()
+    ]
+
+    if not added_presentation_ids:
+        return
+
+    all_presentation_ids = set(order_presentation_ids) | set(added_presentation_ids)
+    presentation_map = {
+        presentation.id: presentation
+        for presentation in Presentacion.objects.filter(id__in=all_presentation_ids).select_related('producto')
+    }
+
+    existing_product_ids = {
+        presentation_map[presentation_id].producto_id
+        for presentation_id in order_presentation_ids
+        if presentation_id in presentation_map
+    }
+    existing_presentation_ids = set(order_presentation_ids)
+
+    seen_added_product_ids = set()
+    seen_added_presentation_ids = set()
+    for presentation_id in added_presentation_ids:
+        presentation = presentation_map.get(presentation_id)
+        if presentation is None:
+            raise ValidationError(_('One of the selected products is no longer available.'))
+
+        product_name = presentation.producto.nombre
+        product_id = presentation.producto_id
+
+        if (
+            presentation_id in existing_presentation_ids
+            or product_id in existing_product_ids
+            or presentation_id in seen_added_presentation_ids
+            or product_id in seen_added_product_ids
+        ):
+            raise ValidationError(
+                _('The product "%(product)s" is already on this picking list.') % {'product': product_name}
+            )
+
+        seen_added_presentation_ids.add(presentation_id)
+        seen_added_product_ids.add(product_id)
+
+
 @transaction.atomic
 def guardar_verificacion_picking(
     *,
@@ -974,6 +1033,12 @@ def guardar_verificacion_picking(
     nota_texto = (nota or '').strip()
     presentacion_updates = presentacion_updates or {}
     additional_items = additional_items or []
+
+    validar_productos_duplicados_picking_por_picker(
+        pedido=pedido,
+        presentacion_updates=presentacion_updates,
+        additional_presentation_ids=[item['presentacion_id'] for item in additional_items],
+    )
 
     items = list(pedido.items.select_related('presentacion__producto').all())
     before_items = [

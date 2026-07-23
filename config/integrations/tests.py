@@ -793,23 +793,25 @@ class QuickBooksItemCostSyncTests(TestCase):
             stock_reservado=0,
             stock_disponible=0,
         )
-        mock_fetch_map.return_value = {
-            'QB-JARRITOS-NEG-QTY': {
-                'Id': 'QB-JARRITOS-NEG-QTY',
-                'Name': 'JARRITOS MANDARIN GLS 24/12.5OZ',
-                'Type': 'Inventory',
-                'QtyOnHand': -10,
-                'Active': True,
-            }
+        client = Mock()
+        client.read_entity.return_value = {
+            'Id': 'QB-JARRITOS-NEG-QTY',
+            'Name': 'JARRITOS MANDARIN GLS 24/12.5OZ',
+            'Type': 'Inventory',
+            'QtyOnHand': -10,
+            'Active': True,
         }
+        client.find_by_id.return_value = None
 
-        result = import_quickbooks_inventory_quantities(client=Mock())
+        result = import_quickbooks_inventory_quantities(client=client)
 
         self.assertEqual(result['updated_count'], 1)
         self.assertEqual(result['failed_count'], 0)
         stock = StockPresentacion.objects.get(presentacion=presentacion)
         self.assertEqual(stock.stock_fisico, -10)
         self.assertEqual(stock.stock_disponible, -10)
+        client.read_entity.assert_called()
+        mock_fetch_map.assert_not_called()
 
     @patch('config.integrations.quickbooks.sync.import_quickbooks_items')
     @patch('config.integrations.quickbooks.sync.import_quickbooks_item_record')
@@ -874,19 +876,20 @@ class QuickBooksItemCostSyncTests(TestCase):
             stock_reservado=0,
             stock_disponible=5,
         )
-        mock_fetch_map.return_value = {
-            'QB-STOCK-ONLY': {
-                'Id': 'QB-STOCK-ONLY',
-                'Name': 'Changed QB Name',
-                'Type': 'Inventory',
-                'PurchaseCost': 99.99,
-                'QtyOnHand': 42,
-            }
+        client = Mock()
+        client.read_entity.return_value = {
+            'Id': 'QB-STOCK-ONLY',
+            'Name': 'Changed QB Name',
+            'Type': 'Inventory',
+            'PurchaseCost': 99.99,
+            'QtyOnHand': 42,
         }
+        client.find_by_id.return_value = None
 
-        result = import_quickbooks_inventory_quantities()
+        result = import_quickbooks_inventory_quantities(client=client)
 
         mock_import.assert_not_called()
+        mock_fetch_map.assert_not_called()
         self.assertEqual(result['updated_count'], 1)
         producto.refresh_from_db()
         presentacion.refresh_from_db()

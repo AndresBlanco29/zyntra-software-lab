@@ -604,11 +604,23 @@ def _build_dashboard_feedback(*, operation, ok, result=None, error=None):
             feedback['details'].append(
                 f"Created: {result.get('created_count', 0)}. Updated: {result.get('updated_count', 0)}. Conflicts: {result.get('conflict_count', 0)}. Failed: {result.get('failed_count', 0)}."
             )
-            for sample in result.get('results', [])[:3]:
+            for sample in result.get('results', [])[:5]:
                 if sample.get('ok'):
-                    feedback['details'].append(f"{sample.get('label')}: {sample.get('action')}")
+                    qty = sample.get('qty_on_hand')
+                    if qty is not None:
+                        feedback['details'].append(f"{sample.get('label')}: {sample.get('action')} ({qty})")
+                    else:
+                        feedback['details'].append(f"{sample.get('label')}: {sample.get('action')}")
                 elif sample.get('action') == 'conflict':
                     feedback['details'].append(sample.get('error'))
+                else:
+                    feedback['details'].append(
+                        f"{sample.get('label') or sample.get('quickbooks_id')}: {sample.get('error') or sample.get('action')}"
+                    )
+            if 'skipped_count' in result:
+                feedback['details'].append(
+                    _('Skipped: %(skipped)s.') % {'skipped': result.get('skipped_count', 0)}
+                )
             return feedback
         preview_key = operation.split('_', 1)[1]
         feedback['title'] = f'QuickBooks {preview_key.title()} Preview'

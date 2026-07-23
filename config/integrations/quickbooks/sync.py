@@ -2769,9 +2769,6 @@ def import_quickbooks_inventory_quantities(*, limit=None, max_results=None, clie
             'results': [],
         }
 
-    qb_ids = _linked_catalog_quickbooks_ids(linked_presentaciones)
-    items_map = _fetch_quickbooks_items_map(client=client, wanted_ids=qb_ids)
-
     if task_cache_key:
         cache.set(
             task_cache_key,
@@ -2800,7 +2797,23 @@ def import_quickbooks_inventory_quantities(*, limit=None, max_results=None, clie
             processed += 1
             continue
 
-        payload = items_map.get(qb_id)
+        # Prefer Item read-by-id: list/query payloads can omit or stale QtyOnHand,
+        # which left oversold products (e.g. -10) stuck at 0 locally.
+        try:
+            payload = client.read_entity('item', qb_id) or client.find_by_id('Item', qb_id)
+        except Exception as exc:
+            failed_count += 1
+            results.append({
+                'ok': False,
+                'action': 'failed',
+                'entity': 'InventoryQuantity',
+                'quickbooks_id': qb_id,
+                'label': label,
+                'error': str(exc),
+            })
+            processed += 1
+            continue
+
         if not payload:
             failed_count += 1
             results.append({
@@ -2816,12 +2829,24 @@ def import_quickbooks_inventory_quantities(*, limit=None, max_results=None, clie
 
         try:
             with transaction.atomic():
-                # Only re-fetch the Item when QtyOnHand is missing from the list payload.
-                # Full enrich also pulls cost/active and is unnecessary (and costly) for quantity sync.
-                working_payload = payload
-                if _extract_quickbooks_item_qty_on_hand(working_payload) is None:
-                    working_payload = _enrich_quickbooks_item_payload(working_payload, client=client)
-                changed = _sync_stock_from_quickbooks_item(presentacion, working_payload)
+                qty_on_hand = _extract_quickbooks_item_qty_on_hand(payload)
+                if qty_on_hand is None:
+                    skipped_count += 1
+                else:
+                    changed = _sync_stock_from_quickbooks_item(presentacion, payload)
+                    if changed:
+                        updated_count += 1
+                        if qty_on_hand < 0:
+                            results.append({
+                                'ok': True,
+                                'action': 'updated_negative',
+                                'entity': 'InventoryQuantity',
+                                'quickbooks_id': qb_id,
+                                'label': label,
+                                'qty_on_hand': qty_on_hand,
+                            })
+                    else:
+                        skipped_count += 1
         except Exception as exc:
             failed_count += 1
             results.append({
@@ -2832,11 +2857,6 @@ def import_quickbooks_inventory_quantities(*, limit=None, max_results=None, clie
                 'label': label,
                 'error': str(exc),
             })
-        else:
-            if changed:
-                updated_count += 1
-            else:
-                skipped_count += 1
 
         processed += 1
         if task_cache_key and total > 0 and (processed == total or processed % progress_interval == 0):
@@ -2848,7 +2868,12 @@ def import_quickbooks_inventory_quantities(*, limit=None, max_results=None, clie
                     'status': 'running',
                     'progress': pct,
                     'operation': 'import_inventory_quantities_to_local',
-                    'result': {'processed': processed, 'total': total},
+                    'result': {
+                        'processed': processed,
+                        'total': total,
+                        'updated_count': updated_count,
+                        'failed_count': failed_count,
+                    },
                 },
                 timeout=60 * 60,
             )

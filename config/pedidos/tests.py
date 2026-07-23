@@ -292,6 +292,23 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'Order comment')
 		self.assertContains(response, 'pedidoNotaClienteDisplay')
 		self.assertContains(response, 'Leave at back door')
+		content = response.content.decode()
+		self.assertGreater(content.rfind('pedidoNotaClienteDisplay'), content.find('Generate Picking Ticket'))
+
+	def test_backoffice_detail_hides_order_comment_when_empty(self):
+		self.pedido.nota_cliente = ''
+		self.pedido.nota_cliente_resuelta = True
+		self.pedido.save(update_fields=['nota_cliente', 'nota_cliente_resuelta'])
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertNotContains(response, 'pedidoNotaClienteDisplay')
+		self.assertFalse(response.context['can_resolve_nota_cliente'])
+		can_send, label = resolve_picking_send_ui_state(self.pedido)
+		self.assertTrue(can_send)
+		self.assertEqual(str(label), 'Send picking')
 
 	def test_order_with_comment_blocks_picking_until_resolved(self):
 		from config.pedidos.services import crear_pedido_desde_items

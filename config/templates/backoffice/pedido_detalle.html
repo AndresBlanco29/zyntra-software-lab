@@ -40,33 +40,6 @@
   {% endif %}
 </div>
 
-<div class="card shadow-sm mb-3 {% if pedido.tiene_nota_cliente_pendiente %}border-warning{% else %}border-info-subtle{% endif %}">
-  <div class="card-body py-3">
-    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
-      <div class="fw-semibold">{% trans "Order comment" %}</div>
-      {% if pedido.nota_cliente %}
-      <span class="badge {% if pedido.tiene_nota_cliente_pendiente %}text-bg-warning{% else %}text-bg-success{% endif %}">
-        {% if pedido.tiene_nota_cliente_pendiente %}{% trans "Pending review" %}{% else %}{% trans "Resolved" %}{% endif %}
-      </span>
-      {% endif %}
-    </div>
-    {% if pedido.nota_cliente %}
-    <div class="mb-0" id="pedidoNotaClienteDisplay">{{ pedido.nota_cliente|linebreaksbr }}</div>
-    {% else %}
-    <div class="text-muted mb-0" id="pedidoNotaClienteDisplay">-</div>
-    {% endif %}
-    {% if can_resolve_nota_cliente %}
-    <div class="alert alert-warning mt-3 mb-0 d-flex flex-wrap gap-2 align-items-center justify-content-between">
-      <span>{% trans "This sales order is blocked until BackOffice resolves the order comment." %}</span>
-      <form method="post" action="{% url 'backoffice_resolver_nota_cliente' pedido.id %}" onsubmit="return confirm('{% trans "Confirm you reviewed the order comment. Resolve it and continue?" %}');">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-success btn-sm">{% trans "Resolve order comment" %}</button>
-      </form>
-    </div>
-    {% endif %}
-  </div>
-</div>
-
 {% if pedido.es_parcial and pedido_raiz %}
 <div class="alert alert-secondary mb-3">
   {% trans "This is a partial order from" %}
@@ -608,10 +581,12 @@
           {% endfor %}
         </select>
       </div>
+      {% if pedido.nota_cliente %}
       <div class="col-md-4">
         <label class="form-label fw-semibold">{% trans "Order comment" %}</label>
         <textarea class="form-control" rows="2" readonly aria-label="{% trans 'Order comment' %}">{{ pedido.nota_cliente }}</textarea>
       </div>
+      {% endif %}
       <div class="col-md-4">
         <label class="form-label fw-semibold">{% trans "BackOffice note" %}</label>
         <input name="nota_backoffice" class="form-control" value="{{ pedido.nota_backoffice }}">
@@ -1124,6 +1099,29 @@
   <a class="btn btn-success" href="{% url 'backoffice_picking_pdf' pedido.id %}">{% trans "Export PDF" %}</a>
   <a class="btn btn-outline-primary" href="{% url 'backoffice_inventory_needs_pdf' pedido.id %}">{% trans "Export Inventory Report" %}</a>
 </div>
+
+{% if pedido.nota_cliente %}
+<div class="card shadow-sm mt-3 mb-3 {% if pedido.tiene_nota_cliente_pendiente %}border-warning{% else %}border-info-subtle{% endif %}">
+  <div class="card-body py-3">
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
+      <div class="fw-semibold">{% trans "Order comment" %}</div>
+      <span class="badge {% if pedido.tiene_nota_cliente_pendiente %}text-bg-warning{% else %}text-bg-success{% endif %}">
+        {% if pedido.tiene_nota_cliente_pendiente %}{% trans "Pending review" %}{% else %}{% trans "Resolved" %}{% endif %}
+      </span>
+    </div>
+    <div class="mb-0" id="pedidoNotaClienteDisplay">{{ pedido.nota_cliente|linebreaksbr }}</div>
+    {% if can_resolve_nota_cliente %}
+    <div class="alert alert-warning mt-3 mb-0 d-flex flex-wrap gap-2 align-items-center justify-content-between">
+      <span>{% trans "This sales order is blocked until BackOffice resolves the order comment." %}</span>
+      <form method="post" action="{% url 'backoffice_resolver_nota_cliente' pedido.id %}" onsubmit="return confirm('{% trans "Confirm you reviewed the order comment. Resolve it and continue?" %}');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-success btn-sm">{% trans "Resolve order comment" %}</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
 {% include "backoffice/includes/document_audit_timeline.html" %}
 

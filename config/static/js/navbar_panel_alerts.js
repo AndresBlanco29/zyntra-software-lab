@@ -67,6 +67,8 @@
 
         var gutter = 12;
         var top = Math.round(toggle.getBoundingClientRect().bottom + 8);
+        // Bootstrap marks navbar dropdowns as static; clear so fixed pin wins.
+        menu.removeAttribute('data-bs-popper');
         menu.classList.add('navbar-urgent-alerts-menu--pinned');
         menu.style.setProperty('position', 'fixed', 'important');
         menu.style.setProperty('left', gutter + 'px', 'important');

@@ -14227,3 +14227,18 @@ msgstr "No se pudo crear el producto porque el código de barras ya lo usa otro 
 
 msgid "Could not save the product because the barcode is already used by another product."
 msgstr "No se pudo guardar el producto porque el código de barras ya lo usa otro producto."
+
+msgid "Contact options"
+msgstr "Opciones de contacto"
+
+msgid "Chat with Us on WhatsApp"
+msgstr "Chatea con nosotros por WhatsApp"
+
+msgid "Chat with Us"
+msgstr "Chatea con nosotros"
+
+msgid "Call Us"
+msgstr "Llámanos"
+
+msgid "Call Us at +1 (470) 967-2782"
+msgstr "Llámanos al +1 (470) 967-2782"

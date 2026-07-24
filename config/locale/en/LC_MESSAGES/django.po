@@ -11703,3 +11703,18 @@ msgstr ""
 
 msgid "No sales actions are available for your account. Ask an administrator to review your permissions."
 msgstr ""
+
+msgid "Contact options"
+msgstr "Contact options"
+
+msgid "Chat with Us on WhatsApp"
+msgstr "Chat with Us on WhatsApp"
+
+msgid "Chat with Us"
+msgstr "Chat with Us"
+
+msgid "Call Us"
+msgstr "Call Us"
+
+msgid "Call Us at +1 (470) 967-2782"
+msgstr "Call Us at +1 (470) 967-2782"

@@ -183,6 +183,7 @@ box-sizing:border-box;
     width: 100%;
     min-width: 0;
     justify-self: center;
+    overflow: visible;
 }
 
 .navbar-header-alerts {
@@ -191,6 +192,7 @@ box-sizing:border-box;
     gap: 8px;
     flex: 0 0 auto;
     min-width: 0;
+    overflow: visible;
 }
 
 .navbar-search {
@@ -303,6 +305,7 @@ box-sizing:border-box;
 .navbar-urgent-alerts {
     position: relative;
     flex: 0 0 auto;
+    overflow: visible;
 }
 
 .navbar-urgent-alerts-toggle {
@@ -372,6 +375,9 @@ box-sizing:border-box;
     box-shadow: 0 0 0 2px rgba(11, 61, 145, 0.35);
 }
 
+/* Sit above the fixed navbar (1000), the sidebar (up to 2000) and page content.
+   Combined with Popper's fixed strategy this keeps the panel visible and on top
+   on desktop, Android and iPhone Safari. */
 .navbar-urgent-alerts-menu {
     width: min(420px, calc(100vw - 24px));
     padding: 0;
@@ -380,24 +386,17 @@ box-sizing:border-box;
     border-radius: 20px;
     overflow: hidden;
     box-shadow: 0 24px 40px rgba(15, 23, 42, 0.18);
-    /* Sit above the fixed navbar (1000), the sidebar (up to 2000) and page content.
-       Combined with Popper's fixed strategy + body portal this keeps the panel visible
-       and on top on iPhone/iPad Safari in every orientation. */
-    z-index: 2050;
-}
-
-/* When the menu is moved to <body> (iOS Safari fix), force a stacking context above
-   transformed/overflow-clipped page cards such as QuickBooks Center. */
-body > .navbar-urgent-alerts-menu,
-.navbar-urgent-alerts-menu.navbar-urgent-alerts-menu--ported {
-    z-index: 10050 !important;
-    position: fixed !important;
+    z-index: 10050;
 }
 
 /* When Popper uses the fixed strategy the menu can briefly render before it is
    positioned; keep it hidden until Bootstrap adds the `show` class. */
 .navbar-urgent-alerts-menu:not(.show) {
     display: none;
+}
+
+.navbar-urgent-alerts-menu.show {
+    z-index: 10050 !important;
 }
 
 /* iOS Safari: prevent a fast double-tap on quantity steppers (used in orders,

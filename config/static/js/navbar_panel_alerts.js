@@ -17,63 +17,31 @@
             .replace(/'/g, '&#39;');
     }
 
-    function portalDropdownToBody(toggle, menu) {
-        if (!toggle || !menu || !window.bootstrap || !bootstrap.Dropdown) {
+    /**
+     * Keep the menu inside its dropdown parent. Moving it to <body> during open
+     * breaks Bootstrap's show/hide on desktop and mobile.
+     * Popper `strategy: 'fixed'` is enough to escape the navbar's overflow clip.
+     */
+    function initAlertDropdown(toggle) {
+        if (!toggle || !window.bootstrap || !bootstrap.Dropdown) {
             return null;
         }
 
-        var homeParent = menu.parentElement;
         var dropdown = bootstrap.Dropdown.getOrCreateInstance(toggle, {
+            autoClose: 'outside',
             popperConfig: function (defaultConfig) {
-                var modifiers = (defaultConfig.modifiers || []).map(function (modifier) {
-                    if (modifier.name === 'preventOverflow') {
-                        return Object.assign({}, modifier, {
-                            options: Object.assign({}, modifier.options || {}, {
-                                boundary: 'viewport',
-                                altBoundary: true,
-                                padding: 8,
-                            }),
-                        });
-                    }
-                    if (modifier.name === 'computeStyles') {
-                        return Object.assign({}, modifier, {
-                            options: Object.assign({}, modifier.options || {}, {
-                                adaptive: false,
-                                gpuAcceleration: false,
-                            }),
-                        });
-                    }
-                    return modifier;
-                });
                 return Object.assign({}, defaultConfig, {
                     strategy: 'fixed',
-                    modifiers: modifiers,
                 });
             },
         });
 
-        toggle.addEventListener('show.bs.dropdown', function () {
-            // Move the menu to <body> so overflow/transform/clip on the fixed
-            // navbar cannot trap or hide it behind page cards on iOS Safari.
-            if (menu.parentElement !== document.body) {
-                document.body.appendChild(menu);
-            }
-            menu.classList.add('navbar-urgent-alerts-menu--ported');
-        });
-
-        toggle.addEventListener('hidden.bs.dropdown', function () {
-            menu.classList.remove('navbar-urgent-alerts-menu--ported');
-            if (homeParent && menu.parentElement !== homeParent) {
-                homeParent.appendChild(menu);
-            }
-        });
-
         var reposition = function () {
-            if (dropdown && toggle.classList.contains('show')) {
+            if (toggle.classList.contains('show')) {
                 try {
                     dropdown.update();
                 } catch (error) {
-                    // Popper instance not ready yet.
+                    // Ignore.
                 }
             }
         };
@@ -146,8 +114,7 @@
             return;
         }
 
-        var menu = container.querySelector('.navbar-urgent-alerts-menu');
-        portalDropdownToBody(toggle, menu);
+        initAlertDropdown(toggle);
 
         var markSeenUrl = container.dataset.markSeenUrl;
         var feedUrl = container.dataset.feedUrl;
@@ -250,8 +217,7 @@
             return;
         }
 
-        var menu = container.querySelector('.navbar-urgent-alerts-menu');
-        portalDropdownToBody(toggle, menu);
+        initAlertDropdown(toggle);
 
         var markSeenUrl = container.dataset.markSeenUrl;
         var feedUrl = container.dataset.feedUrl;

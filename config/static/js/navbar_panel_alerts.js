@@ -20,7 +20,9 @@
     /**
      * Keep the menu inside its dropdown parent. Moving it to <body> during open
      * breaks Bootstrap's show/hide on desktop and mobile.
-     * Popper `strategy: 'fixed'` is enough to escape the navbar's overflow clip.
+     * Popper `strategy: 'fixed'` escapes the navbar overflow clip, and on small
+     * screens we center the panel in the viewport so the left Orders button
+     * does not push the menu off-screen.
      */
     function initAlertDropdown(toggle) {
         if (!toggle || !window.bootstrap || !bootstrap.Dropdown) {
@@ -30,8 +32,34 @@
         var dropdown = bootstrap.Dropdown.getOrCreateInstance(toggle, {
             autoClose: 'outside',
             popperConfig: function (defaultConfig) {
+                var modifiers = Array.isArray(defaultConfig.modifiers)
+                    ? defaultConfig.modifiers.slice()
+                    : [];
+                modifiers.push({
+                    name: 'centerOnMobile',
+                    enabled: true,
+                    phase: 'main',
+                    fn: function (args) {
+                        var state = args.state;
+                        if (!window.matchMedia('(max-width: 991.98px)').matches) {
+                            return;
+                        }
+                        if (!state.modifiersData || !state.modifiersData.popperOffsets) {
+                            return;
+                        }
+                        var width = state.rects.popper.width;
+                        var gutter = 12;
+                        var centeredX = (window.innerWidth - width) / 2;
+                        var maxX = Math.max(gutter, window.innerWidth - width - gutter);
+                        state.modifiersData.popperOffsets.x = Math.min(
+                            Math.max(gutter, centeredX),
+                            maxX
+                        );
+                    },
+                });
                 return Object.assign({}, defaultConfig, {
                     strategy: 'fixed',
+                    modifiers: modifiers,
                 });
             },
         });

@@ -399,6 +399,14 @@ box-sizing:border-box;
     z-index: 10050 !important;
 }
 
+@media (max-width: 991.98px) {
+    /* Keep Orders/Customers panels fully inside the phone viewport. */
+    .navbar-urgent-alerts-menu {
+        width: min(420px, calc(100vw - 24px)) !important;
+        max-width: calc(100vw - 24px);
+    }
+}
+
 /* iOS Safari: prevent a fast double-tap on quantity steppers (used in orders,
    quotes, inventory and picking tables) from being interpreted as a zoom gesture.
    Scoped to the step controls so pinch-to-zoom stays available everywhere else. */

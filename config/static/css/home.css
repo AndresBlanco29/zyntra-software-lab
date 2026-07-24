@@ -628,15 +628,17 @@ background:#f3f4f6;
     }
 
     .hero-content > .hero-contact-col {
-        padding-left: 0 !important;
+        /* Match the text column inset so the card lines up under View Catalog. */
+        padding-left: 27px !important;
         padding-right: 0 !important;
-        max-width: 100% !important;
+        max-width: 320px !important;
         width: 100% !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
         display: flex;
         justify-content: center;
         align-items: center;
+        box-sizing: border-box;
     }
 
     .hero-title {
@@ -4774,15 +4776,16 @@ background:rgba(255,255,255,.25);
 @media (max-width: 991.98px) {
     .hero-contact-col {
         width: 100% !important;
-        max-width: 100% !important;
+        max-width: 320px !important;
         margin-top: 1rem;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        padding-left: 0 !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        padding-left: 27px !important;
         padding-right: 0 !important;
         display: flex;
         justify-content: center;
         align-items: center;
+        box-sizing: border-box;
     }
 
     .hero-contact-panel {
@@ -4799,14 +4802,14 @@ background:rgba(255,255,255,.25);
 }
 
 @media (max-width: 768px) {
-    /* Cancel the asymmetric hero padding so the contact card stays centered under View Catalog. */
     .hero-content > .hero-contact-col {
-        padding-left: 0 !important;
+        padding-left: 27px !important;
         padding-right: 0 !important;
-        max-width: 100% !important;
+        max-width: 320px !important;
         width: 100% !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        box-sizing: border-box;
     }
 
     .hero-contact-panel {

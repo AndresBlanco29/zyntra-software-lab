@@ -89,7 +89,9 @@
         {% for row in analysis.rows %}
         <tr class="{% if row.status == 'out_of_stock' %}table-danger{% elif row.status == 'insufficient' %}table-warning{% endif %}">
           <td>
-            <div class="fw-semibold">{{ row.product_name }}</div>
+            <div class="fw-semibold">
+              {% if row.has_active_adjustments %}<span class="text-warning" title="{% trans 'Active emergency adjustments' %}">⚠</span> {% endif %}{{ row.product_name }}
+            </div>
             <div class="small text-muted">{{ row.presentation_name }}</div>
           </td>
           <td>{% if row.sku %}{{ row.sku }}{% else %}<span class="text-muted">-</span>{% endif %}</td>

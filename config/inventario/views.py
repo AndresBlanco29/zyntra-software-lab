@@ -13,9 +13,11 @@ from .availability import availability_snapshot
 from .models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
 from .services import (
 	_resolve_fractional_rollup_presentacion,
+	registrar_ajuste_emergencia,
 	registrar_ajuste_manual,
 	registrar_entrada_manual,
 	registrar_salida_manual,
+	resolver_ajuste_emergencia,
 )
 
 LOW_STOCK_THRESHOLD = 5
@@ -155,11 +157,14 @@ def backoffice_inventory_list(request):
 	for presentacion in presentacion_list:
 		snapshot = ledger.get(presentacion.id, {
 			'quick_inventory': 0,
+			'active_manual_adjustments': 0,
 			'sales_pending_sync': 0,
 			'in_orders': 0,
 			'available': 0,
+			'has_active_adjustments': False,
 		})
 		quick_inventory = int(snapshot['quick_inventory'])
+		active_manual_adjustments = int(snapshot.get('active_manual_adjustments', 0) or 0)
 		sales_pending_sync = int(snapshot['sales_pending_sync'])
 		in_orders = int(snapshot['in_orders'])
 		stock_disponible = int(snapshot['available'])
@@ -176,12 +181,14 @@ def backoffice_inventory_list(request):
 		row = {
 			'presentacion': presentacion,
 			'quick_inventory': quick_inventory,
+			'active_manual_adjustments': active_manual_adjustments,
 			'sales_pending_sync': sales_pending_sync,
 			'in_orders': in_orders,
 			'stock_fisico': quick_inventory,
 			'stock_reservado': in_orders,
 			'stock_disponible': stock_disponible,
 			'stock_status': status,
+			'has_active_adjustments': bool(snapshot.get('has_active_adjustments')),
 			'units_per_package': packaging['units'],
 			'content_type_label': packaging['content_type'],
 			'fractional_stock': fractional_match['stock_fisico'] if fractional_match else 0,
@@ -238,36 +245,69 @@ def backoffice_inventory_detail(request, presentacion_id):
 		observation = (request.POST.get('observacion') or '').strip()
 
 		try:
-			if not observation:
-				raise ValidationError(_('Observation is required for all inventory movements.'))
-			if action == 'entrada':
-				quantity = _parse_required_positive_integer(
-					request.POST.get('cantidad'),
-					_('Enter a quantity greater than zero for manual entries and exits.'),
+			if action == 'resolve_emergency':
+				movement_id = int(request.POST.get('movement_id') or 0)
+				movement = get_object_or_404(
+					InventarioMovimiento,
+					id=movement_id,
+					presentacion=presentacion,
+					tipo='AJUSTE_EMERGENCIA',
 				)
-				registrar_entrada_manual(presentacion=presentacion, cantidad=quantity, observacion=observation, creado_por=request.user)
-				messages.success(request, _('Inventory entry recorded successfully.'))
-			elif action == 'salida':
-				quantity = _parse_required_positive_integer(
-					request.POST.get('cantidad'),
-					_('Enter a quantity greater than zero for manual entries and exits.'),
+				resolver_ajuste_emergencia(
+					movimiento=movement,
+					resuelto_por=request.user,
+					observacion_resolucion=request.POST.get('observacion_resolucion') or '',
 				)
-				registrar_salida_manual(presentacion=presentacion, cantidad=quantity, observacion=observation, creado_por=request.user)
-				messages.success(request, _('Inventory exit recorded successfully.'))
-			elif action == 'ajuste':
-				delta_quantity = _parse_required_non_zero_integer(
-					request.POST.get('delta_cantidad'),
-					_('Enter a positive or negative adjustment delta different from zero.'),
-				)
-				registrar_ajuste_manual(presentacion=presentacion, delta_cantidad=delta_quantity, observacion=observation, creado_por=request.user)
-				messages.success(request, _('Inventory adjustment recorded successfully.'))
+				messages.success(request, _('Emergency inventory adjustment resolved.'))
 			else:
-				raise ValidationError(_('Select a valid inventory action.'))
+				if not observation:
+					raise ValidationError(_('Observation is required for all inventory movements.'))
+				if action == 'entrada':
+					quantity = _parse_required_positive_integer(
+						request.POST.get('cantidad'),
+						_('Enter a quantity greater than zero for manual entries and exits.'),
+					)
+					registrar_entrada_manual(presentacion=presentacion, cantidad=quantity, observacion=observation, creado_por=request.user)
+					messages.success(request, _('Inventory entry recorded successfully.'))
+				elif action == 'salida':
+					quantity = _parse_required_positive_integer(
+						request.POST.get('cantidad'),
+						_('Enter a quantity greater than zero for manual entries and exits.'),
+					)
+					registrar_salida_manual(presentacion=presentacion, cantidad=quantity, observacion=observation, creado_por=request.user)
+					messages.success(request, _('Inventory exit recorded successfully.'))
+				elif action == 'ajuste':
+					delta_quantity = _parse_required_non_zero_integer(
+						request.POST.get('delta_cantidad'),
+						_('Enter a positive or negative adjustment delta different from zero.'),
+					)
+					registrar_ajuste_manual(presentacion=presentacion, delta_cantidad=delta_quantity, observacion=observation, creado_por=request.user)
+					messages.success(request, _('Inventory adjustment recorded successfully.'))
+				elif action == 'emergencia':
+					delta_quantity = _parse_required_non_zero_integer(
+						request.POST.get('delta_cantidad'),
+						_('Enter a positive or negative emergency adjustment different from zero.'),
+					)
+					registrar_ajuste_emergencia(
+						presentacion=presentacion,
+						delta_cantidad=delta_quantity,
+						observacion=observation,
+						creado_por=request.user,
+					)
+					messages.success(request, _('Emergency inventory adjustment recorded. Quick Inventory was not changed.'))
+				else:
+					raise ValidationError(_('Select a valid inventory action.'))
 		except (ValidationError, ValueError) as exc:
 			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 		return redirect('backoffice_inventory_detail', presentacion_id=presentacion.id)
 
-	movements = InventarioMovimiento.objects.select_related('creado_por').filter(presentacion=presentacion).order_by('-creado_en', '-id')[:50]
+	movements = InventarioMovimiento.objects.select_related('creado_por', 'resuelto_por').filter(
+		presentacion=presentacion,
+	).order_by('-creado_en', '-id')[:50]
+	emergency_adjustments = InventarioMovimiento.objects.select_related('creado_por', 'resuelto_por').filter(
+		presentacion=presentacion,
+		tipo='AJUSTE_EMERGENCIA',
+	).order_by('-creado_en', '-id')
 	consolidation_movements = InventarioMovimiento.objects.select_related('creado_por').filter(
 		presentacion=presentacion,
 		tipo__in=['CONSOLIDACION_FRACCIONADA', 'DESCONSOLIDACION_FRACCIONADA'],
@@ -281,17 +321,22 @@ def backoffice_inventory_detail(request, presentacion_id):
 	packaging = get_effective_packaging_for_display(presentacion)
 	ledger = availability_snapshot([presentacion.id]).get(presentacion.id, {
 		'quick_inventory': int(stock.stock_fisico or 0),
+		'active_manual_adjustments': 0,
 		'sales_pending_sync': 0,
 		'in_orders': 0,
 		'available': int(stock.stock_fisico or 0),
+		'has_active_adjustments': False,
 	})
+	can_manage_inventory = request.user.has_internal_permission('backoffice.orders.manage')
 	context = {
 		'presentacion': presentacion,
 		'stock': stock,
 		'ledger': ledger,
 		'packaging': packaging,
 		'movements': movements,
+		'emergency_adjustments': emergency_adjustments,
 		'consolidation_movements': consolidation_movements,
 		'fractional_stocks': fractional_stocks,
+		'can_manage_inventory': can_manage_inventory,
 	}
 	return render(request, 'backoffice/inventory_detail.html', context)

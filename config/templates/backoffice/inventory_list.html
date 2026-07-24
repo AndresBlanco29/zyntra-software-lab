@@ -14,7 +14,7 @@
 
   <h2 class="mb-1">{% trans "Operational Inventory" %}</h2>
 
-  <p class="text-muted mb-0">{% trans "Quick Inventory comes from QuickBooks. Available = Quick Inventory − Sales Pending Sync − In orders. Main stock is counted in packages (CS); loose units appear in the partial stock section below." %}</p>
+  <p class="text-muted mb-0">{% trans "Quick Inventory comes from QuickBooks. Available = Quick Inventory + Active Manual Adjustments − Sales Pending Sync − In orders. Main stock is counted in packages (CS); loose units appear in the partial stock section below." %}</p>
 
 </div>
 
@@ -306,12 +306,20 @@
 
           <td data-label="{% trans 'Product' %}">
 
-            <div class="fw-semibold">{{ row.presentacion.producto.nombre_traducido }}</div>
+            <div class="fw-semibold">
+              {% if row.has_active_adjustments %}
+              <span class="text-warning" title="{% trans 'Active emergency adjustments' %}" aria-label="{% trans 'Active emergency adjustments' %}">⚠</span>
+              {% endif %}
+              {{ row.presentacion.producto.nombre_traducido }}
+            </div>
 
             {% if row.presentacion.producto.categoria %}
 
             <div class="text-muted small">{{ row.presentacion.producto.categoria.nombre_traducido }}</div>
 
+            {% endif %}
+            {% if row.has_active_adjustments %}
+            <div class="small text-warning">{% trans "Temporary inventory adjustment active" %}</div>
             {% endif %}
 
           </td>

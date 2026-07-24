@@ -1,11 +1,15 @@
 """Dual-ledger inventory availability.
 
 Quick Inventory (QI) is the quantity imported from QuickBooks (stock_fisico).
+Active Manual Adjustments are temporary Emergency Inventory Adjustments.
 Sales Pending Sync is sold on local invoices not yet exported to QuickBooks.
 In orders is quantity on open sales orders that do not yet have an invoice.
 Available is always computed and never stored as source of truth:
 
-    Available = Quick Inventory - Sales Pending Sync - In orders
+    Available = Quick Inventory
+                + Active Manual Adjustments
+                - Sales Pending Sync
+                - In orders
 """
 
 from __future__ import annotations
@@ -13,11 +17,12 @@ from __future__ import annotations
 from django.db.models import Q, Sum
 
 from config.facturacion.models import InvoiceItem
-from config.inventario.models import StockPresentacion
+from config.inventario.models import InventarioMovimiento, StockPresentacion
 from config.pedidos.models import PedidoItem
 
 # Orders that still consume available stock until invoiced/cancelled.
 CLOSED_ORDER_ESTADOS = frozenset({'CANCELADO', 'INVOICE_GENERADA', 'DESPACHADO'})
+EMERGENCY_ADJUSTMENT_TIPO = 'AJUSTE_EMERGENCIA'
 
 
 def _normalize_presentacion_ids(presentacion_ids):
@@ -45,6 +50,40 @@ def quick_inventory_map(presentacion_ids):
     for presentacion_id, stock_fisico in rows:
         result[presentacion_id] = int(stock_fisico or 0)
     return result
+
+
+def active_manual_adjustments_map(presentacion_ids):
+    """Sum Active Emergency Inventory Adjustment deltas (never mutate QI)."""
+    ids = _normalize_presentacion_ids(presentacion_ids)
+    if not ids:
+        return {}
+    rows = (
+        InventarioMovimiento.objects.filter(
+            presentacion_id__in=ids,
+            tipo=EMERGENCY_ADJUSTMENT_TIPO,
+            estado=InventarioMovimiento.ESTADO_ACTIVE,
+        )
+        .values('presentacion_id')
+        .annotate(qty=Sum('delta_fisico'))
+    )
+    result = {presentacion_id: 0 for presentacion_id in ids}
+    for row in rows:
+        result[int(row['presentacion_id'])] = int(row['qty'] or 0)
+    return result
+
+
+def presentations_with_active_adjustments(presentacion_ids):
+    """Return set of presentacion_ids that have at least one Active emergency adjustment."""
+    ids = _normalize_presentacion_ids(presentacion_ids)
+    if not ids:
+        return set()
+    return set(
+        InventarioMovimiento.objects.filter(
+            presentacion_id__in=ids,
+            tipo=EMERGENCY_ADJUSTMENT_TIPO,
+            estado=InventarioMovimiento.ESTADO_ACTIVE,
+        ).values_list('presentacion_id', flat=True)
+    )
 
 
 def sales_pending_sync_map(presentacion_ids):
@@ -90,23 +129,34 @@ def availability_snapshot(presentacion_ids, *, exclude_pedido_ids=None):
     Build per-presentation dual-ledger snapshot.
 
     Returns dict[presentacion_id] = {
-        'quick_inventory', 'sales_pending_sync', 'in_orders', 'available'
+        'quick_inventory', 'active_manual_adjustments', 'sales_pending_sync',
+        'in_orders', 'available', 'has_active_adjustments'
     }
     """
     ids = _normalize_presentacion_ids(presentacion_ids)
     qi = quick_inventory_map(ids)
+    adjustments = active_manual_adjustments_map(ids)
     pending = sales_pending_sync_map(ids)
     in_orders = in_orders_map(ids, exclude_pedido_ids=exclude_pedido_ids)
+    with_active = presentations_with_active_adjustments(ids)
     snapshot = {}
     for presentacion_id in ids:
         quick_inventory = int(qi.get(presentacion_id, 0) or 0)
+        active_manual_adjustments = int(adjustments.get(presentacion_id, 0) or 0)
         sales_pending_sync = int(pending.get(presentacion_id, 0) or 0)
         in_orders_qty = int(in_orders.get(presentacion_id, 0) or 0)
         snapshot[presentacion_id] = {
             'quick_inventory': quick_inventory,
+            'active_manual_adjustments': active_manual_adjustments,
             'sales_pending_sync': sales_pending_sync,
             'in_orders': in_orders_qty,
-            'available': quick_inventory - sales_pending_sync - in_orders_qty,
+            'available': (
+                quick_inventory
+                + active_manual_adjustments
+                - sales_pending_sync
+                - in_orders_qty
+            ),
+            'has_active_adjustments': presentacion_id in with_active,
         }
     return snapshot
 

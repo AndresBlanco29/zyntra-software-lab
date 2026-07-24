@@ -735,6 +735,7 @@ def build_pedido_inventory_needs_analysis(*, pedido, pedido_items=None):
 			'status': status,
 			'status_label': status_label,
 			'needs_purchase': to_buy > 0,
+			'has_active_adjustments': bool(snapshot.get('has_active_adjustments')),
 		})
 	rows.sort(key=lambda row: (0 if row['needs_purchase'] else 1, row['product_name'].casefold(), row['item_id']))
 	needs_purchase_count = sum(1 for row in rows if row['needs_purchase'])
@@ -787,6 +788,7 @@ def build_multi_pedido_inventory_needs_analysis(*, pedidos):
 				'sales_pending_sync': 0,
 				'in_orders': 0,
 				'available': 0,
+				'has_active_adjustments': False,
 			})
 			bucket = {
 				'presentacion_id': presentacion_id,
@@ -795,6 +797,7 @@ def build_multi_pedido_inventory_needs_analysis(*, pedidos):
 				'sku': (presentacion.producto.codigo_barras or '').strip(),
 				'requested_quantity': 0,
 				'available': max(int(snapshot['available']), 0),
+				'has_active_adjustments': bool(snapshot.get('has_active_adjustments')),
 				'order_ids': set(),
 			}
 			aggregated[presentacion_id] = bucket
@@ -829,6 +832,7 @@ def build_multi_pedido_inventory_needs_analysis(*, pedidos):
 			'status': status,
 			'status_label': status_label,
 			'needs_purchase': to_buy > 0,
+			'has_active_adjustments': bool(bucket.get('has_active_adjustments')),
 			'order_count': len(bucket['order_ids']),
 			'order_ids': sorted(bucket['order_ids']),
 		})

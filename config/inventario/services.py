@@ -344,6 +344,61 @@ def registrar_ajuste_manual(*, presentacion, delta_cantidad, observacion='', cre
 
 
 @transaction.atomic
+def registrar_ajuste_emergencia(*, presentacion, delta_cantidad, observacion='', creado_por=None):
+    """Temporary Available delta. Does not mutate Quick Inventory (stock_fisico)."""
+    delta_cantidad = int(delta_cantidad or 0)
+    if delta_cantidad == 0:
+        raise ValidationError(_('Emergency adjustment quantity cannot be zero.'))
+    motivo = (observacion or '').strip()
+    if not motivo:
+        raise ValidationError(_('A reason is required for emergency inventory adjustments.'))
+
+    stock = _lock_stock_records([presentacion.id])[presentacion.id]
+    qi = int(stock.stock_fisico or 0)
+    reserved = int(stock.stock_reservado or 0)
+    movement = InventarioMovimiento.objects.create(
+        presentacion=presentacion,
+        stock=stock,
+        categoria='AJUSTE',
+        tipo='AJUSTE_EMERGENCIA',
+        cantidad=abs(delta_cantidad),
+        delta_fisico=delta_cantidad,
+        delta_reservado=0,
+        stock_fisico_anterior=qi,
+        stock_fisico_posterior=qi,
+        stock_reservado_anterior=reserved,
+        stock_reservado_posterior=reserved,
+        stock_disponible_anterior=int(stock.stock_disponible or 0),
+        stock_disponible_posterior=int(stock.stock_disponible or 0),
+        referencia=f'EMERGENCY-{presentacion.id}',
+        observacion=motivo,
+        estado=InventarioMovimiento.ESTADO_ACTIVE,
+        creado_por=creado_por,
+    )
+    return movement
+
+
+@transaction.atomic
+def resolver_ajuste_emergencia(*, movimiento, resuelto_por=None, observacion_resolucion=''):
+    """Mark an Active emergency adjustment as Resolved. Never deletes the record."""
+    locked = InventarioMovimiento.objects.select_for_update().select_related('presentacion').get(pk=movimiento.pk)
+    if locked.tipo != 'AJUSTE_EMERGENCIA':
+        raise ValidationError(_('Only emergency inventory adjustments can be resolved.'))
+    if locked.estado != InventarioMovimiento.ESTADO_ACTIVE:
+        raise ValidationError(_('This emergency adjustment is already resolved.'))
+    note = (observacion_resolucion or '').strip()
+    if not note:
+        raise ValidationError(_('A resolution observation is required.'))
+
+    locked.estado = InventarioMovimiento.ESTADO_RESOLVED
+    locked.resuelto_por = resuelto_por
+    locked.resuelto_en = timezone.now()
+    locked.observacion_resolucion = note
+    locked.save(update_fields=['estado', 'resuelto_por', 'resuelto_en', 'observacion_resolucion'])
+    return locked
+
+
+@transaction.atomic
 def validar_disponibilidad_para_items(items_payload, bypass_stock_check=False):
     if bypass_stock_check:
         return

@@ -91,6 +91,7 @@ class InventarioMovimiento(models.Model):
 		('SALIDA_MANUAL', _('Manual exit')),
 		('AJUSTE_POSITIVO', _('Positive adjustment')),
 		('AJUSTE_NEGATIVO', _('Negative adjustment')),
+		('AJUSTE_EMERGENCIA', _('Emergency Inventory Adjustment')),
 		('CONSOLIDACION_FRACCIONADA', _('Fractional stock consolidation')),
 		('DESCONSOLIDACION_FRACCIONADA', _('Fractional stock deconsolidation')),
 		('RESERVA_PEDIDO', _('Order reservation')),
@@ -101,6 +102,13 @@ class InventarioMovimiento(models.Model):
 		('ENTRADA_NOTA_CREDITO', _('Credit note return')),
 		('REVERSO_NOTA_CREDITO', _('Credit note reversal')),
 		('ANULACION_PEDIDO', _('Order cancellation reversal')),
+	)
+
+	ESTADO_ACTIVE = 'ACTIVE'
+	ESTADO_RESOLVED = 'RESOLVED'
+	ESTADO_CHOICES = (
+		(ESTADO_ACTIVE, _('Active')),
+		(ESTADO_RESOLVED, _('Resolved')),
 	)
 
 	presentacion = models.ForeignKey(Presentacion, on_delete=models.PROTECT, related_name='movimientos_inventario')
@@ -119,6 +127,24 @@ class InventarioMovimiento(models.Model):
 	referencia = models.CharField(max_length=120)
 	idempotency_key = models.CharField(max_length=160, blank=True, null=True, unique=True)
 	observacion = models.TextField(blank=True)
+	# Temporary emergency adjustments only: Active deltas affect Available; Resolved is history.
+	estado = models.CharField(
+		max_length=20,
+		choices=ESTADO_CHOICES,
+		blank=True,
+		default='',
+		db_index=True,
+		help_text=_('Used by Emergency Inventory Adjustment. Blank for non-temporary movements.'),
+	)
+	resuelto_por = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='movimientos_inventario_resueltos',
+	)
+	resuelto_en = models.DateTimeField(null=True, blank=True)
+	observacion_resolucion = models.TextField(blank=True)
 	pedido = models.ForeignKey('pedidos.Pedido', on_delete=models.SET_NULL, null=True, blank=True, related_name='movimientos_inventario')
 	pedido_item = models.ForeignKey('pedidos.PedidoItem', on_delete=models.SET_NULL, null=True, blank=True, related_name='movimientos_inventario')
 	invoice = models.ForeignKey('facturacion.Invoice', on_delete=models.SET_NULL, null=True, blank=True, related_name='movimientos_inventario')
@@ -129,9 +155,20 @@ class InventarioMovimiento(models.Model):
 
 	class Meta:
 		ordering = ('-creado_en', '-id')
+		indexes = [
+			models.Index(fields=['presentacion', 'tipo', 'estado'], name='inv_mov_pres_tipo_estado_idx'),
+		]
 
 	def __str__(self):
 		return f'{self.referencia} | {self.get_tipo_display()} | {self.presentacion_id}'
+
+	@property
+	def is_emergency_adjustment(self):
+		return self.tipo == 'AJUSTE_EMERGENCIA'
+
+	@property
+	def is_active_emergency(self):
+		return self.is_emergency_adjustment and self.estado == self.ESTADO_ACTIVE
 
 
 class Proveedor(models.Model):

@@ -628,8 +628,15 @@ background:#f3f4f6;
     }
 
     .hero-content > .hero-contact-col {
-        padding-left: 0;
-        max-width: 320px;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        display: flex;
+        justify-content: center;
+        align-items: center;
     }
 
     .hero-title {
@@ -4729,28 +4736,59 @@ background:rgba(255,255,255,.25);
 }
 
 @media (min-width: 992px) {
+    /* Slightly lower the desktop header so logo, brand and menu are not flush to the top. */
+    .navbar-home {
+        padding-top: 30px;
+        padding-bottom: 18px;
+    }
+
+    .logo-navbar {
+        top: 10px;
+    }
+
+    .brand-text {
+        margin-top: -18px;
+    }
+
+    .navbar-home .nav-link {
+        margin-top: -8px;
+    }
+
+    .navbar-divider {
+        margin-top: 2px;
+    }
+
+    /* Keep contact panel between hero copy and product image (not hugging the right). */
     .hero-contact-col {
-        justify-content: flex-start;
-        padding-left: 0.5rem;
+        justify-content: center;
+        padding-left: 0;
+        padding-right: 2.75rem;
     }
 
     .hero-contact-panel {
-        margin-left: auto;
-        margin-right: 1.5rem;
+        margin-left: 0;
+        margin-right: 2.75rem;
     }
 }
 
 @media (max-width: 991.98px) {
     .hero-contact-col {
-        width: 100%;
+        width: 100% !important;
+        max-width: 100% !important;
         margin-top: 1rem;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        display: flex;
         justify-content: center;
+        align-items: center;
     }
 
     .hero-contact-panel {
-        width: min(100%, 320px);
-        margin-left: auto;
-        margin-right: auto;
+        width: min(100%, 280px);
+        margin-left: auto !important;
+        margin-right: auto !important;
     }
 
     .hero-home .hero-contact-btn {
@@ -4761,9 +4799,22 @@ background:rgba(255,255,255,.25);
 }
 
 @media (max-width: 768px) {
+    /* Cancel the asymmetric hero padding so the contact card stays centered under View Catalog. */
+    .hero-content > .hero-contact-col {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+    }
+
     .hero-contact-panel {
         gap: 0.65rem;
         padding: 0.9rem 1rem;
+        width: min(100%, 280px);
+        margin-left: auto !important;
+        margin-right: auto !important;
     }
 
     .hero-contact-btn {

@@ -177,6 +177,45 @@ def _parse_invoice_edit_payload(invoice, post_data):
 	return line_updates, delete_item_ids, new_lines
 
 
+def _enrich_invoice_items_for_edit(*, invoice, invoice_items):
+	"""Attach price-list and discount-preset options used by the edit-mode UI."""
+	from config.pedidos.views import (
+		_build_pedido_discount_preset_options,
+		_build_presentacion_price_options,
+		_match_discount_preset_key,
+		_match_presentacion_price_key,
+	)
+
+	discount_options = _build_pedido_discount_preset_options()
+	pedido = invoice.pedido
+	for item in invoice_items:
+		presentacion = item.presentacion
+		if presentacion is None:
+			item.price_options = []
+			item.selected_price_key = ''
+		else:
+			price_options, _, _ = _build_presentacion_price_options(
+				presentacion=presentacion,
+				pedido=pedido,
+			)
+			list_price = item.precio_unitario_lista if item.precio_unitario_lista is not None else item.precio_unitario
+			item.price_options = price_options
+			item.selected_price_key = _match_presentacion_price_key(price_options, list_price)
+		item.discount_preset_options = discount_options
+		item.selected_discount_preset_key = (
+			_match_discount_preset_key(discount_options, item.descuento_monto_unitario)
+			if item.descuento_monto_unitario and item.descuento_monto_unitario > 0
+			else ''
+		)
+		if not item.selected_discount_preset_key and item.descuento_porcentaje and item.descuento_porcentaje > 0:
+			pct = format(item.descuento_porcentaje, '.2f')
+			for option in discount_options:
+				if option.get('type') == 'percent' and option.get('value') == pct:
+					item.selected_discount_preset_key = option.get('key')
+					break
+	return discount_options
+
+
 def _resolve_invoice_barcode(item):
 	presentacion = item.presentacion
 	if not presentacion or not presentacion.producto_id:
@@ -1874,6 +1913,12 @@ def backoffice_invoice_detail(request, invoice_id):
 	customer_overdue_balance = resolve_customer_overdue_balance(cliente=invoice.cliente)
 	customer_open_balance = resolve_customer_open_balance(cliente=invoice.cliente)
 	edit_mode = can_edit_invoice and str(request.GET.get('edit') or '').strip() == '1'
+	discount_preset_options = []
+	if edit_mode:
+		discount_preset_options = _enrich_invoice_items_for_edit(
+			invoice=invoice,
+			invoice_items=invoice_items,
+		)
 	from config.auditoria.document_timeline import get_invoice_audit_timeline
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
@@ -1907,6 +1952,7 @@ def backoffice_invoice_detail(request, invoice_id):
 		'invoice_was_edited': bool(invoice.editada_en),
 		'edit_history': list(invoice.edit_history.select_related('editado_por').all()[:20]),
 		'product_search_url': reverse('backoffice_buscar_presentaciones'),
+		'discount_preset_options': discount_preset_options,
 	})
 
 

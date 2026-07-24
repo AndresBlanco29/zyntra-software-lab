@@ -1,5 +1,5 @@
 {% extends "bases/base_vendedor.html" %}
-{% load i18n static shipment_summary_tags %}
+{% load i18n l10n static shipment_summary_tags %}
 
 {% block title %}{{ invoice.numero }}{% endblock %}
 
@@ -530,11 +530,10 @@
             <tr>
               <th>{% trans "Description" %}</th>
               <th>{% trans "U/M" %}</th>
-              <th>{% trans "Qty." %}</th>
-              <th>{% trans "List price" %}</th>
-              <th>{% trans "Discount $" %}</th>
-              <th>{% trans "Disc. %" %}</th>
-              <th>{% trans "Unit price" %}</th>
+              <th style="width:90px;">{% trans "Qty." %}</th>
+              <th style="min-width:160px;">{% trans "List price" %}</th>
+              <th style="min-width:170px;">{% trans "Discount" %}</th>
+              <th style="width:110px;">{% trans "Unit price" %}</th>
               <th>{% trans "Subtotal" %}</th>
               <th>{% trans "Remove" %}</th>
             </tr>
@@ -550,19 +549,51 @@
               </td>
               <td data-label="{% trans 'U/M' %}">{{ item.presentacion_nombre_display }}</td>
               <td data-label="{% trans 'Qty.' %}">
-                <input type="number" min="1" step="1" class="form-control form-control-sm" name="cantidad_{{ item.id }}" value="{{ item.cantidad_facturada }}" required {% if item.es_regalo %}{% endif %}>
+                <input type="number" min="1" step="1" class="form-control form-control-sm invoice-edit-qty" name="cantidad_{{ item.id }}" value="{{ item.cantidad_facturada }}" data-item-id="{{ item.id }}" required>
               </td>
               <td data-label="{% trans 'List price' %}">
-                <input type="number" min="0" step="0.01" class="form-control form-control-sm" name="lista_{{ item.id }}" value="{% if item.precio_unitario_lista %}{{ item.precio_unitario_lista }}{% else %}{{ item.precio_unitario }}{% endif %}">
+                {% if item.es_regalo or item.precio_unitario == 0 %}
+                <div class="fw-semibold text-success">{% trans "Free" %}</div>
+                <input type="hidden" name="lista_{{ item.id }}" value="0">
+                <input type="hidden" name="precio_{{ item.id }}" value="0">
+                <input type="hidden" name="descuento_monto_{{ item.id }}" value="0">
+                <input type="hidden" name="descuento_pct_{{ item.id }}" value="0">
+                {% else %}
+                <select class="form-select form-select-sm mb-1 no-search-select invoice-edit-price-preset" data-item-id="{{ item.id }}" data-list-input="lista_{{ item.id }}" data-unit-input="precio_{{ item.id }}">
+                  <option value="">{% trans "Manual price" %}</option>
+                  {% for option in item.price_options %}
+                  <option value="{{ option.value|unlocalize }}" data-price-key="{{ option.key }}" {% if item.selected_price_key == option.key %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+                <input type="number" min="0" step="0.01" class="form-control form-control-sm invoice-edit-list-price" id="lista_{{ item.id }}" name="lista_{{ item.id }}" value="{% if item.precio_unitario_lista %}{{ item.precio_unitario_lista|unlocalize }}{% else %}{{ item.precio_unitario|unlocalize }}{% endif %}" data-item-id="{{ item.id }}">
+                {% endif %}
               </td>
-              <td data-label="{% trans 'Discount $' %}">
-                <input type="number" min="0" step="0.01" class="form-control form-control-sm" name="descuento_monto_{{ item.id }}" value="{{ item.descuento_monto_unitario|default:'0.00' }}">
-              </td>
-              <td data-label="{% trans 'Disc. %' %}">
-                <input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" name="descuento_pct_{{ item.id }}" value="{{ item.descuento_porcentaje|default:'0.00' }}">
+              <td data-label="{% trans 'Discount' %}">
+                {% if not item.es_regalo and item.precio_unitario != 0 %}
+                <select class="form-select form-select-sm mb-1 no-search-select invoice-edit-discount-preset" data-item-id="{{ item.id }}" data-amount-input="descuento_monto_{{ item.id }}" data-percent-input="descuento_pct_{{ item.id }}">
+                  <option value="">{% trans "Manual discount" %}</option>
+                  {% for option in discount_preset_options %}
+                  <option value="{{ option.value|unlocalize }}" data-discount-key="{{ option.key }}" data-discount-type="{{ option.type|default:'amount' }}" {% if item.selected_discount_preset_key == option.key %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+                <div class="input-group input-group-sm mb-1">
+                  <span class="input-group-text">$</span>
+                  <input type="number" min="0" step="0.01" class="form-control invoice-edit-discount-amount" id="descuento_monto_{{ item.id }}" name="descuento_monto_{{ item.id }}" value="{{ item.descuento_monto_unitario|default:'0.00'|unlocalize }}" data-item-id="{{ item.id }}">
+                </div>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">%</span>
+                  <input type="number" min="0" max="100" step="0.01" class="form-control invoice-edit-discount-pct" id="descuento_pct_{{ item.id }}" name="descuento_pct_{{ item.id }}" value="{{ item.descuento_porcentaje|default:'0.00'|unlocalize }}" data-item-id="{{ item.id }}">
+                </div>
+                {% else %}
+                —
+                {% endif %}
               </td>
               <td data-label="{% trans 'Unit price' %}">
-                <input type="number" min="0" step="0.01" class="form-control form-control-sm" name="precio_{{ item.id }}" value="{{ item.precio_unitario }}" required>
+                {% if not item.es_regalo and item.precio_unitario != 0 %}
+                <input type="number" min="0" step="0.01" class="form-control form-control-sm invoice-edit-unit-price" id="precio_{{ item.id }}" name="precio_{{ item.id }}" value="{{ item.precio_unitario|unlocalize }}" data-item-id="{{ item.id }}" required>
+                {% else %}
+                $0.00
+                {% endif %}
               </td>
               <td data-label="{% trans 'Subtotal' %}">${{ item.subtotal }}</td>
               <td data-label="{% trans 'Remove' %}">
@@ -580,7 +611,7 @@
       <div class="border rounded-3 p-3 mt-3 mb-3">
         <h6 class="mb-3">{% trans "Add product" %}</h6>
         <div class="row g-2 align-items-end">
-          <div class="col-lg-5">
+          <div class="col-lg-4">
             <label class="form-label fw-semibold" for="invoiceEditProductSearch">{% trans "Search product" %}</label>
             <div
               class="product-search-field position-relative"
@@ -595,17 +626,29 @@
               <div id="invoiceEditSelectedLabel" class="small text-success fw-semibold mt-1" hidden></div>
             </div>
           </div>
-          <div class="col-md-2">
+          <div class="col-md-1">
             <label class="form-label fw-semibold" for="invoiceEditQty">{% trans "Qty." %}</label>
             <input type="number" min="1" step="1" id="invoiceEditQty" class="form-control" value="1">
           </div>
           <div class="col-md-2">
-            <label class="form-label fw-semibold" for="invoiceEditPrice">{% trans "Unit price" %}</label>
-            <input type="number" min="0" step="0.01" id="invoiceEditPrice" class="form-control" value="">
+            <label class="form-label fw-semibold" for="invoiceEditPricePreset">{% trans "Price" %}</label>
+            <select id="invoiceEditPricePreset" class="form-select form-select-sm mb-1 no-search-select" disabled>
+              <option value="">{% trans "Select a price" %}</option>
+            </select>
+            <input type="number" min="0" step="0.01" id="invoiceEditPrice" class="form-control form-control-sm" placeholder="{% trans 'Manual' %}" disabled>
           </div>
           <div class="col-md-2">
-            <label class="form-label fw-semibold" for="invoiceEditDiscount">{% trans "Disc. %" %}</label>
-            <input type="number" min="0" max="100" step="0.01" id="invoiceEditDiscount" class="form-control" value="0">
+            <label class="form-label fw-semibold" for="invoiceEditDiscountPreset">{% trans "Discount" %}</label>
+            <select id="invoiceEditDiscountPreset" class="form-select form-select-sm mb-1 no-search-select">
+              <option value="">{% trans "Manual / none" %}</option>
+              {% for option in discount_preset_options %}
+              <option value="{{ option.value|unlocalize }}" data-discount-type="{{ option.type|default:'amount' }}">{{ option.label }}</option>
+              {% endfor %}
+            </select>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">%</span>
+              <input type="number" min="0" max="100" step="0.01" id="invoiceEditDiscount" class="form-control" value="0">
+            </div>
           </div>
           <div class="col-md-1 d-grid">
             <button type="button" class="btn btn-outline-primary" id="invoiceEditAddLine">{% trans "Add" %}</button>
@@ -1030,6 +1073,176 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  function roundMoney(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+      return 0;
+    }
+    return Math.round((number + Number.EPSILON) * 100) / 100;
+  }
+
+  function formatMoney(value) {
+    return roundMoney(value).toFixed(2);
+  }
+
+  function syncSelectToValue(selectEl, value) {
+    if (!selectEl) {
+      return;
+    }
+    const target = formatMoney(value || 0);
+    let matched = '';
+    Array.from(selectEl.options).forEach(function (option) {
+      if (!option.value) {
+        return;
+      }
+      if (formatMoney(option.value) === target) {
+        matched = option.value;
+      }
+    });
+    selectEl.value = matched;
+  }
+
+  function recalcInvoiceEditLine(itemId) {
+    const listInput = document.getElementById('lista_' + itemId);
+    const amountInput = document.getElementById('descuento_monto_' + itemId);
+    const percentInput = document.getElementById('descuento_pct_' + itemId);
+    const unitInput = document.getElementById('precio_' + itemId);
+    if (!listInput || !unitInput) {
+      return;
+    }
+    const listPrice = roundMoney(listInput.value || 0);
+    let amount = roundMoney(amountInput ? amountInput.value || 0 : 0);
+    let percent = roundMoney(percentInput ? percentInput.value || 0 : 0);
+    if (amount > 0 && listPrice > 0) {
+      percent = roundMoney((amount / listPrice) * 100);
+      if (percentInput) {
+        percentInput.value = formatMoney(percent);
+      }
+    } else if (percent > 0 && listPrice > 0) {
+      amount = roundMoney(listPrice * (percent / 100));
+      if (amountInput) {
+        amountInput.value = formatMoney(amount);
+      }
+    } else {
+      amount = 0;
+      percent = 0;
+      if (amountInput) {
+        amountInput.value = '0.00';
+      }
+      if (percentInput) {
+        percentInput.value = '0.00';
+      }
+    }
+    const unit = Math.max(0, roundMoney(listPrice - amount));
+    unitInput.value = formatMoney(unit);
+  }
+
+  document.querySelectorAll('.invoice-edit-price-preset').forEach(function (presetSelect) {
+    const itemId = presetSelect.dataset.itemId;
+    const listInput = document.getElementById(presetSelect.dataset.listInput);
+    const unitInput = document.getElementById(presetSelect.dataset.unitInput);
+    if (!listInput || !unitInput) {
+      return;
+    }
+    presetSelect.addEventListener('change', function () {
+      if (!presetSelect.value) {
+        return;
+      }
+      listInput.value = formatMoney(presetSelect.value);
+      recalcInvoiceEditLine(itemId);
+    });
+    listInput.addEventListener('input', function () {
+      syncSelectToValue(presetSelect, listInput.value);
+      recalcInvoiceEditLine(itemId);
+    });
+  });
+
+  document.querySelectorAll('.invoice-edit-discount-preset').forEach(function (presetSelect) {
+    const itemId = presetSelect.dataset.itemId;
+    const amountInput = document.getElementById(presetSelect.dataset.amountInput);
+    const percentInput = document.getElementById(presetSelect.dataset.percentInput);
+    const listInput = document.getElementById('lista_' + itemId);
+    if (!amountInput || !percentInput) {
+      return;
+    }
+    presetSelect.addEventListener('change', function () {
+      const selected = presetSelect.options[presetSelect.selectedIndex];
+      const type = selected ? (selected.dataset.discountType || 'amount') : 'amount';
+      if (!presetSelect.value) {
+        amountInput.value = '0.00';
+        percentInput.value = '0.00';
+        recalcInvoiceEditLine(itemId);
+        return;
+      }
+      if (type === 'percent') {
+        percentInput.value = formatMoney(presetSelect.value);
+        amountInput.value = '0.00';
+        const listPrice = roundMoney(listInput ? listInput.value || 0 : 0);
+        if (listPrice > 0) {
+          amountInput.value = formatMoney(listPrice * (roundMoney(presetSelect.value) / 100));
+        }
+      } else {
+        amountInput.value = formatMoney(presetSelect.value);
+        percentInput.value = '0.00';
+      }
+      recalcInvoiceEditLine(itemId);
+    });
+    amountInput.addEventListener('input', function () {
+      percentInput.value = '0.00';
+      syncSelectToValue(presetSelect, amountInput.value);
+      const selected = Array.from(presetSelect.options).find(function (option) {
+        return option.value && formatMoney(option.value) === formatMoney(amountInput.value) && (option.dataset.discountType || 'amount') === 'amount';
+      });
+      presetSelect.value = selected ? selected.value : '';
+      recalcInvoiceEditLine(itemId);
+    });
+    percentInput.addEventListener('input', function () {
+      amountInput.value = '0.00';
+      const selected = Array.from(presetSelect.options).find(function (option) {
+        return option.value && formatMoney(option.value) === formatMoney(percentInput.value) && option.dataset.discountType === 'percent';
+      });
+      presetSelect.value = selected ? selected.value : '';
+      recalcInvoiceEditLine(itemId);
+    });
+  });
+
+  document.querySelectorAll('.invoice-edit-unit-price').forEach(function (unitInput) {
+    unitInput.addEventListener('input', function () {
+      const itemId = unitInput.dataset.itemId;
+      const listInput = document.getElementById('lista_' + itemId);
+      const amountInput = document.getElementById('descuento_monto_' + itemId);
+      const percentInput = document.getElementById('descuento_pct_' + itemId);
+      const pricePreset = document.querySelector('.invoice-edit-price-preset[data-item-id="' + itemId + '"]');
+      const discountPreset = document.querySelector('.invoice-edit-discount-preset[data-item-id="' + itemId + '"]');
+      if (!listInput) {
+        return;
+      }
+      const listPrice = roundMoney(listInput.value || 0);
+      const unitPrice = roundMoney(unitInput.value || 0);
+      if (listPrice > unitPrice) {
+        const amount = roundMoney(listPrice - unitPrice);
+        if (amountInput) {
+          amountInput.value = formatMoney(amount);
+        }
+        if (percentInput && listPrice > 0) {
+          percentInput.value = formatMoney((amount / listPrice) * 100);
+        }
+      } else {
+        if (amountInput) {
+          amountInput.value = '0.00';
+        }
+        if (percentInput) {
+          percentInput.value = '0.00';
+        }
+        listInput.value = formatMoney(unitPrice);
+        syncSelectToValue(pricePreset, listInput.value);
+      }
+      if (discountPreset) {
+        syncSelectToValue(discountPreset, amountInput ? amountInput.value : 0);
+      }
+    });
+  });
+
   const searchRoot = document.getElementById('invoiceEditSearchRoot');
   const addButton = document.getElementById('invoiceEditAddLine');
   const newLinesBody = document.getElementById('invoiceEditNewLinesBody');
@@ -1039,8 +1252,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const selectedLabel = document.getElementById('invoiceEditSelectedLabel');
     const presentacionInput = document.getElementById('invoiceEditPresentacionId');
     const priceInput = document.getElementById('invoiceEditPrice');
+    const pricePreset = document.getElementById('invoiceEditPricePreset');
     const qtyInput = document.getElementById('invoiceEditQty');
     const discountInput = document.getElementById('invoiceEditDiscount');
+    const discountPreset = document.getElementById('invoiceEditDiscountPreset');
     const searchUrl = searchRoot.dataset.searchUrl;
     const clienteId = searchRoot.dataset.clienteId || '';
     const emptyMessage = searchRoot.dataset.emptyMessage || 'No products found.';
@@ -1048,12 +1263,54 @@ document.addEventListener('DOMContentLoaded', function () {
     let searchTimer = null;
     let selectedProductLabel = '';
 
+    function resetAddPriceControls() {
+      if (pricePreset) {
+        pricePreset.innerHTML = '<option value="">{% trans "Select a price"|escapejs %}</option>';
+        pricePreset.disabled = true;
+        pricePreset.value = '';
+      }
+      priceInput.value = '';
+      priceInput.disabled = true;
+    }
+
     function clearSelection() {
       presentacionInput.value = '';
       selectedProductLabel = '';
       selectedLabel.hidden = true;
       selectedLabel.textContent = '';
-      priceInput.value = '';
+      resetAddPriceControls();
+    }
+
+    function fillPricePreset(item) {
+      if (!pricePreset) {
+        return;
+      }
+      pricePreset.innerHTML = '<option value="">{% trans "Manual price"|escapejs %}</option>';
+      const options = Array.isArray(item.prices) ? item.prices : [];
+      options.forEach(function (option) {
+        const value = option.value != null ? option.value : option.amount;
+        if (value == null) {
+          return;
+        }
+        const opt = document.createElement('option');
+        opt.value = formatMoney(value);
+        opt.textContent = option.label || ('$' + formatMoney(value));
+        if (option.key) {
+          opt.dataset.priceKey = option.key;
+        }
+        pricePreset.appendChild(opt);
+      });
+      pricePreset.disabled = false;
+      priceInput.disabled = false;
+      const defaultPrice = item.price != null ? item.price : (options[0] && (options[0].value != null ? options[0].value : options[0].amount));
+      if (defaultPrice != null) {
+        priceInput.value = formatMoney(defaultPrice);
+        syncSelectToValue(pricePreset, defaultPrice);
+        if (!pricePreset.value && options.length) {
+          pricePreset.selectedIndex = 1;
+          priceInput.value = formatMoney(pricePreset.value);
+        }
+      }
     }
 
     function renderResults(items) {
@@ -1074,16 +1331,53 @@ document.addEventListener('DOMContentLoaded', function () {
           selectedLabel.textContent = selectedProductLabel;
           selectedLabel.hidden = false;
           searchInput.value = selectedProductLabel;
-          const price = item.price != null ? item.price : (item.prices && item.prices[0] && item.prices[0].amount);
-          if (price != null) {
-            priceInput.value = price;
-          }
+          fillPricePreset(item);
           resultsBox.hidden = true;
         });
         resultsBox.appendChild(button);
       });
       resultsBox.hidden = false;
     }
+
+    if (pricePreset) {
+      pricePreset.addEventListener('change', function () {
+        if (pricePreset.value) {
+          priceInput.value = formatMoney(pricePreset.value);
+        }
+      });
+    }
+    priceInput.addEventListener('input', function () {
+      syncSelectToValue(pricePreset, priceInput.value);
+    });
+    if (discountPreset) {
+      discountPreset.addEventListener('change', function () {
+        const selected = discountPreset.options[discountPreset.selectedIndex];
+        const type = selected ? (selected.dataset.discountType || 'amount') : 'amount';
+        if (!discountPreset.value) {
+          discountInput.value = '0';
+          return;
+        }
+        if (type === 'percent') {
+          discountInput.value = formatMoney(discountPreset.value);
+        } else {
+          const listPrice = roundMoney(priceInput.value || 0);
+          if (listPrice > 0) {
+            discountInput.value = formatMoney((roundMoney(discountPreset.value) / listPrice) * 100);
+          } else {
+            discountInput.value = '0';
+          }
+        }
+      });
+    }
+    discountInput.addEventListener('input', function () {
+      if (!discountPreset) {
+        return;
+      }
+      const selected = Array.from(discountPreset.options).find(function (option) {
+        return option.value && formatMoney(option.value) === formatMoney(discountInput.value) && option.dataset.discountType === 'percent';
+      });
+      discountPreset.value = selected ? selected.value : '';
+    });
 
     searchInput.addEventListener('input', function () {
       const query = (searchInput.value || '').trim();
@@ -1131,14 +1425,17 @@ document.addEventListener('DOMContentLoaded', function () {
         '<td><input type="hidden" name="presentacion_nueva" value="' + presentacionId + '">' +
         '<span class="fw-semibold">' + (selectedProductLabel || presentacionId) + '</span></td>' +
         '<td><input type="number" min="1" class="form-control form-control-sm" name="cantidad_nueva" value="' + qty + '" required></td>' +
-        '<td><input type="number" min="0" step="0.01" class="form-control form-control-sm" name="precio_nuevo" value="' + price + '" required></td>' +
-        '<td><input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" name="descuento_nuevo" value="' + discount + '"></td>' +
+        '<td><input type="number" min="0" step="0.01" class="form-control form-control-sm" name="precio_nuevo" value="' + formatMoney(price) + '" required></td>' +
+        '<td><input type="number" min="0" max="100" step="0.01" class="form-control form-control-sm" name="descuento_nuevo" value="' + formatMoney(discount) + '"></td>' +
         '<td><button type="button" class="btn btn-sm btn-outline-danger invoice-edit-remove-new">{% trans "Remove" %}</button></td>';
       newLinesBody.appendChild(row);
       clearSelection();
       searchInput.value = '';
       qtyInput.value = '1';
       discountInput.value = '0';
+      if (discountPreset) {
+        discountPreset.value = '';
+      }
       resultsBox.hidden = true;
     });
 

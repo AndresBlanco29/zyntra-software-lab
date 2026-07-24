@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.http import JsonResponse
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Case, IntegerField, Q, When
 from config.clientes.models import Cliente
 from config.clientes.assignment import filter_clientes_for_vendedor
 from config.clientes.phone import normalize_stored_phone_number
@@ -16,6 +16,8 @@ from config.productos.promotions import (
     marcar_descuento_manual_en_item,
     adjuntar_promociones_a_productos,
     combos_para_catalogo,
+    producto_ids_con_promocion_individual_activa,
+    promociones_activas_queryset,
     reaplicar_promociones_en_lineas_sesion,
     _gift_session_signature,
 )
@@ -433,10 +435,12 @@ def _catalogo_vendedor_filter_params(request):
     marca_id = str(request.GET.get('marca') or '').strip()
     if marca_id.isdigit():
         params['marca'] = marca_id
+    if request.GET.get('promociones') == '1':
+        params['promociones'] = '1'
     return params
 
 
-def _catalogo_vendedor_queryset(request):
+def _catalogo_vendedor_queryset(request, cliente=None):
     queryset = (
         Producto.objects.filter(activo=True)
         .select_related('categoria', 'marca')
@@ -456,6 +460,18 @@ def _catalogo_vendedor_queryset(request):
         queryset = queryset.filter(categoria_id=filters['categoria'])
     if filters.get('marca'):
         queryset = queryset.filter(marca_id=filters['marca'])
+    if filters.get('promociones'):
+        # Promo-first mode: keep the full catalog and surface active promotions first
+        # so the vendor can continue browsing without leaving the page.
+        promo_product_ids = list(producto_ids_con_promocion_individual_activa(cliente=cliente))
+        if promo_product_ids:
+            queryset = queryset.annotate(
+                _promo_first=Case(
+                    When(id__in=promo_product_ids, then=0),
+                    default=1,
+                    output_field=IntegerField(),
+                )
+            ).order_by('_promo_first', 'nombre', 'id')
     return queryset
 
 
@@ -688,10 +704,26 @@ def catalogo_vendedor(request, cliente_id):
     carrito = bind_take_order_cart(request, cliente_id)
 
     filter_params = _catalogo_vendedor_filter_params(request)
-    paginator = Paginator(_catalogo_vendedor_queryset(request), VENDEDOR_CATALOGO_PAGE_SIZE)
+    catalogo_url = reverse('catalogo_vendedor', args=[cliente.id])
+    promociones_url = f"{catalogo_url}?promociones=1"
+    promociones_disponibles = promociones_activas_queryset(cliente=cliente).exists()
+
+    paginator = Paginator(
+        _catalogo_vendedor_queryset(request, cliente=cliente),
+        VENDEDOR_CATALOGO_PAGE_SIZE,
+    )
     page_obj = paginator.get_page(request.GET.get('page'))
     productos = adjuntar_promociones_a_productos(_hydrate_productos(list(page_obj.object_list)), cliente=cliente)
     _attach_recent_customer_order_history(cliente=cliente, productos=productos)
+
+    # In promo-first mode, mark where the promotional block ends so the template
+    # can show a seamless "continue browsing" divider before the rest of the catalog.
+    promo_catalog_continue_index = None
+    if filter_params.get('promociones'):
+        for index, producto in enumerate(productos):
+            if not getattr(producto, 'promocion_activa', None):
+                promo_catalog_continue_index = index
+                break
 
     combos = []
     productos_favoritos = []
@@ -702,12 +734,13 @@ def catalogo_vendedor(request, cliente_id):
         and not filter_params.get('marca')
     ):
         combos = combos_para_catalogo(cliente=cliente)
-        productos_favoritos = load_cliente_favorite_productos(
-            cliente=cliente,
-            hydrate_fn=_hydrate_productos,
-            attach_promos_fn=lambda rows: adjuntar_promociones_a_productos(rows, cliente=cliente),
-        )
-        _attach_recent_customer_order_history(cliente=cliente, productos=productos_favoritos)
+        if not filter_params.get('promociones'):
+            productos_favoritos = load_cliente_favorite_productos(
+                cliente=cliente,
+                hydrate_fn=_hydrate_productos,
+                attach_promos_fn=lambda rows: adjuntar_promociones_a_productos(rows, cliente=cliente),
+            )
+            _attach_recent_customer_order_history(cliente=cliente, productos=productos_favoritos)
 
     categorias = Categoria.objects.all()
     marcas = Marca.objects.filter(activo=True)
@@ -729,6 +762,11 @@ def catalogo_vendedor(request, cliente_id):
         'filter_q': filter_params.get('q', ''),
         'filter_categoria': filter_params.get('categoria', ''),
         'filter_marca': filter_params.get('marca', ''),
+        'filter_promociones': filter_params.get('promociones', ''),
+        'promo_catalog_continue_index': promo_catalog_continue_index,
+        'catalogo_url': catalogo_url,
+        'promociones_url': promociones_url,
+        'promociones_disponibles': promociones_disponibles,
         'categorias': categorias,
         'marcas': marcas,
         'total_items': total_items,

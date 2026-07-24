@@ -20,6 +20,18 @@ data-costo="{{ producto.presentaciones.first.effective_cost|default:producto.pre
 {% endif %}
 {% endif %}
 
+{% if producto.promocion_fecha_fin_iso %}
+<div
+  class="promo-countdown js-promo-countdown promo-countdown--top"
+  data-ends-at="{{ producto.promocion_fecha_fin_iso }}"
+  role="status"
+  aria-live="polite"
+>
+  <i class="bi bi-alarm-fill" aria-hidden="true"></i>
+  <span class="promo-countdown__text"></span>
+</div>
+{% endif %}
+
 <div class="producto-img-wrap mb-3">
 {% include "productos/includes/producto_imagen.html" with img_extra_class="mb-0" %}
 </div>

@@ -1597,9 +1597,13 @@ class VendedorComboTests(TestCase):
 		self.pres_b = Presentacion.objects.create(producto=self.producto_b, nombre='Case B', unidades=1, tipo_contenido='caja', precio_1=Decimal('20.00'))
 		self.pres_c = Presentacion.objects.create(producto=self.producto_c, nombre='Case C', unidades=1, tipo_contenido='caja', precio_1=Decimal('20.00'))
 
+		from django.utils import timezone
+		from datetime import timedelta
+
 		self.promo = Promocion.objects.create(
 			nombre='Combo Vendedor', descripcion='Buy 10 mixed, 10% off',
 			alcance=Promocion.ALCANCE_GRUPO, producto=self.producto_a, activa=True,
+			fecha_fin=timezone.now() + timedelta(hours=15),
 		)
 		PromocionProducto.objects.create(promocion=self.promo, producto=self.producto_a)
 		PromocionProducto.objects.create(promocion=self.promo, producto=self.producto_b)
@@ -1746,3 +1750,42 @@ class VendedorComboTests(TestCase):
 		self.assertContains(response, 'Combo Vendedor')
 		self.assertContains(response, 'js-combo-add-btn')
 		self.assertContains(response, 'id="comboModal"')
+		self.assertContains(response, 'js-promo-countdown')
+		self.assertContains(response, 'promo_countdown.js')
+		self.assertContains(response, 'data-countdown-prefix')
+
+	def test_vendor_catalog_shows_promo_banner_before_favorites(self):
+		from django.utils import timezone
+		from datetime import timedelta
+		from config.productos.models import PromocionEscala
+
+		individual = Promocion.objects.create(
+			nombre='Promo Individual Banner',
+			producto=self.producto_a,
+			activa=True,
+			fecha_fin=timezone.now() + timedelta(days=1),
+		)
+		PromocionEscala.objects.create(
+			promocion=individual,
+			cantidad_minima=5,
+			valor_beneficio=Decimal('10'),
+		)
+
+		self.client.force_login(self.vendor)
+		session = self.client.session
+		session['cliente_id'] = self.customer.id
+		session.save()
+		response = self.client.get(reverse('catalogo_vendedor', args=[self.customer.id]))
+		self.assertEqual(response.status_code, 200)
+		content = response.content.decode()
+		self.assertIn('promo-welcome-banner', content)
+		self.assertIn('promoWelcomeTitle', content)
+		self.assertIn('promociones=1', content)
+		banner_pos = content.find('promo-welcome-banner')
+		favorites_pos = content.find('favorites-section')
+		combos_pos = content.find('combos-section')
+		self.assertGreater(banner_pos, -1)
+		self.assertGreater(combos_pos, banner_pos)
+		if favorites_pos != -1:
+			self.assertGreater(favorites_pos, banner_pos)
+			self.assertGreater(combos_pos, favorites_pos)

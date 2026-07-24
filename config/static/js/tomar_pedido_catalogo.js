@@ -790,23 +790,29 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    initComboBuilder({
-        agregarUrl: document.body.dataset.agregarUrl,
-        csrfToken: document.body.dataset.csrf,
-        includePrice: true,
-        onSubmitComplete: function (result) {
-            if (result.totalItems != null) {
-                const counter = document.getElementById('contadorPedido');
-                const counter2 = document.getElementById('pedidoCantidad');
-                if (counter) counter.textContent = result.totalItems;
-                if (counter2) counter2.textContent = result.totalItems;
-            }
-            if (result.total != null) {
-                const totalEl = document.getElementById('pedidoTotal');
-                if (totalEl) totalEl.textContent = Number(result.total).toFixed(2);
-            }
-        },
-    });
+    if (typeof initPromoCountdowns === 'function') {
+        initPromoCountdowns();
+    }
+
+    if (typeof initComboBuilder === 'function') {
+        initComboBuilder({
+            agregarUrl: document.body.dataset.agregarUrl,
+            csrfToken: document.body.dataset.csrf,
+            includePrice: true,
+            onSubmitComplete: function (result) {
+                if (result.totalItems != null) {
+                    const counter = document.getElementById('contadorPedido');
+                    const counter2 = document.getElementById('pedidoCantidad');
+                    if (counter) counter.textContent = result.totalItems;
+                    if (counter2) counter2.textContent = result.totalItems;
+                }
+                if (result.total != null) {
+                    const totalEl = document.getElementById('pedidoTotal');
+                    if (totalEl) totalEl.textContent = Number(result.total).toFixed(2);
+                }
+            },
+        });
+    }
 
     document.addEventListener('ltg:client-mode-changed', function () {
         document.querySelectorAll('.producto-card').forEach(function (card) {

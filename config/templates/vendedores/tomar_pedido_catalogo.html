@@ -49,6 +49,11 @@ data-combo-presentation-label="{% trans 'Presentation' %}"
 data-combo-free-label="{% trans 'FREE' %}"
 data-combo-free-section-label="{% trans 'Free product' %}"
 data-combo-free-preview-label="{% trans 'Included when you reach this tier' %}"
+data-countdown-prefix="{% trans 'Ends in' %}"
+data-countdown-days="{% trans 'days' %}"
+data-countdown-hours="{% trans 'hours' %}"
+data-countdown-minutes="{% trans 'minutes' %}"
+data-countdown-ended="{% trans 'Promotion ended' %}"
 class="vendedor-catalogo-page"
 >
 
@@ -185,7 +190,76 @@ Showing {{ start }}-{{ end }} of {{ total }} products
 
 </div>
 
-<form method="get" id="catalogo-vendedor-filter-form" class="catalog-filter-form mb-3">
+{% if promociones_disponibles %}
+<section class="promo-welcome-banner mb-4" aria-labelledby="promoWelcomeTitle">
+    <div class="promo-welcome-banner__icon" aria-hidden="true">🎉</div>
+    <div class="promo-welcome-banner__content">
+        <h2 id="promoWelcomeTitle" class="promo-welcome-banner__title">
+            {% trans "There are products on promotion!" %}
+        </h2>
+        <p class="promo-welcome-banner__text">
+            {% if filter_promociones %}
+            {% trans "Promotional products appear first. Keep scrolling to browse the full catalog without leaving this page." %}
+            {% else %}
+            {% trans "Take advantage of discounts and special offers available for a limited time." %}
+            {% endif %}
+        </p>
+        <form method="get" class="promo-search-form" action="{{ catalogo_url }}">
+            <input type="hidden" name="promociones" value="1">
+            <label class="visually-hidden" for="promoSearch">{% trans "Search promotional products" %}</label>
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
+                <input
+                    type="search"
+                    id="promoSearch"
+                    name="q"
+                    value="{% if filter_promociones %}{{ filter_q }}{% endif %}"
+                    class="form-control"
+                    placeholder="{% trans 'Search a promotional product...' %}"
+                    autocomplete="off"
+                >
+                <button class="btn promo-search-button" type="submit">
+                    {% trans "View promotional products" %}
+                </button>
+            </div>
+        </form>
+    </div>
+    {% if filter_promociones %}
+    <a href="{{ catalogo_url }}" class="promo-clear-filter">
+        <i class="bi bi-x-circle" aria-hidden="true"></i> {% trans "View all products" %}
+    </a>
+    {% else %}
+    <a href="{{ promociones_url }}" class="promo-banner-cta">
+        <i class="bi bi-stars" aria-hidden="true"></i> {% trans "View promotional products" %}
+    </a>
+    {% endif %}
+</section>
+{% endif %}
+
+{% if productos_favoritos and page_obj.number == 1 %}
+<div class="favorites-section mb-4">
+    <div class="favorites-section__header">
+        <div>
+            <h2 class="favorites-section__title">{% trans "Favorite products" %}</h2>
+            <p class="favorites-section__subtitle mb-0">
+                {% blocktrans with customer=cliente.nombre_empresa %}Products {{ customer }} buys often — add them again in one tap.{% endblocktrans %}
+            </p>
+        </div>
+    </div>
+    <div class="row g-4 catalog-products-row justify-content-center favorites-section__grid">
+        {% for producto in productos_favoritos %}
+        <div class="col-12 col-sm-6 col-md-4 col-lg-3 catalog-product-col">
+            {% include "vendedores/includes/tomar_pedido_producto_card.html" %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<form method="get" id="catalogo-vendedor-filter-form" class="catalog-filter-form mb-3" action="{{ catalogo_url }}">
+{% if filter_promociones %}
+<input type="hidden" name="promociones" value="1">
+{% endif %}
 
 <div class="catalog-search-sticky">
 <div class="catalog-search-row">
@@ -281,25 +355,6 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 
 <!-- PRODUCTOS -->
 
-{% if productos_favoritos and page_obj.number == 1 %}
-<div class="favorites-section mb-4">
-    <div class="favorites-section__header">
-        <div>
-            <h2 class="favorites-section__title">{% trans "Favorite products" %}</h2>
-            <p class="favorites-section__subtitle mb-0">
-                {% blocktrans with customer=cliente.nombre_empresa %}Products {{ customer }} buys often — add them again in one tap.{% endblocktrans %}
-            </p>
-        </div>
-    </div>
-    <div class="row g-4 catalog-products-row justify-content-center favorites-section__grid">
-        {% for producto in productos_favoritos %}
-        <div class="col-12 col-sm-6 col-md-4 col-lg-3 catalog-product-col">
-            {% include "vendedores/includes/tomar_pedido_producto_card.html" %}
-        </div>
-        {% endfor %}
-    </div>
-</div>
-{% endif %}
 {% if combos and page_obj.number == 1 %}
 <div class="combos-section mb-4">
     <div class="favorites-section__header">
@@ -324,13 +379,40 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 <div class="row g-4 catalog-products-row justify-content-center">
 
 {% for producto in productos %}
+{% if filter_promociones and promo_catalog_continue_index is not None and forloop.counter0 == promo_catalog_continue_index %}
+<div class="col-12">
+    <div class="promo-catalog-split promo-catalog-split--catalog">
+        <h3 class="promo-catalog-split__title">
+            <i class="bi bi-grid-3x3-gap-fill" aria-hidden="true"></i>
+            {% trans "Continue with the full catalog" %}
+        </h3>
+        <p class="promo-catalog-split__text mb-0">
+            {% trans "Keep browsing and ordering without changing screens." %}
+        </p>
+    </div>
+</div>
+{% endif %}
 <div class="col-12 col-sm-6 col-md-4 col-lg-3 catalog-product-col">
 {% include "vendedores/includes/tomar_pedido_producto_card.html" %}
+</div>
+{% empty %}
+<div class="col-12">
+    <div class="promo-empty-state">
+        <i class="bi bi-search" aria-hidden="true"></i>
+        {% if filter_promociones %}
+        <h4>{% trans "No promotional products found" %}</h4>
+        <p>{% trans "Try another product name or view the complete catalog." %}</p>
+        {% else %}
+        <h4>{% trans "No products found" %}</h4>
+        <p>{% trans "Try another product name or clear the catalog filters." %}</p>
+        {% endif %}
+        <a href="{{ catalogo_url }}" class="btn btn-outline-primary">{% trans "View all products" %}</a>
+    </div>
 </div>
 {% endfor %}
 </div>
 
-{% pagination_controls page_obj aria_label=_('Product pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-2" q=filter_q categoria=filter_categoria marca=filter_marca %}
+{% pagination_controls page_obj aria_label=_('Product pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-2" q=filter_q categoria=filter_categoria marca=filter_marca promociones=filter_promociones %}
 
 </form>
 
@@ -531,6 +613,7 @@ body.client-mode .precio-select option {
 }
 </style>
 <script src="{% static 'js/take_order_client_mode.js' %}"></script>
+<script src="{% static 'js/promo_countdown.js' %}"></script>
 <script src="{% static 'js/combo_builder.js' %}"></script>
 <script src="{% static 'js/tomar_pedido_catalogo.js' %}"></script>
 

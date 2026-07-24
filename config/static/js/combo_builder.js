@@ -318,11 +318,26 @@
             return payload;
         }
 
+        function resolveComboUrl(promoId) {
+            const template = comboUrlTemplate || '';
+            const id = String(promoId || '').trim();
+            if (!template || !id) {
+                return '';
+            }
+            if (template.indexOf('/0/') !== -1) {
+                return template.split('/0/').join('/' + id + '/');
+            }
+            if (/\/0\/miembros\/?$/.test(template)) {
+                return template.replace(/\/0(\/miembros\/?)$/, '/' + id + '$1');
+            }
+            return template.replace(/(^|\/)0(\/|$)/, '$1' + id + '$2');
+        }
+
         function openCombo(promoId) {
             if (beforeOpenCombo && beforeOpenCombo() === false) {
                 return;
             }
-            const url = comboUrlTemplate.replace(/\/0\/miembros\/$/, '/' + promoId + '/miembros/');
+            const url = resolveComboUrl(promoId);
             currentData = null;
             pinnedTierMin = null;
             membersEl.innerHTML = '';
@@ -335,6 +350,12 @@
             addBtn.textContent = addLabel;
             loadingEl.hidden = false;
             getModal().show();
+
+            if (!url || url.indexOf('/' + promoId + '/') === -1) {
+                loadingEl.hidden = true;
+                membersEl.innerHTML = '<p class="text-danger">Error</p>';
+                return;
+            }
 
             fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
                 .then(function (response) { return response.ok ? response.json() : null; })

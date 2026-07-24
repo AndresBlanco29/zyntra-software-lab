@@ -93,6 +93,15 @@ class Invoice(models.Model):
 		blank=True,
 		related_name='invoices_liberadas_cierre',
 	)
+	editada_en = models.DateTimeField(blank=True, null=True, db_index=True)
+	editada_por = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='invoices_editadas',
+	)
+	veces_editada = models.PositiveIntegerField(default=0)
 
 	class Meta:
 		ordering = ('-creada_en',)
@@ -120,6 +129,29 @@ class Invoice(models.Model):
 			and self.estado == 'GENERADA'
 			and not self.delivery_is_on_route()
 		)
+
+	def can_edit_from_backoffice(self):
+		"""Editable only before Daily Closing release and QuickBooks sync."""
+		from config.integrations.quickbooks.sync import is_sync_locked
+
+		return (
+			self.estado == 'GENERADA'
+			and not is_sync_locked(self)
+			and not self.cierre_liberada
+		)
+
+	def edit_block_reason(self):
+		from config.integrations.quickbooks.sync import is_sync_locked
+
+		if self.estado == 'ANULADA':
+			return _('This invoice was voided and cannot be edited.')
+		if is_sync_locked(self):
+			return _('This invoice was synchronized with QuickBooks and cannot be edited.')
+		if self.cierre_liberada:
+			return _(
+				'This invoice was released in Daily Closing for QuickBooks export and cannot be edited.'
+			)
+		return ''
 
 	def can_delete_from_backoffice(self):
 		if self.estado == 'ANULADA':
@@ -766,6 +798,29 @@ class NotaAjusteAplicacion(models.Model):
 			raise ValidationError({'monto': _('Applied amount must be greater than zero.')})
 		if self.nota_id and self.invoice_id and self.nota.cliente_id != self.invoice.cliente_id:
 			raise ValidationError({'invoice': _('The selected invoice does not belong to the note customer.')})
+
+
+class InvoiceEditHistory(models.Model):
+	invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name='edit_history')
+	motivo = models.TextField()
+	snapshot_antes = models.JSONField(default=dict, blank=True)
+	snapshot_despues = models.JSONField(default=dict, blank=True)
+	editado_por = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='invoice_edit_history',
+	)
+	editado_en = models.DateTimeField(auto_now_add=True, db_index=True)
+
+	class Meta:
+		ordering = ('-editado_en', '-id')
+		verbose_name = _('Invoice edit history')
+		verbose_name_plural = _('Invoice edit history')
+
+	def __str__(self):
+		return f'{self.invoice.numero} edit #{self.pk}'
 
 
 class FacturacionRegistroAnulacion(models.Model):

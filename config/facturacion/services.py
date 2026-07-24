@@ -14,7 +14,7 @@ from config.notificaciones.models import crear_notificacion_backoffice
 from config.pedidos.services import crear_pedido_desde_items
 from config.productos.models import Presentacion
 
-from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, DeliveryPayment, FacturacionRegistroAnulacion, Invoice, InvoiceItem, NotaAjuste, NotaAjusteAplicacion, NotaAjusteItem
+from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, DeliveryPayment, FacturacionRegistroAnulacion, Invoice, InvoiceEditHistory, InvoiceItem, NotaAjuste, NotaAjusteAplicacion, NotaAjusteItem
 
 
 DEFAULT_SUGGESTED_PROFIT_PERCENTAGE = Decimal('30.00')
@@ -1837,6 +1837,385 @@ def _build_invoice_void_snapshot(invoice):
 			'motivo_no_pago': delivery.motivo_no_pago or '',
 		}
 	return snapshot
+
+
+def _build_invoice_edit_snapshot(invoice):
+	"""Richer snapshot for edit audit (prices + discounts + totals)."""
+	invoice.refresh_from_db()
+	items = list(invoice.items.select_related('presentacion__producto').order_by('id'))
+	return {
+		'numero': invoice.numero,
+		'subtotal': str(invoice.subtotal),
+		'credito_cliente_aplicado': str(invoice.credito_cliente_aplicado),
+		'total_creditos': str(invoice.total_creditos),
+		'total_debitos': str(invoice.total_debitos),
+		'total_neto': str(invoice.total_neto),
+		'saldo_cliente': str(invoice.saldo_cliente),
+		'metodo_entrega': invoice.metodo_entrega,
+		'items': [
+			{
+				'item_id': item.id,
+				'pedido_item_id': item.pedido_item_id,
+				'producto_nombre': item.producto_nombre,
+				'presentacion_nombre': item.presentacion_nombre,
+				'presentacion_id': item.presentacion_id,
+				'cantidad_facturada': item.cantidad_facturada,
+				'precio_unitario_lista': str(item.precio_unitario_lista) if item.precio_unitario_lista is not None else None,
+				'descuento_porcentaje': str(item.descuento_porcentaje),
+				'descuento_monto_unitario': str(item.descuento_monto_unitario),
+				'precio_unitario': str(item.precio_unitario),
+				'subtotal': str(item.subtotal),
+				'es_regalo': bool(item.es_regalo),
+			}
+			for item in items
+		],
+	}
+
+
+def _invoice_items_audit_rows(invoice):
+	return [
+		{
+			'item_id': item.id,
+			'producto': item.producto_nombre,
+			'presentacion': item.presentacion_nombre,
+			'cantidad': item.cantidad_facturada,
+			'precio': str(item.precio_unitario),
+			'descuento_aplicado': bool(
+				(item.descuento_monto_unitario and item.descuento_monto_unitario > 0)
+				or (item.descuento_porcentaje and item.descuento_porcentaje > 0)
+			),
+			'descuento_monto': str(item.descuento_monto_unitario or '0.00'),
+			'subtotal': str(item.subtotal),
+		}
+		for item in invoice.items.order_by('id')
+	]
+
+
+def _resolve_invoice_line_pricing(*, list_price, unit_price, discount_percentage, discount_amount_unit, es_regalo=False):
+	"""Normalize list/discount/unit price for an editable invoice line."""
+	if es_regalo:
+		return {
+			'precio_unitario_lista': None,
+			'descuento_porcentaje': Decimal('0.00'),
+			'descuento_monto_unitario': Decimal('0.00'),
+			'precio_unitario': Decimal('0.00'),
+		}
+
+	discount_percentage = _parse_line_discount_percentage(discount_percentage)
+	discount_amount_unit = _clamp_non_negative_money(discount_amount_unit)
+
+	if unit_price not in (None, ''):
+		final_unit_price = _clamp_non_negative_money(unit_price)
+		list_unit_price = _quantize_money(list_price) if list_price not in (None, '') else final_unit_price
+		if discount_amount_unit > 0:
+			list_unit_price = _quantize_money(final_unit_price + discount_amount_unit)
+			if list_unit_price > 0 and discount_percentage <= 0:
+				discount_percentage = _quantize_money((discount_amount_unit / list_unit_price) * Decimal('100'))
+		elif discount_percentage > 0 and list_price not in (None, ''):
+			list_unit_price = _quantize_money(list_price)
+			final_unit_price = _calculate_discounted_unit_price(list_unit_price, discount_percentage)
+			discount_amount_unit = _quantize_money(list_unit_price - final_unit_price)
+		elif list_price not in (None, '') and _quantize_money(list_price) > final_unit_price:
+			list_unit_price = _quantize_money(list_price)
+			discount_amount_unit = _quantize_money(list_unit_price - final_unit_price)
+			if list_unit_price > 0:
+				discount_percentage = _quantize_money((discount_amount_unit / list_unit_price) * Decimal('100'))
+		else:
+			list_unit_price = final_unit_price if discount_percentage <= 0 and discount_amount_unit <= 0 else list_unit_price
+	elif list_price not in (None, ''):
+		list_unit_price = _quantize_money(list_price)
+		if discount_amount_unit > 0:
+			final_unit_price = _clamp_non_negative_money(list_unit_price - discount_amount_unit)
+			if list_unit_price > 0 and discount_percentage <= 0:
+				discount_percentage = _quantize_money((discount_amount_unit / list_unit_price) * Decimal('100'))
+		else:
+			final_unit_price = _calculate_discounted_unit_price(list_unit_price, discount_percentage)
+			if discount_percentage > 0:
+				discount_amount_unit = _quantize_money(list_unit_price - final_unit_price)
+	else:
+		raise ValidationError(_('Each invoice line needs a unit price.'))
+
+	has_discount = discount_percentage > 0 or discount_amount_unit > 0
+	return {
+		'precio_unitario_lista': list_unit_price if has_discount else None,
+		'descuento_porcentaje': discount_percentage if has_discount else Decimal('0.00'),
+		'descuento_monto_unitario': discount_amount_unit if has_discount else Decimal('0.00'),
+		'precio_unitario': final_unit_price,
+	}
+
+
+def _sync_pedido_item_from_invoice_line(*, invoice_item, cantidad, list_unit_price, final_unit_price, discount_amount_unit, es_regalo=False):
+	from config.pedidos.models import PedidoItem
+	from config.pedidos.services import calcular_subtotal_item_pedido
+
+	pedido = invoice_item.invoice.pedido
+	pedido_item = invoice_item.pedido_item
+	descuento_aplicado = bool(discount_amount_unit and discount_amount_unit > 0)
+	precio_lista = _quantize_money(list_unit_price if list_unit_price is not None else final_unit_price)
+
+	if pedido_item is None:
+		if invoice_item.presentacion_id is None:
+			raise ValidationError(_('Cannot add an order line without a product presentation.'))
+		pedido_item = PedidoItem.objects.create(
+			pedido=pedido,
+			presentacion_id=invoice_item.presentacion_id,
+			cantidad_solicitada=cantidad,
+			cantidad=cantidad,
+			cantidad_reservada_inventario=cantidad,
+			cantidad_inventario_aplicada=cantidad,
+			precio=precio_lista,
+			descuento_aplicado=descuento_aplicado,
+			descuento_monto=discount_amount_unit if descuento_aplicado else Decimal('0.00'),
+			subtotal=calcular_subtotal_item_pedido(
+				precio=precio_lista,
+				cantidad=cantidad,
+				descuento_aplicado=descuento_aplicado,
+				descuento_monto=discount_amount_unit if descuento_aplicado else Decimal('0.00'),
+			),
+			es_regalo=bool(es_regalo),
+		)
+		invoice_item.pedido_item = pedido_item
+		invoice_item.save(update_fields=['pedido_item'])
+		return pedido_item
+
+	pedido_item.cantidad = cantidad
+	if cantidad > int(pedido_item.cantidad_solicitada or 0):
+		pedido_item.cantidad_solicitada = cantidad
+	if int(pedido_item.cantidad_inventario_aplicada or 0) > 0 or int(pedido_item.cantidad_reservada_inventario or 0) > 0:
+		pedido_item.cantidad_inventario_aplicada = cantidad
+		pedido_item.cantidad_reservada_inventario = cantidad
+	pedido_item.precio = precio_lista
+	pedido_item.descuento_aplicado = descuento_aplicado
+	pedido_item.descuento_monto = discount_amount_unit if descuento_aplicado else Decimal('0.00')
+	pedido_item.subtotal = calcular_subtotal_item_pedido(
+		precio=pedido_item.precio,
+		cantidad=pedido_item.cantidad,
+		descuento_aplicado=pedido_item.descuento_aplicado,
+		descuento_monto=pedido_item.descuento_monto,
+	)
+	pedido_item.es_regalo = bool(es_regalo)
+	pedido_item.save(
+		update_fields=[
+			'cantidad',
+			'cantidad_solicitada',
+			'cantidad_inventario_aplicada',
+			'cantidad_reservada_inventario',
+			'precio',
+			'descuento_aplicado',
+			'descuento_monto',
+			'subtotal',
+			'es_regalo',
+		]
+	)
+	return pedido_item
+
+
+@transaction.atomic
+def editar_invoice_desde_backoffice(*, invoice, usuario, motivo, line_updates=None, delete_item_ids=None, new_lines=None, request=None):
+	"""
+	Edit invoice lines before Daily Closing release / QuickBooks sync.
+
+	line_updates: iterable of dicts with invoice_item_id, cantidad, precio_unitario,
+	  optional precio_unitario_lista, descuento_porcentaje, descuento_monto_unitario
+	delete_item_ids: iterable of InvoiceItem ids to remove
+	new_lines: iterable of dicts with presentacion_id, cantidad, precio (list/unit),
+	  optional descuento_porcentaje / descuento_monto_unitario
+	"""
+	from config.auditoria.business_events import log_business_event
+	from config.auditoria.enrichment import build_line_item_changes
+	from config.auditoria.models import AuditLog
+	from config.pedidos.services import recalcular_pedido
+
+	invoice = Invoice.objects.select_for_update().select_related('pedido', 'cliente').prefetch_related('items').get(pk=invoice.pk)
+
+	if not invoice.can_edit_from_backoffice():
+		reason = invoice.edit_block_reason() or _(
+			'This invoice was synchronized with QuickBooks / released for export and cannot be edited.'
+		)
+		raise ValidationError(reason)
+
+	_ensure_quickbooks_not_locked(invoice=invoice)
+
+	motivo_text = str(motivo or '').strip()
+	if not motivo_text:
+		raise ValidationError(_('A reason is required to edit this invoice.'))
+
+	line_updates = list(line_updates or [])
+	delete_item_ids = {int(item_id) for item_id in (delete_item_ids or []) if str(item_id).isdigit() or isinstance(item_id, int)}
+	new_lines = list(new_lines or [])
+
+	if not line_updates and not delete_item_ids and not new_lines:
+		raise ValidationError(_('No invoice changes were submitted.'))
+
+	snapshot_antes = _build_invoice_edit_snapshot(invoice)
+	before_audit_rows = _invoice_items_audit_rows(invoice)
+	existing_items = {item.id: item for item in invoice.items.select_related('pedido_item', 'presentacion__producto')}
+
+	for item_id in delete_item_ids:
+		item = existing_items.get(item_id)
+		if item is None:
+			raise ValidationError(_('One of the lines to delete was not found on this invoice.'))
+		pedido_item = item.pedido_item
+		item.delete()
+		if pedido_item is not None:
+			pedido_item.delete()
+		existing_items.pop(item_id, None)
+
+	for update in line_updates:
+		item_id = int(update.get('invoice_item_id') or 0)
+		if item_id in delete_item_ids:
+			continue
+		item = existing_items.get(item_id)
+		if item is None:
+			raise ValidationError(_('Invoice line %(id)s was not found.') % {'id': item_id})
+
+		try:
+			cantidad = int(update.get('cantidad'))
+		except (TypeError, ValueError):
+			raise ValidationError(_('Quantity must be a whole number greater than zero.'))
+		if cantidad <= 0:
+			raise ValidationError(_('Quantity must be a whole number greater than zero.'))
+
+		es_regalo = bool(item.es_regalo or getattr(item.pedido_item, 'es_regalo', False))
+		pricing = _resolve_invoice_line_pricing(
+			list_price=update.get('precio_unitario_lista', item.precio_unitario_lista),
+			unit_price=update.get('precio_unitario', item.precio_unitario),
+			discount_percentage=update.get('descuento_porcentaje', item.descuento_porcentaje),
+			discount_amount_unit=update.get('descuento_monto_unitario', item.descuento_monto_unitario),
+			es_regalo=es_regalo,
+		)
+		line_subtotal = _quantize_money(pricing['precio_unitario'] * Decimal(str(cantidad)))
+		item.cantidad_facturada = cantidad
+		item.precio_unitario_lista = pricing['precio_unitario_lista']
+		item.descuento_porcentaje = pricing['descuento_porcentaje']
+		item.descuento_monto_unitario = pricing['descuento_monto_unitario']
+		item.precio_unitario = pricing['precio_unitario']
+		item.subtotal = line_subtotal
+		if es_regalo:
+			item.es_regalo = True
+			item.precio_unitario = Decimal('0.00')
+			item.subtotal = Decimal('0.00')
+		item.save(
+			update_fields=[
+				'cantidad_facturada',
+				'precio_unitario_lista',
+				'descuento_porcentaje',
+				'descuento_monto_unitario',
+				'precio_unitario',
+				'subtotal',
+				'es_regalo',
+			]
+		)
+		_sync_pedido_item_from_invoice_line(
+			invoice_item=item,
+			cantidad=cantidad,
+			list_unit_price=item.precio_unitario_lista if item.precio_unitario_lista is not None else item.precio_unitario,
+			final_unit_price=item.precio_unitario,
+			discount_amount_unit=item.descuento_monto_unitario,
+			es_regalo=item.es_regalo,
+		)
+
+	for new_line in new_lines:
+		presentacion_id = new_line.get('presentacion_id') or new_line.get('presentacion')
+		if hasattr(presentacion_id, 'pk'):
+			presentacion = presentacion_id
+		else:
+			try:
+				presentacion = Presentacion.objects.select_related('producto').get(pk=int(presentacion_id))
+			except (TypeError, ValueError, Presentacion.DoesNotExist):
+				raise ValidationError(_('Select a valid product presentation for each new line.'))
+
+		try:
+			cantidad = int(new_line.get('cantidad'))
+		except (TypeError, ValueError):
+			raise ValidationError(_('Quantity must be a whole number greater than zero.'))
+		if cantidad <= 0:
+			raise ValidationError(_('Quantity must be a whole number greater than zero.'))
+
+		pricing = _resolve_invoice_line_pricing(
+			list_price=new_line.get('precio_unitario_lista', new_line.get('precio')),
+			unit_price=new_line.get('precio_unitario', new_line.get('precio')),
+			discount_percentage=new_line.get('descuento_porcentaje', '0'),
+			discount_amount_unit=new_line.get('descuento_monto_unitario', '0'),
+			es_regalo=bool(new_line.get('es_regalo')),
+		)
+		suggested = resolve_presentacion_suggested_unit_price(
+			presentacion=presentacion,
+			base_case_price=pricing['precio_unitario_lista'] or pricing['precio_unitario'],
+		)
+		line_subtotal = _quantize_money(pricing['precio_unitario'] * Decimal(str(cantidad)))
+		invoice_item = InvoiceItem.objects.create(
+			invoice=invoice,
+			presentacion=presentacion,
+			producto_nombre=presentacion.producto.nombre,
+			presentacion_nombre=(presentacion.nombre_empaque_cliente or presentacion.nombre)[:120],
+			cantidad_facturada=cantidad,
+			peso_por_caja=presentacion.peso_por_caja,
+			precio_unitario_lista=pricing['precio_unitario_lista'],
+			descuento_porcentaje=pricing['descuento_porcentaje'],
+			descuento_monto_unitario=pricing['descuento_monto_unitario'],
+			precio_unitario=pricing['precio_unitario'],
+			precio_venta_sugerido_unitario=suggested,
+			subtotal=line_subtotal,
+			es_regalo=bool(new_line.get('es_regalo')),
+		)
+		_sync_pedido_item_from_invoice_line(
+			invoice_item=invoice_item,
+			cantidad=cantidad,
+			list_unit_price=invoice_item.precio_unitario_lista if invoice_item.precio_unitario_lista is not None else invoice_item.precio_unitario,
+			final_unit_price=invoice_item.precio_unitario,
+			discount_amount_unit=invoice_item.descuento_monto_unitario,
+			es_regalo=invoice_item.es_regalo,
+		)
+
+	if not invoice.items.exists():
+		raise ValidationError(_('The invoice must keep at least one product line.'))
+
+	subtotal = Decimal('0.00')
+	for item in invoice.items.all():
+		subtotal += _quantize_money(item.subtotal)
+	invoice.subtotal = _quantize_money(subtotal)
+	invoice.save(update_fields=['subtotal', 'actualizada_en'])
+	_recalculate_invoice_balances(invoice)
+	recalcular_pedido(invoice.pedido)
+
+	invoice.editada_en = timezone.now()
+	invoice.editada_por = usuario
+	invoice.veces_editada = int(invoice.veces_editada or 0) + 1
+	invoice.pdf_generado_en = None
+	invoice.save(update_fields=['editada_en', 'editada_por', 'veces_editada', 'pdf_generado_en', 'actualizada_en'])
+
+	snapshot_despues = _build_invoice_edit_snapshot(invoice)
+	history = InvoiceEditHistory.objects.create(
+		invoice=invoice,
+		motivo=motivo_text,
+		snapshot_antes=snapshot_antes,
+		snapshot_despues=snapshot_despues,
+		editado_por=usuario,
+	)
+
+	after_audit_rows = _invoice_items_audit_rows(invoice)
+	log_business_event(
+		usuario,
+		action_label='Invoice edited',
+		action_category=AuditLog.CATEGORY_ACTION,
+		entity_type='Invoice',
+		entity_id=str(invoice.id),
+		entity_label=invoice.numero,
+		metadata={
+			'motivo': motivo_text,
+			'edit_history_id': history.id,
+			'veces_editada': invoice.veces_editada,
+			'subtotal_before': snapshot_antes.get('subtotal'),
+			'subtotal_after': snapshot_despues.get('subtotal'),
+			'total_neto_before': snapshot_antes.get('total_neto'),
+			'total_neto_after': snapshot_despues.get('total_neto'),
+		},
+		changes=build_line_item_changes(before_audit_rows, after_audit_rows),
+		request=request,
+		module='facturacion',
+	)
+	return invoice
 
 
 def _cleanup_delivery_on_invoice_void(*, invoice):

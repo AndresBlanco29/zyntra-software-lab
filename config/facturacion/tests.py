@@ -18,12 +18,13 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate
 
 from config.clientes.models import Cliente
-from config.facturacion.models import Delivery, DeliveryNotificationLog, FacturacionRegistroAnulacion, Invoice, InvoiceItem, NotaAjuste, NotaAjusteAplicacion
-from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, attach_invoice_item_net_dispatched_quantities, build_google_maps_route_url, build_invoice_shipment_summary, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, invoice_delete_requires_confirmation_phrase, mark_delivery_unpaid_from_backoffice, resolve_customer_amount_owed, resolve_customer_overdue_balance, resolve_invoice_item_net_dispatched_quantity, resolve_invoice_payment_base_date, resolve_invoice_payment_due_date, start_delivery_route, unlock_client_from_delivery, validate_invoice_delete_confirmation_phrase
+from config.facturacion.models import Delivery, DeliveryNotificationLog, FacturacionRegistroAnulacion, Invoice, InvoiceEditHistory, InvoiceItem, NotaAjuste, NotaAjusteAplicacion
+from config.facturacion.services import _normalize_uploaded_file, _rewind_uploaded_file, anular_invoice, anular_nota_ajuste, aprobar_nota_ajuste, attach_invoice_item_net_dispatched_quantities, build_google_maps_route_url, build_invoice_shipment_summary, complete_driver_delivery, crear_nota_ajuste, crear_nota_ajuste_desde_invoice, editar_invoice_desde_backoffice, eliminar_invoice, eliminar_nota_ajuste, ensure_delivery_for_invoice, generar_invoice_desde_picking, generar_invoice_directa_backoffice, invoice_delete_requires_confirmation_phrase, mark_delivery_unpaid_from_backoffice, resolve_customer_amount_owed, resolve_customer_overdue_balance, resolve_invoice_item_net_dispatched_quantity, resolve_invoice_payment_base_date, resolve_invoice_payment_due_date, start_delivery_route, unlock_client_from_delivery, validate_invoice_delete_confirmation_phrase
 from config.facturacion.views import _build_invoice_pdf_barcode, _build_invoice_pdf_barcode_cell, _build_invoice_pdf_footer_layout, _build_invoice_pdf_item_data, _build_invoice_pdf_shipment_summary_table, _build_invoice_pdf_terms_paragraph, _build_invoice_pdf_totals_rows, _chunk_invoice_pdf_item_rows, _invoice_pdf_item_table_column_widths, _resolve_invoice_pdf_due_date_label, _resolve_invoice_suggested_unit_price, _save_adjustment_note_evidence_files
 from config.integrations.quickbooks.constants import QUICKBOOKS_SYNC_STATUS_SYNCED
 from config.inventario.models import InventarioMovimiento, StockPresentacion, StockProductoFraccionado
 from config.inventario.services import registrar_entrada_manual, reservar_stock_para_pedido_items
+from config.inventario.availability import sales_pending_sync_map
 from config.notificaciones.models import Notificacion
 from config.pedidos.models import Pedido, PedidoItem
 from config.productos.models import Categoria, Marca, Presentacion, Producto
@@ -5224,3 +5225,229 @@ class InvoiceVoidDeleteTests(TestCase):
 		)
 		self.assertEqual(response.status_code, 302)
 		self.assertFalse(Invoice.objects.filter(id=invoice_id).exists())
+
+
+class InvoiceEditBeforeQuickBooksTests(TestCase):
+	def setUp(self):
+		self.backoffice = Usuario.objects.create_user(username='backoffice-edit-inv', password='secret123', role='backoffice')
+		self.viewer = Usuario.objects.create_user(username='viewer-edit-inv', password='secret123', role='seleccionador')
+		self.cliente_user = Usuario.objects.create_user(username='cliente-edit-inv', password='secret123', role='cliente')
+		self.cliente = Cliente.objects.create(
+			usuario=self.cliente_user,
+			nombre_empresa='Cliente Edit Invoice',
+			telefono='5551113333',
+			direccion='100 Edit St',
+			ciudad='Dallas',
+			estado='TX',
+			codigo_postal='75001',
+			pais='USA',
+			sales_tax_number='TX-EDIT',
+			certificado_tax='certificados/test-edit.pdf',
+		)
+		categoria = Categoria.objects.create(nombre='Edit Cat')
+		marca = Marca.objects.create(nombre='Edit Brand')
+		producto = Producto.objects.create(nombre='Edit Tortilla', categoria=categoria, marca=marca, codigo_barras='7509998887771')
+		self.presentacion = Presentacion.objects.create(
+			producto=producto,
+			nombre='Caja',
+			unidades=12,
+			tipo_contenido='unidades',
+			precio_1=Decimal('10.00'),
+			precio_2=Decimal('11.00'),
+			precio_3=Decimal('12.00'),
+			precio_4=Decimal('13.00'),
+			precio_5=Decimal('14.00'),
+		)
+		self.presentacion_extra = Presentacion.objects.create(
+			producto=producto,
+			nombre='Unidad',
+			unidades=1,
+			tipo_contenido='unidad',
+			precio_1=Decimal('1.00'),
+			precio_2=Decimal('1.10'),
+			precio_3=Decimal('1.20'),
+			precio_4=Decimal('1.30'),
+			precio_5=Decimal('1.40'),
+		)
+		registrar_entrada_manual(presentacion=self.presentacion, cantidad=50, observacion='Seed edit stock')
+		registrar_entrada_manual(presentacion=self.presentacion_extra, cantidad=50, observacion='Seed edit unit stock')
+		pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='VERIFICADO_AJUSTADO',
+			total=Decimal('20.00'),
+		)
+		PedidoItem.objects.create(
+			pedido=pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=2,
+			cantidad=2,
+			cantidad_inventario_aplicada=2,
+			precio=Decimal('10.00'),
+			subtotal=Decimal('20.00'),
+		)
+		self.invoice = generar_invoice_desde_picking(
+			pedido=pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			usuario=self.backoffice,
+		)
+
+	def test_can_edit_eligible_invoice_updates_totals_and_history(self):
+		item = self.invoice.items.get()
+		self.assertTrue(self.invoice.can_edit_from_backoffice())
+
+		editar_invoice_desde_backoffice(
+			invoice=self.invoice,
+			usuario=self.backoffice,
+			motivo='Wrong quantity picked',
+			line_updates=[{
+				'invoice_item_id': item.id,
+				'cantidad': 3,
+				'precio_unitario': '12.00',
+				'precio_unitario_lista': '12.00',
+				'descuento_porcentaje': '0',
+				'descuento_monto_unitario': '0',
+			}],
+		)
+
+		self.invoice.refresh_from_db()
+		item.refresh_from_db()
+		self.assertEqual(item.cantidad_facturada, 3)
+		self.assertEqual(item.precio_unitario, Decimal('12.00'))
+		self.assertEqual(self.invoice.subtotal, Decimal('36.00'))
+		self.assertEqual(self.invoice.total_neto, Decimal('36.00'))
+		self.assertEqual(self.invoice.veces_editada, 1)
+		self.assertIsNotNone(self.invoice.editada_en)
+		self.assertEqual(self.invoice.editada_por_id, self.backoffice.id)
+		history = InvoiceEditHistory.objects.get(invoice=self.invoice)
+		self.assertEqual(history.motivo, 'Wrong quantity picked')
+		self.assertEqual(history.snapshot_antes['subtotal'], '20.00')
+		self.assertEqual(history.snapshot_despues['subtotal'], '36.00')
+		pedido_item = self.invoice.pedido.items.get()
+		self.assertEqual(pedido_item.cantidad, 3)
+		self.assertEqual(pedido_item.precio, Decimal('12.00'))
+
+	def test_edit_blocked_when_daily_closing_released(self):
+		self.invoice.cierre_liberada = True
+		self.invoice.save(update_fields=['cierre_liberada', 'actualizada_en'])
+		item = self.invoice.items.get()
+		self.assertFalse(self.invoice.can_edit_from_backoffice())
+		with self.assertRaises(ValidationError):
+			editar_invoice_desde_backoffice(
+				invoice=self.invoice,
+				usuario=self.backoffice,
+				motivo='Too late',
+				line_updates=[{
+					'invoice_item_id': item.id,
+					'cantidad': 1,
+					'precio_unitario': '10.00',
+				}],
+			)
+
+	def test_edit_blocked_when_quickbooks_synced(self):
+		self.invoice.quickbooks_id = 'QB-EDIT-1'
+		self.invoice.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+		self.invoice.save(update_fields=['quickbooks_id', 'sync_status', 'actualizada_en'])
+		item = self.invoice.items.get()
+		self.assertFalse(self.invoice.can_edit_from_backoffice())
+		with self.assertRaises(ValidationError):
+			editar_invoice_desde_backoffice(
+				invoice=self.invoice,
+				usuario=self.backoffice,
+				motivo='Already synced',
+				line_updates=[{
+					'invoice_item_id': item.id,
+					'cantidad': 1,
+					'precio_unitario': '10.00',
+				}],
+			)
+
+	def test_add_and_delete_lines_update_sales_pending_sync(self):
+		item = self.invoice.items.get()
+		before = sales_pending_sync_map([self.presentacion.id, self.presentacion_extra.id])
+		self.assertEqual(before[self.presentacion.id], 2)
+
+		editar_invoice_desde_backoffice(
+			invoice=self.invoice,
+			usuario=self.backoffice,
+			motivo='Replace product',
+			delete_item_ids=[item.id],
+			new_lines=[{
+				'presentacion_id': self.presentacion_extra.id,
+				'cantidad': 4,
+				'precio': '1.25',
+			}],
+		)
+
+		self.invoice.refresh_from_db()
+		self.assertEqual(self.invoice.items.count(), 1)
+		new_item = self.invoice.items.get()
+		self.assertEqual(new_item.presentacion_id, self.presentacion_extra.id)
+		self.assertEqual(new_item.cantidad_facturada, 4)
+		after = sales_pending_sync_map([self.presentacion.id, self.presentacion_extra.id])
+		self.assertEqual(after[self.presentacion.id], 0)
+		self.assertEqual(after[self.presentacion_extra.id], 4)
+		self.assertEqual(self.invoice.pedido.items.count(), 1)
+		self.assertEqual(self.invoice.pedido.items.get().presentacion_id, self.presentacion_extra.id)
+
+	def test_edit_requires_motivo(self):
+		item = self.invoice.items.get()
+		with self.assertRaises(ValidationError):
+			editar_invoice_desde_backoffice(
+				invoice=self.invoice,
+				usuario=self.backoffice,
+				motivo='   ',
+				line_updates=[{
+					'invoice_item_id': item.id,
+					'cantidad': 1,
+					'precio_unitario': '10.00',
+				}],
+			)
+
+	def test_detail_edit_post_requires_manage_permission(self):
+		item = self.invoice.items.get()
+		url = reverse('backoffice_invoice_detail', args=[self.invoice.id])
+		self.client.force_login(self.backoffice)
+
+		with patch(
+			'config.usuarios.permissions.user_has_permission',
+			side_effect=lambda user, code: code == 'backoffice.invoices.view',
+		):
+			response = self.client.post(url, {
+				'action': 'save_edit',
+				'motivo': 'Unauthorized attempt',
+				f'cantidad_{item.id}': '1',
+				f'precio_{item.id}': '10.00',
+				f'lista_{item.id}': '10.00',
+				f'descuento_pct_{item.id}': '0',
+				f'descuento_monto_{item.id}': '0',
+			})
+		self.assertEqual(response.status_code, 302)
+		self.invoice.refresh_from_db()
+		self.assertEqual(self.invoice.veces_editada, 0)
+		self.assertFalse(InvoiceEditHistory.objects.filter(invoice=self.invoice).exists())
+
+	def test_detail_edit_post_saves_changes_for_backoffice(self):
+		item = self.invoice.items.get()
+		url = reverse('backoffice_invoice_detail', args=[self.invoice.id])
+		self.client.force_login(self.backoffice)
+		response = self.client.get(f'{url}?edit=1')
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Edit mode')
+		self.assertContains(response, 'Save changes')
+
+		response = self.client.post(url, {
+			'action': 'save_edit',
+			'motivo': 'Price correction',
+			f'cantidad_{item.id}': '2',
+			f'precio_{item.id}': '15.00',
+			f'lista_{item.id}': '15.00',
+			f'descuento_pct_{item.id}': '0',
+			f'descuento_monto_{item.id}': '0',
+		})
+		self.assertEqual(response.status_code, 302)
+		self.invoice.refresh_from_db()
+		item.refresh_from_db()
+		self.assertEqual(item.precio_unitario, Decimal('15.00'))
+		self.assertEqual(self.invoice.subtotal, Decimal('30.00'))
+		self.assertEqual(self.invoice.veces_editada, 1)

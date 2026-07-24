@@ -77,6 +77,7 @@ from .services import (
 	complete_driver_delivery,
 	crear_nota_ajuste,
 	crear_nota_ajuste_desde_invoice,
+	editar_invoice_desde_backoffice,
 	eliminar_invoice,
 	invoice_delete_requires_confirmation_phrase,
 	validate_invoice_delete_confirmation_phrase,
@@ -139,6 +140,41 @@ def _validate_note_is_not_quickbooks_locked(nota):
 		raise ValidationError(_('Adjustment note %(note)s is locked because it is already synced with QuickBooks.') % {'note': nota.numero})
 	if nota.invoice_id:
 		_validate_invoice_is_not_quickbooks_locked(nota.invoice)
+
+
+def _parse_invoice_edit_payload(invoice, post_data):
+	line_updates = []
+	delete_item_ids = []
+	for item in invoice.items.all():
+		if str(post_data.get(f'eliminar_{item.id}') or '').strip() in {'1', 'on', 'true', 'True'}:
+			delete_item_ids.append(item.id)
+			continue
+		if f'cantidad_{item.id}' not in post_data:
+			continue
+		line_updates.append({
+			'invoice_item_id': item.id,
+			'cantidad': post_data.get(f'cantidad_{item.id}'),
+			'precio_unitario': post_data.get(f'precio_{item.id}'),
+			'precio_unitario_lista': post_data.get(f'lista_{item.id}') or None,
+			'descuento_porcentaje': post_data.get(f'descuento_pct_{item.id}') or '0',
+			'descuento_monto_unitario': post_data.get(f'descuento_monto_{item.id}') or '0',
+		})
+
+	new_lines = []
+	presentacion_ids = post_data.getlist('presentacion_nueva')
+	cantidades = post_data.getlist('cantidad_nueva')
+	precios = post_data.getlist('precio_nuevo')
+	descuentos = post_data.getlist('descuento_nuevo')
+	for index, presentacion_id in enumerate(presentacion_ids):
+		if not str(presentacion_id or '').strip():
+			continue
+		new_lines.append({
+			'presentacion_id': presentacion_id,
+			'cantidad': cantidades[index] if index < len(cantidades) else 1,
+			'precio': precios[index] if index < len(precios) else '0',
+			'descuento_porcentaje': descuentos[index] if index < len(descuentos) else '0',
+		})
+	return line_updates, delete_item_ids, new_lines
 
 
 def _resolve_invoice_barcode(item):
@@ -1750,9 +1786,65 @@ def backoffice_generate_invoice(request, pedido_id):
 @internal_permission_required('backoffice.invoices.view')
 def backoffice_invoice_detail(request, invoice_id):
 	invoice = get_object_or_404(
-		Invoice.objects.select_related('pedido__cliente__usuario', 'driver', 'creada_por').prefetch_related('items__presentacion__producto', 'items__pedido_item__movimientos_inventario', 'items__pedido_item', 'notas_ajuste__items__presentacion', 'notas_ajuste__evidence_photos', 'notas_ajuste__creada_por', 'notas_ajuste__aprobada_por', 'delivery__evidence_photos', 'delivery__notification_logs'),
+		Invoice.objects.select_related(
+			'pedido__cliente__usuario',
+			'driver',
+			'creada_por',
+			'editada_por',
+		).prefetch_related(
+			'items__presentacion__producto',
+			'items__pedido_item__movimientos_inventario',
+			'items__pedido_item',
+			'notas_ajuste__items__presentacion',
+			'notas_ajuste__evidence_photos',
+			'notas_ajuste__creada_por',
+			'notas_ajuste__aprobada_por',
+			'delivery__evidence_photos',
+			'delivery__notification_logs',
+			'edit_history__editado_por',
+		),
 		id=invoice_id,
 	)
+
+	can_manage_invoices = request.user.has_internal_permission('backoffice.invoices.manage')
+	can_edit_invoice = bool(can_manage_invoices and invoice.can_edit_from_backoffice())
+	edit_block_reason = ''
+	if not can_edit_invoice:
+		if can_manage_invoices:
+			edit_block_reason = invoice.edit_block_reason()
+		elif invoice.can_edit_from_backoffice():
+			edit_block_reason = _('You do not have permission to edit invoices.')
+		else:
+			edit_block_reason = invoice.edit_block_reason()
+
+	if request.method == 'POST' and str(request.POST.get('action') or '').strip() == 'save_edit':
+		if not can_manage_invoices:
+			messages.error(request, _('You do not have permission to edit invoices.'))
+			return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
+		try:
+			line_updates, delete_item_ids, new_lines = _parse_invoice_edit_payload(invoice, request.POST)
+			editar_invoice_desde_backoffice(
+				invoice=invoice,
+				usuario=request.user,
+				motivo=request.POST.get('motivo'),
+				line_updates=line_updates,
+				delete_item_ids=delete_item_ids,
+				new_lines=new_lines,
+				request=request,
+			)
+		except ValidationError as exc:
+			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+			return redirect(f"{reverse('backoffice_invoice_detail', args=[invoice.id])}?edit=1")
+
+		messages.success(request, _('Invoice updated successfully. Totals, inventory ledgers, and documents now reflect the latest lines.'))
+		delivery = getattr(invoice, 'delivery', None)
+		if delivery is not None and delivery.sent_to_driver_at:
+			messages.warning(
+				request,
+				_('Driver documents were updated. Ask the driver to re-download the invoice PDF.'),
+			)
+		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
+
 	if invoice.metodo_entrega == 'RUTA_DRIVER' and invoice.driver_id:
 		ensure_delivery_for_invoice(invoice)
 		invoice.refresh_from_db()
@@ -1764,7 +1856,7 @@ def backoffice_invoice_detail(request, invoice_id):
 		pickup_delivery = ensure_customer_pickup_delivery_for_invoice(invoice)
 		invoice.refresh_from_db()
 		if pickup_delivery and not pickup_delivery.is_completed:
-			can_complete_pickup = request.user.has_internal_permission('backoffice.invoices.manage')
+			can_complete_pickup = can_manage_invoices
 			show_customer_pickup_completion = can_complete_pickup
 			pickup_collectible_balance = calculate_delivery_collectible_balance(delivery=pickup_delivery)
 	Notificacion.objects.filter(
@@ -1781,6 +1873,7 @@ def backoffice_invoice_detail(request, invoice_id):
 	attach_invoice_item_net_dispatched_quantities(invoice, list(invoice.items.all()))
 	customer_overdue_balance = resolve_customer_overdue_balance(cliente=invoice.cliente)
 	customer_open_balance = resolve_customer_open_balance(cliente=invoice.cliente)
+	edit_mode = can_edit_invoice and str(request.GET.get('edit') or '').strip() == '1'
 	from config.auditoria.document_timeline import get_invoice_audit_timeline
 	return render(request, 'backoffice/invoice_detail.html', {
 		'invoice': invoice,
@@ -1808,6 +1901,12 @@ def backoffice_invoice_detail(request, invoice_id):
 		'adjustment_note_form_draft': get_workflow_draft(request.session, INVOICE_ADJUSTMENT_DRAFT_SCOPE, invoice.id),
 		'document_audit_timeline': get_invoice_audit_timeline(invoice),
 		'audit_trail_url': f"{reverse('audit_log_list')}?entity_type=Invoice&entity_id={invoice.id}",
+		'can_edit_invoice': can_edit_invoice,
+		'edit_mode': edit_mode,
+		'edit_block_reason': edit_block_reason,
+		'invoice_was_edited': bool(invoice.editada_en),
+		'edit_history': list(invoice.edit_history.select_related('editado_por').all()[:20]),
+		'product_search_url': reverse('backoffice_buscar_presentaciones'),
 	})
 
 

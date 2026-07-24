@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, DeliveryPayment, Invoice, InvoiceItem, NotaAjuste, NotaAjusteItem
+from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, DeliveryPayment, Invoice, InvoiceEditHistory, InvoiceItem, NotaAjuste, NotaAjusteItem
 
 
 class InvoiceItemInline(admin.TabularInline):
@@ -37,6 +37,14 @@ class InvoiceAdmin(admin.ModelAdmin):
 	search_fields = ('numero', 'cliente__nombre_empresa', 'pedido__id')
 	list_filter = ('estado', 'metodo_entrega', 'despachador_notificado')
 	inlines = [InvoiceItemInline]
+
+
+@admin.register(InvoiceEditHistory)
+class InvoiceEditHistoryAdmin(admin.ModelAdmin):
+	list_display = ('invoice', 'editado_por', 'editado_en', 'motivo')
+	search_fields = ('invoice__numero', 'motivo', 'editado_por__username')
+	list_filter = ('editado_en',)
+	readonly_fields = ('invoice', 'motivo', 'snapshot_antes', 'snapshot_despues', 'editado_por', 'editado_en')
 
 
 @admin.register(NotaAjuste)

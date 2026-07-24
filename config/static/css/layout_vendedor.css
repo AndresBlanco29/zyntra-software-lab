@@ -400,10 +400,23 @@ box-sizing:border-box;
 }
 
 @media (max-width: 991.98px) {
-    /* Keep Orders/Customers panels fully inside the phone viewport. */
+    /* Keep Orders/Customers panels fully inside the phone viewport.
+       JS also pins .navbar-urgent-alerts-menu--pinned with fixed left/right gutters
+       because Bootstrap disables Popper inside `.navbar`. */
     .navbar-urgent-alerts-menu {
         width: min(420px, calc(100vw - 24px)) !important;
         max-width: calc(100vw - 24px);
+    }
+
+    .navbar-urgent-alerts-menu.navbar-urgent-alerts-menu--pinned,
+    .navbar-urgent-alerts-menu.navbar-urgent-alerts-menu--pinned.show {
+        position: fixed !important;
+        left: 12px !important;
+        right: 12px !important;
+        width: auto !important;
+        max-width: none !important;
+        transform: none !important;
+        z-index: 10050 !important;
     }
 }
 

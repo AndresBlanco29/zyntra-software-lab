@@ -17,31 +17,123 @@
             .replace(/'/g, '&#39;');
     }
 
+    function isMobileAlertsViewport() {
+        return window.matchMedia('(max-width: 991.98px)').matches;
+    }
+
+    function getAlertMenu(toggle) {
+        if (!toggle) {
+            return null;
+        }
+        var parent = toggle.closest('.navbar-urgent-alerts');
+        return parent ? parent.querySelector('.navbar-urgent-alerts-menu') : null;
+    }
+
+    function clearPinnedAlertMenu(menu) {
+        if (!menu) {
+            return;
+        }
+        [
+            'position',
+            'left',
+            'right',
+            'top',
+            'bottom',
+            'width',
+            'max-width',
+            'transform',
+            'inset-inline-start',
+            'inset-inline-end',
+        ].forEach(function (prop) {
+            menu.style.removeProperty(prop);
+        });
+        menu.classList.remove('navbar-urgent-alerts-menu--pinned');
+    }
+
+    /**
+     * Bootstrap disables Popper applyStyles for dropdowns inside `.navbar`, so the
+     * Orders panel falls back to CSS `dropdown-menu-end` and hangs off the left
+     * edge of the phone. Pin it to the viewport gutters on small screens.
+     */
+    function pinAlertMenuToViewport(toggle) {
+        var menu = getAlertMenu(toggle);
+        if (!menu) {
+            return;
+        }
+        if (!isMobileAlertsViewport()) {
+            clearPinnedAlertMenu(menu);
+            return;
+        }
+
+        var gutter = 12;
+        var top = Math.round(toggle.getBoundingClientRect().bottom + 8);
+        menu.classList.add('navbar-urgent-alerts-menu--pinned');
+        menu.style.setProperty('position', 'fixed', 'important');
+        menu.style.setProperty('left', gutter + 'px', 'important');
+        menu.style.setProperty('right', gutter + 'px', 'important');
+        menu.style.setProperty('top', top + 'px', 'important');
+        menu.style.setProperty('bottom', 'auto', 'important');
+        menu.style.setProperty('width', 'auto', 'important');
+        menu.style.setProperty('max-width', 'none', 'important');
+        menu.style.setProperty('transform', 'none', 'important');
+        menu.style.setProperty('inset-inline-start', gutter + 'px', 'important');
+        menu.style.setProperty('inset-inline-end', gutter + 'px', 'important');
+    }
+
     /**
      * Keep the menu inside its dropdown parent. Moving it to <body> during open
      * breaks Bootstrap's show/hide on desktop and mobile.
-     * Popper `strategy: 'fixed'` escapes the navbar overflow clip, and on small
-     * screens we center the panel in the viewport so the left Orders button
-     * does not push the menu off-screen.
+     * Popper `strategy: 'fixed'` escapes the navbar overflow clip on desktop.
+     * On phones we also pin the panel with `pinAlertMenuToViewport` because
+     * Bootstrap 5.3 passes `undefined` as the first popperConfig arg and
+     * disables Popper entirely inside navbars.
      */
     function initAlertDropdown(toggle) {
         if (!toggle || !window.bootstrap || !bootstrap.Dropdown) {
             return null;
         }
 
+        var existing = bootstrap.Dropdown.getInstance(toggle);
+        if (existing) {
+            existing.dispose();
+        }
+
         var dropdown = bootstrap.Dropdown.getOrCreateInstance(toggle, {
             autoClose: 'outside',
-            popperConfig: function (defaultConfig) {
+            popperConfig: function (maybeConfig, explicitConfig) {
+                // BS 5.3 calls: popperConfig(undefined, defaultBsPopperConfig)
+                var defaultConfig = (maybeConfig && maybeConfig.modifiers)
+                    ? maybeConfig
+                    : (explicitConfig || maybeConfig || {});
                 var modifiers = Array.isArray(defaultConfig.modifiers)
                     ? defaultConfig.modifiers.slice()
                     : [];
+
+                // Drop Bootstrap's navbar "static" kill-switch so fixed positioning works.
+                modifiers = modifiers.filter(function (modifier) {
+                    return !(modifier && modifier.name === 'applyStyles' && modifier.enabled === false);
+                });
+
+                if (!modifiers.some(function (modifier) { return modifier && modifier.name === 'offset'; })) {
+                    modifiers.push({
+                        name: 'offset',
+                        options: { offset: [0, 8] },
+                    });
+                }
+                if (!modifiers.some(function (modifier) { return modifier && modifier.name === 'preventOverflow'; })) {
+                    modifiers.push({
+                        name: 'preventOverflow',
+                        options: { boundary: 'viewport', padding: 12 },
+                    });
+                }
+
                 modifiers.push({
                     name: 'centerOnMobile',
                     enabled: true,
                     phase: 'main',
                     fn: function (args) {
                         var state = args.state;
-                        if (!window.matchMedia('(max-width: 991.98px)').matches) {
+                        if (!isMobileAlertsViewport()) {
                             return;
                         }
                         if (!state.modifiersData || !state.modifiersData.popperOffsets) {
@@ -57,6 +149,7 @@
                         );
                     },
                 });
+
                 return Object.assign({}, defaultConfig, {
                     strategy: 'fixed',
                     modifiers: modifiers,
@@ -64,13 +157,22 @@
             },
         });
 
+        toggle.addEventListener('shown.bs.dropdown', function () {
+            pinAlertMenuToViewport(toggle);
+        });
+        toggle.addEventListener('hidden.bs.dropdown', function () {
+            clearPinnedAlertMenu(getAlertMenu(toggle));
+        });
+
         var reposition = function () {
-            if (toggle.classList.contains('show')) {
-                try {
-                    dropdown.update();
-                } catch (error) {
-                    // Ignore.
-                }
+            if (!toggle.classList.contains('show')) {
+                return;
+            }
+            pinAlertMenuToViewport(toggle);
+            try {
+                dropdown.update();
+            } catch (error) {
+                // Ignore.
             }
         };
         window.addEventListener('resize', reposition);

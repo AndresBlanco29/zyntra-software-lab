@@ -3448,6 +3448,40 @@ background:rgba(255,255,255,.25);
     }
 }
 
+/* Tablet portrait: keep contact under the hero copy (left), never over the product image. */
+@media (min-width: 769px) and (max-width: 991.98px) and (orientation: portrait) {
+    .hero-content {
+        flex-wrap: wrap !important;
+        align-items: flex-start !important;
+    }
+
+    .hero-content > .col-lg-7 {
+        flex: 0 0 58% !important;
+        max-width: 58% !important;
+        width: 58% !important;
+    }
+
+    .hero-contact-col {
+        flex: 0 0 58% !important;
+        max-width: 58% !important;
+        width: 58% !important;
+        margin-top: 0.85rem !important;
+        margin-left: 0 !important;
+        margin-right: auto !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        justify-content: flex-start !important;
+        align-items: flex-start !important;
+        order: 2;
+    }
+
+    .hero-contact-panel {
+        margin-left: 0 !important;
+        margin-right: auto !important;
+        width: min(100%, 280px);
+    }
+}
+
 /* Final tablet-portrait override: show only two featured offer cards */
 @media (min-width: 769px) and (max-width: 991.98px) and (orientation: portrait) {
     #ofertas #carouselOfertas .carousel-item .row > .col-lg-3:nth-child(n+3),

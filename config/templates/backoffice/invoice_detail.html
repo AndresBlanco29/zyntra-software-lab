@@ -549,7 +549,7 @@
               </td>
               <td data-label="{% trans 'U/M' %}">{{ item.presentacion_nombre_display }}</td>
               <td data-label="{% trans 'Qty.' %}">
-                <input type="number" min="1" step="1" class="form-control form-control-sm invoice-edit-qty" name="cantidad_{{ item.id }}" value="{{ item.cantidad_facturada }}" data-item-id="{{ item.id }}" required>
+                <input type="number" min="0" step="1" class="form-control form-control-sm invoice-edit-qty" name="cantidad_{{ item.id }}" value="{{ item.cantidad_facturada }}" data-item-id="{{ item.id }}" required>
               </td>
               <td data-label="{% trans 'List price' %}">
                 {% if item.es_regalo or item.precio_unitario == 0 %}

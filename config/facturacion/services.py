@@ -2072,9 +2072,9 @@ def editar_invoice_desde_backoffice(*, invoice, usuario, motivo, line_updates=No
 		try:
 			cantidad = int(update.get('cantidad'))
 		except (TypeError, ValueError):
-			raise ValidationError(_('Quantity must be a whole number greater than zero.'))
-		if cantidad <= 0:
-			raise ValidationError(_('Quantity must be a whole number greater than zero.'))
+			raise ValidationError(_('Quantity must be a whole number greater than or equal to zero.'))
+		if cantidad < 0:
+			raise ValidationError(_('Quantity cannot be negative.'))
 
 		es_regalo = bool(item.es_regalo or getattr(item.pedido_item, 'es_regalo', False))
 		pricing = _resolve_invoice_line_pricing(

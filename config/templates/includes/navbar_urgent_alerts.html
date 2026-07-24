@@ -1,9 +1,12 @@
 {% load static i18n %}
+{% if workspace_urgent_alerts or workspace_customer_request_alerts %}
+<div class="navbar-header-alerts">
 {% if workspace_urgent_alerts %}
 <div
   class="navbar-urgent-alerts dropdown"
   id="navbarUrgentAlerts"
   data-mark-seen-url="{{ workspace_urgent_alerts.mark_seen_url }}"
+  data-feed-url="{{ workspace_urgent_alerts.feed_url }}"
   data-csrf="{{ csrf_token }}">
   <button
     type="button"
@@ -30,6 +33,7 @@
       <span class="text-muted small">{% trans "Pending dispatch only" %}</span>
     </div>
 
+    <div id="navbarUrgentAlertsSummary">
     {% if workspace_urgent_alerts.summary_items %}
       <div class="navbar-urgent-alerts-summary">
         {% for item in workspace_urgent_alerts.summary_items %}
@@ -45,10 +49,12 @@
     {% else %}
       <div class="navbar-urgent-alerts-empty">{% trans "No open orders right now." %}</div>
     {% endif %}
+    </div>
 
+    <div id="navbarUrgentAlertsRecentWrap">
     {% if workspace_urgent_alerts.recent_items %}
       <div class="navbar-urgent-alerts-recent-header">{% trans "Latest open orders" %}</div>
-      <div class="navbar-urgent-alerts-recent">
+      <div class="navbar-urgent-alerts-recent" id="navbarUrgentAlertsRecent">
         {% for item in workspace_urgent_alerts.recent_items %}
           <a href="{{ item.url }}" class="navbar-urgent-alerts-recent-item{% if item.is_unread %} navbar-urgent-alerts-recent-item--unread{% endif %}">
             <span class="navbar-urgent-alerts-recent-title">{{ item.title }}</span>
@@ -57,13 +63,92 @@
         {% endfor %}
       </div>
     {% endif %}
+    </div>
 
     <div class="navbar-urgent-alerts-footer">
-      <a href="{{ workspace_urgent_alerts.orders_url }}" class="navbar-urgent-alerts-footer-link">
+      <a href="{{ workspace_urgent_alerts.orders_url }}" class="navbar-urgent-alerts-footer-link" id="navbarUrgentAlertsOrdersLink">
         {% trans "Open all orders" %}
       </a>
     </div>
   </div>
 </div>
-<script src="{% static 'js/navbar_urgent_alerts.js' %}"></script>
+{% endif %}
+
+{% if workspace_customer_request_alerts %}
+<div
+  class="navbar-urgent-alerts navbar-customer-alerts dropdown"
+  id="navbarCustomerRequestAlerts"
+  data-mark-seen-url="{{ workspace_customer_request_alerts.mark_seen_url }}"
+  data-feed-url="{{ workspace_customer_request_alerts.feed_url }}"
+  data-csrf="{{ csrf_token }}"
+  data-can-manage="{{ workspace_customer_request_alerts.can_manage|yesno:'true,false' }}"
+  data-label-view="{% trans 'View request' %}"
+  data-label-approve="{% trans 'Approve' %}"
+  data-label-reject="{% trans 'Reject' %}"
+  data-label-empty="{% trans 'No pending customer requests right now.' %}"
+  data-label-latest="{% trans 'Latest registration requests' %}">
+  <button
+    type="button"
+    class="navbar-urgent-alerts-toggle dropdown-toggle"
+    id="navbarCustomerRequestAlertsToggle"
+    data-bs-toggle="dropdown"
+    data-bs-auto-close="outside"
+    aria-expanded="false"
+    aria-label="{% trans 'Customer registration requests' %}">
+    <span class="navbar-urgent-alerts-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false">
+        <path d="M16.5 7.5a3.75 3.75 0 1 1-7.5 0a3.75 3.75 0 0 1 7.5 0ZM4.5 19.125a6.75 6.75 0 0 1 13.5 0c0 .621-.504 1.125-1.125 1.125h-11.25A1.125 1.125 0 0 1 4.5 19.125Zm13.22-8.345a.75.75 0 0 1 1.06 0A3.75 3.75 0 0 1 21 13.5v.375a.75.75 0 0 1-1.5 0V13.5a2.25 2.25 0 0 0-1.72-2.19a.75.75 0 0 1-.06-1.53Z"></path>
+      </svg>
+    </span>
+    <span class="navbar-urgent-alerts-label">{% trans "Customers" %}</span>
+    {% if workspace_customer_request_alerts.pending_count %}
+      <span class="navbar-urgent-alerts-badge" id="navbarCustomerRequestAlertsBadge">{{ workspace_customer_request_alerts.pending_count }}</span>
+    {% endif %}
+  </button>
+
+  <div class="dropdown-menu dropdown-menu-end navbar-urgent-alerts-menu" aria-labelledby="navbarCustomerRequestAlertsToggle">
+    <div class="navbar-urgent-alerts-menu-header">
+      <strong>{% trans "Customer requests" %}</strong>
+      <span class="text-muted small">{% trans "Pending registration review" %}</span>
+    </div>
+
+    <div id="navbarCustomerRequestAlertsBody">
+      {% if workspace_customer_request_alerts.recent_items %}
+        <div class="navbar-urgent-alerts-recent-header">{% trans "Latest registration requests" %}</div>
+        <div class="navbar-urgent-alerts-recent navbar-customer-alerts-list">
+          {% for item in workspace_customer_request_alerts.recent_items %}
+            <div class="navbar-customer-alert-card{% if item.is_unread %} navbar-urgent-alerts-recent-item--unread{% endif %}">
+              <a href="{{ item.url }}" class="navbar-customer-alert-main">
+                <span class="navbar-urgent-alerts-recent-title">{{ item.customer_name }}</span>
+                <span class="navbar-customer-alert-company">{{ item.company }}</span>
+                <span class="navbar-urgent-alerts-recent-message">{{ item.email }}</span>
+                {% if item.registered_at %}
+                <span class="navbar-customer-alert-time">{{ item.registered_at|date:"m/d/Y H:i" }}</span>
+                {% endif %}
+              </a>
+              <div class="navbar-customer-alert-actions">
+                <a href="{{ item.url }}" class="navbar-customer-alert-action">{% trans "View request" %}</a>
+                {% if workspace_customer_request_alerts.can_manage %}
+                <a href="{{ item.approve_url }}" class="navbar-customer-alert-action navbar-customer-alert-action--approve">{% trans "Approve" %}</a>
+                <a href="{{ item.reject_url }}" class="navbar-customer-alert-action navbar-customer-alert-action--reject">{% trans "Reject" %}</a>
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="navbar-urgent-alerts-empty">{% trans "No pending customer requests right now." %}</div>
+      {% endif %}
+    </div>
+
+    <div class="navbar-urgent-alerts-footer">
+      <a href="{{ workspace_customer_request_alerts.list_url }}" class="navbar-urgent-alerts-footer-link">
+        {% trans "Open all customer requests" %}
+      </a>
+    </div>
+  </div>
+</div>
+{% endif %}
+</div>
+<script src="{% static 'js/navbar_panel_alerts.js' %}"></script>
 {% endif %}

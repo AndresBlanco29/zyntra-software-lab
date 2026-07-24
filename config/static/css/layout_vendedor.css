@@ -185,6 +185,14 @@ box-sizing:border-box;
     justify-self: center;
 }
 
+.navbar-header-alerts {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    min-width: 0;
+}
+
 .navbar-search {
     position: relative;
     flex: 1 1 auto;
@@ -373,9 +381,17 @@ box-sizing:border-box;
     overflow: hidden;
     box-shadow: 0 24px 40px rgba(15, 23, 42, 0.18);
     /* Sit above the fixed navbar (1000), the sidebar (up to 2000) and page content.
-       Combined with Popper's fixed strategy this keeps the panel visible and on top
-       on iPad Safari in both portrait and landscape. */
+       Combined with Popper's fixed strategy + body portal this keeps the panel visible
+       and on top on iPhone/iPad Safari in every orientation. */
     z-index: 2050;
+}
+
+/* When the menu is moved to <body> (iOS Safari fix), force a stacking context above
+   transformed/overflow-clipped page cards such as QuickBooks Center. */
+body > .navbar-urgent-alerts-menu,
+.navbar-urgent-alerts-menu.navbar-urgent-alerts-menu--ported {
+    z-index: 10050 !important;
+    position: fixed !important;
 }
 
 /* When Popper uses the fixed strategy the menu can briefly render before it is
@@ -524,6 +540,89 @@ box-sizing:border-box;
 
 .navbar-urgent-alerts-recent-item--unread .navbar-urgent-alerts-recent-title {
     color: #0b3d91;
+}
+
+.navbar-customer-alerts-list {
+    max-height: min(58vh, 420px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.navbar-customer-alert-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.navbar-customer-alert-card + .navbar-customer-alert-card {
+    margin-top: 4px;
+}
+
+.navbar-customer-alert-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-decoration: none;
+    color: #0f172a;
+}
+
+.navbar-customer-alert-main:hover,
+.navbar-customer-alert-main:focus {
+    color: #0b3d91;
+}
+
+.navbar-customer-alert-company {
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: #334155;
+}
+
+.navbar-customer-alert-time {
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+.navbar-customer-alert-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.navbar-customer-alert-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 30px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.navbar-customer-alert-action:hover,
+.navbar-customer-alert-action:focus {
+    background: #eef4ff;
+    border-color: #93c5fd;
+    color: #0b3d91;
+}
+
+.navbar-customer-alert-action--approve {
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #166534;
+}
+
+.navbar-customer-alert-action--reject {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #b91c1c;
 }
 
 .navbar-urgent-alerts-recent-title {
@@ -1012,6 +1111,16 @@ box-sizing:border-box;
             width: 100%;
             justify-content: stretch;
             gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .navbar-header-alerts {
+            width: 100%;
+        }
+
+        .navbar-header-alerts .navbar-urgent-alerts {
+            flex: 1 1 0;
+            min-width: 0;
         }
 
         .navbar-search {
@@ -1345,20 +1454,30 @@ box-sizing:border-box;
         max-width: 100%;
     }
 
-    .navbar-urgent-alerts {
-        width: 100%;
-    }
+        .navbar-urgent-alerts {
+            width: 100%;
+        }
 
-    .navbar-urgent-alerts-toggle {
-        width: 100%;
-        justify-content: center;
-        min-height: 40px;
-        padding: 6px 12px;
-    }
+        .navbar-header-alerts {
+            width: 100%;
+        }
 
-    .navbar-urgent-alerts-label {
-        display: inline;
-    }
+        .navbar-header-alerts .navbar-urgent-alerts {
+            flex: 1 1 0;
+            width: auto;
+            min-width: 0;
+        }
+
+        .navbar-urgent-alerts-toggle {
+            width: 100%;
+            justify-content: center;
+            min-height: 40px;
+            padding: 6px 12px;
+        }
+
+        .navbar-urgent-alerts-label {
+            display: inline;
+        }
 
     .navbar-search-field {
         min-height: 40px;

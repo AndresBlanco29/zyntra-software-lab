@@ -1890,6 +1890,14 @@ def registro_view(request):
                 # asegurar que el grupo exista
                 grupo, created = Group.objects.get_or_create(name='Cliente')
                 usuario.groups.add(grupo)
+
+                try:
+                    from config.notificaciones.alerts import notify_customer_registration_request
+                    cliente_creado = Cliente.objects.select_related('usuario').filter(usuario=usuario).first()
+                    if cliente_creado is not None:
+                        notify_customer_registration_request(cliente_creado)
+                except Exception:
+                    logger.exception('No se pudo crear la notificacion de solicitud de cliente para %s', username)
                 
         except Exception as e:
             logger.error(f"Error en registro_view para usuario {username}: {str(e)}", exc_info=True)
@@ -1971,6 +1979,15 @@ def corregir_solicitud_cliente(request, correction_token):
             update_fields.append('certificado_tax')
 
         cliente.save(update_fields=update_fields)
+
+        try:
+            from config.notificaciones.alerts import notify_customer_registration_request
+            notify_customer_registration_request(cliente)
+        except Exception:
+            logger.exception(
+                'No se pudo crear la notificacion de solicitud corregida para cliente %s',
+                cliente.id,
+            )
 
         return render(request, 'usuarios/corregir_solicitud.html', {
             'cliente': cliente,

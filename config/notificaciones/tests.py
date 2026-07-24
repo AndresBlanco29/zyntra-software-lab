@@ -94,7 +94,9 @@ class WorkspaceUrgentAlertsTests(TestCase):
 		context = workspace_urgent_alerts(request)
 
 		self.assertIn('workspace_urgent_alerts', context)
+		self.assertIn('workspace_customer_request_alerts', context)
 		self.assertIsNotNone(context['workspace_urgent_alerts'])
+		self.assertIsNone(context['workspace_customer_request_alerts'])
 
 	def test_backoffice_dashboard_includes_navbar_orders_button(self):
 		self.client.force_login(self.backoffice)
@@ -104,7 +106,7 @@ class WorkspaceUrgentAlertsTests(TestCase):
 		self.assertContains(response, 'Orders')
 		self.assertContains(response, 'Orders for dispatch')
 		self.assertContains(response, 'Pending dispatch only')
-		self.assertContains(response, 'navbar_urgent_alerts.js')
+		self.assertContains(response, 'navbar_panel_alerts.js')
 
 	def test_new_pending_order_after_mark_seen_counts_as_unread(self):
 		mark_dispatch_alerts_seen(self.backoffice)
@@ -114,3 +116,76 @@ class WorkspaceUrgentAlertsTests(TestCase):
 
 		self.assertEqual(alerts['total_count'], 1)
 		self.assertTrue(alerts['recent_items'][0]['is_unread'])
+
+
+class WorkspaceCustomerRequestAlertsTests(TestCase):
+	def setUp(self):
+		self.admin = Usuario.objects.create_user(
+			username='admin-alerts',
+			password='secret123',
+			role='admin',
+			is_superuser=True,
+		)
+		self.pending_user = Usuario.objects.create_user(
+			username='pending-customer',
+			password='secret123',
+			role='cliente',
+			email='pending@example.com',
+			first_name='Ana',
+			last_name='Lopez',
+			is_active=False,
+		)
+		self.pending_cliente = Cliente.objects.create(
+			usuario=self.pending_user,
+			nombre_empresa='Pending Co',
+			telefono='5559998888',
+			direccion='9 Peachtree',
+			ciudad='Atlanta',
+			estado='GA',
+			codigo_postal='30301',
+			pais='USA',
+			sales_tax_number='TAX-PENDING',
+			certificado_tax=SimpleUploadedFile('certificado.txt', b'certificado'),
+			aprobado=False,
+			estado_revision=Cliente.REVIEW_STATUS_PENDING,
+		)
+
+	def test_admin_receives_pending_customer_request_alerts(self):
+		from config.notificaciones.alerts import get_customer_request_alerts
+
+		alerts = get_customer_request_alerts(self.admin)
+		self.assertIsNotNone(alerts)
+		self.assertEqual(alerts['pending_count'], 1)
+		self.assertEqual(alerts['recent_items'][0]['company'], 'Pending Co')
+		self.assertEqual(alerts['recent_items'][0]['email'], 'pending@example.com')
+		self.assertIn('ver_cliente', alerts['recent_items'][0]['url'])
+
+	def test_customer_request_feed_endpoint(self):
+		self.client.force_login(self.admin)
+		response = self.client.get(reverse('customer_request_alerts_feed'))
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(payload['success'])
+		self.assertEqual(payload['pending_count'], 1)
+		self.assertEqual(payload['items'][0]['company'], 'Pending Co')
+
+	def test_mark_customer_request_alerts_seen(self):
+		from config.notificaciones.alerts import (
+			get_customer_request_alerts,
+			mark_customer_request_alerts_seen,
+		)
+		from config.notificaciones.models import WorkspaceCustomerRequestAlertReadState
+
+		mark_customer_request_alerts_seen(self.admin)
+		alerts = get_customer_request_alerts(self.admin)
+		self.assertEqual(alerts['pending_count'], 1)
+		self.assertFalse(alerts['recent_items'][0]['is_unread'])
+		self.assertTrue(WorkspaceCustomerRequestAlertReadState.objects.filter(user=self.admin).exists())
+
+	def test_context_processor_includes_customer_alerts(self):
+		request = RequestFactory().get('/')
+		request.user = self.admin
+		context = workspace_urgent_alerts(request)
+		self.assertIn('workspace_customer_request_alerts', context)
+		self.assertIsNotNone(context['workspace_customer_request_alerts'])
+		self.assertEqual(context['workspace_customer_request_alerts']['pending_count'], 1)

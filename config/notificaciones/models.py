@@ -10,6 +10,7 @@ class Notificacion(models.Model):
 		('COTIZACION', 'Cotizacion'),
 		('PEDIDO', 'Pedido'),
 		('NOTA_AJUSTE', 'Nota de ajuste'),
+		('CLIENTE', 'Solicitud de cliente'),
 	)
 
 	tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
@@ -51,6 +52,22 @@ class WorkspaceDispatchAlertReadState(models.Model):
 
 	def __str__(self):
 		return f'Dispatch alerts read state for {self.user_id}'
+
+
+class WorkspaceCustomerRequestAlertReadState(models.Model):
+	user = models.OneToOneField(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.CASCADE,
+		related_name='customer_request_alert_read_state',
+	)
+	last_opened_at = models.DateTimeField(blank=True, null=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		db_table = 'notificaciones_customer_request_alert_read_state'
+
+	def __str__(self):
+		return f'Customer request alerts read state for {self.user_id}'
 
 
 def _get_fallback_notification_user():

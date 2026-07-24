@@ -195,4 +195,132 @@ def get_urgent_workspace_alerts(user):
         'recent_items': recent_items,
         'orders_url': orders_url,
         'mark_seen_url': reverse('mark_dispatch_alerts_seen'),
+        'feed_url': reverse('dispatch_alerts_feed'),
     }
+
+
+def _get_customer_request_alert_last_seen_at(user):
+    from django.db.utils import ProgrammingError
+
+    from config.notificaciones.models import WorkspaceCustomerRequestAlertReadState
+
+    try:
+        state = (
+            WorkspaceCustomerRequestAlertReadState.objects
+            .filter(user=user)
+            .only('last_opened_at')
+            .first()
+        )
+    except ProgrammingError:
+        return None
+    return state.last_opened_at if state else None
+
+
+def _customer_request_activity_at(cliente):
+    return (
+        getattr(cliente, 'corrected_at', None)
+        or getattr(cliente, 'creado_en', None)
+    )
+
+
+def mark_customer_request_alerts_seen(user):
+    from django.db.utils import ProgrammingError
+
+    from config.notificaciones.models import Notificacion, WorkspaceCustomerRequestAlertReadState
+
+    now = timezone.now()
+    try:
+        WorkspaceCustomerRequestAlertReadState.objects.update_or_create(
+            user=user,
+            defaults={'last_opened_at': now},
+        )
+    except ProgrammingError:
+        pass
+    Notificacion.objects.filter(
+        tipo='CLIENTE',
+        leida=False,
+    ).filter(
+        Q(usuario=user) | Q(usuario__isnull=True),
+    ).update(leida=True)
+    return now
+
+
+def get_customer_request_alerts(user):
+    if not _is_internal_panel_user(user):
+        return None
+    if not user.has_internal_permission('admin.customer_requests.view'):
+        return None
+
+    from config.clientes.models import Cliente
+
+    last_seen_at = _get_customer_request_alert_last_seen_at(user)
+    pending_qs = (
+        Cliente.objects
+        .select_related('usuario')
+        .filter(estado_revision=Cliente.REVIEW_STATUS_PENDING)
+        .order_by('-corrected_at', '-creado_en', '-id')
+    )
+    pending_count = pending_qs.count()
+    recent_items = []
+    for cliente in pending_qs[:12]:
+        activity_at = _customer_request_activity_at(cliente)
+        detail_url = reverse('ver_cliente', args=[cliente.id])
+        customer_name = ''
+        email = ''
+        if cliente.usuario_id:
+            customer_name = (
+                f'{(cliente.usuario.first_name or "").strip()} '
+                f'{(cliente.usuario.last_name or "").strip()}'
+            ).strip() or (cliente.usuario.username or '')
+            email = cliente.usuario.email or ''
+        recent_items.append({
+            'id': cliente.id,
+            'customer_name': customer_name or _('Customer'),
+            'company': cliente.nombre_empresa or '',
+            'email': email,
+            'registered_at': activity_at,
+            'title': customer_name or cliente.nombre_empresa or _('Customer request'),
+            'message': email,
+            'url': detail_url,
+            'approve_url': f'{detail_url}#approve-section',
+            'reject_url': f'{detail_url}#reject-section',
+            'is_unread': _is_dispatch_alert_unread(
+                activity_at=activity_at,
+                last_seen_at=last_seen_at,
+            ),
+        })
+
+    return {
+        'pending_count': pending_count,
+        'total_count': pending_count,
+        'recent_items': recent_items,
+        'list_url': reverse('clientes_pendientes'),
+        'mark_seen_url': reverse('mark_customer_request_alerts_seen'),
+        'feed_url': reverse('customer_request_alerts_feed'),
+        'can_manage': user.has_internal_permission('admin.customer_requests.manage'),
+    }
+
+
+def notify_customer_registration_request(cliente):
+    """Create a backoffice notification when a customer registration is submitted."""
+    from config.notificaciones.models import crear_notificacion_backoffice
+
+    detail_url = reverse('ver_cliente', args=[cliente.id])
+    company = (cliente.nombre_empresa or '').strip() or _('New customer')
+    customer_name = ''
+    if getattr(cliente, 'usuario', None):
+        customer_name = (
+            f'{(cliente.usuario.first_name or "").strip()} '
+            f'{(cliente.usuario.last_name or "").strip()}'
+        ).strip()
+    titulo = _('New customer registration request')
+    mensaje = _('%(company)s · %(customer)s') % {
+        'company': company,
+        'customer': customer_name or company,
+    }
+    return crear_notificacion_backoffice(
+        titulo=titulo,
+        mensaje=mensaje,
+        tipo='CLIENTE',
+        url=detail_url,
+    )

@@ -250,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function applyBulkPriceTierToAllCards(priceKey) {
-        document.querySelectorAll('.producto-card').forEach(card => {
+        document.querySelectorAll('.producto-card:not(.combo-card)').forEach(card => {
             applyPriceTierToCard(card, priceKey);
         });
     }
@@ -458,6 +458,30 @@ document.addEventListener('DOMContentLoaded', function() {
 
     syncClearSearchVisibility();
 
+    // Combo/countdown must initialize even if later product-card wiring throws.
+    if (typeof initPromoCountdowns === 'function') {
+        initPromoCountdowns();
+    }
+    if (typeof initComboBuilder === 'function') {
+        initComboBuilder({
+            agregarUrl: document.body.dataset.agregarUrl,
+            csrfToken: document.body.dataset.csrf,
+            includePrice: true,
+            onSubmitComplete: function (result) {
+                if (result.totalItems != null) {
+                    const counter = document.getElementById('contadorPedido');
+                    const counter2 = document.getElementById('pedidoCantidad');
+                    if (counter) counter.textContent = result.totalItems;
+                    if (counter2) counter2.textContent = result.totalItems;
+                }
+                if (result.total != null) {
+                    const totalEl = document.getElementById('pedidoTotal');
+                    if (totalEl) totalEl.textContent = Number(result.total).toFixed(2);
+                }
+            },
+        });
+    }
+
     if (filtroCategoria) {
         filtroCategoria.addEventListener('change', function () {
             let categoriaSeleccionada = this.value;
@@ -513,8 +537,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    /* BOTONES + - */
-    document.querySelectorAll(".producto-card").forEach(card => {
+    /* BOTONES + - (skip combo cards — they share .producto-card but have no price/qty controls) */
+    document.querySelectorAll(".producto-card:not(.combo-card)").forEach(card => {
         window.CatalogQuantity.bindLocalQuantityStepper(card);
         const precioSelect = card.querySelector('.precio-select');
         const precioHoldTrigger = card.querySelector('.precio-hold-trigger');
@@ -687,12 +711,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     /* CAMBIAR TEXTO SEGÚN PRESENTACIÓN */
-    document.querySelectorAll(".producto-card").forEach(card => {
+    document.querySelectorAll(".producto-card:not(.combo-card)").forEach(card => {
         const select = card.querySelector(".presentacion-select");
         const infoTexto = card.querySelector(".info-presentacion");
+        if (!select || !infoTexto) {
+            return;
+        }
 
         select.addEventListener("change", function () {
             const option = this.selectedOptions[0];
+            if (!option) {
+                return;
+            }
             const summary = (option.dataset.summary || '').trim();
 
             if (summary) {
@@ -790,32 +820,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (typeof initPromoCountdowns === 'function') {
-        initPromoCountdowns();
-    }
-
-    if (typeof initComboBuilder === 'function') {
-        initComboBuilder({
-            agregarUrl: document.body.dataset.agregarUrl,
-            csrfToken: document.body.dataset.csrf,
-            includePrice: true,
-            onSubmitComplete: function (result) {
-                if (result.totalItems != null) {
-                    const counter = document.getElementById('contadorPedido');
-                    const counter2 = document.getElementById('pedidoCantidad');
-                    if (counter) counter.textContent = result.totalItems;
-                    if (counter2) counter2.textContent = result.totalItems;
-                }
-                if (result.total != null) {
-                    const totalEl = document.getElementById('pedidoTotal');
-                    if (totalEl) totalEl.textContent = Number(result.total).toFixed(2);
-                }
-            },
-        });
-    }
-
     document.addEventListener('ltg:client-mode-changed', function () {
-        document.querySelectorAll('.producto-card').forEach(function (card) {
+        document.querySelectorAll('.producto-card:not(.combo-card)').forEach(function (card) {
             syncPrecioMask(card);
         });
     });

@@ -144,18 +144,39 @@ padding:40px;
 
 height:calc(100vh - var(--panel-navbar-offset) - var(--panel-content-top-gap));
 overflow-y:auto;
-overflow-x:clip;
+/* Keep horizontal overflow scrollable inside .table-responsive (iPad Safari).
+   `clip` on this pane prevented swipe-scrolling wide customer/order tables. */
+overflow-x: hidden;
+min-width: 0;
 
 width:calc(100% - 240px);
 max-width:calc(100% - 240px);
-min-width:0;
-box-sizing:border-box;
+box-sizing: border-box;
 }
 
 .content > .container-fluid,
 .content .dashboard-cards,
-.content .card {
+.content .card,
+.content .vendor-shell,
+.content .vendor-table-card {
     max-width: 100%;
+    min-width: 0;
+}
+
+/* Always constrain list tables so iPad/Safari can swipe horizontally. */
+.content .table-responsive {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
+}
+
+.content .table-responsive.mobile-stack-responsive .table.mobile-stack-table {
+    min-width: 980px;
 }
 
 
@@ -1033,7 +1054,7 @@ box-sizing:border-box;
         max-width: calc(100% - 240px);
         min-width: 0;
         box-sizing: border-box;
-        overflow-x: clip;
+        overflow-x: hidden;
     }
 
     /* Sidebar siempre visible en escritorio */
@@ -1062,7 +1083,7 @@ box-sizing:border-box;
             max-width: calc(100% - 240px);
             min-width: 0;
             box-sizing: border-box;
-            overflow-x: clip;
+            overflow-x: hidden;
         }
     }
 
@@ -1205,10 +1226,32 @@ box-sizing:border-box;
     .content .table-responsive {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+        touch-action: pan-x pan-y;
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
     }
 
     .content .table-responsive:not(.mobile-stack-responsive) .table {
         min-width: 700px;
+    }
+
+    /* iPad / tablet: keep wide list tables swipeable instead of stacking or clipping. */
+    @media (min-width: 768px) and (max-width: 1199.98px) {
+        .content .table-responsive.mobile-stack-responsive {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-x: contain;
+            touch-action: pan-x pan-y;
+            width: 100%;
+            max-width: 100%;
+        }
+
+        .content .table-responsive.mobile-stack-responsive .table.mobile-stack-table {
+            min-width: 960px;
+            margin-bottom: 0;
+        }
     }
 
     .content .table {
@@ -1564,7 +1607,7 @@ box-sizing:border-box;
 
     .content {
         padding: 14px;
-        overflow-x: clip;
+        overflow-x: hidden;
     }
 
     .sidebar {
@@ -1769,7 +1812,7 @@ box-sizing:border-box;
     margin-left: 0;
     width: 100%;
     max-width: 100%;
-    overflow-x: clip;
+    overflow-x: hidden;
     padding: 16px;
     padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
     height: auto;

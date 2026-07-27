@@ -724,6 +724,39 @@ background:#f3f4f6;
 
 }
 
+/* iPad / tablet: customer list must swipe horizontally (not clip). */
+.vendor-shell--customers,
+.vendor-shell--customers .vendor-table-card,
+.vendor-shell--customers .vendor-table-card .card-body {
+    max-width: 100%;
+    min-width: 0;
+}
+
+.vendor-shell--customers .table-responsive {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
+}
+
+.vendor-shell--customers .table-responsive .table {
+    min-width: 980px;
+}
+
+@media (max-width: 767.98px) {
+    .vendor-shell--customers .table-responsive.mobile-stack-responsive {
+        overflow-x: visible !important;
+    }
+
+    .vendor-shell--customers .table-responsive .table.mobile-stack-table {
+        min-width: 0;
+    }
+}
+
 @media (max-width: 992px) {
     .clientes-toolbar {
         flex-direction: column;
@@ -748,6 +781,8 @@ background:#f3f4f6;
     .table-responsive {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+        width: 100%;
+        max-width: 100%;
     }
 
     .table-responsive .table {

@@ -23,10 +23,65 @@ body::-webkit-scrollbar,
     position: fixed;
     top: 0;
     left: 0;
+    right: 0;
     width: 100%;
-    height: 70px;
+    /* Grow with content instead of clipping the Order button on iPhone. */
+    height: auto;
+    min-height: calc(56px + env(safe-area-inset-top, 0px));
+    padding-top: calc(0.55rem + env(safe-area-inset-top, 0px));
+    padding-bottom: 0.55rem;
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
     z-index: 1000;
     background: linear-gradient(90deg, #023b82, #0c64cf, #3f89da);
+    overflow: visible;
+    box-sizing: border-box;
+    max-width: 100%;
+}
+
+.navbar-custom .container-fluid {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+.navbar-custom .navbar-brand {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-right: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.navbar-custom .ms-auto {
+    flex: 0 0 auto;
+    margin-left: 0 !important;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.navbar-custom .sidebar-toggle-btn {
+    flex: 0 0 auto;
+    min-width: 42px;
+    min-height: 42px;
+}
+
+.navbar-custom .ms-auto .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    min-height: 42px;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.1;
 }
 
 .sidebar {
@@ -722,17 +777,42 @@ body::-webkit-scrollbar,
         padding: 14px !important;
     }
 
-    .navbar-brand {
-        font-size: 16px !important;
+    .navbar-custom {
+        padding-top: calc(0.45rem + env(safe-area-inset-top, 0px));
+        padding-bottom: 0.45rem;
+        padding-left: max(0.6rem, env(safe-area-inset-left, 0px));
+        padding-right: max(0.6rem, env(safe-area-inset-right, 0px));
+        overflow: visible !important;
     }
 
-    .btn-outline-light {
+    .navbar-custom .container-fluid {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 0.4rem !important;
+        grid-template-columns: none !important;
+    }
+
+    .navbar-brand {
+        font-size: 15px !important;
+        max-width: none;
+    }
+
+    .navbar-custom .ms-auto .btn,
+    .navbar-custom .btn-outline-light {
         font-size: 12px !important;
-        padding: 0.25rem 0.5rem !important;
+        padding: 0.4rem 0.65rem !important;
+        min-height: 40px !important;
+        line-height: 1.15 !important;
     }
 
     .container-fluid {
         padding: 0.5rem !important;
+    }
+
+    .navbar-custom .container-fluid {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
     }
 
     .card.custom-card.p-4 {

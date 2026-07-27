@@ -51,8 +51,10 @@
     const height = Math.max(Math.ceil(navbar.getBoundingClientRect().height), 56);
     const isMobile = window.matchMedia('(max-width: 767.98px)').matches;
     const isSmallPhone = window.matchMedia('(max-width: 576px)').matches;
-    const buffer = isSmallPhone ? 28 : (isMobile ? 20 : 6);
-    const topGap = isSmallPhone ? 18 : (isMobile ? 12 : 0);
+    // Keep a small buffer under the live navbar height; avoid oversized gaps
+    // that used to fight the fixed 70px navbar and clip the Order button.
+    const buffer = isSmallPhone ? 8 : (isMobile ? 6 : 6);
+    const topGap = isSmallPhone ? 8 : (isMobile ? 6 : 0);
     root.style.setProperty('--panel-navbar-offset', (height + buffer) + 'px');
     root.style.setProperty('--panel-content-top-gap', topGap + 'px');
   }
@@ -112,7 +114,7 @@ La Tortilla Grocery
 
 <div class="ms-auto d-flex align-items-center gap-2">
 
-<a href="#" class="btn btn-outline-light">
+<a href="{% url 'ver_pedido' %}" class="btn btn-outline-light pedido-navbar-order-btn" aria-current="page">
 {% trans "Order" %} (<span id="contadorPedido">{{ productos|length }}</span>)
 </a>
 

@@ -250,7 +250,18 @@ La Tortilla Grocery
 
 <tr>
 
-<td class="fw-bold" data-label="{% trans "Producto" %}">
+<td class="fw-bold pedido-product-cell" data-label="{% trans "Producto" %}">
+<div class="pedido-product-identity">
+<img
+  src="{{ item.imagen_url }}"
+  alt=""
+  class="pedido-product-thumb"
+  width="64"
+  height="64"
+  loading="lazy"
+  decoding="async"
+>
+<div class="pedido-product-identity__text">
 {{ item.nombre }}
 {% if item.es_regalo %}
 <div class="mt-1"><span class="badge text-bg-success">{% trans "FREE" %}</span></div>
@@ -261,6 +272,8 @@ La Tortilla Grocery
 </span>
 </div>
 {% endif %}
+</div>
+</div>
 </td>
 
 <td data-label="{% trans "Presentación" %}">

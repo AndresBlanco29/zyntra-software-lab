@@ -92,6 +92,42 @@ body::-webkit-scrollbar,
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 
+.pedido-product-identity {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-width: 0;
+}
+
+.pedido-product-thumb {
+    width: 64px;
+    height: 64px;
+    object-fit: contain;
+    flex: 0 0 64px;
+    border-radius: 12px;
+    border: 1px solid #dbe3ef;
+    background: #f8fafc;
+    padding: 4px;
+}
+
+.pedido-product-identity__text {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.tabla-productos tbody tr {
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.tabla-productos tbody tr:nth-child(even) {
+    background: #f8fafc;
+}
+
+.tabla-productos td.pedido-product-cell {
+    min-width: 220px;
+    vertical-align: middle;
+}
+
 .order-comment-panel {
     background: #f8fafc;
     border: 1px solid #d7dee8;
@@ -223,10 +259,14 @@ body::-webkit-scrollbar,
 .presentacion-resumen:focus,
 .precio-resumen-preset:focus,
 .precio-resumen-manual:focus,
-.cantidad-input:focus {
+.cantidad-input:focus,
+.order-comment-panel__input:focus,
+.form-control:focus,
+.form-select:focus {
     outline: none;
-    border-color: #0c64cf;
-    box-shadow: 0 0 0 2px rgba(12, 100, 207, 0.15);
+    border-color: #f59e0b !important;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.45) !important;
+    background-color: #fffbeb;
 }
 
 .accion.eliminar {
@@ -579,13 +619,33 @@ body::-webkit-scrollbar,
 
     .mobile-stack-table tr {
         background: #fff;
-        border: 1px solid #d7dce2;
-        border-radius: 12px;
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-        margin-bottom: 14px;
+        border: 2px solid #94a3b8;
+        border-radius: 16px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+        margin-bottom: 18px;
         overflow: hidden;
         float: none !important;
         clear: both;
+        padding-top: 4px;
+    }
+
+    .mobile-stack-table td.pedido-product-cell {
+        background: #f1f5f9;
+        padding-top: 14px !important;
+        padding-bottom: 14px !important;
+    }
+
+    .mobile-stack-table .pedido-product-identity {
+        align-items: center;
+    }
+
+    .mobile-stack-table .pedido-product-thumb {
+        width: 72px;
+        height: 72px;
+        flex-basis: 72px;
+        border-width: 2px;
+        border-color: #64748b;
+        background: #fff;
     }
 
     .mobile-stack-table td {

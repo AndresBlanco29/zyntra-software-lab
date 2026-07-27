@@ -1922,9 +1922,22 @@ box-sizing: border-box;
 .pickup-completion-shell .form-control:focus,
 .pickup-completion-shell .form-select:focus,
 .driver-shell .form-control:focus,
-.driver-shell .form-select:focus {
-  border-color: #0d6efd;
-  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+.driver-shell .form-select:focus,
+body.vendedor-catalogo-page .form-control:focus,
+body.vendedor-catalogo-page .form-select:focus,
+body.vendedor-catalogo-page input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):focus,
+body.vendedor-catalogo-page textarea:focus,
+body.vendedor-catalogo-page select:focus,
+body.vendedor-catalogo-page .cantidad-input:focus,
+.main-content .form-control:focus,
+.main-content .form-select:focus,
+.main-content input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):focus,
+.main-content textarea:focus,
+.main-content select:focus {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.45) !important;
+  outline: none;
+  background-color: #fffbeb;
 }
 
 .content .input-group-text,

@@ -3,6 +3,7 @@ from django.urls import reverse
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db.models import Case, IntegerField, Q, When
+from django.templatetags.static import static
 from config.clientes.models import Cliente
 from config.clientes.assignment import filter_clientes_for_vendedor
 from config.clientes.phone import normalize_stored_phone_number
@@ -47,6 +48,7 @@ import logging
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
+from django.utils.safestring import mark_safe
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from config.clientes.balance_summary import (
@@ -773,6 +775,7 @@ def catalogo_vendedor(request, cliente_id):
         'total': total,
         'bulk_price_options': _build_catalog_bulk_price_options(),
         'price_margin_percentages': _catalog_price_margin_percentages(),
+        'pedido_presentacion_ids_json': mark_safe(json.dumps([str(key) for key in carrito.keys()])),
         'take_order_flow': flow,
         'is_quote_flow': flow == FLOW_QUOTE,
     }
@@ -1009,9 +1012,15 @@ def ver_pedido(request):
             descuento_monto=item.get("descuento_monto", 0),
         )
 
+        if producto.imagen:
+            imagen_url = producto.imagen.url
+        else:
+            imagen_url = static('img/product-placeholder.svg')
+
         productos.append({
             "id": key,
             "nombre": item.get("nombre") or producto.nombre,
+            "imagen_url": imagen_url,
             "presentacion_id": item["presentacion_id"],
             "costo": effective_cost,
             "precio": precio,

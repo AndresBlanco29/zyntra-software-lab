@@ -108,8 +108,9 @@ body { background:#f4f6f9; }
 }
 
 .vendor-order-search:focus {
-    border-color: #2b72d6;
-    box-shadow: 0 0 0 0.2rem rgba(43, 114, 214, 0.15);
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.45);
+    background-color: #fffbeb;
 }
 
 .table thead th{

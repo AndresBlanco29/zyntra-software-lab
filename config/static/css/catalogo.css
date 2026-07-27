@@ -1465,8 +1465,9 @@ z-index:9999;
 
 .cantidad-input:focus {
     outline: none;
-    border-color: #1f4fa3;
-    box-shadow: 0 0 0 2px rgba(31, 79, 163, 0.15);
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.45);
+    background-color: #fffbeb;
 }
 
         /* BOTON AMARILLO */
@@ -1479,6 +1480,18 @@ z-index:9999;
 
 .btn-yellow:hover {
     background: #e6c200;
+}
+
+.btn-yellow.agregar-btn.is-in-order,
+.btn-yellow.agregar-btn.is-just-added {
+    background: #16a34a;
+    color: #fff;
+}
+
+.btn-yellow.agregar-btn.is-in-order:hover,
+.btn-yellow.agregar-btn.is-just-added:hover {
+    background: #15803d;
+    color: #fff;
 }
 
         /* SIDEBAR MOBILE */

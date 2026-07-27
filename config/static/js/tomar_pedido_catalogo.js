@@ -14,9 +14,19 @@ document.addEventListener('DOMContentLoaded', function() {
     let activePrecioCard = null;
     const bulkPriceTierSelect = document.getElementById('bulkPriceTierSelect');
     const applyBulkPriceTierButton = document.getElementById('applyBulkPriceTierButton');
+    const bulkPriceTierFeedback = document.getElementById('bulkPriceTierFeedback');
     const bulkPriceTierStorageKey = `vendedor_catalog_bulk_price_tier_${document.body.dataset.clienteId || 'default'}`;
     let activeBulkPriceTier = '';
     const marginLabel = document.body.dataset.labelMargin || 'Margin';
+    let inOrderPresentationIds = new Set();
+    try {
+        const rawIds = JSON.parse(document.body.dataset.pedidoPresentacionIds || '[]');
+        if (Array.isArray(rawIds)) {
+            inOrderPresentationIds = new Set(rawIds.map(String));
+        }
+    } catch (error) {
+        inOrderPresentationIds = new Set();
+    }
 
     function getPriceMarginTiers() {
         const raw = document.body.dataset.priceMargins || '';
@@ -231,28 +241,78 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function applyPriceTierToCard(card, priceKey) {
         if (!priceKey || !card) {
-            return;
+            return false;
         }
 
         const precioSelect = card.querySelector('.precio-select');
         if (!precioSelect) {
-            return;
+            return false;
         }
 
         const matchingOption = precioSelect.querySelector(`option[data-price-key="${priceKey}"]`);
         if (!matchingOption || !matchingOption.value) {
-            return;
+            return false;
         }
 
         precioSelect.value = matchingOption.value;
         precioSelect.dispatchEvent(new Event('change', { bubbles: true }));
         syncPrecioMask(card);
+        return true;
     }
 
     function applyBulkPriceTierToAllCards(priceKey) {
+        let appliedCount = 0;
         document.querySelectorAll('.producto-card:not(.combo-card)').forEach(card => {
-            applyPriceTierToCard(card, priceKey);
+            if (applyPriceTierToCard(card, priceKey)) {
+                appliedCount += 1;
+            }
         });
+        return appliedCount;
+    }
+
+    function showBulkPriceFeedback(appliedCount) {
+        if (!bulkPriceTierFeedback) {
+            return;
+        }
+        const base = document.body.dataset.msgBulkApplied || 'Price applied to visible products';
+        bulkPriceTierFeedback.textContent = `${base}: ${appliedCount}`;
+        bulkPriceTierFeedback.classList.remove('d-none');
+        window.clearTimeout(showBulkPriceFeedback._timer);
+        showBulkPriceFeedback._timer = window.setTimeout(() => {
+            bulkPriceTierFeedback.classList.add('d-none');
+        }, 2500);
+    }
+
+    function markAddButtonInOrder(btn, justAdded) {
+        if (!btn) {
+            return;
+        }
+        btn.classList.add('is-in-order');
+        if (justAdded) {
+            btn.classList.add('is-just-added');
+            window.clearTimeout(btn._justAddedTimer);
+            btn._justAddedTimer = window.setTimeout(() => {
+                btn.classList.remove('is-just-added');
+            }, 900);
+        }
+        btn.textContent = document.body.dataset.msgInOrder
+            || document.body.dataset.msgAdded
+            || 'In order ✔';
+    }
+
+    function refreshAddButtonState(card) {
+        const btn = card?.querySelector('.agregar-btn');
+        const presentacionSelect = card?.querySelector('.presentacion-select');
+        if (!btn || !presentacionSelect) {
+            return;
+        }
+        const presentacionId = String(presentacionSelect.value || '');
+        if (presentacionId && inOrderPresentationIds.has(presentacionId)) {
+            markAddButtonInOrder(btn, false);
+        } else {
+            btn.classList.remove('is-in-order', 'is-just-added');
+            btn.textContent = document.body.dataset.msgAddDefault || 'Add to Order';
+        }
     }
 
     function restoreBulkPriceTierSelection() {
@@ -283,10 +343,28 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedOption = precioSelect.selectedOptions[0];
         const marginValue = hasSelectedPrice ? resolveOptionMargin(selectedOption, getCardCost(card)) : null;
         const marginSuffix = buildMarginLabel(marginValue);
+        const helpers = clientModeHelpers();
+        const clientModeOn = Boolean(helpers?.isEnabled?.() || document.body.classList.contains('client-mode'));
+
+        if (clientModeOn) {
+            if (hasSelectedPrice) {
+                mask.textContent = helpers
+                    ? helpers.buildMaskLabel(precioSelect.value, marginSuffix)
+                    : `$${precioSelect.value}`;
+                shell.dataset.state = 'selected';
+                delete shell.dataset.clientPending;
+            } else {
+                mask.textContent = '';
+                shell.dataset.state = 'client-pending';
+                shell.dataset.clientPending = 'true';
+            }
+            updatePrecioMarginHint(card);
+            return;
+        }
 
         shell.dataset.state = hasSelectedPrice ? 'selected' : 'empty';
+        delete shell.dataset.clientPending;
         if (hasSelectedPrice) {
-            const helpers = clientModeHelpers();
             if (helpers) {
                 mask.textContent = helpers.buildMaskLabel(precioSelect.value, marginSuffix);
             } else if (marginSuffix) {
@@ -383,7 +461,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function startLongPress(card) {
-        if (!isMobilePriceMode()) {
+        if (!isMobilePriceMode() || document.body.classList.contains('client-mode')) {
             return;
         }
 
@@ -508,11 +586,28 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             storeBulkPriceTier(selectedPriceKey);
-            applyBulkPriceTierToAllCards(selectedPriceKey);
+            const appliedCount = applyBulkPriceTierToAllCards(selectedPriceKey);
+            showBulkPriceFeedback(appliedCount);
         });
     }
 
     restoreBulkPriceTierSelection();
+
+    document.querySelectorAll('.producto-card:not(.combo-card)').forEach(card => {
+        refreshAddButtonState(card);
+        const presentacionSelect = card.querySelector('.presentacion-select');
+        if (presentacionSelect) {
+            presentacionSelect.addEventListener('change', function () {
+                refreshAddButtonState(card);
+            });
+        }
+    });
+
+    document.addEventListener('ltg:client-mode-changed', function () {
+        document.querySelectorAll('.producto-card:not(.combo-card)').forEach(card => {
+            syncPrecioMask(card);
+        });
+    });
 
     function syncOrderHistory(card, select) {
         const historyLabel = card.querySelector('[data-order-history-current-label]');
@@ -661,10 +756,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById("contadorPedido").textContent = data.total_items;
                     document.getElementById("pedidoCantidad").textContent = data.total_items;
 
-                    btn.textContent = document.body.dataset.msgAdded || "Added ✔";
-                    setTimeout(() => {
-                        btn.textContent = document.body.dataset.msgAddDefault || "Add to Order";
-                    }, 1200);
+                    inOrderPresentationIds.add(String(presentacion_id));
+                    markAddButtonInOrder(btn, true);
 
                     animarNumero(
                         document.getElementById("pedidoTotal"),

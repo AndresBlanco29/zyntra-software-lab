@@ -46,6 +46,28 @@
     }
   }
 
+  function applyCatalogShellState(shell, select, mask, enabled) {
+    if (!shell || !select || !mask) {
+      return;
+    }
+
+    if (!enabled) {
+      delete shell.dataset.clientPending;
+      return;
+    }
+
+    if (select.value) {
+      mask.textContent = formatPriceOnly(select.value);
+      shell.dataset.state = 'selected';
+      delete shell.dataset.clientPending;
+    } else {
+      // Hide hold-to-pick / "Select price" guidance from the customer view.
+      mask.textContent = '';
+      shell.dataset.state = 'client-pending';
+      shell.dataset.clientPending = 'true';
+    }
+  }
+
   function applyCatalogPresentation(enabled) {
     document.querySelectorAll('.precio-select').forEach(function (select) {
       applyOptionLabels(select, enabled);
@@ -54,13 +76,7 @@
     document.querySelectorAll('.precio-select-shell').forEach(function (shell) {
       var select = shell.querySelector('.precio-select');
       var mask = shell.querySelector('.precio-select-mask');
-      if (!select || !mask) {
-        return;
-      }
-      if (enabled && select.value) {
-        mask.textContent = formatPriceOnly(select.value);
-        shell.dataset.state = 'selected';
-      }
+      applyCatalogShellState(shell, select, mask, enabled);
     });
 
     document.querySelectorAll('.precios-vendedor > label.fw-bold.small').forEach(function (label) {
@@ -70,6 +86,14 @@
       label.textContent = enabled
         ? (label.dataset.clientLabel || 'Price')
         : label.dataset.originalLabel;
+      var shell = label.parentElement
+        ? label.parentElement.querySelector('.precio-select-shell')
+        : null;
+      if (enabled && shell && shell.dataset.state === 'client-pending') {
+        label.classList.add('d-none');
+      } else {
+        label.classList.remove('d-none');
+      }
     });
   }
 

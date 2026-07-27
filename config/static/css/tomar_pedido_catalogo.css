@@ -543,3 +543,21 @@ body.vendedor-catalogo-page .col-md-10 {
         padding-bottom: 165px;
     }
 }
+
+/* Striking focus ring for Take Order catalog inputs */
+body.vendedor-catalogo-page .form-control:focus,
+body.vendedor-catalogo-page .form-select:focus,
+body.vendedor-catalogo-page .cantidad-input:focus,
+body.vendedor-catalogo-page input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):focus,
+body.vendedor-catalogo-page textarea:focus,
+body.vendedor-catalogo-page select:focus {
+    border-color: #f59e0b !important;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.45) !important;
+    outline: none;
+    background-color: #fffbeb;
+}
+
+body.client-mode .precios-vendedor:has(.precio-select-shell[data-state="client-pending"]) > label,
+body.client-mode .precios-vendedor:has(.precio-select-shell[data-state="empty"]) > label {
+    display: none !important;
+}

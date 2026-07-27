@@ -31,7 +31,10 @@ data-agregar-url="{% url 'agregar_producto_pedido' %}"
 data-csrf="{{ csrf_token }}"
 data-cliente-id="{{ cliente.id }}"
 data-msg-added="{% trans 'Added' %} ✔"
+data-msg-in-order="{% trans 'In order' %} ✔"
 data-msg-add-default="{% trans 'Add to Order' %}"
+data-msg-bulk-applied="{% trans 'Price applied to visible products' %}"
+data-pedido-presentacion-ids='{{ pedido_presentacion_ids_json }}'
 data-price-margins="{{ price_margin_percentages|join:',' }}"
 data-label-margin="{% trans 'Margin' %}"
 data-label-manual-price="{% trans 'Manual price' %}"
@@ -340,12 +343,13 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 <option value="{{ option.key }}">{{ option.label }}</option>
 {% endfor %}
 </select>
-<div class="form-text mb-0 d-none d-md-block">{% trans "Apply a price tier to every product in the catalog so you can add items faster without choosing the price on each card." %}</div>
+<div class="form-text mb-0">{% trans "Tip: filter by category or brand first (for example all flavors of the same pack), then apply one price to every product shown." %}</div>
 </div>
 <div class="col-md-4 col-lg-5 d-grid d-md-flex justify-content-md-end">
 <button type="button" class="btn btn-outline-primary btn-sm" id="applyBulkPriceTierButton">{% trans "Apply to all products" %}</button>
 </div>
 </div>
+<p id="bulkPriceTierFeedback" class="small text-success fw-semibold mb-0 mt-2 d-none" aria-live="polite"></p>
 </div>
 </div>
 
@@ -583,6 +587,11 @@ body.client-mode .precio-manual-wrap,
 body.client-mode .precio-hold-trigger {
   display: none !important;
 }
+/* Never show long-press / "select price" guidance in Client Mode. */
+body.client-mode .precio-select-shell[data-state="empty"],
+body.client-mode .precio-select-shell[data-state="client-pending"] {
+  display: none !important;
+}
 body.client-mode .precio-select-shell .precio-select {
   pointer-events: none;
   background: transparent;
@@ -593,8 +602,9 @@ body.client-mode .precio-select-shell .precio-select {
   padding-left: 0;
 }
 body.client-mode .precio-select-shell[data-state="selected"] .precio-select-mask {
-  display: block !important;
+  display: flex !important;
   position: static;
+  inset: auto;
   transform: none;
   background: #eef2ff;
   border: 1px solid #c7d2fe;
@@ -610,6 +620,19 @@ body.client-mode .precio-select option {
 #clientModeToggleBtn.is-active {
   background: #fff;
   color: #111827;
+}
+
+/* Persistent "already in order" confirmation on Add button */
+.agregar-btn.is-in-order,
+.agregar-btn.is-just-added {
+  background: #16a34a !important;
+  color: #fff !important;
+  border-color: #15803d !important;
+}
+.agregar-btn.is-in-order:hover,
+.agregar-btn.is-just-added:hover {
+  background: #15803d !important;
+  color: #fff !important;
 }
 </style>
 <script src="{% static 'js/take_order_client_mode.js' %}"></script>

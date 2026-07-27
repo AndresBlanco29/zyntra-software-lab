@@ -930,10 +930,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     );
 
                     const barra = document.querySelector(".pedido-bar");
-                    barra.style.transform = "scale(1.03)";
-                    setTimeout(()=>{
-                        barra.style.transform = "scale(1)";
-                    }, 200);
+                    if (barra) {
+                        barra.classList.add('pedido-bar--pulse');
+                        // Never leave an inline transform on a fixed bar (iOS Safari).
+                        barra.style.removeProperty('transform');
+                        window.clearTimeout(barra._pulseTimer);
+                        barra._pulseTimer = window.setTimeout(() => {
+                            barra.classList.remove('pedido-bar--pulse');
+                        }, 220);
+                    }
                 } else {
                     console.log("DEBUG - success=false, no actualizar");
                 }
@@ -1078,4 +1083,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    // iPhone Safari: clear fixed-bar transforms and avoid carrying a deep
+    // document scroll into View Order navigation state.
+    document.querySelectorAll('.pedido-bar a[href], a[href*="ver_pedido"]').forEach((link) => {
+        link.addEventListener('click', function () {
+            const barra = document.querySelector('.pedido-bar');
+            if (barra) {
+                barra.style.removeProperty('transform');
+                barra.classList.remove('pedido-bar--pulse');
+            }
+            if ('scrollRestoration' in window.history) {
+                window.history.scrollRestoration = 'manual';
+            }
+        }, { passive: true });
+    });
 });

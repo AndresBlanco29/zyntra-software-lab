@@ -5,7 +5,7 @@
 <head>
 
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 
 <title>{% trans "Tomar Pedido" %}</title>
 
@@ -114,12 +114,22 @@ La Tortilla Grocery
     // and the sticky search bar pins right below the navbar.
     if (document.body) {
       document.body.style.setProperty('--catalog-sticky-top', stickyTop + 'px');
+      document.body.style.setProperty('--panel-navbar-offset', stickyTop + 'px');
+    }
+    const sticky = document.querySelector('.catalog-search-sticky');
+    if (sticky) {
+      sticky.style.top = stickyTop + 'px';
     }
   }
   syncPanelNavbarOffset();
   window.addEventListener('load', syncPanelNavbarOffset);
   window.addEventListener('resize', syncPanelNavbarOffset);
   window.addEventListener('orientationchange', syncPanelNavbarOffset);
+  // iPhone Safari: URL bar show/hide changes layout without a window resize.
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncPanelNavbarOffset);
+    window.visualViewport.addEventListener('scroll', syncPanelNavbarOffset);
+  }
 })();
 </script>
 
@@ -241,26 +251,6 @@ Showing {{ start }}-{{ end }} of {{ total }} products
 </section>
 {% endif %}
 
-{% if productos_favoritos and page_obj.number == 1 %}
-<div class="favorites-section mb-4">
-    <div class="favorites-section__header">
-        <div>
-            <h2 class="favorites-section__title">{% trans "Favorite products" %}</h2>
-            <p class="favorites-section__subtitle mb-0">
-                {% blocktrans with customer=cliente.nombre_empresa %}Products {{ customer }} buys often — add them again in one tap.{% endblocktrans %}
-            </p>
-        </div>
-    </div>
-    <div class="row g-4 catalog-products-row justify-content-center favorites-section__grid">
-        {% for producto in productos_favoritos %}
-        <div class="col-12 col-sm-6 col-md-4 col-lg-3 catalog-product-col">
-            {% include "vendedores/includes/tomar_pedido_producto_card.html" %}
-        </div>
-        {% endfor %}
-    </div>
-</div>
-{% endif %}
-
 <form method="get" id="catalogo-vendedor-filter-form" class="catalog-filter-form mb-3" action="{{ catalogo_url }}">
 {% if filter_promociones %}
 <input type="hidden" name="promociones" value="1">
@@ -333,6 +323,26 @@ data-categoria="{{ m.producto_set.first.categoria.id|default:'' }}"
 
 </select>
 </div>
+
+{% if productos_favoritos and page_obj.number == 1 %}
+<div class="favorites-section mb-4">
+    <div class="favorites-section__header">
+        <div>
+            <h2 class="favorites-section__title">{% trans "Favorite products" %}</h2>
+            <p class="favorites-section__subtitle mb-0">
+                {% blocktrans with customer=cliente.nombre_empresa %}Products {{ customer }} buys often — add them again in one tap.{% endblocktrans %}
+            </p>
+        </div>
+    </div>
+    <div class="row g-4 catalog-products-row justify-content-center favorites-section__grid">
+        {% for producto in productos_favoritos %}
+        <div class="col-12 col-sm-6 col-md-4 col-lg-3 catalog-product-col">
+            {% include "vendedores/includes/tomar_pedido_producto_card.html" %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
 
 <div class="card shadow-sm mb-3 bulk-price-tier-panel js-internal-only">
 <div class="card-body py-2 px-3">

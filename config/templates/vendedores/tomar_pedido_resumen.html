@@ -8,7 +8,7 @@
 <head>
 
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="csrf-token" content="{{ csrf_token }}">
 
 <title>{% if is_quote_flow %}{% trans "Quote summary" %}{% else %}{% trans "Order summary" %}{% endif %}</title>
@@ -26,6 +26,22 @@
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
 <script>
 (function () {
+  // iPhone Safari often restores the previous catalog scroll offset into View
+  // Order and leaves fixed chrome (navbar/sidebar) misaligned.
+  if ('scrollRestoration' in window.history) {
+    window.history.scrollRestoration = 'manual';
+  }
+  function resetOrderSummaryScroll() {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    const main = document.querySelector('.main-content');
+    if (main) {
+      main.scrollTop = 0;
+    }
+  }
+  resetOrderSummaryScroll();
+
   const navbar = document.querySelector('.navbar-custom');
   if (!navbar) {
     return;
@@ -41,9 +57,26 @@
     root.style.setProperty('--panel-content-top-gap', topGap + 'px');
   }
   syncPanelNavbarOffset();
-  window.addEventListener('load', syncPanelNavbarOffset);
-  document.addEventListener('DOMContentLoaded', syncPanelNavbarOffset);
+  window.addEventListener('load', function () {
+    syncPanelNavbarOffset();
+    resetOrderSummaryScroll();
+  });
+  document.addEventListener('DOMContentLoaded', function () {
+    syncPanelNavbarOffset();
+    resetOrderSummaryScroll();
+  });
+  window.addEventListener('pageshow', function (event) {
+    // BFCache restore after Back/Forward on iOS.
+    if (event.persisted) {
+      resetOrderSummaryScroll();
+      syncPanelNavbarOffset();
+    }
+  });
   window.addEventListener('resize', syncPanelNavbarOffset);
+  window.addEventListener('orientationchange', syncPanelNavbarOffset);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', syncPanelNavbarOffset);
+  }
 })();
 </script>
 

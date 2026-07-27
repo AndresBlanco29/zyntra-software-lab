@@ -2,6 +2,8 @@ body {
     margin: 0;
     padding: 0;
     background: #f4f6f9;
+    overflow-x: clip;
+    max-width: 100%;
 }
 
 html,
@@ -29,10 +31,11 @@ body::-webkit-scrollbar,
 
 .sidebar {
     position: fixed !important;
-    top: 70px !important;
+    top: var(--panel-navbar-offset, 70px) !important;
     left: 0;
     width: 250px !important;
-    height: calc(100vh - 70px) !important;
+    height: calc(100vh - var(--panel-navbar-offset, 70px)) !important;
+    height: calc(100dvh - var(--panel-navbar-offset, 70px)) !important;
     background: #fff;
     overflow-y: auto;
     overflow-x: hidden;
@@ -78,12 +81,14 @@ body::-webkit-scrollbar,
     margin-left: 250px;
     margin-top: calc(var(--panel-navbar-offset, 70px) + var(--panel-content-top-gap, 0px));
     min-height: calc(100vh - var(--panel-navbar-offset, 70px));
+    min-height: calc(100dvh - var(--panel-navbar-offset, 70px));
     padding: 30px !important;
-    overflow-y: auto;
-    overflow-x: hidden;
+    /* Prefer document scroll; nested overflow-y:auto breaks iOS Safari after
+       navigating from a scrolled catalog page into View Order. */
+    overflow-x: clip;
+    overflow-y: visible;
     scrollbar-width: none;
     -ms-overflow-style: none;
-    -webkit-overflow-scrolling: touch;
 }
 
 .custom-card {
@@ -535,7 +540,10 @@ body::-webkit-scrollbar,
         margin-left: 0;
         padding: 20px !important;
         width: 100%;
-        min-height: calc(100vh - 70px);
+        max-width: 100%;
+        min-height: 0;
+        overflow: visible;
+        padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
     }
 
     .sidebar {

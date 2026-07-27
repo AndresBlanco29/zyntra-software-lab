@@ -561,3 +561,14 @@ body.client-mode .precios-vendedor:has(.precio-select-shell[data-state="client-p
 body.client-mode .precios-vendedor:has(.precio-select-shell[data-state="empty"]) > label {
     display: none !important;
 }
+
+.apply-related-price-btn {
+    font-weight: 700;
+    border-width: 2px;
+}
+
+.producto-card.producto-card--price-synced {
+    outline: 3px solid #22c55e;
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.2);
+    transition: outline-color 0.2s ease, box-shadow 0.2s ease;
+}

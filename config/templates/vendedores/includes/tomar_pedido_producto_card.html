@@ -225,6 +225,14 @@ data-summary="{{ p.descripcion_empaque_cliente }}"
 
 <div class="precio-margin-hint small text-success fw-semibold mt-1 d-none js-internal-only" aria-live="polite"></div>
 
+<button
+  type="button"
+  class="btn btn-sm btn-outline-success w-100 mt-2 apply-related-price-btn js-internal-only d-none"
+>
+  {% trans "Apply this price to related flavors" %}
+</button>
+<p class="apply-related-price-feedback small text-success fw-semibold mt-1 mb-0 d-none js-internal-only" aria-live="polite"></p>
+
 </div>
 
 

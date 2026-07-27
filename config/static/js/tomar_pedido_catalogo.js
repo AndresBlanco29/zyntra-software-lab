@@ -283,6 +283,159 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 2500);
     }
 
+    const RELATED_FLAVOR_TOKENS = new Set([
+        'GUAVA', 'GUAYABA', 'JAMAICA', 'MANDARIN', 'MANDARINA', 'ORANGE', 'NARANJA',
+        'LEMON', 'LIMON', 'LIME', 'FRESA', 'STRAWBERRY', 'UVA', 'GRAPE', 'GRAPEFRUIT',
+        'TORONJA', 'MANGO', 'PINA', 'PINEAPPLE', 'COCO', 'COCONUT', 'SANDIA',
+        'WATERMELON', 'APPLE', 'MANZANA', 'TAMARINDO', 'TAMARIND', 'BBQ', 'ORIGINAL',
+        'JALAPENO', 'JALAPE', 'FLAMIN', 'FLAMING', 'HOT', 'HOTS', 'CHILE', 'CHILI',
+        'QUESO', 'CHEESE', 'SAL', 'SALT', 'ADOBADA', 'DIABLO', 'PIQUANTE', 'SPICY',
+        'FIRE', 'FUEGO', 'LIMONCITO', 'PEACH', 'DURAZNO', 'CHERRY', 'CEREZA',
+        'VANILLA', 'VAINILLA', 'CHOCOLATE', 'CAFE', 'COFFEE', 'COLITA', 'TAMPICO',
+        'CLASSIC', 'CLASICO', 'LIGHT', 'DIET', 'ZERO', 'MINERAL', 'NATURAL',
+        'ROJA', 'ROJO', 'VERDE', 'AZUL', 'NEGRA', 'NEGRO', 'BLANCA', 'BLANCO',
+        'PICANTE', 'HABANERO', 'CHIPOTLE', 'CREMA', 'CEBOLLA', 'ONION',
+    ]);
+
+    function normalizeProductName(name) {
+        return String(name || '')
+            .toUpperCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/['"`]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function extractPackSignature(name) {
+        const normalized = normalizeProductName(name);
+        const match = normalized.match(/(\d+\s*\/\s*\d+(?:\.\d+)?(?:\s*[A-Z]{1,6})?)\s*$/);
+        return match ? match[1].replace(/\s+/g, '') : '';
+    }
+
+    function buildRelatedGroupKey(card) {
+        if (!card) {
+            return '';
+        }
+        if (card.dataset.relatedGroup) {
+            return card.dataset.relatedGroup;
+        }
+
+        const marca = String(card.dataset.marca || '0');
+        const normalized = normalizeProductName(card.dataset.nombre || '');
+        const pack = extractPackSignature(normalized);
+        let stem = normalized;
+        if (pack) {
+            stem = stem.replace(new RegExp(`${pack.replace('/', '\\/')}\\s*$`, 'i'), '').trim();
+        }
+
+        const tokens = stem.split(/[^A-Z0-9]+/).filter(Boolean);
+        const coreTokens = tokens.filter((token) => (
+            !RELATED_FLAVOR_TOKENS.has(token)
+            && !/^\d+$/.test(token)
+        ));
+        const core = (coreTokens.length ? coreTokens : tokens.slice(0, 1)).join(' ');
+        const key = `${marca}|${core}|${pack}`;
+        card.dataset.relatedGroup = key;
+        return key;
+    }
+
+    function getVisibleProductCards() {
+        return Array.from(document.querySelectorAll('.producto-card:not(.combo-card)'));
+    }
+
+    function getRelatedCards(sourceCard) {
+        const groupKey = buildRelatedGroupKey(sourceCard);
+        if (!groupKey) {
+            return [];
+        }
+        return getVisibleProductCards().filter((card) => (
+            card !== sourceCard && buildRelatedGroupKey(card) === groupKey
+        ));
+    }
+
+    function getSelectedPriceKey(card) {
+        const precioSelect = card?.querySelector('.precio-select');
+        const selectedOption = precioSelect?.selectedOptions?.[0];
+        const priceKey = selectedOption?.dataset.priceKey || '';
+        if (!priceKey || priceKey === 'manual' || !precioSelect?.value) {
+            return '';
+        }
+        return priceKey;
+    }
+
+    function refreshRelatedPriceAction(card) {
+        const button = card?.querySelector('.apply-related-price-btn');
+        const feedback = card?.querySelector('.apply-related-price-feedback');
+        if (!button) {
+            return;
+        }
+
+        const priceKey = getSelectedPriceKey(card);
+        const relatedCards = getRelatedCards(card);
+        const needsApply = relatedCards.some((relatedCard) => getSelectedPriceKey(relatedCard) !== priceKey);
+        const shouldShow = Boolean(
+            priceKey
+            && relatedCards.length
+            && needsApply
+            && !document.body.classList.contains('client-mode')
+        );
+
+        button.classList.toggle('d-none', !shouldShow);
+        button.disabled = !shouldShow;
+        button.textContent = document.body.dataset.msgRelatedApply || 'Apply this price to related flavors';
+        if (feedback && !feedback.dataset.keepVisible) {
+            feedback.classList.add('d-none');
+            feedback.textContent = '';
+        }
+    }
+
+    function refreshAllRelatedPriceActions() {
+        getVisibleProductCards().forEach((card) => refreshRelatedPriceAction(card));
+    }
+
+    function flashRelatedPriceSync(cards) {
+        cards.forEach((card) => {
+            card.classList.add('producto-card--price-synced');
+            window.clearTimeout(card._priceSyncTimer);
+            card._priceSyncTimer = window.setTimeout(() => {
+                card.classList.remove('producto-card--price-synced');
+            }, 1200);
+        });
+    }
+
+    function applyPriceToRelatedCards(sourceCard) {
+        const priceKey = getSelectedPriceKey(sourceCard);
+        if (!priceKey) {
+            return 0;
+        }
+
+        const relatedCards = getRelatedCards(sourceCard);
+        let appliedCount = 0;
+        relatedCards.forEach((card) => {
+            if (applyPriceTierToCard(card, priceKey)) {
+                appliedCount += 1;
+            }
+        });
+
+        const feedback = sourceCard.querySelector('.apply-related-price-feedback');
+        if (feedback) {
+            const base = document.body.dataset.msgRelatedApplied || 'Price applied to related flavors';
+            feedback.textContent = `${base}: ${appliedCount}`;
+            feedback.classList.remove('d-none');
+            feedback.dataset.keepVisible = '1';
+            window.clearTimeout(feedback._hideTimer);
+            feedback._hideTimer = window.setTimeout(() => {
+                feedback.classList.add('d-none');
+                delete feedback.dataset.keepVisible;
+            }, 2500);
+        }
+
+        flashRelatedPriceSync(relatedCards);
+        refreshAllRelatedPriceActions();
+        return appliedCount;
+    }
+
     function markAddButtonInOrder(btn, justAdded) {
         if (!btn) {
             return;
@@ -588,6 +741,7 @@ document.addEventListener('DOMContentLoaded', function() {
             storeBulkPriceTier(selectedPriceKey);
             const appliedCount = applyBulkPriceTierToAllCards(selectedPriceKey);
             showBulkPriceFeedback(appliedCount);
+            refreshAllRelatedPriceActions();
         });
     }
 
@@ -606,6 +760,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.addEventListener('ltg:client-mode-changed', function () {
         document.querySelectorAll('.producto-card:not(.combo-card)').forEach(card => {
             syncPrecioMask(card);
+            refreshRelatedPriceAction(card);
         });
     });
 
@@ -656,8 +811,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     manualInput.value = '';
                 }
                 syncPrecioMask(card);
+                refreshRelatedPriceAction(card);
             });
         }
+
+        const relatedPriceBtn = card.querySelector('.apply-related-price-btn');
+        if (relatedPriceBtn) {
+            relatedPriceBtn.addEventListener('click', function () {
+                applyPriceToRelatedCards(card);
+            });
+        }
+
+        refreshRelatedPriceAction(card);
 
         const manualInput = card.querySelector('.precio-manual-input');
         const manualApplyButton = card.querySelector('.precio-manual-apply');
@@ -854,6 +1019,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 updatePrecioMarginHint(card);
             }
+            refreshRelatedPriceAction(card);
         });
 
         syncOrderHistory(card, select);
@@ -912,10 +1078,4 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-
-    document.addEventListener('ltg:client-mode-changed', function () {
-        document.querySelectorAll('.producto-card:not(.combo-card)').forEach(function (card) {
-            syncPrecioMask(card);
-        });
-    });
 });

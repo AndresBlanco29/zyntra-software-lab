@@ -3,7 +3,8 @@
 Quick Inventory (QI) is the quantity imported from QuickBooks (stock_fisico).
 Active Manual Adjustments are temporary Emergency Inventory Adjustments.
 Sales Pending Sync is sold on local invoices not yet exported to QuickBooks.
-In orders is quantity on open sales orders that do not yet have an invoice.
+In orders is quantity reserved on open sales orders (after picking verification)
+that do not yet have an invoice. Creating an order alone does not reserve stock.
 Available is always computed and never stored as source of truth:
 
     Available = Quick Inventory
@@ -107,17 +108,23 @@ def sales_pending_sync_map(presentacion_ids):
 
 
 def in_orders_map(presentacion_ids, *, exclude_pedido_ids=None):
-    """Sum PedidoItem.cantidad for open orders that do not yet have an invoice."""
+    """Sum reserved packages on open orders that do not yet have an invoice.
+
+    Reservation happens at picking verification via
+    PedidoItem.cantidad_reservada_inventario. Requested/open line qty alone
+    does not reduce Available.
+    """
     ids = _normalize_presentacion_ids(presentacion_ids)
     if not ids:
         return {}
     queryset = PedidoItem.objects.filter(
         presentacion_id__in=ids,
         pedido__invoice__isnull=True,
+        cantidad_reservada_inventario__gt=0,
     ).exclude(pedido__estado__in=CLOSED_ORDER_ESTADOS)
     if exclude_pedido_ids:
         queryset = queryset.exclude(pedido_id__in=list(exclude_pedido_ids))
-    rows = queryset.values('presentacion_id').annotate(qty=Sum('cantidad'))
+    rows = queryset.values('presentacion_id').annotate(qty=Sum('cantidad_reservada_inventario'))
     result = {presentacion_id: 0 for presentacion_id in ids}
     for row in rows:
         result[int(row['presentacion_id'])] = int(row['qty'] or 0)

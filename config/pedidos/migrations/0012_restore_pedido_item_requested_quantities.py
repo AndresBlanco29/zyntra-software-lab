@@ -46,6 +46,8 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('pedidos', '0011_pedido_credit_limit_flags'),
+        ('inventario', '0002_operational_inventory'),
+        ('cotizaciones', '0001_initial'),
     ]
 
     operations = [

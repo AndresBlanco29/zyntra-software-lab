@@ -5,11 +5,23 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.base import ContentFile
 from django.db import transaction
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from config.auditoria.models import AuditLog
-from config.inventario.services import _apply_fractional_inventory_change, _apply_inventory_change, _lock_fractional_stock_records, _lock_stock_records, aplicar_inventario_pendiente_pedido, aplicar_verificacion_picking_inventario, restaurar_inventario_por_anulacion_factura
+from config.inventario.services import (
+	_apply_fractional_inventory_change,
+	_apply_inventory_change,
+	_lock_fractional_stock_records,
+	_lock_stock_records,
+	aplicar_inventario_pendiente_pedido,
+	aplicar_verificacion_picking_inventario,
+	liberar_reserva_inventario_pedido,
+	reservar_cantidades_verificacion_picking,
+	restaurar_inventario_por_anulacion_factura,
+	validar_disponibilidad_para_items,
+)
 from config.notificaciones.models import crear_notificacion_backoffice
 from config.pedidos.services import crear_pedido_desde_items
 from config.productos.models import Presentacion
@@ -714,6 +726,65 @@ def _apply_selected_customer_notes_to_invoice(*, invoice, note_applications, usu
 		NotaAjusteAplicacion.objects.create(nota=nota, invoice=invoice, monto=amount_to_apply, aplicada_por=usuario)
 
 
+def _crear_pedido_remanente_si_aplica(*, pedido_origen, usuario):
+	"""If verification reserved less than solicitada, open a follow-up order for the remainder."""
+	remaining_payload = []
+	for item in pedido_origen.items.select_related('presentacion').all():
+		solicitada = int(item.cantidad_solicitada or 0)
+		facturada = int(item.cantidad or 0)
+		pendiente = max(solicitada - facturada, 0)
+		if pendiente <= 0:
+			continue
+		remaining_payload.append({
+			'presentacion': item.presentacion,
+			'cantidad': pendiente,
+			'precio': item.precio,
+			'descuento_aplicado': bool(item.descuento_aplicado),
+			'descuento_monto': item.descuento_monto,
+			'es_regalo': bool(getattr(item, 'es_regalo', False)),
+		})
+	if not remaining_payload:
+		return None
+
+	remanente = crear_pedido_desde_items(
+		cliente=pedido_origen.cliente,
+		items_payload=remaining_payload,
+		origen=pedido_origen.origen or 'BACKOFFICE',
+		vendedor=pedido_origen.vendedor,
+		nota_cliente=pedido_origen.nota_cliente or '',
+		acepta_terminos=bool(pedido_origen.acepta_terminos),
+		canal_toma=pedido_origen.canal_toma or '',
+		reservar_inventario=False,
+	)
+	remanente.pedido_raiz = pedido_origen.pedido_raiz_efectivo
+	# Keep partial numbering best-effort without hard dependency on index helpers.
+	from config.pedidos.models import Pedido
+	raiz = remanente.pedido_raiz
+	next_index = (
+		Pedido.objects.filter(pedido_raiz=raiz).exclude(pk=remanente.pk).count() + 1
+		if raiz
+		else 1
+	)
+	remanente.indice_parcial = next_index
+	remanente.nota_backoffice = (
+		_('Remainder created after partial picking/invoice of sales order #%(numero)s.')
+		% {'numero': pedido_origen.numero_display}
+	)
+	remanente.save(update_fields=['pedido_raiz', 'indice_parcial', 'nota_backoffice', 'actualizada_en'])
+	crear_notificacion_backoffice(
+		titulo=_('Remainder order #%(id)s created from partial fulfillment') % {'id': remanente.numero_display},
+		mensaje=_(
+			'Sales order #%(source)s was invoiced partially. Remainder #%(remainder)s is open for a later picking when stock is available.'
+		) % {
+			'source': pedido_origen.numero_display,
+			'remainder': remanente.numero_display,
+		},
+		tipo='PEDIDO',
+		url=reverse('backoffice_pedido_detalle', args=[remanente.id]),
+	)
+	return remanente
+
+
 @transaction.atomic
 def generar_invoice_desde_picking(
 	*,
@@ -816,6 +887,9 @@ def generar_invoice_desde_picking(
 
 	pedido.estado = 'INVOICE_GENERADA'
 	pedido.save(update_fields=['estado', 'actualizada_en'])
+	# Move reserved qty out of In Orders; Sales Pending Sync rises via InvoiceItem.
+	liberar_reserva_inventario_pedido(pedido=pedido, creado_por=usuario)
+	_crear_pedido_remanente_si_aplica(pedido_origen=pedido, usuario=usuario)
 
 	if metodo_entrega == 'RUTA_DRIVER':
 		delivery = ensure_delivery_for_invoice(invoice)
@@ -891,10 +965,17 @@ def generar_invoice_directa_backoffice(
 		acepta_terminos=False,
 		canal_toma='BACKOFFICE_DIRECT',
 		bypass_stock_check=False,
-		reservar_inventario=True,
+		reservar_inventario=False,
 	)
+	# Direct invoice reserves at the same moment as picking verification.
+	validar_disponibilidad_para_items(items_payload)
 	item_ids = list(pedido.items.values_list('id', flat=True))
-	aplicar_verificacion_picking_inventario(pedido=pedido, pedido_item_ids=item_ids, creado_por=usuario)
+	items_qty_map = {item.id: int(item.cantidad or 0) for item in pedido.items.all()}
+	reservar_cantidades_verificacion_picking(
+		pedido=pedido,
+		items_qty_map=items_qty_map,
+		creado_por=usuario,
+	)
 	pedido.estado = 'VERIFICADO_AJUSTADO'
 	pedido.nota_backoffice = (nota_backoffice or '').strip()
 	pedido.picking_verificado_en = timezone.now()

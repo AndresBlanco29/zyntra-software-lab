@@ -17,6 +17,7 @@ from config.inventario.services import (
     aplicar_verificacion_picking_inventario,
     eliminar_item_pedido_con_inventario,
     reemplazar_presentacion_item_pedido,
+    reservar_cantidades_verificacion_picking,
     reservar_stock_para_pedido_items,
     validar_disponibilidad_para_items,
 )
@@ -251,11 +252,10 @@ def crear_pedido_parcial(*, pedido, lineas_payload, usuario=None, request=None):
     )
 
     created_items = []
-    items_to_reserve = []
     for source_item, qty in lineas:
         locked_source = locked_items[source_item.id]
-        had_reservation = int(locked_source.cantidad_reservada_inventario or 0) > 0
         remaining = int(locked_source.cantidad or 0) - int(qty)
+        remaining_solicitada = max(int(locked_source.cantidad_solicitada or locked_source.cantidad or 0) - int(qty), 0)
         subtotal = calcular_subtotal_item_pedido(
             precio=locked_source.precio,
             cantidad=qty,
@@ -268,16 +268,32 @@ def crear_pedido_parcial(*, pedido, lineas_payload, usuario=None, request=None):
             item_origen=locked_source,
             cantidad_solicitada=qty,
             cantidad=qty,
+            cantidad_reservada_inventario=0,
+            cantidad_inventario_aplicada=0,
             precio=locked_source.precio,
             descuento_aplicado=locked_source.descuento_aplicado,
             descuento_monto=locked_source.descuento_monto,
             subtotal=subtotal,
         )
         created_items.append(child_item)
-        if had_reservation:
-            items_to_reserve.append(child_item)
         if remaining > 0:
-            _reducir_cantidad_item_fuente(item=locked_source, nueva_cantidad=remaining, usuario=usuario)
+            locked_source.cantidad = remaining
+            locked_source.cantidad_solicitada = remaining_solicitada or remaining
+            # Keep source reservation only for what remains reserved on the source wave.
+            if int(locked_source.cantidad_reservada_inventario or 0) > remaining:
+                locked_source.cantidad_reservada_inventario = remaining
+            locked_source.subtotal = calcular_subtotal_item_pedido(
+                precio=locked_source.precio,
+                cantidad=remaining,
+                descuento_aplicado=locked_source.descuento_aplicado,
+                descuento_monto=locked_source.descuento_monto,
+            )
+            locked_source.save(update_fields=[
+                'cantidad',
+                'cantidad_solicitada',
+                'cantidad_reservada_inventario',
+                'subtotal',
+            ])
         else:
             # Full line moved to the partial: remove it from the source order
             # (do not leave a zero-quantity row).
@@ -285,9 +301,6 @@ def crear_pedido_parcial(*, pedido, lineas_payload, usuario=None, request=None):
 
     recalcular_pedido(locked_pedido)
     recalcular_pedido(parcial)
-
-    if items_to_reserve:
-        reservar_stock_para_pedido_items(pedido=parcial, pedido_items=items_to_reserve, creado_por=usuario)
 
     from config.auditoria.business_events import log_business_event
     from config.auditoria.models import AuditLog
@@ -354,14 +367,16 @@ def crear_pedido_desde_items(
     acepta_terminos=False,
     canal_toma='',
     bypass_stock_check=False,
-    reservar_inventario=True,
+    reservar_inventario=False,
     request=None,
 ):
     if not items_payload:
         raise ValidationError(_('You must add at least one item to create the sales order.'))
 
-    if reservar_inventario:
-        validar_disponibilidad_para_items(items_payload, bypass_stock_check=bypass_stock_check)
+    # Creating an order only records the customer request. Inventory is reserved
+    # later during picking verification (cantidad_reservada_inventario).
+    # ``reservar_inventario`` / stock checks on create are intentionally ignored.
+    del bypass_stock_check, reservar_inventario
 
     nota_texto = (nota_cliente or '').strip()
     pedido = Pedido.objects.create(
@@ -407,6 +422,8 @@ def crear_pedido_desde_items(
                 presentacion=presentacion,
                 cantidad_solicitada=cantidad,
                 cantidad=cantidad,
+                cantidad_reservada_inventario=0,
+                cantidad_inventario_aplicada=0,
                 precio=precio,
                 descuento_aplicado=descuento_aplicado,
                 descuento_monto=descuento_monto,
@@ -425,9 +442,6 @@ def crear_pedido_desde_items(
     sincronizar_regalos_promocion_en_pedido(pedido)
     created_items = list(PedidoItem.objects.filter(pedido=pedido).order_by('id'))
     pedido.refresh_from_db(fields=['total'])
-
-    if reservar_inventario and created_items:
-        reservar_stock_para_pedido_items(pedido=pedido, pedido_items=created_items, creado_por=vendedor)
 
     from config.auditoria.business_events import log_business_event
     from config.auditoria.models import AuditLog
@@ -663,12 +677,13 @@ def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales
         })
         cantidad_real = max(int(cantidades_reales.get(item.id, item.cantidad) or 0), 0)
         cantidad_aplicada_previa = max(int(item.cantidad_inventario_aplicada or 0), 0)
-        cantidad_pendiente_aplicar = max(cantidad_real - cantidad_aplicada_previa, 0)
+        # Own In Orders reservation is excluded above, so validate the full pick qty
+        # against Available (equivalent to Available + this line's current reserved).
         stock_fisico = int(snapshot['quick_inventory'])
         stock_reservado = int(snapshot['in_orders'])
         stock_disponible = int(snapshot['available'])
         available_packages = max(stock_disponible, 0)
-        shortage_packages = max(cantidad_pendiente_aplicar - available_packages, 0)
+        shortage_packages = max(cantidad_real - available_packages, 0)
 
         evaluation[item.id] = {
             'units_per_package': max(int(getattr(item.presentacion, 'unidades', 0) or 0), 1),
@@ -681,7 +696,7 @@ def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales
             'available_packages': available_packages,
             'cantidad_real': cantidad_real,
             'cantidad_aplicada_previa': cantidad_aplicada_previa,
-            'cantidad_pendiente_aplicar': cantidad_pendiente_aplicar,
+            'cantidad_pendiente_aplicar': cantidad_real,
             'has_shortage': shortage_packages > 0,
             'shortage_amount': shortage_packages,
         }
@@ -710,7 +725,10 @@ def build_pedido_inventory_needs_analysis(*, pedido, pedido_items=None):
 			'available': 0,
 		})
 		requested = int(getattr(item, 'cantidad_solicitada_documentada', None) or item.cantidad_solicitada or item.cantidad or 0)
+		reserved = int(item.cantidad_reservada_inventario or 0)
+		pending = max(requested - reserved, 0)
 		available = max(int(snapshot['available']), 0)
+		# Own reservation is excluded from In Orders above, so compare full requested qty.
 		to_buy = max(requested - available, 0)
 		if requested <= 0:
 			status = 'sufficient'
@@ -730,6 +748,8 @@ def build_pedido_inventory_needs_analysis(*, pedido, pedido_items=None):
 			'presentation_name': item.presentacion.nombre_empaque_cliente,
 			'sku': (item.presentacion.producto.codigo_barras or '').strip(),
 			'requested_quantity': requested,
+			'reserved_quantity': reserved,
+			'pending_quantity': pending,
 			'available_stock': available,
 			'to_buy_quantity': to_buy,
 			'status': status,
@@ -781,6 +801,8 @@ def build_multi_pedido_inventory_needs_analysis(*, pedidos):
 			or item.cantidad
 			or 0
 		)
+		reserved = int(item.cantidad_reservada_inventario or 0)
+		pending = max(requested - reserved, 0)
 		bucket = aggregated.get(presentacion_id)
 		if bucket is None:
 			snapshot = ledger.get(presentacion_id, {
@@ -796,12 +818,16 @@ def build_multi_pedido_inventory_needs_analysis(*, pedidos):
 				'presentation_name': presentacion.nombre_empaque_cliente,
 				'sku': (presentacion.producto.codigo_barras or '').strip(),
 				'requested_quantity': 0,
+				'reserved_quantity': 0,
+				'pending_quantity': 0,
 				'available': max(int(snapshot['available']), 0),
 				'has_active_adjustments': bool(snapshot.get('has_active_adjustments')),
 				'order_ids': set(),
 			}
 			aggregated[presentacion_id] = bucket
 		bucket['requested_quantity'] += max(requested, 0)
+		bucket['reserved_quantity'] += max(reserved, 0)
+		bucket['pending_quantity'] += max(pending, 0)
 		bucket['order_ids'].add(item.pedido_id)
 
 	rows = []
@@ -827,6 +853,8 @@ def build_multi_pedido_inventory_needs_analysis(*, pedidos):
 			'presentation_name': bucket['presentation_name'],
 			'sku': bucket['sku'],
 			'requested_quantity': requested,
+			'reserved_quantity': bucket['reserved_quantity'],
+			'pending_quantity': bucket['pending_quantity'],
 			'available_stock': available,
 			'to_buy_quantity': to_buy,
 			'status': status,
@@ -1096,11 +1124,13 @@ def guardar_verificacion_picking(
             selector_added_by_picker=True,
             cantidad_solicitada=cantidad,
             cantidad=cantidad,
+            cantidad_reservada_inventario=0,
+            cantidad_inventario_aplicada=0,
             precio=precio,
             subtotal=_quantize_money(precio * Decimal(str(cantidad))),
         )
-        reservar_stock_para_pedido_items(pedido=pedido, pedido_items=[nuevo_item], creado_por=seleccionador)
         nuevos_items_creados.append(nuevo_item)
+        cantidades_reales[nuevo_item.id] = cantidad
 
     items = list(pedido.items.select_for_update().select_related('presentacion__producto').all())
     stock_evaluation = evaluar_stock_fisico_verificacion_picking(
@@ -1114,18 +1144,41 @@ def guardar_verificacion_picking(
     elif not nota_resuelta:
         raise ValidationError(_('Picker approval is required when physical stock is available.'))
 
+    # Persist requested qty separately from the fulfillment-wave qty being verified.
     for item in items:
         cantidad_real = max(int(cantidades_reales.get(item.id, item.cantidad) or 0), 0)
+        if not item.cantidad_solicitada:
+            item.cantidad_solicitada = max(int(item.cantidad or 0), cantidad_real)
         item.cantidad = cantidad_real
         item.subtotal = _quantize_money(_to_decimal(item.precio) * Decimal(str(cantidad_real)))
-        item.save(update_fields=['cantidad', 'subtotal'])
+        update_fields = ['cantidad', 'cantidad_solicitada', 'subtotal']
+        if has_stock_shortage:
+            # Do not keep a prior In Orders marker when verification could not reserve.
+            if int(item.cantidad_reservada_inventario or 0) or int(item.cantidad_inventario_aplicada or 0):
+                item.cantidad_reservada_inventario = 0
+                item.cantidad_inventario_aplicada = 0
+                update_fields.extend(['cantidad_reservada_inventario', 'cantidad_inventario_aplicada'])
+        item.save(update_fields=update_fields)
 
     if not has_stock_shortage:
-        aplicar_verificacion_picking_inventario(
+        items_qty_map = {
+            item.id: max(int(cantidades_reales.get(item.id, item.cantidad) or 0), 0)
+            for item in items
+        }
+        reservar_cantidades_verificacion_picking(
             pedido=pedido,
-            pedido_item_ids=[item.id for item in items],
+            items_qty_map=items_qty_map,
             creado_por=seleccionador,
         )
+        # Recalculate money after reservation helper updates cantidades.
+        for item in pedido.items.select_for_update().all():
+            item.subtotal = calcular_subtotal_item_pedido(
+                precio=item.precio,
+                cantidad=item.cantidad,
+                descuento_aplicado=item.descuento_aplicado,
+                descuento_monto=item.descuento_monto,
+            )
+            item.save(update_fields=['subtotal'])
 
     recalcular_pedido(pedido)
     pedido.estado = 'VERIFICADO_AJUSTADO'

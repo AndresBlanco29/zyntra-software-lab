@@ -132,6 +132,8 @@ class PickingVerificationFlowTests(TestCase):
 		row = analysis['rows'][0]
 		self.assertEqual(row['sku'], 'SKU-TEST-001')
 		self.assertEqual(row['requested_quantity'], 2)
+		self.assertEqual(row['reserved_quantity'], 2)
+		self.assertEqual(row['pending_quantity'], 0)
 		self.assertEqual(row['available_stock'], 1)
 		self.assertEqual(row['to_buy_quantity'], 1)
 		self.assertEqual(row['status'], 'insufficient')

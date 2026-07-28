@@ -645,6 +645,8 @@
                 <th>{% trans "Product" %}</th>
                 <th>{% trans "SKU" %}</th>
                 <th>{% trans "Requested" %}</th>
+                <th>{% trans "Reserved" %}</th>
+                <th>{% trans "Pending" %}</th>
                 <th>{% trans "Stock" %}</th>
                 <th>{% trans "To buy" %}</th>
                 <th>{% trans "Status" %}</th>
@@ -659,6 +661,8 @@
                 </td>
                 <td>{% if row.sku %}{{ row.sku }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
                 <td>{{ row.requested_quantity }} CS</td>
+                <td>{{ row.reserved_quantity }} CS</td>
+                <td>{{ row.pending_quantity }} CS</td>
                 <td>{{ row.available_stock }} CS</td>
                 <td class="{% if row.to_buy_quantity %}fw-semibold{% endif %}">{{ row.to_buy_quantity }} CS</td>
                 <td>
@@ -673,7 +677,7 @@
               </tr>
               {% empty %}
               <tr>
-                <td colspan="6" class="text-center text-muted py-3">{% trans "This order has no product lines yet." %}</td>
+                <td colspan="8" class="text-center text-muted py-3">{% trans "This order has no product lines yet." %}</td>
               </tr>
               {% endfor %}
             </tbody>

@@ -57,11 +57,13 @@ class DualLedgerAvailabilityTests(TestCase):
 			estado='RECIBIDO',
 			total=Decimal('100.00'),
 		)
+		# Requested qty alone does not reduce Available — only reserved does.
 		PedidoItem.objects.create(
 			pedido=pedido,
 			presentacion=self.presentacion,
 			cantidad_solicitada=10,
 			cantidad=10,
+			cantidad_reservada_inventario=0,
 			precio=Decimal('10.00'),
 			subtotal=Decimal('100.00'),
 		)
@@ -69,6 +71,11 @@ class DualLedgerAvailabilityTests(TestCase):
 		snapshot = availability_snapshot([self.presentacion.id])[self.presentacion.id]
 		self.assertEqual(snapshot['quick_inventory'], 20)
 		self.assertEqual(snapshot['sales_pending_sync'], 0)
+		self.assertEqual(snapshot['in_orders'], 0)
+		self.assertEqual(snapshot['available'], 20)
+
+		PedidoItem.objects.filter(pedido=pedido).update(cantidad_reservada_inventario=10)
+		snapshot = availability_snapshot([self.presentacion.id])[self.presentacion.id]
 		self.assertEqual(snapshot['in_orders'], 10)
 		self.assertEqual(snapshot['available'], 10)
 
@@ -84,6 +91,7 @@ class DualLedgerAvailabilityTests(TestCase):
 			presentacion=self.presentacion,
 			cantidad_solicitada=10,
 			cantidad=10,
+			cantidad_reservada_inventario=10,
 			precio=Decimal('10.00'),
 			subtotal=Decimal('100.00'),
 		)
@@ -105,6 +113,8 @@ class DualLedgerAvailabilityTests(TestCase):
 			precio_unitario=Decimal('10.00'),
 			subtotal=Decimal('100.00'),
 		)
+		# Invoice presence removes the line from In Orders; reserved marker is cleared in services.
+		PedidoItem.objects.filter(pedido=pedido).update(cantidad_reservada_inventario=0)
 		pedido.estado = 'INVOICE_GENERADA'
 		pedido.save(update_fields=['estado'])
 

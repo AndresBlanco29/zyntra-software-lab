@@ -399,27 +399,33 @@ def resolver_ajuste_emergencia(*, movimiento, resuelto_por=None, observacion_res
 
 
 @transaction.atomic
-def validar_disponibilidad_para_items(items_payload, bypass_stock_check=False):
+def validar_disponibilidad_para_items(items_payload, bypass_stock_check=False, *, exclude_pedido_ids=None):
+    """Validate that requested quantities fit dual-ledger Available.
+
+    Used at picking verification (and similar gates), not when creating an order.
+    Partial quantities are allowed as long as each presentation's total qty
+    does not exceed Available.
+    """
     if bypass_stock_check:
         return
 
     presentacion_ids = [item['presentacion'].id for item in items_payload]
-    snapshot = availability_snapshot(presentacion_ids)
-    # Demand from this payload is not yet in In orders; subtract requested from Available.
+    snapshot = availability_snapshot(presentacion_ids, exclude_pedido_ids=exclude_pedido_ids)
     needed_by_presentacion = {}
     for item in items_payload:
         presentacion_id = item['presentacion'].id
-        needed_by_presentacion[presentacion_id] = needed_by_presentacion.get(presentacion_id, 0) + max(int(item['cantidad']), 1)
+        qty = max(int(item.get('cantidad') or 0), 0)
+        if qty <= 0:
+            continue
+        needed_by_presentacion[presentacion_id] = needed_by_presentacion.get(presentacion_id, 0) + qty
 
     for item in items_payload:
         presentacion = item['presentacion']
         presentacion_id = presentacion.id
-        cantidad = max(int(item['cantidad']), 1)
-        available_packages = int(snapshot.get(presentacion_id, {}).get('available', 0) or 0)
-        # Only validate once per presentation using total requested in this payload.
         if needed_by_presentacion.get(presentacion_id) is None:
             continue
         total_needed = needed_by_presentacion.pop(presentacion_id)
+        available_packages = int(snapshot.get(presentacion_id, {}).get('available', 0) or 0)
         if available_packages < total_needed:
             raise ValidationError(
                 _('Insufficient available stock for %(product)s - %(presentation)s. Requested %(requested)s, available %(available)s.') % {
@@ -432,37 +438,131 @@ def validar_disponibilidad_para_items(items_payload, bypass_stock_check=False):
 
 
 @transaction.atomic
-def reservar_stock_para_pedido_items(*, pedido, pedido_items, creado_por=None):
-    """Mark order lines as reserved for tracking; do not mutate Quick Inventory."""
+def reservar_stock_para_pedido_items(*, pedido, pedido_items, creado_por=None, cantidades=None):
+    """Mark order lines as reserved for In Orders; do not mutate Quick Inventory.
+
+    ``cantidades`` is an optional map {item_id: qty}. When omitted, uses each
+    item's current ``cantidad`` (fulfillment wave), not the full solicitada.
+    """
+    cantidades = cantidades or {}
     for item in pedido_items:
-        cantidad = max(int(item.cantidad_solicitada or item.cantidad or 0), 1)
+        if item.id in cantidades:
+            cantidad = max(int(cantidades.get(item.id) or 0), 0)
+        else:
+            cantidad = max(int(item.cantidad or 0), 0)
         item.cantidad_reservada_inventario = cantidad
-        item.cantidad_inventario_aplicada = 0
-        item.save(update_fields=['cantidad_reservada_inventario', 'cantidad_inventario_aplicada'])
+        item.save(update_fields=['cantidad_reservada_inventario'])
+
+
+@transaction.atomic
+def reservar_cantidades_verificacion_picking(*, pedido, items_qty_map, creado_por=None):
+    """Reserve manual verification quantities after validating Available.
+
+    ``items_qty_map``: {PedidoItem: qty} or {item_id: qty}.
+    Allows partial reservation (qty < cantidad_solicitada) when stock is limited.
+    """
+    if not items_qty_map:
+        raise ValidationError(_('Enter at least one quantity to reserve during picking verification.'))
+
+    normalized = []
+    item_ids = []
+    for key, qty in items_qty_map.items():
+        item = key if hasattr(key, 'pk') else None
+        item_id = int(getattr(item, 'pk', key) or 0)
+        item_ids.append(item_id)
+        normalized.append((item_id, max(int(qty or 0), 0)))
+
+    locked_items = {
+        item.id: item
+        for item in PedidoItem.objects.select_for_update()
+        .select_related('presentacion__producto', 'pedido')
+        .filter(id__in=item_ids, pedido=pedido)
+    }
+    if len(locked_items) != len(set(item_ids)):
+        raise ValidationError(_('One or more picking lines do not belong to this sales order.'))
+
+    if sum(qty for _item_id, qty in normalized) <= 0:
+        raise ValidationError(_('Enter at least one quantity greater than zero to complete picking verification.'))
+
+    payload = []
+    for item_id, qty in normalized:
+        item = locked_items[item_id]
+        solicitada = max(int(item.cantidad_solicitada or item.cantidad or 0), 0)
+        if qty > solicitada:
+            raise ValidationError(
+                _('Cannot reserve %(qty)s for %(product)s - %(presentation)s; the order only requested %(requested)s.') % {
+                    'qty': qty,
+                    'product': item.presentacion.producto.nombre,
+                    'presentation': item.presentacion.nombre,
+                    'requested': solicitada,
+                }
+            )
+        if qty > 0:
+            payload.append({'presentacion': item.presentacion, 'cantidad': qty, 'item': item})
+
+    validar_disponibilidad_para_items(
+        payload,
+        exclude_pedido_ids=[pedido.id],
+    )
+
+    updated = []
+    for item_id, qty in normalized:
+        item = locked_items[item_id]
+        item.cantidad = qty
+        item.cantidad_reservada_inventario = qty
+        item.cantidad_inventario_aplicada = qty
+        item.subtotal = item.subtotal  # callers recalculate; keep placeholder if needed
+        item.save(update_fields=['cantidad', 'cantidad_reservada_inventario', 'cantidad_inventario_aplicada'])
+        updated.append(item)
+    return updated
+
+
+@transaction.atomic
+def liberar_reserva_inventario_pedido(*, pedido, pedido_item_ids=None, creado_por=None):
+    """Clear In Orders reservation markers (e.g. after invoice generation)."""
+    queryset = PedidoItem.objects.select_for_update().filter(pedido=pedido)
+    if pedido_item_ids is not None:
+        queryset = queryset.filter(id__in=pedido_item_ids)
+    for item in queryset:
+        if item.cantidad_reservada_inventario:
+            item.cantidad_reservada_inventario = 0
+            item.save(update_fields=['cantidad_reservada_inventario'])
 
 
 @transaction.atomic
 def ajustar_reserva_item_pedido(*, item, nueva_cantidad, creado_por=None):
-    """Update open-order quantity tracking without mutating Quick Inventory."""
+    """Update open-order quantity. Reservation is only adjusted if already reserved."""
     locked_item = PedidoItem.objects.select_for_update().select_related('pedido', 'presentacion__producto').get(pk=item.pk)
     objetivo = max(int(nueva_cantidad), 0)
-    if locked_item.cantidad_inventario_aplicada:
+    if locked_item.cantidad_inventario_aplicada and int(locked_item.cantidad_reservada_inventario or 0) == 0:
         raise ValidationError(_('Reserved quantities cannot be edited after picking has affected stock.'))
     locked_item.cantidad = objetivo
-    locked_item.cantidad_reservada_inventario = objetivo
-    locked_item.save(update_fields=['cantidad', 'cantidad_reservada_inventario'])
+    locked_item.cantidad_solicitada = max(int(locked_item.cantidad_solicitada or 0), objetivo) if objetivo else int(locked_item.cantidad_solicitada or 0)
+    # Editing the customer request before reservation must not invent a reservation.
+    if int(locked_item.cantidad_reservada_inventario or 0) > 0:
+        locked_item.cantidad_reservada_inventario = min(int(locked_item.cantidad_reservada_inventario or 0), objetivo)
+        locked_item.save(update_fields=['cantidad', 'cantidad_solicitada', 'cantidad_reservada_inventario'])
+    else:
+        locked_item.cantidad_solicitada = objetivo
+        locked_item.save(update_fields=['cantidad', 'cantidad_solicitada'])
     return locked_item
 
 
 @transaction.atomic
 def ajustar_cantidad_item_pedido_despues_picking(*, item, nueva_cantidad, creado_por=None):
-    """Update picked quantity on the order line without mutating Quick Inventory."""
+    """Update picked/reserved quantity on the order line without mutating Quick Inventory."""
     locked_item = PedidoItem.objects.select_for_update().select_related('pedido', 'presentacion__producto').get(pk=item.pk)
     objetivo = max(int(nueva_cantidad), 0)
+    solicitada = max(int(locked_item.cantidad_solicitada or 0), objetivo)
     locked_item.cantidad = objetivo
-    locked_item.cantidad_inventario_aplicada = objetivo
-    locked_item.cantidad_reservada_inventario = 0
-    locked_item.save(update_fields=['cantidad', 'cantidad_inventario_aplicada', 'cantidad_reservada_inventario'])
+    locked_item.cantidad_solicitada = solicitada
+    # Keep reservation aligned with the fulfillment wave until invoice.
+    if int(locked_item.cantidad_reservada_inventario or 0) > 0 or int(locked_item.cantidad_inventario_aplicada or 0) > 0:
+        locked_item.cantidad_reservada_inventario = objetivo
+        locked_item.cantidad_inventario_aplicada = objetivo
+        locked_item.save(update_fields=['cantidad', 'cantidad_solicitada', 'cantidad_inventario_aplicada', 'cantidad_reservada_inventario'])
+    else:
+        locked_item.save(update_fields=['cantidad', 'cantidad_solicitada'])
     return locked_item
 
 
@@ -501,10 +601,9 @@ def eliminar_item_pedido_con_inventario(*, item, creado_por=None):
 
 @transaction.atomic
 def aplicar_verificacion_picking_inventario(*, pedido, pedido_item_ids, creado_por=None):
-    """Mark picking quantities as applied on order lines without mutating Quick Inventory.
+    """Keep verification quantities reserved in In Orders until the invoice is generated.
 
     Physical stock reductions arrive later via QuickBooks after invoice export + QI import.
-    Open-order demand / pending sync are calculated from orders and invoices.
     """
     items = list(
         PedidoItem.objects.select_for_update()
@@ -514,7 +613,7 @@ def aplicar_verificacion_picking_inventario(*, pedido, pedido_item_ids, creado_p
     )
     for item in items:
         nuevo_real = int(item.cantidad or 0)
-        item.cantidad_reservada_inventario = 0
+        item.cantidad_reservada_inventario = nuevo_real
         item.cantidad_inventario_aplicada = nuevo_real
         item.save(update_fields=['cantidad_reservada_inventario', 'cantidad_inventario_aplicada'])
 
@@ -556,7 +655,7 @@ def cancelar_pedido_con_inventario(*, pedido, creado_por=None):
 
 @transaction.atomic
 def restaurar_inventario_por_anulacion_factura(*, pedido, invoice, creado_por=None):
-    """Void invoice: clear applied markers only. Pending Sync drops when invoice is voided."""
+    """Void invoice: clear applied/reserved markers. Remnant stays unreserved until next verification."""
     items = list(
         PedidoItem.objects.select_for_update()
         .select_related('presentacion__producto')
@@ -564,6 +663,7 @@ def restaurar_inventario_por_anulacion_factura(*, pedido, invoice, creado_por=No
         .order_by('presentacion_id', 'id')
     )
     for item in items:
-        if item.cantidad_inventario_aplicada:
+        if item.cantidad_inventario_aplicada or item.cantidad_reservada_inventario:
             item.cantidad_inventario_aplicada = 0
-            item.save(update_fields=['cantidad_inventario_aplicada'])
+            item.cantidad_reservada_inventario = 0
+            item.save(update_fields=['cantidad_inventario_aplicada', 'cantidad_reservada_inventario'])

@@ -379,6 +379,14 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 			(option['stock_fisico'] for option in presentation_options if option['id'] == selected_presentation_id),
 			int(ledger.get(item.presentacion_id, {}).get('available', 0) or 0),
 		)
+		requested_quantity = int(
+			getattr(item, 'cantidad_solicitada_documentada', None)
+			or item.cantidad_solicitada
+			or item.cantidad
+			or 0
+		)
+		reserved_quantity = int(item.cantidad_reservada_inventario or 0)
+		pending_quantity = max(requested_quantity - reserved_quantity, 0)
 		rows.append({
 			'id': item.id,
 			'product': item.presentacion.producto.nombre,
@@ -388,7 +396,9 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 			'presentation_id': selected_presentation_id,
 			'baseline_presentation_id': item.presentacion_id,
 			'presentation_options': presentation_options,
-			'requested_quantity': item.cantidad_solicitada_documentada,
+			'requested_quantity': requested_quantity,
+			'reserved_quantity': reserved_quantity,
+			'pending_quantity': pending_quantity,
 			'actual_quantity': actual_quantity,
 			'baseline_quantity': (
 				int(item.cantidad_inventario_aplicada or item.cantidad or 0) if picking_verified else 0
@@ -1459,6 +1469,8 @@ def _render_multi_inventory_needs_pdf(*, analysis, pedidos):
 		Paragraph(escape(_('Product')), header_cell_style),
 		Paragraph(escape(_('SKU')), header_cell_style),
 		Paragraph(escape(_('Requested')), header_cell_style),
+		Paragraph(escape(_('Reserved')), header_cell_style),
+		Paragraph(escape(_('Pending')), header_cell_style),
 		Paragraph(escape(_('Stock')), header_cell_style),
 		Paragraph(escape(_('To buy')), header_cell_style),
 		Paragraph(escape(_('Orders')), header_cell_style),
@@ -1472,13 +1484,15 @@ def _render_multi_inventory_needs_pdf(*, analysis, pedidos):
 			),
 			Paragraph(escape(row['sku'] or '-'), item_cell_style),
 			Paragraph(escape(f"{row['requested_quantity']} CS"), item_cell_style),
+			Paragraph(escape(f"{row.get('reserved_quantity', 0)} CS"), item_cell_style),
+			Paragraph(escape(f"{row.get('pending_quantity', 0)} CS"), item_cell_style),
 			Paragraph(escape(f"{row['available_stock']} CS"), item_cell_style),
 			Paragraph(escape(f"{row['to_buy_quantity']} CS"), item_cell_style),
 			Paragraph(escape(str(row['order_count'])), item_cell_style),
 			Paragraph(escape(str(row['status_label'])), item_cell_style),
 		])
 
-	table = Table(rows, colWidths=[150, 65, 50, 50, 50, 45, 94])
+	table = Table(rows, colWidths=[120, 50, 42, 42, 42, 42, 42, 40, 84])
 	table_style = [
 		('BACKGROUND', (0, 0), (-1, 0), BRAND_PRIMARY),
 		('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),
@@ -1840,6 +1854,8 @@ def backoffice_inventory_needs_pdf(request, pedido_id):
 		Paragraph(escape(_('Product')), header_cell_style),
 		Paragraph(escape(_('SKU')), header_cell_style),
 		Paragraph(escape(_('Requested')), header_cell_style),
+		Paragraph(escape(_('Reserved')), header_cell_style),
+		Paragraph(escape(_('Pending')), header_cell_style),
 		Paragraph(escape(_('Stock')), header_cell_style),
 		Paragraph(escape(_('To buy')), header_cell_style),
 		Paragraph(escape(_('Status')), header_cell_style),
@@ -1852,12 +1868,14 @@ def backoffice_inventory_needs_pdf(request, pedido_id):
 			),
 			Paragraph(escape(row['sku'] or '-'), item_cell_style),
 			Paragraph(escape(f"{row['requested_quantity']} CS"), item_cell_style),
+			Paragraph(escape(f"{row.get('reserved_quantity', 0)} CS"), item_cell_style),
+			Paragraph(escape(f"{row.get('pending_quantity', 0)} CS"), item_cell_style),
 			Paragraph(escape(f"{row['available_stock']} CS"), item_cell_style),
 			Paragraph(escape(f"{row['to_buy_quantity']} CS"), item_cell_style),
 			Paragraph(escape(str(row['status_label'])), item_cell_style),
 		])
 
-	table = Table(rows, colWidths=[170, 70, 55, 55, 55, 99])
+	table = Table(rows, colWidths=[140, 55, 45, 45, 45, 45, 45, 84])
 	table_style = [
 		('BACKGROUND', (0, 0), (-1, 0), BRAND_PRIMARY),
 		('GRID', (0, 0), (-1, -1), 0.5, BRAND_BORDER),

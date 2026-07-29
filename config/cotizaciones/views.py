@@ -35,6 +35,7 @@ from config.pedidos.services import (
     normalizar_descuento_item_pedido,
     notificar_backoffice_pedido,
     notificar_cliente_pedido,
+    validar_presentaciones_sin_producto_duplicado,
 )
 from config.productos.models import ConfiguracionDescuentos, ConfiguracionDescuentosPorcentaje, ConfiguracionPrecios, Presentacion
 from config.productos.promotions import (
@@ -969,6 +970,20 @@ def backoffice_cotizacion_detalle(request, cotizacion_id):
             )
             precio_nuevo = _parse_decimal(request.POST.get('precio_nuevo'), 0)
             validation_error = _validate_backoffice_quote_price(presentacion=nueva_presentacion, price=precio_nuevo)
+
+        if not validation_error:
+            try:
+                remaining_presentation_ids = [
+                    item.presentacion_id for item in quote_items if item.id not in deleted_ids
+                ]
+                if nueva_presentacion is not None:
+                    remaining_presentation_ids.append(nueva_presentacion.id)
+                validar_presentaciones_sin_producto_duplicado(
+                    presentation_ids=remaining_presentation_ids,
+                    error_message=_('The product "%(product)s" is already on this quote.'),
+                )
+            except ValidationError as exc:
+                validation_error = exc.messages[0] if getattr(exc, 'messages', None) else str(exc)
 
         if validation_error:
             messages.error(request, validation_error)

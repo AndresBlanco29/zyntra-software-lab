@@ -52,6 +52,7 @@
     var addMissingMessage = root.dataset.addMissingMessage || 'Select a product before adding it.';
     var addQtyMessage = root.dataset.addQtyMessage || 'Enter a quantity of at least 1.';
     var addPriceMessage = root.dataset.addPriceMessage || 'Enter a valid price.';
+    var duplicateProductMessage = root.dataset.duplicateProductMessage || 'This product is already on the list.';
     var pendingLabel = root.dataset.pendingLabel || 'Pending';
     var removeLabel = root.dataset.removeLabel || 'Remove';
     var showCost = root.dataset.showCost === 'true';
@@ -60,11 +61,13 @@
     var realCostDisplay = document.getElementById('newProductRealCost');
     var priceLocked = (pricePresetSelect && pricePresetSelect.dataset.locked === 'true')
       || (priceInput && priceInput.dataset.locked === 'true');
+    var quoteUpdateForm = document.getElementById('quoteUpdateForm');
 
     var debounceTimer = null;
     var activeIndex = -1;
     var lastResults = [];
     var selectedCost = null;
+    var selectedProductId = null;
 
     function formatRealCostLabel(costValue) {
       if (costValue === null || costValue === undefined || costValue === '') {
@@ -120,6 +123,7 @@
 
     function clearStagingFields() {
       hiddenInput.value = '';
+      selectedProductId = null;
       searchInput.value = '';
       selectedLabel.hidden = true;
       selectedLabel.textContent = '';
@@ -214,8 +218,58 @@
       activeIndex = -1;
     }
 
+    function collectUsedProducts(excludePendingPresentationId) {
+      var usedProductIds = new Set();
+      var usedPresentationIds = new Set();
+      var excludePresentation = String(excludePendingPresentationId || '');
+
+      document.querySelectorAll('[data-pedido-item-row], [data-quote-item-row]').forEach(function (row) {
+        if (row.querySelector('input[name^="eliminar_"]:checked')) {
+          return;
+        }
+        if (row.dataset.productId) {
+          usedProductIds.add(String(row.dataset.productId));
+        }
+        if (row.dataset.presentationId) {
+          usedPresentationIds.add(String(row.dataset.presentationId));
+        }
+      });
+
+      document.querySelectorAll('[data-pending-product-row]').forEach(function (row) {
+        var presentationInput = row.querySelector('input[name="presentacion_nueva[]"]');
+        var presentationId = presentationInput ? String(presentationInput.value || '') : '';
+        if (!presentationId || presentationId === excludePresentation) {
+          return;
+        }
+        if (row.dataset.productId) {
+          usedProductIds.add(String(row.dataset.productId));
+        }
+        usedPresentationIds.add(presentationId);
+      });
+
+      return { usedProductIds: usedProductIds, usedPresentationIds: usedPresentationIds };
+    }
+
+    function isDuplicateSelection(presentationId, productId) {
+      var used = collectUsedProducts();
+      var presentationKey = String(presentationId || '');
+      var productKey = String(productId || '');
+      return (
+        (presentationKey && used.usedPresentationIds.has(presentationKey))
+        || (productKey && used.usedProductIds.has(productKey))
+      );
+    }
+
     function selectResult(item) {
+      var productId = item.product_id != null ? String(item.product_id) : '';
+      if (isDuplicateSelection(item.id, productId)) {
+        window.alert(duplicateProductMessage);
+        clearStagingFields();
+        searchInput.focus();
+        return;
+      }
       hiddenInput.value = String(item.id);
+      selectedProductId = productId || null;
       searchInput.value = item.label;
       selectedLabel.textContent = item.label;
       selectedLabel.hidden = false;
@@ -298,7 +352,7 @@
       totalDisplay.textContent = formatMoney(total);
     }
 
-    function buildPendingProductRow(presentationId, label, quantity, price, costValue) {
+    function buildPendingProductRow(presentationId, label, quantity, price, costValue, productId) {
       var costMarkup = '';
       if (showCost) {
         costMarkup = '<div class="small text-muted mt-1">' + escapeHtml(formatRealCostLabel(costValue)) + '</div>';
@@ -306,6 +360,10 @@
       var row = document.createElement('tr');
       row.className = 'table-success';
       row.setAttribute('data-pending-product-row', 'true');
+      if (productId) {
+        row.setAttribute('data-product-id', String(productId));
+      }
+      row.setAttribute('data-presentation-id', String(presentationId));
       row.innerHTML = '' +
         '<td>' +
           '<div class="fw-semibold">' + escapeHtml(label) + '</div>' +
@@ -335,9 +393,16 @@
       var label = String(selectedLabel.textContent || searchInput.value || '').trim();
       var quantity = parseDecimal(qtyInput ? qtyInput.value : '1');
       var price = parseDecimal(priceInput ? priceInput.value : '');
+      var productId = selectedProductId ? String(selectedProductId) : '';
 
       if (!presentationId) {
         window.alert(addMissingMessage);
+        searchInput.focus();
+        return;
+      }
+      if (isDuplicateSelection(presentationId, productId)) {
+        window.alert(duplicateProductMessage);
+        clearStagingFields();
         searchInput.focus();
         return;
       }
@@ -359,7 +424,7 @@
         return;
       }
 
-      var row = buildPendingProductRow(presentationId, label, Math.round(quantity), price, selectedCost);
+      var row = buildPendingProductRow(presentationId, label, Math.round(quantity), price, selectedCost, productId);
       tableBody.appendChild(row);
       updatePendingRowSubtotal(row);
       clearStagingFields();
@@ -427,8 +492,24 @@
       });
     }
 
+    if (quoteUpdateForm) {
+      quoteUpdateForm.addEventListener('submit', function (event) {
+        var presentationId = String(hiddenInput.value || '').trim();
+        if (!presentationId) {
+          return;
+        }
+        if (isDuplicateSelection(presentationId, selectedProductId)) {
+          event.preventDefault();
+          window.alert(duplicateProductMessage);
+          clearStagingFields();
+          searchInput.focus();
+        }
+      });
+    }
+
     searchInput.addEventListener('input', function () {
       hiddenInput.value = '';
+      selectedProductId = null;
       selectedLabel.hidden = true;
       selectedLabel.textContent = '';
       resetPriceFields();

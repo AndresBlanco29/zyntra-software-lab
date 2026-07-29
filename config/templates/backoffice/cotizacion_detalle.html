@@ -121,7 +121,7 @@
             <tbody>
               {% for row in cotizacion_item_rows %}
               {% with item=row.item %}
-              <tr data-quote-item-row="{{ item.id }}" {% if item.es_regalo %}data-free-promo-line="true"{% endif %}>
+              <tr data-quote-item-row="{{ item.id }}" data-product-id="{{ item.presentacion.producto_id }}" data-presentation-id="{{ item.presentacion_id }}" {% if item.es_regalo %}data-free-promo-line="true"{% endif %}>
                 <td data-label="{% trans 'Product' %}">
                   <div>{{ item.presentacion.producto.nombre }}</div>
                   {% if item.es_regalo %}
@@ -292,7 +292,8 @@
               data-empty-message="{% trans 'No products found.'|escapejs %}"
               data-min-chars-message="{% trans 'Type at least 2 characters to search.'|escapejs %}"
               data-price-placeholder="{% trans 'Select price...'|escapejs %}"
-              data-manual-price-label="{% trans 'Manual price'|escapejs %}">
+              data-manual-price-label="{% trans 'Manual price'|escapejs %}"
+              data-duplicate-product-message="{% trans 'This product is already on this quote.'|escapejs %}">
               <input
                 type="search"
                 id="buscadorProductoPedido"

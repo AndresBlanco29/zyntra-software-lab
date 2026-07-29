@@ -742,7 +742,7 @@
         </thead>
         <tbody id="pedidoItemsTableBody">
           {% for item in pedido_items %}
-          <tr class="{% if item.has_picker_stock_shortage or item.selector_has_changes %}table-danger{% endif %}" data-pedido-item-row="{{ item.id }}" {% if item.has_picker_stock_shortage %}data-stock-shortage="true"{% endif %} {% if item.es_regalo %}data-free-promo-line="true"{% endif %}>
+          <tr class="{% if item.has_picker_stock_shortage or item.selector_has_changes %}table-danger{% endif %}" data-pedido-item-row="{{ item.id }}" data-product-id="{{ item.presentacion.producto_id }}" data-presentation-id="{{ item.presentacion_id }}" {% if item.has_picker_stock_shortage %}data-stock-shortage="true"{% endif %} {% if item.es_regalo %}data-free-promo-line="true"{% endif %}>
             <td>
               {{ item.presentacion.producto.nombre }}
               {% if item.es_regalo %}
@@ -946,6 +946,7 @@
           data-add-missing-message="{% trans 'Select a product before adding it.'|escapejs %}"
           data-add-qty-message="{% trans 'Enter a quantity of at least 1.'|escapejs %}"
           data-add-price-message="{% trans 'Enter a valid price.'|escapejs %}"
+          data-duplicate-product-message="{% trans 'This product is already on this sales order.'|escapejs %}"
           data-pending-label="{% trans 'Pending'|escapejs %}"
           data-remove-label="{% trans 'Remove'|escapejs %}"
           data-show-cost="{% if can_view_product_cost %}true{% else %}false{% endif %}"

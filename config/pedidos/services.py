@@ -1000,6 +1000,47 @@ def resolve_picking_send_ui_state(pedido):
     return False, _('Sent')
 
 
+def validar_presentaciones_sin_producto_duplicado(
+    *,
+    presentation_ids,
+    error_message=None,
+):
+    """Ensure each product appears at most once among the given presentations.
+
+    Same rule as picker validation: two presentations of the same product count
+    as a duplicate even when the U/M differs.
+    """
+    normalized_ids = []
+    for presentation_id in presentation_ids or []:
+        value = str(presentation_id or '').strip()
+        if not value:
+            continue
+        try:
+            normalized_ids.append(int(value))
+        except (TypeError, ValueError) as exc:
+            raise ValidationError(_('One of the selected products is no longer available.')) from exc
+
+    if not normalized_ids:
+        return
+
+    presentation_map = {
+        presentation.id: presentation
+        for presentation in Presentacion.objects.filter(id__in=normalized_ids).select_related('producto')
+    }
+    seen_product_ids = {}
+    default_message = _('The product "%(product)s" is already on the list.')
+    message_template = error_message or default_message
+
+    for presentation_id in normalized_ids:
+        presentation = presentation_map.get(presentation_id)
+        if presentation is None:
+            raise ValidationError(_('One of the selected products is no longer available.'))
+        product_id = presentation.producto_id
+        if product_id in seen_product_ids:
+            raise ValidationError(message_template % {'product': presentation.producto.nombre})
+        seen_product_ids[product_id] = presentation_id
+
+
 def validar_productos_duplicados_picking_por_picker(
     *,
     pedido,
@@ -1022,41 +1063,10 @@ def validar_productos_duplicados_picking_por_picker(
     if not added_presentation_ids:
         return
 
-    all_presentation_ids = set(order_presentation_ids) | set(added_presentation_ids)
-    presentation_map = {
-        presentation.id: presentation
-        for presentation in Presentacion.objects.filter(id__in=all_presentation_ids).select_related('producto')
-    }
-
-    existing_product_ids = {
-        presentation_map[presentation_id].producto_id
-        for presentation_id in order_presentation_ids
-        if presentation_id in presentation_map
-    }
-    existing_presentation_ids = set(order_presentation_ids)
-
-    seen_added_product_ids = set()
-    seen_added_presentation_ids = set()
-    for presentation_id in added_presentation_ids:
-        presentation = presentation_map.get(presentation_id)
-        if presentation is None:
-            raise ValidationError(_('One of the selected products is no longer available.'))
-
-        product_name = presentation.producto.nombre
-        product_id = presentation.producto_id
-
-        if (
-            presentation_id in existing_presentation_ids
-            or product_id in existing_product_ids
-            or presentation_id in seen_added_presentation_ids
-            or product_id in seen_added_product_ids
-        ):
-            raise ValidationError(
-                _('The product "%(product)s" is already on this picking list.') % {'product': product_name}
-            )
-
-        seen_added_presentation_ids.add(presentation_id)
-        seen_added_product_ids.add(product_id)
+    validar_presentaciones_sin_producto_duplicado(
+        presentation_ids=list(order_presentation_ids) + list(added_presentation_ids),
+        error_message=_('The product "%(product)s" is already on this picking list.'),
+    )
 
 
 @transaction.atomic

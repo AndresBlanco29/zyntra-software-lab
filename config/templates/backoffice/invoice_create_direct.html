@@ -179,8 +179,10 @@ document.addEventListener('DOMContentLoaded', function () {
   const minCharsMessage = searchRoot.dataset.minCharsMessage || 'Type at least 2 characters to search.';
   const permissionMessage = searchRoot.dataset.permissionMessage || 'You do not have permission to search products.';
   const searchUrl = searchRoot.dataset.searchUrl;
+  const duplicateProductMessage = '{% trans "This product is already on the invoice."|escapejs %}';
   let searchTimer = null;
   let selectedProductLabel = '';
+  let selectedProductId = '';
   let lineIndex = linesBody.querySelectorAll('tr[data-line-index]').length;
 
   function syncDeliveryFields() {
@@ -199,12 +201,29 @@ document.addEventListener('DOMContentLoaded', function () {
   function clearSelection() {
     presentacionInput.value = '';
     selectedProductLabel = '';
+    selectedProductId = '';
     selectedLabel.hidden = true;
     selectedLabel.textContent = '';
     pricePreset.innerHTML = '<option value="">{% trans "Select a price"|escapejs %}</option>';
     pricePreset.disabled = true;
     priceInput.value = '';
     priceInput.disabled = true;
+  }
+
+  function isDuplicateLine(presentationId, productId) {
+    const presentationKey = String(presentationId || '');
+    const productKey = String(productId || '');
+    const rows = linesBody.querySelectorAll('tr[data-line-index]');
+    for (const row of rows) {
+      if (productKey && String(row.dataset.productId || '') === productKey) {
+        return true;
+      }
+      const existingPresentation = row.querySelector('input[name^="line_presentacion_id_"]');
+      if (presentationKey && existingPresentation && String(existingPresentation.value || '') === presentationKey) {
+        return true;
+      }
+    }
+    return false;
   }
 
   function renderResults(items) {
@@ -220,7 +239,15 @@ document.addEventListener('DOMContentLoaded', function () {
       button.className = 'list-group-item list-group-item-action';
       button.textContent = item.label + ' · $' + item.price;
       button.addEventListener('click', function () {
+        const productId = item.product_id != null ? String(item.product_id) : '';
+        if (isDuplicateLine(item.id, productId)) {
+          alert(duplicateProductMessage);
+          clearSelection();
+          searchInput.focus();
+          return;
+        }
         presentacionInput.value = String(item.id);
+        selectedProductId = productId;
         selectedProductLabel = item.label;
         selectedLabel.textContent = item.label;
         selectedLabel.hidden = false;
@@ -371,10 +398,19 @@ document.addEventListener('DOMContentLoaded', function () {
       alert('{% trans "Each direct invoice line needs product, quantity, and unit price."|escapejs %}');
       return;
     }
+    if (isDuplicateLine(presentacionId, selectedProductId)) {
+      alert(duplicateProductMessage);
+      clearSelection();
+      searchInput.focus();
+      return;
+    }
     removeEmptyRow();
     const index = lineIndex++;
     const row = document.createElement('tr');
     row.setAttribute('data-line-index', String(index));
+    if (selectedProductId) {
+      row.setAttribute('data-product-id', selectedProductId);
+    }
     row.innerHTML =
       '<td>' +
         '<input type="hidden" name="line_presentacion_id_' + index + '" value="' + presentacionId + '">' +

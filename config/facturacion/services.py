@@ -23,7 +23,7 @@ from config.inventario.services import (
 	validar_disponibilidad_para_items,
 )
 from config.notificaciones.models import crear_notificacion_backoffice
-from config.pedidos.services import crear_pedido_desde_items
+from config.pedidos.services import crear_pedido_desde_items, validar_presentaciones_sin_producto_duplicado
 from config.productos.models import Presentacion
 
 from .models import Delivery, DeliveryEvidencePhoto, DeliveryNotificationLog, DeliveryPayment, FacturacionRegistroAnulacion, Invoice, InvoiceEditHistory, InvoiceItem, NotaAjuste, NotaAjusteAplicacion, NotaAjusteItem
@@ -287,6 +287,12 @@ def _validate_invoice_generation(pedido, metodo_entrega, driver):
 		raise ValidationError(_('Driver assignment is not allowed for customer pickup invoices.'))
 	if driver is not None and getattr(driver, 'role', '') != 'driver':
 		raise ValidationError(_('Only users with driver role can be assigned.'))
+	validar_presentaciones_sin_producto_duplicado(
+		presentation_ids=list(pedido.items.values_list('presentacion_id', flat=True)),
+		error_message=_(
+			'The product "%(product)s" is duplicated on this sales order. Remove the duplicate before generating the invoice.'
+		),
+	)
 
 
 def _ensure_picking_inventory_applied_for_invoice(*, pedido, usuario):
@@ -955,6 +961,16 @@ def generar_invoice_directa_backoffice(
 		raise ValidationError(_('Driver assignment is not allowed for customer pickup invoices.'))
 	if not items_payload:
 		raise ValidationError(_('Add at least one item before creating the direct invoice.'))
+
+	validar_presentaciones_sin_producto_duplicado(
+		presentation_ids=[
+			item['presentacion'].id if hasattr(item.get('presentacion'), 'id') else item.get('presentacion_id')
+			for item in items_payload
+		],
+		error_message=_(
+			'The product "%(product)s" is duplicated. Remove the duplicate before generating the invoice.'
+		),
+	)
 
 	pedido = crear_pedido_desde_items(
 		cliente=cliente,

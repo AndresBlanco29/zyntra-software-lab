@@ -87,6 +87,7 @@ from .services import (
 	resolver_nota_cliente_desde_backoffice,
 	resolve_picking_send_ui_state,
 	validar_estado_backoffice_con_bloqueo,
+	validar_presentaciones_sin_producto_duplicado,
 	validar_productos_duplicados_picking_por_picker,
 	notificar_cliente_pedido,
 )
@@ -668,6 +669,16 @@ def backoffice_pedido_detalle(request, pedido_id):
 					nueva_cantidades = [request.POST.get('cantidad_nueva') or '1']
 					nueva_precios = [request.POST.get('precio_nuevo') or '0']
 
+				# After deletes / U/M edits, remaining lines plus newly added ones
+				# must keep one presentation per product (same rule as picker).
+				final_presentation_ids = list(
+					pedido.items.values_list('presentacion_id', flat=True)
+				) + nueva_presentacion_ids
+				validar_presentaciones_sin_producto_duplicado(
+					presentation_ids=final_presentation_ids,
+					error_message=_('The product "%(product)s" is already on this sales order.'),
+				)
+
 				for index, nueva_presentacion_id in enumerate(nueva_presentacion_ids):
 					presentacion = get_object_or_404(Presentacion.objects.select_related('producto'), id=nueva_presentacion_id)
 					cantidad_value = nueva_cantidades[index] if index < len(nueva_cantidades) else '1'
@@ -1215,6 +1226,7 @@ def backoffice_buscar_presentaciones(request):
 			)
 		result = {
 			'id': presentacion.id,
+			'product_id': presentacion.producto_id,
 			'label': f'{presentacion.producto.nombre} - {presentacion.nombre_empaque_cliente}',
 			'price': default_price,
 			'default_price_key': default_price_key,

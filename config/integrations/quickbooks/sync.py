@@ -1971,6 +1971,24 @@ def _sync_stock_from_quickbooks_item(presentacion, payload):
     return True
 
 
+def _apply_quickbooks_qty_with_schema_repair(presentacion, payload):
+    """Sync QtyOnHand; if UNSIGNED columns block negatives, repair schema and retry outside the failed txn."""
+    from config.inventario.signed_stock import ensure_signed_stock_columns, is_out_of_range_stock_error
+
+    try:
+        with transaction.atomic():
+            return _sync_stock_from_quickbooks_item(presentacion, payload)
+    except Exception as exc:
+        if not (
+            is_out_of_range_stock_error(exc)
+            or 'reject negative stock values' in str(exc).lower()
+        ):
+            raise
+        ensure_signed_stock_columns(force=True)
+        with transaction.atomic():
+            return _sync_stock_from_quickbooks_item(presentacion, payload)
+
+
 def _update_presentacion_from_quickbooks(
     presentacion,
     *,
@@ -2084,7 +2102,7 @@ def _apply_quickbooks_item_to_local_record(
     if apply_case_packaging_defaults_to_presentacion(presentacion, product_name):
         presentacion.save(update_fields=['nombre', 'tipo_contenido', 'unidades'])
     try:
-        _sync_stock_from_quickbooks_item(presentacion, payload)
+        _apply_quickbooks_qty_with_schema_repair(presentacion, payload)
     except Exception:
         logger.exception(
             'Failed syncing stock from QuickBooks item %s for presentation %s',
@@ -2258,9 +2276,13 @@ def import_quickbooks_item_record(
                 qb_price=unit_price,
             )
             try:
-                _sync_stock_from_quickbooks_item(presentacion, payload)
+                _apply_quickbooks_qty_with_schema_repair(presentacion, payload)
             except Exception:
-                pass
+                logger.exception(
+                    'Failed syncing stock from QuickBooks item %s for new presentation %s',
+                    quickbooks_id,
+                    presentacion.pk,
+                )
             action = 'created'
         except IntegrityError as exc:
             err_text = str(exc)
@@ -2302,9 +2324,13 @@ def import_quickbooks_item_record(
                     qb_price=unit_price,
                 )
                 try:
-                    _sync_stock_from_quickbooks_item(presentacion, payload)
+                    _apply_quickbooks_qty_with_schema_repair(presentacion, payload)
                 except Exception:
-                    pass
+                    logger.exception(
+                        'Failed syncing stock from QuickBooks item %s for new presentation %s',
+                        quickbooks_id,
+                        presentacion.pk,
+                    )
                 action = 'created'
             else:
                 raise
@@ -2747,9 +2773,14 @@ def _quickbooks_id_for_presentacion(presentacion):
 
 def import_quickbooks_inventory_quantities(*, limit=None, max_results=None, client=None, task_cache_key=None):
     """Update local physical stock from QuickBooks QtyOnHand for linked catalog rows only."""
+    from config.inventario.signed_stock import ensure_signed_stock_columns
+
     if limit is None:
         limit = max_results
     client = client or QuickBooksAPIClient()
+
+    # Heal production DBs where 0014 was applied but columns stayed UNSIGNED.
+    ensure_signed_stock_columns(force=False)
 
     queryset = _linked_catalog_presentacion_queryset()
     if limit is not None:
@@ -2828,25 +2859,24 @@ def import_quickbooks_inventory_quantities(*, limit=None, max_results=None, clie
             continue
 
         try:
-            with transaction.atomic():
-                qty_on_hand = _extract_quickbooks_item_qty_on_hand(payload)
-                if qty_on_hand is None:
-                    skipped_count += 1
+            qty_on_hand = _extract_quickbooks_item_qty_on_hand(payload)
+            if qty_on_hand is None:
+                skipped_count += 1
+            else:
+                changed = _apply_quickbooks_qty_with_schema_repair(presentacion, payload)
+                if changed:
+                    updated_count += 1
+                    if qty_on_hand < 0:
+                        results.append({
+                            'ok': True,
+                            'action': 'updated_negative',
+                            'entity': 'InventoryQuantity',
+                            'quickbooks_id': qb_id,
+                            'label': label,
+                            'qty_on_hand': qty_on_hand,
+                        })
                 else:
-                    changed = _sync_stock_from_quickbooks_item(presentacion, payload)
-                    if changed:
-                        updated_count += 1
-                        if qty_on_hand < 0:
-                            results.append({
-                                'ok': True,
-                                'action': 'updated_negative',
-                                'entity': 'InventoryQuantity',
-                                'quickbooks_id': qb_id,
-                                'label': label,
-                                'qty_on_hand': qty_on_hand,
-                            })
-                    else:
-                        skipped_count += 1
+                    skipped_count += 1
         except Exception as exc:
             failed_count += 1
             results.append({

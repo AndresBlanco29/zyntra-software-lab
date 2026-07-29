@@ -550,3 +550,45 @@ class InventoryListFilterTests(TestCase):
 		self.assertContains(response, 'Producto En Stock')
 		self.assertNotContains(response, 'Producto Sin Stock')
 		self.assertNotContains(response, 'Producto Low Stock')
+
+
+class SignedStockSchemaTests(TestCase):
+	def test_out_of_range_stock_error_detection(self):
+		from config.inventario.signed_stock import is_out_of_range_stock_error
+
+		self.assertTrue(
+			is_out_of_range_stock_error(
+				'(1264, "Out of range value for column \'stock_fisico\' at row 1")'
+			)
+		)
+		self.assertFalse(is_out_of_range_stock_error('other database error'))
+
+	def test_ensure_signed_stock_columns_skips_inside_atomic_block(self):
+		from django.db import connection
+
+		from config.inventario.signed_stock import ensure_signed_stock_columns
+
+		# TestCase wraps each test in atomic; DDL must be skipped here.
+		self.assertTrue(connection.in_atomic_block)
+		self.assertFalse(ensure_signed_stock_columns(force=True))
+
+	def test_negative_quick_inventory_reduces_available(self):
+		categoria = Categoria.objects.create(nombre='Neg QI Cat')
+		marca = Marca.objects.create(nombre='Neg QI Brand')
+		producto = Producto.objects.create(nombre='Neg QI Product', categoria=categoria, marca=marca)
+		presentacion = Presentacion.objects.create(
+			producto=producto,
+			nombre='CS',
+			unidades=24,
+			tipo_contenido='unidades',
+		)
+		StockPresentacion.objects.create(
+			presentacion=presentacion,
+			stock_fisico=-4,
+			stock_reservado=0,
+			stock_disponible=-4,
+		)
+
+		snapshot = availability_snapshot([presentacion.id])[presentacion.id]
+		self.assertEqual(snapshot['quick_inventory'], -4)
+		self.assertEqual(snapshot['available'], -4)

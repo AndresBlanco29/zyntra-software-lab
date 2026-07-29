@@ -162,6 +162,13 @@
                     {% endfor %}
                   </select>
                   <input type="number" min="1.01" step="0.01" id="precio_{{ item.id }}" name="precio_{{ item.id }}" value="{{ row.current_price|unlocalize }}" class="form-control form-control-sm customer-price-input quote-item-list-price" data-item-id="{{ item.id }}" data-product-name="{{ item.presentacion.producto.nombre|escape }}" data-presentation-name="{{ item.presentacion.nombre|escape }}" data-cost="{% if row.cost is not None %}{{ row.cost|unlocalize }}{% endif %}" data-min-price="{{ row.minimum_price|unlocalize }}" data-margin-target="margin_{{ item.id }}" {% if not can_manage_quote_lines %}disabled{% endif %}>
+                  <div class="small text-muted mt-1 quote-item-real-cost" data-item-id="{{ item.id }}">
+                    {% if row.cost is not None %}
+                      {% blocktrans with amount=row.cost|floatformat:2 %}Real cost: ${{ amount }}{% endblocktrans %}
+                    {% else %}
+                      {% trans "Real cost: not configured" %}
+                    {% endif %}
+                  </div>
                   <div id="margin_{{ item.id }}" class="small text-muted mt-1 utility-indicator">
                     {% if row.profit.has_cost and row.profit.unit_profit_amount is not None %}
                       {% blocktrans with amount=row.profit.unit_profit_amount percentage=row.profit.profit_percent %}Unit profit: ${{ amount }} ({{ percentage }}%){% endblocktrans %}

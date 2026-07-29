@@ -15,7 +15,7 @@ class StockPresentacion(models.Model):
 	# Quick Inventory: packages imported from QuickBooks QtyOnHand. Never mutated by local sales.
 	stock_fisico = models.IntegerField(
 		default=0,
-		help_text=_('Quick Inventory from QuickBooks (packages). May be negative when QuickBooks reports oversold quantity.'),
+		help_text=_('Quick Inventory from QuickBooks (packages). Oversold/negative QtyOnHand from QuickBooks is stored as 0.'),
 	)
 	# Legacy allocation counter; Available no longer uses this field.
 	stock_reservado = models.PositiveIntegerField(

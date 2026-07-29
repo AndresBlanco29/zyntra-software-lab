@@ -740,7 +740,7 @@ class QuickBooksItemCostSyncTests(TestCase):
             -10,
         )
 
-    def test_sync_stock_from_quickbooks_item_stores_negative_qty(self):
+    def test_sync_stock_from_quickbooks_item_clamps_negative_qty_to_zero(self):
         from config.integrations.quickbooks.sync import _sync_stock_from_quickbooks_item
 
         categoria = Categoria.objects.create(nombre='Drinks Neg')
@@ -755,9 +755,9 @@ class QuickBooksItemCostSyncTests(TestCase):
         )
         StockPresentacion.objects.create(
             presentacion=presentacion,
-            stock_fisico=0,
+            stock_fisico=5,
             stock_reservado=0,
-            stock_disponible=0,
+            stock_disponible=5,
         )
 
         updated = _sync_stock_from_quickbooks_item(
@@ -767,11 +767,11 @@ class QuickBooksItemCostSyncTests(TestCase):
 
         self.assertTrue(updated)
         stock = StockPresentacion.objects.get(presentacion=presentacion)
-        self.assertEqual(stock.stock_fisico, -10)
-        self.assertEqual(stock.stock_disponible, -10)
+        self.assertEqual(stock.stock_fisico, 0)
+        self.assertEqual(stock.stock_disponible, 0)
 
     @patch('config.integrations.quickbooks.sync._fetch_quickbooks_items_map')
-    def test_import_inventory_quantities_preserves_negative_qty_on_hand(self, mock_fetch_map):
+    def test_import_inventory_quantities_clamps_negative_qty_on_hand_to_zero(self, mock_fetch_map):
         categoria = Categoria.objects.create(nombre='Drinks Neg Qty')
         marca = Marca.objects.create(nombre='Jarritos Neg Qty')
         producto = Producto.objects.create(
@@ -789,9 +789,9 @@ class QuickBooksItemCostSyncTests(TestCase):
         )
         StockPresentacion.objects.create(
             presentacion=presentacion,
-            stock_fisico=0,
+            stock_fisico=2,
             stock_reservado=0,
-            stock_disponible=0,
+            stock_disponible=2,
         )
         client = Mock()
         client.read_entity.return_value = {
@@ -808,8 +808,12 @@ class QuickBooksItemCostSyncTests(TestCase):
         self.assertEqual(result['updated_count'], 1)
         self.assertEqual(result['failed_count'], 0)
         stock = StockPresentacion.objects.get(presentacion=presentacion)
-        self.assertEqual(stock.stock_fisico, -10)
-        self.assertEqual(stock.stock_disponible, -10)
+        self.assertEqual(stock.stock_fisico, 0)
+        self.assertEqual(stock.stock_disponible, 0)
+        zeroed = [row for row in result['results'] if row.get('action') == 'updated_zeroed_from_negative']
+        self.assertEqual(len(zeroed), 1)
+        self.assertEqual(zeroed[0]['qty_on_hand'], 0)
+        self.assertEqual(zeroed[0]['quickbooks_qty_on_hand'], -10)
         client.read_entity.assert_called()
         mock_fetch_map.assert_not_called()
 

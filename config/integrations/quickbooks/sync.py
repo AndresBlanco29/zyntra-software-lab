@@ -1865,7 +1865,7 @@ def _save_quickbooks_item_image(*, producto, payload, client=None, force=False, 
 
 def _extract_quickbooks_item_qty_on_hand(payload):
     # QuickBooks inventory/assembly items expose on-hand quantity; other types do not track stock.
-    # Negative QtyOnHand is valid in QuickBooks (oversold / adjustments) and must be preserved locally.
+    # Raw value may be negative (oversold). Local storage clamps negatives to 0.
     item_type = str(payload.get('Type') or '').strip().lower()
     if item_type and item_type not in {'inventory', 'assembly'}:
         return None
@@ -1880,6 +1880,17 @@ def _extract_quickbooks_item_qty_on_hand(payload):
         except (TypeError, ValueError):
             continue
     return None
+
+
+def _local_quick_inventory_from_quickbooks_qty(qty_on_hand):
+    """Map QuickBooks QtyOnHand into Tortilla Quick Inventory packages.
+
+    Negative/oversold quantities become 0 so Available cannot keep a stale
+    positive value and continue selling product that QuickBooks already shows oversold.
+    """
+    if qty_on_hand is None:
+        return None
+    return max(int(qty_on_hand), 0)
 
 
 def _enrich_quickbooks_item_payload(payload, *, client=None):
@@ -1925,7 +1936,8 @@ def _enrich_quickbooks_item_payload(payload, *, client=None):
 
 def _sync_stock_from_quickbooks_item(presentacion, payload):
     """Update Quick Inventory (stock_fisico) only. Available/Pending/In orders are computed elsewhere."""
-    qty_on_hand = _extract_quickbooks_item_qty_on_hand(payload)
+    raw_qty = _extract_quickbooks_item_qty_on_hand(payload)
+    qty_on_hand = _local_quick_inventory_from_quickbooks_qty(raw_qty)
     if qty_on_hand is None:
         return False
     stock, created = StockPresentacion.objects.get_or_create(
@@ -1937,8 +1949,7 @@ def _sync_stock_from_quickbooks_item(presentacion, payload):
         if int(stock.stock_fisico) != int(qty_on_hand):
             raise ValidationError(
                 _(
-                    'Could not store QuickBooks quantity %(qty)s for %(product)s. '
-                    'The database may still reject negative stock values; run inventory migrations and retry.'
+                    'Could not store QuickBooks quantity %(qty)s for %(product)s.'
                 )
                 % {
                     'qty': qty_on_hand,
@@ -1960,8 +1971,7 @@ def _sync_stock_from_quickbooks_item(presentacion, payload):
     if int(stock.stock_fisico) != int(qty_on_hand):
         raise ValidationError(
             _(
-                'Could not store QuickBooks quantity %(qty)s for %(product)s. '
-                'The database may still reject negative stock values; run inventory migrations and retry.'
+                'Could not store QuickBooks quantity %(qty)s for %(product)s.'
             )
             % {
                 'qty': qty_on_hand,
@@ -1972,21 +1982,9 @@ def _sync_stock_from_quickbooks_item(presentacion, payload):
 
 
 def _apply_quickbooks_qty_with_schema_repair(presentacion, payload):
-    """Sync QtyOnHand; if UNSIGNED columns block negatives, repair schema and retry outside the failed txn."""
-    from config.inventario.signed_stock import ensure_signed_stock_columns, is_out_of_range_stock_error
-
-    try:
-        with transaction.atomic():
-            return _sync_stock_from_quickbooks_item(presentacion, payload)
-    except Exception as exc:
-        if not (
-            is_out_of_range_stock_error(exc)
-            or 'reject negative stock values' in str(exc).lower()
-        ):
-            raise
-        ensure_signed_stock_columns(force=True)
-        with transaction.atomic():
-            return _sync_stock_from_quickbooks_item(presentacion, payload)
+    """Sync QtyOnHand (negatives clamped to 0). Kept for call-site compatibility."""
+    with transaction.atomic():
+        return _sync_stock_from_quickbooks_item(presentacion, payload)
 
 
 def _update_presentacion_from_quickbooks(
@@ -2869,11 +2867,12 @@ def import_quickbooks_inventory_quantities(*, limit=None, max_results=None, clie
                     if qty_on_hand < 0:
                         results.append({
                             'ok': True,
-                            'action': 'updated_negative',
+                            'action': 'updated_zeroed_from_negative',
                             'entity': 'InventoryQuantity',
                             'quickbooks_id': qb_id,
                             'label': label,
-                            'qty_on_hand': qty_on_hand,
+                            'quickbooks_qty_on_hand': qty_on_hand,
+                            'qty_on_hand': 0,
                         })
                 else:
                     skipped_count += 1

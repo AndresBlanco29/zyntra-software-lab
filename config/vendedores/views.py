@@ -54,6 +54,9 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from config.clientes.balance_summary import (
     attach_customer_balance_summaries,
     build_customer_balance_summary,
+    build_customers_receivables_summary,
+    filter_clientes_queryset_by_receivables,
+    normalize_ar_filter_params,
 )
 from config.core.product_ordering import order_invoice_items_for_display
 from config.facturacion.form_drafts import serialize_post_data
@@ -335,15 +338,28 @@ def _clientes_filter_params(request):
     estado = str(request.GET.get('estado') or '').strip()
     if estado in ('activo', 'inactivo'):
         params['estado'] = estado
+    ar_params = normalize_ar_filter_params(
+        ar_status=request.GET.get('ar_status'),
+        due_soon_window=request.GET.get('due_soon_window'),
+        overdue_bucket=request.GET.get('overdue_bucket'),
+    )
+    if ar_params['ar_status'] != 'all':
+        params['ar_status'] = ar_params['ar_status']
+    if ar_params['ar_status'] == 'due_soon':
+        params['due_soon_window'] = ar_params['due_soon_window']
+    if ar_params['ar_status'] == 'overdue' and ar_params['overdue_bucket']:
+        params['overdue_bucket'] = ar_params['overdue_bucket']
+    params['_ar'] = ar_params
     return params
 
 
-def _clientes_queryset(request):
+def _clientes_base_queryset(request, *, filter_params=None):
+    """Search + Active/Inactive + vendor scope (before receivables filters)."""
     queryset = annotate_clientes_open_invoice_balance(
         Cliente.objects.select_related('usuario').order_by('nombre_empresa', 'id')
     )
 
-    filters = _clientes_filter_params(request)
+    filters = filter_params if filter_params is not None else _clientes_filter_params(request)
     query = filters.get('q')
     if query:
         queryset = queryset.filter(
@@ -361,6 +377,17 @@ def _clientes_queryset(request):
     elif estado == 'inactivo':
         queryset = queryset.filter(aprobado=False)
     return filter_clientes_for_vendedor(queryset, request.user)
+
+
+def _clientes_queryset(request, *, filter_params=None):
+    filter_params = filter_params if filter_params is not None else _clientes_filter_params(request)
+    ar_params = filter_params.get('_ar') or normalize_ar_filter_params()
+    return filter_clientes_queryset_by_receivables(
+        _clientes_base_queryset(request, filter_params=filter_params),
+        ar_status=ar_params['ar_status'],
+        due_soon_window=ar_params['due_soon_window'],
+        overdue_bucket=ar_params['overdue_bucket'],
+    )
 
 
 def _build_catalog_bulk_price_options():
@@ -539,7 +566,16 @@ def vendedor_home(request):
 @internal_permission_required('vendor.customers.view')
 def clientes(request):
     filter_params = _clientes_filter_params(request)
-    paginator = Paginator(_clientes_queryset(request), VENDEDOR_CLIENTES_PAGE_SIZE)
+    ar_params = filter_params.get('_ar') or normalize_ar_filter_params()
+    base_queryset = _clientes_base_queryset(request, filter_params=filter_params)
+    receivables_summary = build_customers_receivables_summary(base_queryset)
+    queryset = filter_clientes_queryset_by_receivables(
+        base_queryset,
+        ar_status=ar_params['ar_status'],
+        due_soon_window=ar_params['due_soon_window'],
+        overdue_bucket=ar_params['overdue_bucket'],
+    )
+    paginator = Paginator(queryset, VENDEDOR_CLIENTES_PAGE_SIZE)
     page_obj = paginator.get_page(request.GET.get('page'))
 
     clientes = attach_customer_balance_summaries(page_obj.object_list)
@@ -549,6 +585,10 @@ def clientes(request):
         'filter_params': filter_params,
         'filter_q': filter_params.get('q', ''),
         'filter_estado': filter_params.get('estado', ''),
+        'filter_ar_status': ar_params['ar_status'],
+        'filter_due_soon_window': ar_params['due_soon_window'],
+        'filter_overdue_bucket': ar_params['overdue_bucket'],
+        'receivables_summary': receivables_summary,
         'us_locations_json': json.dumps(US_STATE_CITIES),
         'us_states': sorted(US_STATE_CITIES.keys()),
         'can_change_customer_username': _can_change_customer_username(request.user),

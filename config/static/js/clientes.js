@@ -1,16 +1,98 @@
 document.addEventListener("DOMContentLoaded", function () {
     const form = document.getElementById("clientes-filter-form");
     const filtroEstado = document.getElementById("filtroEstado");
-
-    if (!form || !filtroEstado) {
-        return;
-    }
+    const arToggle = document.getElementById("receivablesFiltersToggle");
+    const arPanel = document.getElementById("receivablesFiltersPanel");
+    const dueSoonGroup = document.getElementById("dueSoonWindowGroup");
+    const overdueGroup = document.getElementById("overdueBucketGroup");
+    const dueSoonSelect = document.getElementById("dueSoonWindow");
+    const overdueSelect = document.getElementById("overdueBucket");
 
     function submitFilters() {
+        if (!form) {
+            return;
+        }
         form.submit();
     }
 
-    filtroEstado.addEventListener("change", submitFilters);
+    function selectedArStatus() {
+        if (!form) {
+            return "all";
+        }
+        const checked = form.querySelector('input[name="ar_status"]:checked');
+        return checked ? checked.value : "all";
+    }
+
+    function syncArRangeVisibility() {
+        const status = selectedArStatus();
+        if (dueSoonGroup) {
+            dueSoonGroup.hidden = status !== "due_soon";
+        }
+        if (overdueGroup) {
+            overdueGroup.hidden = status !== "overdue";
+        }
+        if (dueSoonSelect) {
+            dueSoonSelect.disabled = status !== "due_soon";
+        }
+        if (overdueSelect) {
+            overdueSelect.disabled = status !== "overdue";
+        }
+    }
+
+    function setArPanelOpen(isOpen) {
+        if (!arPanel || !arToggle) {
+            return;
+        }
+        arPanel.hidden = !isOpen;
+        arPanel.classList.toggle("is-open", isOpen);
+        arToggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    }
+
+    if (filtroEstado) {
+        filtroEstado.addEventListener("change", submitFilters);
+    }
+
+    if (arToggle && arPanel) {
+        arToggle.addEventListener("click", function () {
+            const willOpen = arPanel.hidden || !arPanel.classList.contains("is-open");
+            setArPanelOpen(willOpen);
+        });
+    }
+
+    if (form) {
+        form.querySelectorAll('input[name="ar_status"]').forEach(function (input) {
+            input.addEventListener("change", function () {
+                syncArRangeVisibility();
+                if (selectedArStatus() !== "all" && arPanel) {
+                    setArPanelOpen(true);
+                }
+                submitFilters();
+            });
+        });
+    }
+
+    if (dueSoonSelect) {
+        dueSoonSelect.addEventListener("change", submitFilters);
+    }
+    if (overdueSelect) {
+        overdueSelect.addEventListener("change", submitFilters);
+    }
+
+    syncArRangeVisibility();
+
+    document.querySelectorAll("[data-cliente-expand]").forEach(function (button) {
+        button.addEventListener("click", function () {
+            const clienteId = button.getAttribute("data-cliente-expand");
+            const detail = document.getElementById("cliente-invoices-" + clienteId);
+            if (!detail) {
+                return;
+            }
+            const willExpand = detail.hidden;
+            detail.hidden = !willExpand;
+            button.setAttribute("aria-expanded", willExpand ? "true" : "false");
+            button.classList.toggle("is-expanded", willExpand);
+        });
+    });
 });
 
 let clienteEstadoId = null;

@@ -107,6 +107,255 @@ body{
     max-width: 180px;
 }
 
+.clientes-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.clientes-toolbar__intro {
+    min-width: 0;
+}
+
+.clientes-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(140px, 180px) auto;
+    gap: 0.75rem;
+    align-items: center;
+    margin: 0;
+}
+
+.clientes-filters__search {
+    width: 100%;
+    min-width: 0;
+}
+
+.clientes-filters__estado {
+    width: 100%;
+    max-width: none;
+}
+
+.clientes-filters__ar-toggle {
+    white-space: nowrap;
+    min-height: 48px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.clientes-filters__ar-toggle.is-active {
+    border-color: #2b72d6;
+    color: #0b3d91;
+    background: rgba(43, 114, 214, 0.08);
+}
+
+.clientes-ar-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: #0b3d91;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 800;
+}
+
+.clientes-ar-panel {
+    grid-column: 1 / -1;
+    display: none;
+    gap: 0.85rem;
+    padding: 0.95rem 1rem;
+    border-radius: 16px;
+    border: 1px solid rgba(14, 58, 133, 0.12);
+    background: rgba(244, 249, 255, 0.9);
+}
+
+.clientes-ar-panel.is-open {
+    display: grid;
+}
+
+.clientes-ar-panel__title {
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: #102a63;
+}
+
+.clientes-ar-status-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+.clientes-ar-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0.45rem 0.75rem;
+    border-radius: 12px;
+    border: 1px solid #d8e4f3;
+    background: #fff;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+}
+
+.clientes-ar-option:has(input:checked) {
+    border-color: #2b72d6;
+    background: rgba(43, 114, 214, 0.08);
+    color: #0b3d91;
+}
+
+.clientes-ar-range .vendor-filter-select {
+    max-width: 220px;
+}
+
+.clientes-ar-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.85rem;
+}
+
+.clientes-ar-summary__card {
+    display: grid;
+    gap: 0.25rem;
+    padding: 1rem 1.1rem;
+    border-radius: 18px;
+    border: 1px solid rgba(14, 58, 133, 0.08);
+    background: linear-gradient(180deg, #fff, #f6faff);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+}
+
+.clientes-ar-summary__value {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #102a63;
+    line-height: 1.1;
+}
+
+.clientes-ar-summary__label {
+    font-size: 0.82rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.clientes-ar-summary__card.is-overdue .clientes-ar-summary__value {
+    color: #b4232e;
+}
+
+.clientes-ar-summary__card.is-due-soon .clientes-ar-summary__value {
+    color: #a16207;
+}
+
+.cliente-invoice-toggle {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-decoration: none;
+    color: #2b72d6;
+}
+
+.cliente-invoice-detail-row > td {
+    background: #f8fbff;
+    padding: 0 !important;
+    border-top: none;
+}
+
+.cliente-invoice-detail {
+    padding: 0.75rem 1rem 1rem;
+}
+
+.cliente-invoice-detail__table {
+    background: #fff;
+    border: 1px solid rgba(14, 58, 133, 0.08);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.cliente-invoice-detail__table th {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #64748b;
+    background: #f1f5f9;
+}
+
+.customer-severity-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+}
+
+.customer-severity-badge.severity-none,
+.customer-balance-total.severity-none {
+    color: #15803d;
+    background: rgba(21, 128, 61, 0.1);
+}
+
+.customer-severity-badge.severity-current,
+.customer-balance-total.severity-current {
+    color: #15803d;
+    background: rgba(21, 128, 61, 0.1);
+}
+
+.customer-severity-badge.severity-due_soon,
+.customer-balance-total.severity-due_soon {
+    color: #a16207;
+    background: rgba(234, 179, 8, 0.16);
+}
+
+.customer-severity-badge.severity-overdue_soft,
+.customer-balance-total.severity-overdue_soft,
+.customer-aging-line.severity-overdue_soft {
+    color: #c2410c;
+    background: rgba(234, 88, 12, 0.12);
+}
+
+.customer-severity-badge.severity-overdue_hard,
+.customer-balance-total.severity-overdue_hard,
+.customer-aging-line.severity-overdue_hard {
+    color: #b4232e;
+    background: rgba(220, 53, 69, 0.12);
+}
+
+.customer-aging-line.severity-overdue_soft,
+.customer-aging-line.severity-overdue_hard {
+    font-weight: 700;
+    font-size: 13px;
+    padding: 0.2rem 0.45rem;
+    border-radius: 8px;
+    display: inline-block;
+}
+
+.cliente-invoice-detail__table tr.severity-due_soon .customer-severity-amount {
+    color: #a16207;
+    font-weight: 700;
+}
+
+.cliente-invoice-detail__table tr.severity-overdue_soft .customer-severity-amount {
+    color: #c2410c;
+    font-weight: 700;
+}
+
+.cliente-invoice-detail__table tr.severity-overdue_hard .customer-severity-amount {
+    color: #b4232e;
+    font-weight: 700;
+}
+
+.cliente-invoice-detail__table tr.severity-current .customer-severity-amount,
+.cliente-invoice-detail__table tr.severity-none .customer-severity-amount {
+    color: #15803d;
+    font-weight: 700;
+}
+
 .vendor-search-input:focus,
 .vendor-filter-select:focus {
     border-color: #2b72d6;
@@ -630,21 +879,21 @@ transform:scale(1.05);
     }
 
     .clientes-toolbar {
-        align-items: stretch !important;
         gap: 12px;
-        flex-direction: column;
     }
 
     .clientes-filters {
         width: 100%;
-        flex-direction: column;
+        grid-template-columns: 1fr;
         margin-bottom: 0 !important;
     }
 
-    .clientes-filters > * {
+    .clientes-filters__search,
+    .clientes-filters__estado,
+    .clientes-filters__ar-toggle,
+    .clientes-ar-range .vendor-filter-select {
         width: 100%;
         max-width: none !important;
-        flex: 0 0 auto;
     }
 
     .clientes-filters #buscadorClientes,
@@ -652,6 +901,10 @@ transform:scale(1.05);
         height: auto;
         min-height: 48px;
         max-height: none;
+    }
+
+    .clientes-ar-summary {
+        grid-template-columns: 1fr 1fr;
     }
 
     .clientes-acciones-group {

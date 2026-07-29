@@ -78,39 +78,118 @@
 </section>
 
 <section class="vendor-filter-panel mb-4">
-  <div class="d-flex justify-content-between align-items-center clientes-toolbar gap-3">
-    <div>
+  <div class="clientes-toolbar">
+    <div class="clientes-toolbar__intro">
       <div class="vendor-panel-title">{% trans "Customer directory" %}</div>
       <small class="vendor-panel-copy">{% trans "Search, filter and review your customer base quickly." %}</small>
     </div>
 
-    <form method="get" id="clientes-filter-form" class="d-flex gap-2 mb-0 clientes-filters">
+    <form method="get" id="clientes-filter-form" class="clientes-filters">
       <input
-      type="search"
-      id="buscadorClientes"
-      name="q"
-      value="{{ filter_q }}"
-      class="form-control vendor-search-input"
-      placeholder="{% trans 'Buscar por nombre, empresa o documento' %}"
-      autocomplete="off"
+        type="search"
+        id="buscadorClientes"
+        name="q"
+        value="{{ filter_q }}"
+        class="form-control vendor-search-input clientes-filters__search"
+        placeholder="{% trans 'Buscar por nombre, empresa o documento' %}"
+        autocomplete="off"
       >
 
-      <select id="filtroEstado" name="estado" class="form-select vendor-filter-select">
-        <option value="" {% if not filter_estado %}selected{% endif %}>
-        {% trans "Todos" %}
-        </option>
-
-        <option value="activo" {% if filter_estado == 'activo' %}selected{% endif %}>
-        {% trans "Activos" %}
-        </option>
-
-        <option value="inactivo" {% if filter_estado == 'inactivo' %}selected{% endif %}>
-        {% trans "Inactivos" %}
-        </option>
+      <select id="filtroEstado" name="estado" class="form-select vendor-filter-select clientes-filters__estado">
+        <option value="" {% if not filter_estado %}selected{% endif %}>{% trans "Todos" %}</option>
+        <option value="activo" {% if filter_estado == 'activo' %}selected{% endif %}>{% trans "Activos" %}</option>
+        <option value="inactivo" {% if filter_estado == 'inactivo' %}selected{% endif %}>{% trans "Inactivos" %}</option>
       </select>
+
+      <button
+        type="button"
+        id="receivablesFiltersToggle"
+        class="btn vendor-secondary-btn clientes-filters__ar-toggle{% if filter_ar_status and filter_ar_status != 'all' %} is-active{% endif %}"
+        aria-expanded="{% if filter_ar_status and filter_ar_status != 'all' %}true{% else %}false{% endif %}"
+        aria-controls="receivablesFiltersPanel"
+      >
+        {% trans "Receivables Filters" %}
+        {% if filter_ar_status and filter_ar_status != 'all' %}
+        <span class="clientes-ar-badge">1</span>
+        {% endif %}
+      </button>
+
+      <div
+        id="receivablesFiltersPanel"
+        class="clientes-ar-panel{% if filter_ar_status and filter_ar_status != 'all' %} is-open{% endif %}"
+        {% if not filter_ar_status or filter_ar_status == 'all' %}hidden{% endif %}
+      >
+        <div class="clientes-ar-panel__title">{% trans "Filter by receivables" %}</div>
+        <div class="clientes-ar-status-grid" role="radiogroup" aria-label="{% trans 'Receivables status' %}">
+          <label class="clientes-ar-option">
+            <input type="radio" name="ar_status" value="all" {% if filter_ar_status == 'all' or not filter_ar_status %}checked{% endif %}>
+            <span>{% trans "All" %}</span>
+          </label>
+          <label class="clientes-ar-option">
+            <input type="radio" name="ar_status" value="outstanding" {% if filter_ar_status == 'outstanding' %}checked{% endif %}>
+            <span>{% trans "Outstanding" %}</span>
+          </label>
+          <label class="clientes-ar-option">
+            <input type="radio" name="ar_status" value="overdue" {% if filter_ar_status == 'overdue' %}checked{% endif %}>
+            <span>{% trans "Overdue" %}</span>
+          </label>
+          <label class="clientes-ar-option">
+            <input type="radio" name="ar_status" value="due_soon" {% if filter_ar_status == 'due_soon' %}checked{% endif %}>
+            <span>{% trans "Due soon" %}</span>
+          </label>
+          <label class="clientes-ar-option">
+            <input type="radio" name="ar_status" value="no_debt" {% if filter_ar_status == 'no_debt' %}checked{% endif %}>
+            <span>{% trans "No debt" %}</span>
+          </label>
+        </div>
+
+        <div id="dueSoonWindowGroup" class="clientes-ar-range" {% if filter_ar_status != 'due_soon' %}hidden{% endif %}>
+          <label class="form-label mb-1" for="dueSoonWindow">{% trans "Due soon window (days)" %}</label>
+          <select id="dueSoonWindow" name="due_soon_window" class="form-select vendor-filter-select">
+            <option value="0" {% if filter_due_soon_window == 0 %}selected{% endif %}>{% trans "Due today" %}</option>
+            <option value="3" {% if filter_due_soon_window == 3 %}selected{% endif %}>3</option>
+            <option value="7" {% if filter_due_soon_window == 7 or filter_due_soon_window == None %}selected{% endif %}>7</option>
+            <option value="15" {% if filter_due_soon_window == 15 %}selected{% endif %}>15</option>
+            <option value="30" {% if filter_due_soon_window == 30 %}selected{% endif %}>30</option>
+          </select>
+        </div>
+
+        <div id="overdueBucketGroup" class="clientes-ar-range" {% if filter_ar_status != 'overdue' %}hidden{% endif %}>
+          <label class="form-label mb-1" for="overdueBucket">{% trans "Overdue period (days past due)" %}</label>
+          <select id="overdueBucket" name="overdue_bucket" class="form-select vendor-filter-select">
+            <option value="" {% if not filter_overdue_bucket %}selected{% endif %}>{% trans "Any overdue" %}</option>
+            <option value="1_7" {% if filter_overdue_bucket == '1_7' %}selected{% endif %}>1–7</option>
+            <option value="8_15" {% if filter_overdue_bucket == '8_15' %}selected{% endif %}>8–15</option>
+            <option value="16_30" {% if filter_overdue_bucket == '16_30' %}selected{% endif %}>16–30</option>
+            <option value="31_60" {% if filter_overdue_bucket == '31_60' %}selected{% endif %}>31–60</option>
+            <option value="60_plus" {% if filter_overdue_bucket == '60_plus' %}selected{% endif %}>60+</option>
+          </select>
+        </div>
+      </div>
     </form>
   </div>
 </section>
+
+{% if receivables_summary %}
+<section class="clientes-ar-summary mb-4" aria-label="{% trans 'Receivables summary' %}">
+  <div class="clientes-ar-summary__card">
+    <span class="clientes-ar-summary__value">{{ receivables_summary.customers_with_balance }}</span>
+    <span class="clientes-ar-summary__label">{% trans "Customers with balance" %}</span>
+  </div>
+  <div class="clientes-ar-summary__card">
+    <span class="clientes-ar-summary__value">${{ receivables_summary.total_outstanding|floatformat:2 }}</span>
+    <span class="clientes-ar-summary__label">{% trans "Total outstanding" %}</span>
+  </div>
+  <div class="clientes-ar-summary__card is-overdue">
+    <span class="clientes-ar-summary__value">{{ receivables_summary.invoices_overdue }}</span>
+    <span class="clientes-ar-summary__label">{% trans "Invoices overdue" %}</span>
+  </div>
+  <div class="clientes-ar-summary__card is-due-soon">
+    <span class="clientes-ar-summary__value">{{ receivables_summary.invoices_due_this_week }}</span>
+    <span class="clientes-ar-summary__label">{% trans "Due this week" %}</span>
+  </div>
+</section>
+{% endif %}
 
 <div class="d-flex justify-content-center">
 
@@ -164,6 +243,8 @@
 {% with summary=cliente.balance_summary %}
 
 <tr
+class="cliente-row severity-{{ summary.severity }}"
+data-cliente-row="{{ cliente.id }}"
 data-nombre="{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa }}"
 data-empresa="{{ cliente.nombre_empresa }}"
 data-correo="{{ cliente.usuario.email }}"
@@ -173,6 +254,17 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 
 <td data-label="{% trans 'Name' %}">
   <div class="vendor-person-name">{{ cliente.usuario.get_full_name|default:cliente.nombre_empresa }}</div>
+  {% if summary.lines %}
+  <button
+    type="button"
+    class="btn btn-link btn-sm p-0 cliente-invoice-toggle"
+    data-cliente-expand="{{ cliente.id }}"
+    aria-expanded="false"
+    aria-controls="cliente-invoices-{{ cliente.id }}"
+  >
+    {% blocktrans count counter=summary.lines|length %}{{ counter }} invoice{% plural %}{{ counter }} invoices{% endblocktrans %}
+  </button>
+  {% endif %}
 </td>
 
 <td data-label="{% trans 'Company Name' %}">
@@ -192,33 +284,19 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
       <span class="customer-balance-total__label">{% trans "Customer credit" %}</span>
       <span class="customer-balance-total__amount">${{ summary.customer_credit|floatformat:2 }}</span>
     </div>
-  {% elif summary.overdue_lines %}
-    <div class="customer-balance-total is-overdue">
+  {% elif summary.overdue_balance %}
+    <div class="customer-balance-total severity-{{ summary.severity }}">
       <span class="customer-balance-total__label">{% trans "Overdue" %}</span>
       <span class="customer-balance-total__amount">${{ summary.overdue_balance|floatformat:2 }}</span>
     </div>
-    <ul class="customer-invoice-list">
-      {% for line in summary.overdue_lines|slice:":4" %}
-      <li class="customer-invoice-item is-overdue">
-        <span class="customer-invoice-item__name">{{ line.invoice_label }}</span>
-        {% if line.invoice_date_display %}<span class="customer-invoice-item__meta">{{ line.invoice_date_display }}</span>{% endif %}
-        <span class="customer-invoice-item__amount">${{ line.amount|floatformat:2 }}</span>
-      </li>
-      {% endfor %}
-    </ul>
-    {% if summary.overdue_count > 4 %}
-    <div class="small text-muted">
-      {% blocktrans count counter=summary.overdue_count|add:"-4" %}+{{ counter }} more overdue invoice{% plural %}+{{ counter }} more overdue invoices{% endblocktrans %}
-    </div>
-    {% endif %}
   {% else %}
-    <span class="text-muted">{% trans "No overdue balance" %}</span>
+    <span class="customer-severity-badge severity-none">{% trans "No overdue balance" %}</span>
   {% endif %}
 </td>
 
 <td data-label="{% trans 'Aging' %}" class="vendor-muted-cell customer-aging-cell">
   {% if summary.max_aging_days %}
-    <div class="customer-aging-line is-overdue">
+    <div class="customer-aging-line severity-{{ summary.severity }}">
       {% blocktrans count counter=summary.max_aging_days %}{{ counter }} day past due{% plural %}{{ counter }} days past due{% endblocktrans %}
     </div>
     {% if summary.overdue_count > 1 %}
@@ -230,29 +308,11 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 </td>
 
 <td data-label="{% trans 'Not yet due' %}" class="vendor-muted-cell customer-upcoming-cell">
-  {% if summary.current_lines %}
-    <div class="customer-balance-total is-current">
+  {% if summary.current_balance %}
+    <div class="customer-balance-total severity-{% if summary.severity == 'due_soon' %}due_soon{% else %}current{% endif %}">
       <span class="customer-balance-total__label">{% trans "Open" %}</span>
       <span class="customer-balance-total__amount">${{ summary.current_balance|floatformat:2 }}</span>
     </div>
-    <ul class="customer-invoice-list">
-      {% for line in summary.current_lines|slice:":4" %}
-      <li class="customer-invoice-item is-current">
-        <span class="customer-invoice-item__name">{{ line.invoice_label }}</span>
-        <span class="customer-invoice-item__meta">
-          {% if line.terms_label %}{{ line.terms_label }}{% endif %}
-          {% if line.due_date_display %}· {% trans "due" %} {{ line.due_date_display }}{% endif %}
-        </span>
-        {% if line.due_in_display %}<span class="customer-invoice-item__badge">{{ line.due_in_display }}</span>{% endif %}
-        <span class="customer-invoice-item__amount">${{ line.amount|floatformat:2 }}</span>
-      </li>
-      {% endfor %}
-    </ul>
-    {% if summary.current_count > 4 %}
-    <div class="small text-muted">
-      {% blocktrans count counter=summary.current_count|add:"-4" %}+{{ counter }} more open invoice{% plural %}+{{ counter }} more open invoices{% endblocktrans %}
-    </div>
-    {% endif %}
   {% else %}
     <span class="text-muted">—</span>
   {% endif %}
@@ -337,6 +397,47 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 
 </tr>
 
+{% if summary.lines %}
+<tr class="cliente-invoice-detail-row" id="cliente-invoices-{{ cliente.id }}" hidden>
+  <td colspan="7">
+    <div class="cliente-invoice-detail">
+      <table class="table table-sm mb-0 cliente-invoice-detail__table">
+        <thead>
+          <tr>
+            <th>{% trans "Invoice #" %}</th>
+            <th>{% trans "Invoice Date" %}</th>
+            <th>{% trans "Due Date" %}</th>
+            <th>{% trans "Days" %}</th>
+            <th>{% trans "Outstanding" %}</th>
+            <th>{% trans "Status" %}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in summary.lines %}
+          <tr class="severity-{{ line.severity }}">
+            <td>{{ line.invoice_number|default:line.invoice_label }}</td>
+            <td>{% if line.invoice_date_display %}{{ line.invoice_date_display }}{% else %}—{% endif %}</td>
+            <td>{% if line.due_date_display %}{{ line.due_date_display }}{% else %}—{% endif %}</td>
+            <td>
+              {% if line.is_overdue %}
+                {% blocktrans count counter=line.aging_days %}{{ counter }} day past due{% plural %}{{ counter }} days past due{% endblocktrans %}
+              {% elif line.days_until_due != None %}
+                {% blocktrans count counter=line.days_until_due %}{{ counter }} day until due{% plural %}{{ counter }} days until due{% endblocktrans %}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td class="customer-severity-amount">${{ line.amount|floatformat:2 }}</td>
+            <td><span class="customer-severity-badge severity-{{ line.severity }}">{{ line.status_label }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </td>
+</tr>
+{% endif %}
+
 {% endwith %}
 {% empty %}
 
@@ -354,7 +455,7 @@ data-estado="{% if cliente.aprobado %}activo{% else %}inactivo{% endif %}"
 
 </div>
 
-{% pagination_controls page_obj aria_label=_('Customer pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 px-3 py-3 border-top" q=filter_q estado=filter_estado %}
+{% pagination_controls page_obj aria_label=_('Customer pagination') nav_class="d-flex justify-content-center align-items-center flex-wrap gap-2 px-3 py-3 border-top" q=filter_q estado=filter_estado ar_status=filter_params.ar_status due_soon_window=filter_params.due_soon_window overdue_bucket=filter_params.overdue_bucket %}
 
 </div>
 </div>

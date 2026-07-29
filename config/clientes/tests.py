@@ -15,8 +15,18 @@ from config.clientes.assignment import (
     sync_vendedor_cliente_assignments,
 )
 from config.clientes.balance_summary import (
+    AR_STATUS_DUE_SOON,
+    AR_STATUS_NO_DEBT,
+    AR_STATUS_OUTSTANDING,
+    AR_STATUS_OVERDUE,
+    SEVERITY_DUE_SOON,
+    SEVERITY_NONE,
+    SEVERITY_OVERDUE_HARD,
+    SEVERITY_OVERDUE_SOFT,
     build_customer_balance_summary,
+    build_customers_receivables_summary,
     expand_clientes_for_list_display,
+    filter_clientes_queryset_by_receivables,
 )
 from config.clientes.models import Cliente
 from config.clientes.phone import normalize_stored_phone_number
@@ -215,22 +225,26 @@ class CustomerBalanceSummaryTests(TestCase):
         self.cliente.credit_limit = Decimal('3500.00')
         self.cliente.save(update_fields=['terminos_pago', 'credit_limit'])
 
-    def _create_open_invoice(self, *, amount, created_at):
+    def _create_open_invoice(self, *, amount, created_at, cliente=None, qb_due_date=None):
+        cliente = cliente or self.cliente
         pedido = Pedido.objects.create(
-            cliente=self.cliente,
+            cliente=cliente,
             origen='CLIENTE',
             estado='INVOICE_GENERADA',
             total=amount,
         )
         invoice = Invoice.objects.create(
             pedido=pedido,
-            cliente=self.cliente,
+            cliente=cliente,
             metodo_entrega='CUSTOMER_PICK_UP',
             subtotal=amount,
             total_neto=amount,
             saldo_cliente=amount,
         )
-        Invoice.objects.filter(pk=invoice.pk).update(creada_en=created_at)
+        update_fields = {'creada_en': created_at}
+        if qb_due_date is not None:
+            update_fields['qb_due_date'] = qb_due_date
+        Invoice.objects.filter(pk=invoice.pk).update(**update_fields)
         invoice.refresh_from_db()
         return invoice
 
@@ -360,3 +374,214 @@ class CustomerBalanceSummaryTests(TestCase):
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0].hidden_line_count, 1)
         self.assertEqual(rows[1].hidden_line_count, 0)
+
+
+class CustomersReceivablesFilterTests(TestCase):
+    def setUp(self):
+        self.today = date(2026, 7, 6)
+        self.overdue_customer = _create_customer(company_name='AR Overdue Co', approved=True)
+        self.overdue_customer.terminos_pago = Cliente.PAYMENT_TERMS_NET7
+        self.overdue_customer.save(update_fields=['terminos_pago'])
+
+        self.due_soon_customer = _create_customer(company_name='AR Due Soon Co', approved=True)
+        self.due_soon_customer.terminos_pago = Cliente.PAYMENT_TERMS_NET7
+        self.due_soon_customer.save(update_fields=['terminos_pago'])
+
+        self.clean_customer = _create_customer(company_name='AR Clean Co', approved=True)
+        self.inactive_customer = _create_customer(company_name='AR Inactive Co', approved=False)
+
+        self._create_invoice(
+            self.overdue_customer,
+            amount=Decimal('200.00'),
+            qb_due_date=date(2026, 6, 20),
+        )
+        self._create_invoice(
+            self.due_soon_customer,
+            amount=Decimal('80.00'),
+            qb_due_date=date(2026, 7, 10),
+        )
+        paid = self._create_invoice(
+            self.clean_customer,
+            amount=Decimal('40.00'),
+            qb_due_date=date(2026, 6, 1),
+        )
+        Invoice.objects.filter(pk=paid.pk).update(qb_payment_status='PAID', saldo_cliente=Decimal('0.00'))
+
+    def _create_invoice(self, cliente, *, amount, qb_due_date):
+        pedido = Pedido.objects.create(
+            cliente=cliente,
+            origen='CLIENTE',
+            estado='INVOICE_GENERADA',
+            total=amount,
+        )
+        invoice = Invoice.objects.create(
+            pedido=pedido,
+            cliente=cliente,
+            metodo_entrega='CUSTOMER_PICK_UP',
+            subtotal=amount,
+            total_neto=amount,
+            saldo_cliente=amount,
+            qb_due_date=qb_due_date,
+        )
+        return invoice
+
+    def _qs(self):
+        return Cliente.objects.filter(
+            id__in=[
+                self.overdue_customer.id,
+                self.due_soon_customer.id,
+                self.clean_customer.id,
+                self.inactive_customer.id,
+            ]
+        ).order_by('id')
+
+    @patch('config.clientes.balance_summary.timezone')
+    def test_outstanding_excludes_customers_without_open_balance(self, mock_timezone):
+        mock_timezone.localdate.return_value = self.today
+        mock_timezone.make_aware.side_effect = timezone.make_aware
+
+        filtered = filter_clientes_queryset_by_receivables(
+            self._qs(),
+            ar_status=AR_STATUS_OUTSTANDING,
+            today=self.today,
+        )
+        ids = set(filtered.values_list('id', flat=True))
+
+        self.assertEqual(ids, {self.overdue_customer.id, self.due_soon_customer.id})
+
+    @patch('config.clientes.balance_summary.timezone')
+    def test_no_debt_excludes_customers_with_open_balance(self, mock_timezone):
+        mock_timezone.localdate.return_value = self.today
+        mock_timezone.make_aware.side_effect = timezone.make_aware
+
+        filtered = filter_clientes_queryset_by_receivables(
+            self._qs(),
+            ar_status=AR_STATUS_NO_DEBT,
+            today=self.today,
+        )
+        ids = set(filtered.values_list('id', flat=True))
+
+        self.assertEqual(ids, {self.clean_customer.id, self.inactive_customer.id})
+
+    @patch('config.clientes.balance_summary.timezone')
+    def test_overdue_bucket_filters_by_days_past_due(self, mock_timezone):
+        mock_timezone.localdate.return_value = self.today
+        mock_timezone.make_aware.side_effect = timezone.make_aware
+
+        mid = _create_customer(company_name='AR Mid Overdue', approved=True)
+        self._create_invoice(mid, amount=Decimal('50.00'), qb_due_date=date(2026, 6, 28))  # 8 days
+
+        qs = Cliente.objects.filter(id__in=[self.overdue_customer.id, mid.id, self.due_soon_customer.id])
+        filtered = filter_clientes_queryset_by_receivables(
+            qs,
+            ar_status=AR_STATUS_OVERDUE,
+            overdue_bucket='8_15',
+            today=self.today,
+        )
+        ids = set(filtered.values_list('id', flat=True))
+
+        # overdue_customer: due 2026-06-20 => 16 days; mid: 8 days; due_soon: not overdue
+        self.assertEqual(ids, {mid.id})
+
+    @patch('config.clientes.balance_summary.timezone')
+    def test_due_soon_window_filters_by_days_until_due(self, mock_timezone):
+        mock_timezone.localdate.return_value = self.today
+        mock_timezone.make_aware.side_effect = timezone.make_aware
+
+        later = _create_customer(company_name='AR Later Due', approved=True)
+        self._create_invoice(later, amount=Decimal('25.00'), qb_due_date=date(2026, 7, 25))
+
+        qs = Cliente.objects.filter(
+            id__in=[self.due_soon_customer.id, later.id, self.overdue_customer.id]
+        )
+        filtered = filter_clientes_queryset_by_receivables(
+            qs,
+            ar_status=AR_STATUS_DUE_SOON,
+            due_soon_window=7,
+            today=self.today,
+        )
+        ids = set(filtered.values_list('id', flat=True))
+
+        # due_soon: Jul 10 => 4 days; later: 19 days; overdue excluded
+        self.assertEqual(ids, {self.due_soon_customer.id})
+
+    @patch('config.clientes.balance_summary.timezone')
+    def test_priority_sort_puts_most_overdue_first(self, mock_timezone):
+        mock_timezone.localdate.return_value = self.today
+        mock_timezone.make_aware.side_effect = timezone.make_aware
+
+        soft = _create_customer(company_name='AR Soft Overdue', approved=True)
+        self._create_invoice(soft, amount=Decimal('500.00'), qb_due_date=date(2026, 7, 1))  # 5 days
+
+        qs = Cliente.objects.filter(id__in=[soft.id, self.overdue_customer.id]).order_by('nombre_empresa')
+        filtered = list(
+            filter_clientes_queryset_by_receivables(
+                qs,
+                ar_status=AR_STATUS_OUTSTANDING,
+                today=self.today,
+            ).values_list('id', flat=True)
+        )
+
+        self.assertEqual(filtered[0], self.overdue_customer.id)
+        self.assertEqual(filtered[1], soft.id)
+
+    @patch('config.clientes.balance_summary.timezone')
+    def test_receivables_summary_counts(self, mock_timezone):
+        mock_timezone.localdate.return_value = self.today
+        mock_timezone.make_aware.side_effect = timezone.make_aware
+
+        summary = build_customers_receivables_summary(self._qs(), today=self.today)
+
+        self.assertEqual(summary.customers_with_balance, 2)
+        self.assertEqual(summary.total_outstanding, Decimal('280.00'))
+        self.assertEqual(summary.invoices_overdue, 1)
+        self.assertEqual(summary.invoices_due_this_week, 1)
+
+    @patch('config.clientes.balance_summary.timezone')
+    def test_severity_colors_for_overdue_and_due_soon(self, mock_timezone):
+        mock_timezone.localdate.return_value = self.today
+        mock_timezone.make_aware.side_effect = timezone.make_aware
+
+        overdue_summary = build_customer_balance_summary(self.overdue_customer, today=self.today)
+        due_soon_summary = build_customer_balance_summary(self.due_soon_customer, today=self.today)
+        clean_summary = build_customer_balance_summary(self.clean_customer, today=self.today)
+
+        self.assertEqual(overdue_summary.severity, SEVERITY_OVERDUE_SOFT)  # 16 days <= 30
+        hard = _create_customer(company_name='AR Hard Overdue', approved=True)
+        self._create_invoice(hard, amount=Decimal('10.00'), qb_due_date=date(2026, 5, 1))
+        hard_summary = build_customer_balance_summary(hard, today=self.today)
+        self.assertEqual(hard_summary.severity, SEVERITY_OVERDUE_HARD)
+        self.assertEqual(due_soon_summary.severity, SEVERITY_DUE_SOON)
+        self.assertEqual(clean_summary.severity, SEVERITY_NONE)
+
+    def test_customer_list_view_applies_ar_filters_with_search_and_estado(self):
+        admin = Usuario.objects.create_user(
+            username='admin-ar-filters',
+            password='secret123',
+            role='admin',
+        )
+        self.client.force_login(admin)
+
+        with patch(
+            'config.clientes.balance_summary.timezone.localdate',
+            return_value=self.today,
+        ):
+            response = self.client.get(
+                reverse('vendedores_clientes'),
+                {
+                    'q': 'AR',
+                    'estado': 'activo',
+                    'ar_status': 'outstanding',
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        names = {c.nombre_empresa for c in response.context['clientes']}
+        self.assertIn('AR Overdue Co', names)
+        self.assertIn('AR Due Soon Co', names)
+        self.assertNotIn('AR Clean Co', names)
+        self.assertNotIn('AR Inactive Co', names)
+        self.assertContains(response, 'Receivables Filters')
+        self.assertContains(response, 'Customers with balance')
+        self.assertEqual(response.context['filter_ar_status'], 'outstanding')
+        self.assertEqual(response.context['receivables_summary'].customers_with_balance, 2)

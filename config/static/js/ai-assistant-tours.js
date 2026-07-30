@@ -76,6 +76,9 @@
     const steps = tours[tourKey] || [];
     let lastActiveIndex = 0;
     let resumingAfterModal = false;
+    const preventManualScroll = function (event) {
+      event.preventDefault();
+    };
     const createDriver = window.driver && window.driver.js && typeof window.driver.js.driver === "function"
       ? window.driver.js.driver
       : (typeof window.driver === "function" ? window.driver : null);
@@ -86,7 +89,7 @@
       animate: true,
       allowClose: true,
       overlayClickBehavior: "close",
-      allowScroll: false,
+      allowScroll: true,
       showProgress: true,
       steps: steps.map(function (step) {
         return {
@@ -101,6 +104,8 @@
         };
       }),
       onDestroyed: function () {
+        window.removeEventListener("wheel", preventManualScroll, true);
+        window.removeEventListener("touchmove", preventManualScroll, true);
         const completed = lastActiveIndex === steps.length - 1;
         persist(tourKey, lastActiveIndex, completed, !completed);
         if (!completed && !resumingAfterModal) {
@@ -131,6 +136,8 @@
         }, { once: true });
       }
     });
+    window.addEventListener("wheel", preventManualScroll, { capture: true, passive: false });
+    window.addEventListener("touchmove", preventManualScroll, { capture: true, passive: false });
     driverObj.drive(Number.isInteger(startIndex) ? startIndex : 0);
     return true;
   }

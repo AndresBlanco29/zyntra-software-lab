@@ -76,6 +76,7 @@
     const steps = tours[tourKey] || [];
     let lastActiveIndex = 0;
     let resumingAfterModal = false;
+    let modalTriggerBoundForIndex = null;
     const preventManualScroll = function (event) {
       event.preventDefault();
     };
@@ -118,6 +119,7 @@
         lastActiveIndex = typeof context.state?.activeIndex === "number"
           ? context.state.activeIndex
           : (driverObj.getActiveIndex() || 0);
+        modalTriggerBoundForIndex = null;
       },
       onPrevClick: function (_element, _step, context) {
         const activeIndex = typeof context.state?.activeIndex === "number"
@@ -139,8 +141,8 @@
         if (!step || !step.pauseForModal) return;
         const trigger = findVisibleElement(step.element);
         const modal = document.querySelector(step.pauseForModal);
-        if (!trigger || !modal || trigger.dataset.aiTourModalBound === "true") return;
-        trigger.dataset.aiTourModalBound = "true";
+        if (!trigger || !modal || modalTriggerBoundForIndex === lastActiveIndex) return;
+        modalTriggerBoundForIndex = lastActiveIndex;
         trigger.addEventListener("click", function () {
           const resumeIndex = lastActiveIndex + 1;
           resumingAfterModal = true;

@@ -115,6 +115,11 @@ PERMISSION_SECTIONS = (
                 'label': _('Assign customers to sales'),
                 'description': _('Assign one, several or all customers to specific sales users.'),
             },
+            {
+                'code': 'backoffice.ai_assistant.manage',
+                'label': _('AI Assistant'),
+                'description': _('Configure the customer AI Assistant, its knowledge and commercial guidance.'),
+            },
         ),
     },
     {
@@ -238,6 +243,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         'backoffice.invoices.manage',
         'backoffice.reports.view',
         'backoffice.customers.assign',
+        'backoffice.ai_assistant.manage',
         'admin.products.view',
         'admin.products.manage',
         'vendor.customers.view',

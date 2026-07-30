@@ -1200,6 +1200,15 @@ def enviar_cotizacion_cliente(request, cotizacion_id):
         updates.extend(['whatsapp_enviado', 'whatsapp_enviado_en'])
 
     cotizacion.save(update_fields=list(dict.fromkeys(updates)))
+    from config.ai_assistant.models import AssistantDomainEvent
+    from config.ai_assistant.services.events import record_assistant_event
+    record_assistant_event(
+        cliente=cotizacion.cliente,
+        event_type=AssistantDomainEvent.TYPE_QUOTE_READY,
+        entity_type='Cotizacion',
+        entity_id=cotizacion.id,
+        payload={'quote_token': str(cotizacion.token_cliente), 'tour_id': 'quote-ready'},
+    )
 
     if cotizacion.correo_enviado:
         success_message = _('The order was sent to the customer by email.')

@@ -85,7 +85,7 @@ data-combo-free-preview-label="{% trans 'Included when you reach this tier' %}">
               {% endif %}
                 <a href="{% url 'ver_cotizacion' %}"
                    class="btn btn-outline-light js-my-order-cta{% if carrito_total_items %} my-order-cta--attention{% endif %}"
-                   id="myOrderNavBtn">
+                   id="myOrderNavBtn" data-ai-tour="cart">
                     {% trans "My Order" %} (<span id="contadorCarrito">{{ carrito_total_items|default:0 }}</span>)
                 </a>
                 <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#logoutModal" style="font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
@@ -180,7 +180,7 @@ data-combo-free-preview-label="{% trans 'Included when you reach this tier' %}">
                 </div>
 
                 {% if promociones_disponibles %}
-                <section class="promo-welcome-banner mb-4" aria-labelledby="promoWelcomeTitle">
+                <section class="promo-welcome-banner mb-4" data-ai-tour="promotions" aria-labelledby="promoWelcomeTitle">
                     <div class="promo-welcome-banner__icon" aria-hidden="true">🎉</div>
                     <div class="promo-welcome-banner__content">
                         <h2 id="promoWelcomeTitle" class="promo-welcome-banner__title">
@@ -994,6 +994,7 @@ function cargarLogin() {
 }
 </script>
 
+{% include "includes/customer_ai_assistant.html" with ai_assistant_page="catalog" %}
 
 </body>
 </html>

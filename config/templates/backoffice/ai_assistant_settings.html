@@ -1,0 +1,78 @@
+{% extends "bases/base_vendedor.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "AI Assistant" %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h3 class="mb-1">{% trans "AI Assistant" %}</h3>
+      <p class="text-muted mb-0">{% trans "Customer assistant configuration, knowledge and safe sales guidance." %}</p>
+    </div>
+    <span class="badge text-bg-secondary">{{ conversations_count }} {% trans "conversations" %}</span>
+  </div>
+
+  <form method="post" class="card custom-card mb-4">
+    {% csrf_token %}
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">{% trans "Assistant name" %}</label>
+          <input class="form-control" name="assistant_name" value="{{ assistant_config.assistant_name }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{% trans "Chat model" %}</label>
+          <input class="form-control" name="chat_model" value="{{ assistant_config.chat_model }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{% trans "Embedding model" %}</label>
+          <input class="form-control" name="embedding_model" value="{{ assistant_config.embedding_model }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{% trans "Temperature" %}</label>
+          <input class="form-control" type="number" min="0" max="1" step="0.05" name="temperature" value="{{ assistant_config.temperature }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label">{% trans "Welcome message" %}</label>
+          <textarea class="form-control" rows="3" name="welcome_message">{{ assistant_config.welcome_message }}</textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{% trans "Personality" %}</label>
+          <textarea class="form-control" rows="4" name="personality">{{ assistant_config.personality }}</textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{% trans "Commercial objective" %}</label>
+          <textarea class="form-control" rows="4" name="sales_goal">{{ assistant_config.sales_goal }}</textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label">{% trans "Additional system instructions" %}</label>
+          <textarea class="form-control" rows="5" name="system_prompt">{{ assistant_config.system_prompt }}</textarea>
+        </div>
+        <div class="col-12 d-flex flex-wrap gap-3">
+          <label class="form-check"><input class="form-check-input" type="checkbox" name="enabled" {% if assistant_config.enabled %}checked{% endif %}> {% trans "Enable assistant" %}</label>
+          <label class="form-check"><input class="form-check-input" type="checkbox" name="enable_home" {% if assistant_config.enable_home %}checked{% endif %}> {% trans "Home" %}</label>
+          <label class="form-check"><input class="form-check-input" type="checkbox" name="enable_catalog" {% if assistant_config.enable_catalog %}checked{% endif %}> {% trans "Catalog" %}</label>
+          <label class="form-check"><input class="form-check-input" type="checkbox" name="enable_customer_portal" {% if assistant_config.enable_customer_portal %}checked{% endif %}> {% trans "Customer portal" %}</label>
+        </div>
+      </div>
+    </div>
+    <div class="card-footer text-end"><button class="btn btn-primary">{% trans "Save configuration" %}</button></div>
+  </form>
+
+  <div class="card custom-card">
+    <div class="card-body">
+      <h5>{% trans "Published knowledge" %}</h5>
+      <p class="text-muted">{% trans "Manage FAQs and documents from Django Admin while the dedicated editor is introduced." %}</p>
+      <a class="btn btn-outline-primary" href="/admin/ai_assistant/assistantknowledgedocument/">{% trans "Manage knowledge documents" %}</a>
+      <ul class="mt-3 mb-0">
+        {% for document in knowledge_documents %}
+        <li>{{ document.title }} — {{ document.get_status_display }} ({{ document.chunks.count }} {% trans "chunks" %})</li>
+        {% empty %}
+        <li class="text-muted">{% trans "No documents created yet." %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

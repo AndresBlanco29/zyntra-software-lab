@@ -1,0 +1,36 @@
+{% load static i18n %}
+<link rel="stylesheet" href="{% static 'css/ai-assistant.css' %}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.4.0/dist/driver.css">
+<section
+  data-ai-assistant
+  data-page="{{ ai_assistant_page|default:'customer-portal' }}"
+  data-context-url="{% url 'ai_assistant_context' %}"
+  data-conversation-url="{% url 'ai_assistant_create_conversation' %}"
+  data-message-url="/ai-assistant/conversations/__conversation__/messages/"
+  data-confirm-action-url="/ai-assistant/actions/__action__/confirm/"
+  data-delete-history-url="{% url 'ai_assistant_delete_history' %}"
+  aria-label="{% trans 'La Tortilla Grocery assistant' %}"
+>
+  <button type="button" class="ai-assistant-launcher" data-ai-launcher aria-expanded="false" aria-controls="aiAssistantPanel">
+    AI
+  </button>
+  <div class="ai-assistant-panel" id="aiAssistantPanel" data-ai-panel role="dialog" aria-modal="false" aria-label="{% trans 'AI Assistant' %}">
+    <header class="ai-assistant-header d-flex align-items-center justify-content-between">
+      <div>
+        <strong data-ai-name>{% trans "Assistant" %}</strong>
+        <div class="small">{% trans "La Tortilla Grocery" %}</div>
+      </div>
+      <button class="btn btn-sm btn-outline-light" type="button" data-ai-delete-history>{% trans "Clear" %}</button>
+    </header>
+    <div class="ai-assistant-messages" data-ai-messages aria-live="polite"></div>
+    <div class="ai-assistant-actions" data-ai-actions></div>
+    <form class="ai-assistant-form" data-ai-form>
+      <label class="visually-hidden" for="aiAssistantInput">{% trans "Message" %}</label>
+      <textarea class="form-control" id="aiAssistantInput" data-ai-input maxlength="2000" placeholder="{% trans 'How can I help you?' %}"></textarea>
+      <button class="btn btn-primary" type="submit">{% trans "Send" %}</button>
+    </form>
+  </div>
+</section>
+<script src="https://cdn.jsdelivr.net/npm/driver.js@1.4.0/dist/driver.js"></script>
+<script src="{% static 'js/ai-assistant-tours.js' %}"></script>
+<script src="{% static 'js/ai-assistant.js' %}"></script>

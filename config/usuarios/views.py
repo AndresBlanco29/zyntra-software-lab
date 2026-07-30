@@ -1464,6 +1464,15 @@ def aprobar_cliente(request, cliente_id):
     usuario = cliente.usuario
     usuario.is_active = True
     usuario.save(update_fields=['is_active'])
+    from config.ai_assistant.models import AssistantDomainEvent
+    from config.ai_assistant.services.events import record_assistant_event
+    record_assistant_event(
+        cliente=cliente,
+        event_type=AssistantDomainEvent.TYPE_ACCOUNT_APPROVED,
+        entity_type='Cliente',
+        entity_id=cliente.id,
+        payload={'tour_id': 'approved-login'},
+    )
 
     try:
         email_sent = _send_client_decision_email(

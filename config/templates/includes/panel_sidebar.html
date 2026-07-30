@@ -73,6 +73,13 @@
       {% trans "Home Content" %}
     </a>
     {% endif %}
+
+    {% if request.user|has_internal_permission:'backoffice.ai_assistant.manage' %}
+    <a href="{% url 'ai_assistant_backoffice' %}"
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'ai_assistant_backoffice' %}active{% endif %}">
+      {% trans "AI Assistant" %}
+    </a>
+    {% endif %}
   </div>
 </details>
 {% endif %}

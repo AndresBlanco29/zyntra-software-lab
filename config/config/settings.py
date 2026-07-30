@@ -172,6 +172,7 @@ INSTALLED_APPS = [
     'config.pedidos',
     'config.reportes',
     'config.auditoria',
+    'config.ai_assistant',
 ]
 
 # ========================
@@ -198,6 +199,20 @@ MIDDLEWARE = [
 ]
 
 LOGIN_URL = '/login/'
+
+# ========================
+# AI ASSISTANT
+# ========================
+# The browser never receives OPENAI_API_KEY. Set it only in Railway/.env.
+OPENAI_API_KEY = (os.environ.get('OPENAI_API_KEY') or '').strip()
+OPENAI_API_BASE_URL = (os.environ.get('OPENAI_API_BASE_URL') or 'https://api.openai.com/v1').strip()
+AI_ASSISTANT_ENABLED = env_bool('AI_ASSISTANT_ENABLED', False)
+AI_ASSISTANT_OPENAI_TIMEOUT_SECONDS = env_int('AI_ASSISTANT_OPENAI_TIMEOUT_SECONDS', 25)
+AI_ASSISTANT_MAX_MESSAGE_CHARS = env_int('AI_ASSISTANT_MAX_MESSAGE_CHARS', 2000)
+AI_ASSISTANT_MAX_MESSAGES_PER_HOUR = env_int('AI_ASSISTANT_MAX_MESSAGES_PER_HOUR', 30)
+AI_ASSISTANT_CHAT_MODEL = (os.environ.get('AI_ASSISTANT_CHAT_MODEL') or 'gpt-4.1-mini').strip()
+AI_ASSISTANT_EMBEDDING_MODEL = (os.environ.get('AI_ASSISTANT_EMBEDDING_MODEL') or 'text-embedding-3-small').strip()
+AI_ASSISTANT_ROLLOUT_PERCENT = max(0, min(env_int('AI_ASSISTANT_ROLLOUT_PERCENT', 100), 100))
 
 # ========================
 # CORS

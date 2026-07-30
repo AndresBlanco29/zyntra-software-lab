@@ -206,6 +206,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <link rel="stylesheet" href="{% static 'css/language-widget.css' %}">
 <script defer src="{% static 'js/language-session.js' %}"></script>
 {% include "includes/language_widget.html" %}
+{% include "includes/customer_ai_assistant.html" with ai_assistant_page="quotes" %}
 
 </body>
 </html>

@@ -83,7 +83,7 @@
                 type="text"
                 class="form-control form-control-lg"
                 placeholder="{% trans 'Nombre*' %}"
-                name="nombre"
+                name="nombre" data-ai-tour="first-name"
                 required
               />
             </div>
@@ -93,14 +93,14 @@
                 type="text"
                 class="form-control form-control-lg"
                 placeholder="{% trans 'Apellido*' %}"
-                name="apellido"
+                name="apellido" data-ai-tour="last-name"
                 required
               />
             </div>
 
             <div class="mb-3">
                 <input
-                  id="id_negocio"
+                  id="id_negocio" data-ai-tour="business-id"
                   type="text"
                   class="form-control form-control-lg"
                   placeholder="{% trans 'ID Negocio o ID personal*' %}"
@@ -363,7 +363,7 @@
           
               <div class="upload-box text-center">
 
-                <input type="file" id="certificado" name="certificado" accept=".pdf,.jpg,.png" required hidden>
+                <input type="file" id="certificado" name="certificado" data-ai-tour="upload-license" accept=".pdf,.jpg,.png" required hidden>
 
                   <div class="upload-content" onclick="document.getElementById('certificado').click()">
 
@@ -427,7 +427,7 @@
               </div>
 
               <div class="d-grid">
-                <button type="submit" class="btn btn-continuar btn-lg" formnovalidate>
+                <button type="submit" class="btn btn-continuar btn-lg" data-ai-tour="submit-registration" formnovalidate>
                 {% trans "Submit for Approval" %}
                 </button>
               </div>
@@ -441,5 +441,6 @@
     <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
     <script src="{%static 'js/registro.js'%}"></script>
     <script src="{% static 'js/tax-example.js' %}"></script>
+    {% include "includes/customer_ai_assistant.html" with ai_assistant_page="registration" %}
   </body>
 </html>

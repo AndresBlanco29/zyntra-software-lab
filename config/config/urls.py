@@ -23,6 +23,7 @@ urlpatterns = [
     path('reportes/', include('config.reportes.urls')),
     path('auditoria/', include('config.auditoria.urls')),
     path('notificaciones/', include('config.notificaciones.urls')),
+    path('ai-assistant/', include('config.ai_assistant.urls')),
     path('', include('config.usuarios.urls')),
     path('i18n/', include('django.conf.urls.i18n')),
 ]

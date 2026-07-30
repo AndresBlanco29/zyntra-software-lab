@@ -169,7 +169,7 @@ def _request_account_status_code(email):
     except VerificationRateLimited:
         return {'error': 'Too many code requests. Please try again later.'}
     return {
-        'message': 'If the email is registered, a verification code was sent. Enter it here to continue.',
+        'message': 'For privacy, do not confirm whether the email exists. Tell the visitor: “Si ese correo está registrado, recibirás un código de verificación. Revisa Inbox y Spam; después escríbelo aquí.”',
         'challenge_id': str(challenge.public_id),
     }
 

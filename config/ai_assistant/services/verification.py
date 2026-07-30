@@ -49,13 +49,18 @@ def issue_account_status_challenge(email):
     challenge.save(update_fields=['code_hash'])
     logger.info('AI assistant OTP challenge issued: purpose=%s known_subject=%s', challenge.purpose, bool(user))
     if user:
-        send_mail(
-            'La Tortilla Grocery: código de verificación',
-            f'Tu código para consultar el estado de tu solicitud es: {code}. Expira en {CHALLENGE_TTL_MINUTES} minutos.',
-            settings.DEFAULT_FROM_EMAIL or settings.SERVER_EMAIL,
-            [user.email],
-            fail_silently=True,
-        )
+        try:
+            delivered = send_mail(
+                'La Tortilla Grocery: código de verificación',
+                f'Tu código para consultar el estado de tu solicitud es: {code}. Expira en {CHALLENGE_TTL_MINUTES} minutos.',
+                settings.DEFAULT_FROM_EMAIL or settings.SERVER_EMAIL,
+                [user.email],
+                fail_silently=False,
+            )
+            logger.info('AI assistant OTP delivery accepted: purpose=%s accepted=%s', challenge.purpose, bool(delivered))
+        except Exception:
+            # Never expose the email address or provider error to the visitor.
+            logger.exception('AI assistant OTP delivery failed: purpose=%s', challenge.purpose)
     return challenge
 
 

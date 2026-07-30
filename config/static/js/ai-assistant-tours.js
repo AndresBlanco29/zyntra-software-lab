@@ -12,12 +12,12 @@
       { element: "[data-ai-tour='last-name']", title: "Apellido", description: "Escribe tu apellido." },
       { element: "[data-ai-tour='business-id']", title: "Business ID", description: "Ingresa tu identificación comercial." },
       { element: "[data-ai-tour='mobile-contact-number']", title: "Número de contacto móvil", description: "Ingresa tu número móvil de 10 dígitos." },
-      { element: "[data-ai-tour='continue-personal']", title: "Continuar", description: "Cuando termines estos datos, presiona Continuar.", advanceOnClick: true },
+      { element: "[data-ai-tour='continue-personal']", title: "Continuar", description: "Completa correctamente todos los campos obligatorios y presiona Continuar.", advanceWhenVisible: "[data-ai-tour='username']" },
       { element: "[data-ai-tour='username']", title: "Usuario", description: "Crea el usuario para ingresar al portal." },
       { element: "[data-ai-tour='email']", title: "Correo electrónico", description: "Ingresa un correo al que tengas acceso." },
       { element: "[data-ai-tour='password']", title: "Contraseña", description: "Crea y confirma una contraseña segura." },
       { element: "[data-ai-tour='confirm-password']", title: "Confirmar contraseña", description: "Escribe nuevamente la misma contraseña para confirmarla." },
-      { element: "[data-ai-tour='continue-credentials']", title: "Continuar", description: "Avanza a la información comercial.", advanceOnClick: true },
+      { element: "[data-ai-tour='continue-credentials']", title: "Continuar", description: "Completa usuario, correo y ambas contraseñas válidas; después presiona Continuar.", advanceWhenVisible: "[data-ai-tour='business-name']" },
       { element: "[data-ai-tour='business-name']", title: "Nombre legal del negocio", description: "Ingresa el nombre legal de tu empresa." },
       { element: "[data-ai-tour='sales-tax-example']", title: "Ejemplo de Sales Tax", description: "Haz clic en View example. Al cerrar el ejemplo, te mostraré el campo donde debes escribir ese número.", pauseForModal: "#taxExampleModal" },
       { element: "[data-ai-tour='sales-tax']", title: "Sales Tax Number", description: "Escribe aquí el número que viste en el ejemplo." },
@@ -30,9 +30,9 @@
       { element: "[data-ai-tour='zip-code']", title: "Código postal", description: "Ingresa el ZIP code de la dirección." },
       { element: "[data-ai-tour='country']", title: "País", description: "El país está preconfigurado como USA." },
       { element: "[data-ai-tour='certificate-example']", title: "Ejemplo de certificado", description: "Haz clic en View example. Al cerrar el ejemplo, te mostraré dónde cargar tu archivo.", pauseForModal: "#taxExampleModal" },
-      { element: "[data-ai-tour='upload-license']", title: "Certificado o licencia", description: "Haz clic aquí para cargar el certificado requerido.", advanceOnClick: true },
-      { element: "[data-ai-tour='certify-information']", title: "Confirmar información", description: "Marca esta casilla después de verificar que toda la información es correcta." },
-      { element: "[data-ai-tour='submit-registration']", title: "Enviar solicitud", description: "Envía la solicitud para aprobación." }
+      { element: "[data-ai-tour='upload-license']", title: "Certificado o licencia", description: "Carga un PDF, JPG o PNG. La guía continuará solo cuando el archivo se haya seleccionado.", advanceWhenFileSelected: "#certificado" },
+      { element: "[data-ai-tour='certify-information']", title: "Confirmar información", description: "Marca esta casilla después de verificar que toda la información es correcta.", requireChecked: true },
+      { element: "[data-ai-tour='submit-registration']", title: "Enviar solicitud", description: "Cuando todos los campos sean válidos, envía la solicitud. ¡Excelente trabajo!", completeOnClick: true }
     ],
     "approved-login": [
       { element: "input[name='username']", title: "Usuario", description: "Ingresa tu usuario." },
@@ -151,6 +151,23 @@
         }
         driverObj.movePrevious();
       },
+      onNextClick: function (_element, _step, context) {
+        const activeIndex = typeof context.state?.activeIndex === "number"
+          ? context.state.activeIndex
+          : (driverObj.getActiveIndex() || 0);
+        const step = steps[activeIndex];
+        if (step && step.requireChecked) {
+          const checkbox = findVisibleElement(step.element);
+          if (!checkbox || !checkbox.checked) {
+            if (checkbox) {
+              checkbox.focus();
+              checkbox.classList.add("is-invalid");
+            }
+            return;
+          }
+        }
+        driverObj.moveNext();
+      },
       onHighlighted: function () {
         const activeElement = driverObj.getActiveElement();
         if (activeElement) {
@@ -158,7 +175,33 @@
           window.setTimeout(refreshTourPosition, 250);
         }
         const step = steps[lastActiveIndex];
-        if (!step || !step.pauseForModal) return;
+        if (!step) return;
+        const activeControl = findVisibleElement(step.element);
+        if (step.advanceWhenVisible && activeControl) {
+          activeControl.addEventListener("click", function () {
+            window.setTimeout(function () {
+              if (findVisibleElement(step.advanceWhenVisible)) driverObj.moveNext();
+            }, 180);
+          }, { once: true });
+        }
+        if (step.advanceWhenFileSelected) {
+          const fileInput = document.querySelector(step.advanceWhenFileSelected);
+          if (fileInput) {
+            fileInput.addEventListener("change", function () {
+              if (fileInput.files && fileInput.files.length) driverObj.moveNext();
+            }, { once: true });
+          }
+        }
+        if (step.completeOnClick && activeControl) {
+          activeControl.addEventListener("click", function () {
+            const form = activeControl.form;
+            if (form && form.checkValidity()) {
+              resumingAfterModal = true;
+              driverObj.destroy();
+            }
+          });
+        }
+        if (!step.pauseForModal) return;
         const trigger = findVisibleElement(step.element);
         const modal = document.querySelector(step.pauseForModal);
         if (!trigger || !modal || modalTriggerBoundForIndex === lastActiveIndex) return;

@@ -175,3 +175,34 @@ class VerificationTests(TestCase):
         self.assertIsNone(verify_account_status_challenge(challenge.public_id, '000000'))
         challenge.refresh_from_db()
         self.assertEqual(challenge.attempts, 1)
+
+    @patch('config.ai_assistant.services.verification.send_mail', return_value=1)
+    @patch('config.ai_assistant.services.verification.secrets.randbelow', return_value=123456)
+    def test_correct_otp_is_accepted_once_for_the_registered_customer(self, _random_code, send_mail_mock):
+        from config.ai_assistant.services.verification import issue_account_status_challenge, verify_account_status_challenge
+        from config.clientes.models import Cliente
+
+        user = Usuario.objects.create_user(
+            username='otp-customer',
+            email='otp-customer@example.com',
+            password='safe-password',
+            role='cliente',
+        )
+        cliente = Cliente.objects.create(
+            usuario=user,
+            nombre_empresa='OTP Test',
+            telefono='5551234567',
+            direccion='123 Test Street',
+            ciudad='Atlanta',
+            estado='GA',
+            sales_tax_number='OTP-1',
+            certificado_tax='certificados/test.pdf',
+        )
+        # The OTP resolves ownership through Cliente, not a mutable user role.
+        user.role = 'backoffice'
+        user.save(update_fields=['role'])
+
+        challenge = issue_account_status_challenge(user.email)
+        self.assertEqual(verify_account_status_challenge(challenge.public_id, '123456'), cliente)
+        self.assertIsNone(verify_account_status_challenge(challenge.public_id, '123456'))
+        send_mail_mock.assert_called_once()

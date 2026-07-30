@@ -9,7 +9,7 @@ from django.core.mail import send_mail
 from django.utils import timezone
 
 from config.ai_assistant.models import AssistantVerificationChallenge
-from config.usuarios.models import Usuario
+from config.clientes.models import Cliente
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +35,18 @@ def issue_account_status_challenge(email):
     if issued >= MAX_CHALLENGES_PER_HOUR:
         raise VerificationRateLimited()
     cache.set(rate_key, issued + 1, timeout=3600)
-    user = Usuario.objects.filter(email__iexact=normalized_email, role='cliente').select_related('cliente').first()
+    # Pending applications can have a different role while backoffice reviews
+    # them. The Cliente record is the authoritative ownership boundary.
+    cliente = Cliente.objects.select_related('usuario').filter(
+        usuario__email__iexact=normalized_email,
+    ).first()
+    user = cliente.usuario if cliente else None
     code = f'{secrets.randbelow(1_000_000):06d}'
     challenge = AssistantVerificationChallenge.objects.create(
         purpose=AssistantVerificationChallenge.PURPOSE_ACCOUNT_STATUS,
         email_hash=_email_hash(normalized_email),
         user=user,
-        cliente=getattr(user, 'cliente', None) if user else None,
+        cliente=cliente,
         expires_at=timezone.now() + timedelta(minutes=CHALLENGE_TTL_MINUTES),
         code_hash='',
     )

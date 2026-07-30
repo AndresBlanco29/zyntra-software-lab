@@ -337,6 +337,27 @@ def _annotate_selector_picking_rows(pedidos):
 	return pedidos
 
 
+def _presentations_for_picker_catalog(*, exclude_pedido_ids=None):
+	"""Active presentations with dual-ledger Available (not Quick Inventory) attached."""
+	from config.inventario.availability import availability_snapshot
+
+	presentations = list(
+		Presentacion.objects.select_related('producto', 'stock_operativo')
+		.filter(producto__activo=True)
+		.order_by('producto__nombre', 'nombre')
+	)
+	ledger = availability_snapshot(
+		[presentation.id for presentation in presentations],
+		exclude_pedido_ids=exclude_pedido_ids,
+	)
+	for presentation in presentations:
+		presentation.available_packages = max(
+			int(ledger.get(presentation.id, {}).get('available', 0) or 0),
+			0,
+		)
+	return presentations
+
+
 def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentation_overrides=None):
 	from config.inventario.availability import availability_snapshot
 
@@ -372,13 +393,15 @@ def _build_selector_item_rows(pedido, actual_quantity_overrides=None, presentati
 			{
 				'id': presentation.id,
 				'label': presentation.nombre_traducido,
-				'stock_fisico': int(ledger.get(presentation.id, {}).get('available', 0) or 0),
+				# Legacy key name kept for the template; value is dual-ledger Available.
+				'stock_fisico': max(int(ledger.get(presentation.id, {}).get('available', 0) or 0), 0),
+				'available': max(int(ledger.get(presentation.id, {}).get('available', 0) or 0), 0),
 			}
 			for presentation in product_presentations
 		]
 		selected_stock = next(
-			(option['stock_fisico'] for option in presentation_options if option['id'] == selected_presentation_id),
-			int(ledger.get(item.presentacion_id, {}).get('available', 0) or 0),
+			(option['available'] for option in presentation_options if option['id'] == selected_presentation_id),
+			max(int(ledger.get(item.presentacion_id, {}).get('available', 0) or 0), 0),
 		)
 		requested_quantity = int(
 			getattr(item, 'cantidad_solicitada_documentada', None)
@@ -2100,6 +2123,6 @@ def selector_picking_detail(request, pedido_id):
 		'form_has_stock_shortage': form_has_stock_shortage,
 		'additional_item_rows': additional_item_rows,
 		'reviewed_item_ids': reviewed_item_ids,
-		'available_presentations': Presentacion.objects.select_related('producto', 'stock_operativo').filter(producto__activo=True).order_by('producto__nombre', 'nombre'),
+		'available_presentations': _presentations_for_picker_catalog(exclude_pedido_ids=[pedido.id]),
 	}
 	return render(request, 'backoffice/selector_picking_detail.html', context)

@@ -393,7 +393,7 @@
     "id": "{{ presentacion.id }}",
     "product_id": "{{ presentacion.producto_id }}",
     "label": "{{ presentacion.producto.nombre|escapejs }} - {{ presentacion.nombre_traducido|escapejs }}",
-    "stock_physical": {{ presentacion.stock_operativo.stock_fisico|default:0 }}
+    "stock_physical": {{ presentacion.available_packages|default:0 }}
   }{% if not forloop.last %},{% endif %}
 {% endfor %}
 ]

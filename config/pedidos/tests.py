@@ -1309,6 +1309,65 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'name="cantidad_pallets"', html=False)
 		self.assertContains(response, 'Pallets:')
 
+	def test_picker_catalog_and_labels_use_available_not_quick_inventory(self):
+		"""Sales Pending Sync must reduce the picker 'Available stock' label and search JSON."""
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(
+			stock_fisico=10,
+			stock_reservado=0,
+			stock_disponible=10,
+		)
+		other_pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='INVOICE_GENERADA',
+			total=Decimal('48.00'),
+		)
+		other_item = PedidoItem.objects.create(
+			pedido=other_pedido,
+			presentacion=self.presentacion,
+			cantidad=4,
+			precio=Decimal('12.00'),
+			subtotal=Decimal('48.00'),
+		)
+		invoice = Invoice.objects.create(
+			pedido=other_pedido,
+			cliente=self.cliente,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			estado='GENERADA',
+			subtotal=Decimal('48.00'),
+			total_neto=Decimal('48.00'),
+		)
+		InvoiceItem.objects.create(
+			invoice=invoice,
+			pedido_item=other_item,
+			presentacion=self.presentacion,
+			producto_nombre=self.presentacion.producto.nombre,
+			presentacion_nombre=self.presentacion.nombre,
+			cantidad_facturada=4,
+			precio_unitario=Decimal('12.00'),
+			subtotal=Decimal('48.00'),
+		)
+
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+		response = self.client.get(reverse('selector_picking_detail', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		# Dual-ledger Available = QI 10 - pending sync 4 = 6 (not Quick Inventory 10).
+		self.assertContains(response, 'Available stock: 6 CS')
+		self.assertNotContains(response, 'Available stock: 10 CS')
+		self.assertContains(
+			response,
+			f'"id": "{self.presentacion.id}"',
+			html=False,
+		)
+		self.assertContains(
+			response,
+			f'"product_id": "{self.presentacion.producto_id}"',
+			html=False,
+		)
+		self.assertContains(response, '"stock_physical": 6', html=False)
+
 	def test_selector_can_save_and_restore_picking_progress_without_completing(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		self.client.force_login(self.selector)

@@ -86,6 +86,7 @@
       animate: true,
       allowClose: true,
       overlayClickBehavior: "close",
+      allowScroll: false,
       showProgress: true,
       steps: steps.map(function (step) {
         return {

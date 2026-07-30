@@ -1,6 +1,9 @@
 (function () {
   "use strict";
 
+  let activeTour = null;
+  let tourRunId = 0;
+
   const tours = {
     registration: [
       { element: "[data-ai-tour='login']", title: "¿Ya tienes cuenta?", description: "Si ya fuiste aprobado, haz clic en Login. Si eres nuevo, presiona Next para crear una cuenta." },
@@ -73,6 +76,11 @@
   }
 
   function start(tourKey, startIndex) {
+    const runId = ++tourRunId;
+    if (activeTour && activeTour.driver && activeTour.driver.isActive()) {
+      activeTour.replaced = true;
+      activeTour.driver.destroy();
+    }
     const steps = tours[tourKey] || [];
     let lastActiveIndex = 0;
     let resumingAfterModal = false;
@@ -92,6 +100,7 @@
     if (!steps.length || !createDriver) {
       return false;
     }
+    const tourSession = { driver: null, replaced: false };
     const driverObj = createDriver({
       animate: true,
       allowClose: true,
@@ -112,9 +121,10 @@
       }),
       onDestroyed: function () {
         window.removeEventListener("scroll", refreshTourPosition, true);
+        if (activeTour === tourSession) activeTour = null;
         const completed = lastActiveIndex === steps.length - 1;
         persist(tourKey, lastActiveIndex, completed, !completed);
-        if (!completed && !resumingAfterModal) {
+        if (!completed && !resumingAfterModal && !tourSession.replaced) {
           window.dispatchEvent(new CustomEvent("tortilla-assistant-tour-dismissed", {
             detail: { tourId: tourKey, resumeIndex: lastActiveIndex }
           }));
@@ -158,7 +168,7 @@
           resumingAfterModal = true;
           let resumed = false;
           const resumeGuide = function () {
-            if (resumed) return;
+            if (resumed || runId !== tourRunId) return;
             resumed = true;
             window.setTimeout(function () { start(tourKey, resumeIndex); }, 250);
           };
@@ -172,6 +182,8 @@
         }, { once: true });
       }
     });
+    tourSession.driver = driverObj;
+    activeTour = tourSession;
     window.addEventListener("scroll", refreshTourPosition, true);
     driverObj.drive(Number.isInteger(startIndex) ? startIndex : 0);
     return true;

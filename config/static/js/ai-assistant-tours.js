@@ -99,7 +99,7 @@
           popover: {
             title: step.title,
             description: step.description,
-            showButtons: step.advanceOnClick ? ["close"] : ["next", "previous", "close"]
+            showButtons: step.advanceOnClick ? ["previous", "close"] : ["next", "previous", "close"]
           }
         };
       }),
@@ -118,6 +118,21 @@
         lastActiveIndex = typeof context.state?.activeIndex === "number"
           ? context.state.activeIndex
           : (driverObj.getActiveIndex() || 0);
+      },
+      onPrevClick: function (_element, _step, context) {
+        const activeIndex = typeof context.state?.activeIndex === "number"
+          ? context.state.activeIndex
+          : (driverObj.getActiveIndex() || 0);
+        const formStepToRestore = {
+          12: 3, // Business information -> platform access.
+          7: 2   // Platform access -> personal details.
+        }[activeIndex];
+        if (formStepToRestore && typeof window.prevStepModal === "function") {
+          window.prevStepModal(formStepToRestore);
+          window.setTimeout(function () { driverObj.movePrevious(); }, 200);
+          return;
+        }
+        driverObj.movePrevious();
       },
       onHighlighted: function () {
         const step = steps[lastActiveIndex];

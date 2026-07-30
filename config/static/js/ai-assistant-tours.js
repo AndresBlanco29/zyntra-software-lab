@@ -60,7 +60,7 @@
     });
   }
 
-  function start(tourKey) {
+  function start(tourKey, startIndex) {
     const steps = tours[tourKey] || [];
     let lastActiveIndex = 0;
     const createDriver = window.driver && window.driver.js && typeof window.driver.js.driver === "function"
@@ -91,7 +91,7 @@
         persist(tourKey, lastActiveIndex, completed, !completed);
         if (!completed) {
           window.dispatchEvent(new CustomEvent("tortilla-assistant-tour-dismissed", {
-            detail: { tourId: tourKey }
+            detail: { tourId: tourKey, resumeIndex: lastActiveIndex }
           }));
         }
       },
@@ -101,7 +101,7 @@
           : (driverObj.getActiveIndex() || 0);
       }
     });
-    driverObj.drive();
+    driverObj.drive(Number.isInteger(startIndex) ? startIndex : 0);
     return true;
   }
 

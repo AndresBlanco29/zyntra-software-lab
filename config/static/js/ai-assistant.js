@@ -39,7 +39,14 @@
       link.textContent = action.label || "Continuar";
       if (action.tour_id) {
         link.dataset.aiTourStart = action.tour_id;
-        if (action.url && action.url !== "#") {
+        if (Number.isInteger(action.resume_index)) {
+          link.addEventListener("click", function (event) {
+            event.preventDefault();
+            if (window.TortillaAssistantTours) {
+              window.TortillaAssistantTours.start(action.tour_id, action.resume_index);
+            }
+          });
+        } else if (action.url && action.url !== "#") {
           const targetUrl = new URL(action.url, window.location.origin);
           targetUrl.searchParams.set("ai_tour", action.tour_id);
           link.href = targetUrl.pathname + targetUrl.search + targetUrl.hash;
@@ -155,6 +162,7 @@
 
     window.addEventListener("tortilla-assistant-tour-dismissed", function (event) {
       const tourId = event.detail && event.detail.tourId;
+      const resumeIndex = event.detail && event.detail.resumeIndex;
       if (!tourId) return;
       boot();
       panel.classList.add("is-open");
@@ -163,7 +171,8 @@
       renderActions(actions, [{
         label: "Reanudar guía paso a paso",
         url: "#",
-        tour_id: tourId
+        tour_id: tourId,
+        resume_index: Number.isInteger(resumeIndex) ? resumeIndex : 0
       }]);
       input.focus();
     });

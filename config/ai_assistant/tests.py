@@ -1,6 +1,7 @@
 import json
 import uuid
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -8,6 +9,7 @@ from django.utils import timezone
 
 from config.ai_assistant.models import AssistantConfiguration, AssistantKnowledgeDocument, AssistantMessage, AssistantPendingAction
 from config.ai_assistant.services.knowledge import rebuild_document_chunks, search_published_knowledge
+from config.ai_assistant.services.openai_client import OpenAIClient
 from config.usuarios.models import Usuario
 
 
@@ -100,3 +102,28 @@ class AssistantKnowledgeTests(TestCase):
 
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]['title'], 'Registro de clientes')
+
+
+class OpenAIClientTests(TestCase):
+    @patch.object(OpenAIClient, '_post')
+    def test_create_response_extracts_raw_responses_api_message_text(self, mock_post):
+        mock_post.return_value = {
+            'id': 'resp_test',
+            'output': [{
+                'type': 'message',
+                'content': [{
+                    'type': 'output_text',
+                    'text': 'Conexión correcta.',
+                }],
+            }],
+            'usage': {'input_tokens': 1, 'output_tokens': 2},
+        }
+
+        response = OpenAIClient().create_response(
+            model='gpt-4.1-mini',
+            instructions='Test',
+            input_messages=[{'role': 'user', 'content': 'Hola'}],
+            tools=[],
+        )
+
+        self.assertEqual(response['text'], 'Conexión correcta.')

@@ -55,7 +55,7 @@ class OpenAIClient:
             payload.pop('instructions', None)
             payload.pop('tools', None)
         response = self._post('/responses', payload)
-        output_text = response.get('output_text', '')
+        output_text = self._extract_output_text(response)
         tool_calls = []
         for item in response.get('output', []):
             if item.get('type') == 'function_call':
@@ -70,6 +70,28 @@ class OpenAIClient:
             'tool_calls': tool_calls,
             'usage': response.get('usage') or {},
         }
+
+    @staticmethod
+    def _extract_output_text(response):
+        """Extract assistant text from the raw Responses API JSON payload.
+
+        The official SDK exposes ``output_text`` as a convenience property, but
+        the raw REST JSON returned by requests keeps it under message content.
+        """
+        direct_text = response.get('output_text')
+        if isinstance(direct_text, str) and direct_text.strip():
+            return direct_text
+
+        text_parts = []
+        for item in response.get('output') or []:
+            if item.get('type') != 'message':
+                continue
+            for content in item.get('content') or []:
+                if content.get('type') in {'output_text', 'text'}:
+                    text = content.get('text')
+                    if isinstance(text, str) and text:
+                        text_parts.append(text)
+        return '\n'.join(text_parts)
 
     def create_embedding(self, *, model, content):
         response = self._post('/embeddings', {'model': model, 'input': content})

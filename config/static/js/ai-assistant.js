@@ -147,7 +147,10 @@
           }
           root.querySelector("[data-ai-name]").textContent = context.assistant_name;
           appendMessage(messages, context.welcome_message, false);
-          renderActions(actions, context.actions || [context.next_recommended_action].filter(Boolean));
+          const initialActions = Array.isArray(context.actions) && context.actions.length
+            ? context.actions
+            : [context.next_recommended_action].filter(Boolean);
+          renderActions(actions, initialActions);
           renderPendingEvent(root, context, messages, actions);
         })
         .catch(function () {});

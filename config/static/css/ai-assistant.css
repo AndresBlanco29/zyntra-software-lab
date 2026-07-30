@@ -36,7 +36,18 @@
 .ai-assistant-form { display: flex; gap: .5rem; padding: .75rem; border-top: 1px solid #e5e7eb; }
 .ai-assistant-form textarea { min-height: 42px; resize: none; }
 
-@media (max-width: 576px) {
-    .ai-assistant-launcher { right: 1rem; bottom: 1rem; }
-    .ai-assistant-panel { right: 1rem; bottom: 5.25rem; }
+@media (max-width: 768px) {
+    .ai-assistant-launcher { right: .75rem; bottom: .75rem; }
+    .ai-assistant-panel {
+        right: .75rem;
+        bottom: 4.85rem;
+        width: calc(100vw - 1.5rem);
+        max-height: calc(100dvh - 5.75rem);
+    }
+    .ai-assistant-header { padding: .75rem 1rem; }
+    .ai-assistant-messages { padding: .75rem; font-size: .92rem; }
+    .ai-assistant-message { margin-bottom: .5rem; padding: .65rem; }
+    .ai-assistant-actions { padding: 0 .75rem .65rem; }
+    .ai-assistant-actions .btn { width: 100%; }
+    .ai-assistant-form { padding: .65rem .75rem; }
 }

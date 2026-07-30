@@ -1,3 +1,4 @@
+from django.urls import reverse
 from django.utils import timezone
 
 from config.ai_assistant.models import (
@@ -19,6 +20,7 @@ Never expose secrets, passwords, internal QuickBooks data, other customers' info
 Never invent facts about prices, promotions, approval status, stock, delivery tracking, orders or quotes; use an available tool or say you cannot verify it.
 Do not claim an order was created, a quote accepted, or a cart changed. This assistant version provides read-only guidance only.
 Offer a relevant in-app next step before a text-only answer whenever possible.
+Never write Markdown links. Deep links and guided tours are rendered by the application as safe buttons.
 Use the customer's language. Be concise, warm and human.
 """
 
@@ -52,6 +54,37 @@ def _fallback_response(config, context, message):
         'suggested_actions': context.get('actions', []),
         'tour_id': None,
     }
+
+
+def _authorized_tour_for_message(message, context):
+    """Map a customer request to one of the fixed, browser-safe tours."""
+    normalized = str(message or '').lower()
+    if not context.get('authenticated'):
+        if any(term in normalized for term in ('registr', 'sign up', 'signup', 'crear cuenta', 'create account')):
+            return 'registration'
+        return None
+    if any(term in normalized for term in ('cotiz', 'quotation', 'quote')):
+        return 'quote-ready'
+    if any(term in normalized for term in ('reorden', 'reorder', 'historial', 'history')):
+        return 'reorder'
+    if any(term in normalized for term in ('pedido', 'orden', 'order', 'comprar', 'catalog', 'producto', 'promoc')):
+        return 'first-order'
+    return None
+
+
+def _guided_actions(context, tour_id):
+    if tour_id == 'registration':
+        return [{
+            'label': 'Iniciar registro guiado',
+            'url': f"{reverse('registro_usuario')}?ai_tour=registration",
+            'tour_id': 'registration',
+        }]
+    if tour_id:
+        return [
+            action for action in context.get('actions', [])
+            if action.get('tour_id') == tour_id
+        ] or context.get('actions', [])
+    return context.get('actions', [context.get('next_recommended_action')])
 
 
 def get_or_create_conversation(*, visitor_id, user, cliente, page, language):
@@ -159,10 +192,11 @@ def reply_to_message(*, request, conversation, message):
                 previous_response_id=response['id'],
             )
         text = response['text'] or _fallback_response(config, context, message)['message']
+        tour_id = _authorized_tour_for_message(message, context)
         result = {
             'message': text,
-            'suggested_actions': context.get('actions', []),
-            'tour_id': None,
+            'suggested_actions': _guided_actions(context, tour_id),
+            'tour_id': tour_id,
             'tool_results': tool_results,
             'confirmation_actions': [
                 {

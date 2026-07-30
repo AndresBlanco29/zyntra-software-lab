@@ -3,12 +3,17 @@
 
   const tours = {
     registration: [
-      { element: "[data-ai-tour='login']", title: "Inicia sesión", description: "Haz clic aquí si ya tienes una cuenta.", advanceOnClick: true },
-      { element: "[data-ai-tour='signup']", title: "Crea tu cuenta", description: "Haz clic en Sign Up para iniciar tu solicitud.", advanceOnClick: true },
       { element: "[data-ai-tour='first-name']", title: "Nombre", description: "Escribe tu primer nombre." },
       { element: "[data-ai-tour='last-name']", title: "Apellido", description: "Escribe tu apellido." },
       { element: "[data-ai-tour='business-id']", title: "Business ID", description: "Ingresa tu identificación comercial." },
-      { element: "[data-ai-tour='upload-license']", title: "Upload License", description: "Carga tu certificado o licencia." },
+      { element: "[data-ai-tour='continue-personal']", title: "Continuar", description: "Cuando termines estos datos, presiona Continuar.", advanceOnClick: true },
+      { element: "[data-ai-tour='username']", title: "Usuario", description: "Crea el usuario para ingresar al portal." },
+      { element: "[data-ai-tour='email']", title: "Correo electrónico", description: "Ingresa un correo al que tengas acceso." },
+      { element: "[data-ai-tour='password']", title: "Contraseña", description: "Crea y confirma una contraseña segura." },
+      { element: "[data-ai-tour='continue-credentials']", title: "Continuar", description: "Avanza a la información comercial.", advanceOnClick: true },
+      { element: "[data-ai-tour='business-name']", title: "Nombre legal del negocio", description: "Ingresa el nombre legal de tu empresa." },
+      { element: "[data-ai-tour='sales-tax']", title: "Sales Tax Number", description: "Ingresa tu número de Sales Tax." },
+      { element: "[data-ai-tour='upload-license']", title: "Certificado o licencia", description: "Haz clic aquí para cargar el certificado requerido.", advanceOnClick: true },
       { element: "[data-ai-tour='submit-registration']", title: "Enviar solicitud", description: "Envía la solicitud para aprobación." }
     ],
     "approved-login": [
@@ -45,12 +50,16 @@
 
   function start(tourKey) {
     const steps = (tours[tourKey] || []).filter(function (step) {
-      return document.querySelector(step.element);
+      const element = document.querySelector(step.element);
+      return element && element.offsetParent !== null;
     });
-    if (!steps.length || typeof window.driver !== "function") {
+    const createDriver = window.driver && typeof window.driver.js === "function"
+      ? window.driver.js
+      : (typeof window.driver === "function" ? window.driver : null);
+    if (!steps.length || !createDriver) {
       return false;
     }
-    const driverObj = window.driver({
+    const driverObj = createDriver({
       animate: true,
       allowClose: true,
       showProgress: true,
@@ -77,7 +86,13 @@
 
   window.TortillaAssistantTours = { start: start };
   document.addEventListener("click", function (event) {
-    const target = event.target.closest("[data-ai-tour-start]");
-    if (target) start(target.dataset.aiTourStart);
+    const target = event.target.closest("[data-ai-tour='continue-personal'], [data-ai-tour='continue-credentials']");
+    if (target) window.setTimeout(function () { start('registration'); }, 350);
+  });
+  document.addEventListener("DOMContentLoaded", function () {
+    const requestedTour = new URLSearchParams(window.location.search).get("ai_tour");
+    if (requestedTour && Object.prototype.hasOwnProperty.call(tours, requestedTour)) {
+      window.setTimeout(function () { start(requestedTour); }, 450);
+    }
   });
 }());

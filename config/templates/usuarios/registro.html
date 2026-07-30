@@ -129,6 +129,7 @@
               <button
                 type="button"
                 class="btn btn-continuar btn-lg"
+                data-ai-tour="continue-personal"
                 onclick="nextStep()">{% trans 'Continuar' %}
               </button>
             </div>
@@ -153,6 +154,7 @@
                 type="text"
                 class="form-control form-control-lg"
                 name="username"
+                data-ai-tour="username"
                 placeholder="{% trans 'Usuario*' %}"
                 required
               />
@@ -163,6 +165,7 @@
                 type="email"
                 class="form-control form-control-lg"
                 name="email"
+                data-ai-tour="email"
                 placeholder="{% trans 'Correo electrónico*' %}"
                 required
               />
@@ -173,6 +176,7 @@
                 type="password"
                 class="form-control form-control-lg"
                 name="password1"
+                data-ai-tour="password"
                 placeholder="{% trans 'Contraseña*' %}"
                 required
               />
@@ -192,6 +196,7 @@
               <button
                 type="button"
                 class="btn btn-continuar btn-lg"
+                data-ai-tour="continue-credentials"
                 onclick="nextStepCredenciales()"
               >
                 {% trans 'Continuar' %}
@@ -235,6 +240,7 @@
                     type="text"
                     class="form-control form-control-lg"
                     name="empresa"
+                    data-ai-tour="business-name"
                     placeholder="{% trans 'Legal business name' %}"
                     required/>
                 </div>
@@ -243,6 +249,7 @@
                   <div class="input-group">
                     <input
                       id="id_sales_tax"
+                      data-ai-tour="sales-tax"
                       type="text"
                       class="form-control form-control-lg"
                       name="sales_tax"
@@ -365,7 +372,7 @@
 
                 <input type="file" id="certificado" name="certificado" data-ai-tour="upload-license" accept=".pdf,.jpg,.png" required hidden>
 
-                  <div class="upload-content" onclick="document.getElementById('certificado').click()">
+                  <div class="upload-content" data-ai-tour="upload-license" onclick="document.getElementById('certificado').click()">
 
                     <i class="bi bi-cloud-arrow-up fs-1 text-secondary"></i>
 

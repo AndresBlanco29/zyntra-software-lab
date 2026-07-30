@@ -10,6 +10,7 @@ from django.utils import timezone
 from config.ai_assistant.models import AssistantConfiguration, AssistantKnowledgeDocument, AssistantMessage, AssistantPendingAction
 from config.ai_assistant.services.knowledge import rebuild_document_chunks, search_published_knowledge
 from config.ai_assistant.services.openai_client import OpenAIClient
+from config.ai_assistant.services.orchestrator import _authorized_tour_for_message, _guided_actions
 from config.usuarios.models import Usuario
 
 
@@ -127,3 +128,15 @@ class OpenAIClientTests(TestCase):
         )
 
         self.assertEqual(response['text'], 'Conexión correcta.')
+
+
+class GuidedTourIntentTests(TestCase):
+    def test_registration_request_gets_only_the_authorized_registration_tour(self):
+        context = {'authenticated': False, 'next_recommended_action': {'label': 'Registrarme', 'url': '/registro/'}}
+
+        tour_id = _authorized_tour_for_message('Ayúdame a registrarme', context)
+        actions = _guided_actions(context, tour_id)
+
+        self.assertEqual(tour_id, 'registration')
+        self.assertEqual(actions[0]['tour_id'], 'registration')
+        self.assertIn('ai_tour=registration', actions[0]['url'])

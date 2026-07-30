@@ -39,6 +39,18 @@
       link.textContent = action.label || "Continuar";
       if (action.tour_id) {
         link.dataset.aiTourStart = action.tour_id;
+        if (action.url && action.url !== "#") {
+          const targetUrl = new URL(action.url, window.location.origin);
+          targetUrl.searchParams.set("ai_tour", action.tour_id);
+          link.href = targetUrl.pathname + targetUrl.search + targetUrl.hash;
+        } else {
+          link.addEventListener("click", function (event) {
+            event.preventDefault();
+            if (window.TortillaAssistantTours) {
+              window.TortillaAssistantTours.start(action.tour_id);
+            }
+          });
+        }
       }
       container.appendChild(link);
     });

@@ -1,8 +1,10 @@
 import json
 import logging
+import time
 
 import requests
 from django.conf import settings
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -26,21 +28,37 @@ class OpenAIClient:
     def _post(self, path, payload):
         if not self.configured:
             raise OpenAIServiceError('OpenAI is not configured.')
-        try:
-            response = requests.post(
-                f'{self.base_url}{path}',
-                headers={
-                    'Authorization': f'Bearer {self.api_key}',
-                    'Content-Type': 'application/json',
-                },
-                data=json.dumps(payload),
-                timeout=self.timeout,
-            )
-            response.raise_for_status()
-            return response.json()
-        except requests.RequestException as exc:
-            logger.warning('OpenAI request failed: %s', exc)
-            raise OpenAIServiceError('The assistant service is temporarily unavailable.') from exc
+        breaker_key = 'ai-assistant:openai:circuit-open'
+        if cache.get(breaker_key):
+            raise OpenAIServiceError('The assistant service is temporarily unavailable.')
+        last_error = None
+        for attempt in range(3):
+            try:
+                response = requests.post(
+                    f'{self.base_url}{path}',
+                    headers={
+                        'Authorization': f'Bearer {self.api_key}',
+                        'Content-Type': 'application/json',
+                    },
+                    data=json.dumps(payload),
+                    timeout=self.timeout,
+                )
+                if response.status_code not in {408, 409, 429} and response.status_code < 500:
+                    response.raise_for_status()
+                    cache.delete('ai-assistant:openai:failures')
+                    return response.json()
+                response.raise_for_status()
+            except requests.RequestException as exc:
+                last_error = exc
+                if attempt < 2:
+                    time.sleep(0.4 * (2 ** attempt))
+        failures_key = 'ai-assistant:openai:failures'
+        failures = int(cache.get(failures_key, 0)) + 1
+        cache.set(failures_key, failures, timeout=120)
+        if failures >= 3:
+            cache.set(breaker_key, True, timeout=60)
+        logger.warning('OpenAI request failed after retries: %s', last_error)
+        raise OpenAIServiceError('The assistant service is temporarily unavailable.') from last_error
 
     def create_response(self, *, model, instructions, input_messages, tools, temperature=0.3, previous_response_id=''):
         payload = {

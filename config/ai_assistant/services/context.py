@@ -35,7 +35,7 @@ def build_customer_context(request):
         'actions': [
             {'label': 'Ver catálogo', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
             {'label': 'Mi orden', 'url': reverse('ver_cotizacion')},
-            {'label': 'Mis cotizaciones', 'url': reverse('cliente_cotizaciones_recibidas')},
+            {'label': 'Mis cotizaciones', 'url': reverse('cliente_cotizaciones_recibidas'), 'tour_id': 'quote-ready'},
             {'label': 'Mis pedidos', 'url': reverse('cliente_historial_ordenes'), 'tour_id': 'reorder'},
         ],
     })
@@ -76,6 +76,7 @@ def build_customer_context(request):
     )
     if latest_event:
         context['pending_event'] = {
+            'id': latest_event.id,
             'type': latest_event.event_type,
             'entity_type': latest_event.entity_type,
             'entity_id': latest_event.entity_id,

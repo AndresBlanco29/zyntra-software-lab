@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from config.ai_assistant.models import AssistantConfiguration, AssistantKnowledgeDocument, AssistantMessage, AssistantPendingAction
-from config.ai_assistant.services.knowledge import rebuild_document_chunks, search_published_knowledge
+from config.ai_assistant.services.knowledge import _cosine_similarity, rebuild_document_chunks, search_published_knowledge
 from config.ai_assistant.services.openai_client import OpenAIClient
 from config.ai_assistant.services.orchestrator import _authorized_tour_for_message, _guided_actions
 from config.usuarios.models import Usuario
@@ -103,6 +103,10 @@ class AssistantKnowledgeTests(TestCase):
 
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]['title'], 'Registro de clientes')
+
+    def test_cosine_similarity_ranks_matching_vectors(self):
+        self.assertGreater(_cosine_similarity([1, 0, 0], [0.9, 0.1, 0]), 0.9)
+        self.assertEqual(_cosine_similarity([1, 0], [0, 1]), 0)
 
 
 class OpenAIClientTests(TestCase):

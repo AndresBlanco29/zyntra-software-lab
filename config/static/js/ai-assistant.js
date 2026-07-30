@@ -78,6 +78,32 @@
     });
   }
 
+  function renderPendingEvent(root, context, messages, actions) {
+    const event = context.pending_event;
+    if (!event) return;
+    const messagesByType = {
+      ACCOUNT_APPROVED: "Tu cuenta fue aprobada. Puedo guiarte para iniciar sesión.",
+      QUOTE_READY: "Tengo buenas noticias: tu cotización está lista para revisar.",
+      ORDER_DISPATCHED: "Tu pedido fue despachado. Puedes consultar su estado.",
+      ORDER_DELIVERED: "Tu pedido fue marcado como entregado.",
+    };
+    appendMessage(messages, messagesByType[event.type] || "Tienes una actualización de tu cuenta.", false);
+    const action = document.createElement("button");
+    action.type = "button";
+    action.className = "btn btn-primary btn-sm";
+    action.textContent = "Ver actualización";
+    action.addEventListener("click", function () {
+      jsonFetch(root.dataset.consumeEventUrl.replace("__event__", event.id), { method: "POST", body: "{}" })
+        .then(function () {
+          const tourId = (event.payload || {}).tour_id;
+          if (tourId && window.TortillaAssistantTours) window.TortillaAssistantTours.start(tourId);
+          action.remove();
+        })
+        .catch(function () {});
+    });
+    actions.appendChild(action);
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     const root = document.querySelector("[data-ai-assistant]");
     if (!root) return;
@@ -115,6 +141,7 @@
           root.querySelector("[data-ai-name]").textContent = context.assistant_name;
           appendMessage(messages, context.welcome_message, false);
           renderActions(actions, context.actions || [context.next_recommended_action].filter(Boolean));
+          renderPendingEvent(root, context, messages, actions);
         })
         .catch(function () {});
     }

@@ -26,7 +26,7 @@
     <div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">
       <a href="{% url 'catalogo' %}" class="btn btn-outline-light">{% trans "Catalog" %}</a>
       <a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">{% trans "My Order" %}</a>
-      <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-light">
+      <a href="{% url 'cliente_cotizaciones_recibidas' %}" data-ai-tour="quotes" class="btn btn-outline-light">
         {% trans "Orders Received" %}
         {% if pendientes_cotizaciones %}
         <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
@@ -137,7 +137,7 @@
                   <td>${{ cotizacion.total }}</td>
                   <td>{{ cotizacion.items.count }}</td>
                   <td class="text-end">
-                    <a href="{% url 'cliente_cotizacion_recibida_detalle' cotizacion.token_cliente %}" class="btn btn-sm {% if cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}btn-yellow{% elif cotizacion.estado == 'CONFIRMADA_CLIENTE' %}btn-outline-success{% else %}btn-outline-primary{% endif %}">
+                    <a href="{% url 'cliente_cotizacion_recibida_detalle' cotizacion.token_cliente %}" data-ai-tour="quote-open" class="btn btn-sm {% if cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}btn-yellow{% elif cotizacion.estado == 'CONFIRMADA_CLIENTE' %}btn-outline-success{% else %}btn-outline-primary{% endif %}">
                       {% if cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}
                       {% trans "Review and confirm" %}
                       {% elif cotizacion.estado == 'CONFIRMADA_CLIENTE' %}

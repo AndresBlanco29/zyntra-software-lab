@@ -607,6 +607,15 @@ def _finalize_delivery_completion(
 	pedido = delivery.invoice.pedido
 	pedido.estado = 'DESPACHADO'
 	pedido.save(update_fields=['estado', 'actualizada_en'])
+	from config.ai_assistant.models import AssistantDomainEvent
+	from config.ai_assistant.services.events import record_assistant_event
+	record_assistant_event(
+		cliente=delivery.invoice.cliente,
+		event_type=AssistantDomainEvent.TYPE_ORDER_DELIVERED,
+		entity_type='Pedido',
+		entity_id=pedido.id,
+		payload={'pedido_id': pedido.id, 'delivery_status': delivery.estado},
+	)
 	from config.auditoria.business_events import log_business_event
 	log_business_event(
 		acting_user,

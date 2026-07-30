@@ -162,7 +162,7 @@
                     </td>
                     <td data-label="{% trans 'Quantity' %}">
                       {% if puede_editar %}
-                        <div class="input-group quantity-stepper" data-quantity-stepper>
+                        <div class="input-group quantity-stepper" data-quantity-stepper data-ai-tour="quote-lines">
                           <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="down" aria-label="{% trans 'Decrease quantity' %}">-</button>
                           <input type="number" min="1" class="form-control form-control-sm quantity-stepper__input" name="cantidad_{{ row.item.id }}" value="{{ row.quantity }}">
                           <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="up" aria-label="{% trans 'Increase quantity' %}">+</button>
@@ -203,7 +203,7 @@
               </div>
 
               <div class="d-flex flex-wrap gap-2">
-                <button type="submit" name="accion" value="aprobar" class="btn btn-primary">{% trans "Approve and Send Order" %}</button>
+                <button type="submit" name="accion" value="aprobar" data-ai-tour="quote-accept" class="btn btn-primary">{% trans "Approve and Send Order" %}</button>
                 <button type="submit" name="accion" value="cancelar" class="btn btn-outline-danger">{% trans "Cancel Order" %}</button>
               </div>
             </form>

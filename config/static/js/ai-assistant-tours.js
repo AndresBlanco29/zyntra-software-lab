@@ -30,7 +30,9 @@
       { element: "[data-ai-tour='cart']", title: "Mi orden", description: "Revisa comentarios y envía tu solicitud." }
     ],
     "quote-ready": [
-      { element: "[data-ai-tour='quotes']", title: "Cotizaciones", description: "Abre tu cotización respondida." },
+      { element: "[data-ai-tour='quote-open']", title: "Tu cotización está lista", description: "Haz clic para abrirla y revisar productos, cantidades y precios.", advanceOnClick: true },
+    ],
+    "quote-detail": [
       { element: "[data-ai-tour='quote-lines']", title: "Cantidades", description: "Revisa o ajusta tus cantidades." },
       { element: "[data-ai-tour='quote-accept']", title: "Aceptar", description: "Acepta la cotización cuando estés listo." }
     ],
@@ -93,6 +95,12 @@
   document.addEventListener("click", function (event) {
     const target = event.target.closest("[data-ai-tour='continue-personal'], [data-ai-tour='continue-credentials']");
     if (target) window.setTimeout(function () { start('registration'); }, 350);
+    const quoteLink = event.target.closest("[data-ai-tour='quote-open']");
+    if (quoteLink && quoteLink.href) {
+      const quoteUrl = new URL(quoteLink.href, window.location.origin);
+      quoteUrl.searchParams.set('ai_tour', 'quote-detail');
+      quoteLink.href = quoteUrl.toString();
+    }
   });
   document.addEventListener("DOMContentLoaded", function () {
     const requestedTour = new URLSearchParams(window.location.search).get("ai_tour");

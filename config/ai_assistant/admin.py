@@ -10,7 +10,8 @@ from .models import (
     AssistantMessage,
     AssistantUserState,
 )
-from .services.knowledge import embed_document_chunks, rebuild_document_chunks
+from .services.knowledge import rebuild_document_chunks
+from .tasks import rebuild_and_embed_knowledge_document
 
 
 @admin.register(AssistantConfiguration)
@@ -36,8 +37,9 @@ class AssistantKnowledgeDocumentAdmin(admin.ModelAdmin):
 
     @admin.action(description='Create OpenAI embeddings for selected chunks')
     def embed_chunks(self, request, queryset):
-        total = sum(embed_document_chunks(document) for document in queryset)
-        self.message_user(request, f'Created {total} embeddings.')
+        for document in queryset:
+            rebuild_and_embed_knowledge_document.delay(document.id)
+        self.message_user(request, f'Queued embeddings for {queryset.count()} knowledge documents.')
 
 
 @admin.register(AssistantConversation)

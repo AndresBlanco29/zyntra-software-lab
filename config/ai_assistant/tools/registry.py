@@ -3,7 +3,16 @@ import json
 from django.urls import reverse
 
 from config.ai_assistant.services.identity import get_customer_for_user
-from config.ai_assistant.services.actions import ACTION_ADD_CART, create_pending_action
+from config.ai_assistant.services.actions import (
+    ACTION_ACCEPT_QUOTE,
+    ACTION_ADD_CART,
+    ACTION_CANCEL_QUOTE,
+    ACTION_REMOVE_CART,
+    ACTION_REORDER,
+    ACTION_SUBMIT_QUOTE_REQUEST,
+    ACTION_UPDATE_CART,
+    create_pending_action,
+)
 from config.productos.models import Presentacion
 from config.productos.promotions import promociones_activas_queryset
 from config.cotizaciones.models import Cotizacion
@@ -60,6 +69,47 @@ def openai_tool_schemas():
             'name': 'get_quotes_and_orders',
             'description': 'Get the authenticated customer own ready quotes and recent order statuses only.',
             'parameters': {'type': 'object', 'properties': {}, 'additionalProperties': False},
+        },
+        {
+            'type': 'function',
+            'name': 'propose_cart_change',
+            'description': 'Prepare a quantity update or removal from the customer order. Requires explicit confirmation and never changes the cart immediately.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'cart_key': {'type': 'string'},
+                    'operation': {'type': 'string', 'enum': ['update', 'remove']},
+                    'quantity': {'type': 'integer', 'minimum': 1},
+                },
+                'required': ['cart_key', 'operation'],
+                'additionalProperties': False,
+            },
+        },
+        {
+            'type': 'function',
+            'name': 'propose_reorder',
+            'description': 'Prepare loading one of the authenticated customer previous orders into My Order. Requires confirmation.',
+            'parameters': {
+                'type': 'object',
+                'properties': {'pedido_id': {'type': 'integer'}},
+                'required': ['pedido_id'],
+                'additionalProperties': False,
+            },
+        },
+        {
+            'type': 'function',
+            'name': 'propose_quote_decision',
+            'description': 'Prepare sending a quote request, accepting a ready quote with terms, or cancelling a ready quote. Requires explicit confirmation.',
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'operation': {'type': 'string', 'enum': ['submit_request', 'accept', 'cancel']},
+                    'quote_token': {'type': 'string'},
+                    'note': {'type': 'string'},
+                },
+                'required': ['operation'],
+                'additionalProperties': False,
+            },
         },
     ]
 
@@ -145,6 +195,56 @@ def _propose_add_to_order(request, presentation_id, quantity):
     }
 
 
+def _propose_customer_action(request, action_type, payload, label):
+    cliente = get_customer_for_user(request.user)
+    if cliente is None or not cliente.aprobado:
+        return {'error': 'Customer approval and login are required for this action.'}
+    action = create_pending_action(request=request, action_type=action_type, payload=payload)
+    return {
+        'requires_confirmation': True,
+        'action_id': str(action.public_id),
+        'label': label,
+    }
+
+
+def _propose_cart_change(request, operation, cart_key, quantity=None):
+    if operation == 'update':
+        return _propose_customer_action(
+            request,
+            ACTION_UPDATE_CART,
+            {'cart_key': str(cart_key), 'quantity': quantity},
+            'Update this order quantity',
+        )
+    if operation == 'remove':
+        return _propose_customer_action(
+            request,
+            ACTION_REMOVE_CART,
+            {'cart_key': str(cart_key)},
+            'Remove this product from My Order',
+        )
+    return {'error': 'Unsupported cart operation.'}
+
+
+def _propose_reorder(request, pedido_id):
+    return _propose_customer_action(
+        request, ACTION_REORDER, {'pedido_id': pedido_id}, 'Load this previous order into My Order'
+    )
+
+
+def _propose_quote_decision(request, operation, quote_token='', note=''):
+    action_types = {
+        'submit_request': (ACTION_SUBMIT_QUOTE_REQUEST, 'Send My Order as a quote request'),
+        'accept': (ACTION_ACCEPT_QUOTE, 'Accept this quote and its terms'),
+        'cancel': (ACTION_CANCEL_QUOTE, 'Cancel this quote'),
+    }
+    if operation not in action_types:
+        return {'error': 'Unsupported quote operation.'}
+    action_type, label = action_types[operation]
+    return _propose_customer_action(
+        request, action_type, {'quote_token': quote_token, 'note': str(note or '')[:1000]}, label
+    )
+
+
 def _cart_summary(request):
     lines = []
     for item in (request.session.get('carrito', {}) or {}).values():
@@ -195,4 +295,15 @@ def execute_tool(request, name, raw_arguments):
         return _cart_summary(request)
     if name == 'get_quotes_and_orders':
         return _quotes_and_orders(request)
+    if name == 'propose_cart_change':
+        return _propose_cart_change(request, arguments.get('operation'), arguments.get('cart_key'), arguments.get('quantity'))
+    if name == 'propose_reorder':
+        return _propose_reorder(request, arguments.get('pedido_id'))
+    if name == 'propose_quote_decision':
+        return _propose_quote_decision(
+            request,
+            arguments.get('operation'),
+            arguments.get('quote_token', ''),
+            arguments.get('note', ''),
+        )
     return {'error': 'Tool is not allowed.'}

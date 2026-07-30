@@ -411,16 +411,38 @@ STORAGES = {
 # WhiteNoise will fall back to the original static path instead of raising ValueError.
 WHITENOISE_MANIFEST_STRICT = False
 
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'tortilla-railway-cache',
-        'TIMEOUT': view_cache_timeout,
-        'OPTIONS': {
-            'MAX_ENTRIES': 1000,
-            'CULL_FREQUENCY': 3,
-        },
+REDIS_URL = (os.environ.get('REDIS_URL') or '').strip()
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'TIMEOUT': view_cache_timeout,
+            'OPTIONS': {'CLIENT_CLASS': 'django_redis.client.DefaultClient'},
+        }
     }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'tortilla-railway-cache',
+            'TIMEOUT': view_cache_timeout,
+            'OPTIONS': {
+                'MAX_ENTRIES': 1000,
+                'CULL_FREQUENCY': 3,
+            },
+        }
+    }
+
+CELERY_BROKER_URL = REDIS_URL or 'memory://'
+CELERY_RESULT_BACKEND = REDIS_URL or 'cache+memory://'
+CELERY_TASK_ALWAYS_EAGER = env_bool('CELERY_TASK_ALWAYS_EAGER', not bool(REDIS_URL))
+CELERY_TASK_TIME_LIMIT = env_int('CELERY_TASK_TIME_LIMIT', 120)
+CELERY_BEAT_SCHEDULE = {
+    'cleanup-ai-assistant-daily': {
+        'task': 'config.ai_assistant.tasks.cleanup_expired_assistant_data',
+        'schedule': 86400.0,
+    },
 }
 
 # ========================

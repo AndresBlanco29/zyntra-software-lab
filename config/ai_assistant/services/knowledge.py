@@ -72,14 +72,46 @@ def _token_overlap_score(query, content):
     return len(query_terms & content_terms) / math.sqrt(len(query_terms) * max(len(content_terms), 1))
 
 
+def _cosine_similarity(left, right):
+    if not left or not right or len(left) != len(right):
+        return 0.0
+    try:
+        dot_product = sum(float(a) * float(b) for a, b in zip(left, right))
+        left_norm = math.sqrt(sum(float(a) ** 2 for a in left))
+        right_norm = math.sqrt(sum(float(b) ** 2 for b in right))
+    except (TypeError, ValueError):
+        return 0.0
+    return dot_product / (left_norm * right_norm) if left_norm and right_norm else 0.0
+
+
 def search_published_knowledge(query, *, language='es', limit=4):
-    """Safe MVP retrieval; upgrades to cosine similarity once embeddings exist."""
-    chunks = AssistantKnowledgeChunk.objects.filter(
+    """Return published knowledge using vector similarity with lexical fallback."""
+    chunks = list(AssistantKnowledgeChunk.objects.filter(
         document__status=AssistantKnowledgeDocument.STATUS_PUBLISHED,
-    ).select_related('document')
+    ).select_related('document'))
     language_chunks = [chunk for chunk in chunks if chunk.document.language == language]
-    candidates = language_chunks or list(chunks)
-    ranked = sorted(candidates, key=lambda chunk: _token_overlap_score(query, chunk.content), reverse=True)
+    candidates = language_chunks or chunks
+    query_embedding = []
+    try:
+        from config.ai_assistant.models import AssistantConfiguration
+        from config.ai_assistant.services.openai_client import OpenAIClient
+
+        client = OpenAIClient()
+        if client.configured and candidates and any(chunk.embedding for chunk in candidates):
+            query_embedding = client.create_embedding(
+                model=AssistantConfiguration.get_solo().embedding_model,
+                content=query,
+            )
+    except Exception:
+        # Retrieval must remain available if embeddings are delayed/unavailable.
+        query_embedding = []
+
+    def relevance(chunk):
+        vector_score = _cosine_similarity(query_embedding, chunk.embedding) if query_embedding else 0.0
+        lexical_score = _token_overlap_score(query, chunk.content)
+        return vector_score if vector_score > 0 else lexical_score
+
+    ranked = sorted(candidates, key=relevance, reverse=True)
     return [
         {
             'title': chunk.document.title,
@@ -88,5 +120,5 @@ def search_published_knowledge(query, *, language='es', limit=4):
             'source_url': chunk.document.source_url,
         }
         for chunk in ranked[:limit]
-        if _token_overlap_score(query, chunk.content) > 0
+        if relevance(chunk) > 0
     ]

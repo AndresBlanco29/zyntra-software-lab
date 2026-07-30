@@ -77,8 +77,14 @@
     let lastActiveIndex = 0;
     let resumingAfterModal = false;
     let modalTriggerBoundForIndex = null;
-    const preventManualScroll = function (event) {
-      event.preventDefault();
+    let refreshQueued = false;
+    const refreshTourPosition = function () {
+      if (refreshQueued) return;
+      refreshQueued = true;
+      window.requestAnimationFrame(function () {
+        refreshQueued = false;
+        if (driverObj.isActive()) driverObj.refresh();
+      });
     };
     const createDriver = window.driver && window.driver.js && typeof window.driver.js.driver === "function"
       ? window.driver.js.driver
@@ -105,8 +111,7 @@
         };
       }),
       onDestroyed: function () {
-        window.removeEventListener("wheel", preventManualScroll, true);
-        window.removeEventListener("touchmove", preventManualScroll, true);
+        window.removeEventListener("scroll", refreshTourPosition, true);
         const completed = lastActiveIndex === steps.length - 1;
         persist(tourKey, lastActiveIndex, completed, !completed);
         if (!completed && !resumingAfterModal) {
@@ -137,6 +142,11 @@
         driverObj.movePrevious();
       },
       onHighlighted: function () {
+        const activeElement = driverObj.getActiveElement();
+        if (activeElement) {
+          activeElement.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+          window.setTimeout(refreshTourPosition, 250);
+        }
         const step = steps[lastActiveIndex];
         if (!step || !step.pauseForModal) return;
         const trigger = findVisibleElement(step.element);
@@ -162,8 +172,7 @@
         }, { once: true });
       }
     });
-    window.addEventListener("wheel", preventManualScroll, { capture: true, passive: false });
-    window.addEventListener("touchmove", preventManualScroll, { capture: true, passive: false });
+    window.addEventListener("scroll", refreshTourPosition, true);
     driverObj.drive(Number.isInteger(startIndex) ? startIndex : 0);
     return true;
   }

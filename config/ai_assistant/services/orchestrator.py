@@ -98,6 +98,25 @@ def _authorized_tour_for_message(message, context):
     return None
 
 
+def _conversation_tour_for_message(conversation, message, context):
+    """Interpret a short affirmative answer using the immediately prior assistant intent."""
+    tour_id = _authorized_tour_for_message(message, context)
+    affirmative = str(message or '').lower().strip(' .!¡?') in {
+        'si', 'sí', 's', 'yes', 'y', 'claro', 'dale', 'ok', 'okay',
+    }
+    if tour_id != 'registration' or not affirmative:
+        return tour_id
+    previous_assistant = conversation.messages.filter(
+        role=AssistantMessage.ROLE_ASSISTANT,
+    ).order_by('-created_at').first()
+    previous_text = (previous_assistant.content or '').lower() if previous_assistant else ''
+    if any(term in previous_text for term in ('iniciar sesión', 'iniciar sesion', 'login', 'sign in')):
+        return 'login'
+    if any(term in previous_text for term in ('contraseña', 'password', 'recuper')):
+        return 'password-recovery'
+    return tour_id
+
+
 def _guided_actions(context, tour_id):
     if tour_id == 'registration':
         return [{
@@ -305,7 +324,7 @@ def reply_to_message(*, request, conversation, message):
             )
             response_usage = response.get('usage') or response_usage
         text = response['text'] or _fallback_response(config, context, message)['message']
-        tour_id = _authorized_tour_for_message(message, context)
+        tour_id = _conversation_tour_for_message(conversation, message, context)
         result = {
             'message': text,
             'suggested_actions': _guided_actions(context, tour_id),

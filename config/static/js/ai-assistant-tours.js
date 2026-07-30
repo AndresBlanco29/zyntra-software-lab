@@ -87,6 +87,9 @@
   }
 
   function start(tourKey, startIndex) {
+    window.dispatchEvent(new CustomEvent("tortilla-assistant-tour-started", {
+      detail: { tourId: tourKey }
+    }));
     const runId = ++tourRunId;
     if (activeTour && activeTour.driver && activeTour.driver.isActive()) {
       activeTour.replaced = true;

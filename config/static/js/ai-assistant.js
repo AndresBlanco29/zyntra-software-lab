@@ -189,6 +189,13 @@
 
     window.setTimeout(function () { boot({ autoOpen: true }); }, 4000);
 
+    window.addEventListener("tortilla-assistant-tour-started", function (event) {
+      const tourId = event.detail && event.detail.tourId;
+      if (!["registration", "login", "password-recovery", "approved-login"].includes(tourId)) return;
+      panel.classList.remove("is-open");
+      launcher.setAttribute("aria-expanded", "false");
+    });
+
     window.addEventListener("tortilla-assistant-tour-dismissed", function (event) {
       const tourId = event.detail && event.detail.tourId;
       const resumeIndex = event.detail && event.detail.resumeIndex;

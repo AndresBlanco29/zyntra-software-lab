@@ -16,8 +16,8 @@
       { element: "[data-ai-tour='confirm-password']", title: "Confirmar contraseña", description: "Escribe nuevamente la misma contraseña para confirmarla." },
       { element: "[data-ai-tour='continue-credentials']", title: "Continuar", description: "Avanza a la información comercial.", advanceOnClick: true },
       { element: "[data-ai-tour='business-name']", title: "Nombre legal del negocio", description: "Ingresa el nombre legal de tu empresa." },
-      { element: "[data-ai-tour='sales-tax']", title: "Sales Tax Number", description: "Ingresa tu número de Sales Tax." },
-      { element: "[data-ai-tour='sales-tax-example']", title: "Ver ejemplo de Sales Tax", description: "Puedes usar este botón para ver dónde encontrar el número en tu certificado." },
+      { element: "[data-ai-tour='sales-tax-example']", title: "Ejemplo de Sales Tax", description: "Haz clic en View example. Al cerrar el ejemplo, te mostraré el campo donde debes escribir ese número.", pauseForModal: "#taxExampleModal" },
+      { element: "[data-ai-tour='sales-tax']", title: "Sales Tax Number", description: "Escribe aquí el número que viste en el ejemplo." },
       { element: "[data-ai-tour='business-phone']", title: "Teléfono comercial", description: "Ingresa el teléfono principal de tu negocio." },
       { element: "[data-ai-tour='business-email']", title: "Correo comercial", description: "Ingresa el correo de contacto de tu negocio." },
       { element: "[data-ai-tour='primary-address']", title: "Dirección principal", description: "Ingresa la dirección física principal del negocio." },
@@ -26,7 +26,7 @@
       { element: "[data-ai-tour='city']", title: "Ciudad", description: "Ingresa la ciudad del negocio." },
       { element: "[data-ai-tour='zip-code']", title: "Código postal", description: "Ingresa el ZIP code de la dirección." },
       { element: "[data-ai-tour='country']", title: "País", description: "El país está preconfigurado como USA." },
-      { element: "[data-ai-tour='certificate-example']", title: "Ver ejemplo de certificado", description: "Consulta un ejemplo del certificado o licencia que debes cargar." },
+      { element: "[data-ai-tour='certificate-example']", title: "Ejemplo de certificado", description: "Haz clic en View example. Al cerrar el ejemplo, te mostraré dónde cargar tu archivo.", pauseForModal: "#taxExampleModal" },
       { element: "[data-ai-tour='upload-license']", title: "Certificado o licencia", description: "Haz clic aquí para cargar el certificado requerido.", advanceOnClick: true },
       { element: "[data-ai-tour='certify-information']", title: "Confirmar información", description: "Marca esta casilla después de verificar que toda la información es correcta." },
       { element: "[data-ai-tour='submit-registration']", title: "Enviar solicitud", description: "Envía la solicitud para aprobación." }
@@ -75,6 +75,7 @@
   function start(tourKey, startIndex) {
     const steps = tours[tourKey] || [];
     let lastActiveIndex = 0;
+    let resumingAfterModal = false;
     const createDriver = window.driver && window.driver.js && typeof window.driver.js.driver === "function"
       ? window.driver.js.driver
       : (typeof window.driver === "function" ? window.driver : null);
@@ -101,7 +102,7 @@
       onDestroyed: function () {
         const completed = lastActiveIndex === steps.length - 1;
         persist(tourKey, lastActiveIndex, completed, !completed);
-        if (!completed) {
+        if (!completed && !resumingAfterModal) {
           window.dispatchEvent(new CustomEvent("tortilla-assistant-tour-dismissed", {
             detail: { tourId: tourKey, resumeIndex: lastActiveIndex }
           }));
@@ -111,6 +112,22 @@
         lastActiveIndex = typeof context.state?.activeIndex === "number"
           ? context.state.activeIndex
           : (driverObj.getActiveIndex() || 0);
+      },
+      onHighlighted: function () {
+        const step = steps[lastActiveIndex];
+        if (!step || !step.pauseForModal) return;
+        const trigger = findVisibleElement(step.element);
+        const modal = document.querySelector(step.pauseForModal);
+        if (!trigger || !modal || trigger.dataset.aiTourModalBound === "true") return;
+        trigger.dataset.aiTourModalBound = "true";
+        trigger.addEventListener("click", function () {
+          const resumeIndex = lastActiveIndex + 1;
+          resumingAfterModal = true;
+          modal.addEventListener("hidden.bs.modal", function () {
+            window.setTimeout(function () { start(tourKey, resumeIndex); }, 150);
+          }, { once: true });
+          driverObj.destroy();
+        }, { once: true });
       }
     });
     driverObj.drive(Number.isInteger(startIndex) ? startIndex : 0);

@@ -196,7 +196,7 @@
         <div class="tax-example-container" style="position:relative;">
           <img id="taxExampleImg" src="{% static 'img/examples/sales_tax_example.png' %}" alt="Ejemplo Sales Tax" class="img-fluid" />
           <div class="tax-overlay" style="position:absolute;inset:0;pointer-events:none;">
-            <div class="tax-redaction" data-tax-mask="address" aria-hidden="true" style="position:absolute;background:#fff;border-radius:2px;"></div>
+            <div class="tax-redaction" data-tax-mask="address" aria-hidden="true" style="position:absolute;background:rgba(32,38,48,.55);backdrop-filter:blur(4px);border-radius:2px;"></div>
             <div class="tax-highlight" id="taxHighlight" data-tax-highlight="salesTax" style="position:absolute;border:3px solid rgba(255,99,71,0.95);box-shadow:0 8px 24px rgba(0,0,0,0.25);background:rgba(255,99,71,0.06);border-radius:6px;">
               <div class="tax-label" id="taxLabel" style="position:absolute;top:50%;left:calc(100% + 14px);transform:translateY(-50%);padding:6px 10px;background:rgba(255,99,71,0.95);color:#fff;border-radius:6px;font-weight:600;font-size:0.9rem;white-space:nowrap">{% trans "This is the sales tax number" %}</div>
             </div>

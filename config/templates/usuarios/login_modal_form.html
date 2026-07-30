@@ -18,19 +18,19 @@
 
   <div class="mb-3">
     <label class="form-label" style="font-weight: 600; color: #2c3e50;">{% trans "Usuario" %}</label>
-    <input type="text" name="username" class="form-control" placeholder="{% trans 'Ingresa tu usuario' %}" required style="border: 1px solid #d4d8e2; border-radius: 8px; padding: 10px 14px; font-size: 15px;">
+    <input type="text" name="username" data-ai-tour="login-username" class="form-control" placeholder="{% trans 'Ingresa tu usuario' %}" required style="border: 1px solid #d4d8e2; border-radius: 8px; padding: 10px 14px; font-size: 15px;">
   </div>
 
   <div class="mb-3 position-relative">
     <label class="form-label" style="font-weight: 600; color: #2c3e50;">{% trans "Contraseña" %}</label>
-    <input type="password" name="password" id="password" class="form-control" placeholder="{% trans 'Ingresa tu contraseña' %}" required style="border: 1px solid #d4d8e2; border-radius: 8px; padding: 10px 14px; font-size: 15px;">
+    <input type="password" name="password" id="password" data-ai-tour="login-password" class="form-control" placeholder="{% trans 'Ingresa tu contraseña' %}" required style="border: 1px solid #d4d8e2; border-radius: 8px; padding: 10px 14px; font-size: 15px;">
     <span class="position-absolute top-50 end-0 translate-middle-y me-3" style="cursor: pointer; margin-top: 0.5rem;" onclick="togglePassword()">
       <i id="toggleIcon" class="bi bi-eye"></i>
     </span>
   </div>
 
   <div class="d-grid mt-4">
-    <button type="submit" class="btn btn-yellow" style="background: linear-gradient(to right, #ffe600, #c7c700); border: none; color: #1e293b; font-weight: 700; padding: 12px 20px; border-radius: 8px; font-size: 16px;">
+    <button type="submit" data-ai-tour="login-submit" class="btn btn-yellow" style="background: linear-gradient(to right, #ffe600, #c7c700); border: none; color: #1e293b; font-weight: 700; padding: 12px 20px; border-radius: 8px; font-size: 16px;">
       {% trans "Iniciar Sesión" %}
     </button>
   </div>
@@ -38,7 +38,7 @@
 
 <div class="text-center mt-3">
   <small style="color: #475569; font-size: 14px;">
-    <a href="{% url 'password_reset' %}" class="fw-bold" style="color: #0b3d91; text-decoration: none;" onclick="cargarRecuperacionContrasena(); return false;">{% trans "Forgot your password?" %}</a>
+    <a href="{% url 'password_reset' %}" data-ai-tour="forgot-password" class="fw-bold" style="color: #0b3d91; text-decoration: none;" onclick="cargarRecuperacionContrasena(); return false;">{% trans "Forgot your password?" %}</a>
   </small>
 </div>
 

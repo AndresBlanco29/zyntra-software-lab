@@ -68,6 +68,7 @@
             <input
             type="text"
             name="username"
+            data-ai-tour="login-username"
             class="form-control"
             placeholder="Usuario"
             required
@@ -80,6 +81,7 @@
               type="password"
               name="password"
               id="password"
+              data-ai-tour="login-password"
               class="form-control form-control-lg pe-5"
               placeholder="Contraseña"
               required
@@ -97,7 +99,7 @@
 
           <!-- Botón -->
           <div class="d-grid">
-            <button type="submit" class="btn btn-login btn-lg">
+            <button type="submit" data-ai-tour="login-submit" class="btn btn-login btn-lg">
               {% trans "Sign in" %}
             </button>
           </div>
@@ -105,7 +107,7 @@
 
         <div class="text-center mt-3">
           <small>
-            <a href="{% url 'home' %}?show_login=1&auth_view=password_reset" class="fw-bold text-primary">{% trans "Forgot your password?" %}</a>
+            <a href="{% url 'home' %}?show_login=1&auth_view=password_reset" data-ai-tour="forgot-password" class="fw-bold text-primary">{% trans "Forgot your password?" %}</a>
           </small>
         </div>
 

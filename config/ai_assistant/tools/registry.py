@@ -29,6 +29,28 @@ def openai_tool_schemas():
         },
         {
             'type': 'function',
+            'name': 'request_account_status_code',
+            'description': 'Send a one-time verification code to the registered email before disclosing an unauthenticated account status.',
+            'parameters': {
+                'type': 'object',
+                'properties': {'email': {'type': 'string'}},
+                'required': ['email'],
+                'additionalProperties': False,
+            },
+        },
+        {
+            'type': 'function',
+            'name': 'verify_account_status_code',
+            'description': 'Verify the one-time code and return only the verified account application status.',
+            'parameters': {
+                'type': 'object',
+                'properties': {'challenge_id': {'type': 'string'}, 'code': {'type': 'string'}},
+                'required': ['challenge_id', 'code'],
+                'additionalProperties': False,
+            },
+        },
+        {
+            'type': 'function',
             'name': 'search_catalog',
             'description': 'Search active La Tortilla Grocery products by name. Never invent prices or promotions.',
             'parameters': {
@@ -122,17 +144,44 @@ def _account_status(request):
             'status': 'visitor',
             'next_step': {'label': 'Registrarme', 'url': reverse('registro_usuario'), 'tour_id': 'registration'},
         }
+    from config.ai_assistant.services.status_gateway import StatusGateway
+
+    status = StatusGateway().get_status(cliente=cliente, entity_type='account')
     return {
         'authenticated': True,
         'approved': bool(cliente.aprobado),
         'review_status': cliente.estado_revision,
         'company': cliente.nombre_empresa,
+        'status_details': status,
         'next_step': (
             {'label': 'Ver catálogo', 'url': reverse('catalogo'), 'tour_id': 'first-order'}
             if cliente.aprobado else
             {'label': 'Iniciar sesión', 'url': reverse('login'), 'tour_id': 'approved-login'}
         ),
     }
+
+
+def _request_account_status_code(email):
+    from config.ai_assistant.services.verification import VerificationRateLimited, issue_account_status_challenge
+
+    try:
+        challenge = issue_account_status_challenge(email)
+    except VerificationRateLimited:
+        return {'error': 'Too many code requests. Please try again later.'}
+    return {
+        'message': 'If the email is registered, a verification code was sent. Enter it here to continue.',
+        'challenge_id': str(challenge.public_id),
+    }
+
+
+def _verify_account_status_code(challenge_id, code):
+    from config.ai_assistant.services.status_gateway import StatusGateway
+    from config.ai_assistant.services.verification import verify_account_status_challenge
+
+    cliente = verify_account_status_challenge(challenge_id, code)
+    if cliente is None:
+        return {'error': 'The verification code is invalid, expired, or has already been used.'}
+    return StatusGateway().get_status(cliente=cliente, entity_type='account')
 
 
 def _search_catalog(request, query):
@@ -285,6 +334,10 @@ def execute_tool(request, name, raw_arguments):
         return {'error': 'Invalid tool arguments.'}
     if name == 'get_account_status':
         return _account_status(request)
+    if name == 'request_account_status_code':
+        return _request_account_status_code(arguments.get('email', ''))
+    if name == 'verify_account_status_code':
+        return _verify_account_status_code(arguments.get('challenge_id', ''), arguments.get('code', ''))
     if name == 'search_catalog':
         return _search_catalog(request, arguments.get('query', ''))
     if name == 'get_customer_next_steps':

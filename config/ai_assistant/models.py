@@ -168,6 +168,23 @@ class AssistantVisitorProfile(models.Model):
     preferences = models.JSONField(default=dict, blank=True)
 
 
+class AssistantVerificationChallenge(models.Model):
+    PURPOSE_ACCOUNT_STATUS = 'ACCOUNT_STATUS'
+    PURPOSE_CHOICES = ((PURPOSE_ACCOUNT_STATUS, 'Account status'),)
+
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    purpose = models.CharField(max_length=40, choices=PURPOSE_CHOICES)
+    email_hash = models.CharField(max_length=64, db_index=True)
+    code_hash = models.CharField(max_length=128)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE)
+    cliente = models.ForeignKey('clientes.Cliente', null=True, blank=True, on_delete=models.CASCADE)
+    expires_at = models.DateTimeField(db_index=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    verified_at = models.DateTimeField(blank=True, null=True)
+    consumed_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
 class AssistantGuidedTourProgress(models.Model):
     visitor_id = models.UUIDField()
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE)
@@ -183,12 +200,14 @@ class AssistantGuidedTourProgress(models.Model):
 
 
 class AssistantDomainEvent(models.Model):
+    TYPE_REGISTRATION_SUBMITTED = 'REGISTRATION_SUBMITTED'
     TYPE_ACCOUNT_APPROVED = 'ACCOUNT_APPROVED'
     TYPE_ACCOUNT_NEEDS_CORRECTION = 'ACCOUNT_NEEDS_CORRECTION'
     TYPE_QUOTE_READY = 'QUOTE_READY'
     TYPE_ORDER_DISPATCHED = 'ORDER_DISPATCHED'
     TYPE_ORDER_DELIVERED = 'ORDER_DELIVERED'
     TYPE_CHOICES = (
+        (TYPE_REGISTRATION_SUBMITTED, 'Registration submitted'),
         (TYPE_ACCOUNT_APPROVED, 'Account approved'),
         (TYPE_ACCOUNT_NEEDS_CORRECTION, 'Account needs correction'),
         (TYPE_QUOTE_READY, 'Quote ready'),

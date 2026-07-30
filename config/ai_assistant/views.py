@@ -40,6 +40,38 @@ def _json_body(request):
         return None
 
 
+@require_POST
+def request_account_status_code(request):
+    payload = _json_body(request)
+    if payload is None:
+        return HttpResponseBadRequest('Invalid JSON.')
+    from config.ai_assistant.services.verification import VerificationRateLimited, issue_account_status_challenge
+
+    try:
+        challenge = issue_account_status_challenge(payload.get('email', ''))
+    except VerificationRateLimited:
+        return JsonResponse({'error': 'Try again later.'}, status=429)
+    return JsonResponse({
+        'success': True,
+        'challenge_id': str(challenge.public_id),
+        'message': 'If the email is registered, a verification code was sent.',
+    })
+
+
+@require_POST
+def verify_account_status_code(request):
+    payload = _json_body(request)
+    if payload is None:
+        return HttpResponseBadRequest('Invalid JSON.')
+    from config.ai_assistant.services.status_gateway import StatusGateway
+    from config.ai_assistant.services.verification import verify_account_status_challenge
+
+    cliente = verify_account_status_challenge(payload.get('challenge_id', ''), payload.get('code', ''))
+    if cliente is None:
+        return JsonResponse({'error': 'Invalid or expired verification code.'}, status=400)
+    return JsonResponse({'success': True, 'status': StatusGateway().get_status(cliente=cliente, entity_type='account')})
+
+
 def _conversation_for_request(request, public_id):
     visitor_id = get_visitor_id(request)
     conversation = AssistantConversation.objects.filter(public_id=public_id, visitor_id=visitor_id).first()
@@ -161,7 +193,10 @@ def tour_progress(request, tour_key):
 def consume_event(request, event_id):
     cliente = get_customer_for_user(request.user)
     if cliente is None:
-        return JsonResponse({'error': 'Customer login required.'}, status=403)
+        profile, _ = get_visitor_profile(request)
+        cliente = profile.cliente
+        if cliente is None:
+            return JsonResponse({'error': 'Customer login required.'}, status=403)
     event = AssistantDomainEvent.objects.filter(pk=event_id, cliente=cliente).first()
     if event is None:
         return JsonResponse({'error': 'Event not found.'}, status=404)

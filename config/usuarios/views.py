@@ -1888,7 +1888,7 @@ def registro_view(request):
                 usuario.is_active = False
                 usuario.save()
 
-                Cliente.objects.create(
+                cliente = Cliente.objects.create(
                     usuario=usuario,
                     nombre_empresa=request.POST.get('empresa'),
                     telefono=request.POST.get('telefono_comercial'),
@@ -1903,6 +1903,19 @@ def registro_view(request):
                     declaracion_fiscal_aceptada_en=timezone.now(),
                     estado_revision=Cliente.REVIEW_STATUS_PENDING,
                 )
+                from config.ai_assistant.models import AssistantDomainEvent
+                from config.ai_assistant.services.events import record_assistant_event
+                record_assistant_event(
+                    cliente=cliente,
+                    event_type=AssistantDomainEvent.TYPE_REGISTRATION_SUBMITTED,
+                    entity_type='Cliente',
+                    entity_id=cliente.id,
+                    payload={'tour_id': 'login'},
+                )
+                from config.ai_assistant.services.identity import get_visitor_profile
+                visitor_profile, _ = get_visitor_profile(request)
+                visitor_profile.cliente = cliente
+                visitor_profile.save(update_fields=['cliente', 'last_seen_at'])
 
                 # asegurar que el grupo exista
                 grupo, created = Group.objects.get_or_create(name='Cliente')

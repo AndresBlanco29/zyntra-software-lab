@@ -9,6 +9,7 @@ class CustomerPasswordResetForm(PasswordResetForm):
 		max_length=254,
 		widget=forms.EmailInput(attrs={
 			'class': 'form-control form-control-lg',
+			'data-ai-tour': 'recovery-email',
 			'placeholder': _('Enter your registered email'),
 			'autocomplete': 'email',
 		}),

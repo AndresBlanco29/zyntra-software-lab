@@ -1,7 +1,9 @@
 from django.urls import reverse
+from django.utils import timezone
+from datetime import timedelta
 
-from config.ai_assistant.models import AssistantDomainEvent
-from config.ai_assistant.services.identity import get_customer_for_user, get_visitor_profile
+from config.ai_assistant.models import AssistantDomainEvent, AssistantUserState
+from config.ai_assistant.services.identity import get_customer_for_user, get_visitor_id, get_visitor_profile
 from config.cotizaciones.models import Cotizacion
 from config.pedidos.client_history import list_cliente_favorite_product_ids, list_cliente_purchase_orders
 
@@ -18,6 +20,24 @@ def build_customer_context(request):
         'actions': [],
     }
     if cliente is None:
+        linked_customer = visitor_profile.cliente
+        if linked_customer and visitor_profile.last_seen_at >= timezone.now() - timedelta(days=30):
+            latest_event = AssistantDomainEvent.objects.filter(
+                cliente=linked_customer,
+                event_type__in=[
+                    AssistantDomainEvent.TYPE_ACCOUNT_APPROVED,
+                    AssistantDomainEvent.TYPE_ACCOUNT_NEEDS_CORRECTION,
+                ],
+                consumed_at__isnull=True,
+            ).order_by('-created_at').first()
+            if latest_event:
+                context['pending_event'] = {
+                    'id': latest_event.id,
+                    'type': latest_event.event_type,
+                    'entity_type': latest_event.entity_type,
+                    'entity_id': latest_event.entity_id,
+                    'payload': latest_event.payload,
+                }
         context['next_recommended_action'] = {
             'label': 'Iniciar registro guiado',
             'url': reverse('home'),
@@ -53,6 +73,19 @@ def build_customer_context(request):
             {'label': 'Mis pedidos', 'url': reverse('cliente_historial_ordenes'), 'tour_id': 'reorder'},
         ],
     })
+    state, _ = AssistantUserState.objects.get_or_create(
+        visitor_id=get_visitor_id(request),
+        defaults={'user': user, 'cliente': cliente},
+    )
+    if not state.onboarding_completed:
+        context['proactive'] = {
+            'kind': 'first_authenticated_login',
+            'message': '¡Bienvenido! Ya puedes usar tu cuenta. ¿Quieres que te muestre la plataforma o te ayudo con tu primer pedido?',
+            'actions': [
+                {'label': 'Hacer mi primer pedido', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
+                {'label': 'Explorar por mi cuenta', 'url': '#', 'kind': 'dismiss_proactive'},
+            ],
+        }
     cart = request.session.get('carrito', {}) or {}
     cart_lines = [
         {

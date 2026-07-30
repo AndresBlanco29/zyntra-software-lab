@@ -159,3 +159,19 @@ class GuidedTourIntentTests(TestCase):
             _authorized_tour_for_message('Sí', {'authenticated': False}),
             'registration',
         )
+
+    def test_login_and_recovery_intents_only_return_ui_tours(self):
+        context = {'authenticated': False}
+        self.assertEqual(_authorized_tour_for_message('Quiero iniciar sesión', context), 'login')
+        self.assertEqual(_authorized_tour_for_message('Olvidé mi contraseña', context), 'password-recovery')
+        self.assertEqual(_guided_actions(context, 'login')[0]['tour_id'], 'login')
+
+
+class VerificationTests(TestCase):
+    def test_invalid_or_reused_otp_cannot_verify_status(self):
+        from config.ai_assistant.services.verification import issue_account_status_challenge, verify_account_status_challenge
+
+        challenge = issue_account_status_challenge('nobody@example.com')
+        self.assertIsNone(verify_account_status_challenge(challenge.public_id, '000000'))
+        challenge.refresh_from_db()
+        self.assertEqual(challenge.attempts, 1)

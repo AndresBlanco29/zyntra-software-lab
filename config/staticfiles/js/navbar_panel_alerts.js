@@ -1,0 +1,448 @@
+(function () {
+    'use strict';
+
+    var POLL_INTERVAL_MS = 25000;
+
+    function getCookie(name) {
+        var match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+        return match ? decodeURIComponent(match[1]) : '';
+    }
+
+    function escapeHtml(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function isMobileAlertsViewport() {
+        return window.matchMedia('(max-width: 991.98px)').matches;
+    }
+
+    function getAlertMenu(toggle) {
+        if (!toggle) {
+            return null;
+        }
+        var parent = toggle.closest('.navbar-urgent-alerts');
+        return parent ? parent.querySelector('.navbar-urgent-alerts-menu') : null;
+    }
+
+    function clearPinnedAlertMenu(menu) {
+        if (!menu) {
+            return;
+        }
+        [
+            'position',
+            'left',
+            'right',
+            'top',
+            'bottom',
+            'width',
+            'max-width',
+            'transform',
+            'inset-inline-start',
+            'inset-inline-end',
+        ].forEach(function (prop) {
+            menu.style.removeProperty(prop);
+        });
+        menu.classList.remove('navbar-urgent-alerts-menu--pinned');
+    }
+
+    /**
+     * Bootstrap disables Popper applyStyles for dropdowns inside `.navbar`, so the
+     * Orders panel falls back to CSS `dropdown-menu-end` and hangs off the left
+     * edge of the phone. Pin it to the viewport gutters on small screens.
+     */
+    function pinAlertMenuToViewport(toggle) {
+        var menu = getAlertMenu(toggle);
+        if (!menu) {
+            return;
+        }
+        if (!isMobileAlertsViewport()) {
+            clearPinnedAlertMenu(menu);
+            return;
+        }
+
+        var gutter = 12;
+        var top = Math.round(toggle.getBoundingClientRect().bottom + 8);
+        // Bootstrap marks navbar dropdowns as static; clear so fixed pin wins.
+        menu.removeAttribute('data-bs-popper');
+        menu.classList.add('navbar-urgent-alerts-menu--pinned');
+        menu.style.setProperty('position', 'fixed', 'important');
+        menu.style.setProperty('left', gutter + 'px', 'important');
+        menu.style.setProperty('right', gutter + 'px', 'important');
+        menu.style.setProperty('top', top + 'px', 'important');
+        menu.style.setProperty('bottom', 'auto', 'important');
+        menu.style.setProperty('width', 'auto', 'important');
+        menu.style.setProperty('max-width', 'none', 'important');
+        menu.style.setProperty('transform', 'none', 'important');
+        menu.style.setProperty('inset-inline-start', gutter + 'px', 'important');
+        menu.style.setProperty('inset-inline-end', gutter + 'px', 'important');
+    }
+
+    /**
+     * Keep the menu inside its dropdown parent. Moving it to <body> during open
+     * breaks Bootstrap's show/hide on desktop and mobile.
+     * Popper `strategy: 'fixed'` escapes the navbar overflow clip on desktop.
+     * On phones we also pin the panel with `pinAlertMenuToViewport` because
+     * Bootstrap 5.3 passes `undefined` as the first popperConfig arg and
+     * disables Popper entirely inside navbars.
+     */
+    function initAlertDropdown(toggle) {
+        if (!toggle || !window.bootstrap || !bootstrap.Dropdown) {
+            return null;
+        }
+
+        var existing = bootstrap.Dropdown.getInstance(toggle);
+        if (existing) {
+            existing.dispose();
+        }
+
+        var dropdown = bootstrap.Dropdown.getOrCreateInstance(toggle, {
+            autoClose: 'outside',
+            popperConfig: function (maybeConfig, explicitConfig) {
+                // BS 5.3 calls: popperConfig(undefined, defaultBsPopperConfig)
+                var defaultConfig = (maybeConfig && maybeConfig.modifiers)
+                    ? maybeConfig
+                    : (explicitConfig || maybeConfig || {});
+                var modifiers = Array.isArray(defaultConfig.modifiers)
+                    ? defaultConfig.modifiers.slice()
+                    : [];
+
+                // Drop Bootstrap's navbar "static" kill-switch so fixed positioning works.
+                modifiers = modifiers.filter(function (modifier) {
+                    return !(modifier && modifier.name === 'applyStyles' && modifier.enabled === false);
+                });
+
+                if (!modifiers.some(function (modifier) { return modifier && modifier.name === 'offset'; })) {
+                    modifiers.push({
+                        name: 'offset',
+                        options: { offset: [0, 8] },
+                    });
+                }
+                if (!modifiers.some(function (modifier) { return modifier && modifier.name === 'preventOverflow'; })) {
+                    modifiers.push({
+                        name: 'preventOverflow',
+                        options: { boundary: 'viewport', padding: 12 },
+                    });
+                }
+
+                modifiers.push({
+                    name: 'centerOnMobile',
+                    enabled: true,
+                    phase: 'main',
+                    fn: function (args) {
+                        var state = args.state;
+                        if (!isMobileAlertsViewport()) {
+                            return;
+                        }
+                        if (!state.modifiersData || !state.modifiersData.popperOffsets) {
+                            return;
+                        }
+                        var width = state.rects.popper.width;
+                        var gutter = 12;
+                        var centeredX = (window.innerWidth - width) / 2;
+                        var maxX = Math.max(gutter, window.innerWidth - width - gutter);
+                        state.modifiersData.popperOffsets.x = Math.min(
+                            Math.max(gutter, centeredX),
+                            maxX
+                        );
+                    },
+                });
+
+                return Object.assign({}, defaultConfig, {
+                    strategy: 'fixed',
+                    modifiers: modifiers,
+                });
+            },
+        });
+
+        toggle.addEventListener('shown.bs.dropdown', function () {
+            pinAlertMenuToViewport(toggle);
+        });
+        toggle.addEventListener('hidden.bs.dropdown', function () {
+            clearPinnedAlertMenu(getAlertMenu(toggle));
+        });
+
+        var reposition = function () {
+            if (!toggle.classList.contains('show')) {
+                return;
+            }
+            pinAlertMenuToViewport(toggle);
+            try {
+                dropdown.update();
+            } catch (error) {
+                // Ignore.
+            }
+        };
+        window.addEventListener('resize', reposition);
+        window.addEventListener('orientationchange', reposition);
+        return dropdown;
+    }
+
+    function postMarkSeen(url, csrfToken) {
+        if (!url) {
+            return Promise.resolve(null);
+        }
+        return fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken || getCookie('csrftoken'),
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+        }).then(function (response) {
+            if (!response.ok) {
+                throw new Error('mark seen failed');
+            }
+            return response.json();
+        });
+    }
+
+    function fetchFeed(url) {
+        if (!url) {
+            return Promise.resolve(null);
+        }
+        return fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'same-origin',
+            cache: 'no-store',
+        }).then(function (response) {
+            if (!response.ok) {
+                throw new Error('feed failed');
+            }
+            return response.json();
+        });
+    }
+
+    function setBadge(badgeId, count) {
+        var badge = document.getElementById(badgeId);
+        var value = Math.max(0, parseInt(count, 10) || 0);
+        if (value <= 0) {
+            if (badge) {
+                badge.remove();
+            }
+            return;
+        }
+        if (!badge) {
+            var toggle = document.getElementById(badgeId.replace('Badge', 'Toggle'));
+            if (!toggle) {
+                return;
+            }
+            badge = document.createElement('span');
+            badge.className = 'navbar-urgent-alerts-badge';
+            badge.id = badgeId;
+            toggle.appendChild(badge);
+        }
+        badge.textContent = String(value);
+    }
+
+    function initOrdersAlerts() {
+        var container = document.getElementById('navbarUrgentAlerts');
+        var toggle = document.getElementById('navbarUrgentAlertsToggle');
+        if (!container || !toggle) {
+            return;
+        }
+
+        initAlertDropdown(toggle);
+
+        var markSeenUrl = container.dataset.markSeenUrl;
+        var feedUrl = container.dataset.feedUrl;
+        var csrfToken = container.dataset.csrf || '';
+        var markSeenRequest = null;
+
+        function clearUnreadState() {
+            container.querySelectorAll('.navbar-urgent-alerts-item--unread').forEach(function (item) {
+                item.classList.remove('navbar-urgent-alerts-item--unread');
+            });
+            document.querySelectorAll('#navbarUrgentAlertsRecent .navbar-urgent-alerts-recent-item--unread').forEach(function (item) {
+                item.classList.remove('navbar-urgent-alerts-recent-item--unread');
+            });
+            setBadge('navbarUrgentAlertsBadge', 0);
+        }
+
+        function renderOrdersFeed(data) {
+            if (!data || !data.success) {
+                return;
+            }
+            setBadge('navbarUrgentAlertsBadge', data.total_count);
+
+            var summaryHost = document.getElementById('navbarUrgentAlertsSummary');
+            if (summaryHost) {
+                if (data.summary_items && data.summary_items.length) {
+                    summaryHost.innerHTML = '<div class="navbar-urgent-alerts-summary">' + data.summary_items.map(function (item) {
+                        var count = item.unread_count || item.count || 0;
+                        var unreadClass = item.unread_count ? ' navbar-urgent-alerts-item--unread' : '';
+                        return (
+                            '<a href="' + escapeHtml(item.url || '#') + '" class="navbar-urgent-alerts-item navbar-urgent-alerts-item--' +
+                            escapeHtml(item.priority || 'medium') + unreadClass + '">' +
+                            '<span class="navbar-urgent-alerts-item-copy">' +
+                            '<span class="navbar-urgent-alerts-item-label">' + escapeHtml(item.label || '') + '</span>' +
+                            '<span class="navbar-urgent-alerts-item-detail">' + escapeHtml(item.detail || '') + '</span>' +
+                            '</span>' +
+                            '<span class="navbar-urgent-alerts-item-count">' + escapeHtml(count) + '</span>' +
+                            '</a>'
+                        );
+                    }).join('') + '</div>';
+                } else {
+                    summaryHost.innerHTML = '<div class="navbar-urgent-alerts-empty">No open orders right now.</div>';
+                }
+            }
+
+            var recentWrap = document.getElementById('navbarUrgentAlertsRecentWrap');
+            if (recentWrap) {
+                if (data.recent_items && data.recent_items.length) {
+                    recentWrap.innerHTML =
+                        '<div class="navbar-urgent-alerts-recent-header">Latest open orders</div>' +
+                        '<div class="navbar-urgent-alerts-recent" id="navbarUrgentAlertsRecent">' +
+                        data.recent_items.map(function (item) {
+                            var unreadClass = item.is_unread ? ' navbar-urgent-alerts-recent-item--unread' : '';
+                            return (
+                                '<a href="' + escapeHtml(item.url || '#') + '" class="navbar-urgent-alerts-recent-item' + unreadClass + '">' +
+                                '<span class="navbar-urgent-alerts-recent-title">' + escapeHtml(item.title || '') + '</span>' +
+                                '<span class="navbar-urgent-alerts-recent-message">' + escapeHtml(item.message || '') + '</span>' +
+                                '</a>'
+                            );
+                        }).join('') +
+                        '</div>';
+                } else {
+                    recentWrap.innerHTML = '';
+                }
+            }
+
+            var ordersLink = document.getElementById('navbarUrgentAlertsOrdersLink');
+            if (ordersLink && data.orders_url) {
+                ordersLink.href = data.orders_url;
+            }
+        }
+
+        toggle.addEventListener('show.bs.dropdown', function () {
+            if (!markSeenUrl || markSeenRequest) {
+                return;
+            }
+            markSeenRequest = postMarkSeen(markSeenUrl, csrfToken)
+                .then(function () {
+                    clearUnreadState();
+                })
+                .catch(function () {})
+                .finally(function () {
+                    markSeenRequest = null;
+                });
+        });
+
+        if (feedUrl) {
+            window.setInterval(function () {
+                if (document.hidden) {
+                    return;
+                }
+                fetchFeed(feedUrl).then(renderOrdersFeed).catch(function () {});
+            }, POLL_INTERVAL_MS);
+        }
+    }
+
+    function initCustomerRequestAlerts() {
+        var container = document.getElementById('navbarCustomerRequestAlerts');
+        var toggle = document.getElementById('navbarCustomerRequestAlertsToggle');
+        if (!container || !toggle) {
+            return;
+        }
+
+        initAlertDropdown(toggle);
+
+        var markSeenUrl = container.dataset.markSeenUrl;
+        var feedUrl = container.dataset.feedUrl;
+        var csrfToken = container.dataset.csrf || '';
+        var canManage = container.dataset.canManage === 'true';
+        var labelView = container.dataset.labelView || 'View request';
+        var labelApprove = container.dataset.labelApprove || 'Approve';
+        var labelReject = container.dataset.labelReject || 'Reject';
+        var labelEmpty = container.dataset.labelEmpty || 'No pending customer requests right now.';
+        var labelLatest = container.dataset.labelLatest || 'Latest registration requests';
+        var markSeenRequest = null;
+
+        function clearUnreadHighlights() {
+            document.querySelectorAll('#navbarCustomerRequestAlertsBody .navbar-urgent-alerts-recent-item--unread').forEach(function (item) {
+                item.classList.remove('navbar-urgent-alerts-recent-item--unread');
+            });
+        }
+
+        function renderCustomerFeed(data) {
+            if (!data || !data.success) {
+                return;
+            }
+            setBadge('navbarCustomerRequestAlertsBadge', data.pending_count);
+
+            var body = document.getElementById('navbarCustomerRequestAlertsBody');
+            if (!body) {
+                return;
+            }
+
+            if (!data.items || !data.items.length) {
+                body.innerHTML = '<div class="navbar-urgent-alerts-empty">' + escapeHtml(labelEmpty) + '</div>';
+                return;
+            }
+
+            body.innerHTML =
+                '<div class="navbar-urgent-alerts-recent-header">' + escapeHtml(labelLatest) + '</div>' +
+                '<div class="navbar-urgent-alerts-recent navbar-customer-alerts-list">' +
+                data.items.map(function (item) {
+                    var unreadClass = item.is_unread ? ' navbar-urgent-alerts-recent-item--unread' : '';
+                    var actions =
+                        '<div class="navbar-customer-alert-actions">' +
+                        '<a href="' + escapeHtml(item.url || '#') + '" class="navbar-customer-alert-action">' + escapeHtml(labelView) + '</a>';
+                    if (canManage) {
+                        actions +=
+                            '<a href="' + escapeHtml(item.approve_url || item.url || '#') + '" class="navbar-customer-alert-action navbar-customer-alert-action--approve">' +
+                            escapeHtml(labelApprove) + '</a>' +
+                            '<a href="' + escapeHtml(item.reject_url || item.url || '#') + '" class="navbar-customer-alert-action navbar-customer-alert-action--reject">' +
+                            escapeHtml(labelReject) + '</a>';
+                    }
+                    actions += '</div>';
+                    return (
+                        '<div class="navbar-customer-alert-card' + unreadClass + '">' +
+                        '<a href="' + escapeHtml(item.url || '#') + '" class="navbar-customer-alert-main">' +
+                        '<span class="navbar-urgent-alerts-recent-title">' + escapeHtml(item.customer_name || '') + '</span>' +
+                        '<span class="navbar-customer-alert-company">' + escapeHtml(item.company || '') + '</span>' +
+                        '<span class="navbar-urgent-alerts-recent-message">' + escapeHtml(item.email || '') + '</span>' +
+                        (item.registered_at
+                            ? '<span class="navbar-customer-alert-time">' + escapeHtml(item.registered_at) + '</span>'
+                            : '') +
+                        '</a>' +
+                        actions +
+                        '</div>'
+                    );
+                }).join('') +
+                '</div>';
+        }
+
+        toggle.addEventListener('show.bs.dropdown', function () {
+            if (!markSeenUrl || markSeenRequest) {
+                return;
+            }
+            markSeenRequest = postMarkSeen(markSeenUrl, csrfToken)
+                .then(function () {
+                    clearUnreadHighlights();
+                })
+                .catch(function () {})
+                .finally(function () {
+                    markSeenRequest = null;
+                });
+        });
+
+        if (feedUrl) {
+            window.setInterval(function () {
+                if (document.hidden) {
+                    return;
+                }
+                fetchFeed(feedUrl).then(renderCustomerFeed).catch(function () {});
+            }, POLL_INTERVAL_MS);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        initOrdersAlerts();
+        initCustomerRequestAlerts();
+    });
+})();

@@ -20,6 +20,7 @@ Never expose secrets, passwords, internal QuickBooks data, other customers' info
 Never invent facts about prices, promotions, approval status, stock, delivery tracking, orders or quotes; use an available tool or say you cannot verify it.
 Never claim an order was created, a quote accepted, or a cart changed until the customer explicitly confirms a proposed action and the server reports success.
 For writes, use only proposal tools; the application will present a one-time confirmation button.
+Never reveal an account, application, order, or quote status to an unauthenticated visitor. For an account application status, ask for the registered email, call request_account_status_code, then ask for the code and call verify_account_status_code. Do not say whether an email or account exists.
 Offer a relevant in-app next step before a text-only answer whenever possible.
 Never write Markdown links. Deep links and guided tours are rendered by the application as safe buttons.
 Use the customer's language. Be concise, warm and human.
@@ -33,6 +34,19 @@ def _safe_text(text):
 def _fallback_response(config, context, message):
     lower = message.lower()
     if not context['authenticated']:
+        tour_id = _authorized_tour_for_message(message, context)
+        if tour_id == 'login':
+            return {
+                'message': 'Claro. Te guiaré para iniciar sesión paso a paso.',
+                'suggested_actions': _guided_actions(context, tour_id),
+                'tour_id': tour_id,
+            }
+        if tour_id == 'password-recovery':
+            return {
+                'message': 'Te ayudaré a solicitar un enlace seguro para recuperar tu contraseña.',
+                'suggested_actions': _guided_actions(context, tour_id),
+                'tour_id': tour_id,
+            }
         return {
             'message': f"Hola, soy {config.assistant_name}. Puedo ayudarte a registrarte y conocer cómo funciona La Tortilla Grocery.",
             'suggested_actions': [context['next_recommended_action']],
@@ -61,6 +75,10 @@ def _authorized_tour_for_message(message, context):
     """Map a customer request to one of the fixed, browser-safe tours."""
     normalized = str(message or '').lower()
     if not context.get('authenticated'):
+        if any(term in normalized for term in ('contraseña', 'password', 'olvidé', 'olvide', 'recuperar')):
+            return 'password-recovery'
+        if any(term in normalized for term in ('iniciar sesión', 'iniciar sesion', 'login', 'sign in', 'entrar')):
+            return 'login'
         affirmative = {'si', 'sí', 's', 'yes', 'y', 'claro', 'dale', 'ok', 'okay'}
         if (
             normalized.strip(' .!¡?') in affirmative
@@ -83,6 +101,18 @@ def _guided_actions(context, tour_id):
             'label': 'Iniciar registro guiado',
             'url': f"{reverse('home')}?ai_tour=registration",
             'tour_id': 'registration',
+        }]
+    if tour_id == 'login':
+        return [{
+            'label': 'Iniciar sesión guiado',
+            'url': f"{reverse('home')}?ai_tour=login",
+            'tour_id': 'login',
+        }]
+    if tour_id == 'password-recovery':
+        return [{
+            'label': 'Recuperar contraseña guiado',
+            'url': f"{reverse('home')}?show_login=1&ai_tour=password-recovery",
+            'tour_id': 'password-recovery',
         }]
     if tour_id:
         return [

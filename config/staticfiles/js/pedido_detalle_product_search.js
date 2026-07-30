@@ -1,0 +1,595 @@
+(function () {
+  'use strict';
+
+  function escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function parseDecimal(value) {
+    var normalized = String(value || '').trim().replace(',', '.');
+    if (!normalized) {
+      return null;
+    }
+    var parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function formatMoney(value) {
+    var amount = Number(value);
+    if (!Number.isFinite(amount)) {
+      amount = 0;
+    }
+    return amount.toFixed(2);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var root = document.getElementById('newProductSearchRoot');
+    if (!root) {
+      return;
+    }
+
+    var searchInput = document.getElementById('buscadorProductoPedido');
+    var hiddenInput = document.getElementById('presentacionNuevaId');
+    var resultsBox = document.getElementById('newProductSearchResults');
+    var selectedLabel = document.getElementById('newProductSelectedLabel');
+    var qtyInput = document.getElementById('cantidadNuevaPedido');
+    var pricePresetSelect = document.getElementById('precioNuevoPedidoPreset');
+    var priceInput = document.getElementById('precioNuevoPedido');
+    var addButton = document.getElementById('addPendingProductBtn');
+    var tableBody = document.getElementById('pedidoItemsTableBody');
+    var totalDisplay = document.getElementById('pedidoFormTotalDisplay');
+    var orderForm = document.getElementById('backofficeOrderForm');
+    var searchUrl = root.dataset.searchUrl;
+    var pedidoId = root.dataset.pedidoId;
+    var cotizacionId = root.dataset.cotizacionId;
+    var emptyMessage = root.dataset.emptyMessage || 'No products found.';
+    var minCharsMessage = root.dataset.minCharsMessage || 'Type at least 2 characters to search.';
+    var manualPriceLabel = root.dataset.manualPriceLabel || 'Manual price';
+    var addMissingMessage = root.dataset.addMissingMessage || 'Select a product before adding it.';
+    var addQtyMessage = root.dataset.addQtyMessage || 'Enter a quantity of at least 1.';
+    var addPriceMessage = root.dataset.addPriceMessage || 'Enter a valid price.';
+    var duplicateProductMessage = root.dataset.duplicateProductMessage || 'This product is already on the list.';
+    var pendingLabel = root.dataset.pendingLabel || 'Pending';
+    var removeLabel = root.dataset.removeLabel || 'Remove';
+    var showCost = root.dataset.showCost === 'true';
+    var realCostLabel = root.dataset.realCostLabel || 'Real cost';
+    var realCostMissingLabel = root.dataset.realCostMissingLabel || 'Real cost: not configured';
+    var realCostDisplay = document.getElementById('newProductRealCost');
+    var priceLocked = (pricePresetSelect && pricePresetSelect.dataset.locked === 'true')
+      || (priceInput && priceInput.dataset.locked === 'true');
+    var quoteUpdateForm = document.getElementById('quoteUpdateForm');
+
+    var debounceTimer = null;
+    var activeIndex = -1;
+    var lastResults = [];
+    var selectedCost = null;
+    var selectedProductId = null;
+
+    function formatRealCostLabel(costValue) {
+      if (costValue === null || costValue === undefined || costValue === '') {
+        return realCostMissingLabel;
+      }
+      return realCostLabel + ': $' + formatMoney(costValue);
+    }
+
+    function updateRealCostDisplay(costValue) {
+      if (!showCost || !realCostDisplay) {
+        return;
+      }
+      if (costValue === null || costValue === undefined || costValue === '') {
+        realCostDisplay.textContent = realCostMissingLabel;
+      } else {
+        realCostDisplay.textContent = formatRealCostLabel(costValue);
+      }
+      realCostDisplay.classList.remove('d-none');
+    }
+
+    function hideRealCostDisplay() {
+      selectedCost = null;
+      if (realCostDisplay) {
+        realCostDisplay.textContent = '';
+        realCostDisplay.classList.add('d-none');
+      }
+    }
+
+    function hideResults() {
+      resultsBox.hidden = true;
+      resultsBox.innerHTML = '';
+      activeIndex = -1;
+      lastResults = [];
+    }
+
+    function resetPriceFields() {
+      if (!pricePresetSelect || !priceInput) {
+        return;
+      }
+
+      pricePresetSelect.innerHTML = '';
+      var manualOption = document.createElement('option');
+      manualOption.value = '';
+      manualOption.textContent = manualPriceLabel;
+      pricePresetSelect.appendChild(manualOption);
+      pricePresetSelect.value = '';
+      pricePresetSelect.disabled = true;
+
+      priceInput.value = '';
+      priceInput.disabled = true;
+      hideRealCostDisplay();
+    }
+
+    function clearStagingFields() {
+      hiddenInput.value = '';
+      selectedProductId = null;
+      searchInput.value = '';
+      selectedLabel.hidden = true;
+      selectedLabel.textContent = '';
+      if (qtyInput) {
+        qtyInput.value = '1';
+      }
+      resetPriceFields();
+      hideResults();
+    }
+
+    function syncPresetFromInput() {
+      if (!pricePresetSelect || !priceInput) {
+        return;
+      }
+
+      var inputValue = parseDecimal(priceInput.value);
+      var matchedValue = '';
+
+      Array.prototype.forEach.call(pricePresetSelect.options, function (option) {
+        if (!option.value) {
+          return;
+        }
+        var optionValue = parseDecimal(option.value);
+        if (inputValue !== null && optionValue !== null && optionValue === inputValue) {
+          matchedValue = option.value;
+        }
+      });
+
+      pricePresetSelect.value = matchedValue;
+    }
+
+    function populatePriceFields(item) {
+      if (!pricePresetSelect || !priceInput || priceLocked) {
+        return;
+      }
+
+      pricePresetSelect.innerHTML = '';
+      var manualOption = document.createElement('option');
+      manualOption.value = '';
+      manualOption.textContent = manualPriceLabel;
+      pricePresetSelect.appendChild(manualOption);
+
+      (item.prices || []).forEach(function (priceOption) {
+        var option = document.createElement('option');
+        option.value = priceOption.value;
+        option.textContent = priceOption.label;
+        option.dataset.priceKey = priceOption.key;
+        pricePresetSelect.appendChild(option);
+      });
+
+      var defaultPrice = item.price || '';
+      priceInput.value = defaultPrice;
+      syncPresetFromInput();
+
+      if (!pricePresetSelect.value && defaultPrice) {
+        var defaultOption = pricePresetSelect.querySelector('option[data-price-key="' + item.default_price_key + '"]');
+        if (defaultOption) {
+          pricePresetSelect.value = defaultOption.value;
+        }
+      }
+
+      pricePresetSelect.disabled = false;
+      priceInput.disabled = false;
+    }
+
+    function highlightActive() {
+      resultsBox.querySelectorAll('.product-search-result').forEach(function (element, index) {
+        element.classList.toggle('active', index === activeIndex);
+        if (index === activeIndex) {
+          element.scrollIntoView({ block: 'nearest' });
+        }
+      });
+    }
+
+    function renderResults(results, message) {
+      lastResults = results;
+      if (!results.length) {
+        resultsBox.innerHTML = '<div class="list-group-item text-muted">' + escapeHtml(message || emptyMessage) + '</div>';
+        resultsBox.hidden = false;
+        return;
+      }
+
+      resultsBox.innerHTML = results.map(function (item, index) {
+        return (
+          '<button type="button" class="list-group-item list-group-item-action product-search-result" data-index="' + index + '">' +
+            '<div class="fw-semibold">' + escapeHtml(item.label) + '</div>' +
+            '<div class="small text-muted">$' + escapeHtml(item.price) + '</div>' +
+          '</button>'
+        );
+      }).join('');
+      resultsBox.hidden = false;
+      activeIndex = -1;
+    }
+
+    function collectUsedProducts(excludePendingPresentationId) {
+      var usedProductIds = new Set();
+      var usedPresentationIds = new Set();
+      var excludePresentation = String(excludePendingPresentationId || '');
+
+      document.querySelectorAll('[data-pedido-item-row], [data-quote-item-row]').forEach(function (row) {
+        if (row.querySelector('input[name^="eliminar_"]:checked')) {
+          return;
+        }
+        if (row.dataset.productId) {
+          usedProductIds.add(String(row.dataset.productId));
+        }
+        if (row.dataset.presentationId) {
+          usedPresentationIds.add(String(row.dataset.presentationId));
+        }
+      });
+
+      document.querySelectorAll('[data-pending-product-row]').forEach(function (row) {
+        var presentationInput = row.querySelector('input[name="presentacion_nueva[]"]');
+        var presentationId = presentationInput ? String(presentationInput.value || '') : '';
+        if (!presentationId || presentationId === excludePresentation) {
+          return;
+        }
+        if (row.dataset.productId) {
+          usedProductIds.add(String(row.dataset.productId));
+        }
+        usedPresentationIds.add(presentationId);
+      });
+
+      return { usedProductIds: usedProductIds, usedPresentationIds: usedPresentationIds };
+    }
+
+    function isDuplicateSelection(presentationId, productId) {
+      var used = collectUsedProducts();
+      var presentationKey = String(presentationId || '');
+      var productKey = String(productId || '');
+      return (
+        (presentationKey && used.usedPresentationIds.has(presentationKey))
+        || (productKey && used.usedProductIds.has(productKey))
+      );
+    }
+
+    function selectResult(item) {
+      var productId = item.product_id != null ? String(item.product_id) : '';
+      if (isDuplicateSelection(item.id, productId)) {
+        window.alert(duplicateProductMessage);
+        clearStagingFields();
+        searchInput.focus();
+        return;
+      }
+      hiddenInput.value = String(item.id);
+      selectedProductId = productId || null;
+      searchInput.value = item.label;
+      selectedLabel.textContent = item.label;
+      selectedLabel.hidden = false;
+      selectedCost = item.cost !== undefined ? item.cost : null;
+      populatePriceFields(item);
+      updateRealCostDisplay(selectedCost);
+      hideResults();
+      if (qtyInput && !qtyInput.value) {
+        qtyInput.value = '1';
+      }
+      if (qtyInput) {
+        qtyInput.focus();
+        qtyInput.select();
+      }
+    }
+
+    function fetchResults(query) {
+      var url = new URL(searchUrl, window.location.origin);
+      url.searchParams.set('q', query);
+      if (pedidoId) {
+        url.searchParams.set('pedido_id', pedidoId);
+      } else if (cotizacionId) {
+        url.searchParams.set('cotizacion_id', cotizacionId);
+      }
+
+      fetch(url.toString(), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin',
+      })
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error('search failed');
+          }
+          return response.json();
+        })
+        .then(function (data) {
+          renderResults(data.results || [], emptyMessage);
+        })
+        .catch(function () {
+          hideResults();
+        });
+    }
+
+    function updatePendingRowSubtotal(row) {
+      var qtyField = row.querySelector('[data-pending-qty]');
+      var priceField = row.querySelector('[data-pending-price]');
+      var subtotalCell = row.querySelector('[data-pending-subtotal]');
+      var payCell = row.querySelector('[data-pending-pay]');
+      var qty = parseDecimal(qtyField ? qtyField.value : 0) || 0;
+      var price = parseDecimal(priceField ? priceField.value : 0) || 0;
+      var subtotal = qty * price;
+      if (subtotalCell) {
+        subtotalCell.textContent = '$' + formatMoney(subtotal);
+      }
+      if (payCell) {
+        payCell.textContent = '$' + formatMoney(price);
+      }
+      updateDisplayedTotal();
+    }
+
+    function updateDisplayedTotal() {
+      if (!totalDisplay) {
+        return;
+      }
+      var total = 0;
+      document.querySelectorAll('.pedido-item-subtotal').forEach(function (cell) {
+        var raw = String(cell.textContent || '').replace(/[^0-9.,-]/g, '').replace(',', '.');
+        var value = parseDecimal(raw);
+        if (value !== null) {
+          total += value;
+        }
+      });
+      document.querySelectorAll('[data-pending-product-row]').forEach(function (row) {
+        var qtyField = row.querySelector('[data-pending-qty]');
+        var priceField = row.querySelector('[data-pending-price]');
+        var qty = parseDecimal(qtyField ? qtyField.value : 0) || 0;
+        var price = parseDecimal(priceField ? priceField.value : 0) || 0;
+        total += qty * price;
+      });
+      totalDisplay.textContent = formatMoney(total);
+    }
+
+    function buildPendingProductRow(presentationId, label, quantity, price, costValue, productId) {
+      var costMarkup = '';
+      if (showCost) {
+        costMarkup = '<div class="small text-muted mt-1">' + escapeHtml(formatRealCostLabel(costValue)) + '</div>';
+      }
+      var row = document.createElement('tr');
+      row.className = 'table-success';
+      row.setAttribute('data-pending-product-row', 'true');
+      if (productId) {
+        row.setAttribute('data-product-id', String(productId));
+      }
+      row.setAttribute('data-presentation-id', String(presentationId));
+      row.innerHTML = '' +
+        '<td>' +
+          '<div class="fw-semibold">' + escapeHtml(label) + '</div>' +
+          '<span class="badge text-bg-success mt-1">' + escapeHtml(pendingLabel) + '</span>' +
+          '<input type="hidden" name="presentacion_nueva[]" value="' + escapeHtml(presentationId) + '">' +
+        '</td>' +
+        '<td class="small text-muted">—</td>' +
+        '<td class="small text-muted">—</td>' +
+        '<td>' +
+          '<input type="number" min="1" class="form-control form-control-sm" name="cantidad_nueva[]" value="' + escapeHtml(String(quantity)) + '" data-pending-qty>' +
+        '</td>' +
+        '<td>' +
+          '<input type="number" min="0.01" step="0.01" class="form-control form-control-sm" name="precio_nuevo[]" value="' + escapeHtml(formatMoney(price)) + '" data-pending-price>' +
+          costMarkup +
+        '</td>' +
+        '<td class="small text-muted">—</td>' +
+        '<td data-pending-pay>$' + escapeHtml(formatMoney(price)) + '</td>' +
+        '<td data-pending-subtotal>$' + escapeHtml(formatMoney(quantity * price)) + '</td>' +
+        '<td>' +
+          '<button type="button" class="btn btn-outline-danger btn-sm" data-remove-pending-row>' + escapeHtml(removeLabel) + '</button>' +
+        '</td>';
+      return row;
+    }
+
+    function addPendingProduct() {
+      var presentationId = String(hiddenInput.value || '').trim();
+      var label = String(selectedLabel.textContent || searchInput.value || '').trim();
+      var quantity = parseDecimal(qtyInput ? qtyInput.value : '1');
+      var price = parseDecimal(priceInput ? priceInput.value : '');
+      var productId = selectedProductId ? String(selectedProductId) : '';
+
+      if (!presentationId) {
+        window.alert(addMissingMessage);
+        searchInput.focus();
+        return;
+      }
+      if (isDuplicateSelection(presentationId, productId)) {
+        window.alert(duplicateProductMessage);
+        clearStagingFields();
+        searchInput.focus();
+        return;
+      }
+      if (quantity === null || quantity < 1) {
+        window.alert(addQtyMessage);
+        if (qtyInput) {
+          qtyInput.focus();
+        }
+        return;
+      }
+      if (price === null || price <= 0) {
+        window.alert(addPriceMessage);
+        if (priceInput) {
+          priceInput.focus();
+        }
+        return;
+      }
+      if (!tableBody) {
+        return;
+      }
+
+      var row = buildPendingProductRow(presentationId, label, Math.round(quantity), price, selectedCost, productId);
+      tableBody.appendChild(row);
+      updatePendingRowSubtotal(row);
+      clearStagingFields();
+      searchInput.focus();
+    }
+
+    resetPriceFields();
+    if (qtyInput && !qtyInput.value) {
+      qtyInput.value = '1';
+    }
+
+    if (pricePresetSelect && priceInput) {
+      pricePresetSelect.addEventListener('change', function () {
+        if (pricePresetSelect.value) {
+          priceInput.value = pricePresetSelect.value;
+        }
+      });
+
+      priceInput.addEventListener('input', syncPresetFromInput);
+    }
+
+    if (addButton) {
+      addButton.addEventListener('click', function (event) {
+        event.preventDefault();
+        addPendingProduct();
+      });
+    }
+
+    if (tableBody) {
+      tableBody.addEventListener('click', function (event) {
+        var removeButton = event.target.closest('[data-remove-pending-row]');
+        if (!removeButton) {
+          return;
+        }
+        var row = removeButton.closest('[data-pending-product-row]');
+        if (row) {
+          row.remove();
+          updateDisplayedTotal();
+        }
+      });
+
+      tableBody.addEventListener('input', function (event) {
+        var field = event.target.closest('[data-pending-qty], [data-pending-price]');
+        if (!field) {
+          return;
+        }
+        var row = field.closest('[data-pending-product-row]');
+        if (row) {
+          updatePendingRowSubtotal(row);
+        }
+      });
+    }
+
+    if (orderForm) {
+      orderForm.addEventListener('submit', function (event) {
+        if (!hiddenInput || !hiddenInput.value || !tableBody || !addButton) {
+          return;
+        }
+        // If the user selected a product but forgot Add, queue it automatically.
+        event.preventDefault();
+        addPendingProduct();
+        if (!hiddenInput.value) {
+          HTMLFormElement.prototype.submit.call(orderForm);
+        }
+      });
+    }
+
+    if (quoteUpdateForm) {
+      quoteUpdateForm.addEventListener('submit', function (event) {
+        var presentationId = String(hiddenInput.value || '').trim();
+        if (!presentationId) {
+          return;
+        }
+        if (isDuplicateSelection(presentationId, selectedProductId)) {
+          event.preventDefault();
+          window.alert(duplicateProductMessage);
+          clearStagingFields();
+          searchInput.focus();
+        }
+      });
+    }
+
+    searchInput.addEventListener('input', function () {
+      hiddenInput.value = '';
+      selectedProductId = null;
+      selectedLabel.hidden = true;
+      selectedLabel.textContent = '';
+      resetPriceFields();
+
+      var rawValue = searchInput.value || '';
+      if (rawValue.endsWith(' ')) {
+        return;
+      }
+
+      var query = rawValue.trim();
+      if (query.length < 2) {
+        if (query.length) {
+          renderResults([], minCharsMessage);
+        } else {
+          hideResults();
+        }
+        return;
+      }
+
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(function () {
+        fetchResults(query);
+      }, (window.PreserveSearchFocus && window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS) || 1000);
+    });
+
+    resultsBox.addEventListener('click', function (event) {
+      var button = event.target.closest('.product-search-result');
+      if (!button) {
+        return;
+      }
+      var item = lastResults[Number(button.dataset.index)];
+      if (item) {
+        selectResult(item);
+      }
+    });
+
+    document.addEventListener('click', function (event) {
+      if (!root.contains(event.target)) {
+        hideResults();
+      }
+    });
+
+    searchInput.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter') {
+        if (!resultsBox.hidden && lastResults.length && activeIndex >= 0) {
+          event.preventDefault();
+          selectResult(lastResults[activeIndex]);
+          return;
+        }
+        if (hiddenInput.value && addButton && tableBody) {
+          event.preventDefault();
+          addPendingProduct();
+        }
+        return;
+      }
+
+      if (resultsBox.hidden || !lastResults.length) {
+        return;
+      }
+
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        activeIndex = Math.min(activeIndex + 1, lastResults.length - 1);
+        highlightActive();
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        activeIndex = Math.max(activeIndex - 1, 0);
+        highlightActive();
+      } else if (event.key === 'Escape') {
+        hideResults();
+      }
+    });
+
+    if (qtyInput && addButton && tableBody) {
+      qtyInput.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          addPendingProduct();
+        }
+      });
+    }
+  });
+})();

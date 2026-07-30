@@ -31,10 +31,10 @@ def get_visitor_profile(request):
         defaults={'user': user, 'cliente': cliente},
     )
     updates = []
-    if profile.user_id != getattr(user, 'id', None):
+    if user is not None and profile.user_id != user.id:
         profile.user = user
         updates.append('user')
-    if profile.cliente_id != getattr(cliente, 'id', None):
+    if cliente is not None and profile.cliente_id != cliente.id:
         profile.cliente = cliente
         updates.append('cliente')
     profile.last_seen_at = timezone.now()

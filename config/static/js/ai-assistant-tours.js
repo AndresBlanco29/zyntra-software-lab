@@ -39,6 +39,17 @@
       { element: "input[name='password']", title: "Contraseña", description: "Ingresa tu contraseña." },
       { element: "button[type='submit']", title: "Iniciar sesión", description: "Haz clic para entrar al catálogo.", advanceOnClick: true }
     ],
+    login: [
+      { element: "[data-ai-tour='login']", title: "Iniciar sesión", description: "Haz clic en Login para abrir el acceso a la plataforma.", advanceOnClick: true },
+      { element: "[data-ai-tour='login-username']", title: "Usuario", description: "Ingresa el usuario que creaste durante el registro." },
+      { element: "[data-ai-tour='login-password']", title: "Contraseña", description: "Ingresa tu contraseña. No la compartas con nadie." },
+      { element: "[data-ai-tour='login-submit']", title: "Sign In", description: "Cuando los datos sean correctos, presiona Iniciar Sesión para entrar." }
+    ],
+    "password-recovery": [
+      { element: "[data-ai-tour='forgot-password']", title: "Forgot Password", description: "Haz clic aquí para iniciar la recuperación de tu contraseña.", advanceOnClick: true },
+      { element: "[data-ai-tour='recovery-email']", title: "Correo registrado", description: "Ingresa el correo con el que registraste tu cuenta." },
+      { element: "[data-ai-tour='recovery-submit']", title: "Enviar correo de recuperación", description: "Enviaremos un enlace seguro a tu correo para crear una nueva contraseña." }
+    ],
     "first-order": [
       { element: "#buscador", title: "Busca productos", description: "Busca por nombre o categoría." },
       { element: "[data-ai-tour='promotions']", title: "Promociones", description: "Revisa las promociones aplicables antes de agregar." },

@@ -100,7 +100,9 @@
     const event = context.pending_event;
     if (!event) return;
     const messagesByType = {
+      REGISTRATION_SUBMITTED: "Gracias. Recibimos tu solicitud y nuestro equipo revisará tus documentos. Te enviaremos una respuesta pronto.",
       ACCOUNT_APPROVED: "Tu cuenta fue aprobada. Puedo guiarte para iniciar sesión.",
+      ACCOUNT_NEEDS_CORRECTION: "Tu solicitud necesita una corrección. Puedo ayudarte a revisar el siguiente paso.",
       QUOTE_READY: "Tengo buenas noticias: tu cotización está lista para revisar.",
       ORDER_DISPATCHED: "Tu pedido fue despachado. Puedes consultar su estado.",
       ORDER_DELIVERED: "Tu pedido fue marcado como entregado.",

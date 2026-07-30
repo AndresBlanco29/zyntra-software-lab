@@ -22,15 +22,15 @@
   <!-- PASO 1: DATOS PERSONALES -->
   <div id="step1">
     <div class="mb-3">
-      <input type="text" class="form-control form-control-lg" placeholder="{% trans 'Nombre*' %}" name="nombre" required />
+      <input type="text" class="form-control form-control-lg" placeholder="{% trans 'Nombre*' %}" name="nombre" data-ai-tour="first-name" required />
     </div>
 
     <div class="mb-3">
-      <input type="text" class="form-control form-control-lg" placeholder="{% trans 'Apellido*' %}" name="apellido" required />
+      <input type="text" class="form-control form-control-lg" placeholder="{% trans 'Apellido*' %}" name="apellido" data-ai-tour="last-name" required />
     </div>
 
     <div class="mb-3">
-      <input id="id_negocio_modal" type="text" class="form-control form-control-lg" placeholder="{% trans 'Business ID or personal ID*' %}" name="id_cliente" pattern="[0-9]{8,9}" maxlength="9" inputmode="numeric" required />
+      <input id="id_negocio_modal" type="text" class="form-control form-control-lg" placeholder="{% trans 'Business ID or personal ID*' %}" name="id_cliente" data-ai-tour="business-id" pattern="[0-9]{8,9}" maxlength="9" inputmode="numeric" required />
     </div>
 
     <div class="mb-3">
@@ -38,7 +38,7 @@
     </div>
 
     <div class="d-grid">
-      <button type="button" class="btn btn-continuar btn-lg" onclick="nextStepModal(1)">{% trans "Continuar" %}</button>
+      <button type="button" class="btn btn-continuar btn-lg" data-ai-tour="continue-personal" onclick="nextStepModal(1)">{% trans "Continuar" %}</button>
     </div>
   </div>
 
@@ -54,15 +54,15 @@
     </div>
 
     <div class="mb-3">
-      <input type="text" class="form-control form-control-lg" name="username" placeholder="{% trans 'Usuario*' %}" required />
+      <input type="text" class="form-control form-control-lg" name="username" data-ai-tour="username" placeholder="{% trans 'Usuario*' %}" required />
     </div>
 
     <div class="mb-3">
-      <input type="email" class="form-control form-control-lg" name="email" placeholder="{% trans 'Correo electrónico*' %}" required />
+      <input type="email" class="form-control form-control-lg" name="email" data-ai-tour="email" placeholder="{% trans 'Correo electrónico*' %}" required />
     </div>
 
     <div class="mb-3 position-relative">
-      <input type="password" id="passwordStep2" class="form-control form-control-lg pe-5" name="password1" placeholder="{% trans 'Contraseña*' %}" required />
+      <input type="password" id="passwordStep2" class="form-control form-control-lg pe-5" name="password1" data-ai-tour="password" placeholder="{% trans 'Contraseña*' %}" required />
       <span class="position-absolute top-50 end-0 translate-middle-y me-3" style="cursor: pointer;" onclick="togglePasswordField('passwordStep2', 'toggleIconStep2')">
         <i id="toggleIconStep2" class="bi bi-eye"></i>
       </span>
@@ -76,7 +76,7 @@
     </div>
 
     <div class="d-grid gap-2">
-      <button type="button" class="btn btn-continuar btn-lg" onclick="nextStepModal(2)">{% trans "Continuar" %}</button>
+      <button type="button" class="btn btn-continuar btn-lg" data-ai-tour="continue-credentials" onclick="nextStepModal(2)">{% trans "Continuar" %}</button>
       <button type="button" class="btn btn-outline-secondary btn-sm" onclick="prevStepModal(2)">{% trans "Back" %}</button>
     </div>
   </div>
@@ -98,11 +98,11 @@
     <h6 class="fw-bold text-center mb-3" style="font-size: 14px;">{% trans "Business details" %}</h6>
     <div class="row g-2">
       <div class="col-12">
-        <input type="text" class="form-control form-control-lg" name="empresa" placeholder="{% trans 'Legal business name' %}" required />
+        <input type="text" class="form-control form-control-lg" name="empresa" data-ai-tour="business-name" placeholder="{% trans 'Legal business name' %}" required />
       </div>
       <div class="col-12">
         <div class="input-group">
-          <input id="id_sales_tax_modal" type="text" class="form-control form-control-lg" name="sales_tax" placeholder="{% trans 'Sales tax number' %}" inputmode="numeric" pattern="[0-9]+" required />
+          <input id="id_sales_tax_modal" type="text" class="form-control form-control-lg" name="sales_tax" data-ai-tour="sales-tax" placeholder="{% trans 'Sales tax number' %}" inputmode="numeric" pattern="[0-9]+" required />
           <button type="button" class="btn btn-outline-secondary" id="btn-tax-example-modal" onclick="openTaxExample(event)"
             data-tax-example-mode="number"
             data-tax-example-title="{% trans 'Example: Sales tax number' %}"
@@ -159,7 +159,7 @@
     </div>
     <div class="upload-box text-center mb-3">
       <input type="file" id="certificado" name="certificado" accept=".pdf,.jpg,.png" required hidden>
-      <div class="upload-content" onclick="document.getElementById('certificado').click()" style="padding: 15px; border: 2px dashed #ccc; border-radius: 8px; cursor: pointer; background: #f8f9fa;">
+      <div class="upload-content" data-ai-tour="upload-license" onclick="document.getElementById('certificado').click()" style="padding: 15px; border: 2px dashed #ccc; border-radius: 8px; cursor: pointer; background: #f8f9fa;">
         <i class="bi bi-cloud-arrow-up fs-3 text-secondary"></i>
         <p class="fw-bold mt-2 text-primary" style="font-size: 13px; margin: 0;">{% trans "Drag or click to upload (PDF or image)" %}</p>
         <small class="text-muted d-block mt-1" style="font-size: 11px;">{% trans "Issued by the Department of Revenue" %}</small>
@@ -176,7 +176,7 @@
     </div>
 
     <div class="d-grid gap-2">
-      <button type="submit" class="btn btn-continuar btn-lg">{% trans "Submit for Approval" %}</button>
+      <button type="submit" class="btn btn-continuar btn-lg" data-ai-tour="submit-registration">{% trans "Submit for Approval" %}</button>
       <button type="button" class="btn btn-outline-secondary btn-sm" onclick="prevStepModal(3)">{% trans "Back" %}</button>
     </div>
   </div>

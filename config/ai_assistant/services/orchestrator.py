@@ -76,7 +76,7 @@ def _guided_actions(context, tour_id):
     if tour_id == 'registration':
         return [{
             'label': 'Iniciar registro guiado',
-            'url': f"{reverse('registro_usuario')}?ai_tour=registration",
+            'url': f"{reverse('home')}?ai_tour=registration",
             'tour_id': 'registration',
         }]
     if tour_id:

@@ -3,6 +3,8 @@
 
   const tours = {
     registration: [
+      { element: "[data-ai-tour='login']", title: "¿Ya tienes cuenta?", description: "Si ya fuiste aprobado, haz clic en Login. Si eres nuevo, presiona Next para crear una cuenta." },
+      { element: "[data-ai-tour='signup']", title: "Crea una cuenta", description: "Haz clic aquí para abrir el formulario de registro.", advanceOnClick: true },
       { element: "[data-ai-tour='first-name']", title: "Nombre", description: "Escribe tu primer nombre." },
       { element: "[data-ai-tour='last-name']", title: "Apellido", description: "Escribe tu apellido." },
       { element: "[data-ai-tour='business-id']", title: "Business ID", description: "Ingresa tu identificación comercial." },
@@ -48,11 +50,14 @@
     }).catch(function () {});
   }
 
-  function start(tourKey) {
-    const steps = (tours[tourKey] || []).filter(function (step) {
-      const element = document.querySelector(step.element);
-      return element && element.offsetParent !== null;
+  function findVisibleElement(selector) {
+    return Array.from(document.querySelectorAll(selector)).find(function (element) {
+      return element.offsetParent !== null;
     });
+  }
+
+  function start(tourKey) {
+    const steps = tours[tourKey] || [];
     const createDriver = window.driver && typeof window.driver.js === "function"
       ? window.driver.js
       : (typeof window.driver === "function" ? window.driver : null);
@@ -65,7 +70,7 @@
       showProgress: true,
       steps: steps.map(function (step) {
         return {
-          element: step.element,
+          element: function () { return findVisibleElement(step.element); },
           advanceOnClick: !!step.advanceOnClick,
           waitForElement: 5000,
           popover: {

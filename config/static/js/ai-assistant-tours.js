@@ -13,6 +13,7 @@
       { element: "[data-ai-tour='username']", title: "Usuario", description: "Crea el usuario para ingresar al portal." },
       { element: "[data-ai-tour='email']", title: "Correo electrónico", description: "Ingresa un correo al que tengas acceso." },
       { element: "[data-ai-tour='password']", title: "Contraseña", description: "Crea y confirma una contraseña segura." },
+      { element: "[data-ai-tour='confirm-password']", title: "Confirmar contraseña", description: "Escribe nuevamente la misma contraseña para confirmarla." },
       { element: "[data-ai-tour='continue-credentials']", title: "Continuar", description: "Avanza a la información comercial.", advanceOnClick: true },
       { element: "[data-ai-tour='business-name']", title: "Nombre legal del negocio", description: "Ingresa el nombre legal de tu empresa." },
       { element: "[data-ai-tour='sales-tax']", title: "Sales Tax Number", description: "Ingresa tu número de Sales Tax." },

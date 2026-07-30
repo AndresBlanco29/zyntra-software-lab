@@ -200,9 +200,10 @@ class VerificationTests(TestCase):
         )
         # The OTP resolves ownership through Cliente, not a mutable user role.
         user.role = 'backoffice'
-        user.save(update_fields=['role'])
+        user.email = ' otp-customer@example.com '
+        user.save(update_fields=['role', 'email'])
 
-        challenge = issue_account_status_challenge(user.email)
+        challenge = issue_account_status_challenge('otp-customer@example.com')
         self.assertEqual(verify_account_status_challenge(challenge.public_id, '123456'), cliente)
         self.assertIsNone(verify_account_status_challenge(challenge.public_id, '123456'))
         send_mail_mock.assert_called_once()

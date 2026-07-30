@@ -6,6 +6,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.core.cache import cache
 from django.core.mail import send_mail
+from django.db.models.functions import Lower, Trim
 from django.utils import timezone
 
 from config.ai_assistant.models import AssistantVerificationChallenge
@@ -37,9 +38,12 @@ def issue_account_status_challenge(email):
     cache.set(rate_key, issued + 1, timeout=3600)
     # Pending applications can have a different role while backoffice reviews
     # them. The Cliente record is the authoritative ownership boundary.
-    cliente = Cliente.objects.select_related('usuario').filter(
-        usuario__email__iexact=normalized_email,
-    ).first()
+    cliente = (
+        Cliente.objects.select_related('usuario')
+        .annotate(_assistant_email=Lower(Trim('usuario__email')))
+        .filter(_assistant_email=normalized_email)
+        .first()
+    )
     user = cliente.usuario if cliente else None
     code = f'{secrets.randbelow(1_000_000):06d}'
     challenge = AssistantVerificationChallenge.objects.create(

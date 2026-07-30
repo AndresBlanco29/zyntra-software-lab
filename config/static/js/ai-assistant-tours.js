@@ -108,8 +108,6 @@
 
   window.TortillaAssistantTours = { start: start };
   document.addEventListener("click", function (event) {
-    const target = event.target.closest("[data-ai-tour='continue-personal'], [data-ai-tour='continue-credentials']");
-    if (target) window.setTimeout(function () { start('registration'); }, 350);
     const quoteLink = event.target.closest("[data-ai-tour='quote-open']");
     if (quoteLink && quoteLink.href) {
       const quoteUrl = new URL(quoteLink.href, window.location.origin);

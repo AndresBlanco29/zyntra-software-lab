@@ -21,7 +21,13 @@ from config.ai_assistant.models import (
     AssistantUserState,
 )
 from config.ai_assistant.services.context import build_customer_context
-from config.ai_assistant.services.identity import get_customer_for_user, get_visitor_id, visitor_in_rollout
+from config.ai_assistant.services.identity import (
+    get_customer_for_user,
+    get_visitor_id,
+    get_visitor_profile,
+    set_visitor_cookie,
+    visitor_in_rollout,
+)
 from config.ai_assistant.services.orchestrator import get_or_create_conversation, reply_to_message
 from config.ai_assistant.services.actions import execute_confirmed_action
 from config.usuarios.permissions import internal_permission_required
@@ -83,7 +89,12 @@ def assistant_context(request):
         'welcome_message': config.welcome_message,
         'visitor_id': str(visitor_id),
     })
-    return JsonResponse(context)
+    response = JsonResponse(context)
+    if context.get('proactive', {}).get('kind') == 'first_visit':
+        profile, _ = get_visitor_profile(request)
+        profile.first_visit_prompted_at = timezone.now()
+        profile.save(update_fields=['first_visit_prompted_at'])
+    return set_visitor_cookie(response, request)
 
 
 @require_POST

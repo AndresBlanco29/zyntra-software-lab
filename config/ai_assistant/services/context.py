@@ -1,7 +1,7 @@
 from django.urls import reverse
 
 from config.ai_assistant.models import AssistantDomainEvent
-from config.ai_assistant.services.identity import get_customer_for_user
+from config.ai_assistant.services.identity import get_customer_for_user, get_visitor_profile
 from config.cotizaciones.models import Cotizacion
 from config.pedidos.client_history import list_cliente_favorite_product_ids, list_cliente_purchase_orders
 
@@ -10,6 +10,7 @@ def build_customer_context(request):
     """Small, scoped context. Volatile commerce values are queried by tools."""
     user = request.user
     cliente = get_customer_for_user(user)
+    visitor_profile, _ = get_visitor_profile(request)
     context = {
         'authenticated': bool(getattr(user, 'is_authenticated', False)),
         'role': getattr(user, 'role', '') if getattr(user, 'is_authenticated', False) else '',
@@ -22,6 +23,19 @@ def build_customer_context(request):
             'url': reverse('home'),
             'tour_id': 'registration',
         }
+        if visitor_profile.first_visit_prompted_at is None:
+            context['proactive'] = {
+                'kind': 'first_visit',
+                'message': (
+                    '¡Hola! 👋\n\nBienvenido a La Tortilla Grocery.\n\n'
+                    'Soy Paco, tu asistente virtual. Veo que es tu primera visita. ¿En qué puedo ayudarte hoy?'
+                ),
+                'actions': [
+                    {'label': 'Registrarme como cliente', 'url': reverse('home'), 'tour_id': 'registration'},
+                    {'label': 'Ver el catálogo como invitado', 'url': f"{reverse('catalogo')}?guest=1"},
+                    {'label': 'Explorar la página por mi cuenta', 'url': '#', 'kind': 'dismiss_proactive'},
+                ],
+            }
         return context
 
     context.update({

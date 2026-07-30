@@ -143,6 +143,31 @@ class AssistantUserState(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+class AssistantVisitorProfile(models.Model):
+    """Anonymous first-party visitor state; never used as an authorization credential."""
+
+    visitor_id = models.UUIDField(unique=True, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='assistant_visitor_profiles',
+    )
+    cliente = models.ForeignKey(
+        'clientes.Cliente',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='assistant_visitor_profiles',
+    )
+    first_seen_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(default=timezone.now, db_index=True)
+    first_visit_prompted_at = models.DateTimeField(blank=True, null=True)
+    quiet_until = models.DateTimeField(blank=True, null=True)
+    preferences = models.JSONField(default=dict, blank=True)
+
+
 class AssistantGuidedTourProgress(models.Model):
     visitor_id = models.UUIDField()
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE)

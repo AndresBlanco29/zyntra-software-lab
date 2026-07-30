@@ -59,6 +59,17 @@
           });
         }
       }
+      if (action.kind === "dismiss_proactive") {
+        link.addEventListener("click", function (event) {
+          event.preventDefault();
+          container.replaceChildren();
+          appendMessage(
+            document.querySelector("[data-ai-assistant] [data-ai-messages]"),
+            "Perfecto. Explora con calma; estaré disponible cuando me necesites.",
+            false
+          );
+        });
+      }
       container.appendChild(link);
     });
   }
@@ -135,7 +146,8 @@
       });
     }
 
-    function boot() {
+    function boot(options) {
+      options = options || {};
       if (booted) return;
       booted = true;
       fetch(root.dataset.contextUrl + "?page=" + encodeURIComponent(root.dataset.page || ""), { credentials: "same-origin" })
@@ -146,11 +158,21 @@
             return;
           }
           root.querySelector("[data-ai-name]").textContent = context.assistant_name;
-          appendMessage(messages, context.welcome_message, false);
-          const initialActions = Array.isArray(context.actions) && context.actions.length
-            ? context.actions
-            : [context.next_recommended_action].filter(Boolean);
-          renderActions(actions, initialActions);
+          if (context.proactive) {
+            appendMessage(messages, context.proactive.message, false);
+            renderActions(actions, context.proactive.actions);
+            if (options.autoOpen) {
+              panel.classList.add("is-open");
+              launcher.setAttribute("aria-expanded", "true");
+              input.focus();
+            }
+          } else {
+            appendMessage(messages, context.welcome_message, false);
+            const initialActions = Array.isArray(context.actions) && context.actions.length
+              ? context.actions
+              : [context.next_recommended_action].filter(Boolean);
+            renderActions(actions, initialActions);
+          }
           renderPendingEvent(root, context, messages, actions);
         })
         .catch(function () {});
@@ -162,6 +184,8 @@
       launcher.setAttribute("aria-expanded", panel.classList.contains("is-open") ? "true" : "false");
       if (panel.classList.contains("is-open")) input.focus();
     });
+
+    window.setTimeout(function () { boot({ autoOpen: true }); }, 4000);
 
     window.addEventListener("tortilla-assistant-tour-dismissed", function (event) {
       const tourId = event.detail && event.detail.tourId;

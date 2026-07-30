@@ -7,7 +7,13 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from config.ai_assistant.models import AssistantConfiguration, AssistantKnowledgeDocument, AssistantMessage, AssistantPendingAction
+from config.ai_assistant.models import (
+    AssistantConfiguration,
+    AssistantKnowledgeDocument,
+    AssistantMessage,
+    AssistantPendingAction,
+    AssistantVisitorProfile,
+)
 from config.ai_assistant.services.knowledge import _cosine_similarity, rebuild_document_chunks, search_published_knowledge
 from config.ai_assistant.services.openai_client import OpenAIClient
 from config.ai_assistant.services.orchestrator import _authorized_tour_for_message, _guided_actions
@@ -26,6 +32,9 @@ class AssistantApiTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['assistant_name'], 'Paco')
         self.assertTrue(response.json()['enabled'])
+        self.assertEqual(response.json()['proactive']['kind'], 'first_visit')
+        self.assertTrue(AssistantVisitorProfile.objects.exists())
+        self.assertIn('ai_assistant_visitor', response.cookies)
 
     def test_conversation_message_uses_safe_fallback_without_openai_key(self):
         created = self.client.post(

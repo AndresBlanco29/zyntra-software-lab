@@ -66,8 +66,19 @@ def assistant_context(request):
     config = AssistantConfiguration.get_solo()
     visitor_id = get_visitor_id(request)
     context = build_customer_context(request)
+    page = str(request.GET.get('page') or '').strip()
+    page_enabled = {
+        'home': config.enable_home,
+        'registration': config.enable_home,
+        'login': config.enable_home,
+        'catalog': config.enable_catalog,
+        'cart': config.enable_customer_portal,
+        'quotes': config.enable_customer_portal,
+        'quote-detail': config.enable_customer_portal,
+        'order-history': config.enable_customer_portal,
+    }.get(page, config.enable_customer_portal)
     context.update({
-        'enabled': bool(config.enabled) and visitor_in_rollout(visitor_id),
+        'enabled': bool(config.enabled) and bool(page_enabled) and visitor_in_rollout(visitor_id),
         'assistant_name': config.assistant_name,
         'welcome_message': config.welcome_message,
         'visitor_id': str(visitor_id),

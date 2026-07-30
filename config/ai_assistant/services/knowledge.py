@@ -3,6 +3,7 @@ import math
 import re
 
 from config.ai_assistant.models import AssistantKnowledgeChunk, AssistantKnowledgeDocument
+from config.ai_assistant.services.vector_store import MySQLJsonVectorStore, cosine_similarity
 
 
 def content_hash(content):
@@ -73,15 +74,7 @@ def _token_overlap_score(query, content):
 
 
 def _cosine_similarity(left, right):
-    if not left or not right or len(left) != len(right):
-        return 0.0
-    try:
-        dot_product = sum(float(a) * float(b) for a, b in zip(left, right))
-        left_norm = math.sqrt(sum(float(a) ** 2 for a in left))
-        right_norm = math.sqrt(sum(float(b) ** 2 for b in right))
-    except (TypeError, ValueError):
-        return 0.0
-    return dot_product / (left_norm * right_norm) if left_norm and right_norm else 0.0
+    return cosine_similarity(left, right)
 
 
 def search_published_knowledge(query, *, language='es', limit=4):
@@ -105,6 +98,19 @@ def search_published_knowledge(query, *, language='es', limit=4):
     except Exception:
         # Retrieval must remain available if embeddings are delayed/unavailable.
         query_embedding = []
+
+    if query_embedding:
+        vector_results = MySQLJsonVectorStore().search(query_embedding, language=language, limit=limit)
+        if vector_results:
+            return [
+                {
+                    'title': chunk.document.title,
+                    'content': chunk.content,
+                    'category': chunk.document.category,
+                    'source_url': chunk.document.source_url,
+                }
+                for chunk, _score in vector_results
+            ]
 
     def relevance(chunk):
         vector_score = _cosine_similarity(query_embedding, chunk.embedding) if query_embedding else 0.0

@@ -27,7 +27,8 @@
       { element: "#buscador", title: "Busca productos", description: "Busca por nombre o categoría." },
       { element: "[data-ai-tour='promotions']", title: "Promociones", description: "Revisa las promociones aplicables antes de agregar." },
       { element: "[data-ai-tour='add-order']", title: "Agregar a la orden", description: "Agrega el producto y ajusta la cantidad." },
-      { element: "[data-ai-tour='cart']", title: "Mi orden", description: "Revisa comentarios y envía tu solicitud." }
+      { element: "[data-ai-tour='cart']", title: "Mi orden", description: "Revisa comentarios y envía tu solicitud." },
+      { element: "[data-ai-tour='submit-order']", title: "Enviar solicitud", description: "Cuando revises cantidades, envía tu solicitud para que nuestro equipo prepare la cotización." }
     ],
     "quote-ready": [
       { element: "[data-ai-tour='quote-open']", title: "Tu cotización está lista", description: "Haz clic para abrirla y revisar productos, cantidades y precios.", advanceOnClick: true },

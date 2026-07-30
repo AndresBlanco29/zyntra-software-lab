@@ -159,11 +159,13 @@ class AssistantGuidedTourProgress(models.Model):
 
 class AssistantDomainEvent(models.Model):
     TYPE_ACCOUNT_APPROVED = 'ACCOUNT_APPROVED'
+    TYPE_ACCOUNT_NEEDS_CORRECTION = 'ACCOUNT_NEEDS_CORRECTION'
     TYPE_QUOTE_READY = 'QUOTE_READY'
     TYPE_ORDER_DISPATCHED = 'ORDER_DISPATCHED'
     TYPE_ORDER_DELIVERED = 'ORDER_DELIVERED'
     TYPE_CHOICES = (
         (TYPE_ACCOUNT_APPROVED, 'Account approved'),
+        (TYPE_ACCOUNT_NEEDS_CORRECTION, 'Account needs correction'),
         (TYPE_QUOTE_READY, 'Quote ready'),
         (TYPE_ORDER_DISPATCHED, 'Order dispatched'),
         (TYPE_ORDER_DELIVERED, 'Order delivered'),

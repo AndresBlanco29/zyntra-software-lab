@@ -1,6 +1,6 @@
 {% load static i18n %}
 <link rel="stylesheet" href="{% static 'css/ai-assistant.css' %}">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.css">
+<link rel="stylesheet" href="{% static 'vendor/node_modules/driver.js/dist/driver.css' %}">
 <section
   data-ai-assistant
   data-page="{{ ai_assistant_page|default:'customer-portal' }}"
@@ -32,6 +32,6 @@
     </form>
   </div>
 </section>
-<script src="https://cdn.jsdelivr.net/npm/driver.js@1.8.0/dist/driver.js.iife.js"></script>
+<script src="{% static 'vendor/node_modules/driver.js/dist/driver.js.iife.js' %}"></script>
 <script src="{% static 'js/ai-assistant-tours.js' %}"></script>
 <script src="{% static 'js/ai-assistant.js' %}"></script>

@@ -1065,6 +1065,15 @@ def start_delivery_route(*, delivery, driver_user):
 		delivery.estado = 'EN_RUTA'
 		delivery.route_started_at = timezone.now()
 		delivery.save(update_fields=['estado', 'route_started_at', 'updated_at'])
+		from config.ai_assistant.models import AssistantDomainEvent
+		from config.ai_assistant.services.events import record_assistant_event
+		record_assistant_event(
+			cliente=delivery.invoice.cliente,
+			event_type=AssistantDomainEvent.TYPE_ORDER_DISPATCHED,
+			entity_type='Pedido',
+			entity_id=delivery.invoice.pedido_id,
+			payload={'pedido_id': delivery.invoice.pedido_id, 'invoice_id': delivery.invoice_id},
+		)
 	from config.auditoria.business_events import log_business_event
 	log_business_event(
 		driver_user,

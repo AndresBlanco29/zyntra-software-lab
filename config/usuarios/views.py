@@ -1560,11 +1560,19 @@ def rechazar_cliente(request, cliente_id):
     cliente.save(update_fields=update_fields)
     usuario.is_active = False
     usuario.save(update_fields=['is_active'])
-
     client_email = usuario.email
     client_name = (usuario.first_name or usuario.username or 'Client').strip()
     company_name = cliente.nombre_empresa
     correction_url = _build_client_correction_url(request, cliente)
+    from config.ai_assistant.models import AssistantDomainEvent
+    from config.ai_assistant.services.events import record_assistant_event
+    record_assistant_event(
+        cliente=cliente,
+        event_type=AssistantDomainEvent.TYPE_ACCOUNT_NEEDS_CORRECTION,
+        entity_type='Cliente',
+        entity_id=cliente.id,
+        payload={'correction_url': correction_url},
+    )
 
     try:
         email_sent = _send_client_decision_email(

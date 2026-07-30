@@ -131,7 +131,7 @@
     function boot() {
       if (booted) return;
       booted = true;
-      fetch(root.dataset.contextUrl, { credentials: "same-origin" })
+      fetch(root.dataset.contextUrl + "?page=" + encodeURIComponent(root.dataset.page || ""), { credentials: "same-origin" })
         .then(function (response) { return response.json(); })
         .then(function (context) {
           if (!context.enabled) {

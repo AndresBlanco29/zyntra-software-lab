@@ -144,9 +144,18 @@
         trigger.addEventListener("click", function () {
           const resumeIndex = lastActiveIndex + 1;
           resumingAfterModal = true;
-          modal.addEventListener("hidden.bs.modal", function () {
-            window.setTimeout(function () { start(tourKey, resumeIndex); }, 150);
-          }, { once: true });
+          let resumed = false;
+          const resumeGuide = function () {
+            if (resumed) return;
+            resumed = true;
+            window.setTimeout(function () { start(tourKey, resumeIndex); }, 250);
+          };
+          modal.addEventListener("hidden.bs.modal", resumeGuide, { once: true });
+          modal.querySelectorAll(".btn-close, [data-bs-dismiss='modal'], .modal-footer button").forEach(function (closeButton) {
+            closeButton.addEventListener("click", function () {
+              window.setTimeout(resumeGuide, 350);
+            }, { once: true });
+          });
           driverObj.destroy();
         }, { once: true });
       }

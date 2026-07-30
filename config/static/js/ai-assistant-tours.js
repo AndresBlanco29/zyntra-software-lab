@@ -17,7 +17,18 @@
       { element: "[data-ai-tour='continue-credentials']", title: "Continuar", description: "Avanza a la información comercial.", advanceOnClick: true },
       { element: "[data-ai-tour='business-name']", title: "Nombre legal del negocio", description: "Ingresa el nombre legal de tu empresa." },
       { element: "[data-ai-tour='sales-tax']", title: "Sales Tax Number", description: "Ingresa tu número de Sales Tax." },
+      { element: "[data-ai-tour='sales-tax-example']", title: "Ver ejemplo de Sales Tax", description: "Puedes usar este botón para ver dónde encontrar el número en tu certificado." },
+      { element: "[data-ai-tour='business-phone']", title: "Teléfono comercial", description: "Ingresa el teléfono principal de tu negocio." },
+      { element: "[data-ai-tour='business-email']", title: "Correo comercial", description: "Ingresa el correo de contacto de tu negocio." },
+      { element: "[data-ai-tour='primary-address']", title: "Dirección principal", description: "Ingresa la dirección física principal del negocio." },
+      { element: "[data-ai-tour='address-line-2']", title: "Dirección adicional", description: "Este campo es opcional, por ejemplo apartamento o local." },
+      { element: "[data-ai-tour='state']", title: "Estado", description: "Ingresa el estado o departamento del negocio." },
+      { element: "[data-ai-tour='city']", title: "Ciudad", description: "Ingresa la ciudad del negocio." },
+      { element: "[data-ai-tour='zip-code']", title: "Código postal", description: "Ingresa el ZIP code de la dirección." },
+      { element: "[data-ai-tour='country']", title: "País", description: "El país está preconfigurado como USA." },
+      { element: "[data-ai-tour='certificate-example']", title: "Ver ejemplo de certificado", description: "Consulta un ejemplo del certificado o licencia que debes cargar." },
       { element: "[data-ai-tour='upload-license']", title: "Certificado o licencia", description: "Haz clic aquí para cargar el certificado requerido.", advanceOnClick: true },
+      { element: "[data-ai-tour='certify-information']", title: "Confirmar información", description: "Marca esta casilla después de verificar que toda la información es correcta." },
       { element: "[data-ai-tour='submit-registration']", title: "Enviar solicitud", description: "Envía la solicitud para aprobación." }
     ],
     "approved-login": [

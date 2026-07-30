@@ -104,6 +104,7 @@
         <div class="input-group">
           <input id="id_sales_tax_modal" type="text" class="form-control form-control-lg" name="sales_tax" data-ai-tour="sales-tax" placeholder="{% trans 'Sales tax number' %}" inputmode="numeric" pattern="[0-9]+" required />
           <button type="button" class="btn btn-outline-secondary" id="btn-tax-example-modal" onclick="openTaxExample(event)"
+            data-ai-tour="sales-tax-example"
             data-tax-example-mode="number"
             data-tax-example-title="{% trans 'Example: Sales tax number' %}"
             data-tax-example-note="{% trans 'Find the sales tax number on your certificate and enter it without spaces or hyphens.' %}"
@@ -113,10 +114,10 @@
         </div>
       </div>
       <div class="col-12">
-        <input type="text" class="form-control form-control-lg" name="telefono_comercial" placeholder="{% trans 'Business phone' %}" inputmode="numeric" maxlength="10" required />
+        <input type="text" class="form-control form-control-lg" name="telefono_comercial" data-ai-tour="business-phone" placeholder="{% trans 'Business phone' %}" inputmode="numeric" maxlength="10" required />
       </div>
       <div class="col-12">
-        <input type="email" class="form-control form-control-lg" name="email_comercial" placeholder="{% trans 'Business email' %}" required />
+        <input type="email" class="form-control form-control-lg" name="email_comercial" data-ai-tour="business-email" placeholder="{% trans 'Business email' %}" required />
       </div>
     </div>
 
@@ -126,22 +127,22 @@
     <h6 class="fw-bold text-center mb-3" style="font-size: 14px;">{% trans "Business address" %}</h6>
     <div class="row g-2">
       <div class="col-12">
-        <input type="text" class="form-control form-control-lg" name="direccion" placeholder="{% trans 'Primary address' %}" required />
+        <input type="text" class="form-control form-control-lg" name="direccion" data-ai-tour="primary-address" placeholder="{% trans 'Primary address' %}" required />
       </div>
       <div class="col-12">
-        <input type="text" class="form-control form-control-lg" name="direccion2" placeholder="{% trans 'Address line 2 (optional)' %}" />
+        <input type="text" class="form-control form-control-lg" name="direccion2" data-ai-tour="address-line-2" placeholder="{% trans 'Address line 2 (optional)' %}" />
       </div>
       <div class="col-6">
-        <input type="text" class="form-control form-control-lg" name="estado" placeholder="{% trans 'State / Department' %}" required />
+        <input type="text" class="form-control form-control-lg" name="estado" data-ai-tour="state" placeholder="{% trans 'State / Department' %}" required />
       </div>
       <div class="col-6">
-        <input type="text" class="form-control form-control-lg" name="ciudad" placeholder="{% trans 'City' %}" required />
+        <input type="text" class="form-control form-control-lg" name="ciudad" data-ai-tour="city" placeholder="{% trans 'City' %}" required />
       </div>
       <div class="col-6">
-        <input type="text" class="form-control form-control-lg" name="codigo_postal" placeholder="{% trans 'ZIP code' %}" required />
+        <input type="text" class="form-control form-control-lg" name="codigo_postal" data-ai-tour="zip-code" placeholder="{% trans 'ZIP code' %}" required />
       </div>
       <div class="col-6">
-        <input type="text" class="form-control form-control-lg" name="pais" value="USA" readonly />
+        <input type="text" class="form-control form-control-lg" name="pais" data-ai-tour="country" value="USA" readonly />
       </div>
     </div>
 
@@ -151,6 +152,7 @@
     <h6 class="fw-bold text-center mb-2" style="font-size: 14px;">{% trans "Sales Tax Certificate" %}</h6>
     <div class="text-center mb-3">
       <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openTaxExample(event)"
+        data-ai-tour="certificate-example"
         data-tax-example-mode="certificate"
         data-tax-example-title="{% trans 'Example: Sales tax certificate' %}"
         data-tax-example-note="{% trans 'This is an example of the certificate you need to upload to complete your registration.' %}">
@@ -169,7 +171,7 @@
 
     <!-- CHECKBOX CONFIRMACIÓN -->
     <div class="form-check my-3 text-center">
-      <input class="form-check-input" type="checkbox" name="confirmacion" required id="confirmacion" />
+      <input class="form-check-input" type="checkbox" name="confirmacion" data-ai-tour="certify-information" required id="confirmacion" />
       <label class="form-check-label small" for="confirmacion">
         {% trans "I certify that the tax and business information I provide, including my sales tax number and supporting certificate, is true, accurate, current, and verifiable to the best of my knowledge. I understand that I am solely responsible for any error, omission, or improper use of this information or any tax exemption claim made by my business." %}
       </label>

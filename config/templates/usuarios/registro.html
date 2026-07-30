@@ -263,6 +263,7 @@
                       type="button"
                       class="btn btn-outline-secondary"
                       id="btn-tax-example"
+                      data-ai-tour="sales-tax-example"
                       onclick="openTaxExample(event)"
                       data-tax-example-mode="number"
                       data-tax-example-title="{% trans 'Example: Sales tax number' %}"
@@ -279,6 +280,7 @@
                     type="text"
                     class="form-control form-control-lg"
                     name="telefono_comercial"
+                    data-ai-tour="business-phone"
                     placeholder="{% trans 'Business phone' %}"
                     inputmode="numeric"
                     maxlength="10"
@@ -290,6 +292,7 @@
                     type="email"
                     class="form-control form-control-lg"
                     name="email_comercial"
+                    data-ai-tour="business-email"
                     placeholder="{% trans 'Business email' %}"
                     required/>
                 </div>
@@ -305,6 +308,7 @@
                     type="text"
                     class="form-control form-control-lg"
                     name="direccion"
+                    data-ai-tour="primary-address"
                     placeholder="{% trans 'Primary address' %}"
                     required/>
                 </div>
@@ -314,6 +318,7 @@
                     type="text"
                     class="form-control form-control-lg"
                     name="direccion2"
+                    data-ai-tour="address-line-2"
                     placeholder="{% trans 'Address line 2 (optional)' %}"/>
                 </div>
 
@@ -322,6 +327,7 @@
                     type="text"
                     class="form-control form-control-lg"
                     name="estado"
+                    data-ai-tour="state"
                     placeholder="{% trans 'State / Department' %}"
                     required/>
                 </div>
@@ -331,6 +337,7 @@
                     type="text"
                     class="form-control form-control-lg"
                     name="ciudad"
+                    data-ai-tour="city"
                     placeholder="{% trans 'City' %}"
                     required/>
                 </div>
@@ -340,6 +347,7 @@
                     type="text"
                     class="form-control form-control-lg"
                     name="codigo_postal"
+                    data-ai-tour="zip-code"
                     placeholder="{% trans 'ZIP code' %}"
                     required/>
                 </div>
@@ -349,6 +357,7 @@
                     type="text"
                     class="form-control form-control-lg"
                     name="pais"
+                    data-ai-tour="country"
                     value="USA"
                     readonly/>
                 </div>
@@ -361,6 +370,7 @@
               </h6>
               <div class="text-center mb-3">
                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="openTaxExample(event)"
+                  data-ai-tour="certificate-example"
                   data-tax-example-mode="certificate"
                   data-tax-example-title="{% trans 'Example: Sales tax certificate' %}"
                   data-tax-example-note="{% trans 'This is an example of the certificate you need to upload to complete your registration.' %}">
@@ -428,7 +438,7 @@
               <!-- CHECKBOX CONFIRMACIÓN -->
               <div class="form-check my-4 text-center">
 
-                <input class="form-check-input" type="checkbox" name="confirmacion" required id="confirmacion">
+                <input class="form-check-input" type="checkbox" name="confirmacion" data-ai-tour="certify-information" required id="confirmacion">
 
                 <label class="form-check-label small" for="confirmacion">
                 {% trans "I certify that the tax and business information I provide, including my sales tax number and supporting certificate, is true, accurate, current, and verifiable to the best of my knowledge. I understand that I am solely responsible for any error, omission, or improper use of this information or any tax exemption claim made by my business." %}

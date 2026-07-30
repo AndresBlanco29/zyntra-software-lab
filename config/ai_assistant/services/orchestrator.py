@@ -1,3 +1,6 @@
+import json
+import re
+
 from django.urls import reverse
 from django.utils import timezone
 
@@ -157,6 +160,67 @@ def _instructions(config, context, knowledge, conversation_summary=''):
     ])
 
 
+def _forced_status_verification(request, conversation, context, message, model):
+    """Execute OTP actions deterministically instead of trusting LLM tool selection."""
+    if context.get('authenticated'):
+        return None
+    email_match = re.search(r'\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b', message, re.IGNORECASE)
+    recent = list(conversation.messages.order_by('-created_at')[:8])
+    status_flow = any(
+        any(term in (item.content or '').lower() for term in (
+            'estado', 'aprobación', 'aprobacion', 'solicitud', 'código de verificación', 'codigo de verificacion',
+        ))
+        for item in recent
+    )
+    tool_name = None
+    arguments = None
+    if email_match and status_flow:
+        tool_name = 'request_account_status_code'
+        arguments = {'email': email_match.group(0)}
+    else:
+        challenge = conversation.messages.filter(
+            role=AssistantMessage.ROLE_TOOL,
+            tool_name='request_account_status_code',
+        ).order_by('-created_at').first()
+        code_match = re.fullmatch(r'\s*(\d{6})\s*', message or '')
+        if challenge and code_match and (challenge.tool_payload or {}).get('challenge_id'):
+            tool_name = 'verify_account_status_code'
+            arguments = {
+                'challenge_id': challenge.tool_payload['challenge_id'],
+                'code': code_match.group(1),
+            }
+    if not tool_name:
+        return None
+
+    tool_result = execute_tool(request, tool_name, json.dumps(arguments))
+    AssistantMessage.objects.create(
+        conversation=conversation,
+        role=AssistantMessage.ROLE_TOOL,
+        content=redact_content(str(tool_result)),
+        redacted_content=redact_content(str(tool_result)),
+        tool_name=tool_name,
+        tool_payload=tool_result,
+        model=model,
+    )
+    if tool_name == 'request_account_status_code':
+        reply = 'Si ese correo está registrado, recibirás un código de verificación. Revisa Inbox y Spam; después escríbelo aquí.'
+    elif tool_result.get('error'):
+        reply = 'El código no es válido, ya fue usado o expiró. Solicita un nuevo código para intentarlo otra vez.'
+    else:
+        reply = {
+            'pending_review': 'Tu solicitud está pendiente de revisión.',
+            'approved': 'Tu cuenta fue aprobada. Ya puedes iniciar sesión.',
+            'rejected': 'Tu solicitud requiere una revisión con nuestro equipo.',
+        }.get(tool_result.get('status'), 'Consultamos el estado de tu solicitud.')
+    return {
+        'message': reply,
+        'suggested_actions': [],
+        'tour_id': None,
+        'tool_results': [{'name': tool_name, 'result': tool_result}],
+        'confirmation_actions': [],
+    }
+
+
 def reply_to_message(*, request, conversation, message):
     config = AssistantConfiguration.get_solo()
     context = build_customer_context(request)
@@ -170,6 +234,16 @@ def reply_to_message(*, request, conversation, message):
     )
     conversation.last_activity_at = timezone.now()
     conversation.save(update_fields=['last_activity_at'])
+    forced_result = _forced_status_verification(request, conversation, context, message, config.chat_model)
+    if forced_result:
+        AssistantMessage.objects.create(
+            conversation=conversation,
+            role=AssistantMessage.ROLE_ASSISTANT,
+            content=redact_content(forced_result['message']),
+            redacted_content=redact_content(forced_result['message']),
+            model='deterministic-status-verification',
+        )
+        return forced_result
 
     knowledge = search_published_knowledge(message, language=conversation.language)
     client = OpenAIClient()

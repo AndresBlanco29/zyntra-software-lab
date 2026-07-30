@@ -144,3 +144,9 @@ class GuidedTourIntentTests(TestCase):
         self.assertEqual(tour_id, 'registration')
         self.assertEqual(actions[0]['tour_id'], 'registration')
         self.assertIn('ai_tour=registration', actions[0]['url'])
+
+    def test_affirmative_registration_answer_starts_registration_tour(self):
+        self.assertEqual(
+            _authorized_tour_for_message('Sí', {'authenticated': False}),
+            'registration',
+        )

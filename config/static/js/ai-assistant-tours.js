@@ -8,6 +8,7 @@
       { element: "[data-ai-tour='first-name']", title: "Nombre", description: "Escribe tu primer nombre." },
       { element: "[data-ai-tour='last-name']", title: "Apellido", description: "Escribe tu apellido." },
       { element: "[data-ai-tour='business-id']", title: "Business ID", description: "Ingresa tu identificación comercial." },
+      { element: "[data-ai-tour='mobile-contact-number']", title: "Número de contacto móvil", description: "Ingresa tu número móvil de 10 dígitos." },
       { element: "[data-ai-tour='continue-personal']", title: "Continuar", description: "Cuando termines estos datos, presiona Continuar.", advanceOnClick: true },
       { element: "[data-ai-tour='username']", title: "Usuario", description: "Crea el usuario para ingresar al portal." },
       { element: "[data-ai-tour='email']", title: "Correo electrónico", description: "Ingresa un correo al que tengas acceso." },
@@ -61,6 +62,7 @@
 
   function start(tourKey) {
     const steps = tours[tourKey] || [];
+    let lastActiveIndex = 0;
     const createDriver = window.driver && window.driver.js && typeof window.driver.js.driver === "function"
       ? window.driver.js.driver
       : (typeof window.driver === "function" ? window.driver : null);
@@ -70,6 +72,7 @@
     const driverObj = createDriver({
       animate: true,
       allowClose: true,
+      overlayClickBehavior: "close",
       showProgress: true,
       steps: steps.map(function (step) {
         return {
@@ -84,8 +87,18 @@
         };
       }),
       onDestroyed: function () {
-        const completed = driverObj.getActiveIndex() === steps.length - 1;
-        persist(tourKey, driverObj.getActiveIndex() || 0, completed, !completed);
+        const completed = lastActiveIndex === steps.length - 1;
+        persist(tourKey, lastActiveIndex, completed, !completed);
+        if (!completed) {
+          window.dispatchEvent(new CustomEvent("tortilla-assistant-tour-dismissed", {
+            detail: { tourId: tourKey }
+          }));
+        }
+      },
+      onHighlightStarted: function (_element, _step, context) {
+        lastActiveIndex = typeof context.state?.activeIndex === "number"
+          ? context.state.activeIndex
+          : (driverObj.getActiveIndex() || 0);
       }
     });
     driverObj.drive();

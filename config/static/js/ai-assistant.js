@@ -153,6 +153,21 @@
       if (panel.classList.contains("is-open")) input.focus();
     });
 
+    window.addEventListener("tortilla-assistant-tour-dismissed", function (event) {
+      const tourId = event.detail && event.detail.tourId;
+      if (!tourId) return;
+      boot();
+      panel.classList.add("is-open");
+      launcher.setAttribute("aria-expanded", "true");
+      appendMessage(messages, "La guía se pausó. Puedes retomarla cuando quieras.", false);
+      renderActions(actions, [{
+        label: "Reanudar guía paso a paso",
+        url: "#",
+        tour_id: tourId
+      }]);
+      input.focus();
+    });
+
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       const value = input.value.trim();

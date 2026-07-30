@@ -18,8 +18,8 @@ def build_customer_context(request):
     }
     if cliente is None:
         context['next_recommended_action'] = {
-            'label': 'Registrarme',
-            'url': reverse('registro_usuario'),
+            'label': 'Iniciar registro guiado',
+            'url': reverse('home'),
             'tour_id': 'registration',
         }
         return context

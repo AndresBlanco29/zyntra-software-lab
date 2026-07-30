@@ -61,7 +61,11 @@ def _authorized_tour_for_message(message, context):
     """Map a customer request to one of the fixed, browser-safe tours."""
     normalized = str(message or '').lower()
     if not context.get('authenticated'):
-        if any(term in normalized for term in ('registr', 'sign up', 'signup', 'crear cuenta', 'create account')):
+        affirmative = {'si', 'sí', 's', 'yes', 'y', 'claro', 'dale', 'ok', 'okay'}
+        if (
+            normalized.strip(' .!¡?') in affirmative
+            or any(term in normalized for term in ('registr', 'sign up', 'signup', 'crear cuenta', 'create account'))
+        ):
             return 'registration'
         return None
     if any(term in normalized for term in ('cotiz', 'quotation', 'quote')):

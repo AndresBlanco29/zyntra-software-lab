@@ -60,6 +60,12 @@
     <div class="card-footer text-end"><button class="btn btn-primary">{% trans "Save configuration" %}</button></div>
   </form>
 
+  <div class="row g-3 mb-4">
+    <div class="col-md-4"><div class="card custom-card"><div class="card-body"><small class="text-muted">{% trans "Messages" %}</small><div class="fs-4">{{ assistant_metrics.messages }}</div></div></div></div>
+    <div class="col-md-4"><div class="card custom-card"><div class="card-body"><small class="text-muted">{% trans "Pending confirmations" %}</small><div class="fs-4">{{ assistant_metrics.pending_actions }}</div></div></div></div>
+    <div class="col-md-4"><div class="card custom-card"><div class="card-body"><small class="text-muted">{% trans "Tool calls" %}</small><div class="fs-4">{{ assistant_metrics.tool_calls }}</div></div></div></div>
+  </div>
+
   <div class="card custom-card">
     <div class="card-body">
       <h5>{% trans "Published knowledge" %}</h5>

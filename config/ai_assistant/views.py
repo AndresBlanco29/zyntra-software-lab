@@ -16,6 +16,7 @@ from config.ai_assistant.models import (
     AssistantDomainEvent,
     AssistantGuidedTourProgress,
     AssistantKnowledgeDocument,
+    AssistantMessage,
     AssistantPendingAction,
     AssistantUserState,
 )
@@ -207,4 +208,9 @@ def backoffice_assistant_settings(request):
         'assistant_config': config,
         'knowledge_documents': AssistantKnowledgeDocument.objects.all().order_by('title'),
         'conversations_count': AssistantConversation.objects.count(),
+        'assistant_metrics': {
+            'messages': AssistantMessage.objects.count(),
+            'pending_actions': AssistantPendingAction.objects.filter(status=AssistantPendingAction.STATUS_PENDING).count(),
+            'tool_calls': AssistantMessage.objects.filter(role=AssistantMessage.ROLE_TOOL).count(),
+        },
     })

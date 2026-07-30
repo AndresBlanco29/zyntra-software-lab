@@ -61,8 +61,8 @@
 
   function start(tourKey) {
     const steps = tours[tourKey] || [];
-    const createDriver = window.driver && typeof window.driver.driver === "function"
-      ? window.driver.driver
+    const createDriver = window.driver && window.driver.js && typeof window.driver.js.driver === "function"
+      ? window.driver.js.driver
       : (typeof window.driver === "function" ? window.driver : null);
     if (!steps.length || !createDriver) {
       return false;

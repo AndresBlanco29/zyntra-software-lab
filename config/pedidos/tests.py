@@ -5,7 +5,7 @@ from unittest.mock import patch
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import Client, TestCase
+from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -34,6 +34,31 @@ from config.pedidos.services import (
 )
 from config.productos.models import Categoria, ConfiguracionDescuentos, Marca, Presentacion, Producto
 from config.usuarios.models import Usuario
+
+
+class OrderNotificationRecipientTests(TestCase):
+	def setUp(self):
+		Usuario.objects.create_user(
+			username='staff-inbox',
+			password='secret123',
+			role='backoffice',
+			email='carito30033@gmail.com',
+		)
+
+	@override_settings(ORDER_NOTIFICATION_EMAILS=['ltgordersapp@gmail.com'])
+	def test_shared_mailbox_replaces_personal_staff_inboxes(self):
+		from config.pedidos.services import resolve_order_notification_recipients
+
+		recipients = resolve_order_notification_recipients()
+
+		self.assertEqual(recipients, ['ltgordersapp@gmail.com'])
+		self.assertNotIn('carito30033@gmail.com', recipients)
+
+	@override_settings(ORDER_NOTIFICATION_EMAILS=[])
+	def test_staff_users_are_used_when_no_mailbox_is_configured(self):
+		from config.pedidos.services import resolve_order_notification_recipients
+
+		self.assertEqual(resolve_order_notification_recipients(), ['carito30033@gmail.com'])
 
 
 class PickingVerificationFlowTests(TestCase):

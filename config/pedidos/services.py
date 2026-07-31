@@ -1329,6 +1329,30 @@ def resolver_nota_cliente_desde_backoffice(*, pedido, usuario):
     return pedido
 
 
+def resolve_order_notification_recipients():
+	"""Who receives the new order notification.
+
+	The shared mailbox wins so staff no longer get a copy of every order in
+	their personal inbox. Falling back to admin/backoffice users keeps
+	notifications working if the mailbox is ever left unconfigured.
+	"""
+	configured = [
+		address.strip()
+		for address in (getattr(settings, 'ORDER_NOTIFICATION_EMAILS', None) or [])
+		if str(address).strip()
+	]
+	if configured:
+		return configured
+
+	user_model = get_user_model()
+	return list(
+		user_model.objects.filter(role__in=['admin', 'backoffice'], is_active=True)
+		.exclude(email='')
+		.values_list('email', flat=True)
+		.distinct()
+	)
+
+
 def notificar_backoffice_pedido(pedido):
     from config.core.email_branding import brand_email_context
 
@@ -1350,13 +1374,7 @@ def notificar_backoffice_pedido(pedido):
         url=reverse('backoffice_pedido_detalle', args=[pedido.id]),
     )
 
-    user_model = get_user_model()
-    backoffice_emails = list(
-        user_model.objects.filter(role__in=['admin', 'backoffice'], is_active=True)
-        .exclude(email='')
-        .values_list('email', flat=True)
-        .distinct()
-    )
+    backoffice_emails = resolve_order_notification_recipients()
     if not backoffice_emails:
         return
 

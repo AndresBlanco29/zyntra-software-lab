@@ -502,6 +502,14 @@ TWILIO_WHATSAPP_FROM = os.environ.get('TWILIO_WHATSAPP_FROM', '')
 # Ej: 'Pedidos LTG <pedidos@tudominio.com>'
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Pedidos LTG <pedidos@latortillagroceryapp.com>')
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+# Shared mailbox for new order notifications. Without it every admin/backoffice
+# user received a copy in their personal inbox.
+ORDER_NOTIFICATION_EMAILS = [
+    address.strip()
+    for address in os.environ.get('ORDER_NOTIFICATION_EMAILS', 'ltgordersapp@gmail.com').split(',')
+    if address.strip()
+]
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGGING = {

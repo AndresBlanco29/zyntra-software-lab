@@ -16,6 +16,7 @@ ACTION_REORDER = 'REORDER'
 ACTION_SUBMIT_QUOTE_REQUEST = 'SUBMIT_QUOTE_REQUEST'
 ACTION_ACCEPT_QUOTE = 'ACCEPT_QUOTE'
 ACTION_CANCEL_QUOTE = 'CANCEL_QUOTE'
+ACTION_CLEAR_CART = 'CLEAR_CART'
 
 
 def create_pending_action(*, request, action_type, payload):
@@ -51,6 +52,8 @@ def execute_confirmed_action(*, request, action):
         result = _update_cart_item(request, action.payload, cliente)
     elif action.action_type == ACTION_REMOVE_CART:
         result = _remove_cart_item(request, action.payload, cliente)
+    elif action.action_type == ACTION_CLEAR_CART:
+        result = _clear_cart(request)
     elif action.action_type == ACTION_REORDER:
         result = _load_reorder(request, action.payload, cliente)
     elif action.action_type == ACTION_SUBMIT_QUOTE_REQUEST:
@@ -97,6 +100,12 @@ def _add_cart_item(request, payload, cliente):
         'message': 'Product added to your order. Review it before sending your request.',
         'cart_items': sum(int(item.get('cantidad') or 0) for item in carrito.values()),
     }
+
+
+def _clear_cart(request):
+    request.session['carrito'] = {}
+    request.session.modified = True
+    return {'message': 'Your order was cleared.', 'cart_items': 0}
 
 
 def _update_cart_item(request, payload, cliente):
@@ -147,6 +156,7 @@ def _load_reorder(request, payload, cliente):
 
 def _submit_quote_request(request):
     """Delegate to the established portal view so pricing, promos and alerts remain canonical."""
+    from config.ai_assistant.services.identity import get_customer_for_user
     from config.cotizaciones.models import Cotizacion
     from config.cotizaciones.views import guardar_cotizacion
 
@@ -167,6 +177,7 @@ def _submit_quote_request(request):
 
 
 def _decide_quote(request, payload, approve):
+    from config.ai_assistant.services.identity import get_customer_for_user
     from config.cotizaciones.models import Cotizacion
     from config.cotizaciones.views import cliente_cotizacion_recibida_detalle
 

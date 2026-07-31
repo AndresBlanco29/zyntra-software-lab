@@ -164,6 +164,11 @@
         if (activeTour === tourSession) activeTour = null;
         const completed = lastActiveIndex === steps.length - 1;
         persist(tourKey, lastActiveIndex, completed, !completed);
+        if (completed && !tourSession.replaced) {
+          window.dispatchEvent(new CustomEvent("tortilla-assistant-tour-completed", {
+            detail: { tourId: tourKey }
+          }));
+        }
         if (!completed && !resumingAfterModal && !tourSession.replaced) {
           window.dispatchEvent(new CustomEvent("tortilla-assistant-tour-dismissed", {
             detail: { tourId: tourKey, resumeIndex: lastActiveIndex }

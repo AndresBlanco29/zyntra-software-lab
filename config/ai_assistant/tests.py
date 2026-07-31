@@ -263,3 +263,31 @@ class CustomerSuccessProfileTests(TestCase):
         self.assertEqual(profile.last_module, 'catalog')
         self.assertEqual(profile.recently_viewed_products[0]['id'], 42)
         self.assertEqual(profile.help_topics[0], 'product-search')
+
+
+class ConversationPurchaseTests(TestCase):
+    def test_ordinal_reference_uses_saved_catalog_results(self):
+        from config.ai_assistant.models import AssistantConversation
+        from config.ai_assistant.services.conversation_purchase import resolve_catalog_reference, save_catalog_results
+
+        conversation = AssistantConversation.objects.create(visitor_id=uuid.uuid4(), language='es')
+        save_catalog_results(conversation, [
+            {
+                'product_id': 10,
+                'name': 'SODA COCA COLA 6/3LT',
+                'presentations': [{'id': 99, 'name': 'CS'}],
+                'score': 0.99,
+            },
+            {
+                'product_id': 11,
+                'name': 'SODA COCA COLA 24/20OZ',
+                'presentations': [{'id': 100, 'name': 'CS'}],
+                'score': 0.88,
+            },
+        ])
+
+        reference = resolve_catalog_reference(conversation, 'Necesito 10 del primero CS')
+
+        self.assertEqual(reference['product']['product_id'], 10)
+        self.assertEqual(reference['presentation']['id'], 99)
+        self.assertEqual(reference['quantity'], 10)

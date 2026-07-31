@@ -171,6 +171,27 @@
       if (open) input.focus();
     }
 
+    function rememberContinuation(message) {
+      try {
+        window.sessionStorage.setItem("tortilla-assistant-continuation", JSON.stringify({
+          message: message,
+          createdAt: Date.now()
+        }));
+      } catch (_error) {}
+    }
+
+    function consumeContinuation() {
+      try {
+        const raw = window.sessionStorage.getItem("tortilla-assistant-continuation");
+        if (!raw) return null;
+        window.sessionStorage.removeItem("tortilla-assistant-continuation");
+        const continuation = JSON.parse(raw);
+        return Date.now() - continuation.createdAt < 10 * 60 * 1000 ? continuation : null;
+      } catch (_error) {
+        return null;
+      }
+    }
+
     function ensureConversation() {
       if (conversationId) return Promise.resolve(conversationId);
       return jsonFetch(root.dataset.conversationUrl, {
@@ -208,6 +229,11 @@
             renderActions(actions, initialActions);
           }
           renderPendingEvent(root, context, messages, actions);
+          const continuation = consumeContinuation();
+          if (continuation && !requestedTour) {
+            appendMessage(messages, continuation.message, false);
+            setPanelOpen(true);
+          }
         })
         .catch(function () {});
     }
@@ -215,6 +241,13 @@
     launcher.addEventListener("click", function () {
       boot();
       setPanelOpen(!panel.classList.contains("is-open"));
+    });
+
+    actions.addEventListener("click", function (event) {
+      const link = event.target.closest("a[href]");
+      if (!link || link.target === "_blank" || link.getAttribute("href") === "#") return;
+      rememberContinuation("Excelente, ya estamos en esta sección. ¿Quieres que te ayude con el siguiente paso?");
+      setPanelOpen(false);
     });
 
     const requestedTour = new URLSearchParams(window.location.search).get("ai_tour");
@@ -241,6 +274,15 @@
         tour_id: tourId,
         resume_index: Number.isInteger(resumeIndex) ? resumeIndex : 0
       }]);
+    });
+
+    window.addEventListener("tortilla-assistant-tour-completed", function () {
+      root.dataset.tourActive = "false";
+      window.setTimeout(function () {
+        boot();
+        setPanelOpen(true);
+        appendMessage(messages, "Excelente, completaste la guía. ¿Quieres que te ayude a continuar con tu compra?", false);
+      }, 300);
     });
 
     window.addEventListener("tortilla-login-failed", function () {

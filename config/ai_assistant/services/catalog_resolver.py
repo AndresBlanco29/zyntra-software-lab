@@ -10,6 +10,16 @@ from config.ai_assistant.models import AssistantProductAlias
 from config.productos.models import Producto
 from config.productos.promotions import promociones_activas_queryset
 
+RELATED_TERMS = {
+    'coke': 'coca cola',
+    'coca': 'coca cola',
+    'coca cola': 'coca cola',
+    '3 litros': '3lt',
+    '3 litro': '3lt',
+    'litros': 'lt',
+    'litro': 'lt',
+}
+
 
 def normalize_catalog_term(value):
     text = unicodedata.normalize('NFKD', str(value or '').lower())
@@ -33,6 +43,42 @@ def _score(query, *values):
     return best
 
 
+def _query_tokens(value):
+    normalized = normalize_catalog_term(value)
+    for source, replacement in RELATED_TERMS.items():
+        if source in normalized:
+            normalized = normalized.replace(source, replacement)
+    return {token for token in normalized.split() if len(token) > 1}
+
+
+def _size_tokens(value):
+    normalized = normalize_catalog_term(value).replace('litros', 'lt').replace('litro', 'lt')
+    return set(re.findall(r'\b\d+\s*(?:lt|l|oz|ml)\b', normalized)) | set(re.findall(r'\b\d+\s+\d+(?:lt|l|oz|ml)\b', normalized))
+
+
+def _product_score(query, product):
+    names = [product.nombre, product.nombre_en, product.codigo_barras or '']
+    if product.marca_id:
+        names.extend([product.marca.nombre, product.marca.nombre_en])
+    names.extend(presentation.nombre for presentation in product.presentaciones.all())
+    normalized_query = normalize_catalog_term(query)
+    query_tokens = _query_tokens(query)
+    candidate_tokens = set().union(*(_query_tokens(name) for name in names if name))
+    token_overlap = len(query_tokens & candidate_tokens) / max(len(query_tokens), 1)
+    fuzzy = _score(normalized_query, *names)
+    query_sizes = _size_tokens(query)
+    candidate_sizes = set().union(*(_size_tokens(name) for name in names if name))
+    size_bonus = 0.22 if query_sizes and query_sizes & candidate_sizes else 0
+    exact_bonus = 0.35 if normalize_catalog_term(product.nombre) == normalized_query else 0
+    contains_bonus = 0.18 if normalized_query in normalize_catalog_term(product.nombre) else 0
+    score = min(1.0, (token_overlap * 0.58) + (fuzzy * 0.25) + size_bonus + exact_bonus + contains_bonus)
+    return score, {
+        'token_overlap': round(token_overlap, 3),
+        'fuzzy_score': round(fuzzy, 3),
+        'size_match': bool(query_sizes and query_sizes & candidate_sizes),
+    }
+
+
 def _promotion_product_ids(cliente):
     promotions = promociones_activas_queryset(cliente=cliente) if cliente else promociones_activas_queryset()
     ids = set(promotions.exclude(producto__isnull=True).values_list('producto_id', flat=True))
@@ -40,7 +86,7 @@ def _promotion_product_ids(cliente):
     return ids
 
 
-def _product_dto(product, query, promotion_ids, cliente):
+def _product_dto(product, query, promotion_ids, cliente, score=0, match=None):
     presentations = list(product.presentaciones.all())
     catalog_url = f"{reverse('catalogo')}?{urlencode({'q': query})}"
     price_tier = cliente.get_nivel_precio_normalizado() if cliente and cliente.has_assigned_price_tier() else None
@@ -67,6 +113,8 @@ def _product_dto(product, query, promotion_ids, cliente):
             for presentation in presentations
         ],
         'primary_presentation_id': presentations[0].id if presentations else None,
+        'score': round(score, 3),
+        'match': match or {},
     }
 
 
@@ -111,26 +159,22 @@ def find_products(query, *, cliente=None, limit=5):
         (
             (
                 product,
-                _score(
-                    normalized,
-                    product.nombre,
-                    product.nombre_en,
-                    product.marca.nombre if product.marca_id else '',
-                    product.categoria.nombre if product.categoria_id else '',
-                    *(presentation.nombre for presentation in product.presentaciones.all()),
-                ),
+                _product_score(query, product),
             )
             for product in candidates
         ),
-        key=lambda item: item[1],
+        key=lambda item: item[1][0],
         reverse=True,
     )
-    selected = [product for product, score in ranked if score >= 0.43][:limit]
+    selected = [(product, score, match) for product, (score, match) in ranked if score >= 0.55][:limit]
     promotion_ids = _promotion_product_ids(cliente)
-    products = [_product_dto(product, query, promotion_ids, cliente) for product in selected]
+    products = [
+        _product_dto(product, query, promotion_ids, cliente, score=score, match=match)
+        for product, score, match in selected
+    ]
     related = []
     if selected:
-        anchor = selected[0]
+        anchor = selected[0][0]
         relation = Q()
         if anchor.marca_id:
             relation |= Q(marca_id=anchor.marca_id)

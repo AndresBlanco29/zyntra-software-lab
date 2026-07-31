@@ -7,6 +7,7 @@ from config.ai_assistant.services.actions import (
     ACTION_ACCEPT_QUOTE,
     ACTION_ADD_CART,
     ACTION_CANCEL_QUOTE,
+    ACTION_CLEAR_CART,
     ACTION_REMOVE_CART,
     ACTION_REORDER,
     ACTION_SUBMIT_QUOTE_REQUEST,
@@ -138,6 +139,12 @@ def openai_tool_schemas():
         },
         {
             'type': 'function',
+            'name': 'propose_clear_order',
+            'description': 'Prepare clearing the authenticated customer current order. Requires explicit confirmation.',
+            'parameters': {'type': 'object', 'properties': {}, 'additionalProperties': False},
+        },
+        {
+            'type': 'function',
             'name': 'propose_reorder',
             'description': 'Prepare loading one of the authenticated customer previous orders into My Order. Requires confirmation.',
             'parameters': {
@@ -209,6 +216,18 @@ def _customer_success_summary(request):
     if cliente is None:
         return {'error': 'Customer login is required.'}
     return build_customer_success_summary(cliente=cliente, cart=request.session.get('carrito', {}))
+
+
+def _propose_clear_order(request):
+    cliente = get_customer_for_user(request.user)
+    if cliente is None:
+        return {'error': 'Customer login is required.'}
+    action = create_pending_action(request=request, action_type=ACTION_CLEAR_CART, payload={})
+    return {
+        'requires_confirmation': True,
+        'action_id': str(action.public_id),
+        'label': 'Vaciar pedido',
+    }
 
 
 def _request_account_status_code(email):
@@ -371,6 +390,8 @@ def execute_tool(request, name, raw_arguments):
         return _location_information()
     if name == 'get_customer_success_summary':
         return _customer_success_summary(request)
+    if name == 'propose_clear_order':
+        return _propose_clear_order(request)
     if name == 'get_account_status':
         return _account_status(request)
     if name == 'request_account_status_code':

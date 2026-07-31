@@ -135,6 +135,7 @@ class AssistantConversation(models.Model):
     first_page = models.CharField(max_length=80, blank=True)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_OPEN)
     summary = models.TextField(blank=True)
+    shopping_context = models.JSONField(default=dict, blank=True)
     last_activity_at = models.DateTimeField(default=timezone.now, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

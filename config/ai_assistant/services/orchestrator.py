@@ -342,6 +342,24 @@ def _purchase_intent_result(request, conversation, context, message, model):
             'tool_results': [{'name': 'find_products', 'result': tool_result}],
             'confirmation_actions': [],
         }
+    from config.ai_assistant.services.conversation_purchase import save_catalog_results
+    save_catalog_results(conversation, products)
+    is_ambiguous = (
+        len(products) > 1
+        and products[0].get('score', 0) - products[1].get('score', 0) < 0.12
+    )
+    if is_ambiguous:
+        options = '\n'.join(
+            f'{index}. {item["name"]} — {", ".join(presentation["name"] for presentation in item.get("presentations", [])[:2])}'
+            for index, item in enumerate(products, start=1)
+        )
+        return {
+            'message': f'Encontré varias opciones similares. ¿Cuál deseas?\n\n{options}\n\nResponde, por ejemplo: “10 del primero”.',
+            'suggested_actions': [{'label': 'Abrir catálogo', 'url': reverse('catalogo'), 'kind': 'catalog'}],
+            'tour_id': None,
+            'tool_results': [{'name': 'find_products', 'result': tool_result}],
+            'confirmation_actions': [],
+        }
     product = products[0]
     from config.ai_assistant.services.memory import remember_assistant_context
 
@@ -477,6 +495,62 @@ def _pending_product_quantity_result(request, conversation, context, message, mo
     }
 
 
+def _conversation_product_reference_result(request, conversation, context, message, model):
+    """Resolve 'the first/second' against the exact result list already shown."""
+    if not context.get('authenticated'):
+        return None
+    from config.ai_assistant.services.conversation_purchase import resolve_catalog_reference
+
+    reference = resolve_catalog_reference(conversation, message)
+    if reference is None:
+        return None
+    product = reference['product']
+    if reference['requires_presentation']:
+        options = ', '.join(item['name'] for item in product.get('presentations', []))
+        return {
+            'message': f'Perfecto, elegiste {product["name"]}. Indícame la presentación ({options}) y la cantidad.',
+            'suggested_actions': [],
+            'tour_id': None,
+            'tool_results': [],
+            'confirmation_actions': [],
+        }
+    if not reference['quantity']:
+        return {
+            'message': f'Perfecto, elegiste {product["name"]}. ¿Cuántas unidades deseas agregar?',
+            'suggested_actions': [],
+            'tour_id': None,
+            'tool_results': [],
+            'confirmation_actions': [],
+        }
+    if reference['presentation'] is None:
+        return {
+            'message': f'Indícame una presentación para {product["name"]} antes de agregarlo.',
+            'suggested_actions': [],
+            'tour_id': None,
+            'tool_results': [],
+            'confirmation_actions': [],
+        }
+    proposal = execute_tool(
+        request,
+        'propose_add_to_order',
+        json.dumps({'presentation_id': reference['presentation']['id'], 'quantity': reference['quantity']}),
+    )
+    confirmations = [{
+        'id': proposal['action_id'],
+        'label': f'Agregar {reference["quantity"]} × {product["name"]} ({reference["presentation"]["name"]})',
+    }] if proposal.get('requires_confirmation') and proposal.get('action_id') else []
+    return {
+        'message': (
+            f'Preparé {reference["quantity"]} × {product["name"]} '
+            f'en presentación {reference["presentation"]["name"]}. Confirma para agregarlo a tu pedido.'
+        ),
+        'suggested_actions': [{'label': 'Ver mi pedido', 'url': reverse('ver_cotizacion'), 'kind': 'catalog'}],
+        'tour_id': None,
+        'tool_results': [{'name': 'propose_add_to_order', 'result': proposal}],
+        'confirmation_actions': confirmations,
+    }
+
+
 def _customer_success_result(request, conversation, context, message, model):
     if not context.get('authenticated'):
         return None
@@ -528,6 +602,91 @@ def _customer_success_result(request, conversation, context, message, model):
     }
 
 
+def _shopping_checkout_result(request, conversation, context, message, model):
+    if not context.get('authenticated'):
+        return None
+    normalized = str(message or '').lower().strip(' .!¡?')
+    if normalized not in {'no', 'no gracias', 'nada más', 'nada mas', 'terminé', 'termine', 'finalizar'}:
+        return None
+    cart = execute_tool(request, 'get_cart_summary', '{}')
+    if not cart.get('line_count'):
+        return None
+    submit = execute_tool(request, 'propose_quote_decision', json.dumps({'operation': 'submit_request'}))
+    clear = execute_tool(request, 'propose_clear_order', '{}')
+    confirmations = []
+    if submit.get('requires_confirmation') and submit.get('action_id'):
+        confirmations.append({'id': submit['action_id'], 'label': 'Enviar cotización'})
+    if clear.get('requires_confirmation') and clear.get('action_id'):
+        confirmations.append({'id': clear['action_id'], 'label': 'Vaciar pedido'})
+    lines = ', '.join(
+        f'{item.get("quantity")} × {item.get("name")}'
+        for item in cart.get('items', [])[:8]
+    )
+    return {
+        'message': f'Actualmente tu pedido contiene: {lines}. ¿Deseas enviarlo como cotización o seguir comprando?',
+        'suggested_actions': [
+            {'label': 'Seguir comprando', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
+            {'label': 'Editar cantidades', 'url': reverse('ver_cotizacion')},
+        ],
+        'tour_id': None,
+        'tool_results': [{'name': 'get_cart_summary', 'result': cart}],
+        'confirmation_actions': confirmations,
+    }
+
+
+def _multi_item_purchase_result(request, conversation, context, message, model):
+    """Prepare several explicit product lines using the same pending-action cart flow."""
+    if not context.get('authenticated'):
+        return None
+    lines = []
+    for raw_line in re.split(r'[\n,;]+', str(message or '')):
+        match = re.match(r'\s*(\d{1,3})\s+(?:cajas?\s+de\s+|unidades?\s+de\s+)?(.+?)\s*$', raw_line, re.IGNORECASE)
+        if match:
+            lines.append((int(match.group(1)), match.group(2)))
+    if len(lines) < 2:
+        return None
+    prepared = []
+    ambiguous = []
+    confirmations = []
+    for quantity, query in lines[:8]:
+        result = execute_tool(request, 'find_products', json.dumps({'query': query}))
+        products = result.get('products', [])
+        if not products or products[0].get('score', 0) < 0.75:
+            ambiguous.append(query)
+            continue
+        product = products[0]
+        presentations = product.get('presentations', [])
+        if len(presentations) != 1:
+            ambiguous.append(query)
+            continue
+        presentation = presentations[0]
+        proposal = execute_tool(
+            request,
+            'propose_add_to_order',
+            json.dumps({'presentation_id': presentation['id'], 'quantity': quantity}),
+        )
+        if proposal.get('requires_confirmation') and proposal.get('action_id'):
+            confirmations.append({
+                'id': proposal['action_id'],
+                'label': f'Agregar {quantity} × {product["name"]} ({presentation["name"]})',
+            })
+            prepared.append(f'{quantity} × {product["name"]}')
+    if not confirmations:
+        return None
+    message_text = f'Preparé estas líneas para tu pedido: {", ".join(prepared)}.'
+    if ambiguous:
+        message_text += f' Necesito que elijas una presentación para: {", ".join(ambiguous)}.'
+    else:
+        message_text += ' Confirma cada línea para agregarlas al carrito real.'
+    return {
+        'message': message_text,
+        'suggested_actions': [{'label': 'Ver mi pedido', 'url': reverse('ver_cotizacion')}],
+        'tour_id': None,
+        'tool_results': [],
+        'confirmation_actions': confirmations,
+    }
+
+
 def reply_to_message(*, request, conversation, message):
     config = AssistantConfiguration.get_solo()
     context = build_customer_context(request)
@@ -558,6 +717,16 @@ def reply_to_message(*, request, conversation, message):
             model='deterministic-commercial-information',
         )
         return commercial_result
+    reference_result = _conversation_product_reference_result(request, conversation, context, message, config.chat_model)
+    if reference_result:
+        AssistantMessage.objects.create(
+            conversation=conversation,
+            role=AssistantMessage.ROLE_ASSISTANT,
+            content=redact_content(reference_result['message']),
+            redacted_content=redact_content(reference_result['message']),
+            model='deterministic-conversation-reference',
+        )
+        return reference_result
     pending_quantity_result = _pending_product_quantity_result(request, conversation, context, message, config.chat_model)
     if pending_quantity_result:
         AssistantMessage.objects.create(
@@ -568,6 +737,26 @@ def reply_to_message(*, request, conversation, message):
             model='deterministic-commercial-cart',
         )
         return pending_quantity_result
+    multi_item_result = _multi_item_purchase_result(request, conversation, context, message, config.chat_model)
+    if multi_item_result:
+        AssistantMessage.objects.create(
+            conversation=conversation,
+            role=AssistantMessage.ROLE_ASSISTANT,
+            content=redact_content(multi_item_result['message']),
+            redacted_content=redact_content(multi_item_result['message']),
+            model='deterministic-multi-item-cart',
+        )
+        return multi_item_result
+    checkout_result = _shopping_checkout_result(request, conversation, context, message, config.chat_model)
+    if checkout_result:
+        AssistantMessage.objects.create(
+            conversation=conversation,
+            role=AssistantMessage.ROLE_ASSISTANT,
+            content=redact_content(checkout_result['message']),
+            redacted_content=redact_content(checkout_result['message']),
+            model='deterministic-shopping-checkout',
+        )
+        return checkout_result
     success_result = _customer_success_result(request, conversation, context, message, config.chat_model)
     if success_result:
         AssistantMessage.objects.create(

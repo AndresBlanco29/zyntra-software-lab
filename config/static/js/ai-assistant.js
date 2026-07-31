@@ -34,8 +34,13 @@
     container.scrollTop = container.scrollHeight;
   }
 
-  function renderPromotionCards(container, cards) {
-    (cards || []).forEach(function (card) {
+  const PROMOTION_CARDS_SHOWN = 4;
+
+  // Cards belong in the conversation stream: rendering them in the actions bar
+  // made it grow until it covered the previous messages and could not scroll.
+  function renderPromotionCards(container, cards, catalogUrl) {
+    const all = cards || [];
+    all.slice(0, PROMOTION_CARDS_SHOWN).forEach(function (card) {
       const panel = document.createElement("article");
       panel.className = "ai-assistant-promotion-card";
       const title = document.createElement("strong");
@@ -61,11 +66,20 @@
       panel.append(link, quoteLink);
       container.appendChild(panel);
     });
+    if (all.length > PROMOTION_CARDS_SHOWN && catalogUrl) {
+      const more = document.createElement("a");
+      more.className = "ai-assistant-promotion-more";
+      more.href = catalogUrl;
+      more.textContent = "Ver las " + all.length + " promociones en el catálogo";
+      container.appendChild(more);
+    }
+    if (all.length) {
+      container.scrollTop = container.scrollHeight;
+    }
   }
 
-  function renderActions(container, actions, promotionCards) {
+  function renderActions(container, actions) {
     container.replaceChildren();
-    renderPromotionCards(container, promotionCards);
     (actions || []).forEach(function (action) {
       const link = document.createElement("a");
       link.className = "btn btn-outline-primary btn-sm";
@@ -450,7 +464,8 @@
       sendMessage(false)
         .then(function (result) {
           appendMessage(messages, result.message, false);
-          renderActions(actions, result.suggested_actions, result.promotion_cards);
+          renderPromotionCards(messages, result.promotion_cards, root.dataset.catalogUrl);
+          renderActions(actions, result.suggested_actions);
           renderConfirmations(actions, result.confirmation_actions, root, messages);
           if (result.tour_id && window.TortillaAssistantTours) {
             window.TortillaAssistantTours.start(result.tour_id);

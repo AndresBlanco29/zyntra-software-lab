@@ -25,21 +25,6 @@
     transform: scale(1.05);
 }
 
-.ai-assistant-launcher-label {
-    position: absolute;
-    right: -2px;
-    bottom: -2px;
-    min-width: 23px;
-    padding: 2px 4px;
-    border: 2px solid #fff;
-    border-radius: 999px;
-    background: #0b3d91;
-    color: #fff;
-    font-size: .62rem;
-    font-weight: 800;
-    line-height: 1;
-}
-
 .ai-assistant-launcher:hover,
 .ai-assistant-launcher:focus-visible {
     transform: translateY(-4px) scale(1.05);

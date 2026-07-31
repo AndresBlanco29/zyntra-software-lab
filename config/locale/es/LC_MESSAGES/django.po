@@ -14242,3 +14242,6 @@ msgstr "Llámanos"
 
 msgid "Call Us at +1 (470) 967-2782"
 msgstr "Llámanos al +1 (470) 967-2782"
+
+msgid "Quick Inventory comes from QuickBooks. Available = Quick Inventory + Active Manual Adjustments − Sales Pending Sync − In orders. Main stock is counted in packages (CS); loose units appear in the partial stock section below."
+msgstr "El Inventario Rápido proviene de QuickBooks. Disponible = Inventario Rápido + Ajustes Manuales Activos − Ventas Pendientes de Sincronizar − En órdenes. El stock principal se cuenta en paquetes (CS); las unidades sueltas aparecen en la sección de stock parcial más abajo."

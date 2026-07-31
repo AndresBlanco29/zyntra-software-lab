@@ -127,7 +127,7 @@ class BackofficeSpanishTranslationsTests(TestCase):
 
 		self.assertEqual(inventory_response.status_code, 200)
 		self.assertContains(inventory_response, '<title>Inventario operativo</title>', html=False)
-		self.assertContains(inventory_response, 'Revisa el stock físico, reservado y disponible por presentación.', html=False)
+		self.assertContains(inventory_response, 'El Inventario Rápido proviene de QuickBooks.', html=False)
 		self.assertContains(inventory_response, 'Buscar producto o presentación', html=False)
 		self.assertContains(inventory_response, 'Stock físico', html=False)
 		self.assertContains(inventory_response, 'Stock reservado', html=False)

@@ -315,3 +315,119 @@ class ConversationPurchaseTests(TestCase):
         self.assertEqual(reference['product']['product_id'], 10)
         self.assertEqual(reference['presentation']['id'], 99)
         self.assertEqual(reference['quantity'], 10)
+
+
+class AgentContextTests(TestCase):
+    def _conversation(self):
+        from config.ai_assistant.models import AssistantConversation
+
+        return AssistantConversation.objects.create(visitor_id=uuid.uuid4(), language='es')
+
+    def _with_selected_product(self, conversation):
+        from config.ai_assistant.services.conversation_purchase import save_catalog_results
+
+        save_catalog_results(conversation, [{
+            'product_id': 55,
+            'name': 'SODA COCA COLA 6/3LT',
+            'presentations': [{'id': 77, 'name': 'CS'}],
+            'score': 0.97,
+        }])
+        return conversation
+
+    def test_quantity_reply_keeps_current_product_instead_of_account_answer(self):
+        from config.ai_assistant.services.intent_router import resolve_intent
+
+        conversation = self._with_selected_product(self._conversation())
+
+        intent = resolve_intent(
+            conversation=conversation,
+            message='Necesito 10 cajas de ese producto',
+            context={'authenticated': True},
+        )
+
+        self.assertEqual(intent, 'product_reference')
+
+    def test_invoice_question_still_routes_to_customer_success(self):
+        from config.ai_assistant.services.intent_router import resolve_intent
+
+        intent = resolve_intent(
+            conversation=self._conversation(),
+            message='¿Cuánto debo en mis facturas?',
+            context={'authenticated': True},
+        )
+
+        self.assertEqual(intent, 'customer_success')
+
+    def test_promotion_question_routes_to_promotions(self):
+        from config.ai_assistant.services.intent_router import resolve_intent
+
+        intent = resolve_intent(
+            conversation=self._conversation(),
+            message='Hay promociones?',
+            context={'authenticated': False},
+        )
+
+        self.assertEqual(intent, 'promotions')
+
+    def test_deictic_reference_resolves_to_selected_product(self):
+        from config.ai_assistant.services.conversation_purchase import resolve_catalog_reference
+
+        conversation = self._with_selected_product(self._conversation())
+
+        reference = resolve_catalog_reference(conversation, 'Quiero 10 de ese producto')
+
+        self.assertEqual(reference['product']['product_id'], 55)
+        self.assertEqual(reference['quantity'], 10)
+
+    def test_numeric_pick_after_ambiguous_list_resolves_that_option(self):
+        from config.ai_assistant.services.conversation_purchase import (
+            resolve_catalog_reference,
+            save_catalog_results,
+        )
+
+        conversation = self._conversation()
+        save_catalog_results(conversation, [
+            {'product_id': 1, 'name': 'SODA COCA COLA 6/3LT', 'presentations': []},
+            {'product_id': 2, 'name': 'SODA COCA COLA 24/12OZ', 'presentations': []},
+        ])
+
+        reference = resolve_catalog_reference(conversation, 'el 2')
+
+        self.assertEqual(reference['product']['product_id'], 2)
+
+    def test_state_expires_without_leaking_previous_product(self):
+        from config.ai_assistant.services.conversation_state import load_state, update_state
+
+        conversation = self._with_selected_product(self._conversation())
+        stale = dict(conversation.shopping_context)
+        stale['expires_at'] = (timezone.now() - timedelta(minutes=1)).isoformat()
+        conversation.shopping_context = stale
+        conversation.save(update_fields=['shopping_context'])
+
+        self.assertIsNone(load_state(conversation)['selected_product'])
+        update_state(conversation, last_intent='product_search')
+        self.assertEqual(load_state(conversation)['last_intent'], 'product_search')
+
+
+class ToolRuntimeTests(TestCase):
+    def test_failing_tool_returns_safe_error_without_raising(self):
+        from config.ai_assistant.models import AssistantConversation
+        from config.ai_assistant.services.tool_runtime import run_tool, tool_failed
+
+        conversation = AssistantConversation.objects.create(visitor_id=uuid.uuid4(), language='es')
+        with patch(
+            'config.ai_assistant.services.tool_runtime.execute_tool',
+            side_effect=RuntimeError('database is down'),
+        ):
+            result = run_tool(request=None, conversation=conversation, name='find_products')
+
+        self.assertTrue(tool_failed(result))
+        self.assertEqual(conversation.messages.filter(tool_name='find_products').count(), 1)
+
+    def test_unavailable_result_never_exposes_internal_details(self):
+        from config.ai_assistant.services.tool_runtime import unavailable_result
+
+        message = unavailable_result()['message']
+
+        self.assertNotIn('error', message.lower())
+        self.assertIn('intentarlo nuevamente', message)

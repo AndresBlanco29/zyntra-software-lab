@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+from urllib.parse import urlencode
 
 from django.urls import reverse
 from django.utils import timezone
@@ -11,12 +12,21 @@ from config.ai_assistant.models import (
     AssistantMessage,
 )
 from config.ai_assistant.services.context import build_customer_context
+from config.ai_assistant.services.conversation_state import selected_product, update_state
 from config.ai_assistant.services.knowledge import search_published_knowledge
 from config.ai_assistant.services.openai_client import OpenAIClient, OpenAIServiceError
+from config.ai_assistant.services.intent_router import resolve_intent
 from config.ai_assistant.services.privacy import redact_content
+from config.ai_assistant.services.tool_runtime import run_tool, tool_failed, unavailable_result
 from config.ai_assistant.tools import execute_tool, openai_tool_schemas
 
 logger = logging.getLogger(__name__)
+
+# Questions about these subjects may only be answered from tool output.
+SYSTEM_DATA_TERMS = (
+    'precio', 'precios', 'stock', 'inventario', 'disponib', 'promoc', 'oferta', 'descuento',
+    'factura', 'saldo', 'debo', 'vence', 'pedido', 'orden', 'cotiz', 'carrito', 'producto',
+)
 
 BASE_SAFETY_PROMPT = """
 You are a helpful commercial and support assistant for La Tortilla Grocery.
@@ -30,6 +40,9 @@ Offer a relevant in-app next step before a text-only answer whenever possible.
 Never write Markdown links. Deep links and guided tours are rendered by the application as safe buttons.
 Use the customer's language. Be concise, warm and human.
 For authenticated customer questions about orders, quotes, invoices, balances, promotions, last purchases or favorites, call get_customer_success_summary before answering. Never invent a due date, balance, promotion or order status.
+You are an agent, not a text generator: for products, promotions, prices, stock, carts, quotes, orders, invoices or account state you must call a tool first and answer only with what the tool returned.
+If a tool returns nothing, say plainly that you could not find it. Never answer with "creo", "probablemente" or "no estoy seguro".
+Keep the current product of the conversation. When the customer says "ese", "ese producto", "el primero" or gives only a quantity, they mean the product already shown; never switch to a different product.
 """
 
 
@@ -317,16 +330,15 @@ def _purchase_intent_result(request, conversation, context, message, model):
     query = re.sub(r'\s+', ' ', query).strip(' ?!.')
     if len(query) < 2:
         return None
-    tool_result = execute_tool(request, 'find_products', json.dumps({'query': query}))
-    AssistantMessage.objects.create(
+    tool_result = run_tool(
+        request=request,
         conversation=conversation,
-        role=AssistantMessage.ROLE_TOOL,
-        content=redact_content(str(tool_result)),
-        redacted_content=redact_content(str(tool_result)),
-        tool_name='find_products',
-        tool_payload=tool_result,
+        name='find_products',
+        arguments=json.dumps({'query': query}),
         model=model,
     )
+    if tool_failed(tool_result):
+        return unavailable_result([{'label': 'Abrir catálogo', 'url': reverse('catalogo'), 'kind': 'catalog'}])
     products = tool_result.get('products', [])
     logger.info('AI commercial product intent resolved: matched=%s', bool(products))
     if not products:
@@ -343,7 +355,7 @@ def _purchase_intent_result(request, conversation, context, message, model):
             'confirmation_actions': [],
         }
     from config.ai_assistant.services.conversation_purchase import save_catalog_results
-    save_catalog_results(conversation, products)
+    saved_results = save_catalog_results(conversation, products)
     is_ambiguous = (
         len(products) > 1
         and products[0].get('score', 0) - products[1].get('score', 0) < 0.12
@@ -361,6 +373,8 @@ def _purchase_intent_result(request, conversation, context, message, model):
             'confirmation_actions': [],
         }
     product = products[0]
+    # Pin the resolved product so a later "ese producto" or bare quantity keeps it.
+    update_state(conversation, selected_product=saved_results[0] if saved_results else None)
     from config.ai_assistant.services.memory import remember_assistant_context
 
     remember_assistant_context(
@@ -390,9 +404,12 @@ def _purchase_intent_result(request, conversation, context, message, model):
     )
     actions = [
         {'label': 'Ver producto', 'url': product['catalog_url'], 'kind': 'catalog'},
-        {'label': 'Abrir catálogo', 'url': reverse('catalogo'), 'kind': 'catalog'},
+        {'label': 'Agregar al carrito', 'url': product['catalog_url'], 'kind': 'catalog'},
         {'label': 'Ver promociones', 'url': f"{product['catalog_url']}&promociones=1", 'kind': 'catalog'},
+        {'label': 'Abrir catálogo', 'url': reverse('catalogo'), 'kind': 'catalog'},
     ]
+    if context.get('authenticated'):
+        actions.append({'label': 'Solicitar cotización', 'url': reverse('ver_cotizacion'), 'kind': 'catalog'})
     confirmations = []
     if context.get('authenticated') and product.get('pricing_available'):
         prices = ', '.join(
@@ -440,7 +457,12 @@ def _pending_product_quantity_result(request, conversation, context, message, mo
     from config.productos.models import Presentacion
 
     state = AssistantUserState.objects.filter(visitor_id=get_visitor_id(request)).first()
-    pending_product_id = (state.preferences or {}).get('pending_product_id') if state else None
+    # The conversation state wins: the visitor-scoped preference is shared across
+    # conversations and could point at a product from an older chat.
+    current_product = selected_product(conversation) or {}
+    pending_product_id = current_product.get('product_id') or (
+        (state.preferences or {}).get('pending_product_id') if state else None
+    )
     if not pending_product_id:
         return None
     quantity_match = re.search(r'\b(\d{1,3})\b', str(message or ''))
@@ -698,21 +720,17 @@ def _promotion_intent_result(request, conversation, context, message, model):
     promotion_terms = ('oferta', 'ofertas', 'promoción', 'promocion', 'promociones', 'descuento', 'descuentos', 'special', 'specials')
     if not any(term in normalized for term in promotion_terms):
         return None
-    related_product_id = (context.get('assistant_memory') or {}).get('last_product_id')
-    tool_result = execute_tool(
-        request,
-        'get_active_promotions',
-        json.dumps({'related_product_id': related_product_id} if related_product_id else {}),
-    )
-    AssistantMessage.objects.create(
+    current_product = selected_product(conversation) or {}
+    related_product_id = current_product.get('product_id') or (context.get('assistant_memory') or {}).get('last_product_id')
+    tool_result = run_tool(
+        request=request,
         conversation=conversation,
-        role=AssistantMessage.ROLE_TOOL,
-        content=redact_content(str(tool_result)),
-        redacted_content=redact_content(str(tool_result)),
-        tool_name='get_active_promotions',
-        tool_payload=tool_result,
+        name='get_active_promotions',
+        arguments=json.dumps({'related_product_id': related_product_id} if related_product_id else {}),
         model=model,
     )
+    if tool_failed(tool_result):
+        return unavailable_result([{'label': 'Ver catálogo', 'url': reverse('catalogo'), 'kind': 'catalog'}])
     cards = tool_result.get('cards', [])
     catalog_url = f'{reverse("catalogo")}?promociones=1'
     if cards:
@@ -763,6 +781,84 @@ def _promotion_intent_result(request, conversation, context, message, model):
     }
 
 
+def _dispatch_intent(*, intent, request, conversation, context, message, model):
+    """Run the handlers allowed for one intent, in a safe narrowing order.
+
+    Each intent lists its own fallbacks so an unhandled turn degrades into a
+    product answer or the LLM, never into an unrelated account answer.
+    """
+    chains = {
+        'commercial_information': [
+            lambda: _commercial_information_result(request, conversation, message, model),
+        ],
+        'promotions': [
+            lambda: _promotion_intent_result(request, conversation, context, message, model),
+        ],
+        'product_reference': [
+            lambda: _conversation_product_reference_result(request, conversation, context, message, model),
+            lambda: _pending_product_quantity_result(request, conversation, context, message, model),
+            lambda: _selected_product_recap_result(conversation, context),
+        ],
+        'multi_item_purchase': [
+            lambda: _multi_item_purchase_result(request, conversation, context, message, model),
+            lambda: _purchase_intent_result(request, conversation, context, message, model),
+        ],
+        'checkout': [
+            lambda: _shopping_checkout_result(request, conversation, context, message, model),
+        ],
+        'customer_success': [
+            lambda: _customer_success_result(request, conversation, context, message, model),
+        ],
+        'product_search': [
+            lambda: _purchase_intent_result(request, conversation, context, message, model),
+        ],
+    }
+    for handler in chains.get(intent, []):
+        result = handler()
+        if result:
+            return result
+    return None
+
+
+def _selected_product_recap_result(conversation, context):
+    """Keep the current product when a reference could not be completed."""
+    product = selected_product(conversation)
+    if not product:
+        return None
+    presentations = ', '.join(item['name'] for item in product.get('presentations', [])[:6])
+    catalog_url = f"{reverse('catalogo')}?{urlencode({'q': product['name']})}"
+    actions = [{'label': 'Ver producto', 'url': catalog_url, 'kind': 'catalog'}]
+    if not context.get('authenticated'):
+        actions.append({'label': 'Iniciar sesión', 'url': '#', 'tour_id': 'login'})
+    return {
+        'message': (
+            f'Seguimos con {product["name"]}. '
+            + (f'Presentaciones disponibles: {presentations}. ' if presentations else '')
+            + 'Dime la presentación y la cantidad que necesitas.'
+        ),
+        'suggested_actions': actions,
+        'tour_id': None,
+        'tool_results': [],
+        'confirmation_actions': [],
+    }
+
+
+def _requires_system_data(message):
+    normalized = str(message or '').lower()
+    return any(term in normalized for term in SYSTEM_DATA_TERMS)
+
+
+def _system_data_context(conversation, limit=4):
+    """Expose recent tool output to the model so it answers only with real data."""
+    tool_messages = conversation.messages.filter(
+        role=AssistantMessage.ROLE_TOOL,
+    ).order_by('-created_at')[:limit]
+    return [
+        {'role': 'assistant', 'content': f'DATOS REALES DEL SISTEMA ({item.tool_name}): {item.content}'}
+        for item in reversed(list(tool_messages))
+    ]
+
+
 def reply_to_message(*, request, conversation, message):
     config = AssistantConfiguration.get_solo()
     context = build_customer_context(request)
@@ -783,86 +879,26 @@ def reply_to_message(*, request, conversation, message):
     )
     conversation.last_activity_at = timezone.now()
     conversation.save(update_fields=['last_activity_at'])
-    commercial_result = _commercial_information_result(request, conversation, message, config.chat_model)
-    if commercial_result:
+    intent = resolve_intent(conversation=conversation, message=message, context=context)
+    update_state(conversation, last_intent=intent, module=context.get('page', ''))
+    logger.info('AI assistant intent resolved: intent=%s authenticated=%s', intent, context.get('authenticated'))
+    agent_result = _dispatch_intent(
+        intent=intent,
+        request=request,
+        conversation=conversation,
+        context=context,
+        message=message,
+        model=config.chat_model,
+    )
+    if agent_result:
         AssistantMessage.objects.create(
             conversation=conversation,
             role=AssistantMessage.ROLE_ASSISTANT,
-            content=redact_content(commercial_result['message']),
-            redacted_content=redact_content(commercial_result['message']),
-            model='deterministic-commercial-information',
+            content=redact_content(agent_result['message']),
+            redacted_content=redact_content(agent_result['message']),
+            model=f'agent-{intent}',
         )
-        return commercial_result
-    promotion_result = _promotion_intent_result(request, conversation, context, message, config.chat_model)
-    if promotion_result:
-        AssistantMessage.objects.create(
-            conversation=conversation,
-            role=AssistantMessage.ROLE_ASSISTANT,
-            content=redact_content(promotion_result['message']),
-            redacted_content=redact_content(promotion_result['message']),
-            model='deterministic-promotions',
-        )
-        return promotion_result
-    reference_result = _conversation_product_reference_result(request, conversation, context, message, config.chat_model)
-    if reference_result:
-        AssistantMessage.objects.create(
-            conversation=conversation,
-            role=AssistantMessage.ROLE_ASSISTANT,
-            content=redact_content(reference_result['message']),
-            redacted_content=redact_content(reference_result['message']),
-            model='deterministic-conversation-reference',
-        )
-        return reference_result
-    pending_quantity_result = _pending_product_quantity_result(request, conversation, context, message, config.chat_model)
-    if pending_quantity_result:
-        AssistantMessage.objects.create(
-            conversation=conversation,
-            role=AssistantMessage.ROLE_ASSISTANT,
-            content=redact_content(pending_quantity_result['message']),
-            redacted_content=redact_content(pending_quantity_result['message']),
-            model='deterministic-commercial-cart',
-        )
-        return pending_quantity_result
-    multi_item_result = _multi_item_purchase_result(request, conversation, context, message, config.chat_model)
-    if multi_item_result:
-        AssistantMessage.objects.create(
-            conversation=conversation,
-            role=AssistantMessage.ROLE_ASSISTANT,
-            content=redact_content(multi_item_result['message']),
-            redacted_content=redact_content(multi_item_result['message']),
-            model='deterministic-multi-item-cart',
-        )
-        return multi_item_result
-    checkout_result = _shopping_checkout_result(request, conversation, context, message, config.chat_model)
-    if checkout_result:
-        AssistantMessage.objects.create(
-            conversation=conversation,
-            role=AssistantMessage.ROLE_ASSISTANT,
-            content=redact_content(checkout_result['message']),
-            redacted_content=redact_content(checkout_result['message']),
-            model='deterministic-shopping-checkout',
-        )
-        return checkout_result
-    success_result = _customer_success_result(request, conversation, context, message, config.chat_model)
-    if success_result:
-        AssistantMessage.objects.create(
-            conversation=conversation,
-            role=AssistantMessage.ROLE_ASSISTANT,
-            content=redact_content(success_result['message']),
-            redacted_content=redact_content(success_result['message']),
-            model='deterministic-customer-success',
-        )
-        return success_result
-    purchase_result = _purchase_intent_result(request, conversation, context, message, config.chat_model)
-    if purchase_result:
-        AssistantMessage.objects.create(
-            conversation=conversation,
-            role=AssistantMessage.ROLE_ASSISTANT,
-            content=redact_content(purchase_result['message']),
-            redacted_content=redact_content(purchase_result['message']),
-            model='deterministic-commercial-catalog',
-        )
-        return purchase_result
+        return agent_result
     forced_result = _forced_status_verification(request, conversation, context, message, config.chat_model)
     if forced_result:
         AssistantMessage.objects.create(
@@ -889,7 +925,7 @@ def reply_to_message(*, request, conversation, message):
         return result
 
     history = list(conversation.messages.exclude(role=AssistantMessage.ROLE_SYSTEM).order_by('-created_at')[:12])
-    input_messages = [
+    input_messages = _system_data_context(conversation) + [
         {'role': item.role, 'content': item.content}
         for item in reversed(history)
         if item.role in {AssistantMessage.ROLE_USER, AssistantMessage.ROLE_ASSISTANT}
@@ -905,17 +941,14 @@ def reply_to_message(*, request, conversation, message):
         response_usage = response.get('usage') or {}
         tool_results = []
         for call in response['tool_calls']:
-            result = execute_tool(request, call['name'], call['arguments'])
-            tool_results.append({'name': call['name'], 'result': result})
-            AssistantMessage.objects.create(
+            result = run_tool(
+                request=request,
                 conversation=conversation,
-                role=AssistantMessage.ROLE_TOOL,
-                content=redact_content(str(result)),
-                redacted_content=redact_content(str(result)),
-                tool_name=call['name'],
-                tool_payload=result,
+                name=call['name'],
+                arguments=call['arguments'],
                 model=config.chat_model,
             )
+            tool_results.append({'name': call['name'], 'result': result})
         if tool_results:
             response = client.create_response(
                 model=config.chat_model,
@@ -934,6 +967,10 @@ def reply_to_message(*, request, conversation, message):
             )
             response_usage = response.get('usage') or response_usage
         text = response['text'] or _fallback_response(config, context, message)['message']
+        # A business answer must be backed by a tool call; otherwise refuse to guess.
+        if _requires_system_data(message) and not tool_results:
+            logger.warning('AI assistant blocked ungrounded business answer: intent=%s', intent)
+            text = unavailable_result()['message']
         tour_id = _conversation_tour_for_message(conversation, message, context)
         result = {
             'message': text,

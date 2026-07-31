@@ -304,11 +304,11 @@ def _purchase_intent_result(request, conversation, context, message, model):
     normalized = str(message or '').lower().strip()
     if any(term in normalized for term in ('contraseña', 'password', 'iniciar sesión', 'iniciar sesion', 'login', 'cuenta aprob')):
         return None
-    triggers = ('tienen', 'tienes', 'busco', 'necesito', 'quiero comprar', 'comprar', 'producto', 'bebida')
+    triggers = ('tienen', 'tienes', 'busco', 'necesito', 'quiero comprar', 'comprar', 'producto', 'bebida', 'precio', 'precios', 'price', 'cost')
     if not any(trigger in normalized for trigger in triggers):
         return None
     query = re.sub(
-        r'\b(tienen|tienes|busco|necesito|quiero comprar|quiero|comprar|producto|productos|una|un|de|por favor|please)\b',
+        r'\b(tienen|tienes|busco|necesito|quiero comprar|quiero|comprar|producto|productos|una|un|de|por favor|please|precio|precios|price|cost)\b',
         ' ',
         message,
         flags=re.IGNORECASE,
@@ -365,24 +365,103 @@ def _purchase_intent_result(request, conversation, context, message, model):
         {'label': 'Ver promociones', 'url': f"{product['catalog_url']}&promociones=1", 'kind': 'catalog'},
     ]
     confirmations = []
-    if context.get('authenticated'):
+    if context.get('authenticated') and product.get('pricing_available'):
+        prices = ', '.join(
+            f"{item['name']}: ${item['price']}"
+            for item in product.get('presentations', [])[:4]
+            if item.get('price') is not None
+        )
+        reply += f" Tus precios asignados son: {prices}." if prices else ''
         actions.extend([
             {'label': 'Comprar ahora', 'url': product['catalog_url'], 'kind': 'catalog'},
             {'label': 'Continuar comprando', 'url': reverse('catalogo'), 'kind': 'catalog'},
         ])
-        if product.get('primary_presentation_id'):
-            proposal = execute_tool(
-                request,
-                'propose_add_to_order',
-                json.dumps({'presentation_id': product['primary_presentation_id'], 'quantity': 1}),
-            )
-            if proposal.get('requires_confirmation') and proposal.get('action_id'):
-                confirmations.append({'id': proposal['action_id'], 'label': f"Agregar {product['name']} al pedido"})
+        reply += ' Dime qué presentación y cuántas unidades deseas agregar; prepararé la confirmación para tu pedido.'
+        remember_assistant_context(
+            request,
+            pending_product_id=product['product_id'],
+            pending_product_name=product['name'],
+        )
+    elif context.get('authenticated'):
+        reply += (
+            ' Tu cuenta no tiene una lista de precios asignada todavía. '
+            'Podemos armar una cotización para que nuestro equipo confirme los precios.'
+        )
+        actions.append({
+            'label': 'Ayúdame a hacer la cotización',
+            'url': reverse('catalogo'),
+            'tour_id': 'first-order',
+        })
     return {
         'message': reply,
         'suggested_actions': actions,
         'tour_id': None,
         'tool_results': [{'name': 'find_products', 'result': tool_result}],
+        'confirmation_actions': confirmations,
+    }
+
+
+def _pending_product_quantity_result(request, conversation, context, message, model):
+    """Turn a customer presentation/quantity reply into a confirmed cart proposal."""
+    if not context.get('authenticated'):
+        return None
+    from config.ai_assistant.models import AssistantUserState
+    from config.ai_assistant.services.identity import get_visitor_id
+    from config.ai_assistant.services.catalog_resolver import normalize_catalog_term
+    from config.productos.models import Presentacion
+
+    state = AssistantUserState.objects.filter(visitor_id=get_visitor_id(request)).first()
+    pending_product_id = (state.preferences or {}).get('pending_product_id') if state else None
+    if not pending_product_id:
+        return None
+    quantity_match = re.search(r'\b(\d{1,3})\b', str(message or ''))
+    if not quantity_match:
+        return None
+    quantity = int(quantity_match.group(1))
+    presentations = list(Presentacion.objects.filter(producto_id=pending_product_id, producto__activo=True).select_related('producto'))
+    normalized_message = normalize_catalog_term(message)
+    selected = next(
+        (
+            item for item in presentations
+            if normalize_catalog_term(item.nombre) in normalized_message
+            or normalize_catalog_term(item.nombre_empaque_cliente) in normalized_message
+        ),
+        presentations[0] if len(presentations) == 1 else None,
+    )
+    if selected is None:
+        options = ', '.join(item.nombre_empaque_cliente for item in presentations[:6])
+        return {
+            'message': f'Indícame la presentación exacta ({options}) y la cantidad que deseas.',
+            'suggested_actions': [],
+            'tour_id': None,
+            'tool_results': [],
+            'confirmation_actions': [],
+        }
+    proposal = execute_tool(
+        request,
+        'propose_add_to_order',
+        json.dumps({'presentation_id': selected.id, 'quantity': quantity}),
+    )
+    confirmations = []
+    if proposal.get('requires_confirmation') and proposal.get('action_id'):
+        confirmations.append({
+            'id': proposal['action_id'],
+            'label': f'Agregar {quantity} × {selected.producto.nombre} ({selected.nombre_empaque_cliente})',
+        })
+    if state:
+        preferences = dict(state.preferences or {})
+        preferences.pop('pending_product_id', None)
+        preferences.pop('pending_product_name', None)
+        state.preferences = preferences
+        state.save(update_fields=['preferences', 'updated_at'])
+    return {
+        'message': (
+            f'Perfecto. Preparé {quantity} × {selected.producto.nombre} '
+            f'en presentación {selected.nombre_empaque_cliente}. Confirma para agregarlo a tu pedido.'
+        ),
+        'suggested_actions': [{'label': 'Ver mi pedido', 'url': reverse('ver_cotizacion'), 'kind': 'catalog'}],
+        'tour_id': None,
+        'tool_results': [{'name': 'propose_add_to_order', 'result': proposal}],
         'confirmation_actions': confirmations,
     }
 
@@ -410,6 +489,16 @@ def reply_to_message(*, request, conversation, message):
             model='deterministic-commercial-information',
         )
         return commercial_result
+    pending_quantity_result = _pending_product_quantity_result(request, conversation, context, message, config.chat_model)
+    if pending_quantity_result:
+        AssistantMessage.objects.create(
+            conversation=conversation,
+            role=AssistantMessage.ROLE_ASSISTANT,
+            content=redact_content(pending_quantity_result['message']),
+            redacted_content=redact_content(pending_quantity_result['message']),
+            model='deterministic-commercial-cart',
+        )
+        return pending_quantity_result
     purchase_result = _purchase_intent_result(request, conversation, context, message, config.chat_model)
     if purchase_result:
         AssistantMessage.objects.create(

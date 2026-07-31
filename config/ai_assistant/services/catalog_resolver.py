@@ -40,9 +40,10 @@ def _promotion_product_ids(cliente):
     return ids
 
 
-def _product_dto(product, query, promotion_ids):
+def _product_dto(product, query, promotion_ids, cliente):
     presentations = list(product.presentaciones.all())
     catalog_url = f"{reverse('catalogo')}?{urlencode({'q': query})}"
+    price_tier = cliente.get_nivel_precio_normalizado() if cliente and cliente.has_assigned_price_tier() else None
     return {
         'product_id': product.id,
         'name': product.nombre,
@@ -50,12 +51,18 @@ def _product_dto(product, query, promotion_ids):
         'category': product.categoria.nombre if product.categoria_id else '',
         'catalog_url': catalog_url,
         'has_active_promotion': product.id in promotion_ids,
+        'pricing_available': bool(price_tier),
         'presentations': [
             {
                 'id': presentation.id,
                 'name': presentation.nombre_empaque_cliente,
                 'units': presentation.unidades,
                 'unit_type': presentation.tipo_contenido,
+                'price': (
+                    str(getattr(presentation, f'precio_{price_tier}'))
+                    if price_tier and getattr(presentation, f'precio_{price_tier}') is not None
+                    else None
+                ),
             }
             for presentation in presentations
         ],
@@ -120,7 +127,7 @@ def find_products(query, *, cliente=None, limit=5):
     )
     selected = [product for product, score in ranked if score >= 0.43][:limit]
     promotion_ids = _promotion_product_ids(cliente)
-    products = [_product_dto(product, query, promotion_ids) for product in selected]
+    products = [_product_dto(product, query, promotion_ids, cliente) for product in selected]
     related = []
     if selected:
         anchor = selected[0]
@@ -133,5 +140,5 @@ def find_products(query, *, cliente=None, limit=5):
             Producto.objects.filter(activo=True).filter(relation).exclude(pk=anchor.pk).distinct()
             .select_related('marca', 'categoria').prefetch_related('presentaciones')[:4]
         )
-        related = [_product_dto(product, product.nombre, promotion_ids) for product in related_queryset]
+        related = [_product_dto(product, product.nombre, promotion_ids, cliente) for product in related_queryset]
     return {'query': query, 'products': products, 'related_products': related}

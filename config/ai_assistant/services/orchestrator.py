@@ -693,6 +693,44 @@ def _multi_item_purchase_result(request, conversation, context, message, model):
     }
 
 
+def _promotion_intent_result(request, conversation, context, message, model):
+    normalized = str(message or '').lower()
+    promotion_terms = ('oferta', 'ofertas', 'promoción', 'promocion', 'promociones', 'descuento', 'descuentos', 'special', 'specials')
+    if not any(term in normalized for term in promotion_terms):
+        return None
+    from config.ai_assistant.services.identity import get_customer_for_user
+    from config.productos.promotions import promociones_activas_queryset
+
+    cliente = get_customer_for_user(request.user)
+    promotions = promociones_activas_queryset(cliente=cliente) if cliente else promociones_activas_queryset()
+    active_count = promotions.count()
+    catalog_url = f'{reverse("catalogo")}?promociones=1'
+    if active_count:
+        return {
+            'message': (
+                '¡Claro! Hoy tenemos promociones activas. '
+                'Puedes verlas en el catálogo y agregar los productos que te interesen a tu pedido.'
+            ),
+            'suggested_actions': [
+                {'label': 'Ver promociones', 'url': catalog_url, 'kind': 'catalog'},
+                {'label': 'Ver catálogo', 'url': reverse('catalogo'), 'kind': 'catalog'},
+            ],
+            'tour_id': None,
+            'tool_results': [{'name': 'get_active_promotions', 'result': {'active_count': active_count}}],
+            'confirmation_actions': [],
+        }
+    return {
+        'message': 'Por el momento no encontramos promociones activas. Puedes revisar el catálogo completo o hablar con un asesor para conocer las próximas ofertas.',
+        'suggested_actions': [
+            {'label': 'Ver catálogo', 'url': reverse('catalogo'), 'kind': 'catalog'},
+            {'label': 'Hablar con un asesor', 'url': '#', 'kind': 'contact_handoff'},
+        ],
+        'tour_id': None,
+        'tool_results': [{'name': 'get_active_promotions', 'result': {'active_count': 0}}],
+        'confirmation_actions': [],
+    }
+
+
 def reply_to_message(*, request, conversation, message):
     config = AssistantConfiguration.get_solo()
     context = build_customer_context(request)
@@ -723,6 +761,16 @@ def reply_to_message(*, request, conversation, message):
             model='deterministic-commercial-information',
         )
         return commercial_result
+    promotion_result = _promotion_intent_result(request, conversation, context, message, config.chat_model)
+    if promotion_result:
+        AssistantMessage.objects.create(
+            conversation=conversation,
+            role=AssistantMessage.ROLE_ASSISTANT,
+            content=redact_content(promotion_result['message']),
+            redacted_content=redact_content(promotion_result['message']),
+            model='deterministic-promotions',
+        )
+        return promotion_result
     reference_result = _conversation_product_reference_result(request, conversation, context, message, config.chat_model)
     if reference_result:
         AssistantMessage.objects.create(

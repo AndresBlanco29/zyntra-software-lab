@@ -16,7 +16,11 @@
       }
     }, options || {})).then(function (response) {
       return response.json().then(function (payload) {
-        if (!response.ok) throw new Error(payload.error || "Assistant request failed.");
+        if (!response.ok) {
+          const error = new Error(payload.error || "Assistant request failed.");
+          error.status = response.status;
+          throw error;
+        }
         return payload;
       });
     });
@@ -344,13 +348,22 @@
       if (!value) return;
       input.value = "";
       appendMessage(messages, value, true);
-      ensureConversation()
+      function sendMessage(retryAfterMissingConversation) {
+        return ensureConversation()
         .then(function (id) {
           return jsonFetch(root.dataset.messageUrl.replace("__conversation__", id), {
             method: "POST",
             body: JSON.stringify({ message: value })
           });
-        })
+        }).catch(function (error) {
+          if (error.status === 404 && !retryAfterMissingConversation) {
+            conversationId = "";
+            return sendMessage(true);
+          }
+          throw error;
+        });
+      }
+      sendMessage(false)
         .then(function (result) {
           appendMessage(messages, result.message, false);
           renderActions(actions, result.suggested_actions);

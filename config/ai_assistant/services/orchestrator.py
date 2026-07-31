@@ -19,7 +19,7 @@ from config.ai_assistant.services.openai_client import OpenAIClient, OpenAIServi
 from config.ai_assistant.services.intent_router import resolve_intent
 from config.ai_assistant.services.privacy import redact_content
 from config.ai_assistant.services.tool_runtime import run_tool, tool_failed, unavailable_result
-from config.ai_assistant.tools import execute_tool, openai_tool_schemas
+from config.ai_assistant.tools import openai_tool_schemas
 
 logger = logging.getLogger(__name__)
 
@@ -245,16 +245,15 @@ def _forced_status_verification(request, conversation, context, message, model):
     if not tool_name:
         return None
 
-    tool_result = execute_tool(request, tool_name, json.dumps(arguments))
-    AssistantMessage.objects.create(
+    tool_result = run_tool(
+        request=request,
         conversation=conversation,
-        role=AssistantMessage.ROLE_TOOL,
-        content=redact_content(str(tool_result)),
-        redacted_content=redact_content(str(tool_result)),
-        tool_name=tool_name,
-        tool_payload=tool_result,
+        name=tool_name,
+        arguments=json.dumps(arguments),
         model=model,
     )
+    if tool_failed(tool_result):
+        return unavailable_result()
     if tool_name == 'request_account_status_code':
         reply = 'Si ese correo está registrado, recibirás un código de verificación. Revisa Inbox y Spam; después escríbelo aquí.'
     elif tool_result.get('error'):
@@ -287,7 +286,7 @@ def _commercial_information_result(request, conversation, message, model):
     )
     if any(term in normalized for term in contact_terms):
         tool_name = 'get_contact_options'
-        tool_result = execute_tool(request, tool_name, '{}')
+        tool_result = run_tool(request=request, conversation=conversation, name=tool_name, model=model)
         reply = (
             f"Claro. Puedes llamarnos al {tool_result.get('phone') or 'número configurado'}, "
             f"escribirnos por WhatsApp o enviarnos un correo a {tool_result.get('email') or 'nuestro correo de soporte'}."
@@ -295,7 +294,7 @@ def _commercial_information_result(request, conversation, message, model):
         actions = tool_result.get('actions', [])
     elif any(term in normalized for term in location_terms):
         tool_name = 'get_location_information'
-        tool_result = execute_tool(request, tool_name, '{}')
+        tool_result = run_tool(request=request, conversation=conversation, name=tool_name, model=model)
         address = tool_result.get('address')
         reply = (
             f"La Tortilla Grocery cuenta con una ubicación física{': ' + address if address else ''}. "
@@ -305,15 +304,8 @@ def _commercial_information_result(request, conversation, message, model):
                    if tool_result.get('map_url') else [])
     else:
         return None
-    AssistantMessage.objects.create(
-        conversation=conversation,
-        role=AssistantMessage.ROLE_TOOL,
-        content=redact_content(str(tool_result)),
-        redacted_content=redact_content(str(tool_result)),
-        tool_name=tool_name,
-        tool_payload=tool_result,
-        model=model,
-    )
+    if tool_failed(tool_result):
+        return unavailable_result()
     return {
         'message': reply,
         'suggested_actions': actions,
@@ -498,11 +490,15 @@ def _pending_product_quantity_result(request, conversation, context, message, mo
             'tool_results': [],
             'confirmation_actions': [],
         }
-    proposal = execute_tool(
-        request,
-        'propose_add_to_order',
-        json.dumps({'presentation_id': selected.id, 'quantity': quantity}),
+    proposal = run_tool(
+        request=request,
+        conversation=conversation,
+        name='propose_add_to_order',
+        arguments=json.dumps({'presentation_id': selected.id, 'quantity': quantity}),
+        model=model,
     )
+    if tool_failed(proposal):
+        return unavailable_result()
     confirmations = []
     if proposal.get('requires_confirmation') and proposal.get('action_id'):
         confirmations.append({
@@ -564,11 +560,18 @@ def _conversation_product_reference_result(request, conversation, context, messa
             'tool_results': [],
             'confirmation_actions': [],
         }
-    proposal = execute_tool(
-        request,
-        'propose_add_to_order',
-        json.dumps({'presentation_id': reference['presentation']['id'], 'quantity': reference['quantity']}),
+    proposal = run_tool(
+        request=request,
+        conversation=conversation,
+        name='propose_add_to_order',
+        arguments=json.dumps({
+            'presentation_id': reference['presentation']['id'],
+            'quantity': reference['quantity'],
+        }),
+        model=model,
     )
+    if tool_failed(proposal):
+        return unavailable_result()
     confirmations = [{
         'id': proposal['action_id'],
         'label': f'Agregar {reference["quantity"]} × {product["name"]} ({reference["presentation"]["name"]})',
@@ -597,18 +600,18 @@ def _customer_success_result(request, conversation, context, message, model):
     )
     if not any(term in normalized for term in terms):
         return None
-    result = execute_tool(request, 'get_customer_success_summary', '{}')
-    if result.get('error'):
-        return None
-    AssistantMessage.objects.create(
+    result = run_tool(
+        request=request,
         conversation=conversation,
-        role=AssistantMessage.ROLE_TOOL,
-        content=redact_content(str(result)),
-        redacted_content=redact_content(str(result)),
-        tool_name='get_customer_success_summary',
-        tool_payload=result,
+        name='get_customer_success_summary',
         model=model,
     )
+    if tool_failed(result):
+        return unavailable_result([
+            {'label': 'Ver mis cotizaciones', 'url': reverse('cliente_cotizaciones_recibidas')},
+        ])
+    if result.get('error'):
+        return None
     facts = []
     actions = []
     if result.get('ready_quotes'):
@@ -644,11 +647,21 @@ def _shopping_checkout_result(request, conversation, context, message, model):
     normalized = str(message or '').lower().strip(' .!¡?')
     if normalized not in {'no', 'no gracias', 'nada más', 'nada mas', 'terminé', 'termine', 'finalizar'}:
         return None
-    cart = execute_tool(request, 'get_cart_summary', '{}')
+    cart = run_tool(request=request, conversation=conversation, name='get_cart_summary', model=model)
+    if tool_failed(cart):
+        return unavailable_result()
     if not cart.get('line_count'):
         return None
-    submit = execute_tool(request, 'propose_quote_decision', json.dumps({'operation': 'submit_request'}))
-    clear = execute_tool(request, 'propose_clear_order', '{}')
+    submit = run_tool(
+        request=request,
+        conversation=conversation,
+        name='propose_quote_decision',
+        arguments=json.dumps({'operation': 'submit_request'}),
+        model=model,
+    )
+    clear = run_tool(request=request, conversation=conversation, name='propose_clear_order', model=model)
+    if tool_failed(submit) or tool_failed(clear):
+        return unavailable_result()
     confirmations = []
     if submit.get('requires_confirmation') and submit.get('action_id'):
         confirmations.append({'id': submit['action_id'], 'label': 'Enviar cotización'})
@@ -685,7 +698,16 @@ def _multi_item_purchase_result(request, conversation, context, message, model):
     ambiguous = []
     confirmations = []
     for quantity, query in lines[:8]:
-        result = execute_tool(request, 'find_products', json.dumps({'query': query}))
+        result = run_tool(
+            request=request,
+            conversation=conversation,
+            name='find_products',
+            arguments=json.dumps({'query': query}),
+            model=model,
+        )
+        if tool_failed(result):
+            ambiguous.append(query)
+            continue
         products = result.get('products', [])
         if not products or products[0].get('score', 0) < 0.75:
             ambiguous.append(query)
@@ -696,11 +718,16 @@ def _multi_item_purchase_result(request, conversation, context, message, model):
             ambiguous.append(query)
             continue
         presentation = presentations[0]
-        proposal = execute_tool(
-            request,
-            'propose_add_to_order',
-            json.dumps({'presentation_id': presentation['id'], 'quantity': quantity}),
+        proposal = run_tool(
+            request=request,
+            conversation=conversation,
+            name='propose_add_to_order',
+            arguments=json.dumps({'presentation_id': presentation['id'], 'quantity': quantity}),
+            model=model,
         )
+        if tool_failed(proposal):
+            ambiguous.append(query)
+            continue
         if proposal.get('requires_confirmation') and proposal.get('action_id'):
             confirmations.append({
                 'id': proposal['action_id'],

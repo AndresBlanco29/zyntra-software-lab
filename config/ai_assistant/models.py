@@ -1,6 +1,7 @@
 import uuid
 
 from django.conf import settings
+from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
 from django.utils import timezone
 
@@ -135,7 +136,7 @@ class AssistantConversation(models.Model):
     first_page = models.CharField(max_length=80, blank=True)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_OPEN)
     summary = models.TextField(blank=True)
-    shopping_context = models.JSONField(default=dict, blank=True)
+    shopping_context = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
     last_activity_at = models.DateTimeField(default=timezone.now, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -155,7 +156,9 @@ class AssistantMessage(models.Model):
     content = models.TextField()
     redacted_content = models.TextField(blank=True)
     tool_name = models.CharField(max_length=100, blank=True)
-    tool_payload = models.JSONField(default=dict, blank=True)
+    # Tool payloads carry raw domain data (UUIDs, dates, Decimal amounts), so they
+    # need an encoder that can serialize them.
+    tool_payload = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
     model = models.CharField(max_length=100, blank=True)
     input_tokens = models.PositiveIntegerField(default=0)
     output_tokens = models.PositiveIntegerField(default=0)
@@ -171,8 +174,8 @@ class AssistantUserState(models.Model):
     cliente = models.ForeignKey('clientes.Cliente', null=True, blank=True, on_delete=models.SET_NULL, related_name='assistant_state')
     onboarding_completed = models.BooleanField(default=False)
     consented_at = models.DateTimeField(blank=True, null=True)
-    preferences = models.JSONField(default=dict, blank=True)
-    last_notified_events = models.JSONField(default=dict, blank=True)
+    preferences = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
+    last_notified_events = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
     updated_at = models.DateTimeField(auto_now=True)
 
 
@@ -192,9 +195,9 @@ class AssistantCustomerSuccessProfile(models.Model):
     onboarding_learned = models.BooleanField(default=False)
     first_order_at = models.DateTimeField(blank=True, null=True)
     last_order_id = models.PositiveIntegerField(blank=True, null=True)
-    recently_viewed_products = models.JSONField(default=list, blank=True)
-    help_topics = models.JSONField(default=list, blank=True)
-    event_marks = models.JSONField(default=dict, blank=True)
+    recently_viewed_products = models.JSONField(default=list, blank=True, encoder=DjangoJSONEncoder)
+    help_topics = models.JSONField(default=list, blank=True, encoder=DjangoJSONEncoder)
+    event_marks = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
     updated_at = models.DateTimeField(auto_now=True)
 
 
@@ -274,7 +277,7 @@ class AssistantDomainEvent(models.Model):
     event_type = models.CharField(max_length=40, choices=TYPE_CHOICES)
     entity_type = models.CharField(max_length=80, blank=True)
     entity_id = models.CharField(max_length=80, blank=True)
-    payload = models.JSONField(default=dict, blank=True)
+    payload = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
     consumed_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -299,7 +302,7 @@ class AssistantPendingAction(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.CASCADE)
     cliente = models.ForeignKey('clientes.Cliente', null=True, blank=True, on_delete=models.CASCADE)
     action_type = models.CharField(max_length=80)
-    payload = models.JSONField(default=dict)
+    payload = models.JSONField(default=dict, encoder=DjangoJSONEncoder)
     status = models.CharField(max_length=16, choices=STATUS_CHOICES, default=STATUS_PENDING)
     expires_at = models.DateTimeField()
     confirmed_at = models.DateTimeField(blank=True, null=True)

@@ -409,6 +409,34 @@ class AgentContextTests(TestCase):
         self.assertEqual(load_state(conversation)['last_intent'], 'product_search')
 
 
+class ToolPayloadSerializationTests(TestCase):
+    def test_domain_values_in_a_tool_payload_can_be_stored(self):
+        """A UUID, Decimal or date in a tool result used to abort the whole turn."""
+        import datetime
+        from decimal import Decimal
+
+        from config.ai_assistant.models import AssistantConversation
+
+        conversation = AssistantConversation.objects.create(visitor_id=uuid.uuid4(), language='es')
+        payload = {
+            'quote_public_id': uuid.uuid4(),
+            'balance': Decimal('1250.75'),
+            'due_date': datetime.date(2026, 8, 15),
+        }
+
+        message = AssistantMessage.objects.create(
+            conversation=conversation,
+            role=AssistantMessage.ROLE_TOOL,
+            content='summary',
+            tool_name='get_customer_success_summary',
+            tool_payload=payload,
+        )
+        message.refresh_from_db()
+
+        self.assertEqual(message.tool_payload['balance'], '1250.75')
+        self.assertEqual(message.tool_payload['due_date'], '2026-08-15')
+
+
 class CatalogNamingTests(TestCase):
     def test_catalog_answer_keeps_the_stored_product_name_verbatim(self):
         from config.ai_assistant.services.orchestrator import _exact_catalog_answer

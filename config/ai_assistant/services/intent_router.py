@@ -18,8 +18,12 @@ from config.ai_assistant.services.conversation_state import load_state
 
 CONTACT_TERMS = ('telefono', 'llamar', 'whatsapp', 'correo', 'email', 'contacto', 'direccion', 'ubicacion', 'donde estan')
 PROMOTION_TERMS = ('oferta', 'ofertas', 'promocion', 'promociones', 'descuento', 'descuentos', 'special', 'specials')
+BILLING_TERMS = (
+    'factura', 'facturas', 'facturacion', 'invoice', 'invoices', 'billing',
+    'saldo', 'debo', 'pago', 'pagos', 'payment', 'abono', 'credito', 'estado de cuenta',
+    'vence', 'vencimiento', 'nota de credito', 'nota de debito',
+)
 ACCOUNT_TERMS = (
-    'factura', 'facturas', 'saldo', 'debo', 'vence', 'vencimiento', 'invoice',
     'mi pedido', 'mis pedidos', 'mi orden', 'mis ordenes', 'mi cotizacion', 'mis cotizaciones',
     'estado de mi', 'ultima compra', 'favorito', 'favoritos',
     'my order', 'my orders', 'my quote', 'my quotes', 'my invoice', 'mi quote', 'mis quotes',
@@ -67,6 +71,10 @@ def resolve_intent(*, conversation, message, context):
 
     if _contains(normalized, CONTACT_TERMS):
         return 'commercial_information'
+
+    # Billing is not handled in this chat; it is handed off to a human agent.
+    if _contains(normalized, BILLING_TERMS):
+        return 'billing_handoff'
 
     if _contains(normalized, PROMOTION_TERMS):
         return 'promotions'

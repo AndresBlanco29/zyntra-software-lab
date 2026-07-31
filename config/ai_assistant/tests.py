@@ -347,12 +347,12 @@ class AgentContextTests(TestCase):
 
         self.assertEqual(intent, 'product_reference')
 
-    def test_invoice_question_still_routes_to_customer_success(self):
+    def test_order_question_still_routes_to_customer_success(self):
         from config.ai_assistant.services.intent_router import resolve_intent
 
         intent = resolve_intent(
             conversation=self._conversation(),
-            message='¿Cuánto debo en mis facturas?',
+            message='¿En qué estado está mi pedido?',
             context={'authenticated': True},
         )
 
@@ -407,6 +407,45 @@ class AgentContextTests(TestCase):
         self.assertIsNone(load_state(conversation)['selected_product'])
         update_state(conversation, last_intent='product_search')
         self.assertEqual(load_state(conversation)['last_intent'], 'product_search')
+
+
+class ScopedAnswerTests(TestCase):
+    def _conversation(self):
+        from config.ai_assistant.models import AssistantConversation
+
+        return AssistantConversation.objects.create(visitor_id=uuid.uuid4(), language='es')
+
+    def test_billing_question_is_handed_off_instead_of_answered(self):
+        from config.ai_assistant.services.intent_router import resolve_intent
+
+        intent = resolve_intent(
+            conversation=self._conversation(),
+            message='cuanto debo en mis facturas?',
+            context={'authenticated': True},
+        )
+
+        self.assertEqual(intent, 'billing_handoff')
+
+    def test_handoff_points_to_a_human_agent_on_whatsapp(self):
+        from config.ai_assistant.services.orchestrator import _billing_handoff_result
+
+        config = AssistantConfiguration.get_solo()
+        config.support_whatsapp = '14045550100'
+        config.save(update_fields=['support_whatsapp'])
+
+        result = _billing_handoff_result()
+
+        self.assertIn('facturación', result['message'])
+        self.assertEqual(result['suggested_actions'][0]['label'], 'Hablar con un agente por WhatsApp')
+        self.assertTrue(result['suggested_actions'][0]['url'].startswith('https://wa.me/'))
+
+    def test_module_is_detected_from_the_page_the_customer_is_on(self):
+        from config.ai_assistant.services.context import current_module
+
+        self.assertEqual(current_module('/pedidos/cliente/ordenes-recibidas/'), 'orders')
+        self.assertEqual(current_module('cart'), 'cart')
+        self.assertEqual(current_module('/productos/catalogo/'), 'catalog')
+        self.assertEqual(current_module(''), 'home')
 
 
 class GuestAccountStatusTests(TestCase):

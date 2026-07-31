@@ -12,7 +12,7 @@ from config.ai_assistant.models import (
     AssistantConversation,
     AssistantMessage,
 )
-from config.ai_assistant.services.context import build_customer_context
+from config.ai_assistant.services.context import build_customer_context, current_module
 from config.ai_assistant.services.conversation_state import selected_product, update_state
 from config.ai_assistant.services.knowledge import search_published_knowledge
 from config.ai_assistant.services.openai_client import OpenAIClient, OpenAIServiceError
@@ -45,6 +45,8 @@ You are an agent, not a text generator: for products, promotions, prices, stock,
 If a tool returns nothing, say plainly that you could not find it. Never answer with "creo", "probablemente" or "no estoy seguro".
 Keep the current product of the conversation. When the customer says "ese", "ese producto", "el primero" or gives only a quantity, they mean the product already shown; never switch to a different product.
 Write product and presentation names exactly as the catalog stores them, character for character. Never translate, expand or reformat packaging notation: "SODA COCA COLA 6/3LT" must stay "SODA COCA COLA 6/3LT" and never become "6 cajas de 3 litros".
+Never answer invoices, balances, payments or any billing question in this chat: hand the customer off to a human agent on WhatsApp.
+Stay on the process the customer is working on. Answer about the module they are in and the current conversation thread; do not volunteer unrelated pending items.
 """
 
 
@@ -208,6 +210,7 @@ def _instructions(config, context, knowledge, conversation_summary=''):
             f'The customer is {customer_name}. Address them by name naturally, without repeating it in every sentence.'
             if customer_name else ''
         ),
+        f'The customer is currently in the {current_module(context.get("page"))} module.',
         f'Assistant name: {config.assistant_name}.',
         f'Personality: {config.personality}',
         f'Commercial objective: {config.sales_goal}',
@@ -617,23 +620,40 @@ def _customer_success_result(request, conversation, context, message, model):
         ])
     if result.get('error'):
         return None
-    facts = []
-    actions = []
+    # Each fact is tagged with the module it belongs to, so the answer stays on the
+    # process the customer is actually looking at. Invoices are never included:
+    # billing is handed off to a human agent.
+    candidates = []
     if result.get('ready_quotes'):
-        facts.append(f'Tienes {len(result["ready_quotes"])} cotización(es) lista(s) para revisar.')
-        actions.append({'label': 'Ver cotización', 'url': reverse('cliente_cotizaciones_recibidas'), 'tour_id': 'quote-ready'})
+        candidates.append((
+            'quotes',
+            f'Tienes {len(result["ready_quotes"])} cotización(es) lista(s) para revisar.',
+            {'label': 'Ver cotización', 'url': reverse('cliente_cotizaciones_recibidas'), 'tour_id': 'quote-ready'},
+        ))
     if result.get('cart_line_count'):
-        facts.append(f'Tu pedido actual tiene {result["cart_line_count"]} producto(s).')
-        actions.append({'label': 'Continuar pedido', 'url': reverse('ver_cotizacion')})
-    if result.get('open_invoices'):
-        facts.append(f'Tienes {len(result["open_invoices"])} factura(s) con saldo o estado abierto.')
-        actions.append({'label': 'Hablar con un asesor', 'url': '#', 'kind': 'contact_handoff'})
+        candidates.append((
+            'cart',
+            f'Tu pedido actual tiene {result["cart_line_count"]} producto(s).',
+            {'label': 'Continuar pedido', 'url': reverse('ver_cotizacion')},
+        ))
     if result.get('last_order'):
-        facts.append(f'Tu último pedido está en estado {result["last_order"]["status"]}.')
-        actions.append({'label': 'Repetir pedido', 'url': reverse('cliente_historial_ordenes'), 'tour_id': 'reorder'})
+        candidates.append((
+            'orders',
+            f'Tu último pedido está en estado {result["last_order"]["status"]}.',
+            {'label': 'Repetir pedido', 'url': reverse('cliente_historial_ordenes'), 'tour_id': 'reorder'},
+        ))
     if result.get('active_promotion_count'):
-        facts.append(f'Actualmente hay {result["active_promotion_count"]} promoción(es) activa(s).')
-        actions.append({'label': 'Ver promociones', 'url': f'{reverse("catalogo")}?promociones=1'})
+        candidates.append((
+            'catalog',
+            f'Actualmente hay {result["active_promotion_count"]} promoción(es) activa(s).',
+            {'label': 'Ver promociones', 'url': f'{reverse("catalogo")}?promociones=1'},
+        ))
+
+    module = current_module(context.get('page'))
+    scoped = [item for item in candidates if item[0] == module]
+    selected = scoped or candidates
+    facts = [item[1] for item in selected]
+    actions = [item[2] for item in selected]
     if not facts:
         facts.append('No encontré pendientes relevantes en este momento. Puedes iniciar un pedido nuevo cuando quieras.')
         actions.append({'label': 'Nuevo pedido', 'url': reverse('catalogo'), 'tour_id': 'first-order'})
@@ -851,6 +871,9 @@ def _dispatch_intent(*, intent, request, conversation, context, message, model):
         'customer_success': [
             lambda: _customer_success_result(request, conversation, context, message, model),
         ],
+        'billing_handoff': [
+            lambda: _billing_handoff_result(),
+        ],
         'guest_account_status': [
             lambda: _forced_status_verification(request, conversation, context, message, model),
             lambda: _guest_account_status_result(context),
@@ -864,6 +887,29 @@ def _dispatch_intent(*, intent, request, conversation, context, message, model):
         if result:
             return result
     return None
+
+
+def _billing_handoff_result():
+    """Billing is out of scope for this chat and goes to a human agent."""
+    from config.ai_assistant.services.contact import build_contact_dto
+
+    contact = build_contact_dto()
+    whatsapp = next(
+        (action for action in contact['actions'] if action['label'] == 'WhatsApp'),
+        None,
+    )
+    actions = [dict(whatsapp, label='Hablar con un agente por WhatsApp')] if whatsapp else []
+    actions.extend(action for action in contact['actions'] if action is not whatsapp)
+    return {
+        'message': (
+            'Los temas de facturación, saldos y pagos los atiende directamente nuestro equipo, '
+            'no los gestiono desde este chat. Escríbeles por WhatsApp y te ayudan con tu caso puntual.'
+        ),
+        'suggested_actions': actions,
+        'tour_id': None,
+        'tool_results': [],
+        'confirmation_actions': [],
+    }
 
 
 def _guest_account_status_result(context):

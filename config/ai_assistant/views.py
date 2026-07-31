@@ -204,6 +204,8 @@ def conversation_message(request, public_id):
     message = str(payload.get('message') or '').strip()
     if not message or len(message) > config.max_message_chars:
         return JsonResponse({'error': 'Invalid message.'}, status=400)
+    # The page the customer is looking at scopes the answer to that module.
+    request.assistant_page = str(payload.get('page') or '')[:80]
     conversation = _conversation_for_request(request, public_id)
     if conversation is None:
         return JsonResponse({'error': 'Tu sesión de asistencia se actualizó. Reintentaremos tu mensaje.'}, status=404)

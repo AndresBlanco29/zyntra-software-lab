@@ -11,6 +11,24 @@ from config.cotizaciones.models import Cotizacion
 from config.pedidos.client_history import list_cliente_favorite_product_ids, list_cliente_purchase_orders
 
 
+MODULE_KEYWORDS = (
+    ('cart', ('cart', 'mi-orden', 'ver-cotizacion', 'my-order')),
+    ('quotes', ('quote', 'cotizacion', 'cotizaciones')),
+    ('orders', ('order-history', 'orders', 'pedido', 'ordenes', 'historial')),
+    ('invoices', ('invoice', 'factura', 'billing')),
+    ('catalog', ('catalog', 'catalogo', 'product')),
+)
+
+
+def current_module(page):
+    """Map the page the customer is on to the module the answer belongs to."""
+    normalized = str(page or '').lower()
+    for module, keywords in MODULE_KEYWORDS:
+        if any(keyword in normalized for keyword in keywords):
+            return module
+    return 'home'
+
+
 def customer_display_name(user, cliente):
     """The name the assistant uses to address the customer."""
     first_name = str(getattr(user, 'first_name', '') or '').strip()
@@ -27,7 +45,7 @@ def build_customer_context(request):
     context = {
         'authenticated': bool(getattr(user, 'is_authenticated', False)),
         'role': getattr(user, 'role', '') if getattr(user, 'is_authenticated', False) else '',
-        'page': str(request.GET.get('ai_page') or request.path)[:80],
+        'page': str(getattr(request, 'assistant_page', '') or request.GET.get('ai_page') or request.path)[:80],
         'actions': [],
     }
     if cliente is None:

@@ -437,7 +437,7 @@
         .then(function (id) {
           return jsonFetch(root.dataset.messageUrl.replace("__conversation__", id), {
             method: "POST",
-            body: JSON.stringify({ message: value })
+            body: JSON.stringify({ message: value, page: root.dataset.page || window.location.pathname })
           });
         }).catch(function (error) {
           if (error.status === 404 && !retryAfterMissingConversation) {

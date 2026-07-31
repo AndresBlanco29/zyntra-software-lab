@@ -44,6 +44,7 @@ For authenticated customer questions about orders, quotes, invoices, balances, p
 You are an agent, not a text generator: for products, promotions, prices, stock, carts, quotes, orders, invoices or account state you must call a tool first and answer only with what the tool returned.
 If a tool returns nothing, say plainly that you could not find it. Never answer with "creo", "probablemente" or "no estoy seguro".
 Keep the current product of the conversation. When the customer says "ese", "ese producto", "el primero" or gives only a quantity, they mean the product already shown; never switch to a different product.
+Write product and presentation names exactly as the catalog stores them, character for character. Never translate, expand or reformat packaging notation: "SODA COCA COLA 6/3LT" must stay "SODA COCA COLA 6/3LT" and never become "6 cajas de 3 litros".
 """
 
 
@@ -852,6 +853,33 @@ def _selected_product_recap_result(conversation, context):
     }
 
 
+def _exact_catalog_answer(products):
+    """Render found products with the catalog string exactly as it was created.
+
+    The model paraphrased packaging notation ("SODA COCA COLA 6/3LT" became
+    "6 cajas de 3 litros"), so the list is built here instead of being written
+    by the model.
+    """
+    lines = []
+    for product in products[:8]:
+        presentations = ', '.join(item['name'] for item in product.get('presentations', [])[:4])
+        lines.append(f'- {product["name"]}' + (f' ({presentations})' if presentations else ''))
+    return (
+        'Estos son los productos que encontré en el catálogo:\n\n'
+        + '\n'.join(lines)
+        + '\n\nDime cuál necesitas y en qué cantidad.'
+    )
+
+
+def _catalog_products_from_tools(tool_results):
+    for item in tool_results:
+        if item['name'] == 'find_products' and isinstance(item['result'], dict):
+            products = item['result'].get('products')
+            if products:
+                return products
+    return None
+
+
 def _requires_system_data(message):
     normalized = str(message or '').lower()
     return any(term in normalized for term in SYSTEM_DATA_TERMS)
@@ -863,7 +891,13 @@ def _system_data_context(conversation, limit=4):
         role=AssistantMessage.ROLE_TOOL,
     ).order_by('-created_at')[:limit]
     return [
-        {'role': 'assistant', 'content': f'DATOS REALES DEL SISTEMA ({item.tool_name}): {item.content}'}
+        {
+            'role': 'assistant',
+            'content': (
+                f'DATOS REALES DEL SISTEMA ({item.tool_name}). '
+                f'Copia los nombres tal cual, sin reescribirlos: {item.content}'
+            ),
+        }
         for item in reversed(list(tool_messages))
     ]
 
@@ -980,6 +1014,11 @@ def reply_to_message(*, request, conversation, message):
         if _requires_system_data(message) and not tool_results:
             logger.warning('AI assistant blocked ungrounded business answer: intent=%s', intent)
             text = unavailable_result()['message']
+        catalog_products = _catalog_products_from_tools(tool_results)
+        if catalog_products:
+            text = _exact_catalog_answer(catalog_products)
+            from config.ai_assistant.services.conversation_purchase import save_catalog_results
+            save_catalog_results(conversation, catalog_products)
         tour_id = _conversation_tour_for_message(conversation, message, context)
         result = {
             'message': text,

@@ -409,6 +409,37 @@ class AgentContextTests(TestCase):
         self.assertEqual(load_state(conversation)['last_intent'], 'product_search')
 
 
+class CatalogNamingTests(TestCase):
+    def test_catalog_answer_keeps_the_stored_product_name_verbatim(self):
+        from config.ai_assistant.services.orchestrator import _exact_catalog_answer
+
+        answer = _exact_catalog_answer([
+            {'name': 'SODA COCA COLA 6/3LT', 'presentations': [{'id': 1, 'name': 'CS'}]},
+            {'name': 'SODA COCA COLA MEX 24/12OZ', 'presentations': []},
+        ])
+
+        self.assertIn('SODA COCA COLA 6/3LT', answer)
+        self.assertIn('SODA COCA COLA MEX 24/12OZ', answer)
+        self.assertNotIn('cajas de 3 litros', answer)
+        self.assertNotIn('onzas', answer)
+
+    def test_search_results_replace_any_paraphrased_model_text(self):
+        from config.ai_assistant.services.orchestrator import (
+            _catalog_products_from_tools,
+            _exact_catalog_answer,
+        )
+
+        tool_results = [{
+            'name': 'find_products',
+            'result': {'products': [{'name': 'SODA COCA COLA 6/3LT', 'presentations': []}]},
+        }]
+
+        products = _catalog_products_from_tools(tool_results)
+
+        self.assertIsNotNone(products)
+        self.assertIn('SODA COCA COLA 6/3LT', _exact_catalog_answer(products))
+
+
 class ConversationOwnershipTests(TestCase):
     def setUp(self):
         config = AssistantConfiguration.get_solo()

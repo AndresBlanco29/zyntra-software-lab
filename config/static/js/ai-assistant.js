@@ -187,16 +187,19 @@
       if (panel.classList.contains("is-open")) input.focus();
     });
 
-    window.setTimeout(function () { boot({ autoOpen: true }); }, 4000);
+    const requestedTour = new URLSearchParams(window.location.search).get("ai_tour");
+    window.setTimeout(function () {
+      if (!requestedTour && root.dataset.tourActive !== "true") boot({ autoOpen: true });
+    }, 4000);
 
     window.addEventListener("tortilla-assistant-tour-started", function (event) {
-      const tourId = event.detail && event.detail.tourId;
-      if (!["registration", "login", "password-recovery", "approved-login"].includes(tourId)) return;
+      root.dataset.tourActive = "true";
       panel.classList.remove("is-open");
       launcher.setAttribute("aria-expanded", "false");
     });
 
     window.addEventListener("tortilla-assistant-tour-dismissed", function (event) {
+      root.dataset.tourActive = "false";
       const tourId = event.detail && event.detail.tourId;
       const resumeIndex = event.detail && event.detail.resumeIndex;
       if (!tourId) return;

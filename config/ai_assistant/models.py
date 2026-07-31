@@ -175,6 +175,28 @@ class AssistantUserState(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+class AssistantCustomerSuccessProfile(models.Model):
+    """Cross-session customer success memory; source records remain in domain apps."""
+
+    cliente = models.OneToOneField(
+        'clientes.Cliente',
+        on_delete=models.CASCADE,
+        related_name='assistant_success_profile',
+    )
+    first_login_at = models.DateTimeField(blank=True, null=True)
+    last_login_at = models.DateTimeField(blank=True, null=True)
+    last_conversation_at = models.DateTimeField(blank=True, null=True)
+    last_module = models.CharField(max_length=80, blank=True)
+    last_tour = models.CharField(max_length=80, blank=True)
+    onboarding_learned = models.BooleanField(default=False)
+    first_order_at = models.DateTimeField(blank=True, null=True)
+    last_order_id = models.PositiveIntegerField(blank=True, null=True)
+    recently_viewed_products = models.JSONField(default=list, blank=True)
+    help_topics = models.JSONField(default=list, blank=True)
+    event_marks = models.JSONField(default=dict, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
 class AssistantVisitorProfile(models.Model):
     """Anonymous first-party visitor state; never used as an authorization credential."""
 

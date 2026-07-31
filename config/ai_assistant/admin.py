@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     AssistantConfiguration,
     AssistantConversation,
+    AssistantCustomerSuccessProfile,
     AssistantDomainEvent,
     AssistantGuidedTourProgress,
     AssistantKnowledgeChunk,
@@ -54,6 +55,7 @@ class AssistantConversationAdmin(admin.ModelAdmin):
 admin.site.register(AssistantMessage)
 admin.site.register(AssistantKnowledgeChunk)
 admin.site.register(AssistantUserState)
+admin.site.register(AssistantCustomerSuccessProfile)
 admin.site.register(AssistantGuidedTourProgress)
 admin.site.register(AssistantDomainEvent)
 

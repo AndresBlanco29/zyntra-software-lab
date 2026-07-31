@@ -29,6 +29,7 @@ Never reveal an account, application, order, or quote status to an unauthenticat
 Offer a relevant in-app next step before a text-only answer whenever possible.
 Never write Markdown links. Deep links and guided tours are rendered by the application as safe buttons.
 Use the customer's language. Be concise, warm and human.
+For authenticated customer questions about orders, quotes, invoices, balances, promotions, last purchases or favorites, call get_customer_success_summary before answering. Never invent a due date, balance, promotion or order status.
 """
 
 
@@ -351,6 +352,16 @@ def _purchase_intent_result(request, conversation, context, message, model):
         last_module=context.get('page'),
         language=conversation.language,
     )
+    from config.ai_assistant.services.customer_success_profile import touch_success_profile
+    from config.ai_assistant.services.identity import get_customer_for_user
+
+    touch_success_profile(
+        cliente=get_customer_for_user(request.user),
+        module=context.get('page', ''),
+        conversation=True,
+        product={'id': product['product_id'], 'name': product['name']},
+        help_topic='product-search',
+    )
     presentation_names = ', '.join(item['name'] for item in product.get('presentations', [])[:4])
     promotion = ' Tiene una promoción activa.' if product.get('has_active_promotion') else ''
     reply = (
@@ -466,10 +477,68 @@ def _pending_product_quantity_result(request, conversation, context, message, mo
     }
 
 
+def _customer_success_result(request, conversation, context, message, model):
+    if not context.get('authenticated'):
+        return None
+    normalized = str(message or '').lower()
+    terms = (
+        'pedido', 'orden', 'cotiz', 'factura', 'debo', 'venc', 'promoc',
+        'última compra', 'ultima compra', 'favorito', 'más compro', 'mas compro',
+    )
+    if not any(term in normalized for term in terms):
+        return None
+    result = execute_tool(request, 'get_customer_success_summary', '{}')
+    if result.get('error'):
+        return None
+    AssistantMessage.objects.create(
+        conversation=conversation,
+        role=AssistantMessage.ROLE_TOOL,
+        content=redact_content(str(result)),
+        redacted_content=redact_content(str(result)),
+        tool_name='get_customer_success_summary',
+        tool_payload=result,
+        model=model,
+    )
+    facts = []
+    actions = []
+    if result.get('ready_quotes'):
+        facts.append(f'Tienes {len(result["ready_quotes"])} cotización(es) lista(s) para revisar.')
+        actions.append({'label': 'Ver cotización', 'url': reverse('cliente_cotizaciones_recibidas'), 'tour_id': 'quote-ready'})
+    if result.get('cart_line_count'):
+        facts.append(f'Tu pedido actual tiene {result["cart_line_count"]} producto(s).')
+        actions.append({'label': 'Continuar pedido', 'url': reverse('ver_cotizacion')})
+    if result.get('open_invoices'):
+        facts.append(f'Tienes {len(result["open_invoices"])} factura(s) con saldo o estado abierto.')
+        actions.append({'label': 'Hablar con un asesor', 'url': '#', 'kind': 'contact_handoff'})
+    if result.get('last_order'):
+        facts.append(f'Tu último pedido está en estado {result["last_order"]["status"]}.')
+        actions.append({'label': 'Repetir pedido', 'url': reverse('cliente_historial_ordenes'), 'tour_id': 'reorder'})
+    if result.get('active_promotion_count'):
+        facts.append(f'Actualmente hay {result["active_promotion_count"]} promoción(es) activa(s).')
+        actions.append({'label': 'Ver promociones', 'url': f'{reverse("catalogo")}?promociones=1'})
+    if not facts:
+        facts.append('No encontré pendientes relevantes en este momento. Puedes iniciar un pedido nuevo cuando quieras.')
+        actions.append({'label': 'Nuevo pedido', 'url': reverse('catalogo'), 'tour_id': 'first-order'})
+    return {
+        'message': ' '.join(facts),
+        'suggested_actions': actions,
+        'tour_id': None,
+        'tool_results': [{'name': 'get_customer_success_summary', 'result': result}],
+        'confirmation_actions': [],
+    }
+
+
 def reply_to_message(*, request, conversation, message):
     config = AssistantConfiguration.get_solo()
     context = build_customer_context(request)
     message = _safe_text(message)
+    from config.ai_assistant.services.customer_success_profile import touch_success_profile
+    from config.ai_assistant.services.identity import get_customer_for_user
+    touch_success_profile(
+        cliente=get_customer_for_user(request.user),
+        module=context.get('page', ''),
+        conversation=True,
+    )
     stored_message = redact_content(message)
     AssistantMessage.objects.create(
         conversation=conversation,
@@ -499,6 +568,16 @@ def reply_to_message(*, request, conversation, message):
             model='deterministic-commercial-cart',
         )
         return pending_quantity_result
+    success_result = _customer_success_result(request, conversation, context, message, config.chat_model)
+    if success_result:
+        AssistantMessage.objects.create(
+            conversation=conversation,
+            role=AssistantMessage.ROLE_ASSISTANT,
+            content=redact_content(success_result['message']),
+            redacted_content=redact_content(success_result['message']),
+            model='deterministic-customer-success',
+        )
+        return success_result
     purchase_result = _purchase_intent_result(request, conversation, context, message, config.chat_model)
     if purchase_result:
         AssistantMessage.objects.create(

@@ -1,9 +1,12 @@
 from django.urls import reverse
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from config.ai_assistant.models import AssistantDomainEvent, AssistantUserState
 from config.ai_assistant.services.identity import get_customer_for_user, get_visitor_id, get_visitor_profile
+from config.ai_assistant.services.customer_success_profile import touch_success_profile
+from config.ai_assistant.services.customer_success import build_customer_success_summary
+from config.ai_assistant.services.customer_event_engine import resolve_customer_event
 from config.cotizaciones.models import Cotizacion
 from config.pedidos.client_history import list_cliente_favorite_product_ids, list_cliente_purchase_orders
 
@@ -77,6 +80,13 @@ def build_customer_context(request):
         visitor_id=get_visitor_id(request),
         defaults={'user': user, 'cliente': cliente},
     )
+    success_profile = touch_success_profile(cliente=cliente, module=context['page'])
+    context['customer_success'] = {
+        'first_login_at': success_profile.first_login_at.isoformat() if success_profile and success_profile.first_login_at else None,
+        'last_module': success_profile.last_module if success_profile else '',
+        'last_tour': success_profile.last_tour if success_profile else '',
+        'recent_products': success_profile.recently_viewed_products if success_profile else [],
+    }
     context['assistant_memory'] = {
         key: value for key, value in (state.preferences or {}).items()
         if key in {'last_product_id', 'last_product_name', 'last_module', 'last_tour', 'language'}
@@ -89,6 +99,17 @@ def build_customer_context(request):
                 {'label': 'Conocer la plataforma', 'url': f"{reverse('catalogo')}?ai_tour=platform-catalog", 'tour_id': 'platform-catalog'},
                 {'label': 'Hacer mi primer pedido', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
                 {'label': 'Explorar por mi cuenta', 'url': '#', 'kind': 'dismiss_proactive'},
+            ],
+        }
+    elif success_profile:
+        customer_name = (user.first_name or cliente.nombre_empresa or 'cliente').strip()
+        context['proactive'] = {
+            'kind': 'returning_customer',
+            'message': f'Hola {customer_name} 👋\n\nBienvenido nuevamente a La Tortilla Grocery. ¿En qué puedo ayudarte hoy?',
+            'actions': [
+                {'label': 'Ver catálogo', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
+                {'label': 'Ver mi pedido', 'url': reverse('ver_cotizacion')},
+                {'label': 'Hablar con un asesor', 'url': '#', 'kind': 'contact_handoff'},
             ],
         }
     cart = request.session.get('carrito', {}) or {}
@@ -121,6 +142,33 @@ def build_customer_context(request):
         ],
         'favorite_products': list_cliente_favorite_product_ids(cliente=cliente, limit=5),
     })
+    success_summary = build_customer_success_summary(cliente=cliente, cart=cart)
+    context['customer_success_summary'] = success_summary
+    if success_profile and success_summary.get('last_order'):
+        last_order = success_summary['last_order']
+        success_profile.last_order_id = last_order['id']
+        if success_profile.first_order_at is None:
+            success_profile.first_order_at = datetime.fromisoformat(last_order['created_at'])
+            success_profile.save(update_fields=['last_order_id', 'first_order_at', 'updated_at'])
+        else:
+            success_profile.save(update_fields=['last_order_id', 'updated_at'])
+    if state.onboarding_completed:
+        customer_event = resolve_customer_event(
+            cliente=cliente,
+            profile=success_profile,
+            summary=success_summary,
+        )
+        if customer_event:
+            customer_name = (user.first_name or cliente.nombre_empresa or 'cliente').strip()
+            context['customer_event'] = customer_event
+            context['proactive'] = {
+                'kind': 'customer_success',
+                'message': f'Hola {customer_name} 👋\n\n{customer_event["message"]}',
+                'actions': customer_event['actions'] + [
+                    {'label': 'Nuevo pedido', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
+                    {'label': 'Hablar con un asesor', 'url': '#', 'kind': 'contact_handoff'},
+                ],
+            }
     latest_event = (
         AssistantDomainEvent.objects.filter(cliente=cliente, consumed_at__isnull=True)
         .order_by('-created_at')

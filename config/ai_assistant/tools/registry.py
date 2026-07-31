@@ -35,6 +35,12 @@ def openai_tool_schemas():
         },
         {
             'type': 'function',
+            'name': 'get_customer_success_summary',
+            'description': 'Get the authenticated customer own quotes, orders, open invoices, promotions, favorites and cart summary.',
+            'parameters': {'type': 'object', 'properties': {}, 'additionalProperties': False},
+        },
+        {
+            'type': 'function',
             'name': 'get_account_status',
             'description': 'Get the authenticated customer approval status and next recommended action.',
             'parameters': {'type': 'object', 'properties': {}, 'additionalProperties': False},
@@ -196,6 +202,15 @@ def _location_information():
     return build_location_dto()
 
 
+def _customer_success_summary(request):
+    from config.ai_assistant.services.customer_success import build_customer_success_summary
+
+    cliente = get_customer_for_user(request.user)
+    if cliente is None:
+        return {'error': 'Customer login is required.'}
+    return build_customer_success_summary(cliente=cliente, cart=request.session.get('carrito', {}))
+
+
 def _request_account_status_code(email):
     from config.ai_assistant.services.verification import VerificationRateLimited, issue_account_status_challenge
 
@@ -354,6 +369,8 @@ def execute_tool(request, name, raw_arguments):
         return _contact_options()
     if name == 'get_location_information':
         return _location_information()
+    if name == 'get_customer_success_summary':
+        return _customer_success_summary(request)
     if name == 'get_account_status':
         return _account_status(request)
     if name == 'request_account_status_code':

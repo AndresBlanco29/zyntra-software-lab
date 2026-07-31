@@ -210,6 +210,8 @@ def tour_progress(request, tour_key):
     progress.save()
     from config.ai_assistant.services.memory import remember_assistant_context
     remember_assistant_context(request, last_tour=tour_key)
+    from config.ai_assistant.services.customer_success_profile import touch_success_profile
+    touch_success_profile(cliente=get_customer_for_user(request.user), tour=tour_key)
     if (
         tour_key == 'platform-history'
         and progress.completed

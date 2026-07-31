@@ -234,3 +234,32 @@ class CommercialAssistantTests(TestCase):
         result = find_products('coca cola')
 
         self.assertEqual(result['products'][0]['name'], 'Coca-Cola Original')
+
+
+class CustomerSuccessProfileTests(TestCase):
+    def test_profile_remembers_recent_product_without_conversation_content(self):
+        from config.ai_assistant.services.customer_success_profile import touch_success_profile
+        from config.clientes.models import Cliente
+
+        user = Usuario.objects.create_user(username='success-customer', password='safe-password', role='cliente')
+        cliente = Cliente.objects.create(
+            usuario=user,
+            nombre_empresa='Success Test',
+            telefono='5551234567',
+            direccion='123 Test Street',
+            ciudad='Atlanta',
+            estado='GA',
+            sales_tax_number='SUCCESS-1',
+            certificado_tax='certificados/test.pdf',
+        )
+
+        profile = touch_success_profile(
+            cliente=cliente,
+            module='catalog',
+            product={'id': 42, 'name': 'Producto de prueba'},
+            help_topic='product-search',
+        )
+
+        self.assertEqual(profile.last_module, 'catalog')
+        self.assertEqual(profile.recently_viewed_products[0]['id'], 42)
+        self.assertEqual(profile.help_topics[0], 'product-search')

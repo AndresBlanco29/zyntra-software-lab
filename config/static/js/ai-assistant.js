@@ -74,6 +74,22 @@
           );
         });
       }
+      if (action.kind === "contact_handoff") {
+        link.addEventListener("click", function (event) {
+          event.preventDefault();
+          appendMessage(
+            document.querySelector("[data-ai-assistant] [data-ai-messages]"),
+            "Claro. Puedes contactar a nuestro equipo por WhatsApp, llamada, SMS o correo.",
+            false
+          );
+          const contactLink = document.querySelector("[data-ai-whatsapp]");
+          if (contactLink && !contactLink.hidden) {
+            const whatsapp = contactLink.cloneNode(true);
+            whatsapp.hidden = false;
+            container.appendChild(whatsapp);
+          }
+        });
+      }
       container.appendChild(link);
     });
   }

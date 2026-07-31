@@ -1,4 +1,5 @@
 """Read-only, ownership-scoped status adapters for Assistant Function Calling."""
+from django.utils import timezone
 
 
 class StatusGateway:
@@ -9,6 +10,8 @@ class StatusGateway:
             'account': self._account,
             'quote': self._quote,
             'order': self._order,
+            'invoice': self._invoice,
+            'customer_success': self._customer_success,
         }
         adapter = adapters.get(entity_type)
         return adapter(cliente, entity_id) if adapter else {'error': 'Unsupported status type.'}
@@ -40,3 +43,23 @@ class StatusGateway:
         if not order:
             return {'error': 'Order not found.'}
         return {'entity_type': 'order', 'id': order.id, 'status': order.estado, 'created_at': order.creada_en.isoformat()}
+
+    def _invoice(self, cliente, entity_id):
+        from config.facturacion.models import Invoice
+
+        invoice = Invoice.objects.filter(cliente=cliente, pk=entity_id).first() if entity_id else None
+        if not invoice:
+            return {'error': 'Invoice not found.'}
+        return {
+            'entity_type': 'invoice',
+            'id': invoice.id,
+            'number': invoice.numero,
+            'payment_status': invoice.qb_payment_status,
+            'due_date': invoice.qb_due_date.isoformat() if invoice.qb_due_date else None,
+            'balance': str(invoice.saldo_cliente),
+        }
+
+    def _customer_success(self, cliente, _entity_id):
+        from config.ai_assistant.services.customer_success import build_customer_success_summary
+
+        return build_customer_success_summary(cliente=cliente)

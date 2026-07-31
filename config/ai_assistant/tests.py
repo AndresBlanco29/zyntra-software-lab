@@ -409,6 +409,57 @@ class AgentContextTests(TestCase):
         self.assertEqual(load_state(conversation)['last_intent'], 'product_search')
 
 
+class ConversationContinuityTests(TestCase):
+    def setUp(self):
+        config = AssistantConfiguration.get_solo()
+        config.enabled = True
+        config.save(update_fields=['enabled'])
+        self.user = Usuario.objects.create_user(
+            username='thread-customer',
+            password='secret123',
+            role='cliente',
+            first_name='Andres Felipe',
+        )
+        self.client.force_login(self.user)
+
+    def test_reopening_the_chat_on_another_page_returns_the_same_thread(self):
+        from config.ai_assistant.models import AssistantConversation
+
+        first = self.client.post(
+            reverse('ai_assistant_create_conversation'),
+            data=json.dumps({'page': 'catalog'}),
+            content_type='application/json',
+        ).json()
+        conversation = AssistantConversation.objects.get(public_id=first['conversation_id'])
+        AssistantMessage.objects.create(
+            conversation=conversation,
+            role=AssistantMessage.ROLE_USER,
+            content='necesito coca cola',
+        )
+        AssistantMessage.objects.create(
+            conversation=conversation,
+            role=AssistantMessage.ROLE_ASSISTANT,
+            content='Encontré SODA COCA COLA 6/3LT.',
+        )
+
+        resumed = self.client.post(
+            reverse('ai_assistant_create_conversation'),
+            data=json.dumps({'page': 'cart'}),
+            content_type='application/json',
+        ).json()
+
+        self.assertEqual(resumed['conversation_id'], first['conversation_id'])
+        self.assertEqual(
+            [item['content'] for item in resumed['messages']],
+            ['necesito coca cola', 'Encontré SODA COCA COLA 6/3LT.'],
+        )
+
+    def test_customer_display_name_uses_the_first_given_name(self):
+        from config.ai_assistant.services.context import customer_display_name
+
+        self.assertEqual(customer_display_name(self.user, None), 'Andres')
+
+
 class ToolPayloadSerializationTests(TestCase):
     def test_domain_values_in_a_tool_payload_can_be_stored(self):
         """A UUID, Decimal or date in a tool result used to abort the whole turn."""

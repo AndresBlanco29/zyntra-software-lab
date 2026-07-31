@@ -278,6 +278,8 @@
       }
     }
 
+    let resumedHistory = null;
+
     function ensureConversation() {
       if (conversationId) return Promise.resolve(conversationId);
       return jsonFetch(root.dataset.conversationUrl, {
@@ -285,8 +287,17 @@
         body: JSON.stringify({ page: root.dataset.page || window.location.pathname, language: document.documentElement.lang || "es" })
       }).then(function (payload) {
         conversationId = payload.conversation_id;
+        resumedHistory = Array.isArray(payload.messages) ? payload.messages : [];
         return conversationId;
       });
+    }
+
+    function renderResumedThread() {
+      if (!resumedHistory || !resumedHistory.length) return false;
+      resumedHistory.forEach(function (item) {
+        appendMessage(messages, item.content, item.role === "user");
+      });
+      return true;
     }
 
     function boot(options) {
@@ -301,27 +312,44 @@
             return;
           }
           root.querySelector("[data-ai-name]").textContent = context.assistant_name;
-          if (context.proactive) {
-            appendMessage(messages, context.proactive.message, false);
-            renderActions(actions, context.proactive.actions);
-            if (options.autoOpen) {
-              setPanelOpen(true);
-            }
-          } else {
-            appendMessage(messages, context.welcome_message, false);
-            const initialActions = Array.isArray(context.actions) && context.actions.length
-              ? context.actions
-              : [context.next_recommended_action].filter(Boolean);
-            renderActions(actions, initialActions);
+          if (context.authenticated) {
+            // Keep one thread for the whole signed-in session, across pages.
+            return ensureConversation()
+              .then(function () {
+                if (renderResumedThread()) {
+                  renderPendingEvent(root, context, messages, actions);
+                  return;
+                }
+                renderInitialMessage(context, options);
+              })
+              .catch(function () { renderInitialMessage(context, options); });
           }
-          renderPendingEvent(root, context, messages, actions);
-          const continuation = consumeContinuation();
-          if (continuation && !requestedTour) {
-            appendMessage(messages, continuation.message, false);
-            setPanelOpen(true);
-          }
+          renderInitialMessage(context, options);
         })
         .catch(function () {});
+    }
+
+    function renderInitialMessage(context, options) {
+      options = options || {};
+      if (context.proactive) {
+        appendMessage(messages, context.proactive.message, false);
+        renderActions(actions, context.proactive.actions);
+        if (options.autoOpen) {
+          setPanelOpen(true);
+        }
+      } else {
+        appendMessage(messages, context.welcome_message, false);
+        const initialActions = Array.isArray(context.actions) && context.actions.length
+          ? context.actions
+          : [context.next_recommended_action].filter(Boolean);
+        renderActions(actions, initialActions);
+      }
+      renderPendingEvent(root, context, messages, actions);
+      const continuation = consumeContinuation();
+      if (continuation && !requestedTour) {
+        appendMessage(messages, continuation.message, false);
+        setPanelOpen(true);
+      }
     }
 
     launcher.addEventListener("click", function () {

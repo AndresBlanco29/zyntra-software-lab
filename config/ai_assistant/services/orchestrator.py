@@ -201,8 +201,13 @@ def get_or_create_conversation(*, visitor_id, user, cliente, page, language):
 
 def _instructions(config, context, knowledge, conversation_summary=''):
     sources = '\n'.join(f'- {item["title"]}: {item["content"]}' for item in knowledge)
+    customer_name = context.get('customer_name') or ''
     return '\n'.join([
         BASE_SAFETY_PROMPT,
+        (
+            f'The customer is {customer_name}. Address them by name naturally, without repeating it in every sentence.'
+            if customer_name else ''
+        ),
         f'Assistant name: {config.assistant_name}.',
         f'Personality: {config.personality}',
         f'Commercial objective: {config.sales_goal}',

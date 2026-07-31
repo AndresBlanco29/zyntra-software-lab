@@ -172,9 +172,23 @@ def create_conversation(request):
         visitor_id=visitor_id,
         defaults={'user': user if getattr(user, 'is_authenticated', False) else None, 'cliente': cliente},
     )
+    # Return the thread so navigating to another page resumes the conversation
+    # instead of restarting it.
+    history = list(
+        conversation.messages.filter(
+            role__in=[AssistantMessage.ROLE_USER, AssistantMessage.ROLE_ASSISTANT],
+        ).order_by('-created_at')[:20]
+    )
+    payload = {
+        'conversation_id': str(conversation.public_id),
+        'messages': [
+            {'role': item.role, 'content': item.content}
+            for item in reversed(history)
+        ],
+    }
     # Persist the visitor id here too: if it only lived in the session, losing the
     # session would orphan every conversation this visitor owns.
-    return set_visitor_cookie(JsonResponse({'conversation_id': str(conversation.public_id)}), request)
+    return set_visitor_cookie(JsonResponse(payload), request)
 
 
 @require_POST

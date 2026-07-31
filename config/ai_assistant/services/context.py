@@ -11,6 +11,14 @@ from config.cotizaciones.models import Cotizacion
 from config.pedidos.client_history import list_cliente_favorite_product_ids, list_cliente_purchase_orders
 
 
+def customer_display_name(user, cliente):
+    """The name the assistant uses to address the customer."""
+    first_name = str(getattr(user, 'first_name', '') or '').strip()
+    if first_name:
+        return first_name.split()[0]
+    return str(getattr(cliente, 'nombre_empresa', '') or '').strip() if cliente else ''
+
+
 def build_customer_context(request):
     """Small, scoped context. Volatile commerce values are queried by tools."""
     user = request.user
@@ -61,6 +69,7 @@ def build_customer_context(request):
             }
         return context
 
+    context['customer_name'] = customer_display_name(user, cliente)
     context.update({
         'customer': {
             'first_name': (user.first_name or '').strip(),
@@ -94,7 +103,10 @@ def build_customer_context(request):
     if not state.onboarding_completed:
         context['proactive'] = {
             'kind': 'first_authenticated_login',
-            'message': '¡Bienvenido! Ya puedes usar tu cuenta. ¿Quieres que te muestre la plataforma o te ayudo con tu primer pedido?',
+            'message': (
+                f'¡Bienvenido{", " + context["customer_name"] if context["customer_name"] else ""}! '
+                'Ya puedes usar tu cuenta. ¿Quieres que te muestre la plataforma o te ayudo con tu primer pedido?'
+            ),
             'actions': [
                 {'label': 'Conocer la plataforma', 'url': f"{reverse('catalogo')}?ai_tour=platform-catalog", 'tour_id': 'platform-catalog'},
                 {'label': 'Hacer mi primer pedido', 'url': reverse('catalogo'), 'tour_id': 'first-order'},

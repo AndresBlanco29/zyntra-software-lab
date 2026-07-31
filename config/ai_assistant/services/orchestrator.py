@@ -703,13 +703,20 @@ def _promotion_intent_result(request, conversation, context, message, model):
 
     cliente = get_customer_for_user(request.user)
     promotions = promociones_activas_queryset(cliente=cliente) if cliente else promociones_activas_queryset()
-    active_count = promotions.count()
+    active_promotions = list(promotions[:6])
+    active_count = len(active_promotions)
     catalog_url = f'{reverse("catalogo")}?promociones=1'
     if active_count:
+        promotion_lines = []
+        for promotion in active_promotions:
+            product_name = promotion.producto.nombre if promotion.producto_id else ''
+            detail = promotion.descripcion.strip() or product_name or promotion.nombre
+            promotion_lines.append(f'• {promotion.nombre}: {detail}')
         return {
             'message': (
-                '¡Claro! Hoy tenemos promociones activas. '
-                'Puedes verlas en el catálogo y agregar los productos que te interesen a tu pedido.'
+                '¡Claro! Hoy tenemos estas promociones activas:\n\n'
+                + '\n'.join(promotion_lines)
+                + '\n\nMíralas en el catálogo y agrega las que te interesen a tu pedido.'
             ),
             'suggested_actions': [
                 {'label': 'Ver promociones', 'url': catalog_url, 'kind': 'catalog'},

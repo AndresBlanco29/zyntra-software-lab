@@ -46,13 +46,13 @@ La Tortilla Grocery
 {% trans "My Order" %}
 <span class="badge text-bg-light ms-1" id="contadorCarritoDesktop">{{ carrito|length }}</span>
 </a>
-<a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-light btn-sm">
+<a href="{% url 'cliente_cotizaciones_recibidas' %}" data-ai-platform-next="platform-received" class="btn btn-outline-light btn-sm">
 {% trans "Orders Received" %}
 {% if pendientes_cotizaciones %}
 <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
 {% endif %}
 </a>
-<a href="{% url 'cliente_historial_ordenes' %}" class="btn btn-outline-light btn-sm d-none d-xl-inline-flex">
+<a href="{% url 'cliente_historial_ordenes' %}" data-ai-platform-next="platform-history" class="btn btn-outline-light btn-sm d-none d-xl-inline-flex">
 {% trans "Order History" %}
 </a>
 <button class="btn btn-danger btn-sm cot-navbar-logout" data-bs-toggle="modal" data-bs-target="#logoutModal">
@@ -120,10 +120,10 @@ autocomplete="off">
             <div class="col-12 col-lg-9 order-1 order-lg-1">
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
   <div>
-    <h3 class="fw-bold mb-1">{% trans "My Order" %}</h3>
+    <h3 class="fw-bold mb-1" data-ai-tour="platform-order-title">{% trans "My Order" %}</h3>
     <p class="text-muted mb-0">{% trans "Review the products before submitting your request" %}</p>
   </div>
-  <span class="badge text-bg-primary px-3 py-2">{% trans "Total products" %}: {{ carrito|length }}</span>
+  <span class="badge text-bg-primary px-3 py-2" data-ai-tour="platform-order-lines">{% trans "Total products" %}: {{ carrito|length }}</span>
 </div>
 
 {% if carrito %}
@@ -134,7 +134,7 @@ autocomplete="off">
 
 <div class="table-responsive">
 
-<table class="table align-middle" id="tablaProductos">
+<table class="table align-middle" id="tablaProductos" data-ai-tour="platform-order-lines">
 
 <thead>
 <tr>
@@ -327,7 +327,7 @@ aria-label="{% trans 'Quantity' %}"
 
 <label class="form-label">{% trans "Optional note" %}</label>
 
-<textarea name="nota" rows="4" class="form-control"></textarea>
+<textarea name="nota" rows="4" data-ai-tour="platform-order-note" class="form-control"></textarea>
 
 </div>
 

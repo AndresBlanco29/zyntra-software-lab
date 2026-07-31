@@ -82,6 +82,7 @@ def build_customer_context(request):
             'kind': 'first_authenticated_login',
             'message': '¡Bienvenido! Ya puedes usar tu cuenta. ¿Quieres que te muestre la plataforma o te ayudo con tu primer pedido?',
             'actions': [
+                {'label': 'Conocer la plataforma', 'url': f"{reverse('catalogo')}?ai_tour=platform-catalog", 'tour_id': 'platform-catalog'},
                 {'label': 'Hacer mi primer pedido', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
                 {'label': 'Explorar por mi cuenta', 'url': '#', 'kind': 'dismiss_proactive'},
             ],

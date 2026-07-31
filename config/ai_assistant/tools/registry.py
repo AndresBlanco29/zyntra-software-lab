@@ -192,7 +192,10 @@ def _search_catalog(request, query):
     )
     cliente = get_customer_for_user(request.user)
     promotions = promociones_activas_queryset(cliente=cliente) if cliente else promociones_activas_queryset()
-    promotion_product_ids = set(promotions.values_list('productos__id', flat=True))
+    promotion_product_ids = set(promotions.exclude(producto__isnull=True).values_list('producto_id', flat=True))
+    promotion_product_ids.update(
+        promotions.exclude(presentacion__isnull=True).values_list('presentacion__producto_id', flat=True)
+    )
     return {
         'products': [
             {

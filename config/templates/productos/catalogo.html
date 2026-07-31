@@ -73,19 +73,19 @@ data-combo-free-preview-label="{% trans 'Included when you reach this tier' %}">
             <div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">
               {% if can_quote %}
               {% if can_view_received_quotes %}
-              <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-light">
+              <a href="{% url 'cliente_cotizaciones_recibidas' %}" data-ai-platform-next="platform-received" class="btn btn-outline-light">
                 {% trans "Orders Received" %}
                 {% if pendientes_cotizaciones %}
                 <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
                 {% endif %}
               </a>
-              <a href="{% url 'cliente_historial_ordenes' %}" class="btn btn-outline-light d-none d-xl-inline-flex">
+              <a href="{% url 'cliente_historial_ordenes' %}" data-ai-platform-next="platform-history" class="btn btn-outline-light d-none d-xl-inline-flex">
                 {% trans "Order History" %}
               </a>
               {% endif %}
                 <a href="{% url 'ver_cotizacion' %}"
                    class="btn btn-outline-light js-my-order-cta{% if carrito_total_items %} my-order-cta--attention{% endif %}"
-                   id="myOrderNavBtn" data-ai-tour="cart">
+                   id="myOrderNavBtn" data-ai-tour="cart" data-ai-platform-next="platform-order">
                     {% trans "My Order" %} (<span id="contadorCarrito">{{ carrito_total_items|default:0 }}</span>)
                 </a>
                 <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#logoutModal" style="font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">

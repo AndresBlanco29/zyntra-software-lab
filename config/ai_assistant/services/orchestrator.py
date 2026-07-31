@@ -93,6 +93,8 @@ def _authorized_tour_for_message(message, context):
         return 'quote-ready'
     if any(term in normalized for term in ('reorden', 'reorder', 'historial', 'history')):
         return 'reorder'
+    if any(term in normalized for term in ('conocer la plataforma', 'conocer plataforma', 'recorrido de plataforma', 'mostrar plataforma')):
+        return 'platform-catalog'
     if any(term in normalized for term in ('pedido', 'orden', 'order', 'comprar', 'catalog', 'producto', 'promoc')):
         return 'first-order'
     return None
@@ -118,6 +120,12 @@ def _conversation_tour_for_message(conversation, message, context):
 
 
 def _guided_actions(context, tour_id):
+    if tour_id == 'platform-catalog':
+        return [{
+            'label': 'Conocer la plataforma',
+            'url': f"{reverse('catalogo')}?ai_tour=platform-catalog",
+            'tour_id': 'platform-catalog',
+        }]
     if tour_id == 'registration':
         return [{
             'label': 'Iniciar registro guiado',

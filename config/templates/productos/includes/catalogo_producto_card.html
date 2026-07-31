@@ -124,7 +124,7 @@
               {% trans "Presentación" %}:
           </label>
 
-          <select class="form-select form-select-sm presentacion-select">
+          <select class="form-select form-select-sm presentacion-select" data-ai-tour="packaging">
               {% for p in producto.presentaciones_prefetch %}
                   <option
                       value="{{ p.id }}"
@@ -147,7 +147,7 @@
               {% trans "Cantidad" %}:
           </label>
 
-          <div class="d-flex justify-content-center align-items-center gap-2 mt-1">
+          <div class="d-flex justify-content-center align-items-center gap-2 mt-1" data-ai-tour="quantity">
               <button type="button" class="qty-btn restar">-</button>
               <input type="number" min="1" step="1" class="cantidad-input cantidad" value="1" inputmode="numeric" aria-label="{% trans 'Cantidad' %}">
               <button type="button" class="qty-btn sumar">+</button>

@@ -57,6 +57,32 @@
       { element: "[data-ai-tour='cart']", title: "Mi orden", description: "Revisa comentarios y envía tu solicitud." },
       { element: "[data-ai-tour='submit-order']", title: "Enviar solicitud", description: "Cuando revises cantidades, envía tu solicitud para que nuestro equipo prepare la cotización." }
     ],
+    "platform-catalog": [
+      { element: "#buscador", title: "Buscador de productos", description: "Escribe el nombre del producto que necesitas. El catálogo se filtra mientras escribes." },
+      { element: "#filtroCategoria", title: "Categoría", description: "Limita el catálogo a una categoría de productos." },
+      { element: "#filtroMarca", title: "Marca", description: "Usa este filtro junto con la categoría para encontrar una marca específica." },
+      { element: "[data-ai-tour='promotions']", title: "Promociones", description: "Aquí encontrarás descuentos vigentes. Revisa las condiciones y cantidades requeridas antes de agregar productos." },
+      { element: "[data-ai-tour='packaging']", title: "Packaging", description: "Selecciona la presentación o empaque que deseas comprar. Cambia unidades y precio según el producto." },
+      { element: "[data-ai-tour='quantity']", title: "Quantity", description: "Ajusta la cantidad de paquetes o unidades antes de agregar el producto." },
+      { element: "[data-ai-tour='add-order']", title: "Add to Order", description: "Agrega la presentación y cantidad elegidas a tu orden." },
+      { element: "[data-ai-platform-next='platform-order']", title: "My Order", description: "Haz clic aquí para revisar tu orden y continuar con la explicación.", advanceOnClick: true }
+    ],
+    "platform-order": [
+      { element: "[data-ai-tour='platform-order-title']", title: "My Order", description: "Aquí revisas todos los productos que agregaste antes de enviar una solicitud." },
+      { element: "[data-ai-tour='platform-order-lines']", title: "Productos y cantidades", description: "Puedes cambiar cantidades o eliminar productos antes de enviar la orden." },
+      { element: "[data-ai-tour='platform-order-note']", title: "Comentarios", description: "Añade instrucciones especiales para el equipo comercial si son necesarias." },
+      { element: "[data-ai-tour='submit-order']", title: "Enviar solicitud", description: "Envía la orden para que el equipo prepare tu cotización." },
+      { element: "[data-ai-platform-next='platform-received']", title: "Orders Received", description: "Haz clic para conocer dónde revisar las cotizaciones recibidas.", advanceOnClick: true }
+    ],
+    "platform-received": [
+      { element: "[data-ai-tour='platform-received-title']", title: "Orders Received", description: "Aquí aparecen las cotizaciones que el equipo preparó para tus solicitudes." },
+      { element: "[data-ai-tour='quotes']", title: "Abrir cotización", description: "Abre una cotización para revisar productos, precios y condiciones." },
+      { element: "[data-ai-platform-next='platform-history']", title: "Order History", description: "Haz clic para conocer tus pedidos anteriores.", advanceOnClick: true }
+    ],
+    "platform-history": [
+      { element: "[data-ai-tour='platform-history-title']", title: "Order History", description: "Aquí puedes consultar tus pedidos anteriores y su estado." },
+      { element: "[data-ai-tour='reorder']", title: "Reordenar", description: "Carga un pedido anterior en My Order para revisarlo y volver a solicitarlo." }
+    ],
     "quote-ready": [
       { element: "[data-ai-tour='quote-open']", title: "Tu cotización está lista", description: "Haz clic para abrirla y revisar productos, cantidades y precios.", advanceOnClick: true },
     ],
@@ -248,6 +274,12 @@
 
   window.TortillaAssistantTours = { start: start };
   document.addEventListener("click", function (event) {
+    const platformLink = event.target.closest("[data-ai-platform-next]");
+    if (platformLink && platformLink.href) {
+      const platformUrl = new URL(platformLink.href, window.location.origin);
+      platformUrl.searchParams.set('ai_tour', platformLink.dataset.aiPlatformNext);
+      platformLink.href = platformUrl.toString();
+    }
     const quoteLink = event.target.closest("[data-ai-tour='quote-open']");
     if (quoteLink && quoteLink.href) {
       const quoteUrl = new URL(quoteLink.href, window.location.origin);

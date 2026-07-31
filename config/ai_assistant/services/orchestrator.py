@@ -851,6 +851,10 @@ def _dispatch_intent(*, intent, request, conversation, context, message, model):
         'customer_success': [
             lambda: _customer_success_result(request, conversation, context, message, model),
         ],
+        'guest_account_status': [
+            lambda: _forced_status_verification(request, conversation, context, message, model),
+            lambda: _guest_account_status_result(context),
+        ],
         'product_search': [
             lambda: _purchase_intent_result(request, conversation, context, message, model),
         ],
@@ -860,6 +864,26 @@ def _dispatch_intent(*, intent, request, conversation, context, message, model):
         if result:
             return result
     return None
+
+
+def _guest_account_status_result(context):
+    """Invite an unauthenticated visitor to sign in before any status is revealed."""
+    if context.get('authenticated'):
+        return None
+    return {
+        'message': (
+            'Para consultar el estado de tus cotizaciones, pedidos o facturas necesito confirmar tu identidad. '
+            'Inicia sesión y te muestro tu información al instante. Si aún no tienes tu contraseña, puedo ayudarte a recuperarla.'
+        ),
+        'suggested_actions': [
+            {'label': 'Iniciar sesión', 'url': '#', 'tour_id': 'login'},
+            {'label': 'Recuperar contraseña', 'url': '#', 'tour_id': 'password-recovery'},
+            {'label': 'Aún no tengo cuenta', 'url': reverse('home'), 'tour_id': 'registration'},
+        ],
+        'tour_id': 'login',
+        'tool_results': [],
+        'confirmation_actions': [],
+    }
 
 
 def _selected_product_recap_result(conversation, context):

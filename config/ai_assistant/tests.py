@@ -409,6 +409,45 @@ class AgentContextTests(TestCase):
         self.assertEqual(load_state(conversation)['last_intent'], 'product_search')
 
 
+class GuestAccountStatusTests(TestCase):
+    def test_visitor_asking_for_their_quote_is_routed_to_sign_in(self):
+        from config.ai_assistant.models import AssistantConversation
+        from config.ai_assistant.services.intent_router import resolve_intent
+
+        conversation = AssistantConversation.objects.create(visitor_id=uuid.uuid4(), language='es')
+
+        intent = resolve_intent(
+            conversation=conversation,
+            message='puedo saber el estado de mi pedido',
+            context={'authenticated': False},
+        )
+
+        self.assertEqual(intent, 'guest_account_status')
+
+    def test_sign_in_invitation_never_reveals_status_and_offers_a_login_tour(self):
+        from config.ai_assistant.services.orchestrator import _guest_account_status_result
+
+        result = _guest_account_status_result({'authenticated': False})
+
+        self.assertEqual(result['tour_id'], 'login')
+        self.assertIn('Iniciar sesión', [action['label'] for action in result['suggested_actions']])
+        self.assertNotIn('no pude obtener', result['message'].lower())
+
+    def test_signed_in_customer_still_reaches_the_account_summary(self):
+        from config.ai_assistant.models import AssistantConversation
+        from config.ai_assistant.services.intent_router import resolve_intent
+
+        conversation = AssistantConversation.objects.create(visitor_id=uuid.uuid4(), language='es')
+
+        intent = resolve_intent(
+            conversation=conversation,
+            message='mi cotizacion ya esta lista?',
+            context={'authenticated': True},
+        )
+
+        self.assertEqual(intent, 'customer_success')
+
+
 class ConversationContinuityTests(TestCase):
     def setUp(self):
         config = AssistantConfiguration.get_solo()

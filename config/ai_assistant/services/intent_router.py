@@ -22,6 +22,7 @@ ACCOUNT_TERMS = (
     'factura', 'facturas', 'saldo', 'debo', 'vence', 'vencimiento', 'invoice',
     'mi pedido', 'mis pedidos', 'mi orden', 'mis ordenes', 'mi cotizacion', 'mis cotizaciones',
     'estado de mi', 'ultima compra', 'favorito', 'favoritos',
+    'my order', 'my orders', 'my quote', 'my quotes', 'my invoice', 'mi quote', 'mis quotes',
 )
 PURCHASE_TERMS = (
     'necesito', 'busco', 'buscar', 'quiero', 'comprar', 'tienen', 'tienes', 'hay',
@@ -85,8 +86,13 @@ def resolve_intent(*, conversation, message, context):
     if normalized.strip() in CHECKOUT_TERMS:
         return 'checkout'
 
-    if context.get('authenticated') and _contains(normalized, ACCOUNT_TERMS) and not _has(normalized, PURCHASE_TERMS):
-        return 'customer_success'
+    if _contains(normalized, ACCOUNT_TERMS):
+        # A visitor asking about their own orders, quotes or invoices must be
+        # invited to sign in; their status can never be answered anonymously.
+        if not context.get('authenticated'):
+            return 'guest_account_status'
+        if not _has(normalized, PURCHASE_TERMS):
+            return 'customer_success'
 
     if _has(normalized, PURCHASE_TERMS) or _contains(normalized, ('producto', 'productos')):
         return 'product_search'

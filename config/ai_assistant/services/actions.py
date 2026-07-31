@@ -99,6 +99,8 @@ def _add_cart_item(request, payload, cliente):
     return {
         'message': 'Product added to your order. Review it before sending your request.',
         'cart_items': sum(int(item.get('cantidad') or 0) for item in carrito.values()),
+        'presentation_id': presentacion.id,
+        'quantity_added': quantity,
     }
 
 

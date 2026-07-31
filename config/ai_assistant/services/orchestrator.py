@@ -476,6 +476,8 @@ def _pending_product_quantity_result(request, conversation, context, message, mo
         confirmations.append({
             'id': proposal['action_id'],
             'label': f'Agregar {quantity} × {selected.producto.nombre} ({selected.nombre_empaque_cliente})',
+            'presentation_id': selected.id,
+            'quantity': quantity,
         })
     if state:
         preferences = dict(state.preferences or {})
@@ -538,6 +540,8 @@ def _conversation_product_reference_result(request, conversation, context, messa
     confirmations = [{
         'id': proposal['action_id'],
         'label': f'Agregar {reference["quantity"]} × {product["name"]} ({reference["presentation"]["name"]})',
+        'presentation_id': reference['presentation']['id'],
+        'quantity': reference['quantity'],
     }] if proposal.get('requires_confirmation') and proposal.get('action_id') else []
     return {
         'message': (
@@ -669,6 +673,8 @@ def _multi_item_purchase_result(request, conversation, context, message, model):
             confirmations.append({
                 'id': proposal['action_id'],
                 'label': f'Agregar {quantity} × {product["name"]} ({presentation["name"]})',
+                'presentation_id': presentation['id'],
+                'quantity': quantity,
             })
             prepared.append(f'{quantity} × {product["name"]}')
     if not confirmations:

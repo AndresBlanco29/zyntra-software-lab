@@ -105,6 +105,10 @@
         jsonFetch(root.dataset.confirmActionUrl.replace("__action__", confirmation.id), { method: "POST", body: "{}" })
           .then(function (result) {
             appendMessage(messages, result.message, false);
+            highlightAddedCatalogProduct(
+              result.presentation_id || confirmation.presentation_id,
+              result.quantity_added || confirmation.quantity
+            );
             button.remove();
           })
           .catch(function (error) {
@@ -114,6 +118,28 @@
       });
       container.appendChild(button);
     });
+  }
+
+  function highlightAddedCatalogProduct(presentationId, quantity) {
+    if (!presentationId) return;
+    const option = document.querySelector(".presentacion-select option[value='" + CSS.escape(String(presentationId)) + "']");
+    if (!option) return;
+    const card = option.closest(".producto-card");
+    if (!card) return;
+    const presentationSelect = card.querySelector(".presentacion-select");
+    const quantityInput = card.querySelector(".cantidad-input");
+    if (presentationSelect) {
+      presentationSelect.value = String(presentationId);
+      presentationSelect.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    if (quantityInput && quantity) quantityInput.value = quantity;
+    card.classList.remove("ai-assistant-product-added");
+    void card.offsetWidth;
+    card.classList.add("ai-assistant-product-added");
+    window.setTimeout(function () {
+      card.classList.remove("ai-assistant-product-added");
+    }, 2400);
+    card.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
   }
 
   function renderPendingEvent(root, context, messages, actions) {
@@ -330,6 +356,14 @@
         .catch(function (error) {
           appendMessage(messages, error.message || "No pude responder ahora. Inténtalo de nuevo.", false);
         });
+    });
+
+    input.addEventListener("keydown", function (event) {
+      if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+        event.preventDefault();
+        if (typeof form.requestSubmit === "function") form.requestSubmit();
+        else form.dispatchEvent(new Event("submit", { cancelable: true }));
+      }
     });
 
     deleteHistory.addEventListener("click", function () {

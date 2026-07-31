@@ -70,6 +70,19 @@
 .ai-assistant-form { display: flex; gap: .5rem; padding: .75rem; border-top: 1px solid #e5e7eb; }
 .ai-assistant-form textarea { min-height: 42px; resize: none; }
 
+@keyframes ai-assistant-product-confirmed {
+    0% { box-shadow: 0 0 0 0 rgba(255, 212, 0, .9); transform: scale(1); }
+    35% { box-shadow: 0 0 0 12px rgba(255, 212, 0, .18); transform: scale(1.025); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 212, 0, 0); transform: scale(1); }
+}
+
+.producto-card.ai-assistant-product-added {
+    outline: 3px solid #ffd400;
+    outline-offset: 3px;
+    background: #fffbe8;
+    animation: ai-assistant-product-confirmed 1.2s ease-in-out 2;
+}
+
 @media (max-width: 768px) {
     .ai-assistant-launcher { right: .75rem; bottom: .75rem; width: 60px; height: 60px; }
     .ai-assistant-panel {

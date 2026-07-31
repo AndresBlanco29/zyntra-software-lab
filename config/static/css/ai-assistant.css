@@ -21,8 +21,8 @@
     height: 100%;
     display: block;
     object-fit: contain;
-    object-position: center 35%;
-    transform: scale(1.1);
+    object-position: center;
+    transform: scale(1.05);
 }
 
 .ai-assistant-launcher-label {

@@ -653,7 +653,7 @@ en un mercado competitivo.
 
 </div>
 
-<button type="button" class="btn btn-yellow btn-sm mt-2 agregar-oferta-btn" data-ai-tour="login" data-bs-toggle="modal" data-bs-target="#loginModal">{% trans "Sign in to request a quote" %}</button>
+<button type="button" class="btn btn-yellow btn-sm mt-2 agregar-oferta-btn" data-ai-tour="login" data-login-next="{% url 'catalogo' %}?promociones=1&amp;featured_offer=1&amp;q={{ producto.product_name|urlencode }}" data-bs-toggle="modal" data-bs-target="#loginModal">{% trans "Sign in to request a quote" %}</button>
 
 </div>
 
@@ -731,7 +731,7 @@ en un mercado competitivo.
 </div>
 </div>
 
-<button type="button" class="btn btn-yellow btn-sm mt-2 agregar-oferta-btn" data-ai-tour="login" data-bs-toggle="modal" data-bs-target="#loginModal">{% trans "Sign in to request a quote" %}</button>
+<button type="button" class="btn btn-yellow btn-sm mt-2 agregar-oferta-btn" data-ai-tour="login" data-login-next="{% url 'catalogo' %}?promociones=1&amp;featured_offer=1&amp;q={{ producto.product_name|urlencode }}" data-bs-toggle="modal" data-bs-target="#loginModal">{% trans "Sign in to request a quote" %}</button>
 
 </div>
 
@@ -1202,12 +1202,28 @@ data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 
 <script>
 function getLoginFetchUrl() {
+  const loginModal = document.getElementById('loginModal');
+  const promotionNextUrl = loginModal && loginModal.dataset.nextUrl;
+  if (promotionNextUrl) {
+    return `{% url "login" %}?next=${encodeURIComponent(promotionNextUrl)}`;
+  }
   const params = new URLSearchParams(window.location.search);
   const nextUrl = params.get('next');
   return nextUrl
     ? `{% url "login" %}?next=${encodeURIComponent(nextUrl)}`
     : '{% url "login" %}';
 }
+
+document.addEventListener('click', function(event) {
+  const quoteButton = event.target.closest('[data-login-next]');
+  if (!quoteButton) {
+    return;
+  }
+  const loginModal = document.getElementById('loginModal');
+  if (loginModal) {
+    loginModal.dataset.nextUrl = quoteButton.dataset.loginNext;
+  }
+}, true);
 
 function loadAuthModalContent(fetchUrl, onLoaded, errorMessage) {
   const container = document.getElementById('loginFormContainer');
@@ -1962,6 +1978,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         document.body.classList.remove('modal-open');
         document.body.style.removeProperty('padding-right');
+        delete loginModal.dataset.nextUrl;
       }, 0);
     });
   }

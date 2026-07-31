@@ -278,6 +278,8 @@ def _redirect_for_user(user):
 
 def _resolve_login_redirect(user, next_url=None):
     next_url = (next_url or '').strip()
+    if 'featured_offer=1' in next_url and getattr(user, 'role', '') != 'cliente':
+        return _redirect_for_user(user)
     if next_url.startswith('/') and not next_url.startswith('//'):
         return next_url
     return _redirect_for_user(user)

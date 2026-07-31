@@ -2178,6 +2178,7 @@ margin-bottom:10px;
 
 #ofertas .producto-oferta {
     min-height: 365px;
+    height: 100%;
     display: flex;
     flex-direction: column;
     border: 2px solid #e85d45;
@@ -2202,6 +2203,14 @@ margin-bottom:10px;
 
 #ofertas .producto-oferta .agregar-oferta-btn {
     margin-top: auto !important;
+}
+
+#carouselOfertas .carousel-item .row {
+    align-items: stretch;
+}
+
+#carouselOfertas .carousel-item [class*="col-"] {
+    display: flex;
 }
 
 .producto-oferta .btn-yellow{

@@ -179,53 +179,6 @@ data-combo-free-preview-label="{% trans 'Included when you reach this tier' %}">
 
                 </div>
 
-                {% if promociones_disponibles %}
-                <section class="promo-welcome-banner mb-4" data-ai-tour="promotions" aria-labelledby="promoWelcomeTitle">
-                    <div class="promo-welcome-banner__icon" aria-hidden="true">🎉</div>
-                    <div class="promo-welcome-banner__content">
-                        <h2 id="promoWelcomeTitle" class="promo-welcome-banner__title">
-                            {% trans "There are products on promotion!" %}
-                        </h2>
-                        <p class="promo-welcome-banner__text">
-                            {% if filter_promociones %}
-                            {% trans "Promotional products appear first. Keep scrolling to browse the full catalog without leaving this page." %}
-                            {% else %}
-                            {% trans "Take advantage of discounts and special offers available for a limited time." %}
-                            {% endif %}
-                        </p>
-                        <form method="get" class="promo-search-form">
-                            {% if guest_mode %}<input type="hidden" name="guest" value="1">{% endif %}
-                            <input type="hidden" name="promociones" value="1">
-                            <label class="visually-hidden" for="promoSearch">{% trans "Search promotional products" %}</label>
-                            <div class="input-group">
-                                <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
-                                <input
-                                    type="search"
-                                    id="promoSearch"
-                                    name="q"
-                                    value="{% if filter_promociones %}{{ filter_q }}{% endif %}"
-                                    class="form-control"
-                                    placeholder="{% trans 'Search a promotional product...' %}"
-                                    autocomplete="off"
-                                >
-                                <button class="btn promo-search-button" type="submit">
-                                    {% trans "View promotional products" %}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                    {% if filter_promociones %}
-                    <a href="{{ catalogo_url }}" class="promo-clear-filter">
-                        <i class="bi bi-x-circle" aria-hidden="true"></i> {% trans "View all products" %}
-                    </a>
-                    {% else %}
-                    <a href="{{ promociones_url }}" class="promo-banner-cta">
-                        <i class="bi bi-stars" aria-hidden="true"></i> {% trans "View promotional products" %}
-                    </a>
-                    {% endif %}
-                </section>
-                {% endif %}
-
                 {% if combos and page_obj.number == 1 %}
                 <section class="combos-section mb-4" aria-labelledby="combosTitle">
                     <div class="favorites-section__header">
@@ -314,6 +267,38 @@ data-combo-free-preview-label="{% trans 'Included when you reach this tier' %}">
 
                         </select>
                     </div>
+                </form>
+
+                {% if promociones_disponibles %}
+                <section class="promo-welcome-banner mt-4 mb-4" data-ai-tour="promotions" aria-labelledby="promoWelcomeTitle">
+                    <div class="promo-welcome-banner__icon" aria-hidden="true">🎉</div>
+                    <div class="promo-welcome-banner__content">
+                        <h2 id="promoWelcomeTitle" class="promo-welcome-banner__title">{% trans "There are products on promotion!" %}</h2>
+                        <p class="promo-welcome-banner__text">
+                            {% if filter_promociones %}
+                            {% trans "Promotional products appear first. Keep scrolling to browse the full catalog without leaving this page." %}
+                            {% else %}
+                            {% trans "Take advantage of discounts and special offers available for a limited time." %}
+                            {% endif %}
+                        </p>
+                        <form method="get" class="promo-search-form">
+                            {% if guest_mode %}<input type="hidden" name="guest" value="1">{% endif %}
+                            <input type="hidden" name="promociones" value="1">
+                            <label class="visually-hidden" for="promoSearch">{% trans "Search promotional products" %}</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-search" aria-hidden="true"></i></span>
+                                <input type="search" id="promoSearch" name="q" value="{% if filter_promociones %}{{ filter_q }}{% endif %}" class="form-control" placeholder="{% trans 'Search a promotional product...' %}" autocomplete="off">
+                                <button class="btn promo-search-button" type="submit">{% trans "View promotional products" %}</button>
+                            </div>
+                        </form>
+                    </div>
+                    {% if filter_promociones %}
+                    <a href="{{ catalogo_url }}" class="promo-clear-filter"><i class="bi bi-x-circle" aria-hidden="true"></i> {% trans "View all products" %}</a>
+                    {% else %}
+                    <a href="{{ promociones_url }}" class="promo-banner-cta"><i class="bi bi-stars" aria-hidden="true"></i> {% trans "View promotional products" %}</a>
+                    {% endif %}
+                </section>
+                {% endif %}
 
                 <hr>
 
@@ -365,7 +350,6 @@ data-combo-free-preview-label="{% trans 'Included when you reach this tier' %}">
                     {% endfor %}
 
                 </div>
-                </form>
 
                 {% pagination_controls page_obj aria_label=_('Product pagination') nav_class="catalog-pagination d-flex justify-content-center align-items-center flex-wrap gap-2 mt-4 mb-2" q=filter_q categoria=filter_categoria marca=filter_marca promociones=filter_promociones guest=guest_mode|yesno:"1," %}
 

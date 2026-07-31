@@ -172,7 +172,9 @@ def create_conversation(request):
         visitor_id=visitor_id,
         defaults={'user': user if getattr(user, 'is_authenticated', False) else None, 'cliente': cliente},
     )
-    return JsonResponse({'conversation_id': str(conversation.public_id)})
+    # Persist the visitor id here too: if it only lived in the session, losing the
+    # session would orphan every conversation this visitor owns.
+    return set_visitor_cookie(JsonResponse({'conversation_id': str(conversation.public_id)}), request)
 
 
 @require_POST

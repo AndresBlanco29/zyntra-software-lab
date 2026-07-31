@@ -409,6 +409,72 @@ class AgentContextTests(TestCase):
         self.assertEqual(load_state(conversation)['last_intent'], 'product_search')
 
 
+class ConversationOwnershipTests(TestCase):
+    def setUp(self):
+        config = AssistantConfiguration.get_solo()
+        config.enabled = True
+        config.save(update_fields=['enabled'])
+        self.visitor_id = uuid.uuid4()
+        self.customer_user = Usuario.objects.create_user(
+            username='assistant-owner',
+            password='secret123',
+            role='cliente',
+        )
+
+    def _get_or_create(self, user):
+        from config.ai_assistant.services.orchestrator import get_or_create_conversation
+
+        return get_or_create_conversation(
+            visitor_id=self.visitor_id,
+            user=user,
+            cliente=None,
+            page='home',
+            language='es',
+        )
+
+    def test_logged_out_visitor_gets_a_fresh_conversation_instead_of_a_dead_one(self):
+        """Reusing the signed-in conversation after logout would 404 on every message."""
+        from django.contrib.auth.models import AnonymousUser
+
+        owned = self._get_or_create(self.customer_user)
+        anonymous = self._get_or_create(AnonymousUser())
+
+        self.assertNotEqual(anonymous.public_id, owned.public_id)
+        self.assertIsNone(anonymous.user_id)
+
+    def test_signed_in_customer_reuses_their_own_conversation(self):
+        first = self._get_or_create(self.customer_user)
+        second = self._get_or_create(self.customer_user)
+
+        self.assertEqual(first.public_id, second.public_id)
+
+    def test_message_endpoint_recovers_after_the_customer_logs_out(self):
+        from config.ai_assistant.services.identity import VISITOR_COOKIE_NAME
+
+        self.client.cookies[VISITOR_COOKIE_NAME] = str(self.visitor_id)
+        owned = self._get_or_create(self.customer_user)
+
+        stale = self.client.post(
+            reverse('ai_assistant_conversation_message', args=[owned.public_id]),
+            data=json.dumps({'message': 'hay promociones?'}),
+            content_type='application/json',
+        )
+        self.assertEqual(stale.status_code, 404)
+
+        created = self.client.post(
+            reverse('ai_assistant_create_conversation'),
+            data=json.dumps({'page': 'home'}),
+            content_type='application/json',
+        )
+        self.assertEqual(created.status_code, 200)
+        recovered = self.client.post(
+            reverse('ai_assistant_conversation_message', args=[created.json()['conversation_id']]),
+            data=json.dumps({'message': 'hay promociones?'}),
+            content_type='application/json',
+        )
+        self.assertNotEqual(recovered.status_code, 404)
+
+
 class ToolRuntimeTests(TestCase):
     def test_failing_tool_returns_safe_error_without_raising(self):
         from config.ai_assistant.models import AssistantConversation

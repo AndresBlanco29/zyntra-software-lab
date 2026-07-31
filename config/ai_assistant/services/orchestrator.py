@@ -3,6 +3,7 @@ import logging
 import re
 from urllib.parse import urlencode
 
+from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
@@ -169,11 +170,19 @@ def _guided_actions(context, tour_id):
 
 
 def get_or_create_conversation(*, visitor_id, user, cliente, page, language):
-    conversation = (
-        AssistantConversation.objects.filter(visitor_id=visitor_id, status=AssistantConversation.STATUS_OPEN)
-        .order_by('-last_activity_at')
-        .first()
+    # Reuse must follow the same ownership rule the message endpoint enforces.
+    # Handing back a conversation owned by someone else (for example after the
+    # customer logged out) would make every message 404 with no way out.
+    user_id = user.id if getattr(user, 'is_authenticated', False) else None
+    open_conversations = AssistantConversation.objects.filter(
+        visitor_id=visitor_id,
+        status=AssistantConversation.STATUS_OPEN,
     )
+    if user_id is None:
+        open_conversations = open_conversations.filter(user__isnull=True)
+    else:
+        open_conversations = open_conversations.filter(Q(user_id=user_id) | Q(user__isnull=True))
+    conversation = open_conversations.order_by('-last_activity_at').first()
     if conversation is None:
         conversation = AssistantConversation.objects.create(
             visitor_id=visitor_id,

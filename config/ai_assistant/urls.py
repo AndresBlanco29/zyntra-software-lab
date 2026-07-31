@@ -8,6 +8,7 @@ urlpatterns = [
     path('context/', views.assistant_context, name='ai_assistant_context'),
     path('verification/account-status/request/', views.request_account_status_code, name='ai_assistant_request_status_code'),
     path('verification/account-status/verify/', views.verify_account_status_code, name='ai_assistant_verify_status_code'),
+    path('access/login-failure/', views.record_login_failure, name='ai_assistant_login_failure'),
     path('conversations/', views.create_conversation, name='ai_assistant_create_conversation'),
     path('conversations/<uuid:public_id>/messages/', views.conversation_message, name='ai_assistant_conversation_message'),
     path('tours/<slug:tour_key>/progress/', views.tour_progress, name='ai_assistant_tour_progress'),

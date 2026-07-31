@@ -1277,6 +1277,7 @@ function bindLoginForm(container) {
       if (data.success) {
         window.location.href = data.redirect;
       } else {
+        window.dispatchEvent(new CustomEvent('tortilla-login-failed'));
         let mensajeError = data.message || '{% trans "Invalid username or password." %}';
         if (data.error === 'account_inactive') {
           mensajeError = data.message || '{% trans "This account is inactive. Contact an administrator." %}';

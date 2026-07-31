@@ -207,3 +207,30 @@ class VerificationTests(TestCase):
         self.assertEqual(verify_account_status_challenge(challenge.public_id, '123456'), cliente)
         self.assertIsNone(verify_account_status_challenge(challenge.public_id, '123456'))
         send_mail_mock.assert_called_once()
+
+
+class CommercialAssistantTests(TestCase):
+    def test_contact_dto_uses_backoffice_configuration(self):
+        from config.ai_assistant.services.contact import build_contact_dto
+
+        config = AssistantConfiguration.get_solo()
+        config.support_phone = '+1 (404) 555-0100'
+        config.support_whatsapp = '14045550100'
+        config.support_email = 'support@example.com'
+        config.save(update_fields=['support_phone', 'support_whatsapp', 'support_email'])
+
+        dto = build_contact_dto()
+
+        self.assertEqual(dto['email'], 'support@example.com')
+        self.assertIn('tel:+14045550100', [action['url'] for action in dto['actions']])
+        self.assertIn('https://wa.me/14045550100', [action['url'] for action in dto['actions']])
+
+    def test_catalog_resolver_handles_normalized_partial_product_name(self):
+        from config.ai_assistant.services.catalog_resolver import find_products
+        from config.productos.models import Producto
+
+        Producto.objects.create(nombre='Coca-Cola Original', activo=True)
+
+        result = find_products('coca cola')
+
+        self.assertEqual(result['products'][0]['name'], 'Coca-Cola Original')

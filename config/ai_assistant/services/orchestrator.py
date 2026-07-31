@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 
 from django.urls import reverse
@@ -15,6 +16,7 @@ from config.ai_assistant.services.openai_client import OpenAIClient, OpenAIServi
 from config.ai_assistant.services.privacy import redact_content
 from config.ai_assistant.tools import execute_tool, openai_tool_schemas
 
+logger = logging.getLogger(__name__)
 
 BASE_SAFETY_PROMPT = """
 You are a helpful commercial and support assistant for La Tortilla Grocery.
@@ -248,6 +250,143 @@ def _forced_status_verification(request, conversation, context, message, model):
     }
 
 
+def _commercial_information_result(request, conversation, message, model):
+    """Resolve contact/location with configured values before the LLM can invent them."""
+    normalized = str(message or '').lower()
+    contact_terms = (
+        'contact', 'número', 'numero', 'teléfono', 'telefono', 'whatsapp', 'llamar',
+        'correo', 'email', 'hablar con alguien', 'customer service', 'support', 'soporte',
+    )
+    location_terms = (
+        'dirección', 'direccion', 'ubicación', 'ubicacion', 'store', 'warehouse',
+        'pickup', 'office', 'where are you located', 'dónde están', 'donde estan',
+    )
+    if any(term in normalized for term in contact_terms):
+        tool_name = 'get_contact_options'
+        tool_result = execute_tool(request, tool_name, '{}')
+        reply = (
+            f"Claro. Puedes llamarnos al {tool_result.get('phone') or 'número configurado'}, "
+            f"escribirnos por WhatsApp o enviarnos un correo a {tool_result.get('email') or 'nuestro correo de soporte'}."
+        )
+        actions = tool_result.get('actions', [])
+    elif any(term in normalized for term in location_terms):
+        tool_name = 'get_location_information'
+        tool_result = execute_tool(request, tool_name, '{}')
+        address = tool_result.get('address')
+        reply = (
+            f"La Tortilla Grocery cuenta con una ubicación física{': ' + address if address else ''}. "
+            f"Nuestras rutas directas actualmente cubren {tool_result.get('coverage')}."
+        )
+        actions = ([{'label': 'Abrir mapa', 'url': tool_result['map_url'], 'kind': 'contact', 'external': True}]
+                   if tool_result.get('map_url') else [])
+    else:
+        return None
+    AssistantMessage.objects.create(
+        conversation=conversation,
+        role=AssistantMessage.ROLE_TOOL,
+        content=redact_content(str(tool_result)),
+        redacted_content=redact_content(str(tool_result)),
+        tool_name=tool_name,
+        tool_payload=tool_result,
+        model=model,
+    )
+    return {
+        'message': reply,
+        'suggested_actions': actions,
+        'tour_id': None,
+        'tool_results': [{'name': tool_name, 'result': tool_result}],
+        'confirmation_actions': [],
+    }
+
+
+def _purchase_intent_result(request, conversation, context, message, model):
+    """Use canonical catalog data whenever a visitor expresses purchase intent."""
+    normalized = str(message or '').lower().strip()
+    if any(term in normalized for term in ('contraseña', 'password', 'iniciar sesión', 'iniciar sesion', 'login', 'cuenta aprob')):
+        return None
+    triggers = ('tienen', 'tienes', 'busco', 'necesito', 'quiero comprar', 'comprar', 'producto', 'bebida')
+    if not any(trigger in normalized for trigger in triggers):
+        return None
+    query = re.sub(
+        r'\b(tienen|tienes|busco|necesito|quiero comprar|quiero|comprar|producto|productos|una|un|de|por favor|please)\b',
+        ' ',
+        message,
+        flags=re.IGNORECASE,
+    )
+    query = re.sub(r'\s+', ' ', query).strip(' ?!.')
+    if len(query) < 2:
+        return None
+    tool_result = execute_tool(request, 'find_products', json.dumps({'query': query}))
+    AssistantMessage.objects.create(
+        conversation=conversation,
+        role=AssistantMessage.ROLE_TOOL,
+        content=redact_content(str(tool_result)),
+        redacted_content=redact_content(str(tool_result)),
+        tool_name='find_products',
+        tool_payload=tool_result,
+        model=model,
+    )
+    products = tool_result.get('products', [])
+    logger.info('AI commercial product intent resolved: matched=%s', bool(products))
+    if not products:
+        from config.ai_assistant.services.contact import build_contact_dto
+
+        return {
+            'message': (
+                f"Busqué “{query}” en nuestro catálogo y no encontré una coincidencia confirmada. "
+                "Un asesor puede ayudarte a localizarlo o recomendar una alternativa."
+            ),
+            'suggested_actions': build_contact_dto().get('actions', []),
+            'tour_id': None,
+            'tool_results': [{'name': 'find_products', 'result': tool_result}],
+            'confirmation_actions': [],
+        }
+    product = products[0]
+    from config.ai_assistant.services.memory import remember_assistant_context
+
+    remember_assistant_context(
+        request,
+        last_product_id=product['product_id'],
+        last_product_name=product['name'],
+        last_module=context.get('page'),
+        language=conversation.language,
+    )
+    presentation_names = ', '.join(item['name'] for item in product.get('presentations', [])[:4])
+    promotion = ' Tiene una promoción activa.' if product.get('has_active_promotion') else ''
+    reply = (
+        f"Sí, encontré {product['name']}"
+        f"{' de ' + product['brand'] if product.get('brand') else ''}. "
+        f"Presentaciones disponibles: {presentation_names or 'consulta el catálogo para ver las opciones'}."
+        f"{promotion}"
+    )
+    actions = [
+        {'label': 'Ver producto', 'url': product['catalog_url'], 'kind': 'catalog'},
+        {'label': 'Abrir catálogo', 'url': reverse('catalogo'), 'kind': 'catalog'},
+        {'label': 'Ver promociones', 'url': f"{product['catalog_url']}&promociones=1", 'kind': 'catalog'},
+    ]
+    confirmations = []
+    if context.get('authenticated'):
+        actions.extend([
+            {'label': 'Comprar ahora', 'url': product['catalog_url'], 'kind': 'catalog'},
+            {'label': 'Continuar comprando', 'url': reverse('catalogo'), 'kind': 'catalog'},
+        ])
+        if product.get('primary_presentation_id'):
+            proposal = execute_tool(
+                request,
+                'propose_add_to_order',
+                json.dumps({'presentation_id': product['primary_presentation_id'], 'quantity': 1}),
+            )
+            if proposal.get('requires_confirmation') and proposal.get('action_id'):
+                confirmations.append({'id': proposal['action_id'], 'label': f"Agregar {product['name']} al pedido"})
+    return {
+        'message': reply,
+        'suggested_actions': actions,
+        'tour_id': None,
+        'tool_results': [{'name': 'find_products', 'result': tool_result}],
+        'confirmation_actions': confirmations,
+    }
+
+
 def reply_to_message(*, request, conversation, message):
     config = AssistantConfiguration.get_solo()
     context = build_customer_context(request)
@@ -261,6 +400,26 @@ def reply_to_message(*, request, conversation, message):
     )
     conversation.last_activity_at = timezone.now()
     conversation.save(update_fields=['last_activity_at'])
+    commercial_result = _commercial_information_result(request, conversation, message, config.chat_model)
+    if commercial_result:
+        AssistantMessage.objects.create(
+            conversation=conversation,
+            role=AssistantMessage.ROLE_ASSISTANT,
+            content=redact_content(commercial_result['message']),
+            redacted_content=redact_content(commercial_result['message']),
+            model='deterministic-commercial-information',
+        )
+        return commercial_result
+    purchase_result = _purchase_intent_result(request, conversation, context, message, config.chat_model)
+    if purchase_result:
+        AssistantMessage.objects.create(
+            conversation=conversation,
+            role=AssistantMessage.ROLE_ASSISTANT,
+            content=redact_content(purchase_result['message']),
+            redacted_content=redact_content(purchase_result['message']),
+            model='deterministic-commercial-catalog',
+        )
+        return purchase_result
     forced_result = _forced_status_verification(request, conversation, context, message, config.chat_model)
     if forced_result:
         AssistantMessage.objects.create(

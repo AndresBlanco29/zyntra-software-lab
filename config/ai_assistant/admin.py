@@ -8,6 +8,7 @@ from .models import (
     AssistantKnowledgeChunk,
     AssistantKnowledgeDocument,
     AssistantMessage,
+    AssistantProductAlias,
     AssistantUserState,
 )
 from .services.knowledge import rebuild_document_chunks
@@ -55,3 +56,10 @@ admin.site.register(AssistantKnowledgeChunk)
 admin.site.register(AssistantUserState)
 admin.site.register(AssistantGuidedTourProgress)
 admin.site.register(AssistantDomainEvent)
+
+
+@admin.register(AssistantProductAlias)
+class AssistantProductAliasAdmin(admin.ModelAdmin):
+    list_display = ('alias', 'product', 'brand', 'active')
+    list_filter = ('active',)
+    search_fields = ('alias', 'product__nombre', 'brand__nombre')

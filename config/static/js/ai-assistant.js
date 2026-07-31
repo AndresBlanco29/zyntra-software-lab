@@ -37,6 +37,10 @@
       link.className = "btn btn-outline-primary btn-sm";
       link.href = action.url || "#";
       link.textContent = action.label || "Continuar";
+      if (action.external) {
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+      }
       if (action.tour_id) {
         link.dataset.aiTourStart = action.tour_id;
         if (Number.isInteger(action.resume_index)) {
@@ -221,6 +225,27 @@
         tour_id: tourId,
         resume_index: Number.isInteger(resumeIndex) ? resumeIndex : 0
       }]);
+    });
+
+    window.addEventListener("tortilla-login-failed", function () {
+      if (!root.dataset.loginFailureUrl) return;
+      jsonFetch(root.dataset.loginFailureUrl, { method: "POST", body: "{}" })
+        .then(function (result) {
+          if (!result.intervene) return;
+          const showHelp = function () {
+            boot();
+            setPanelOpen(true);
+            appendMessage(messages, result.message, false);
+            renderActions(actions, result.actions);
+          };
+          const errorModal = document.getElementById("loginErrorModal");
+          if (errorModal && errorModal.classList.contains("show")) {
+            errorModal.addEventListener("hidden.bs.modal", showHelp, { once: true });
+          } else {
+            showHelp();
+          }
+        })
+        .catch(function () {});
     });
 
     form.addEventListener("submit", function (event) {

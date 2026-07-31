@@ -22,6 +22,12 @@ class AssistantConfiguration(models.Model):
     max_messages_per_hour = models.PositiveIntegerField(default=30)
     max_message_chars = models.PositiveIntegerField(default=2000)
     handoff_url = models.URLField(blank=True)
+    support_phone = models.CharField(max_length=40, default='+1 (470) 967-2782')
+    support_whatsapp = models.CharField(max_length=40, default='17866516897')
+    support_email = models.EmailField(default='lamtortillagrocery@gmail.com')
+    location_address = models.TextField(blank=True)
+    location_map_url = models.URLField(blank=True)
+    delivery_coverage = models.CharField(max_length=250, default='Georgia, Alabama y Tennessee')
     enabled = models.BooleanField(default=False)
     enable_home = models.BooleanField(default=True)
     enable_catalog = models.BooleanField(default=True)
@@ -88,6 +94,32 @@ class AssistantKnowledgeChunk(models.Model):
     class Meta:
         ordering = ('document_id', 'position')
         unique_together = ('document', 'position')
+
+
+class AssistantProductAlias(models.Model):
+    """Auditable commercial synonyms used only by the catalog resolver."""
+
+    alias = models.CharField(max_length=160, unique=True)
+    product = models.ForeignKey(
+        'productos.Producto',
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='assistant_aliases',
+    )
+    brand = models.ForeignKey(
+        'productos.Marca',
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='assistant_aliases',
+    )
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Assistant product alias'
+        verbose_name_plural = 'Assistant product aliases'
 
 
 class AssistantConversation(models.Model):

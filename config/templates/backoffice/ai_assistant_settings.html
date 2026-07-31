@@ -33,6 +33,30 @@
           <label class="form-label">{% trans "Temperature" %}</label>
           <input class="form-control" type="number" min="0" max="1" step="0.05" name="temperature" value="{{ assistant_config.temperature }}">
         </div>
+        <div class="col-md-4">
+          <label class="form-label">{% trans "Support phone" %}</label>
+          <input class="form-control" name="support_phone" value="{{ assistant_config.support_phone }}">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{% trans "WhatsApp number" %}</label>
+          <input class="form-control" name="support_whatsapp" value="{{ assistant_config.support_whatsapp }}" inputmode="tel">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">{% trans "Support email" %}</label>
+          <input class="form-control" type="email" name="support_email" value="{{ assistant_config.support_email }}">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{% trans "Physical address" %}</label>
+          <textarea class="form-control" rows="2" name="location_address">{{ assistant_config.location_address }}</textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">{% trans "Map URL" %}</label>
+          <input class="form-control" type="url" name="location_map_url" value="{{ assistant_config.location_map_url }}">
+        </div>
+        <div class="col-12">
+          <label class="form-label">{% trans "Direct-route coverage" %}</label>
+          <input class="form-control" name="delivery_coverage" value="{{ assistant_config.delivery_coverage }}">
+        </div>
         <div class="col-12">
           <label class="form-label">{% trans "Welcome message" %}</label>
           <textarea class="form-control" rows="3" name="welcome_message">{{ assistant_config.welcome_message }}</textarea>
@@ -71,6 +95,7 @@
       <h5>{% trans "Published knowledge" %}</h5>
       <p class="text-muted">{% trans "Manage FAQs and documents from Django Admin while the dedicated editor is introduced." %}</p>
       <a class="btn btn-outline-primary" href="/admin/ai_assistant/assistantknowledgedocument/">{% trans "Manage knowledge documents" %}</a>
+      <a class="btn btn-outline-secondary" href="/admin/ai_assistant/assistantproductalias/">{% trans "Manage product aliases" %}</a>
       <ul class="mt-3 mb-0">
         {% for document in knowledge_documents %}
         <li>{{ document.title }} — {{ document.get_status_display }} ({{ document.chunks.count }} {% trans "chunks" %})</li>

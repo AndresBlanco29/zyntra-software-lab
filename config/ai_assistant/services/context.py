@@ -77,6 +77,10 @@ def build_customer_context(request):
         visitor_id=get_visitor_id(request),
         defaults={'user': user, 'cliente': cliente},
     )
+    context['assistant_memory'] = {
+        key: value for key, value in (state.preferences or {}).items()
+        if key in {'last_product_id', 'last_product_name', 'last_module', 'last_tour', 'language'}
+    }
     if not state.onboarding_completed:
         context['proactive'] = {
             'kind': 'first_authenticated_login',

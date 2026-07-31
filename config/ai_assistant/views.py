@@ -72,6 +72,28 @@ def verify_account_status_code(request):
     return JsonResponse({'success': True, 'status': StatusGateway().get_status(cliente=cliente, entity_type='account')})
 
 
+@require_POST
+def record_login_failure(request):
+    """Record only an anonymous, short-lived failure count; never expose account existence."""
+    visitor_id = get_visitor_id(request)
+    key = f'ai-assistant:login-failures:{visitor_id}'
+    attempts = int(cache.get(key, 0)) + 1
+    cache.set(key, attempts, timeout=15 * 60)
+    if attempts < 3:
+        return JsonResponse({'intervene': False})
+    from config.ai_assistant.services.contact import build_contact_dto
+
+    return JsonResponse({
+        'intervene': True,
+        'message': 'Parece que estás teniendo problemas para iniciar sesión. Puedes recuperar tu contraseña, intentarlo nuevamente o hablar con un asesor.',
+        'actions': [
+            {'label': 'Recuperar contraseña', 'url': f"{reverse('home')}?show_login=1", 'tour_id': 'password-recovery'},
+            {'label': 'Intentar nuevamente', 'url': '#', 'tour_id': 'login'},
+            *build_contact_dto().get('actions', []),
+        ],
+    })
+
+
 def _conversation_for_request(request, public_id):
     visitor_id = get_visitor_id(request)
     conversation = AssistantConversation.objects.filter(public_id=public_id, visitor_id=visitor_id).first()
@@ -186,6 +208,21 @@ def tour_progress(request, tour_key):
     progress.dismissed = bool(payload.get('dismissed'))
     progress.context = payload.get('context') if isinstance(payload.get('context'), dict) else {}
     progress.save()
+    from config.ai_assistant.services.memory import remember_assistant_context
+    remember_assistant_context(request, last_tour=tour_key)
+    if (
+        tour_key == 'platform-history'
+        and progress.completed
+        and getattr(request.user, 'is_authenticated', False)
+    ):
+        cliente = get_customer_for_user(request.user)
+        state, _ = AssistantUserState.objects.get_or_create(
+            visitor_id=visitor_id,
+            defaults={'user': request.user, 'cliente': cliente},
+        )
+        if not state.onboarding_completed:
+            state.onboarding_completed = True
+            state.save(update_fields=['onboarding_completed', 'updated_at'])
     return JsonResponse({'success': True})
 
 
@@ -250,6 +287,14 @@ def backoffice_assistant_settings(request):
         config.default_language = str(request.POST.get('default_language') or 'es').strip()[:8]
         config.chat_model = str(request.POST.get('chat_model') or config.chat_model).strip()[:100]
         config.embedding_model = str(request.POST.get('embedding_model') or config.embedding_model).strip()[:100]
+        config.support_phone = str(request.POST.get('support_phone') or '').strip()[:40]
+        config.support_whatsapp = ''.join(
+            character for character in str(request.POST.get('support_whatsapp') or '') if character.isdigit()
+        )[:40]
+        config.support_email = str(request.POST.get('support_email') or '').strip()[:254]
+        config.location_address = str(request.POST.get('location_address') or '').strip()
+        config.location_map_url = str(request.POST.get('location_map_url') or '').strip()[:200]
+        config.delivery_coverage = str(request.POST.get('delivery_coverage') or '').strip()[:250]
         try:
             config.temperature = max(0, min(float(request.POST.get('temperature') or config.temperature), 1))
         except (TypeError, ValueError):

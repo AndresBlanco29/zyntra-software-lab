@@ -23,6 +23,18 @@ def openai_tool_schemas():
     return [
         {
             'type': 'function',
+            'name': 'get_contact_options',
+            'description': 'Get configured La Tortilla Grocery phone, WhatsApp, SMS and support email actions.',
+            'parameters': {'type': 'object', 'properties': {}, 'additionalProperties': False},
+        },
+        {
+            'type': 'function',
+            'name': 'get_location_information',
+            'description': 'Get the configured physical address, map link and direct-route coverage.',
+            'parameters': {'type': 'object', 'properties': {}, 'additionalProperties': False},
+        },
+        {
+            'type': 'function',
             'name': 'get_account_status',
             'description': 'Get the authenticated customer approval status and next recommended action.',
             'parameters': {'type': 'object', 'properties': {}, 'additionalProperties': False},
@@ -56,6 +68,17 @@ def openai_tool_schemas():
             'parameters': {
                 'type': 'object',
                 'properties': {'query': {'type': 'string', 'description': 'Product name or category search.'}},
+                'required': ['query'],
+                'additionalProperties': False,
+            },
+        },
+        {
+            'type': 'function',
+            'name': 'find_products',
+            'description': 'Find real catalog products using names, brands, presentations, commercial aliases and fuzzy matching. Use this before saying a product does not exist.',
+            'parameters': {
+                'type': 'object',
+                'properties': {'query': {'type': 'string'}},
                 'required': ['query'],
                 'additionalProperties': False,
             },
@@ -161,6 +184,18 @@ def _account_status(request):
     }
 
 
+def _contact_options():
+    from config.ai_assistant.services.contact import build_contact_dto
+
+    return build_contact_dto()
+
+
+def _location_information():
+    from config.ai_assistant.services.contact import build_location_dto
+
+    return build_location_dto()
+
+
 def _request_account_status_code(email):
     from config.ai_assistant.services.verification import VerificationRateLimited, issue_account_status_challenge
 
@@ -185,29 +220,9 @@ def _verify_account_status_code(challenge_id, code):
 
 
 def _search_catalog(request, query):
-    queryset = (
-        Presentacion.objects.filter(producto__activo=True, producto__nombre__icontains=str(query or '').strip())
-        .select_related('producto')
-        .order_by('producto__nombre', 'nombre')[:8]
-    )
-    cliente = get_customer_for_user(request.user)
-    promotions = promociones_activas_queryset(cliente=cliente) if cliente else promociones_activas_queryset()
-    promotion_product_ids = set(promotions.exclude(producto__isnull=True).values_list('producto_id', flat=True))
-    promotion_product_ids.update(
-        promotions.exclude(presentacion__isnull=True).values_list('presentacion__producto_id', flat=True)
-    )
-    return {
-        'products': [
-            {
-                'presentation_id': presentation.id,
-                'product': presentation.producto.nombre,
-                'presentation': presentation.nombre_empaque_cliente,
-                'has_active_promotion': presentation.producto_id in promotion_product_ids,
-                'catalog_url': reverse('catalogo'),
-            }
-            for presentation in queryset
-        ]
-    }
+    from config.ai_assistant.services.catalog_resolver import find_products
+
+    return find_products(query, cliente=get_customer_for_user(request.user))
 
 
 def _next_steps(request):
@@ -335,6 +350,10 @@ def execute_tool(request, name, raw_arguments):
         arguments = json.loads(raw_arguments or '{}')
     except (TypeError, json.JSONDecodeError):
         return {'error': 'Invalid tool arguments.'}
+    if name == 'get_contact_options':
+        return _contact_options()
+    if name == 'get_location_information':
+        return _location_information()
     if name == 'get_account_status':
         return _account_status(request)
     if name == 'request_account_status_code':
@@ -342,6 +361,8 @@ def execute_tool(request, name, raw_arguments):
     if name == 'verify_account_status_code':
         return _verify_account_status_code(arguments.get('challenge_id', ''), arguments.get('code', ''))
     if name == 'search_catalog':
+        return _search_catalog(request, arguments.get('query', ''))
+    if name == 'find_products':
         return _search_catalog(request, arguments.get('query', ''))
     if name == 'get_customer_next_steps':
         return _next_steps(request)

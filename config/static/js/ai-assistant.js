@@ -34,8 +34,38 @@
     container.scrollTop = container.scrollHeight;
   }
 
-  function renderActions(container, actions) {
+  function renderPromotionCards(container, cards) {
+    (cards || []).forEach(function (card) {
+      const panel = document.createElement("article");
+      panel.className = "ai-assistant-promotion-card";
+      const title = document.createElement("strong");
+      title.textContent = "🎁 PROMOCIÓN · " + card.product_name;
+      const detail = document.createElement("div");
+      detail.className = "ai-assistant-promotion-card__detail";
+      detail.textContent = (card.benefits || []).join(" · ") || card.description || card.promotion_name;
+      if (card.expires_at) {
+        const validity = document.createElement("div");
+        validity.className = "ai-assistant-promotion-card__validity";
+        validity.textContent = "Vigente hasta " + new Date(card.expires_at).toLocaleDateString();
+        panel.append(validity);
+      }
+      const link = document.createElement("a");
+      link.className = "btn btn-outline-primary btn-sm";
+      link.href = card.catalog_url;
+      link.textContent = "Ver producto";
+      const quoteLink = document.createElement("a");
+      quoteLink.className = "btn btn-primary btn-sm";
+      quoteLink.href = card.catalog_url;
+      quoteLink.textContent = "Agregar a cotización";
+      panel.prepend(title, detail);
+      panel.append(link, quoteLink);
+      container.appendChild(panel);
+    });
+  }
+
+  function renderActions(container, actions, promotionCards) {
     container.replaceChildren();
+    renderPromotionCards(container, promotionCards);
     (actions || []).forEach(function (action) {
       const link = document.createElement("a");
       link.className = "btn btn-outline-primary btn-sm";
@@ -92,6 +122,32 @@
             whatsapp.hidden = false;
             container.appendChild(whatsapp);
           }
+        });
+      }
+      if (action.kind === "promotion_access") {
+        link.addEventListener("click", function (event) {
+          event.preventDefault();
+          container.replaceChildren();
+          appendMessage(
+            document.querySelector("[data-ai-assistant] [data-ai-messages]"),
+            "Puedes ver nuestras promociones como invitado o iniciar sesión para solicitar una cotización.",
+            false
+          );
+          const guestLink = document.createElement("a");
+          guestLink.className = "btn btn-outline-primary btn-sm";
+          guestLink.href = action.guest_url;
+          guestLink.textContent = "👀 Ver catálogo como invitado";
+          const loginButton = document.createElement("button");
+          loginButton.type = "button";
+          loginButton.className = "btn btn-primary btn-sm";
+          loginButton.textContent = "🔑 Iniciar sesión";
+          loginButton.addEventListener("click", function () {
+            const modal = document.getElementById("loginModal");
+            if (!modal || !window.bootstrap) return;
+            modal.dataset.nextUrl = action.login_next;
+            new window.bootstrap.Modal(modal).show();
+          });
+          container.append(guestLink, loginButton);
         });
       }
       container.appendChild(link);
@@ -366,14 +422,18 @@
       sendMessage(false)
         .then(function (result) {
           appendMessage(messages, result.message, false);
-          renderActions(actions, result.suggested_actions);
+          renderActions(actions, result.suggested_actions, result.promotion_cards);
           renderConfirmations(actions, result.confirmation_actions, root, messages);
           if (result.tour_id && window.TortillaAssistantTours) {
             window.TortillaAssistantTours.start(result.tour_id);
           }
         })
         .catch(function (error) {
-          appendMessage(messages, error.message || "No pude responder ahora. Inténtalo de nuevo.", false);
+          appendMessage(
+            messages,
+            "Estoy actualizando mi conexión para ayudarte. Inténtalo nuevamente en unos segundos.",
+            false
+          );
         });
     });
 

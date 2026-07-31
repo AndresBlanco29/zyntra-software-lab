@@ -235,6 +235,30 @@ class CommercialAssistantTests(TestCase):
 
         self.assertEqual(result['products'][0]['name'], 'Coca-Cola Original')
 
+    def test_active_promotion_cards_use_real_active_promotions(self):
+        from config.ai_assistant.services.promotion_catalog import active_promotion_cards
+        from config.productos.models import Producto, Promocion, PromocionEscala
+
+        product = Producto.objects.create(nombre='Monster Energy 24 OZ', activo=True)
+        promotion = Promocion.objects.create(
+            nombre='Monster por volumen',
+            descripcion='Precio especial por caja',
+            producto=product,
+            activa=True,
+        )
+        PromocionEscala.objects.create(
+            promocion=promotion,
+            cantidad_minima=10,
+            tipo_beneficio=PromocionEscala.TIPO_FREE_UNITS,
+            unidades_gratis=1,
+        )
+
+        result = active_promotion_cards(related_product_id=product.id)
+
+        self.assertTrue(result['related'])
+        self.assertEqual(result['cards'][0]['product_name'], 'Monster Energy 24 OZ')
+        self.assertIn('Compra 10+', result['cards'][0]['benefits'][0])
+
 
 class CustomerSuccessProfileTests(TestCase):
     def test_profile_remembers_recent_product_without_conversation_content(self):

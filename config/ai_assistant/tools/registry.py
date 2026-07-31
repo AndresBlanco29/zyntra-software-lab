@@ -15,7 +15,6 @@ from config.ai_assistant.services.actions import (
     create_pending_action,
 )
 from config.productos.models import Presentacion
-from config.productos.promotions import promociones_activas_queryset
 from config.cotizaciones.models import Cotizacion
 from config.pedidos.client_history import list_cliente_purchase_orders
 
@@ -87,6 +86,16 @@ def openai_tool_schemas():
                 'type': 'object',
                 'properties': {'query': {'type': 'string'}},
                 'required': ['query'],
+                'additionalProperties': False,
+            },
+        },
+        {
+            'type': 'function',
+            'name': 'get_active_promotions',
+            'description': 'Get real active promotions available to this visitor or authenticated customer. Optionally prioritize a related product.',
+            'parameters': {
+                'type': 'object',
+                'properties': {'related_product_id': {'type': 'integer'}},
                 'additionalProperties': False,
             },
         },
@@ -259,6 +268,15 @@ def _search_catalog(request, query):
     return find_products(query, cliente=get_customer_for_user(request.user))
 
 
+def _active_promotions(request, related_product_id=None):
+    from config.ai_assistant.services.promotion_catalog import active_promotion_cards
+
+    return active_promotion_cards(
+        cliente=get_customer_for_user(request.user),
+        related_product_id=related_product_id,
+    )
+
+
 def _next_steps(request):
     if get_customer_for_user(request.user) is None:
         return _account_status(request)
@@ -402,6 +420,8 @@ def execute_tool(request, name, raw_arguments):
         return _search_catalog(request, arguments.get('query', ''))
     if name == 'find_products':
         return _search_catalog(request, arguments.get('query', ''))
+    if name == 'get_active_promotions':
+        return _active_promotions(request, arguments.get('related_product_id'))
     if name == 'get_customer_next_steps':
         return _next_steps(request)
     if name == 'propose_add_to_order':

@@ -1,4 +1,5 @@
 import json
+import logging
 from datetime import timedelta
 
 from django.contrib import messages
@@ -32,6 +33,7 @@ from config.ai_assistant.services.orchestrator import get_or_create_conversation
 from config.ai_assistant.services.actions import execute_confirmed_action
 from config.usuarios.permissions import internal_permission_required
 
+logger = logging.getLogger(__name__)
 
 def _json_body(request):
     try:
@@ -188,8 +190,15 @@ def conversation_message(request, public_id):
         return JsonResponse({'error': 'Invalid message.'}, status=400)
     conversation = _conversation_for_request(request, public_id)
     if conversation is None:
-        return JsonResponse({'error': 'Conversation not found.'}, status=404)
-    return JsonResponse(reply_to_message(request=request, conversation=conversation, message=message))
+        return JsonResponse({'error': 'Tu sesión de asistencia se actualizó. Reintentaremos tu mensaje.'}, status=404)
+    try:
+        return JsonResponse(reply_to_message(request=request, conversation=conversation, message=message))
+    except Exception:
+        logger.exception('AI assistant message processing failed: conversation=%s', public_id)
+        return JsonResponse(
+            {'error': 'No pude completar esa consulta en este momento. Inténtalo nuevamente en unos segundos.'},
+            status=503,
+        )
 
 
 @require_POST

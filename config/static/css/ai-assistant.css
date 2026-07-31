@@ -65,6 +65,17 @@
 .ai-assistant-message { margin-bottom: .75rem; padding: .75rem; border-radius: 12px; background: #f1f5f9; white-space: pre-wrap; }
 .ai-assistant-message.is-user { margin-left: 2rem; background: #dbeafe; }
 .ai-assistant-actions { display: flex; flex-wrap: wrap; gap: .5rem; padding: 0 .75rem .75rem; }
+.ai-assistant-promotion-card {
+    width: 100%;
+    padding: .65rem;
+    border: 1px solid #f2b344;
+    border-left: 4px solid #ff9800;
+    border-radius: .55rem;
+    background: #fff8e8;
+    color: #5b3a00;
+}
+.ai-assistant-promotion-card__detail { margin: .35rem 0 .55rem; font-size: .84rem; line-height: 1.35; }
+.ai-assistant-promotion-card__validity { margin: -.25rem 0 .55rem; color: #8a5a00; font-size: .75rem; }
 .ai-assistant-whatsapp { margin: 0 .75rem .75rem; padding: .6rem .75rem; border-radius: .5rem; background: #25d366; color: #fff; font-weight: 600; text-align: center; text-decoration: none; }
 .ai-assistant-whatsapp:hover, .ai-assistant-whatsapp:focus { color: #fff; background: #1ebe57; }
 .ai-assistant-form { display: flex; gap: .5rem; padding: .75rem; border-top: 1px solid #e5e7eb; }

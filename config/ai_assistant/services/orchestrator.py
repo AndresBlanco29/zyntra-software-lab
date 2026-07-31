@@ -698,33 +698,57 @@ def _promotion_intent_result(request, conversation, context, message, model):
     promotion_terms = ('oferta', 'ofertas', 'promoción', 'promocion', 'promociones', 'descuento', 'descuentos', 'special', 'specials')
     if not any(term in normalized for term in promotion_terms):
         return None
-    from config.ai_assistant.services.identity import get_customer_for_user
-    from config.productos.promotions import promociones_activas_queryset
-
-    cliente = get_customer_for_user(request.user)
-    promotions = promociones_activas_queryset(cliente=cliente) if cliente else promociones_activas_queryset()
-    active_promotions = list(promotions[:6])
-    active_count = len(active_promotions)
+    related_product_id = (context.get('assistant_memory') or {}).get('last_product_id')
+    tool_result = execute_tool(
+        request,
+        'get_active_promotions',
+        json.dumps({'related_product_id': related_product_id} if related_product_id else {}),
+    )
+    AssistantMessage.objects.create(
+        conversation=conversation,
+        role=AssistantMessage.ROLE_TOOL,
+        content=redact_content(str(tool_result)),
+        redacted_content=redact_content(str(tool_result)),
+        tool_name='get_active_promotions',
+        tool_payload=tool_result,
+        model=model,
+    )
+    cards = tool_result.get('cards', [])
     catalog_url = f'{reverse("catalogo")}?promociones=1'
-    if active_count:
-        promotion_lines = []
-        for promotion in active_promotions:
-            product_name = promotion.producto.nombre if promotion.producto_id else ''
-            detail = promotion.descripcion.strip() or product_name or promotion.nombre
-            promotion_lines.append(f'• {promotion.nombre}: {detail}')
+    if cards:
+        promotion_lines = [
+            f'• {card["product_name"]}: {card["benefits"][0] if card["benefits"] else card["description"] or card["promotion_name"]}'
+            for card in cards
+        ]
+        authenticated = bool(context.get('authenticated'))
+        actions = [
+            {'label': 'Ver todas las promociones', 'url': catalog_url, 'kind': 'catalog'}
+        ] if authenticated else [{
+            'label': 'Ver todas las promociones',
+            'url': '#',
+            'kind': 'promotion_access',
+            'guest_url': f'{catalog_url}&guest=1',
+            'login_next': catalog_url,
+        }]
+        actions.extend([
+            {'label': 'Ver catálogo', 'url': reverse('catalogo') if authenticated else f'{reverse("catalogo")}?guest=1'},
+            {'label': 'Hablar con un asesor', 'url': '#', 'kind': 'contact_handoff'},
+        ])
+        related_intro = (
+            'Encontré promociones relacionadas con el producto que estabas consultando.\n\n'
+            if tool_result.get('related') else ''
+        )
         return {
             'message': (
-                '¡Claro! Hoy tenemos estas promociones activas:\n\n'
+                f'¡Sí! {related_intro}Actualmente tenemos estas promociones activas:\n\n'
                 + '\n'.join(promotion_lines)
-                + '\n\nMíralas en el catálogo y agrega las que te interesen a tu pedido.'
+                + '\n\nPuedes revisarlas o agregarlas a tu cotización desde el catálogo.'
             ),
-            'suggested_actions': [
-                {'label': 'Ver promociones', 'url': catalog_url, 'kind': 'catalog'},
-                {'label': 'Ver catálogo', 'url': reverse('catalogo'), 'kind': 'catalog'},
-            ],
+            'suggested_actions': actions,
             'tour_id': None,
-            'tool_results': [{'name': 'get_active_promotions', 'result': {'active_count': active_count}}],
+            'tool_results': [{'name': 'get_active_promotions', 'result': tool_result}],
             'confirmation_actions': [],
+            'promotion_cards': cards,
         }
     return {
         'message': 'Por el momento no encontramos promociones activas. Puedes revisar el catálogo completo o hablar con un asesor para conocer las próximas ofertas.',
@@ -733,8 +757,9 @@ def _promotion_intent_result(request, conversation, context, message, model):
             {'label': 'Hablar con un asesor', 'url': '#', 'kind': 'contact_handoff'},
         ],
         'tour_id': None,
-        'tool_results': [{'name': 'get_active_promotions', 'result': {'active_count': 0}}],
+        'tool_results': [{'name': 'get_active_promotions', 'result': tool_result}],
         'confirmation_actions': [],
+        'promotion_cards': [],
     }
 
 

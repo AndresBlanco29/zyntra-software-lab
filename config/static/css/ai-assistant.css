@@ -3,13 +3,60 @@
     right: 1.25rem;
     bottom: 1.25rem;
     z-index: 1060;
-    width: 58px;
-    height: 58px;
-    border: 0;
+    width: 68px;
+    height: 68px;
+    padding: 0;
+    overflow: hidden;
+    border: 3px solid #ffd400;
     border-radius: 50%;
-    background: #0b5ed7;
+    background: radial-gradient(circle at 35% 25%, #4f91ff, #0b3d91 70%);
     color: #fff;
+    box-shadow: 0 10px 24px rgba(11, 61, 145, .45), 0 0 0 4px rgba(255, 212, 0, .16);
+    transition: transform .2s ease, box-shadow .2s ease;
+    animation: ai-assistant-greeting 5s ease-in-out infinite;
+}
+
+.ai-assistant-launcher img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    object-position: center 25%;
+    transform: scale(1.4);
+}
+
+.ai-assistant-launcher-label {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    min-width: 23px;
+    padding: 2px 4px;
+    border: 2px solid #fff;
+    border-radius: 999px;
+    background: #0b3d91;
+    color: #fff;
+    font-size: .62rem;
     font-weight: 800;
+    line-height: 1;
+}
+
+.ai-assistant-launcher:hover,
+.ai-assistant-launcher:focus-visible {
+    transform: translateY(-4px) scale(1.05);
+    box-shadow: 0 14px 30px rgba(11, 61, 145, .55), 0 0 0 5px rgba(255, 212, 0, .25);
+    animation-play-state: paused;
+}
+
+.ai-assistant-launcher:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 3px;
+}
+
+@keyframes ai-assistant-greeting {
+    0%, 82%, 100% { transform: translateY(0) rotate(0); }
+    86% { transform: translateY(-3px) rotate(-3deg); }
+    90% { transform: translateY(-4px) rotate(3deg); }
+    94% { transform: translateY(-2px) rotate(-2deg); }
 }
 
 .ai-assistant-panel {
@@ -39,10 +86,10 @@
 .ai-assistant-form textarea { min-height: 42px; resize: none; }
 
 @media (max-width: 768px) {
-    .ai-assistant-launcher { right: .75rem; bottom: .75rem; }
+    .ai-assistant-launcher { right: .75rem; bottom: .75rem; width: 60px; height: 60px; }
     .ai-assistant-panel {
         right: .75rem;
-        bottom: 4.85rem;
+        bottom: 5.25rem;
         width: calc(100vw - 1.5rem);
         max-height: calc(100dvh - 5.75rem);
     }
@@ -52,4 +99,8 @@
     .ai-assistant-actions { padding: 0 .75rem .65rem; }
     .ai-assistant-actions .btn { width: 100%; }
     .ai-assistant-form { padding: .65rem .75rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ai-assistant-launcher { animation: none; transition: none; }
 }

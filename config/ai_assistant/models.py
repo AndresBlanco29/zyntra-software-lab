@@ -24,7 +24,7 @@ class AssistantConfiguration(models.Model):
     handoff_url = models.URLField(blank=True)
     support_phone = models.CharField(max_length=40, default='+1 (470) 967-2782')
     support_whatsapp = models.CharField(max_length=40, default='17866516897')
-    support_email = models.EmailField(default='lamtortillagrocery@gmail.com')
+    support_email = models.EmailField(default='latortillagrocery@gmail.com')
     location_address = models.TextField(blank=True)
     location_map_url = models.URLField(blank=True)
     delivery_coverage = models.CharField(max_length=250, default='Georgia, Alabama y Tennessee')

@@ -82,6 +82,7 @@ def find_products(query, *, cliente=None, limit=5):
         predicate |= (
             Q(nombre__icontains=term)
             | Q(nombre_en__icontains=term)
+            | Q(codigo_barras__icontains=term)
             | Q(marca__nombre__icontains=term)
             | Q(marca__nombre_en__icontains=term)
             | Q(categoria__nombre__icontains=term)

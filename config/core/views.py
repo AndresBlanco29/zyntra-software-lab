@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 import logging
 from config.productos.models import Producto, Marca, Presentacion
+from config.productos.promotions import promociones_activas_queryset
 from .models import Testimonio, HomeContenido, ensure_homecontenido_quienes_schema
 from urllib.parse import urlparse
 
@@ -64,6 +65,34 @@ def _get_cached_home_productos():
         ))
         cache.set(cache_key, productos, HOME_CACHE_TIMEOUT)
     return productos
+
+
+def _get_cached_home_promotions():
+    cache_key = "home:promociones_activas"
+    promotions = cache.get(cache_key)
+    if promotions is None:
+        promotions = list(
+            promociones_activas_queryset()
+            .defer("imagen")
+            .prefetch_related(
+                "producto__presentaciones",
+                "productos_grupo__producto__presentaciones",
+            )
+        )
+        for promotion in promotions:
+            group_item = next(iter(promotion.productos_grupo.all()), None)
+            product = promotion.producto or (group_item.producto if group_item else None)
+            presentation = promotion.presentacion or (group_item.presentacion if group_item else None)
+            promotion.display_product = product
+            promotion.display_presentation = presentation or (
+                next(iter(product.presentaciones.all()), None) if product else None
+            )
+            promotion.display_image = product.imagen if product else None
+            promotion.product_name = product.nombre if product else promotion.nombre
+            promotion.primera_presentacion = promotion.display_presentation
+            promotion.presentaciones_prefetch = list(product.presentaciones.all()) if product else []
+        cache.set(cache_key, promotions, HOME_CACHE_TIMEOUT)
+    return promotions
 
 
 def _get_cached_home_marcas():
@@ -262,13 +291,15 @@ def home(request):
         marcas = _get_cached_home_marcas()
         testimonios = _get_cached_home_testimonios()
         productos_destacados = _get_cached_home_productos()
-        ofertas_chunks = list(chunk(productos_destacados, 4))
+        promociones_destacadas = _get_cached_home_promotions()
+        ofertas_chunks = list(chunk(promociones_destacadas, 4))
         home_contenido = _get_cached_home_contenido()
     except (OperationalError, ProgrammingError) as exc:
         logger.warning("home fallback due to db error: %s", exc)
         marcas = []
         testimonios = []
         productos_destacados = []
+        promociones_destacadas = []
         ofertas_chunks = []
         home_contenido = None
 
@@ -276,6 +307,7 @@ def home(request):
         "marcas": marcas,
         "testimonios": testimonios,
         "productos_destacados": productos_destacados,
+        "promociones_destacadas": promociones_destacadas,
         "ofertas_chunks": ofertas_chunks,
         "home_contenido": home_contenido,
     }

@@ -600,19 +600,17 @@ en un mercado competitivo.
 
 <div class="producto-oferta">
 
-{% if producto.descuento > 0 %}
 <div class="sale-badge">
--{{ producto.descuento }}%
+<i class="bi bi-stars"></i> {% trans "PROMOTION" %}
 </div>
-{% endif %}
 
-{% if producto.imagen %}
-<img src="{{ producto.imagen.url }}" class="producto-img">
+{% if producto.display_image %}
+<img src="{{ producto.display_image.url }}" class="producto-img">
 {% else %}
 <img src="{% static 'img/product-placeholder.svg' %}" class="producto-img producto-img--placeholder" alt="{% trans 'No product image' %}">
 {% endif %}
 
-<h5>{{ producto.nombre }}</h5>
+<h5>{{ producto.product_name }}</h5>
 
                 {% with producto.primera_presentacion as presentacion %}
 {% if presentacion %}
@@ -621,6 +619,7 @@ en un mercado competitivo.
 </p>
 {% endif %}
 {% endwith %}
+<p class="oferta-promocion-descripcion">{{ producto.descripcion|default:producto.nombre }}</p>
 
 <div class="producto-opcion">
 
@@ -654,7 +653,7 @@ en un mercado competitivo.
 
 </div>
 
-<button class="btn btn-yellow btn-sm mt-2 agregar-oferta-btn">{% trans "Añadir a cotización" %}</button>
+<button type="button" class="btn btn-yellow btn-sm mt-2 agregar-oferta-btn" data-ai-tour="login" data-bs-toggle="modal" data-bs-target="#loginModal">{% trans "Sign in to request a quote" %}</button>
 
 </div>
 
@@ -691,19 +690,17 @@ en un mercado competitivo.
 
 <div class="producto-oferta">
 
-{% if producto.descuento > 0 %}
 <div class="sale-badge">
--{{ producto.descuento }}%
+<i class="bi bi-stars"></i> {% trans "PROMOTION" %}
 </div>
-{% endif %}
 
-{% if producto.imagen %}
-<img src="{{ producto.imagen.url }}" class="producto-img">
+{% if producto.display_image %}
+<img src="{{ producto.display_image.url }}" class="producto-img">
 {% else %}
 <img src="{% static 'img/product-placeholder.svg' %}" class="producto-img producto-img--placeholder" alt="{% trans 'No product image' %}">
 {% endif %}
 
-<h5>{{ producto.nombre }}</h5>
+<h5>{{ producto.product_name }}</h5>
 
 {% with producto.primera_presentacion as presentacion %}
 {% if presentacion %}
@@ -712,6 +709,7 @@ en un mercado competitivo.
 </p>
 {% endif %}
 {% endwith %}
+<p class="oferta-promocion-descripcion">{{ producto.descripcion|default:producto.nombre }}</p>
 
 <div class="producto-opcion">
 <label>{% trans "Presentación:" %}</label>
@@ -733,7 +731,7 @@ en un mercado competitivo.
 </div>
 </div>
 
-<button class="btn btn-yellow btn-sm mt-2 agregar-oferta-btn">{% trans "Añadir a cotización" %}</button>
+<button type="button" class="btn btn-yellow btn-sm mt-2 agregar-oferta-btn" data-ai-tour="login" data-bs-toggle="modal" data-bs-target="#loginModal">{% trans "Sign in to request a quote" %}</button>
 
 </div>
 

@@ -1949,6 +1949,21 @@ document.addEventListener('DOMContentLoaded', function() {
       // Cuando se cierra el modal, también reemplazar el estado
       window.history.replaceState(null, null, window.location.href);
     });
+
+    loginModal.addEventListener('hidden.bs.modal', function() {
+      // Bootstrap can leave a stale backdrop after a modal opened from a carousel card.
+      // Only remove it when no other modal is currently visible.
+      window.setTimeout(function() {
+        if (document.querySelector('.modal.show')) {
+          return;
+        }
+        document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
+          backdrop.remove();
+        });
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
+      }, 0);
+    });
   }
   
   // Detectar cuando el usuario intenta usar el botón atrás

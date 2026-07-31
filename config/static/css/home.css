@@ -2176,6 +2176,34 @@ margin-bottom:10px;
     line-height: 1.35;
 }
 
+#ofertas .producto-oferta {
+    min-height: 365px;
+    display: flex;
+    flex-direction: column;
+    border: 2px solid #e85d45;
+    box-shadow: 0 10px 25px rgba(202, 69, 49, .16);
+}
+
+#ofertas .producto-oferta .producto-img {
+    height: 130px;
+}
+
+#ofertas .producto-oferta h5 {
+    min-height: 2.7rem;
+}
+
+#ofertas .producto-oferta .producto-info {
+    min-height: 1.25rem;
+}
+
+#ofertas .producto-oferta .oferta-promocion-descripcion {
+    min-height: 2.9rem;
+}
+
+#ofertas .producto-oferta .agregar-oferta-btn {
+    margin-top: auto !important;
+}
+
 .producto-oferta .btn-yellow{
 
 display:block;

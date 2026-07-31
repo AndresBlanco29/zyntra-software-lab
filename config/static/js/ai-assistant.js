@@ -332,6 +332,12 @@
         .catch(function () {});
     });
 
+    document.addEventListener("show.bs.modal", function (event) {
+      if (event.target && event.target.id === "loginModal") {
+        setPanelOpen(false);
+      }
+    });
+
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       const value = input.value.trim();

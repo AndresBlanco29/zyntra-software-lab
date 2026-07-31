@@ -36,6 +36,16 @@ class AssistantApiTests(TestCase):
         self.assertTrue(AssistantVisitorProfile.objects.exists())
         self.assertIn('ai_assistant_visitor', response.cookies)
 
+    def test_first_visit_greeting_uses_the_configured_assistant_name(self):
+        self.config.assistant_name = 'Isabella'
+        self.config.save(update_fields=['assistant_name'])
+
+        response = self.client.get(reverse('ai_assistant_context'))
+
+        message = response.json()['proactive']['message']
+        self.assertIn('Soy Isabella', message)
+        self.assertNotIn('Paco', message)
+
     def test_conversation_message_uses_safe_fallback_without_openai_key(self):
         created = self.client.post(
             reverse('ai_assistant_create_conversation'),

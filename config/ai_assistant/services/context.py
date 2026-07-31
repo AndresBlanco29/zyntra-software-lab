@@ -2,7 +2,7 @@ from django.urls import reverse
 from django.utils import timezone
 from datetime import datetime, timedelta
 
-from config.ai_assistant.models import AssistantDomainEvent, AssistantUserState
+from config.ai_assistant.models import AssistantConfiguration, AssistantDomainEvent, AssistantUserState
 from config.ai_assistant.services.identity import get_customer_for_user, get_visitor_id, get_visitor_profile
 from config.ai_assistant.services.customer_success_profile import touch_success_profile
 from config.ai_assistant.services.customer_success import build_customer_success_summary
@@ -77,7 +77,8 @@ def build_customer_context(request):
                 'kind': 'first_visit',
                 'message': (
                     '¡Hola! 👋\n\nBienvenido a La Tortilla Grocery.\n\n'
-                    'Soy Paco, tu asistente virtual. Veo que es tu primera visita. ¿En qué puedo ayudarte hoy?'
+                    f'Soy {AssistantConfiguration.get_solo().assistant_name}, tu asistente virtual. '
+                    'Veo que es tu primera visita. ¿En qué puedo ayudarte hoy?'
                 ),
                 'actions': [
                     {'label': 'Registrarme como cliente', 'url': reverse('home'), 'tour_id': 'registration'},

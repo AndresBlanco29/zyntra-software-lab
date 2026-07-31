@@ -25,6 +25,9 @@
     </header>
     <div class="ai-assistant-messages" data-ai-messages aria-live="polite"></div>
     <div class="ai-assistant-actions" data-ai-actions></div>
+    <a class="ai-assistant-whatsapp" data-ai-whatsapp hidden target="_blank" rel="noopener noreferrer">
+      <i class="bi bi-whatsapp" aria-hidden="true"></i> {% trans "Talk to an advisor on WhatsApp" %}
+    </a>
     <form class="ai-assistant-form" data-ai-form>
       <label class="visually-hidden" for="aiAssistantInput">{% trans "Message" %}</label>
       <textarea class="form-control" id="aiAssistantInput" data-ai-input maxlength="2000" placeholder="{% trans 'How can I help you?' %}"></textarea>

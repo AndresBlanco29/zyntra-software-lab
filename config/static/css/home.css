@@ -4724,7 +4724,7 @@ background:rgba(255,255,255,.25);
 .whatsapp-float {
     position: fixed;
     right: 18px;
-    bottom: 18px;
+    bottom: 5.75rem;
     z-index: 45;
     display: inline-flex;
     align-items: center;
@@ -4739,6 +4739,13 @@ background:rgba(255,255,255,.25);
     cursor: pointer;
     transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
     animation: whatsapp-float-pulse 2.8s ease-in-out infinite;
+}
+
+body.ai-assistant-open .whatsapp-float {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(12px);
+    animation-play-state: paused;
 }
 
 .whatsapp-float i {
@@ -4861,7 +4868,7 @@ background:rgba(255,255,255,.25);
 
     .whatsapp-float {
         right: 14px;
-        bottom: 14px;
+        bottom: 5.1rem;
         width: 52px;
         height: 52px;
     }
@@ -4874,7 +4881,7 @@ background:rgba(255,255,255,.25);
 @media (max-width: 480px) {
     .whatsapp-float {
         right: 12px;
-        bottom: 12px;
+        bottom: 5rem;
         width: 48px;
         height: 48px;
     }
@@ -4889,7 +4896,7 @@ background:rgba(255,255,255,.25);
         width: 54px;
         height: 54px;
         right: 16px;
-        bottom: 16px;
+        bottom: 5.5rem;
     }
 }
 

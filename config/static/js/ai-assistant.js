@@ -134,8 +134,22 @@
     const messages = root.querySelector("[data-ai-messages]");
     const actions = root.querySelector("[data-ai-actions]");
     const deleteHistory = root.querySelector("[data-ai-delete-history]");
+    const whatsappFloat = document.querySelector(".whatsapp-float");
+    const whatsappAction = root.querySelector("[data-ai-whatsapp]");
     let conversationId = "";
     let booted = false;
+
+    if (whatsappFloat && whatsappAction) {
+      whatsappAction.href = whatsappFloat.href;
+      whatsappAction.hidden = false;
+    }
+
+    function setPanelOpen(open) {
+      panel.classList.toggle("is-open", open);
+      launcher.setAttribute("aria-expanded", open ? "true" : "false");
+      document.body.classList.toggle("ai-assistant-open", open);
+      if (open) input.focus();
+    }
 
     function ensureConversation() {
       if (conversationId) return Promise.resolve(conversationId);
@@ -164,9 +178,7 @@
             appendMessage(messages, context.proactive.message, false);
             renderActions(actions, context.proactive.actions);
             if (options.autoOpen) {
-              panel.classList.add("is-open");
-              launcher.setAttribute("aria-expanded", "true");
-              input.focus();
+              setPanelOpen(true);
             }
           } else {
             appendMessage(messages, context.welcome_message, false);
@@ -182,9 +194,7 @@
 
     launcher.addEventListener("click", function () {
       boot();
-      panel.classList.toggle("is-open");
-      launcher.setAttribute("aria-expanded", panel.classList.contains("is-open") ? "true" : "false");
-      if (panel.classList.contains("is-open")) input.focus();
+      setPanelOpen(!panel.classList.contains("is-open"));
     });
 
     const requestedTour = new URLSearchParams(window.location.search).get("ai_tour");
@@ -194,8 +204,7 @@
 
     window.addEventListener("tortilla-assistant-tour-started", function (event) {
       root.dataset.tourActive = "true";
-      panel.classList.remove("is-open");
-      launcher.setAttribute("aria-expanded", "false");
+      setPanelOpen(false);
     });
 
     window.addEventListener("tortilla-assistant-tour-dismissed", function (event) {
@@ -204,8 +213,7 @@
       const resumeIndex = event.detail && event.detail.resumeIndex;
       if (!tourId) return;
       boot();
-      panel.classList.add("is-open");
-      launcher.setAttribute("aria-expanded", "true");
+      setPanelOpen(true);
       appendMessage(messages, "La guía se pausó. Puedes retomarla cuando quieras.", false);
       renderActions(actions, [{
         label: "Reanudar guía paso a paso",
@@ -213,7 +221,6 @@
         tour_id: tourId,
         resume_index: Number.isInteger(resumeIndex) ? resumeIndex : 0
       }]);
-      input.focus();
     });
 
     form.addEventListener("submit", function (event) {

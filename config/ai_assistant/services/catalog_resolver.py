@@ -118,7 +118,7 @@ def _product_dto(product, query, promotion_ids, cliente, score=0, match=None):
     }
 
 
-def find_products(query, *, cliente=None, limit=5):
+def find_products(query, *, cliente=None, limit=10):
     """Find catalog products from canonical data, aliases and bounded fuzzy ranking."""
     query = str(query or '').strip()
     normalized = normalize_catalog_term(query)

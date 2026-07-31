@@ -305,11 +305,11 @@ def _purchase_intent_result(request, conversation, context, message, model):
     normalized = str(message or '').lower().strip()
     if any(term in normalized for term in ('contraseña', 'password', 'iniciar sesión', 'iniciar sesion', 'login', 'cuenta aprob')):
         return None
-    triggers = ('tienen', 'tienes', 'busco', 'necesito', 'quiero comprar', 'comprar', 'producto', 'bebida', 'precio', 'precios', 'price', 'cost')
+    triggers = ('no tienen', 'no hay', 'tienen', 'tienes', 'busco', 'necesito', 'quiero comprar', 'comprar', 'producto', 'bebida', 'precio', 'precios', 'price', 'cost')
     if not any(trigger in normalized for trigger in triggers):
         return None
     query = re.sub(
-        r'\b(tienen|tienes|busco|necesito|quiero comprar|quiero|comprar|producto|productos|una|un|de|por favor|please|precio|precios|price|cost)\b',
+        r'\b(no tienen|no hay|tienen|tienes|busco|necesito|quiero comprar|quiero|comprar|producto|productos|una|un|de|por favor|please|precio|precios|price|cost)\b',
         ' ',
         message,
         flags=re.IGNORECASE,

@@ -3,7 +3,8 @@ import uuid
 from datetime import timedelta
 from unittest.mock import patch
 
-from django.test import TestCase, override_settings
+from django.contrib.auth.models import AnonymousUser
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -605,6 +606,121 @@ class CatalogNamingTests(TestCase):
 
         self.assertIsNotNone(products)
         self.assertIn('SODA COCA COLA 6/3LT', _exact_catalog_answer(products))
+
+
+class MessyProductQueryTests(TestCase):
+    """The customer types the amount, plurals and words out of order."""
+
+    def setUp(self):
+        from config.productos.models import Producto
+
+        self.product = Producto.objects.create(nombre='JARRITO MANGO 24/12.5OZ', activo=True)
+        Producto.objects.create(nombre='SODA COCA COLA 6/3LT', activo=True)
+
+    def test_amount_and_packaging_are_dropped_before_searching(self):
+        from config.ai_assistant.services.catalog_resolver import strip_quantity_noise
+
+        self.assertEqual(strip_quantity_noise('10 cajas jarritos mango'), 'jarritos mango')
+        self.assertEqual(strip_quantity_noise('10 jarritos mango'), 'jarritos mango')
+        self.assertEqual(strip_quantity_noise('5 unidades de coca cola'), 'de coca cola')
+
+    def test_a_size_is_never_mistaken_for_an_amount(self):
+        from config.ai_assistant.services.catalog_resolver import strip_quantity_noise
+
+        self.assertEqual(strip_quantity_noise('3 litros coca cola'), '3 litros coca cola')
+
+    def test_plural_and_amount_still_find_the_catalog_product(self):
+        from config.ai_assistant.services.catalog_resolver import find_products
+
+        result = find_products('10 cajas jarritos mango')
+
+        self.assertEqual(result['query'], 'jarritos mango')
+        self.assertEqual(result['products'][0]['name'], 'JARRITO MANGO 24/12.5OZ')
+
+    def test_words_out_of_order_still_find_the_product(self):
+        from config.ai_assistant.services.catalog_resolver import find_products
+
+        result = find_products('mango jarrito')
+
+        self.assertEqual(result['products'][0]['name'], 'JARRITO MANGO 24/12.5OZ')
+
+    def test_naming_another_product_starts_a_new_search(self):
+        from config.ai_assistant.models import AssistantConversation
+        from config.ai_assistant.services.conversation_state import update_state
+        from config.ai_assistant.services.intent_router import resolve_intent
+
+        conversation = AssistantConversation.objects.create(visitor_id=uuid.uuid4(), language='es')
+        update_state(conversation, selected_product={'name': 'SODA COCA COLA 6/3LT', 'brand': ''})
+
+        self.assertEqual(
+            resolve_intent(
+                conversation=conversation,
+                message='necesito 10 cajas de jarritos mango',
+                context={'authenticated': False},
+            ),
+            'product_search',
+        )
+
+    def test_a_bare_amount_still_belongs_to_the_selected_product(self):
+        from config.ai_assistant.models import AssistantConversation
+        from config.ai_assistant.services.conversation_state import update_state
+        from config.ai_assistant.services.intent_router import resolve_intent
+
+        conversation = AssistantConversation.objects.create(visitor_id=uuid.uuid4(), language='es')
+        update_state(conversation, selected_product={'name': 'SODA COCA COLA 6/3LT', 'brand': ''})
+
+        self.assertEqual(
+            resolve_intent(
+                conversation=conversation,
+                message='quiero 10 cajas',
+                context={'authenticated': False},
+            ),
+            'product_reference',
+        )
+
+
+class PurchaseCallToActionTests(TestCase):
+    """A visitor is invited to sign in; a customer is helped into the cart."""
+
+    def setUp(self):
+        from config.productos.models import Producto
+
+        Producto.objects.create(nombre='JARRITO MANGO 24/12.5OZ', activo=True)
+        self.factory = RequestFactory()
+
+    def _result(self, *, authenticated):
+        from config.ai_assistant.models import AssistantConversation
+        from config.ai_assistant.services.orchestrator import _purchase_intent_result
+
+        from django.contrib.sessions.backends.db import SessionStore
+
+        request = self.factory.post('/')
+        request.user = AnonymousUser()
+        request.session = SessionStore()
+        conversation = AssistantConversation.objects.create(visitor_id=uuid.uuid4(), language='es')
+        return _purchase_intent_result(
+            request,
+            conversation,
+            {'authenticated': authenticated, 'page': 'home'},
+            'necesito 10 cajas de jarritos mango',
+            '',
+        )
+
+    def test_visitor_is_asked_to_sign_in_to_build_the_quote(self):
+        result = self._result(authenticated=False)
+
+        labels = [action['label'] for action in result['suggested_actions']]
+        self.assertIn('JARRITO MANGO 24/12.5OZ', result['message'])
+        self.assertIn('inicies sesión', result['message'])
+        self.assertIn('Iniciar sesión para cotizar', labels)
+        self.assertNotIn('Agregar al carrito', labels)
+
+    def test_signed_in_customer_is_offered_the_cart(self):
+        result = self._result(authenticated=True)
+
+        labels = [action['label'] for action in result['suggested_actions']]
+        self.assertIn('Agregar al carrito', labels)
+        self.assertNotIn('Iniciar sesión para cotizar', labels)
 
 
 class ConversationOwnershipTests(TestCase):

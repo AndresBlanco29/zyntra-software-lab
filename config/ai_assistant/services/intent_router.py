@@ -9,7 +9,11 @@ over account questions, and the orchestrator then runs a single handler.
 
 import re
 
-from config.ai_assistant.services.catalog_resolver import normalize_catalog_term
+from config.ai_assistant.services.catalog_resolver import (
+    catalog_tokens,
+    normalize_catalog_term,
+    strip_quantity_noise,
+)
 from config.ai_assistant.services.conversation_purchase import (
     mentions_current_selection,
     ordinal_index,
@@ -42,6 +46,28 @@ def _has(normalized, terms):
 
 def _contains(normalized, terms):
     return any(term in normalized for term in terms)
+
+
+FILLER_TERMS = frozenset({
+    'de', 'del', 'los', 'las', 'por', 'favor', 'please', 'quiero', 'necesito', 'dame',
+    'ponme', 'agrega', 'agregar', 'add', 'mas', 'unos', 'unas', 'para',
+})
+
+
+def _names_another_product(normalized, state):
+    """True when the message still names a product after removing the amount.
+
+    "10 cajas" is a quantity for the current product, but "10 cajas de jarritos
+    mango" names a different one and must start a new search instead of silently
+    setting a quantity on whatever was selected before.
+    """
+    residual = {
+        token for token in catalog_tokens(strip_quantity_noise(normalized))
+        if len(token) > 2 and token not in FILLER_TERMS
+    }
+    product = state.get('selected_product') or {}
+    known = catalog_tokens(f"{product.get('name', '')} {product.get('brand', '')}")
+    return bool(residual - known)
 
 
 def _looks_like_quantity_reply(normalized):
@@ -85,7 +111,11 @@ def resolve_intent(*, conversation, message, context):
     if (has_results or has_selection) and references_selection:
         return 'product_reference'
 
-    if has_selection and _looks_like_quantity_reply(normalized):
+    if (
+        has_selection
+        and _looks_like_quantity_reply(normalized)
+        and not _names_another_product(normalized, state)
+    ):
         return 'product_reference'
 
     if _multi_line_count(message) >= 2:

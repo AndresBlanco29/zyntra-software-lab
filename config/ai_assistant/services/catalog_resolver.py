@@ -21,10 +21,43 @@ RELATED_TERMS = {
 }
 
 
+PACKAGING_WORDS = (
+    'cajas', 'caja', 'unidades', 'unidad', 'paquetes', 'paquete', 'bultos', 'bulto',
+    'piezas', 'pieza', 'cases', 'case', 'boxes', 'box', 'packs', 'pack', 'cs', 'und', 'pza',
+)
+SIZE_WORDS = ('lt', 'l', 'oz', 'ml', 'litros', 'litro', 'gr', 'g', 'kg', 'lb', 'lbs', 'gal')
+
+
 def normalize_catalog_term(value):
     text = unicodedata.normalize('NFKD', str(value or '').lower())
     text = ''.join(char for char in text if not unicodedata.combining(char))
     return re.sub(r'[^a-z0-9]+', ' ', text).strip()
+
+
+def strip_quantity_noise(value):
+    """Drop the "10 cajas de" wording so only the catalog term is searched.
+
+    Customers type the amount and the product together. Leaving "10 cajas" in the
+    query diluted the token overlap enough to push a real product below the match
+    threshold, so the catalog answered that it did not exist.
+    """
+    text = normalize_catalog_term(value)
+    packaging = '|'.join(PACKAGING_WORDS)
+    text = re.sub(rf'\b\d+\s*(?:{packaging})\b', ' ', text)
+    # A leading amount, unless it is really a size such as "3 litros".
+    text = re.sub(rf'^\s*\d{{1,4}}\s+(?!(?:{"|".join(SIZE_WORDS)})\b)', ' ', text)
+    text = re.sub(rf'\b(?:{packaging})\b', ' ', text)
+    cleaned = re.sub(r'\s+', ' ', text).strip()
+    return cleaned or normalize_catalog_term(value)
+
+
+def _stem(token):
+    """Fold Spanish plurals so "jarritos" still matches the catalog's "JARRITO"."""
+    if len(token) > 4 and token.endswith('es') and not token.endswith('ses'):
+        return token[:-2]
+    if len(token) > 3 and token.endswith('s'):
+        return token[:-1]
+    return token
 
 
 def _score(query, *values):
@@ -48,7 +81,12 @@ def _query_tokens(value):
     for source, replacement in RELATED_TERMS.items():
         if source in normalized:
             normalized = normalized.replace(source, replacement)
-    return {token for token in normalized.split() if len(token) > 1}
+    return {_stem(token) for token in normalized.split() if len(token) > 1}
+
+
+def catalog_tokens(value):
+    """Normalized, plural-folded words of a phrase, for comparing against a name."""
+    return _query_tokens(value)
 
 
 def _size_tokens(value):
@@ -118,39 +156,59 @@ def _product_dto(product, query, promotion_ids, cliente, score=0, match=None):
     }
 
 
+def _term_predicate(term):
+    return (
+        Q(nombre__icontains=term)
+        | Q(nombre_en__icontains=term)
+        | Q(codigo_barras__icontains=term)
+        | Q(marca__nombre__icontains=term)
+        | Q(marca__nombre_en__icontains=term)
+        | Q(categoria__nombre__icontains=term)
+        | Q(categoria__nombre_en__icontains=term)
+        | Q(presentaciones__nombre__icontains=term)
+        | Q(presentaciones__nombre_en__icontains=term)
+    )
+
+
+def _candidates_for(predicate, limit=80):
+    return list(
+        Producto.objects.filter(activo=True).filter(predicate).distinct()
+        .select_related('marca', 'categoria')
+        .prefetch_related('presentaciones')[:limit]
+    )
+
+
 def find_products(query, *, cliente=None, limit=10):
     """Find catalog products from canonical data, aliases and bounded fuzzy ranking."""
     query = str(query or '').strip()
-    normalized = normalize_catalog_term(query)
-    if not normalized:
+    if not normalize_catalog_term(query):
         return {'query': query, 'products': [], 'related_products': []}
+    # Everything downstream ranks and links against the cleaned term, so the answer
+    # and the catalog URL reflect what was actually searched.
+    search_query = strip_quantity_noise(query)
 
     aliases = list(
-        AssistantProductAlias.objects.filter(active=True, alias__icontains=query)
+        AssistantProductAlias.objects.filter(active=True, alias__icontains=search_query)
         .select_related('product', 'brand')[:20]
     )
     alias_product_ids = [item.product_id for item in aliases if item.product_id]
     alias_brand_ids = [item.brand_id for item in aliases if item.brand_id]
-    terms = [query] + [item.alias for item in aliases]
     predicate = Q(pk__in=alias_product_ids) | Q(marca_id__in=alias_brand_ids)
-    for term in terms:
-        predicate |= (
-            Q(nombre__icontains=term)
-            | Q(nombre_en__icontains=term)
-            | Q(codigo_barras__icontains=term)
-            | Q(marca__nombre__icontains=term)
-            | Q(marca__nombre_en__icontains=term)
-            | Q(categoria__nombre__icontains=term)
-            | Q(categoria__nombre_en__icontains=term)
-            | Q(presentaciones__nombre__icontains=term)
-            | Q(presentaciones__nombre_en__icontains=term)
-        )
-    candidates = list(
-        Producto.objects.filter(activo=True).filter(predicate).distinct()
-        .select_related('marca', 'categoria')
-        .prefetch_related('presentaciones')[:60]
-    )
-    # If substring matching produced no candidates, rank a bounded active catalog set.
+    for term in [search_query] + [item.alias for item in aliases]:
+        predicate |= _term_predicate(term)
+    candidates = _candidates_for(predicate)
+
+    # The whole phrase rarely appears verbatim in a name. Retry word by word on the
+    # singular stem before giving up, so a plural or a reordered phrase still hits.
+    if not candidates:
+        token_predicate = Q()
+        for token in sorted(_query_tokens(search_query)):
+            if len(token) >= 4:
+                token_predicate |= _term_predicate(token)
+        if token_predicate:
+            candidates = _candidates_for(token_predicate, limit=120)
+
+    # Last resort: rank a bounded active catalog set.
     if not candidates:
         candidates = list(
             Producto.objects.filter(activo=True).select_related('marca', 'categoria').prefetch_related('presentaciones')[:400]
@@ -159,7 +217,7 @@ def find_products(query, *, cliente=None, limit=10):
         (
             (
                 product,
-                _product_score(query, product),
+                _product_score(search_query, product),
             )
             for product in candidates
         ),
@@ -169,7 +227,7 @@ def find_products(query, *, cliente=None, limit=10):
     selected = [(product, score, match) for product, (score, match) in ranked if score >= 0.55][:limit]
     promotion_ids = _promotion_product_ids(cliente)
     products = [
-        _product_dto(product, query, promotion_ids, cliente, score=score, match=match)
+        _product_dto(product, search_query, promotion_ids, cliente, score=score, match=match)
         for product, score, match in selected
     ]
     related = []
@@ -185,4 +243,4 @@ def find_products(query, *, cliente=None, limit=10):
             .select_related('marca', 'categoria').prefetch_related('presentaciones')[:4]
         )
         related = [_product_dto(product, product.nombre, promotion_ids, cliente) for product in related_queryset]
-    return {'query': query, 'products': products, 'related_products': related}
+    return {'query': search_query, 'products': products, 'related_products': related}

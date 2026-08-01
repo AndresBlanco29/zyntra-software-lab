@@ -350,16 +350,21 @@ def _purchase_intent_result(request, conversation, context, message, model):
     if tool_failed(tool_result):
         return unavailable_result([{'label': 'Abrir catálogo', 'url': reverse('catalogo'), 'kind': 'catalog'}])
     products = tool_result.get('products', [])
+    # The resolver drops the amount ("10 cajas") before searching; quote what it used.
+    searched = tool_result.get('query') or query
     logger.info('AI commercial product intent resolved: matched=%s', bool(products))
     if not products:
         from config.ai_assistant.services.contact import build_contact_dto
 
+        actions = build_contact_dto().get('actions', [])
+        if not context.get('authenticated'):
+            actions = [{'label': 'Iniciar sesión para cotizar', 'url': '#', 'tour_id': 'login'}] + actions
         return {
             'message': (
-                f"Busqué “{query}” en nuestro catálogo y no encontré una coincidencia confirmada. "
+                f"Busqué “{searched}” en nuestro catálogo y no encontré una coincidencia confirmada. "
                 "Un asesor puede ayudarte a localizarlo o recomendar una alternativa."
             ),
-            'suggested_actions': build_contact_dto().get('actions', []),
+            'suggested_actions': actions,
             'tour_id': None,
             'tool_results': [{'name': 'find_products', 'result': tool_result}],
             'confirmation_actions': [],
@@ -414,12 +419,21 @@ def _purchase_intent_result(request, conversation, context, message, model):
     )
     actions = [
         {'label': 'Ver producto', 'url': product['catalog_url'], 'kind': 'catalog'},
-        {'label': 'Agregar al carrito', 'url': product['catalog_url'], 'kind': 'catalog'},
         {'label': 'Ver promociones', 'url': f"{product['catalog_url']}&promociones=1", 'kind': 'catalog'},
         {'label': 'Abrir catálogo', 'url': reverse('catalogo'), 'kind': 'catalog'},
     ]
     if context.get('authenticated'):
+        actions.insert(1, {'label': 'Agregar al carrito', 'url': product['catalog_url'], 'kind': 'catalog'})
         actions.append({'label': 'Solicitar cotización', 'url': reverse('ver_cotizacion'), 'kind': 'catalog'})
+    else:
+        # A visitor cannot hold a cart, so the next step is signing in, not a dead
+        # "add to cart" button that only reopens the catalog.
+        reply += (
+            ' Para armar tu cotización y agregarlo al carrito necesito que inicies sesión; '
+            'apenas entres te ayudo a añadirlo con la cantidad que necesitas.'
+        )
+        actions.insert(1, {'label': 'Iniciar sesión para cotizar', 'url': '#', 'tour_id': 'login'})
+        actions.append({'label': 'Aún no tengo cuenta', 'url': reverse('home'), 'tour_id': 'registration'})
     confirmations = []
     if context.get('authenticated') and product.get('pricing_available'):
         prices = ', '.join(

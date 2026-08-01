@@ -912,7 +912,7 @@ class QuickBooksItemCostSyncTests(TestCase):
         Presentacion.objects.create(producto=producto, nombre='Unit', quickbooks_id='QB-MISSING')
         mock_fetch_map.return_value = {}
 
-        result = refresh_linked_quickbooks_items()
+        result = refresh_linked_quickbooks_items(client=Mock())
 
         producto.refresh_from_db()
         self.assertFalse(producto.activo)
@@ -922,7 +922,7 @@ class QuickBooksItemCostSyncTests(TestCase):
     @patch('config.integrations.quickbooks.sync._fetch_quickbooks_item_payload')
     @patch('config.integrations.quickbooks.sync.import_quickbooks_items')
     @patch('config.integrations.quickbooks.sync._fetch_quickbooks_items_map')
-    def test_refresh_linked_items_deactivates_inactive_item_from_authoritative_fetch(
+    def test_refresh_linked_items_uses_inactive_flag_from_bulk_authoritative_payload(
         self,
         mock_fetch_map,
         mock_incremental,
@@ -935,28 +935,28 @@ class QuickBooksItemCostSyncTests(TestCase):
             activo=True,
             quickbooks_id='QB-PRUEBA-3',
         )
-        Presentacion.objects.create(producto=producto, nombre='Unit', quickbooks_id='QB-PRUEBA-3')
+        Presentacion.objects.create(
+            producto=producto,
+            nombre='Unit',
+            unidades=1,
+            tipo_contenido='unidad',
+            quickbooks_id='QB-PRUEBA-3',
+        )
         mock_fetch_map.return_value = {
             'QB-PRUEBA-3': {
                 'Id': 'QB-PRUEBA-3',
                 'Name': 'PRUEBA 3 PRODUCTO',
                 'Type': 'Inventory',
-                'Active': True,
-            }
-        }
-        mock_fetch_item.return_value = {
-            'Id': 'QB-PRUEBA-3',
-            'Name': 'PRUEBA 3 PRODUCTO',
-            'Type': 'Inventory',
-            'Active': False,
+                'Active': False,
+            },
         }
 
-        result = refresh_linked_quickbooks_items()
+        result = refresh_linked_quickbooks_items(client=Mock())
 
         producto.refresh_from_db()
         self.assertFalse(producto.activo)
         self.assertEqual(result['updated_count'], 1)
-        mock_fetch_item.assert_called()
+        mock_fetch_item.assert_not_called()
 
 
 class QuickBooksLinkedItemUpdateTests(TestCase):

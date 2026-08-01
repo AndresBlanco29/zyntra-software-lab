@@ -4206,7 +4206,7 @@ def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None
                     skip_images=skip_images,
                     prefetched_presentacion=prefetched_presentaciones.get(qb_id),
                     lookup_cache=lookup_cache,
-                    force_active_refresh=True,
+                    force_active_refresh=False,
                 )
             presentacion = _deactivate_local_product_for_quickbooks_item(
                 quickbooks_id=qb_id,
@@ -4237,7 +4237,14 @@ def refresh_linked_quickbooks_items(*, limit=None, max_results=None, client=None
             skip_images=skip_images,
             prefetched_presentacion=prefetched_presentaciones.get(qb_id),
             lookup_cache=lookup_cache,
-            force_active_refresh=True,
+            # ``items_map`` comes from a bulk ``select * from Item where Id IN``.
+            # Its Active flag is authoritative, so do not issue a second
+            # read-by-id request for every linked catalog row. The former
+            # force refresh turned 1,299 items into 1,299 serial HTTP calls
+            # (up to 30 seconds each) and made the task appear frozen midway.
+            # The missing-item branch above still reads individually because
+            # no bulk payload was returned for that specific id.
+            force_active_refresh=False,
         )
 
     linked_result = _import_batch_result(

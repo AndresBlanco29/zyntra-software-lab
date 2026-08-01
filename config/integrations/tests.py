@@ -67,6 +67,7 @@ from config.integrations.quickbooks.sync import (
     _resolve_quickbooks_item_active,
     _resolve_item_import_force_full,
     refresh_linked_quickbooks_invoice_status,
+    sync_missing_quickbooks_item_images,
     sync_product,
 )
 from config.inventario.models import StockPresentacion
@@ -957,6 +958,30 @@ class QuickBooksItemCostSyncTests(TestCase):
         self.assertFalse(producto.activo)
         self.assertEqual(result['updated_count'], 1)
         mock_fetch_item.assert_not_called()
+
+
+class QuickBooksImageSyncTests(TestCase):
+    def test_image_sync_uses_one_bulk_attachment_lookup_without_item_reads(self):
+        producto = Producto.objects.create(
+            nombre='PRODUCTO CON IMAGEN QB',
+            quickbooks_id='QB-IMAGE-1',
+        )
+        client = Mock()
+        client.find_all.return_value = [{
+            'Id': 'ATTACHMENT-1',
+            'ContentType': 'image/jpeg',
+            'AttachableRef': [{
+                'EntityRef': {'Type': 'Item', 'value': 'QB-IMAGE-1'},
+            }],
+        }]
+
+        result = sync_missing_quickbooks_item_images(client=client, dry_run=True)
+
+        self.assertEqual(result['checked'], 1)
+        self.assertEqual(result['synced'], 1)
+        client.find_all.assert_called_once()
+        client.find_by_id.assert_not_called()
+        client.find_attachments_for_entity.assert_not_called()
 
 
 class QuickBooksLinkedItemUpdateTests(TestCase):

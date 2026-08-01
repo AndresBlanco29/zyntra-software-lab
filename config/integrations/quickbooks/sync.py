@@ -1817,14 +1817,60 @@ def _is_image_attachable(payload):
     return file_name.endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif'))
 
 
-def _fetch_quickbooks_item_image(client, payload, *, max_attachments=3):
+def _attachable_item_reference_ids(attachment):
+    """Return Item ids referenced by a QuickBooks Attachable payload."""
+    references = (attachment or {}).get('AttachableRef') or []
+    if isinstance(references, dict):
+        references = [references]
+    item_ids = []
+    for reference in references:
+        entity_ref = (reference or {}).get('EntityRef') or {}
+        if str(entity_ref.get('Type') or '').strip().lower() != 'item':
+            continue
+        item_id = str(entity_ref.get('value') or '').strip()
+        if item_id:
+            item_ids.append(item_id)
+    return item_ids
+
+
+def _fetch_quickbooks_item_image_attachments_map(*, client, item_ids):
+    """Load all Item image attachments once, instead of querying each product."""
+    wanted_ids = {str(item_id).strip() for item_id in item_ids if str(item_id or '').strip()}
+    attachments_by_item = {}
+    if not wanted_ids:
+        return attachments_by_item
+
+    # The same constrained query used by ``find_attachments_for_entity`` works
+    # for the full Item collection. It changes thousands of serial attachment
+    # lookups into a paginated bulk read.
+    attachments = client.find_all(
+        'Attachable',
+        max_results=None,
+        where_clause="AttachableRef.EntityRef.Type = 'Item'",
+        page_size=_quickbooks_catalog_page_size(),
+    )
+    for attachment in attachments:
+        if not _is_image_attachable(attachment):
+            continue
+        for item_id in _attachable_item_reference_ids(attachment):
+            if item_id in wanted_ids:
+                attachments_by_item.setdefault(item_id, []).append(attachment)
+    return attachments_by_item
+
+
+def _fetch_quickbooks_item_image(client, payload, *, max_attachments=3, attachments=None):
     item_id = str(payload.get('Id') or '').strip()
     if not item_id:
         return None
 
     client = client or QuickBooksAPIClient()
     max_attachments = max(int(max_attachments or 3), 1)
-    for attachment in client.find_attachments_for_entity('Item', item_id, max_results=max_attachments):
+    candidates = (
+        attachments
+        if attachments is not None
+        else client.find_attachments_for_entity('Item', item_id, max_results=max_attachments)
+    )
+    for attachment in candidates[:max_attachments]:
         if not _is_image_attachable(attachment):
             continue
         try:
@@ -1849,12 +1895,21 @@ def _fetch_quickbooks_item_image(client, payload, *, max_attachments=3):
     return None
 
 
-def _save_quickbooks_item_image(*, producto, payload, client=None, force=False, skip=False, invalidate_catalog_cache=True):
+def _save_quickbooks_item_image(
+    *,
+    producto,
+    payload,
+    client=None,
+    force=False,
+    skip=False,
+    invalidate_catalog_cache=True,
+    attachments=None,
+):
     if skip:
         return False
     if not force and producto.imagen:
         return False
-    image_file = _fetch_quickbooks_item_image(client, payload)
+    image_file = _fetch_quickbooks_item_image(client, payload, attachments=attachments)
     if image_file is None:
         return False
     producto.imagen.save(image_file.name, image_file, save=True)
@@ -2701,7 +2756,40 @@ def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=Non
     queryset = _products_missing_quickbooks_images_queryset()
     if limit is not None:
         queryset = queryset[:max(int(limit), 0)]
-    total = queryset.count()
+    products = list(queryset)
+    total = len(products)
+
+    # Resolve presentation-level links in one query. Looking this up inside the
+    # loop was an additional database query for every product without a direct
+    # product-level QuickBooks id.
+    product_ids = [product.id for product in products]
+    presentation_item_ids = {}
+    if product_ids:
+        for product_id, quickbooks_id in (
+            Presentacion.objects.filter(producto_id__in=product_ids)
+            .exclude(quickbooks_id__isnull=True)
+            .exclude(quickbooks_id='')
+            .order_by('producto_id', 'id')
+            .values_list('producto_id', 'quickbooks_id')
+        ):
+            presentation_item_ids.setdefault(product_id, str(quickbooks_id).strip())
+
+    item_ids_by_product = {
+        product.id: (str(product.quickbooks_id or '').strip() or presentation_item_ids.get(product.id, ''))
+        for product in products
+    }
+    item_ids = [item_id for item_id in item_ids_by_product.values() if item_id]
+    attachments_by_item = None
+    try:
+        attachments_by_item = _fetch_quickbooks_item_image_attachments_map(
+            client=client,
+            item_ids=item_ids,
+        )
+    except QuickBooksAPIError as exc:
+        # Retain the slower per-item fallback if an older QuickBooks company
+        # rejects the bulk Attachable query. Do not falsely report products as
+        # image-less just because the lookup itself failed.
+        logger.warning('Bulk QuickBooks image attachment lookup failed: %s', exc)
 
     summary = {
         'checked': 0,
@@ -2710,20 +2798,18 @@ def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=Non
         'failed': 0,
         'synced_labels': [],
     }
-    for index, producto in enumerate(queryset.iterator(), start=1):
+    for index, producto in enumerate(products, start=1):
         summary['checked'] += 1
-        item_id = _resolve_product_quickbooks_item_id(producto)
+        item_id = item_ids_by_product.get(producto.id, '')
         if not item_id:
             summary['missing_in_qb'] += 1
             continue
-        try:
-            payload = client.find_by_id('Item', item_id) or {'Id': item_id, 'Name': producto.nombre}
-        except QuickBooksAPIError:
-            summary['failed'] += 1
-            continue
+        attachments = attachments_by_item.get(item_id, []) if attachments_by_item is not None else None
+        payload = {'Id': item_id, 'Name': producto.nombre}
 
         if dry_run:
-            attachments = client.find_attachments_for_entity('Item', item_id, max_results=3)
+            if attachments is None:
+                attachments = client.find_attachments_for_entity('Item', item_id, max_results=3)
             image_attachments = [attachment for attachment in attachments if _is_image_attachable(attachment)]
             if image_attachments:
                 summary['synced'] += 1
@@ -2737,6 +2823,7 @@ def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=Non
             payload=payload,
             client=client,
             invalidate_catalog_cache=False,
+            attachments=attachments,
         ):
             summary['synced'] += 1
             summary['synced_labels'].append(producto.nombre)

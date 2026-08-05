@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import timedelta
+from datetime import timedelta  # used by dismiss quiet window
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -8,6 +8,7 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.shortcuts import redirect, render
 from django.http import HttpResponseBadRequest, JsonResponse
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
@@ -150,6 +151,40 @@ def assistant_context(request):
         profile, _ = get_visitor_profile(request)
         profile.first_visit_prompted_at = timezone.now()
         profile.save(update_fields=['first_visit_prompted_at'])
+    return set_visitor_cookie(response, request)
+
+
+@require_POST
+def dismiss_proactive(request):
+    """Customer closed Isabella / chose to explore alone — stop auto-opening for a while."""
+    visitor_id = get_visitor_id(request)
+    profile, _ = get_visitor_profile(request)
+    now = timezone.now()
+    profile.quiet_until = now + timedelta(hours=12)
+    if profile.first_visit_prompted_at is None:
+        profile.first_visit_prompted_at = now
+    profile.save(update_fields=['quiet_until', 'first_visit_prompted_at', 'last_seen_at'])
+
+    if getattr(request.user, 'is_authenticated', False):
+        cliente = get_customer_for_user(request.user)
+        state, _ = AssistantUserState.objects.get_or_create(
+            visitor_id=visitor_id,
+            defaults={'user': request.user, 'cliente': cliente},
+        )
+        updates = []
+        if state.user_id != getattr(request.user, 'id', None):
+            state.user = request.user
+            updates.append('user')
+        if cliente and state.cliente_id != getattr(cliente, 'id', None):
+            state.cliente = cliente
+            updates.append('cliente')
+        if not state.onboarding_completed:
+            state.onboarding_completed = True
+            updates.append('onboarding_completed')
+        if updates:
+            state.save(update_fields=updates + ['updated_at'])
+
+    response = JsonResponse({'success': True, 'quiet_until': profile.quiet_until.isoformat()})
     return set_visitor_cookie(response, request)
 
 

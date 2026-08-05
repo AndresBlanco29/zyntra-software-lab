@@ -14,6 +14,10 @@
     box-shadow: 0 10px 24px rgba(11, 61, 145, .45), 0 0 0 4px rgba(255, 212, 0, .16);
     transition: transform .2s ease, box-shadow .2s ease;
     animation: ai-assistant-greeting 5s ease-in-out infinite;
+    /* Keep the launcher pinned to the layout viewport on iOS Safari. */
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
 }
 
 .ai-assistant-launcher img {
@@ -57,12 +61,27 @@
     border: 1px solid #d9e2f1;
     border-radius: 16px;
     background: #fff;
+    /* Avoid iOS visual-viewport drift that leaves the panel mid-screen. */
+    transform: translate3d(0, 0, 0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
 }
 
 .ai-assistant-panel.is-open { display: flex; }
 .ai-assistant-header { padding: 1rem; background: #0b5ed7; color: #fff; }
+.ai-assistant-header-actions { flex-shrink: 0; }
+.ai-assistant-close {
+    font-weight: 700;
+    color: #0b5ed7 !important;
+    border: none;
+}
+.ai-assistant-close:hover,
+.ai-assistant-close:focus-visible {
+    background: #fff;
+    color: #084298 !important;
+}
 /* min-height lets the thread shrink so it always keeps its own scrollbar. */
-.ai-assistant-messages { flex: 1 1 auto; min-height: 6rem; overflow-y: auto; padding: 1rem; }
+.ai-assistant-messages { flex: 1 1 auto; min-height: 6rem; overflow-y: auto; padding: 1rem; -webkit-overflow-scrolling: touch; }
 .ai-assistant-message { margin-bottom: .75rem; padding: .75rem; border-radius: 12px; background: #f1f5f9; white-space: pre-wrap; }
 .ai-assistant-message.is-user { margin-left: 2rem; background: #dbeafe; }
 /* Capped so a long list of buttons can never push the conversation out of view. */
@@ -108,12 +127,22 @@
 }
 
 @media (max-width: 768px) {
-    .ai-assistant-launcher { right: .75rem; bottom: .75rem; width: 60px; height: 60px; }
+    .ai-assistant-launcher {
+        right: max(.75rem, env(safe-area-inset-right));
+        bottom: max(.75rem, env(safe-area-inset-bottom));
+        width: 60px;
+        height: 60px;
+    }
     .ai-assistant-panel {
-        right: .75rem;
-        bottom: 5.25rem;
-        width: calc(100vw - 1.5rem);
-        max-height: calc(100dvh - 5.75rem);
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        max-width: none;
+        max-height: min(72dvh, calc(100dvh - env(safe-area-inset-top, 0px) - 4.5rem));
+        border-radius: 16px 16px 0 0;
+        border-bottom: 0;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
     }
     .ai-assistant-header { padding: .75rem 1rem; }
     .ai-assistant-messages { padding: .75rem; font-size: .92rem; }
@@ -121,6 +150,10 @@
     .ai-assistant-actions { padding: 0 .75rem .65rem; }
     .ai-assistant-actions .btn { width: 100%; }
     .ai-assistant-form { padding: .65rem .75rem; }
+    /* While open on phones/tablets, keep page scroll usable behind the sheet. */
+    body.ai-assistant-open {
+        overscroll-behavior: none;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {

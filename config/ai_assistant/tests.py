@@ -47,6 +47,26 @@ class AssistantApiTests(TestCase):
         self.assertIn('Soy Isabella', message)
         self.assertNotIn('Paco', message)
 
+    def test_first_visit_proactive_marks_auto_open(self):
+        response = self.client.get(reverse('ai_assistant_context'))
+        self.assertTrue(response.json()['proactive'].get('auto_open'))
+
+    def test_dismiss_proactive_sets_quiet_window_and_hides_first_visit(self):
+        self.client.get(reverse('ai_assistant_context'))
+        dismiss = self.client.post(reverse('ai_assistant_dismiss_proactive'))
+        self.assertEqual(dismiss.status_code, 200)
+        self.assertTrue(dismiss.json()['success'])
+
+        profile = AssistantVisitorProfile.objects.get()
+        self.assertIsNotNone(profile.quiet_until)
+        self.assertGreater(profile.quiet_until, timezone.now())
+        # Even if the first-visit flag is cleared, quiet_until must suppress auto prompts.
+        profile.first_visit_prompted_at = None
+        profile.save(update_fields=['first_visit_prompted_at'])
+
+        again = self.client.get(reverse('ai_assistant_context'))
+        self.assertIsNone(again.json().get('proactive'))
+
     def test_conversation_message_uses_safe_fallback_without_openai_key(self):
         created = self.client.post(
             reverse('ai_assistant_create_conversation'),

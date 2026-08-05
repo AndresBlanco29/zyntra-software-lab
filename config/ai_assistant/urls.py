@@ -6,6 +6,7 @@ from . import views
 urlpatterns = [
     path('backoffice/', views.backoffice_assistant_settings, name='ai_assistant_backoffice'),
     path('context/', views.assistant_context, name='ai_assistant_context'),
+    path('proactive/dismiss/', views.dismiss_proactive, name='ai_assistant_dismiss_proactive'),
     path('verification/account-status/request/', views.request_account_status_code, name='ai_assistant_request_status_code'),
     path('verification/account-status/verify/', views.verify_account_status_code, name='ai_assistant_verify_status_code'),
     path('access/login-failure/', views.record_login_failure, name='ai_assistant_login_failure'),

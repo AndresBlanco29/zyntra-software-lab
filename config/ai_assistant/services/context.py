@@ -72,9 +72,11 @@ def build_customer_context(request):
             'url': reverse('home'),
             'tour_id': 'registration',
         }
-        if visitor_profile.first_visit_prompted_at is None:
+        quiet = visitor_profile.quiet_until and visitor_profile.quiet_until > timezone.now()
+        if visitor_profile.first_visit_prompted_at is None and not quiet:
             context['proactive'] = {
                 'kind': 'first_visit',
+                'auto_open': True,
                 'message': (
                     '¡Hola! 👋\n\nBienvenido a La Tortilla Grocery.\n\n'
                     f'Soy {AssistantConfiguration.get_solo().assistant_name}, tu asistente virtual. '
@@ -119,9 +121,11 @@ def build_customer_context(request):
         key: value for key, value in (state.preferences or {}).items()
         if key in {'last_product_id', 'last_product_name', 'last_module', 'last_tour', 'language'}
     }
-    if not state.onboarding_completed:
+    quiet = visitor_profile.quiet_until and visitor_profile.quiet_until > timezone.now()
+    if not state.onboarding_completed and not quiet:
         context['proactive'] = {
             'kind': 'first_authenticated_login',
+            'auto_open': True,
             'message': (
                 f'¡Bienvenido{", " + context["customer_name"] if context["customer_name"] else ""}! '
                 'Ya puedes usar tu cuenta. ¿Quieres que te muestre la plataforma o te ayudo con tu primer pedido?'
@@ -133,9 +137,12 @@ def build_customer_context(request):
             ],
         }
     elif success_profile:
+        # Greeting stays available when the customer opens Isabella, but must not
+        # steal the screen on every catalog search / page reload (critical on iOS).
         customer_name = (user.first_name or cliente.nombre_empresa or 'cliente').strip()
         context['proactive'] = {
             'kind': 'returning_customer',
+            'auto_open': False,
             'message': f'Hola {customer_name} 👋\n\nBienvenido nuevamente a La Tortilla Grocery. ¿En qué puedo ayudarte hoy?',
             'actions': [
                 {'label': 'Ver catálogo', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
@@ -189,15 +196,17 @@ def build_customer_context(request):
             profile=success_profile,
             summary=success_summary,
         )
-        if customer_event:
+        if customer_event and not quiet:
             customer_name = (user.first_name or cliente.nombre_empresa or 'cliente').strip()
             context['customer_event'] = customer_event
             context['proactive'] = {
                 'kind': 'customer_success',
+                'auto_open': True,
                 'message': f'Hola {customer_name} 👋\n\n{customer_event["message"]}',
                 'actions': customer_event['actions'] + [
                     {'label': 'Nuevo pedido', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
                     {'label': 'Hablar con un asesor', 'url': '#', 'kind': 'contact_handoff'},
+                    {'label': 'Seguir comprando', 'url': '#', 'kind': 'dismiss_proactive'},
                 ],
             }
     latest_event = (

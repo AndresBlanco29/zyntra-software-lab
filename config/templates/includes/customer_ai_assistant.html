@@ -9,6 +9,7 @@
   data-message-url="/ai-assistant/conversations/__conversation__/messages/"
   data-confirm-action-url="/ai-assistant/actions/__action__/confirm/"
   data-consume-event-url="/ai-assistant/events/__event__/consume/"
+  data-dismiss-url="{% url 'ai_assistant_dismiss_proactive' %}"
   data-catalog-url="{% url 'catalogo' %}?promociones=1"
   data-login-failure-url="{% url 'ai_assistant_login_failure' %}"
   data-delete-history-url="{% url 'ai_assistant_delete_history' %}"
@@ -18,12 +19,15 @@
     <img src="{% static 'img/ai-assistant-isabella-avatar.png' %}" alt="" aria-hidden="true">
   </button>
   <div class="ai-assistant-panel" id="aiAssistantPanel" data-ai-panel role="dialog" aria-modal="false" aria-label="{% trans 'AI Assistant' %}">
-    <header class="ai-assistant-header d-flex align-items-center justify-content-between">
+    <header class="ai-assistant-header d-flex align-items-center justify-content-between gap-2">
       <div>
         <strong data-ai-name>{% trans "Assistant" %}</strong>
         <div class="small">{% trans "La Tortilla Grocery" %}</div>
       </div>
-      <button class="btn btn-sm btn-outline-light" type="button" data-ai-delete-history>{% trans "Clear" %}</button>
+      <div class="ai-assistant-header-actions d-flex align-items-center gap-2">
+        <button class="btn btn-sm btn-outline-light" type="button" data-ai-delete-history>{% trans "Clear" %}</button>
+        <button class="btn btn-sm btn-light ai-assistant-close" type="button" data-ai-close aria-label="{% trans 'Close assistant' %}">{% trans "Close" %}</button>
+      </div>
     </header>
     <div class="ai-assistant-messages" data-ai-messages aria-live="polite"></div>
     <div class="ai-assistant-actions" data-ai-actions></div>

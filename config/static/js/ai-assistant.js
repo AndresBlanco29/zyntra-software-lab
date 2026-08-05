@@ -114,12 +114,16 @@
       if (action.kind === "dismiss_proactive") {
         link.addEventListener("click", function (event) {
           event.preventDefault();
+          const rootEl = document.querySelector("[data-ai-assistant]");
           container.replaceChildren();
           appendMessage(
-            document.querySelector("[data-ai-assistant] [data-ai-messages]"),
+            rootEl.querySelector("[data-ai-messages]"),
             "Perfecto. Explora con calma; estaré disponible cuando me necesites.",
             false
           );
+          if (rootEl && typeof rootEl._aiDismissProactive === "function") {
+            rootEl._aiDismissProactive();
+          }
         });
       }
       if (action.kind === "contact_handoff") {
@@ -254,26 +258,82 @@
     const messages = root.querySelector("[data-ai-messages]");
     const actions = root.querySelector("[data-ai-actions]");
     const deleteHistory = root.querySelector("[data-ai-delete-history]");
+    const closeButton = root.querySelector("[data-ai-close]");
     const whatsappFloat = document.querySelector(".whatsapp-float");
     const whatsappAction = root.querySelector("[data-ai-whatsapp]");
     let conversationId = "";
     let booted = false;
+    const DISMISS_KEY = "tortilla-assistant-dismissed";
+    const CONTINUATION_KEY = "tortilla-assistant-continuation";
+    const requestedTour = new URLSearchParams(window.location.search).get("ai_tour");
 
     if (whatsappFloat && whatsappAction) {
       whatsappAction.href = whatsappFloat.href;
       whatsappAction.hidden = false;
     }
 
+    function isTouchDevice() {
+      return window.matchMedia("(hover: none), (pointer: coarse)").matches
+        || ("ontouchstart" in window)
+        || (navigator.maxTouchPoints || 0) > 0;
+    }
+
+    function isActivelyShopping() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        // Catalog search reloads the page; never steal focus mid-order.
+        if ((params.get("q") || "").trim()) return true;
+      } catch (_error) {}
+      return false;
+    }
+
+    function wasDismissedThisSession() {
+      try {
+        return window.sessionStorage.getItem(DISMISS_KEY) === "1";
+      } catch (_error) {
+        return false;
+      }
+    }
+
+    function markDismissedThisSession() {
+      try {
+        window.sessionStorage.setItem(DISMISS_KEY, "1");
+        window.sessionStorage.removeItem(CONTINUATION_KEY);
+      } catch (_error) {}
+    }
+
+    function clearDismissedThisSession() {
+      try {
+        window.sessionStorage.removeItem(DISMISS_KEY);
+      } catch (_error) {}
+    }
+
     function setPanelOpen(open) {
       panel.classList.toggle("is-open", open);
       launcher.setAttribute("aria-expanded", open ? "true" : "false");
       document.body.classList.toggle("ai-assistant-open", open);
-      if (open) input.focus();
+      // Autofocus on iOS opens the keyboard and jumps the fixed panel mid-screen.
+      if (open && !isTouchDevice()) {
+        try { input.focus({ preventScroll: true }); } catch (_error) { input.focus(); }
+      } else if (!open && document.activeElement === input) {
+        input.blur();
+      }
     }
+
+    function dismissProactive() {
+      markDismissedThisSession();
+      setPanelOpen(false);
+      const url = root.dataset.dismissUrl;
+      if (!url) return;
+      jsonFetch(url, { method: "POST", body: "{}" }).catch(function () {});
+    }
+
+    root._aiDismissProactive = dismissProactive;
 
     function rememberContinuation(message) {
       try {
-        window.sessionStorage.setItem("tortilla-assistant-continuation", JSON.stringify({
+        if (wasDismissedThisSession()) return;
+        window.sessionStorage.setItem(CONTINUATION_KEY, JSON.stringify({
           message: message,
           createdAt: Date.now()
         }));
@@ -282,14 +342,29 @@
 
     function consumeContinuation() {
       try {
-        const raw = window.sessionStorage.getItem("tortilla-assistant-continuation");
+        if (wasDismissedThisSession()) {
+          window.sessionStorage.removeItem(CONTINUATION_KEY);
+          return null;
+        }
+        const raw = window.sessionStorage.getItem(CONTINUATION_KEY);
         if (!raw) return null;
-        window.sessionStorage.removeItem("tortilla-assistant-continuation");
+        window.sessionStorage.removeItem(CONTINUATION_KEY);
         const continuation = JSON.parse(raw);
         return Date.now() - continuation.createdAt < 10 * 60 * 1000 ? continuation : null;
       } catch (_error) {
         return null;
       }
+    }
+
+    function shouldAutoOpen(context) {
+      if (wasDismissedThisSession()) return false;
+      if (isActivelyShopping()) return false;
+      if (root.dataset.tourActive === "true") return false;
+      if (requestedTour) return false;
+      const proactive = context && context.proactive;
+      if (!proactive) return false;
+      // Backend marks welcome / critical events; polite return greetings stay closed.
+      return proactive.auto_open === true;
     }
 
     let resumedHistory = null;
@@ -332,6 +407,7 @@
               .then(function () {
                 if (renderResumedThread()) {
                   renderPendingEvent(root, context, messages, actions);
+                  // Existing thread = customer already met Isabella; stay minimized.
                   return;
                 }
                 renderInitialMessage(context, options);
@@ -343,14 +419,18 @@
         .catch(function () {});
     }
 
+    function maybeAutoOpen(context, options) {
+      options = options || {};
+      if (!options.autoOpen) return;
+      if (!shouldAutoOpen(context)) return;
+      setPanelOpen(true);
+    }
+
     function renderInitialMessage(context, options) {
       options = options || {};
       if (context.proactive) {
         appendMessage(messages, context.proactive.message, false);
         renderActions(actions, context.proactive.actions);
-        if (options.autoOpen) {
-          setPanelOpen(true);
-        }
       } else {
         appendMessage(messages, context.welcome_message, false);
         const initialActions = Array.isArray(context.actions) && context.actions.length
@@ -360,27 +440,51 @@
       }
       renderPendingEvent(root, context, messages, actions);
       const continuation = consumeContinuation();
-      if (continuation && !requestedTour) {
+      if (continuation && !requestedTour && !wasDismissedThisSession() && !isActivelyShopping()) {
         appendMessage(messages, continuation.message, false);
         setPanelOpen(true);
+        return;
       }
+      maybeAutoOpen(context, options);
     }
 
     launcher.addEventListener("click", function () {
+      const opening = !panel.classList.contains("is-open");
+      if (opening) clearDismissedThisSession();
       boot();
-      setPanelOpen(!panel.classList.contains("is-open"));
+      setPanelOpen(opening);
+      if (!opening) dismissProactive();
     });
+
+    if (closeButton) {
+      closeButton.addEventListener("click", function () {
+        dismissProactive();
+      });
+    }
 
     actions.addEventListener("click", function (event) {
       const link = event.target.closest("a[href]");
       if (!link || link.target === "_blank" || link.getAttribute("href") === "#") return;
-      rememberContinuation("Excelente, ya estamos en esta sección. ¿Quieres que te ayude con el siguiente paso?");
+      const href = String(link.getAttribute("href") || "");
+      const goingToCatalog = /catalogo|catalog|product/i.test(href);
+      if (goingToCatalog) {
+        // Customer chose to shop — keep Isabella available via the bubble, not as a popup.
+        markDismissedThisSession();
+        if (root.dataset.dismissUrl) {
+          jsonFetch(root.dataset.dismissUrl, { method: "POST", body: "{}" }).catch(function () {});
+        }
+      } else {
+        rememberContinuation("Excelente, ya estamos en esta sección. ¿Quieres que te ayude con el siguiente paso?");
+      }
       setPanelOpen(false);
     });
 
-    const requestedTour = new URLSearchParams(window.location.search).get("ai_tour");
     window.setTimeout(function () {
-      if (!requestedTour && root.dataset.tourActive !== "true") boot({ autoOpen: true });
+      if (!requestedTour && root.dataset.tourActive !== "true") {
+        boot({ autoOpen: true });
+      } else {
+        boot();
+      }
     }, 4000);
 
     window.addEventListener("tortilla-assistant-tour-started", function (event) {

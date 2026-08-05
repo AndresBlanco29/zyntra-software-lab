@@ -1863,6 +1863,11 @@ class InvoiceFlowTests(TestCase):
 			'already synced with QuickBooks, so new adjustment notes cannot be created here',
 			html=False,
 		)
+		self.assertContains(
+			response,
+			'You can still complete the customer pick up below.',
+			html=False,
+		)
 		self.assertNotContains(response, 'pickupSaveAdjustmentNoteButton')
 
 	def test_backoffice_can_complete_customer_pickup_after_quickbooks_sync(self):

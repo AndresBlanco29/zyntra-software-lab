@@ -1817,7 +1817,16 @@ def _is_image_attachable(payload):
     return file_name.endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif'))
 
 
-def _attachable_item_reference_ids(attachment):
+def _attachable_entity_ref_type(entity_ref):
+    # QuickBooks Online JSON uses lowercase ``type``; some SDK samples use ``Type``.
+    return str((entity_ref or {}).get('Type') or (entity_ref or {}).get('type') or '').strip().lower()
+
+
+def _attachable_entity_ref_value(entity_ref):
+    return str((entity_ref or {}).get('value') or (entity_ref or {}).get('Value') or '').strip()
+
+
+def _attachable_item_reference_ids(attachment, *, allow_missing_type=False):
     """Return Item ids referenced by a QuickBooks Attachable payload."""
     references = (attachment or {}).get('AttachableRef') or []
     if isinstance(references, dict):
@@ -1825,9 +1834,11 @@ def _attachable_item_reference_ids(attachment):
     item_ids = []
     for reference in references:
         entity_ref = (reference or {}).get('EntityRef') or {}
-        if str(entity_ref.get('Type') or '').strip().lower() != 'item':
-            continue
-        item_id = str(entity_ref.get('value') or '').strip()
+        ref_type = _attachable_entity_ref_type(entity_ref)
+        if ref_type != 'item':
+            if not (allow_missing_type and not ref_type):
+                continue
+        item_id = _attachable_entity_ref_value(entity_ref)
         if item_id:
             item_ids.append(item_id)
     return item_ids
@@ -1840,21 +1851,43 @@ def _fetch_quickbooks_item_image_attachments_map(*, client, item_ids):
     if not wanted_ids:
         return attachments_by_item
 
-    # The same constrained query used by ``find_attachments_for_entity`` works
-    # for the full Item collection. It changes thousands of serial attachment
-    # lookups into a paginated bulk read.
+    page_size = _quickbooks_catalog_page_size()
+    # Prefer the Item-scoped query. Some companies return nothing for that filter
+    # even though per-item attachable lookups still work, so fall back broadly.
     attachments = client.find_all(
         'Attachable',
         max_results=None,
         where_clause="AttachableRef.EntityRef.Type = 'Item'",
-        page_size=_quickbooks_catalog_page_size(),
+        page_size=page_size,
     )
+    allow_missing_type = True
+    if not attachments:
+        logger.warning(
+            'QuickBooks Item Attachable filter returned no rows; loading Attachables without Type filter.'
+        )
+        attachments = client.find_all(
+            'Attachable',
+            max_results=None,
+            where_clause=None,
+            page_size=page_size,
+        )
+        allow_missing_type = False
+
     for attachment in attachments:
         if not _is_image_attachable(attachment):
             continue
-        for item_id in _attachable_item_reference_ids(attachment):
+        for item_id in _attachable_item_reference_ids(
+            attachment,
+            allow_missing_type=allow_missing_type,
+        ):
             if item_id in wanted_ids:
                 attachments_by_item.setdefault(item_id, []).append(attachment)
+
+    if attachments and not attachments_by_item:
+        logger.warning(
+            'QuickBooks returned %s Attachable row(s) but none mapped to local Item ids.',
+            len(attachments),
+        )
     return attachments_by_item
 
 
@@ -1865,8 +1898,11 @@ def _fetch_quickbooks_item_image(client, payload, *, max_attachments=3, attachme
 
     client = client or QuickBooksAPIClient()
     max_attachments = max(int(max_attachments or 3), 1)
+    # An empty list from bulk mapping must not block the proven per-item lookup.
+    if attachments is not None and len(attachments) == 0:
+        attachments = None
     candidates = (
-        attachments
+        list(attachments)
         if attachments is not None
         else client.find_attachments_for_entity('Item', item_id, max_results=max_attachments)
     )
@@ -2804,13 +2840,19 @@ def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=Non
         if not item_id:
             summary['missing_in_qb'] += 1
             continue
-        attachments = attachments_by_item.get(item_id, []) if attachments_by_item is not None else None
+        # Missing/empty bulk hits fall back to per-item Attachable queries.
+        attachments = None
+        if attachments_by_item is not None:
+            attachments = attachments_by_item.get(item_id) or None
         payload = {'Id': item_id, 'Name': producto.nombre}
 
         if dry_run:
-            if attachments is None:
-                attachments = client.find_attachments_for_entity('Item', item_id, max_results=3)
-            image_attachments = [attachment for attachment in attachments if _is_image_attachable(attachment)]
+            lookup_attachments = attachments
+            if lookup_attachments is None:
+                lookup_attachments = client.find_attachments_for_entity('Item', item_id, max_results=3)
+            image_attachments = [
+                attachment for attachment in lookup_attachments if _is_image_attachable(attachment)
+            ]
             if image_attachments:
                 summary['synced'] += 1
                 summary['synced_labels'].append(producto.nombre)

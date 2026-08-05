@@ -983,6 +983,45 @@ class QuickBooksImageSyncTests(TestCase):
         client.find_by_id.assert_not_called()
         client.find_attachments_for_entity.assert_not_called()
 
+    def test_image_sync_maps_lowercase_entity_ref_type_from_quickbooks_json(self):
+        producto = Producto.objects.create(
+            nombre='PRODUCTO TYPE MINUSCULA',
+            quickbooks_id='QB-IMAGE-LOWER',
+        )
+        client = Mock()
+        # Real QBO payloads use lowercase ``type`` inside EntityRef.
+        client.find_all.return_value = [{
+            'Id': 'ATTACHMENT-LOWER',
+            'ContentType': 'image/png',
+            'FileName': 'product.png',
+            'AttachableRef': [{
+                'EntityRef': {'type': 'Item', 'value': 'QB-IMAGE-LOWER'},
+            }],
+        }]
+
+        result = sync_missing_quickbooks_item_images(client=client, dry_run=True)
+
+        self.assertEqual(result['synced'], 1)
+        client.find_attachments_for_entity.assert_not_called()
+
+    def test_image_sync_falls_back_to_per_item_when_bulk_map_misses(self):
+        producto = Producto.objects.create(
+            nombre='PRODUCTO FALLBACK IMAGEN',
+            quickbooks_id='QB-IMAGE-FALLBACK',
+        )
+        client = Mock()
+        client.find_all.return_value = []
+        client.find_attachments_for_entity.return_value = [{
+            'Id': 'ATTACHMENT-FALLBACK',
+            'ContentType': 'image/jpeg',
+            'FileName': 'fallback.jpg',
+        }]
+
+        result = sync_missing_quickbooks_item_images(client=client, dry_run=True)
+
+        self.assertEqual(result['synced'], 1)
+        client.find_attachments_for_entity.assert_called()
+
 
 class QuickBooksLinkedItemUpdateTests(TestCase):
     @patch('config.integrations.quickbooks.sync._save_quickbooks_item_image', return_value=False)

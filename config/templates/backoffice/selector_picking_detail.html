@@ -9,7 +9,7 @@
     <h2 class="mb-1">{% trans "Picking Verification" %} - PO #{{ pedido.id }}</h2>
     <p class="text-muted mb-0">{% trans "Customer" %}: {{ pedido.cliente.nombre_empresa }}</p>
   </div>
-  <a href="{% url 'selector_picking_list' %}" class="btn btn-outline-secondary">{% trans "Back" %}</a>
+  <a href="{% url 'selector_picking_list' %}" class="btn btn-outline-secondary" id="pickerBackLink">{% trans "Back" %}</a>
 </div>
 
 {% if messages %}
@@ -46,8 +46,9 @@
   </div>
 </div>
 
-<form method="post" class="card shadow-sm" id="pickerVerificationForm" data-initial-shortage="{% if form_has_stock_shortage %}true{% else %}false{% endif %}" data-require-full-line-review="{% if picker_requires_full_line_review %}1{% else %}0{% endif %}">
+<form method="post" class="card shadow-sm" id="pickerVerificationForm" data-initial-shortage="{% if form_has_stock_shortage %}true{% else %}false{% endif %}" data-require-full-line-review="{% if picker_requires_full_line_review %}1{% else %}0{% endif %}" data-has-unsaved-changes="0">
   {% csrf_token %}
+  <input type="hidden" name="next" value="" id="pickerLeaveNextInput">
   <div class="card-body">
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
       <h5 class="mb-0">{% trans "Real quantities by product" %}</h5>
@@ -419,6 +420,31 @@
     labelReviewedCol: "{% trans 'Reviewed'|escapejs %}",
     duplicateProductMessage: "{% trans 'This product is already on the picking list.'|escapejs %}"
   };
+  window.LTG_PICKER_LEAVE_GUARD = {
+    listUrl: "{% url 'selector_picking_list' %}",
+    draftKey: "ltg-picker-draft-{{ request.user.id|default:'anon' }}-{{ pedido.id }}",
+    confirmMessage: "{% trans 'Do you want to leave without saving your changes?'|escapejs %}"
+  };
 </script>
+<div class="modal fade" id="pickerLeaveGuardModal" tabindex="-1" aria-labelledby="pickerLeaveGuardModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="pickerLeaveGuardModalLabel">{% trans "Unsaved picking changes" %}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0">{% trans "Do you want to leave without saving your changes?" %}</p>
+        <p class="text-muted small mt-2 mb-0">{% trans "You can save your progress and continue later, or keep editing this order." %}</p>
+      </div>
+      <div class="modal-footer flex-column flex-sm-row align-items-stretch gap-2">
+        <button type="button" class="btn btn-outline-secondary" id="pickerLeaveStayBtn">{% trans "Continue editing" %}</button>
+        <button type="button" class="btn btn-outline-danger" id="pickerLeaveWithoutSavingBtn">{% trans "Leave without saving" %}</button>
+        <button type="button" class="btn btn-primary" id="pickerSaveAndLeaveBtn">{% trans "Save progress and leave" %}</button>
+      </div>
+    </div>
+  </div>
+</div>
 <script src="{% static 'js/selector_picking_product_search.js' %}"></script>
+<script src="{% static 'js/selector_picking_leave_guard.js' %}"></script>
 {% endblock %}

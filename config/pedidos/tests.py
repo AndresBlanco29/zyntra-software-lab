@@ -1429,6 +1429,10 @@ class PickingVerificationFlowTests(TestCase):
 		detail = self.client.get(reverse('selector_picking_detail', args=[self.pedido.id]))
 		self.assertEqual(detail.status_code, 200)
 		self.assertContains(detail, 'Saved picking progress was restored.')
+		self.assertContains(detail, 'pickerLeaveGuardModal')
+		self.assertContains(detail, 'selector_picking_leave_guard.js')
+		self.assertContains(detail, 'Continue editing')
+		self.assertContains(detail, 'Save progress and leave')
 		self.assertContains(detail, f'name="cantidad_real_{self.item.id}" value="1"', html=False)
 		self.assertContains(
 			detail,
@@ -1456,6 +1460,49 @@ class PickingVerificationFlowTests(TestCase):
 
 		pending_list = self.client.get(reverse('selector_picking_list'))
 		self.assertNotContains(pending_list, reverse('selector_picking_detail', args=[self.pedido.id]))
+
+	def test_save_progress_can_redirect_to_safe_next_url(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+		list_url = reverse('selector_picking_list')
+
+		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'submit_action': 'save_progress',
+			'next': list_url,
+			'cantidad_pallets': '1',
+			f'presentacion_{self.item.id}': str(self.presentacion.id),
+			f'cantidad_real_{self.item.id}': '1',
+			f'linea_revisada_{self.item.id}': 'on',
+		})
+
+		self.assertRedirects(response, list_url)
+		self.pedido.refresh_from_db()
+		self.assertIsNotNone(self.pedido.picking_progress_saved_at)
+		self.assertEqual(self.pedido.picking_progress['quantities'][str(self.item.id)], 1)
+
+	def test_save_progress_ajax_returns_json_without_redirect(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+
+		response = self.client.post(
+			reverse('selector_picking_detail', args=[self.pedido.id]),
+			{
+				'submit_action': 'save_progress',
+				'ajax': '1',
+				'cantidad_pallets': '1',
+				f'presentacion_{self.item.id}': str(self.presentacion.id),
+				f'cantidad_real_{self.item.id}': '1',
+				f'linea_revisada_{self.item.id}': 'on',
+			},
+			HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		payload = response.json()
+		self.assertTrue(payload['ok'])
+		self.assertIn('saved_at', payload)
+		self.pedido.refresh_from_db()
+		self.assertIsNotNone(self.pedido.picking_progress_saved_at)
 
 	def test_save_progress_does_not_duplicate_additional_items_on_second_save(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)

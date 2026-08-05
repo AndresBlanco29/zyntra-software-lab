@@ -10,6 +10,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.db import transaction
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 import logging
@@ -2115,7 +2116,23 @@ def selector_picking_detail(request, pedido_id):
 				}
 				pedido.picking_progress_saved_at = timezone.now()
 				pedido.save(update_fields=['picking_progress', 'picking_progress_saved_at', 'actualizada_en'])
+				wants_ajax = (
+					request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+					or request.POST.get('ajax') == '1'
+				)
+				if wants_ajax:
+					return JsonResponse({
+						'ok': True,
+						'saved_at': timezone.localtime(pedido.picking_progress_saved_at).strftime('%m/%d/%Y %H:%M'),
+					})
 				messages.success(request, _('Picking progress saved. You can continue this verification later.'))
+				next_url = (request.POST.get('next') or '').strip()
+				if next_url and url_has_allowed_host_and_scheme(
+					url=next_url,
+					allowed_hosts={request.get_host()},
+					require_https=request.is_secure(),
+				):
+					return redirect(next_url)
 				return redirect('selector_picking_detail', pedido_id=pedido.id)
 
 			_validate_selector_line_reviews(

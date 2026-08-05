@@ -191,34 +191,143 @@ class QuickBooksAPIClient:
             attachments.append(attachment)
         return attachments[:max_results]
 
-    def download_attachable_content(self, attachment):
-        attachable_id = str(attachment.get('Id') or '').strip()
-        download_candidates = [
-            attachment.get('TempDownloadUri'),
-            attachment.get('ThumbnailTempDownloadUri'),
-        ]
-        for download_url in download_candidates:
-            normalized_url = str(download_url or '').strip()
-            if not normalized_url:
-                continue
+    @staticmethod
+    def _looks_like_image_bytes(content):
+        data = content or b''
+        if len(data) < 8:
+            return False
+        if data[:3] == b'\xff\xd8\xff':
+            return True
+        if data[:8] == b'\x89PNG\r\n\x1a\n':
+            return True
+        if data[:6] in (b'GIF87a', b'GIF89a'):
+            return True
+        if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+            return True
+        return False
+
+    @staticmethod
+    def _is_presigned_document_url(download_url):
+        normalized = str(download_url or '').strip().lower()
+        return 'financialdocument.platform.intuit.com' in normalized or 'amazonaws.com' in normalized
+
+    def resolve_attachable_temp_download_uri(self, attachable_id, *, _retry_auth=True):
+        """
+        GET /v3/company/{realm}/download/{attachableId} returns a short-lived
+        plain-text TempDownloadUri (not the file bytes).
+        """
+        attachable_id = str(attachable_id or '').strip()
+        if not attachable_id:
+            raise QuickBooksAPIError('QuickBooks attachable id is required to resolve a download URI.')
+
+        response = requests.request(
+            'GET',
+            f'{self.base_url}{self.realm_path(f"download/{attachable_id}")}',
+            headers={
+                'Authorization': f'Bearer {self.connection.access_token}',
+                'Accept': 'text/plain, application/json, */*',
+            },
+            params={'minorversion': settings.QUICKBOOKS_API_MINOR_VERSION},
+            timeout=self._image_download_timeout(),
+        )
+        if response.status_code == 401 and _retry_auth:
             try:
-                return self.download_public_file(normalized_url)
-            except QuickBooksAPIError:
-                try:
-                    return self.download_authenticated_file(normalized_url)
-                except QuickBooksAPIError:
-                    continue
+                self.connection = ensure_valid_access_token(connection=self.connection, force_refresh=True)
+            except QuickBooksServiceError as exc:
+                raise QuickBooksAPIError(f'QuickBooks API authentication failed: {exc}') from exc
+            return self.resolve_attachable_temp_download_uri(attachable_id, _retry_auth=False)
+        if not response.ok:
+            logger.warning(
+                'QuickBooks attachable download URI lookup failed: %s -> %s',
+                attachable_id,
+                response.status_code,
+            )
+            raise QuickBooksAPIError(
+                f'QuickBooks attachable download URI lookup failed with status {response.status_code}.'
+            )
+
+        content_type = str(response.headers.get('Content-Type') or '').lower()
+        if content_type.startswith('image/') or self._looks_like_image_bytes(response.content):
+            # Some environments stream the file directly from this endpoint.
+            return {'bytes': response.content, 'content_type': response.headers.get('Content-Type', content_type)}
+
+        text = (response.text or '').strip().strip('"').strip("'")
+        if text.startswith('http://') or text.startswith('https://'):
+            return {'url': text}
+
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = None
+        if isinstance(payload, dict):
+            for key in ('TempDownloadUri', 'TempDownloadUrl', 'tempDownloadUri', 'tempDownloadUrl'):
+                candidate = str(payload.get(key) or '').strip()
+                if candidate.startswith('http://') or candidate.startswith('https://'):
+                    return {'url': candidate}
+            nested = payload.get('Attachable') if isinstance(payload.get('Attachable'), dict) else None
+            if nested:
+                for key in ('TempDownloadUri', 'TempDownloadUrl'):
+                    candidate = str(nested.get(key) or '').strip()
+                    if candidate.startswith('http://') or candidate.startswith('https://'):
+                        return {'url': candidate}
+
+        raise QuickBooksAPIError('QuickBooks download endpoint did not return a TempDownloadUri.')
+
+    def download_attachable_content(self, attachment):
+        """
+        Download attachable bytes.
+
+        Important: TempDownloadUri hosts are pre-signed. Sending a Bearer token
+        there returns 403. The reliable flow is:
+        1) OAuth GET /download/{id} → fresh TempDownloadUri (text)
+        2) Unauthenticated GET of that URI → file bytes
+        """
+        attachable_id = str(attachment.get('Id') or '').strip()
+        errors = []
 
         if attachable_id:
-            return self.download_authenticated_file(
-                f'{self.base_url}{self.realm_path(f"download/{attachable_id}")}',
-            )
-        raise QuickBooksAPIError('QuickBooks attachment does not include a downloadable URI.')
+            try:
+                resolved = self.resolve_attachable_temp_download_uri(attachable_id)
+                if resolved.get('bytes') is not None:
+                    return resolved['bytes'], resolved.get('content_type') or ''
+                return self.download_public_file(resolved['url'])
+            except QuickBooksAPIError as exc:
+                errors.append(str(exc))
+
+        # Stale query-time URIs often 401; still try without Bearer as a fallback.
+        for key in ('TempDownloadUri', 'ThumbnailTempDownloadUri'):
+            download_url = str((attachment or {}).get(key) or '').strip()
+            if not download_url:
+                continue
+            try:
+                return self.download_public_file(download_url)
+            except QuickBooksAPIError as exc:
+                errors.append(str(exc))
+
+        file_access_uri = str((attachment or {}).get('FileAccessUri') or '').strip()
+        marker = '/download/'
+        if file_access_uri and marker in file_access_uri:
+            extracted_id = file_access_uri.split(marker, 1)[1].split('?', 1)[0].strip('/')
+            if extracted_id and extracted_id != attachable_id:
+                try:
+                    resolved = self.resolve_attachable_temp_download_uri(extracted_id)
+                    if resolved.get('bytes') is not None:
+                        return resolved['bytes'], resolved.get('content_type') or ''
+                    return self.download_public_file(resolved['url'])
+                except QuickBooksAPIError as exc:
+                    errors.append(str(exc))
+
+        detail = '; '.join(errors) if errors else 'no downloadable URI'
+        raise QuickBooksAPIError(f'QuickBooks attachment download failed: {detail}')
 
     def _image_download_timeout(self):
-        return max(int(getattr(settings, 'QUICKBOOKS_IMAGE_DOWNLOAD_TIMEOUT', 8) or 8), 3)
+        return max(int(getattr(settings, 'QUICKBOOKS_IMAGE_DOWNLOAD_TIMEOUT', 20) or 20), 5)
 
     def download_authenticated_file(self, download_url, *, timeout=None, _retry_auth=True):
+        # Pre-signed Intuit document URLs reject Bearer auth with 403.
+        if self._is_presigned_document_url(download_url):
+            return self.download_public_file(download_url, timeout=timeout)
+
         response = requests.request(
             'GET',
             download_url,
@@ -245,6 +354,7 @@ class QuickBooksAPIClient:
             download_url,
             headers={'Accept': '*/*'},
             timeout=timeout or self._image_download_timeout(),
+            allow_redirects=True,
         )
         if not response.ok:
             logger.warning('QuickBooks file download failed: %s -> %s', download_url, response.status_code)

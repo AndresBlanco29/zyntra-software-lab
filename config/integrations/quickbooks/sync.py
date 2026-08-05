@@ -1914,6 +1914,15 @@ def _fetch_quickbooks_item_image(client, payload, *, max_attachments=3, attachme
         except QuickBooksAPIError as exc:
             logger.warning('QuickBooks image download failed for item %s: %s', item_id, exc)
             continue
+        if not QuickBooksAPIClient._looks_like_image_bytes(file_bytes):
+            logger.warning(
+                'QuickBooks item %s returned non-image bytes for attachable %s (%s bytes, content-type=%s).',
+                item_id,
+                attachment.get('Id'),
+                len(file_bytes or b''),
+                content_type,
+            )
+            continue
         original_name = attachment.get('FileName') or f'quickbooks-item-{item_id}.bin'
         extension = Path(original_name).suffix
         if not extension:
@@ -1948,7 +1957,12 @@ def _save_quickbooks_item_image(
     image_file = _fetch_quickbooks_item_image(client, payload, attachments=attachments)
     if image_file is None:
         return False
-    producto.imagen.save(image_file.name, image_file, save=True)
+    try:
+        producto.imagen.save(image_file.name, image_file, save=True)
+    except (ValidationError, OSError, ValueError) as exc:
+        # Never abort a bulk image sync because one attachable is corrupt/HTML.
+        logger.warning('QuickBooks image save failed for product %s: %s', producto.id, exc)
+        return False
     if invalidate_catalog_cache:
         cache.delete('catalogo:productos_activos_v2')
     return True
@@ -2860,22 +2874,32 @@ def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=Non
                 summary['missing_in_qb'] += 1
             continue
 
-        if _save_quickbooks_item_image(
-            producto=producto,
-            payload=payload,
-            client=client,
-            invalidate_catalog_cache=False,
-            attachments=attachments,
-        ):
-            summary['synced'] += 1
-            summary['synced_labels'].append(producto.nombre)
-        else:
-            summary['missing_in_qb'] += 1
+        try:
+            if _save_quickbooks_item_image(
+                producto=producto,
+                payload=payload,
+                client=client,
+                invalidate_catalog_cache=False,
+                attachments=attachments,
+            ):
+                summary['synced'] += 1
+                summary['synced_labels'].append(producto.nombre)
+            else:
+                summary['missing_in_qb'] += 1
+        except Exception as exc:
+            summary['failed'] += 1
+            logger.warning('QuickBooks image sync failed for product %s: %s', producto.id, exc)
 
         if task_cache_key and total:
             task_state = cache.get(task_cache_key) or {}
             task_state['status'] = 'running'
             task_state['progress'] = int(index * 100 / total)
+            task_state['result'] = {
+                'synced': summary['synced'],
+                'checked': summary['checked'],
+                'missing_in_qb': summary['missing_in_qb'],
+                'failed': summary['failed'],
+            }
             cache.set(task_cache_key, task_state, timeout=60 * 60)
 
     cache.delete('catalogo:productos_activos_v2')

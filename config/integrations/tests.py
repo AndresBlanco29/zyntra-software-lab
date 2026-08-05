@@ -1022,7 +1022,6 @@ class QuickBooksImageSyncTests(TestCase):
         self.assertEqual(result['synced'], 1)
         client.find_attachments_for_entity.assert_called()
 
-
 class QuickBooksLinkedItemUpdateTests(TestCase):
     @patch('config.integrations.quickbooks.sync._save_quickbooks_item_image', return_value=False)
     @patch('config.integrations.quickbooks.sync._enrich_quickbooks_item_payload', side_effect=lambda payload, **kwargs: payload)
@@ -1752,6 +1751,52 @@ class QuickBooksIntegrationTests(TestCase):
         response.text = ''
         response.json.side_effect = ValueError('Binary response does not provide JSON.')
         return response
+
+    def _text_response(self, text, *, ok=True, status_code=200, content_type='text/plain'):
+        payload = str(text or '')
+        response = Mock(ok=ok, status_code=status_code, text=payload, content=payload.encode('utf-8'))
+        response.headers = {'Content-Type': content_type}
+        response.json.side_effect = ValueError('Text response does not provide JSON.')
+        return response
+
+    # Valid 1x1 PNG so ImageField / magic-byte checks accept downloaded fixtures.
+    MINIMAL_PNG = (
+        b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01'
+        b'\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\x0f\x00'
+        b'\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82'
+    )
+
+    @patch('config.integrations.quickbooks.client.requests.request')
+    def test_attachable_download_uses_oauth_temp_uri_then_public_get(self, mock_request):
+        from config.integrations.quickbooks.client import QuickBooksAPIClient
+
+        self._activate_connection()
+        temp_url = (
+            'https://financialdocument.platform.intuit.com/v2/no-user-cred/documents/abc/sources/1'
+            '?realmId=realm-1&user-auth-info=token'
+        )
+
+        def request_side_effect(method, url, **kwargs):
+            headers = kwargs.get('headers') or {}
+            if '/download/ATT-1' in url:
+                self.assertIn('Bearer', headers.get('Authorization', ''))
+                return self._text_response(temp_url)
+            if url.startswith('https://financialdocument.platform.intuit.com/'):
+                self.assertNotIn('Authorization', headers)
+                return self._binary_response(self.MINIMAL_PNG, content_type='image/png')
+            raise AssertionError(f'Unexpected request: {method} {url}')
+
+        mock_request.side_effect = request_side_effect
+        client = QuickBooksAPIClient()
+        content, content_type = client.download_attachable_content({
+            'Id': 'ATT-1',
+            'TempDownloadUri': temp_url + '-stale',
+            'ContentType': 'image/png',
+            'FileName': 'item.png',
+        })
+
+        self.assertEqual(content[:8], b'\x89PNG\r\n\x1a\n')
+        self.assertEqual(content_type, 'image/png')
 
     def test_oauth_login_redirects_to_quickbooks_and_stores_state(self):
         response = self.client.get(reverse('quickbooks_login'))
@@ -2742,8 +2787,10 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
                             ]
                         }
                     })
+            if parsed_url.path.endswith('/download/ATT-ITEM-1'):
+                return self._text_response('https://download.quickbooks.test/salsa.png')
             if url == 'https://download.quickbooks.test/salsa.png':
-                return self._binary_response(b'qb-image-bytes', content_type='image/png')
+                return self._binary_response(self.MINIMAL_PNG, content_type='image/png')
             raise AssertionError(f'Unexpected QuickBooks request: {method} {url}')
 
         mock_request.side_effect = request_side_effect
@@ -2803,8 +2850,10 @@ class DatabaseRestoreCommandTests(QuickBooksIntegrationTests):
                             }
                         }
                     })
+            if parsed_url.path.endswith('/download/ATT-ITEM-2'):
+                return self._text_response('https://download.quickbooks.test/chips.png')
             if url == 'https://download.quickbooks.test/chips.png':
-                return self._binary_response(b'qb-image-bytes-single', content_type='image/png')
+                return self._binary_response(self.MINIMAL_PNG, content_type='image/png')
             raise AssertionError(f'Unexpected QuickBooks request: {method} {url}')
 
         mock_request.side_effect = request_side_effect

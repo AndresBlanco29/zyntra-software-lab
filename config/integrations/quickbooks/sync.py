@@ -1817,41 +1817,88 @@ def _is_image_attachable(payload):
     return file_name.endswith(('.png', '.jpg', '.jpeg', '.webp', '.gif'))
 
 
+def _is_downloadable_attachable(payload):
+    """True when the attachable looks like a file (not a note-only row)."""
+    if _is_image_attachable(payload):
+        return True
+    if payload.get('TempDownloadUri') or payload.get('ThumbnailTempDownloadUri') or payload.get('FileAccessUri'):
+        return True
+    file_name = _normalize_text(payload.get('FileName'))
+    content_type = _normalize_text(payload.get('ContentType')).lower()
+    if file_name and content_type and not content_type.startswith('text/'):
+        return True
+    return bool(file_name and payload.get('Id'))
+
+
 def _attachable_entity_ref_type(entity_ref):
     # QuickBooks Online JSON uses lowercase ``type``; some SDK samples use ``Type``.
-    return str((entity_ref or {}).get('Type') or (entity_ref or {}).get('type') or '').strip().lower()
+    if not isinstance(entity_ref, dict):
+        return ''
+    return str(entity_ref.get('Type') or entity_ref.get('type') or '').strip().lower()
 
 
 def _attachable_entity_ref_value(entity_ref):
-    return str((entity_ref or {}).get('value') or (entity_ref or {}).get('Value') or '').strip()
+    if isinstance(entity_ref, (str, int)):
+        return str(entity_ref).strip()
+    if not isinstance(entity_ref, dict):
+        return ''
+    return str(entity_ref.get('value') or entity_ref.get('Value') or entity_ref.get('id') or entity_ref.get('Id') or '').strip()
 
 
 def _attachable_item_reference_ids(attachment, *, allow_missing_type=False):
     """Return Item ids referenced by a QuickBooks Attachable payload."""
-    references = (attachment or {}).get('AttachableRef') or []
+    references = (
+        (attachment or {}).get('AttachableRef')
+        or (attachment or {}).get('AttachableRefs')
+        or []
+    )
     if isinstance(references, dict):
         references = [references]
     item_ids = []
     for reference in references:
-        entity_ref = (reference or {}).get('EntityRef') or {}
+        if isinstance(reference, (str, int)):
+            if allow_missing_type:
+                value = str(reference).strip()
+                if value:
+                    item_ids.append(value)
+            continue
+        if not isinstance(reference, dict):
+            continue
+        entity_ref = reference.get('EntityRef')
+        if entity_ref is None and any(
+            key in reference for key in ('type', 'Type', 'value', 'Value', 'id', 'Id')
+        ):
+            entity_ref = reference
+        if entity_ref is None:
+            continue
+        if isinstance(entity_ref, (str, int)):
+            if allow_missing_type:
+                value = str(entity_ref).strip()
+                if value:
+                    item_ids.append(value)
+            continue
         ref_type = _attachable_entity_ref_type(entity_ref)
-        if ref_type != 'item':
-            if not (allow_missing_type and not ref_type):
-                continue
+        if ref_type != 'item' and not (allow_missing_type and not ref_type):
+            continue
         item_id = _attachable_entity_ref_value(entity_ref)
         if item_id:
             item_ids.append(item_id)
     return item_ids
 
 
-def _fetch_quickbooks_item_image_attachments_map(*, client, item_ids):
-    """Load all Item image attachments once, instead of querying each product."""
+def _fetch_quickbooks_item_image_attachments_map(*, client, item_ids, progress_callback=None):
+    """Load Item file attachments once, instead of querying each product."""
     wanted_ids = {str(item_id).strip() for item_id in item_ids if str(item_id or '').strip()}
     attachments_by_item = {}
     if not wanted_ids:
         return attachments_by_item
 
     page_size = _quickbooks_catalog_page_size()
+
+    def _on_page(total_listed, _batch_len):
+        if callable(progress_callback):
+            progress_callback(total_listed)
+
     # Prefer the Item-scoped query. Some companies return nothing for that filter
     # even though per-item attachable lookups still work, so fall back broadly.
     attachments = client.find_all(
@@ -1859,6 +1906,7 @@ def _fetch_quickbooks_item_image_attachments_map(*, client, item_ids):
         max_results=None,
         where_clause="AttachableRef.EntityRef.Type = 'Item'",
         page_size=page_size,
+        on_page=_on_page,
     )
     allow_missing_type = True
     if not attachments:
@@ -1870,25 +1918,57 @@ def _fetch_quickbooks_item_image_attachments_map(*, client, item_ids):
             max_results=None,
             where_clause=None,
             page_size=page_size,
+            on_page=_on_page,
         )
         allow_missing_type = False
 
+    image_like = 0
+    with_item_refs = 0
     for attachment in attachments:
-        if not _is_image_attachable(attachment):
-            continue
-        for item_id in _attachable_item_reference_ids(
+        refs = _attachable_item_reference_ids(
             attachment,
             allow_missing_type=allow_missing_type,
-        ):
+        )
+        if refs:
+            with_item_refs += 1
+        # Map file attachables first; Image ContentType is often omitted in list queries.
+        if not _is_downloadable_attachable(attachment):
+            continue
+        if _is_image_attachable(attachment):
+            image_like += 1
+        for item_id in refs:
             if item_id in wanted_ids:
                 attachments_by_item.setdefault(item_id, []).append(attachment)
 
     if attachments and not attachments_by_item:
+        sample = attachments[0] if attachments else {}
         logger.warning(
-            'QuickBooks returned %s Attachable row(s) but none mapped to local Item ids.',
+            'QuickBooks returned %s Attachable row(s) but none mapped to local Item ids '
+            '(downloadable=%s, with_item_refs=%s, wanted=%s, sample_keys=%s, sample_ref=%s).',
             len(attachments),
+            sum(1 for row in attachments if _is_downloadable_attachable(row)),
+            with_item_refs,
+            len(wanted_ids),
+            sorted(list(sample.keys()))[:20],
+            sample.get('AttachableRef') or sample.get('AttachableRefs'),
+        )
+    else:
+        logger.info(
+            'QuickBooks attachable map: listed=%s image_like=%s with_item_refs=%s matched_items=%s',
+            len(attachments),
+            image_like,
+            with_item_refs,
+            len(attachments_by_item),
         )
     return attachments_by_item
+
+
+def _rank_attachable_for_image(attachment):
+    if _is_image_attachable(attachment):
+        return 0
+    if _is_downloadable_attachable(attachment):
+        return 1
+    return 2
 
 
 def _fetch_quickbooks_item_image(client, payload, *, max_attachments=3, attachments=None):
@@ -1904,11 +1984,16 @@ def _fetch_quickbooks_item_image(client, payload, *, max_attachments=3, attachme
     candidates = (
         list(attachments)
         if attachments is not None
-        else client.find_attachments_for_entity('Item', item_id, max_results=max_attachments)
+        else client.find_attachments_for_entity('Item', item_id, max_results=max(max_attachments, 10))
     )
-    for attachment in candidates[:max_attachments]:
-        if not _is_image_attachable(attachment):
+    candidates = sorted(candidates, key=_rank_attachable_for_image)
+    attempted = 0
+    for attachment in candidates:
+        if attempted >= max_attachments:
+            break
+        if not _is_downloadable_attachable(attachment):
             continue
+        attempted += 1
         try:
             file_bytes, content_type = client.download_attachable_content(attachment)
         except QuickBooksAPIError as exc:
@@ -2808,6 +2893,21 @@ def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=Non
         queryset = queryset[:max(int(limit), 0)]
     products = list(queryset)
     total = len(products)
+    operation = 'sync_item_images_to_local'
+
+    def _heartbeat(progress, *, result=None):
+        if not task_cache_key:
+            return
+        cache.set(
+            task_cache_key,
+            _qb_task_progress_payload(
+                status='running',
+                progress=max(0, min(99, int(progress))),
+                operation=operation,
+                result=result,
+            ),
+            timeout=60 * 60,
+        )
 
     # Resolve presentation-level links in one query. Looking this up inside the
     # loop was an additional database query for every product without a direct
@@ -2830,16 +2930,31 @@ def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=Non
     }
     item_ids = [item_id for item_id in item_ids_by_product.values() if item_id]
     attachments_by_item = None
+    _heartbeat(3, result={'phase': 'listing_attachments', 'checked': 0, 'total': total})
     try:
         attachments_by_item = _fetch_quickbooks_item_image_attachments_map(
             client=client,
             item_ids=item_ids,
+            progress_callback=lambda listed: _heartbeat(
+                min(12, 3 + (listed // 100)),
+                result={
+                    'phase': 'listing_attachments',
+                    'listed': listed,
+                    'checked': 0,
+                    'total': total,
+                    'processed': 0,
+                },
+            ),
         )
+        # Empty map means bulk listing could not be linked; use per-item lookups.
+        if attachments_by_item is not None and not attachments_by_item:
+            attachments_by_item = None
     except QuickBooksAPIError as exc:
         # Retain the slower per-item fallback if an older QuickBooks company
         # rejects the bulk Attachable query. Do not falsely report products as
         # image-less just because the lookup itself failed.
         logger.warning('Bulk QuickBooks image attachment lookup failed: %s', exc)
+        attachments_by_item = None
 
     summary = {
         'checked': 0,
@@ -2847,12 +2962,17 @@ def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=Non
         'missing_in_qb': 0,
         'failed': 0,
         'synced_labels': [],
+        'total': total,
+        'processed': 0,
     }
+    _heartbeat(15 if total else 100, result=dict(summary, phase='downloading'))
     for index, producto in enumerate(products, start=1):
         summary['checked'] += 1
+        summary['processed'] = index
         item_id = item_ids_by_product.get(producto.id, '')
         if not item_id:
             summary['missing_in_qb'] += 1
+            _heartbeat(15 + int(index * 84 / max(total, 1)), result=dict(summary, phase='downloading'))
             continue
         # Missing/empty bulk hits fall back to per-item Attachable queries.
         attachments = None
@@ -2865,13 +2985,16 @@ def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=Non
             if lookup_attachments is None:
                 lookup_attachments = client.find_attachments_for_entity('Item', item_id, max_results=3)
             image_attachments = [
-                attachment for attachment in lookup_attachments if _is_image_attachable(attachment)
+                attachment
+                for attachment in lookup_attachments
+                if _is_downloadable_attachable(attachment)
             ]
             if image_attachments:
                 summary['synced'] += 1
                 summary['synced_labels'].append(producto.nombre)
             else:
                 summary['missing_in_qb'] += 1
+            _heartbeat(15 + int(index * 84 / max(total, 1)), result=dict(summary, phase='downloading'))
             continue
 
         try:
@@ -2890,17 +3013,7 @@ def sync_missing_quickbooks_item_images(*, limit=None, dry_run=False, client=Non
             summary['failed'] += 1
             logger.warning('QuickBooks image sync failed for product %s: %s', producto.id, exc)
 
-        if task_cache_key and total:
-            task_state = cache.get(task_cache_key) or {}
-            task_state['status'] = 'running'
-            task_state['progress'] = int(index * 100 / total)
-            task_state['result'] = {
-                'synced': summary['synced'],
-                'checked': summary['checked'],
-                'missing_in_qb': summary['missing_in_qb'],
-                'failed': summary['failed'],
-            }
-            cache.set(task_cache_key, task_state, timeout=60 * 60)
+        _heartbeat(15 + int(index * 84 / max(total, 1)), result=dict(summary, phase='downloading'))
 
     cache.delete('catalogo:productos_activos_v2')
     return summary

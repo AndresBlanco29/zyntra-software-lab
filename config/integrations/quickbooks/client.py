@@ -90,7 +90,7 @@ class QuickBooksAPIClient:
             statement = f'{statement} orderby {order_by}'
         return f'{statement} startposition {int(start_position)} maxresults {int(max_results)}'
 
-    def find_all(self, entity_name, *, max_results=100, where_clause=None, order_by=None, page_size=100):
+    def find_all(self, entity_name, *, max_results=100, where_clause=None, order_by=None, page_size=100, on_page=None):
         if max_results is not None and int(max_results) <= 0:
             max_results = None
         page_size = max(int(page_size or 100), 1)
@@ -109,10 +109,15 @@ class QuickBooksAPIClient:
                     max_results=batch_size,
                 )
             )
-            batch = response.get(entity_name, [])
+            batch = self._normalize_query_entities(response, entity_name)
             if not batch:
                 break
             entities.extend(batch)
+            if callable(on_page):
+                try:
+                    on_page(len(entities), len(batch))
+                except Exception:
+                    logger.debug('QuickBooks find_all on_page callback failed', exc_info=True)
             if remaining is not None:
                 remaining -= len(batch)
                 if remaining <= 0:

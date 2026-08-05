@@ -983,6 +983,28 @@ class QuickBooksImageSyncTests(TestCase):
         client.find_by_id.assert_not_called()
         client.find_attachments_for_entity.assert_not_called()
 
+    def test_image_sync_maps_attachables_even_without_image_content_type(self):
+        # List queries often omit ContentType; previously those rows were dropped
+        # before mapping and every product fell back to slow per-item lookups.
+        producto = Producto.objects.create(
+            nombre='PRODUCTO SIN CONTENT TYPE',
+            quickbooks_id='QB-IMAGE-FILE',
+        )
+        client = Mock()
+        client.find_all.return_value = [{
+            'Id': 'ATTACHMENT-FILE',
+            'FileName': 'sku-photo.bin',
+            'FileAccessUri': '/v3/company/1/download/ATTACHMENT-FILE',
+            'AttachableRef': [{
+                'EntityRef': {'type': 'Item', 'value': 'QB-IMAGE-FILE'},
+            }],
+        }]
+
+        result = sync_missing_quickbooks_item_images(client=client, dry_run=True)
+
+        self.assertEqual(result['synced'], 1)
+        client.find_attachments_for_entity.assert_not_called()
+
     def test_image_sync_maps_lowercase_entity_ref_type_from_quickbooks_json(self):
         producto = Producto.objects.create(
             nombre='PRODUCTO TYPE MINUSCULA',

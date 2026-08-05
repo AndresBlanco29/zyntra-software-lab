@@ -459,7 +459,9 @@ def reservar_cantidades_verificacion_picking(*, pedido, items_qty_map, creado_po
     """Reserve manual verification quantities after validating Available.
 
     ``items_qty_map``: {PedidoItem: qty} or {item_id: qty}.
-    Allows partial reservation (qty < cantidad_solicitada) when stock is limited.
+    Allows partial reservation (qty < cantidad_solicitada) and over-request
+    picks (qty > cantidad_solicitada) when Available stock covers the pick.
+    The original ordered quantity stays on ``cantidad_solicitada``.
     """
     if not items_qty_map:
         raise ValidationError(_('Enter at least one quantity to reserve during picking verification.'))
@@ -487,16 +489,6 @@ def reservar_cantidades_verificacion_picking(*, pedido, items_qty_map, creado_po
     payload = []
     for item_id, qty in normalized:
         item = locked_items[item_id]
-        solicitada = max(int(item.cantidad_solicitada or item.cantidad or 0), 0)
-        if qty > solicitada:
-            raise ValidationError(
-                _('Cannot reserve %(qty)s for %(product)s - %(presentation)s; the order only requested %(requested)s.') % {
-                    'qty': qty,
-                    'product': item.presentacion.producto.nombre,
-                    'presentation': item.presentacion.nombre,
-                    'requested': solicitada,
-                }
-            )
         if qty > 0:
             payload.append({'presentacion': item.presentacion, 'cantidad': qty, 'item': item})
 

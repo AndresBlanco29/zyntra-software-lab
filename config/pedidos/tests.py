@@ -894,6 +894,42 @@ class PickingVerificationFlowTests(TestCase):
 			f'name="cantidad_real_{self.item.id}" value="7"',
 			html=False,
 		)
+		self.item.refresh_from_db()
+		self.assertEqual(self.item.cantidad_solicitada, 2)
+		self.assertEqual(self.item.cantidad, 7)
+
+	def test_selector_can_complete_picking_with_qty_above_ordered(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+
+		response = self.client.post(reverse('selector_picking_detail', args=[self.pedido.id]), {
+			'submit_action': 'complete_verification',
+			'cantidad_pallets': '1',
+			f'presentacion_{self.item.id}': str(self.presentacion.id),
+			f'cantidad_real_{self.item.id}': '5',
+			f'linea_revisada_{self.item.id}': 'on',
+			'nota_seleccionador': 'Cliente acepta 5 CS',
+			'nota_seleccionador_resuelta': 'on',
+		})
+
+		self.assertEqual(response.status_code, 302)
+		self.pedido.refresh_from_db()
+		self.item.refresh_from_db()
+		self.assertEqual(self.pedido.estado, 'VERIFICADO_AJUSTADO')
+		self.assertEqual(self.item.cantidad_solicitada, 2)
+		self.assertEqual(self.item.cantidad, 5)
+		self.assertEqual(self.item.cantidad_reservada_inventario, 5)
+
+	def test_selector_picking_detail_includes_overpick_confirmation_copy(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+
+		response = self.client.get(reverse('selector_picking_detail', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'overpickConfirmTemplate')
+		self.assertContains(response, 'more than the')
+		self.assertContains(response, 'you may pick more than ordered if confirmed')
 
 	def test_selector_picking_list_renders_in_spanish_when_selected(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)

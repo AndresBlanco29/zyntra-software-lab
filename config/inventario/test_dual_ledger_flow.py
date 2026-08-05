@@ -135,6 +135,26 @@ class DualLedgerEndToEndTests(TestCase):
 		self.assertEqual(item.cantidad_reservada_inventario, 0)
 		self.assertEqual(self._snapshot()['in_orders'], 0)
 
+	def test_verify_allows_qty_above_requested_when_available(self):
+		pedido = crear_pedido_desde_items(
+			cliente=self.cliente,
+			items_payload=[{'presentacion': self.presentacion, 'cantidad': 10, 'precio': Decimal('10.00')}],
+			origen='CLIENTE',
+		)
+		item = pedido.items.get()
+		reservar_cantidades_verificacion_picking(
+			pedido=pedido,
+			items_qty_map={item.id: 15},
+			creado_por=self.user,
+		)
+		item.refresh_from_db()
+		snap = self._snapshot()
+		self.assertEqual(item.cantidad_solicitada, 10)
+		self.assertEqual(item.cantidad, 15)
+		self.assertEqual(item.cantidad_reservada_inventario, 15)
+		self.assertEqual(snap['in_orders'], 15)
+		self.assertEqual(snap['available'], 5)
+
 	def test_full_flow_order_invoice_export_import(self):
 		# Create does not touch Available / In Orders
 		pedido = crear_pedido_desde_items(

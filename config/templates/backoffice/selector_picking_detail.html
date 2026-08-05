@@ -94,7 +94,7 @@
                 <input type="number" min="0" class="form-control quantity-stepper__input" name="cantidad_real_{{ item.id }}" value="{{ item.actual_quantity }}" required>
                 <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="up" aria-label="{% trans 'Increase real quantity' %}">+</button>
               </div>
-              <div class="form-text mb-0">{% trans "Enter only what you can prepare now (partial pick allowed)." %}</div>
+              <div class="form-text mb-0">{% trans "Enter what you can prepare now. Partial pick is allowed, and you may pick more than ordered if confirmed." %}</div>
             </td>
             <td data-label="{% trans 'Reviewed' %}" class="text-center">
               <div class="form-check d-inline-flex justify-content-center mb-0">
@@ -418,7 +418,10 @@
     labelReviewed: "{% trans 'I reviewed this added product'|escapejs %}",
     labelProduct: "{% trans 'Product'|escapejs %}",
     labelReviewedCol: "{% trans 'Reviewed'|escapejs %}",
-    duplicateProductMessage: "{% trans 'This product is already on the picking list.'|escapejs %}"
+    duplicateProductMessage: "{% trans 'This product is already on the picking list.'|escapejs %}",
+    overpickConfirmTemplate: "{% trans 'You are picking %(qty)s of %(product)s, which is more than the %(requested)s ordered. Are you sure you want to send this quantity?'|escapejs %}",
+    overpickSubmitConfirmMessage: "{% trans 'One or more products exceed the ordered quantity. Are you sure you want to send these quantities?'|escapejs %}",
+    overpickProductFallback: "{% trans 'this product'|escapejs %}"
   };
   window.LTG_PICKER_LEAVE_GUARD = {
     listUrl: "{% url 'selector_picking_list' %}",

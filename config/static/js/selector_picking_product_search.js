@@ -52,7 +52,110 @@
     var labelProduct = config.labelProduct || 'Product';
     var labelReviewedCol = config.labelReviewedCol || 'Reviewed';
     var duplicateProductMessage = config.duplicateProductMessage || 'This product is already on the picking list.';
+    var overpickConfirmTemplate = config.overpickConfirmTemplate || 'You are picking %(qty)s of %(product)s, which is more than the %(requested)s ordered. Are you sure you want to send this quantity?';
+    var overpickSubmitConfirmMessage = config.overpickSubmitConfirmMessage || 'One or more products exceed the ordered quantity. Are you sure you want to send these quantities?';
+    var overpickProductFallback = config.overpickProductFallback || 'this product';
     var availablePresentations = loadPresentations();
+
+    function formatOverpickMessage(template, values) {
+      return String(template || '')
+        .replace(/%\((\w+)\)s/g, function (_match, key) {
+          return values[key] != null ? String(values[key]) : '';
+        });
+    }
+
+    function getOrderLineProductName(row) {
+      if (!row) {
+        return overpickProductFallback;
+      }
+      var cell = row.querySelector('td[data-label]');
+      if (!cell) {
+        return overpickProductFallback;
+      }
+      var clone = cell.cloneNode(true);
+      clone.querySelectorAll('.picker-stock-label, .badge, .mt-1, .form-text').forEach(function (node) {
+        node.remove();
+      });
+      var name = String(clone.textContent || '').replace(/\s+/g, ' ').trim();
+      return name || overpickProductFallback;
+    }
+
+    function getOrderLineRequestedQuantity(row) {
+      if (!row) {
+        return 0;
+      }
+      var orderedCell = row.querySelector('[data-requested-quantity]');
+      return Number(orderedCell ? orderedCell.dataset.requestedQuantity : 0) || 0;
+    }
+
+    function confirmOverpickQuantity(row, qty, requested) {
+      var message = formatOverpickMessage(overpickConfirmTemplate, {
+        product: getOrderLineProductName(row),
+        qty: qty,
+        requested: requested,
+      });
+      return window.confirm(message);
+    }
+
+    function markOverpickConfirmed(row, confirmed) {
+      if (!row) {
+        return;
+      }
+      if (confirmed) {
+        row.dataset.overpickConfirmed = '1';
+      } else {
+        delete row.dataset.overpickConfirmed;
+      }
+    }
+
+    function collectOverpickedOrderLines() {
+      var overpicked = [];
+      document.querySelectorAll('[data-picker-order-line]').forEach(function (row) {
+        var requested = getOrderLineRequestedQuantity(row);
+        var pickInput = row.querySelector('.quantity-stepper__input');
+        var picked = Number(pickInput ? pickInput.value : 0) || 0;
+        if (picked > requested) {
+          overpicked.push({
+            row: row,
+            product: getOrderLineProductName(row),
+            qty: picked,
+            requested: requested,
+            alreadyConfirmed: row.dataset.overpickConfirmed === '1',
+          });
+        } else {
+          markOverpickConfirmed(row, false);
+        }
+      });
+      return overpicked;
+    }
+
+    function confirmOverpickBeforeSubmit() {
+      var overpicked = collectOverpickedOrderLines();
+      if (!overpicked.length) {
+        return true;
+      }
+      var pending = overpicked.filter(function (entry) {
+        return !entry.alreadyConfirmed;
+      });
+      if (!pending.length) {
+        return true;
+      }
+      var accepted;
+      if (pending.length === 1) {
+        accepted = confirmOverpickQuantity(pending[0].row, pending[0].qty, pending[0].requested);
+      } else {
+        var details = pending.map(function (entry) {
+          return entry.product + ' (' + entry.qty + ' vs ' + entry.requested + ')';
+        }).join('\n');
+        accepted = window.confirm(overpickSubmitConfirmMessage + '\n\n' + details);
+      }
+      if (accepted) {
+        pending.forEach(function (entry) {
+          markOverpickConfirmed(entry.row, true);
+        });
+      }
+      return accepted;
+    }
 
     function collectUsedPickerProducts(excludeSearchRoot) {
       var usedProductIds = new Set();
@@ -481,20 +584,48 @@
       }
 
       var input = stepper.querySelector('.quantity-stepper__input');
+      var orderLine = stepper.closest('[data-picker-order-line]');
+      var lastAcceptedValue = Number(input.value || 0) || 0;
+
+      function applyAcceptedValue(nextValue) {
+        lastAcceptedValue = nextValue;
+        input.value = nextValue;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+
+      function acceptOrRevertOverpick(nextValue) {
+        var requested = getOrderLineRequestedQuantity(orderLine);
+        if (orderLine && nextValue > requested && lastAcceptedValue <= requested) {
+          if (!confirmOverpickQuantity(orderLine, nextValue, requested)) {
+            input.value = lastAcceptedValue;
+            updateFormState();
+            return false;
+          }
+          markOverpickConfirmed(orderLine, true);
+        } else if (orderLine && nextValue <= requested) {
+          markOverpickConfirmed(orderLine, false);
+        }
+        applyAcceptedValue(nextValue);
+        return true;
+      }
+
       stepper.querySelectorAll('[data-step]').forEach(function (button) {
         button.addEventListener('click', function () {
           var currentValue = Number(input.value || 0);
           var minValue = Number(input.min || 0);
           var nextValue = button.dataset.step === 'down' ? currentValue - 1 : currentValue + 1;
-
-          input.value = Math.max(minValue, nextValue);
-          input.dispatchEvent(new Event('input', { bubbles: true }));
-          input.dispatchEvent(new Event('change', { bubbles: true }));
+          nextValue = Math.max(minValue, nextValue);
+          acceptOrRevertOverpick(nextValue);
         });
       });
 
       input.addEventListener('input', updateFormState);
-      input.addEventListener('change', updateFormState);
+      input.addEventListener('change', function () {
+        var minValue = Number(input.min || 0);
+        var nextValue = Math.max(minValue, Number(input.value || 0) || 0);
+        acceptOrRevertOverpick(nextValue);
+      });
       stepper.dataset.stepperReady = 'true';
     }
 
@@ -632,6 +763,10 @@
         return;
       }
       if (!validateRequiredLineReviews()) {
+        event.preventDefault();
+        return;
+      }
+      if (!confirmOverpickBeforeSubmit()) {
         event.preventDefault();
       }
     });

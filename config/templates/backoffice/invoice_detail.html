@@ -767,7 +767,7 @@
 {% product_shipment_summary source='invoice' value=invoice %}
 
 {% if show_customer_pickup_completion %}
-{% include 'backoffice/includes/invoice_customer_pickup_form.html' with invoice=invoice pickup_delivery=pickup_delivery pickup_collectible_balance=pickup_collectible_balance pickup_form_draft=pickup_form_draft %}
+{% include 'backoffice/includes/invoice_customer_pickup_form.html' with invoice=invoice pickup_delivery=pickup_delivery pickup_collectible_balance=pickup_collectible_balance pickup_form_draft=pickup_form_draft can_create_pickup_adjustment_note=can_create_adjustment_note invoice_quickbooks_locked=invoice_quickbooks_locked %}
 {% else %}
 <div class="card shadow-sm mb-3 invoice-signature-print">
   <div class="card-body">

@@ -335,6 +335,7 @@
   {% csrf_token %}
 
     {# 1. Create adjustment note #}
+    {% if can_create_pickup_adjustment_note %}
     <div class="pickup-flow-adjustment pickup-flow-card">
     <div class="pickup-adjustment-callout" data-driver-section="adjustment-note">
       <div class="pickup-adjustment-callout-head">
@@ -496,6 +497,13 @@
       </div>
     </div>
     </div>
+    {% elif invoice_quickbooks_locked %}
+    <div class="pickup-flow-adjustment pickup-flow-card">
+      <div class="alert alert-secondary mb-0">
+        {% trans "This invoice is already synced with QuickBooks, so new adjustment notes cannot be created here. You can still complete the customer pick up below." %}
+      </div>
+    </div>
+    {% endif %}
 
     {# 3. Payment details #}
     <div class="pickup-flow-payment pickup-flow-card pickup-payment-panel" data-driver-section="payment-details">

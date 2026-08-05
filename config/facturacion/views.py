@@ -1891,7 +1891,9 @@ def backoffice_invoice_detail(request, invoice_id):
 	show_customer_pickup_completion = False
 	pickup_collectible_balance = None
 	can_complete_pickup = False
-	if invoice.metodo_entrega == 'CUSTOMER_PICK_UP' and invoice.estado == 'GENERADA' and not is_sync_locked(invoice):
+	# Pickup completion is an operational warehouse step (payment + signature).
+	# Keep it available after QuickBooks sync; only accounting edits stay locked.
+	if invoice.metodo_entrega == 'CUSTOMER_PICK_UP' and invoice.estado == 'GENERADA':
 		pickup_delivery = ensure_customer_pickup_delivery_for_invoice(invoice)
 		invoice.refresh_from_db()
 		if pickup_delivery and not pickup_delivery.is_completed:
@@ -1938,6 +1940,7 @@ def backoffice_invoice_detail(request, invoice_id):
 		'void_registro': invoice.registros_anulacion.order_by('-anulado_en', '-id').first(),
 		'focus_adjustment_note': focus_adjustment_note,
 		'show_prominent_adjustment_note': show_prominent_adjustment_note,
+		'can_create_adjustment_note': can_create_adjustment_note,
 		'show_customer_pickup_completion': show_customer_pickup_completion,
 		'pickup_delivery': pickup_delivery,
 		'pickup_collectible_balance': pickup_collectible_balance,
@@ -2078,16 +2081,20 @@ def backoffice_invoice_complete_pickup(request, invoice_id):
 		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
 	if request.method != 'POST':
 		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
-	if is_sync_locked(invoice):
-		messages.error(request, _('This invoice is locked after QuickBooks sync.'))
-		return redirect('backoffice_invoice_detail', invoice_id=invoice.id)
 	try:
 		nota = None
 		note_request = _extract_adjustment_note_request(invoice, request.POST, field_prefix='driver_note_')
 		note_evidence_files = _normalize_uploaded_files(request.FILES.getlist('driver_note_evidence_photos'))
 		if note_request is None and note_evidence_files:
 			raise ValidationError(_('Select a note type before uploading adjustment evidence.'))
-		if note_request is not None:
+		if note_request is not None or note_evidence_files:
+			if is_sync_locked(invoice):
+				raise ValidationError(
+					_(
+						'This invoice is locked after QuickBooks sync, so new adjustment notes cannot be created. '
+						'Complete the customer pick up without a new note.'
+					)
+				)
 			nota = crear_nota_ajuste_desde_invoice(
 				invoice=invoice,
 				tipo_ajuste=note_request['tipo_ajuste'],

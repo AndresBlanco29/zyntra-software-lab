@@ -1838,6 +1838,75 @@ class InvoiceFlowTests(TestCase):
 		self.assertEqual(invoice.delivery.completed_by, self.backoffice)
 		self.assertEqual(invoice.pedido.estado, 'DESPACHADO')
 
+	def test_generate_customer_pickup_invoice_creates_pickup_delivery_immediately(self):
+		invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', driver=None, total='20.00')
+
+		self.assertTrue(hasattr(invoice, 'delivery'))
+		self.assertTrue(invoice.delivery.is_customer_pickup)
+		self.assertFalse(invoice.delivery.is_completed)
+		self.assertIsNone(invoice.delivery.driver_id)
+
+	def test_synced_customer_pickup_invoice_still_shows_completion_panel(self):
+		invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', driver=None, total='20.00')
+		invoice.quickbooks_id = 'QB-INV-PICKUP-1'
+		invoice.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+		invoice.save(update_fields=['quickbooks_id', 'sync_status'])
+		self.client.force_login(self.backoffice)
+
+		response = self.client.get(reverse('backoffice_invoice_detail', args=[invoice.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, reverse('backoffice_invoice_complete_pickup', args=[invoice.id]))
+		self.assertContains(response, 'Complete customer pick up')
+		self.assertContains(
+			response,
+			'already synced with QuickBooks, so new adjustment notes cannot be created here',
+			html=False,
+		)
+		self.assertNotContains(response, 'pickupSaveAdjustmentNoteButton')
+
+	def test_backoffice_can_complete_customer_pickup_after_quickbooks_sync(self):
+		invoice = self._create_invoice(metodo_entrega='CUSTOMER_PICK_UP', driver=None, total='30.00')
+		invoice.quickbooks_id = 'QB-INV-PICKUP-2'
+		invoice.sync_status = QUICKBOOKS_SYNC_STATUS_SYNCED
+		invoice.save(update_fields=['quickbooks_id', 'sync_status'])
+		self.client.force_login(self.backoffice)
+
+		response = self.client.post(
+			reverse('backoffice_invoice_complete_pickup', args=[invoice.id]),
+			{
+				'estado_pago': 'PAGADO',
+				'payment_method_1': 'CASH',
+				'payment_amount_1': '30.00',
+				'monto_pagado': '30.00',
+				'recibido_por': 'Cliente Mostrador',
+				'firma_cliente_data': self.signature_data,
+			},
+		)
+
+		self.assertRedirects(response, reverse('backoffice_invoice_detail', args=[invoice.id]))
+		invoice.refresh_from_db()
+		invoice.pedido.refresh_from_db()
+		self.assertEqual(invoice.delivery.estado, 'ENTREGADA_PAGADA')
+		self.assertEqual(invoice.pedido.estado, 'DESPACHADO')
+
+		completed_list = self.client.get(reverse('backoffice_pedidos'), {'view': 'completed'})
+		self.assertEqual(completed_list.status_code, 200)
+		completed_ids = [
+			row.source_id
+			for row in completed_list.context['dispatch_orders']
+			if row.record_type == 'order'
+		]
+		self.assertIn(invoice.pedido_id, completed_ids)
+
+		pickup_list = self.client.get(reverse('backoffice_pedidos'), {'view': 'customer-pickup'})
+		pickup_ids = [
+			row.source_id
+			for row in pickup_list.context['dispatch_orders']
+			if row.record_type == 'order'
+		]
+		self.assertNotIn(invoice.pedido_id, pickup_ids)
+
 	def test_failed_pickup_complete_preserves_form_draft_in_session(self):
 		from config.facturacion.form_drafts import INVOICE_PICKUP_DRAFT_SCOPE, get_workflow_draft
 

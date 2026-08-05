@@ -911,6 +911,10 @@ def generar_invoice_desde_picking(
 		if delivery is not None and estimated_delivery_at is not None:
 			delivery.estimated_delivery_at = estimated_delivery_at
 			delivery.save(update_fields=['estimated_delivery_at', 'updated_at'])
+	elif metodo_entrega == 'CUSTOMER_PICK_UP':
+		# Create pickup delivery immediately so Orders shows Customer pick up
+		# (and not Sent to driver) as soon as the invoice is generated.
+		ensure_customer_pickup_delivery_for_invoice(invoice)
 
 	_create_invoice_notification(invoice)
 	from config.auditoria.business_events import log_business_event

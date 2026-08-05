@@ -1964,6 +1964,46 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(matched['prices'][-1]['key'], 'qb_price')
 		self.assertEqual(matched['prices'][-1]['value'], '42.99')
 
+	def test_backoffice_search_uses_live_tier_prices_when_stored_prices_are_stale(self):
+		from config.productos.models import ConfiguracionLandedCost, ConfiguracionPrecios
+
+		configuracion = ConfiguracionPrecios.obtener()
+		configuracion.porcentaje_1 = Decimal('12')
+		configuracion.porcentaje_2 = Decimal('15')
+		configuracion.porcentaje_3 = Decimal('20')
+		configuracion.porcentaje_4 = Decimal('25')
+		configuracion.porcentaje_5 = Decimal('30')
+		configuracion.save()
+		landed = ConfiguracionLandedCost.obtener()
+		landed.valor = Decimal('0.00')
+		landed.save(update_fields=['valor'])
+
+		# Simulate Sabriton-style case cost with old unit-era Price 1-5 still in DB.
+		Presentacion.objects.filter(pk=self.presentacion.pk).update(
+			costo=Decimal('21.99'),
+			qb_price=Decimal('44.99'),
+			precio_1=Decimal('1.59'),
+			precio_2=Decimal('1.65'),
+			precio_3=Decimal('1.75'),
+			precio_4=Decimal('1.87'),
+			precio_5=Decimal('2.00'),
+		)
+
+		self.client.force_login(self.backoffice)
+		response = self.client.get(reverse('backoffice_buscar_presentaciones'), {
+			'q': 'Producto test',
+			'pedido_id': self.pedido.id,
+		})
+		matched = next(result for result in response.json()['results'] if result['id'] == self.presentacion.id)
+		price_by_key = {option['key']: option['value'] for option in matched['prices']}
+
+		self.assertEqual(price_by_key['precio_1'], '24.99')
+		self.assertEqual(price_by_key['qb_price'], '44.99')
+		self.assertNotEqual(price_by_key['precio_1'], '1.59')
+
+		self.presentacion.refresh_from_db()
+		self.assertEqual(self.presentacion.precio_1, Decimal('24.99'))
+
 	def test_backoffice_detail_shows_real_cost_for_backoffice_and_admin(self):
 		self.client.force_login(self.backoffice)
 		response = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))

@@ -1007,12 +1007,43 @@ def backoffice_pedido_partial_confirm(request, pedido_id):
 	return redirect('backoffice_pedido_detalle', pedido_id=parcial.id)
 
 
+def _presentacion_tier_price(presentacion, index):
+	"""Always prefer live margin math from current cost over stored precio_N."""
+	live = presentacion.get_price_for_tier(index)
+	if live is not None:
+		return _quantize_money(live)
+	return _quantize_money(getattr(presentacion, f'precio_{index}', 0) or 0)
+
+
+def _heal_presentacion_stored_tier_prices(presentacion):
+	"""
+	Repair DB Price 1-5 when they drifted after a QuickBooks cost update.
+
+	Orders used to read stored precio_N while Products admin JS showed live
+	recalculated values from RCost. Healing keeps both surfaces aligned.
+	"""
+	if getattr(presentacion, 'effective_cost', None) is None:
+		return False
+	updates = {}
+	for index in range(1, 6):
+		key = f'precio_{index}'
+		live_value = _presentacion_tier_price(presentacion, index)
+		stored = _quantize_money(getattr(presentacion, key, 0) or 0)
+		if stored != live_value:
+			updates[key] = live_value
+			setattr(presentacion, key, live_value)
+	if not updates:
+		return False
+	Presentacion.objects.filter(pk=presentacion.pk).update(**updates)
+	return True
+
+
 def _default_presentacion_price_for_pedido(*, presentacion, pedido):
 	cliente = getattr(pedido, 'cliente', None)
 	tier = cliente.get_nivel_precio_normalizado() if cliente and hasattr(cliente, 'get_nivel_precio_normalizado') else None
 	price = presentacion.get_price_for_tier(tier)
 	if price is None:
-		price = presentacion.precio_1
+		price = _presentacion_tier_price(presentacion, 1)
 	return _quantize_money(price or 0)
 
 
@@ -1027,10 +1058,11 @@ def _default_catalog_presentacion_price_key_for_pedido(*, pedido, presentacion):
 
 
 def _build_catalog_presentacion_price_options(*, presentacion, pedido=None):
+	_heal_presentacion_stored_tier_prices(presentacion)
 	prices = []
 	for index in range(1, 6):
 		key = f'precio_{index}'
-		value = _quantize_money(getattr(presentacion, key, 0) or 0)
+		value = _presentacion_tier_price(presentacion, index)
 		prices.append({
 			'key': key,
 			'value': format(value, '.2f'),
@@ -1050,12 +1082,13 @@ def _build_catalog_presentacion_price_options(*, presentacion, pedido=None):
 		default_key = _default_catalog_presentacion_price_key_for_pedido(pedido=pedido, presentacion=presentacion)
 	else:
 		default_key = 'precio_1'
-		default_price = _quantize_money(presentacion.precio_1 or 0)
+		default_price = _presentacion_tier_price(presentacion, 1)
 
 	return prices, default_key, format(default_price, '.2f')
 
 
 def _build_presentacion_price_options(*, presentacion, pedido=None):
+	_heal_presentacion_stored_tier_prices(presentacion)
 	cliente = getattr(pedido, 'cliente', None) if pedido is not None else None
 	prices = []
 
@@ -1064,7 +1097,7 @@ def _build_presentacion_price_options(*, presentacion, pedido=None):
 
 	for index in range(1, 6):
 		key = f'precio_{index}'
-		value = _quantize_money(getattr(presentacion, key, 0) or 0)
+		value = _presentacion_tier_price(presentacion, index)
 		prices.append({
 			'key': key,
 			'value': format(value, '.2f'),
@@ -1085,7 +1118,7 @@ def _build_presentacion_price_options(*, presentacion, pedido=None):
 		default_price = (
 			_default_presentacion_price_for_pedido(presentacion=presentacion, pedido=pedido)
 			if pedido is not None
-			else _quantize_money(presentacion.precio_1 or 0)
+			else _presentacion_tier_price(presentacion, 1)
 		)
 		default_key = _match_presentacion_price_key(prices, default_price) or 'precio_1'
 		return prices, default_key, format(default_price, '.2f')
@@ -1093,7 +1126,7 @@ def _build_presentacion_price_options(*, presentacion, pedido=None):
 	default_price = (
 		_default_presentacion_price_for_pedido(presentacion=presentacion, pedido=pedido)
 		if pedido is not None
-		else _quantize_money(presentacion.precio_1 or 0)
+		else _presentacion_tier_price(presentacion, 1)
 	)
 	return [], '', format(default_price, '.2f')
 

@@ -38,6 +38,41 @@ class ConfiguracionPreciosTests(TestCase):
 		self.assertEqual(self.presentacion.precio_1, Decimal('142.86'))
 		self.assertEqual(self.presentacion.precio_2, Decimal('125.00'))
 
+	def test_partial_save_persists_recalculated_price_tiers(self):
+		"""QuickBooks sync uses update_fields; Price 1-5 must still be written."""
+		from config.productos.models import ConfiguracionLandedCost
+
+		configuracion = ConfiguracionPrecios.obtener()
+		configuracion.porcentaje_1 = Decimal('12')
+		configuracion.porcentaje_2 = Decimal('15')
+		configuracion.porcentaje_3 = Decimal('20')
+		configuracion.porcentaje_4 = Decimal('25')
+		configuracion.porcentaje_5 = Decimal('30')
+		configuracion.save()
+		landed = ConfiguracionLandedCost.obtener()
+		landed.valor = Decimal('0.00')
+		landed.save(update_fields=['valor'])
+
+		# Simulate stale unit-era prices left in the DB.
+		Presentacion.objects.filter(pk=self.presentacion.pk).update(
+			precio_1=Decimal('1.59'),
+			precio_2=Decimal('1.65'),
+			precio_3=Decimal('1.75'),
+			precio_4=Decimal('1.87'),
+			precio_5=Decimal('2.00'),
+			costo=Decimal('21.99'),
+			qb_price=Decimal('44.99'),
+		)
+		presentacion = Presentacion.objects.get(pk=self.presentacion.pk)
+		presentacion.costo = Decimal('21.99')
+		presentacion.qb_price = Decimal('44.99')
+		presentacion.save(update_fields=['costo', 'qb_price'])
+		presentacion.refresh_from_db()
+
+		self.assertEqual(presentacion.precio_1, Decimal('24.99'))
+		self.assertEqual(presentacion.qb_price, Decimal('44.99'))
+		self.assertNotEqual(presentacion.precio_1, Decimal('1.59'))
+
 	def test_configurar_precios_rejects_percentages_of_100_or_more(self):
 		self.client.force_login(self.admin)
 

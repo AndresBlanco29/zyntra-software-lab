@@ -960,6 +960,61 @@ class QuickBooksItemCostSyncTests(TestCase):
         mock_fetch_item.assert_not_called()
 
 
+class QuickBooksPresentationPriceSyncTests(TestCase):
+    def test_quickbooks_cost_update_persists_recalculated_price_tiers(self):
+        from config.integrations.quickbooks.sync import _update_presentacion_from_quickbooks
+        from config.productos.models import ConfiguracionLandedCost, ConfiguracionPrecios
+
+        configuracion = ConfiguracionPrecios.obtener()
+        configuracion.porcentaje_1 = Decimal('12')
+        configuracion.porcentaje_2 = Decimal('15')
+        configuracion.porcentaje_3 = Decimal('20')
+        configuracion.porcentaje_4 = Decimal('25')
+        configuracion.porcentaje_5 = Decimal('30')
+        configuracion.save()
+        landed = ConfiguracionLandedCost.obtener()
+        landed.valor = Decimal('0.00')
+        landed.save(update_fields=['valor'])
+
+        categoria = Categoria.objects.create(nombre='Snacks Sync')
+        marca = Marca.objects.create(nombre='Sabriton Sync')
+        producto = Producto.objects.create(
+            nombre='SABRITON CHILE Y LIMON',
+            categoria=categoria,
+            marca=marca,
+        )
+        presentacion = Presentacion.objects.create(
+            producto=producto,
+            nombre='caja',
+            unidades=15,
+            tipo_contenido='2.3 OZ',
+            costo=Decimal('1.40'),
+            qb_price=Decimal('2.00'),
+            quickbooks_id='QB-SABRITON-1',
+        )
+        # Stale unit-era commercial prices after a case-cost sync that only wrote costo.
+        Presentacion.objects.filter(pk=presentacion.pk).update(
+            precio_1=Decimal('1.59'),
+            precio_2=Decimal('1.65'),
+            precio_3=Decimal('1.75'),
+            precio_4=Decimal('1.87'),
+            precio_5=Decimal('2.00'),
+        )
+
+        _update_presentacion_from_quickbooks(
+            Presentacion.objects.get(pk=presentacion.pk),
+            quickbooks_id='QB-SABRITON-1',
+            item_cost=Decimal('21.99'),
+            sales_price=Decimal('44.99'),
+        )
+        presentacion.refresh_from_db()
+
+        self.assertEqual(presentacion.costo, Decimal('21.99'))
+        self.assertEqual(presentacion.qb_price, Decimal('44.99'))
+        self.assertEqual(presentacion.precio_1, Decimal('24.99'))
+        self.assertNotEqual(presentacion.precio_1, Decimal('1.59'))
+
+
 class QuickBooksImageSyncTests(TestCase):
     def test_image_sync_uses_one_bulk_attachment_lookup_without_item_reads(self):
         producto = Producto.objects.create(

@@ -418,6 +418,20 @@ class Presentacion(models.Model):
     def save(self, *args, **kwargs):
         self.recalcular_precios()
         self.recalcular_pallet_quantity()
+        update_fields = kwargs.get('update_fields')
+        if update_fields is not None:
+            # recalcular_* updates these in memory; a partial save (e.g. QuickBooks
+            # sync writing only costo/qb_price) must persist them or Orders keeps
+            # stale Price 1-5 while Products admin JS shows live recalculated values.
+            kwargs['update_fields'] = list(dict.fromkeys([
+                *list(update_fields),
+                'precio_1',
+                'precio_2',
+                'precio_3',
+                'precio_4',
+                'precio_5',
+                'pallet_quantity',
+            ]))
         super().save(*args, **kwargs)
 
 

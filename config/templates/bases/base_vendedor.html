@@ -69,7 +69,7 @@
 <div class="container-fluid">
 
 <div class="navbar-brand-group">
-<button class="btn btn-outline-light d-lg-none me-2 sidebar-toggle-btn" type="button" id="sidebarToggleBtn" aria-label="{% trans 'Open menu' %}">
+<button class="btn btn-outline-light d-xl-none me-2 sidebar-toggle-btn" type="button" id="sidebarToggleBtn" aria-label="{% trans 'Open menu' %}">
 ☰
 </button>
 
@@ -616,7 +616,8 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   window.addEventListener('resize', function () {
-    if (window.innerWidth > 992) {
+    // Keep overlay sidebar behavior through tablet landscape (~1024-1199).
+    if (window.innerWidth >= 1200) {
       closeSidebar();
     }
   });

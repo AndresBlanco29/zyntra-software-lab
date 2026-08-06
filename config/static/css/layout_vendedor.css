@@ -1057,8 +1057,9 @@ box-sizing: border-box;
         overflow-x: hidden;
     }
 
-    /* Sidebar siempre visible en escritorio */
-    @media (min-width: 992px) {
+    /* Sidebar siempre visible en escritorio (xl+). Tablets, including landscape,
+       keep the overlay/hamburger sidebar so picking and wide tables get full width. */
+    @media (min-width: 1200px) {
         .sidebar {
             left: 0 !important;
             z-index: 1060;
@@ -1087,8 +1088,8 @@ box-sizing: border-box;
         }
     }
 
-    /* Sidebar deslizable solo en móvil/tablet */
-    @media (max-width: 991.98px) {
+    /* Sidebar deslizable en móvil/tablet (incluye landscape bajo 1200px) */
+    @media (max-width: 1199.98px) {
         .sidebar {
             left: -320px;
             z-index: 2000;
@@ -1237,7 +1238,8 @@ box-sizing: border-box;
         min-width: 700px;
     }
 
-    /* iPad / tablet: keep wide list tables swipeable instead of stacking or clipping. */
+    /* iPad / tablet: keep wide list tables swipeable instead of stacking or clipping.
+       Picking verification/detail tables stack as cards so pickers avoid horizontal scroll. */
     @media (min-width: 768px) and (max-width: 1199.98px) {
         .content .table-responsive.mobile-stack-responsive {
             overflow-x: auto !important;
@@ -1251,6 +1253,91 @@ box-sizing: border-box;
         .content .table-responsive.mobile-stack-responsive .table.mobile-stack-table {
             min-width: 960px;
             margin-bottom: 0;
+        }
+
+        .content .table-responsive.mobile-stack-responsive:has(.mobile-stack-table--detail),
+        .content .table-responsive.mobile-stack-responsive:has(.mobile-stack-table--picking) {
+            overflow-x: visible !important;
+        }
+
+        .content .table-responsive.mobile-stack-responsive .table.mobile-stack-table.mobile-stack-table--detail,
+        .content .table-responsive.mobile-stack-responsive .table.mobile-stack-table.mobile-stack-table--picking {
+            min-width: 0;
+        }
+
+        .content .mobile-stack-table.mobile-stack-table--detail thead,
+        .content .mobile-stack-table.mobile-stack-table--picking thead {
+            display: none;
+        }
+
+        .content .mobile-stack-table.mobile-stack-table--detail,
+        .content .mobile-stack-table.mobile-stack-table--detail tbody,
+        .content .mobile-stack-table.mobile-stack-table--detail tr,
+        .content .mobile-stack-table.mobile-stack-table--detail td,
+        .content .mobile-stack-table.mobile-stack-table--picking,
+        .content .mobile-stack-table.mobile-stack-table--picking tbody,
+        .content .mobile-stack-table.mobile-stack-table--picking tr,
+        .content .mobile-stack-table.mobile-stack-table--picking td {
+            display: block;
+            width: 100%;
+        }
+
+        .content .mobile-stack-table.mobile-stack-table--detail tbody,
+        .content .mobile-stack-table.mobile-stack-table--picking tbody {
+            padding: 10px;
+        }
+
+        .content .mobile-stack-table.mobile-stack-table--detail tr,
+        .content .mobile-stack-table.mobile-stack-table--picking tr {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+
+        .content .mobile-stack-table.mobile-stack-table--detail td,
+        .content .mobile-stack-table.mobile-stack-table--picking td {
+            border: 0;
+            padding: 10px 14px;
+            text-align: left;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            white-space: normal;
+        }
+
+        .content .mobile-stack-table.mobile-stack-table--detail td + td,
+        .content .mobile-stack-table.mobile-stack-table--picking td + td {
+            border-top: 1px solid #eef2f7;
+        }
+
+        .content .mobile-stack-table.mobile-stack-table--detail td::before,
+        .content .mobile-stack-table.mobile-stack-table--picking td::before {
+            content: attr(data-label);
+            display: block;
+            margin-bottom: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #64748b;
+        }
+
+        .content .mobile-stack-table.mobile-stack-table--detail .mobile-stack-table__input-cell .quantity-stepper,
+        .content .mobile-stack-table.mobile-stack-table--picking .mobile-stack-table__input-cell .quantity-stepper {
+            width: 100%;
+        }
+
+        .content .mobile-stack-table.mobile-stack-table--detail .mobile-stack-table__input-cell .quantity-stepper__button,
+        .content .mobile-stack-table.mobile-stack-table--picking .mobile-stack-table__input-cell .quantity-stepper__button {
+            width: auto;
+            flex: 0 0 48px;
+        }
+
+        .content .mobile-stack-table.mobile-stack-table--detail .mobile-stack-table__input-cell .quantity-stepper__input,
+        .content .mobile-stack-table.mobile-stack-table--picking .mobile-stack-table__input-cell .quantity-stepper__input {
+            width: 1%;
         }
     }
 
@@ -1798,7 +1885,7 @@ box-sizing: border-box;
   }
 }
 
-@media (max-width: 992px) {
+@media (max-width: 1199.98px) {
   :root {
     --panel-content-top-gap: 10px;
   }
@@ -1857,7 +1944,7 @@ box-sizing: border-box;
     }
 }
 
-@media (max-width: 992px) {
+@media (max-width: 1199.98px) {
 
   .sidebar {
     position: fixed;

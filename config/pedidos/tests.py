@@ -931,6 +931,17 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertContains(response, 'more than the')
 		self.assertContains(response, 'you may pick more than ordered if confirmed')
 
+	def test_selector_picking_detail_uses_tablet_friendly_layout_hooks(self):
+		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
+		self.client.force_login(self.selector)
+
+		response = self.client.get(reverse('selector_picking_detail', args=[self.pedido.id]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'mobile-stack-table--detail')
+		self.assertContains(response, 'd-xl-none me-2 sidebar-toggle-btn')
+		self.assertContains(response, 'window.innerWidth >= 1200')
+
 	def test_selector_picking_list_renders_in_spanish_when_selected(self):
 		asignar_picking_a_seleccionador(pedido=self.pedido, seleccionador=self.selector)
 		self.client.force_login(self.selector)

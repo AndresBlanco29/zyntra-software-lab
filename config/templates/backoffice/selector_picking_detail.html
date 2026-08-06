@@ -59,11 +59,11 @@
           <tr>
             <th>{% trans "Product" %}</th>
             <th>U/M</th>
-            <th>QTY ORD</th>
-            <th>{% trans "Reserved" %}</th>
-            <th>{% trans "Pending" %}</th>
-            <th>QTY PICK</th>
-            <th class="text-center" style="width: 110px;">{% trans "Reviewed" %}</th>
+            <th class="picker-col-qty-ord">QTY ORD</th>
+            <th class="picker-col-compact-hide">{% trans "Reserved" %}</th>
+            <th class="picker-col-compact-hide">{% trans "Pending" %}</th>
+            <th class="picker-col-qty-pick">QTY PICK</th>
+            <th class="text-center picker-col-reviewed">{% trans "Reviewed" %}</th>
           </tr>
         </thead>
         <tbody id="pickerItemsTableBody">
@@ -85,18 +85,18 @@
                 {% endfor %}
               </select>
             </td>
-            <td data-label="QTY ORD" data-requested-quantity="{{ item.requested_quantity }}">{{ item.requested_quantity }}</td>
-            <td data-label="{% trans 'Reserved' %}">{{ item.reserved_quantity }}</td>
-            <td data-label="{% trans 'Pending' %}">{{ item.pending_quantity }}</td>
-            <td data-label="QTY PICK" class="mobile-stack-table__input-cell">
+            <td class="picker-col-qty-ord" data-label="QTY ORD" data-requested-quantity="{{ item.requested_quantity }}">{{ item.requested_quantity }}</td>
+            <td class="picker-col-compact-hide" data-label="{% trans 'Reserved' %}">{{ item.reserved_quantity }}</td>
+            <td class="picker-col-compact-hide" data-label="{% trans 'Pending' %}">{{ item.pending_quantity }}</td>
+            <td data-label="QTY PICK" class="mobile-stack-table__input-cell picker-col-qty-pick">
               <div class="input-group quantity-stepper" data-quantity-stepper data-stock-physical="{{ item.stock_physical }}" data-applied-quantity="{{ item.applied_quantity }}">
                 <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="down" aria-label="{% trans 'Decrease real quantity' %}">-</button>
                 <input type="number" min="0" class="form-control quantity-stepper__input" name="cantidad_real_{{ item.id }}" value="{{ item.actual_quantity }}" required>
                 <button type="button" class="btn btn-outline-secondary quantity-stepper__button" data-step="up" aria-label="{% trans 'Increase real quantity' %}">+</button>
               </div>
-              <div class="form-text mb-0">{% trans "Enter what you can prepare now. Partial pick is allowed, and you may pick more than ordered if confirmed." %}</div>
+              <div class="form-text mb-0 picker-qty-help">{% trans "Enter what you can prepare now. Partial pick is allowed, and you may pick more than ordered if confirmed." %}</div>
             </td>
-            <td data-label="{% trans 'Reviewed' %}" class="text-center">
+            <td data-label="{% trans 'Reviewed' %}" class="text-center picker-col-reviewed">
               <div class="form-check d-inline-flex justify-content-center mb-0">
                 <input
                   type="checkbox"

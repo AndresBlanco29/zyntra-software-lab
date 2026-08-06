@@ -979,6 +979,7 @@ class PickingVerificationFlowTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, 'mobile-stack-table--detail')
+		self.assertContains(response, 'picker-col-compact-hide')
 		self.assertContains(response, 'd-xl-none me-2 sidebar-toggle-btn')
 		self.assertContains(response, 'window.innerWidth >= 1200')
 

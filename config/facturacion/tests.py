@@ -3811,6 +3811,38 @@ class InvoiceFlowTests(TestCase):
 		)
 		self.assertEqual(invoice.items.first().precio_venta_sugerido_unitario, Decimal('2.75'))
 
+	def test_backoffice_can_generate_invoice_with_free_gift_zero_price_line(self):
+		self.client.force_login(self.backoffice)
+		self.pedido_item.precio = Decimal('0.00')
+		self.pedido_item.subtotal = Decimal('0.00')
+		self.pedido_item.save(update_fields=['precio', 'subtotal'])
+		self.pedido.total = Decimal('0.00')
+		self.pedido.save(update_fields=['total', 'actualizada_en'])
+
+		detail = self.client.get(reverse('backoffice_pedido_detalle', args=[self.pedido.id]))
+		self.assertEqual(detail.status_code, 200)
+		self.assertContains(detail, 'data-has-free-gifts="1"', html=False)
+		self.assertContains(detail, 'FREE / gift')
+		self.assertContains(detail, f'name="suggested_unit_price_{self.pedido_item.id}"', html=False)
+		self.assertContains(detail, 'min="0"', html=False)
+
+		response = self.client.post(reverse('backoffice_generate_invoice', args=[self.pedido.id]), {
+			'metodo_entrega': 'CUSTOMER_PICK_UP',
+			'driver_id': '',
+			f'suggested_unit_price_{self.pedido_item.id}': '0.00',
+		})
+
+		invoice = Invoice.objects.get(pedido=self.pedido)
+		self.assertRedirects(
+			response,
+			f"{reverse('backoffice_invoice_detail', args=[invoice.id])}?focus_adjustment_note=1",
+		)
+		item = invoice.items.get()
+		self.assertEqual(item.precio_unitario, Decimal('0.00'))
+		self.assertEqual(item.subtotal, Decimal('0.00'))
+		self.assertTrue(item.es_regalo)
+		self.assertEqual(item.precio_venta_sugerido_unitario, Decimal('0.00'))
+
 	def test_generar_invoice_desde_picking_applies_line_discount(self):
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,

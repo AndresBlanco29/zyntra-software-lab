@@ -198,7 +198,14 @@
             <a href="{% url 'backoffice_invoice_pdf' invoice.id %}" class="btn btn-success">{% trans "Export invoice PDF" %}</a>
           </div>
         {% elif pedido.estado == 'VERIFICADO_AJUSTADO' and not pedido.picking_bloqueado and not pedido.credit_limit_bloqueado and not pedido.tiene_nota_cliente_pendiente %}
-          <form method="post" action="{% url 'backoffice_generate_invoice' pedido.id %}" class="row g-2">
+          <form
+            method="post"
+            action="{% url 'backoffice_generate_invoice' pedido.id %}"
+            class="row g-2"
+            id="generateInvoiceForm"
+            data-has-free-gifts="{% if invoice_has_free_gift_lines %}1{% else %}0{% endif %}"
+            data-free-gift-confirm="{% filter escapejs %}{% trans 'This order includes free/gift products at $0.00. Do you want to continue and generate the invoice with those lines free?' %}{% endfilter %}"
+            data-free-gift-names="{{ invoice_free_gift_product_names|join:', '|escapejs }}">
             {% csrf_token %}
             <div class="col-md-4">
               <label class="form-label fw-semibold">{% trans "Delivery method" %}</label>
@@ -416,12 +423,22 @@
                     </thead>
                     <tbody>
                       {% for row in invoice_suggested_price_rows %}
-                        <tr>
-                          <td>{{ row.product_name }}</td>
+                        <tr {% if row.is_free_gift %}data-free-gift="1"{% endif %}>
+                          <td>
+                            {{ row.product_name }}
+                            {% if row.is_free_gift %}
+                            <div class="mt-1"><span class="badge text-bg-success">{% trans "FREE / gift" %}</span></div>
+                            {% endif %}
+                          </td>
                           <td>{{ row.presentation_name }}</td>
                           <td>{{ row.quantity }}</td>
                           <td style="min-width: 360px; max-width: 420px;">
                             <div class="small text-muted mb-2">{% trans "Customer unit cost" %}: $<span id="suggested_customer_cost_{{ row.item_id }}">{{ row.final_unit_value }}</span></div>
+                            {% if row.is_free_gift %}
+                            <div class="alert alert-success py-2 px-3 mb-2 small">
+                              {% trans "This product is free/gift ($0.00). Suggested retail stays at $0.00." %}
+                            </div>
+                            {% endif %}
                             <div class="row g-2">
                               <div class="col-md-5">
                                 <label class="form-label form-label-sm mb-1">{% trans "Profit %" %}</label>
@@ -432,11 +449,12 @@
                                     max="99.99"
                                     class="form-control suggested-margin-input"
                                     name="suggested_margin_percentage_{{ row.item_id }}"
-                                    value="{{ row.default_percentage }}"
+                                    value="{% if row.is_free_gift %}0.00{% else %}{{ row.default_percentage }}{% endif %}"
                                     data-base-unit-price="{{ row.final_unit_value }}"
                                     data-value-target="suggested_value_{{ row.item_id }}"
                                     data-summary-target="suggested_summary_{{ row.item_id }}"
                                     data-base-price-input="line_discount_percentage_{{ row.item_id }}"
+                                    {% if row.is_free_gift %}readonly{% endif %}
                                   >
                                   <span class="input-group-text">%</span>
                                 </div>
@@ -448,21 +466,26 @@
                                   <input
                                     id="suggested_value_{{ row.item_id }}"
                                     type="number"
-                                    min="0.01"
+                                    min="{% if row.is_free_gift %}0{% else %}0.01{% endif %}"
                                     step="0.01"
                                     class="form-control suggested-value-input"
                                     name="suggested_unit_price_{{ row.item_id }}"
-                                    value="{{ row.default_value }}"
+                                    value="{% if row.is_free_gift %}0.00{% else %}{{ row.default_value }}{% endif %}"
                                     data-base-unit-price="{{ row.final_unit_value }}"
                                     data-margin-target="suggested_margin_percentage_{{ row.item_id }}"
                                     data-summary-target="suggested_summary_{{ row.item_id }}"
                                     data-base-price-input="line_discount_percentage_{{ row.item_id }}"
+                                    {% if row.is_free_gift %}data-free-gift="1" readonly{% endif %}
                                   >
                                 </div>
                               </div>
                             </div>
                             <div id="suggested_summary_{{ row.item_id }}" class="small text-muted mt-2">
-                              {% trans "Suggested resale synced from profit percentage and value." %}
+                              {% if row.is_free_gift %}
+                                {% trans "Free/gift line — no suggested resale charge." %}
+                              {% else %}
+                                {% trans "Suggested resale synced from profit percentage and value." %}
+                              {% endif %}
                             </div>
                           </td>
                         </tr>
@@ -1197,6 +1220,32 @@ document.addEventListener('DOMContentLoaded', function () {
   if (invoiceDeliveryMethod) {
     invoiceDeliveryMethod.addEventListener('change', syncInvoiceDeliveryFields);
     syncInvoiceDeliveryFields();
+  }
+
+  const generateInvoiceForm = document.getElementById('generateInvoiceForm');
+  if (generateInvoiceForm) {
+    generateInvoiceForm.addEventListener('submit', function (event) {
+      if (generateInvoiceForm.dataset.freeGiftConfirmed === '1') {
+        return;
+      }
+      if (generateInvoiceForm.dataset.hasFreeGifts !== '1') {
+        return;
+      }
+      event.preventDefault();
+      const names = (generateInvoiceForm.dataset.freeGiftNames || '').trim();
+      let message = generateInvoiceForm.dataset.freeGiftConfirm || 'This order includes free/gift products. Continue?';
+      if (names) {
+        message += '\n\n' + names;
+      }
+      if (window.confirm(message)) {
+        generateInvoiceForm.dataset.freeGiftConfirmed = '1';
+        if (typeof generateInvoiceForm.requestSubmit === 'function') {
+          generateInvoiceForm.requestSubmit();
+        } else {
+          generateInvoiceForm.submit();
+        }
+      }
+    });
   }
 
   const includePricesToggle = document.getElementById('emailIncludePrices');

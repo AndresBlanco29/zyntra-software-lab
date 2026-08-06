@@ -283,7 +283,21 @@ def _is_invoice_suggested_price_default(item, suggested_unit_price):
 	return Decimal(str(suggested_unit_price or '0')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP) == default_unit_price
 
 
-def _parse_invoice_suggested_unit_price(value):
+def _pedido_item_is_free_gift_line(item):
+	"""True for promo gifts or manually gifted lines priced at $0 with qty > 0."""
+	if getattr(item, 'es_regalo', False):
+		return True
+	quantity = int(getattr(item, 'cantidad', 0) or 0)
+	if quantity <= 0:
+		return False
+	try:
+		unit_price = Decimal(str(getattr(item, 'precio', 0) or 0))
+	except (InvalidOperation, TypeError, ValueError):
+		unit_price = Decimal('0')
+	return unit_price <= 0
+
+
+def _parse_invoice_suggested_unit_price(value, *, allow_zero=False):
 	text = str(value or '').strip().replace(',', '.')
 	if not text:
 		return None
@@ -291,7 +305,11 @@ def _parse_invoice_suggested_unit_price(value):
 		parsed = Decimal(text)
 	except (InvalidOperation, TypeError, ValueError):
 		raise ValidationError(_('Suggested retail per unit must be a valid number.'))
-	if parsed <= 0:
+	if parsed < 0:
+		raise ValidationError(_('Suggested retail per unit must be a valid number.'))
+	if parsed == 0:
+		if allow_zero:
+			return Decimal('0.00')
 		raise ValidationError(_('Suggested retail per unit must be greater than zero.'))
 	return parsed.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
@@ -299,9 +317,16 @@ def _parse_invoice_suggested_unit_price(value):
 def _extract_invoice_suggested_unit_prices(pedido, post_data):
 	suggested_prices = {}
 	for item in pedido.items.all():
-		suggested_price = _parse_invoice_suggested_unit_price(post_data.get(f'suggested_unit_price_{item.id}'))
+		allow_zero = _pedido_item_is_free_gift_line(item)
+		suggested_price = _parse_invoice_suggested_unit_price(
+			post_data.get(f'suggested_unit_price_{item.id}'),
+			allow_zero=allow_zero,
+		)
 		if suggested_price is not None:
 			suggested_prices[item.id] = suggested_price
+		elif allow_zero:
+			# Free/gift lines may post blank or 0.00; keep them at $0 on the invoice.
+			suggested_prices[item.id] = Decimal('0.00')
 	return suggested_prices
 
 

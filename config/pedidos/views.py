@@ -225,6 +225,9 @@ def _build_invoice_suggested_price_row(item):
 		descuento_aplicado=item.descuento_aplicado,
 		descuento_monto=item.descuento_monto,
 	)
+	is_free_gift = bool(getattr(item, 'es_regalo', False)) or (
+		quantity > 0 and Decimal(str(item.precio or 0)) <= 0
+	)
 	return {
 		'item_id': item.id,
 		'product_name': item.presentacion.producto.nombre,
@@ -239,6 +242,7 @@ def _build_invoice_suggested_price_row(item):
 		'line_subtotal_value': format(line_subtotal, '.2f'),
 		'default_value': format(resolve_presentacion_suggested_unit_price(presentacion=item.presentacion, base_case_price=net_unit_price), '.2f'),
 		'default_percentage': format(DEFAULT_SUGGESTED_PROFIT_PERCENTAGE, '.2f'),
+		'is_free_gift': is_free_gift,
 	}
 
 
@@ -842,6 +846,19 @@ def backoffice_pedido_detalle(request, pedido_id):
 			_build_invoice_suggested_price_row(item)
 			for item in pedido.items.select_related('presentacion__producto')
 			if item.cantidad > 0
+		],
+		'invoice_has_free_gift_lines': any(
+			bool(getattr(item, 'es_regalo', False)) or (
+				int(item.cantidad or 0) > 0 and Decimal(str(item.precio or 0)) <= 0
+			)
+			for item in pedido.items.all()
+		),
+		'invoice_free_gift_product_names': [
+			item.presentacion.producto.nombre
+			for item in pedido.items.select_related('presentacion__producto')
+			if int(item.cantidad or 0) > 0 and (
+				bool(getattr(item, 'es_regalo', False)) or Decimal(str(item.precio or 0)) <= 0
+			)
 		],
 		'bulk_price_options': _build_bulk_pedido_price_options(),
 		'discount_preset_options': _build_pedido_discount_preset_options(),

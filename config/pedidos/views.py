@@ -1554,7 +1554,7 @@ def _render_multi_inventory_needs_pdf(*, analysis, pedidos):
 	rows = [[
 		Paragraph(escape(_('Product')), header_cell_style),
 		Paragraph(escape(_('SKU')), header_cell_style),
-		Paragraph(escape(_('Requested')), header_cell_style),
+		Paragraph(escape(_('To dispatch')), header_cell_style),
 		Paragraph(escape(_('Reserved')), header_cell_style),
 		Paragraph(escape(_('Pending')), header_cell_style),
 		Paragraph(escape(_('Stock')), header_cell_style),
@@ -1939,7 +1939,7 @@ def backoffice_inventory_needs_pdf(request, pedido_id):
 	rows = [[
 		Paragraph(escape(_('Product')), header_cell_style),
 		Paragraph(escape(_('SKU')), header_cell_style),
-		Paragraph(escape(_('Requested')), header_cell_style),
+		Paragraph(escape(_('To dispatch')), header_cell_style),
 		Paragraph(escape(_('Reserved')), header_cell_style),
 		Paragraph(escape(_('Pending')), header_cell_style),
 		Paragraph(escape(_('Stock')), header_cell_style),

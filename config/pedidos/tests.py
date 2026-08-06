@@ -236,7 +236,47 @@ class PickingVerificationFlowTests(TestCase):
 		self.assertEqual(row['requested_quantity'], 5)
 		self.assertEqual(row['available_stock'], 4)
 		self.assertEqual(row['to_buy_quantity'], 1)
+		self.assertEqual(row['order_ids'], [self.pedido.id, other_pedido.id])
 		self.assertEqual(row['order_count'], 2)
+
+	def test_inventory_needs_analysis_uses_dispatch_quantity_not_original_request(self):
+		# Customer originally asked for 5; BackOffice raised dispatch qty to 300.
+		self.item.cantidad_solicitada = 5
+		self.item.cantidad = 300
+		self.item.cantidad_reservada_inventario = 0
+		self.item.subtotal = Decimal('3600.00')
+		self.item.save(update_fields=['cantidad_solicitada', 'cantidad', 'cantidad_reservada_inventario', 'subtotal'])
+		StockPresentacion.objects.filter(presentacion=self.presentacion).update(
+			stock_fisico=10,
+			stock_reservado=0,
+			stock_disponible=10,
+		)
+
+		analysis = build_pedido_inventory_needs_analysis(pedido=self.pedido)
+		row = analysis['rows'][0]
+		self.assertEqual(row['requested_quantity'], 300)
+		self.assertEqual(row['available_stock'], 10)
+		self.assertEqual(row['to_buy_quantity'], 290)
+		self.assertEqual(row['status'], 'insufficient')
+
+		other_pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='CLIENTE',
+			estado='LISTO_PARA_PICKING',
+			total=Decimal('12.00'),
+		)
+		PedidoItem.objects.create(
+			pedido=other_pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=5,
+			cantidad=20,
+			precio=Decimal('12.00'),
+			subtotal=Decimal('240.00'),
+		)
+		multi = build_multi_pedido_inventory_needs_analysis(pedidos=[self.pedido, other_pedido])
+		multi_row = multi['rows'][0]
+		self.assertEqual(multi_row['requested_quantity'], 320)
+		self.assertEqual(multi_row['to_buy_quantity'], 310)
 
 	def test_backoffice_inventory_needs_report_from_selected_orders(self):
 		StockPresentacion.objects.filter(presentacion=self.presentacion).update(

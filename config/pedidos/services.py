@@ -704,7 +704,11 @@ def evaluar_stock_fisico_verificacion_picking(*, pedido_items, cantidades_reales
 
 
 def build_pedido_inventory_needs_analysis(*, pedido, pedido_items=None):
-	"""Compare requested order quantities with dual-ledger Available for purchase planning."""
+	"""Compare dispatch quantities with dual-ledger Available for purchase planning.
+
+	Uses ``PedidoItem.cantidad`` (quantity to send/dispatch), not the original
+	customer-requested qty, so later BackOffice increases are reflected.
+	"""
 	from config.inventario.availability import availability_snapshot
 
 	items = list(
@@ -724,11 +728,12 @@ def build_pedido_inventory_needs_analysis(*, pedido, pedido_items=None):
 			'in_orders': 0,
 			'available': 0,
 		})
-		requested = int(getattr(item, 'cantidad_solicitada_documentada', None) or item.cantidad_solicitada or item.cantidad or 0)
+		# Dispatch qty (what will be sent), not original customer request.
+		requested = max(int(item.cantidad or 0), 0)
 		reserved = int(item.cantidad_reservada_inventario or 0)
 		pending = max(requested - reserved, 0)
 		available = max(int(snapshot['available']), 0)
-		# Own reservation is excluded from In Orders above, so compare full requested qty.
+		# Own reservation is excluded from In Orders above, so compare full dispatch qty.
 		to_buy = max(requested - available, 0)
 		if requested <= 0:
 			status = 'sufficient'
@@ -768,7 +773,11 @@ def build_pedido_inventory_needs_analysis(*, pedido, pedido_items=None):
 
 
 def build_multi_pedido_inventory_needs_analysis(*, pedidos):
-	"""Aggregate shortages using dual-ledger Available across several orders."""
+	"""Aggregate shortages using dual-ledger Available across several orders.
+
+	Uses each line's dispatch quantity (``cantidad``), not the original
+	customer-requested qty.
+	"""
 	from config.inventario.availability import availability_snapshot
 
 	pedido_list = list(pedidos)
@@ -795,12 +804,7 @@ def build_multi_pedido_inventory_needs_analysis(*, pedidos):
 	for item in items:
 		presentacion = item.presentacion
 		presentacion_id = presentacion.id
-		requested = int(
-			getattr(item, 'cantidad_solicitada_documentada', None)
-			or item.cantidad_solicitada
-			or item.cantidad
-			or 0
-		)
+		requested = max(int(item.cantidad or 0), 0)
 		reserved = int(item.cantidad_reservada_inventario or 0)
 		pending = max(requested - reserved, 0)
 		bucket = aggregated.get(presentacion_id)

@@ -261,11 +261,88 @@
     const closeButton = root.querySelector("[data-ai-close]");
     const whatsappFloat = document.querySelector(".whatsapp-float");
     const whatsappAction = root.querySelector("[data-ai-whatsapp]");
+    const langButtons = root.querySelectorAll("[data-ai-lang]");
     let conversationId = "";
     let booted = false;
     const DISMISS_KEY = "tortilla-assistant-dismissed";
     const CONTINUATION_KEY = "tortilla-assistant-continuation";
+    const LANGUAGE_KEY = "ltg-ai-language";
     const requestedTour = new URLSearchParams(window.location.search).get("ai_tour");
+    const UI_COPY = {
+      en: {
+        clear: "Clear",
+        close: "Close",
+        send: "Send",
+        placeholder: "How can I help you?",
+        whatsapp: "Talk with sales manager on WhatsApp",
+        historyCleared: "Your assistant history was cleared.",
+        historyError: "Could not clear history.",
+        connectionRetry: "I'm updating my connection to help you. Please try again in a few seconds.",
+        languageSwitched: "Sure — I'll keep helping you in English.",
+        tourPaused: "The guide was paused. You can resume it whenever you want.",
+        resumeTour: "Resume step-by-step guide",
+        tourCompleted: "Great, you finished the guide. Want help continuing with your order?",
+        continuation: "Great, we're in this section now. Want help with the next step?"
+      },
+      es: {
+        clear: "Borrar",
+        close: "Cerrar",
+        send: "Enviar",
+        placeholder: "¿En qué te puedo ayudar?",
+        whatsapp: "Hablar con el gerente de ventas por WhatsApp",
+        historyCleared: "Se borró el historial del asistente.",
+        historyError: "No se pudo borrar el historial.",
+        connectionRetry: "Estoy actualizando mi conexión para ayudarte. Inténtalo nuevamente en unos segundos.",
+        languageSwitched: "Claro — seguiré ayudándote en español.",
+        tourPaused: "La guía se pausó. Puedes retomarla cuando quieras.",
+        resumeTour: "Reanudar guía paso a paso",
+        tourCompleted: "Excelente, completaste la guía. ¿Quieres que te ayude a continuar con tu compra?",
+        continuation: "Excelente, ya estamos en esta sección. ¿Quieres que te ayude con el siguiente paso?"
+      }
+    };
+
+    function normalizeLanguage(value) {
+      const raw = String(value || "").toLowerCase();
+      return raw.indexOf("en") === 0 ? "en" : "es";
+    }
+
+    function readStoredLanguage() {
+      try {
+        const stored = window.localStorage.getItem(LANGUAGE_KEY);
+        if (stored) return normalizeLanguage(stored);
+      } catch (_error) {}
+      return normalizeLanguage(document.documentElement.lang || "es");
+    }
+
+    let aiLanguage = readStoredLanguage();
+
+    function uiCopy() {
+      return UI_COPY[aiLanguage] || UI_COPY.es;
+    }
+
+    function persistLanguage(language) {
+      aiLanguage = normalizeLanguage(language);
+      try {
+        window.localStorage.setItem(LANGUAGE_KEY, aiLanguage);
+      } catch (_error) {}
+    }
+
+    function applyChromeLanguage() {
+      const copy = uiCopy();
+      root.querySelectorAll("[data-ai-i18n]").forEach(function (el) {
+        const key = el.getAttribute("data-ai-i18n");
+        if (copy[key]) el.textContent = copy[key];
+      });
+      root.querySelectorAll("[data-ai-i18n-placeholder]").forEach(function (el) {
+        const key = el.getAttribute("data-ai-i18n-placeholder");
+        if (copy[key]) el.setAttribute("placeholder", copy[key]);
+      });
+      langButtons.forEach(function (button) {
+        button.setAttribute("aria-pressed", button.getAttribute("data-ai-lang") === aiLanguage ? "true" : "false");
+      });
+    }
+
+    applyChromeLanguage();
 
     if (whatsappFloat && whatsappAction) {
       whatsappAction.href = whatsappFloat.href;
@@ -369,17 +446,45 @@
 
     let resumedHistory = null;
 
-    function ensureConversation() {
-      if (conversationId) return Promise.resolve(conversationId);
+    function ensureConversation(forceLanguageSync) {
+      if (conversationId && !forceLanguageSync) return Promise.resolve(conversationId);
       return jsonFetch(root.dataset.conversationUrl, {
         method: "POST",
-        body: JSON.stringify({ page: root.dataset.page || window.location.pathname, language: document.documentElement.lang || "es" })
+        body: JSON.stringify({
+          page: root.dataset.page || window.location.pathname,
+          language: aiLanguage
+        })
       }).then(function (payload) {
         conversationId = payload.conversation_id;
-        resumedHistory = Array.isArray(payload.messages) ? payload.messages : [];
+        if (!forceLanguageSync) {
+          resumedHistory = Array.isArray(payload.messages) ? payload.messages : [];
+        }
         return conversationId;
       });
     }
+
+    function switchLanguage(language) {
+      const next = normalizeLanguage(language);
+      if (next === aiLanguage) return;
+      persistLanguage(next);
+      applyChromeLanguage();
+      const threadIsEmpty = !messages.querySelector(".ai-assistant-message");
+      ensureConversation(true).catch(function () {});
+      if (threadIsEmpty) {
+        messages.replaceChildren();
+        actions.replaceChildren();
+        booted = false;
+        boot({ autoOpen: panel.classList.contains("is-open") });
+        return;
+      }
+      appendMessage(messages, uiCopy().languageSwitched, false);
+    }
+
+    langButtons.forEach(function (button) {
+      button.addEventListener("click", function () {
+        switchLanguage(button.getAttribute("data-ai-lang"));
+      });
+    });
 
     function renderResumedThread() {
       if (!resumedHistory || !resumedHistory.length) return false;
@@ -393,7 +498,11 @@
       options = options || {};
       if (booted) return;
       booted = true;
-      fetch(root.dataset.contextUrl + "?page=" + encodeURIComponent(root.dataset.page || ""), { credentials: "same-origin" })
+      applyChromeLanguage();
+      const contextUrl = root.dataset.contextUrl
+        + "?page=" + encodeURIComponent(root.dataset.page || "")
+        + "&language=" + encodeURIComponent(aiLanguage);
+      fetch(contextUrl, { credentials: "same-origin" })
         .then(function (response) { return response.json(); })
         .then(function (context) {
           if (!context.enabled) {
@@ -401,6 +510,10 @@
             return;
           }
           root.querySelector("[data-ai-name]").textContent = context.assistant_name;
+          if (context.language) {
+            persistLanguage(context.language);
+            applyChromeLanguage();
+          }
           if (context.authenticated) {
             // Keep one thread for the whole signed-in session, across pages.
             return ensureConversation()
@@ -474,7 +587,7 @@
           jsonFetch(root.dataset.dismissUrl, { method: "POST", body: "{}" }).catch(function () {});
         }
       } else {
-        rememberContinuation("Excelente, ya estamos en esta sección. ¿Quieres que te ayude con el siguiente paso?");
+        rememberContinuation(uiCopy().continuation);
       }
       setPanelOpen(false);
     });
@@ -499,9 +612,9 @@
       if (!tourId) return;
       boot();
       setPanelOpen(true);
-      appendMessage(messages, "La guía se pausó. Puedes retomarla cuando quieras.", false);
+      appendMessage(messages, uiCopy().tourPaused, false);
       renderActions(actions, [{
-        label: "Reanudar guía paso a paso",
+        label: uiCopy().resumeTour,
         url: "#",
         tour_id: tourId,
         resume_index: Number.isInteger(resumeIndex) ? resumeIndex : 0
@@ -513,7 +626,7 @@
       window.setTimeout(function () {
         boot();
         setPanelOpen(true);
-        appendMessage(messages, "Excelente, completaste la guía. ¿Quieres que te ayude a continuar con tu compra?", false);
+        appendMessage(messages, uiCopy().tourCompleted, false);
       }, 300);
     });
 
@@ -575,12 +688,8 @@
             window.TortillaAssistantTours.start(result.tour_id);
           }
         })
-        .catch(function (error) {
-          appendMessage(
-            messages,
-            "Estoy actualizando mi conexión para ayudarte. Inténtalo nuevamente en unos segundos.",
-            false
-          );
+        .catch(function () {
+          appendMessage(messages, uiCopy().connectionRetry, false);
         });
     });
 
@@ -598,10 +707,10 @@
           conversationId = "";
           messages.replaceChildren();
           actions.replaceChildren();
-          appendMessage(messages, "Your assistant history was cleared.", false);
+          appendMessage(messages, uiCopy().historyCleared, false);
         })
         .catch(function (error) {
-          appendMessage(messages, error.message || "Could not clear history.", false);
+          appendMessage(messages, error.message || uiCopy().historyError, false);
         });
     });
 

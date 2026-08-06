@@ -70,6 +70,31 @@
 .ai-assistant-panel.is-open { display: flex; }
 .ai-assistant-header { padding: 1rem; background: #0b5ed7; color: #fff; }
 .ai-assistant-header-actions { flex-shrink: 0; }
+.ai-assistant-lang {
+    display: inline-flex;
+    border: 1px solid rgba(255, 255, 255, .55);
+    border-radius: .4rem;
+    overflow: hidden;
+}
+.ai-assistant-lang__btn {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+    line-height: 1;
+    padding: .35rem .45rem;
+    cursor: pointer;
+}
+.ai-assistant-lang__btn + .ai-assistant-lang__btn {
+    border-left: 1px solid rgba(255, 255, 255, .45);
+}
+.ai-assistant-lang__btn[aria-pressed="true"] {
+    background: #fff;
+    color: #0b5ed7;
+}
 .ai-assistant-close {
     font-weight: 700;
     color: #0b5ed7 !important;

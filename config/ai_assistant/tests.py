@@ -47,6 +47,36 @@ class AssistantApiTests(TestCase):
         self.assertIn('Soy Isabella', message)
         self.assertNotIn('Paco', message)
 
+    def test_first_visit_greeting_can_be_requested_in_english(self):
+        self.config.assistant_name = 'Isabella'
+        self.config.save(update_fields=['assistant_name'])
+
+        response = self.client.get(reverse('ai_assistant_context'), {'language': 'en'})
+
+        payload = response.json()
+        message = payload['proactive']['message']
+        self.assertEqual(payload['language'], 'en')
+        self.assertIn("I'm Isabella", message)
+        self.assertIn('La Tortilla Grocery LLC', message)
+        self.assertIn('Register as a customer', payload['proactive']['actions'][0]['label'])
+
+    def test_create_conversation_updates_language_on_existing_thread(self):
+        created = self.client.post(
+            reverse('ai_assistant_create_conversation'),
+            data=json.dumps({'page': 'home', 'language': 'es'}),
+            content_type='application/json',
+        )
+        conversation_id = created.json()['conversation_id']
+        updated = self.client.post(
+            reverse('ai_assistant_create_conversation'),
+            data=json.dumps({'page': 'home', 'language': 'en'}),
+            content_type='application/json',
+        )
+        self.assertEqual(updated.json()['conversation_id'], conversation_id)
+        from config.ai_assistant.models import AssistantConversation
+        conversation = AssistantConversation.objects.get(public_id=conversation_id)
+        self.assertEqual(conversation.language, 'en')
+
     def test_first_visit_proactive_marks_auto_open(self):
         response = self.client.get(reverse('ai_assistant_context'))
         self.assertTrue(response.json()['proactive'].get('auto_open'))
@@ -467,8 +497,26 @@ class ScopedAnswerTests(TestCase):
         result = _billing_handoff_result()
 
         self.assertIn('facturación', result['message'])
-        self.assertEqual(result['suggested_actions'][0]['label'], 'Hablar con un agente por WhatsApp')
+        self.assertEqual(
+            result['suggested_actions'][0]['label'],
+            'Hablar con el gerente de ventas por WhatsApp',
+        )
         self.assertTrue(result['suggested_actions'][0]['url'].startswith('https://wa.me/'))
+
+    def test_billing_handoff_uses_english_when_conversation_language_is_en(self):
+        from config.ai_assistant.services.orchestrator import _billing_handoff_result
+
+        config = AssistantConfiguration.get_solo()
+        config.support_whatsapp = '14045550100'
+        config.save(update_fields=['support_whatsapp'])
+
+        result = _billing_handoff_result(language='en')
+
+        self.assertIn('Billing', result['message'])
+        self.assertEqual(
+            result['suggested_actions'][0]['label'],
+            'Talk with sales manager on WhatsApp',
+        )
 
     def test_module_is_detected_from_the_page_the_customer_is_on(self):
         from config.ai_assistant.services.context import current_module

@@ -7,6 +7,7 @@ from config.ai_assistant.services.identity import get_customer_for_user, get_vis
 from config.ai_assistant.services.customer_success_profile import touch_success_profile
 from config.ai_assistant.services.customer_success import build_customer_success_summary
 from config.ai_assistant.services.customer_event_engine import resolve_customer_event
+from config.ai_assistant.services.language import resolve_request_language
 from config.cotizaciones.models import Cotizacion
 from config.pedidos.client_history import list_cliente_favorite_product_ids, list_cliente_purchase_orders
 
@@ -42,10 +43,13 @@ def build_customer_context(request):
     user = request.user
     cliente = get_customer_for_user(user)
     visitor_profile, _ = get_visitor_profile(request)
+    language = resolve_request_language(request)
+    assistant_name = AssistantConfiguration.get_solo().assistant_name
     context = {
         'authenticated': bool(getattr(user, 'is_authenticated', False)),
         'role': getattr(user, 'role', '') if getattr(user, 'is_authenticated', False) else '',
         'page': str(getattr(request, 'assistant_page', '') or request.GET.get('ai_page') or request.path)[:80],
+        'language': language,
         'actions': [],
     }
     if cliente is None:
@@ -68,29 +72,59 @@ def build_customer_context(request):
                     'payload': latest_event.payload,
                 }
         context['next_recommended_action'] = {
-            'label': 'Iniciar registro guiado',
+            'label': 'Start guided registration' if language == 'en' else 'Iniciar registro guiado',
             'url': reverse('home'),
             'tour_id': 'registration',
         }
         quiet = visitor_profile.quiet_until and visitor_profile.quiet_until > timezone.now()
         if visitor_profile.first_visit_prompted_at is None and not quiet:
-            context['proactive'] = {
-                'kind': 'first_visit',
-                'auto_open': True,
-                'message': (
-                    '¡Hola! 👋\n\nBienvenido a La Tortilla Grocery.\n\n'
-                    f'Soy {AssistantConfiguration.get_solo().assistant_name}, tu asistente virtual. '
-                    'Veo que es tu primera visita. ¿En qué puedo ayudarte hoy?'
-                ),
-                'actions': [
-                    {'label': 'Registrarme como cliente', 'url': reverse('home'), 'tour_id': 'registration'},
-                    {'label': 'Ver el catálogo como invitado', 'url': f"{reverse('catalogo')}?guest=1"},
-                    {'label': 'Explorar la página por mi cuenta', 'url': '#', 'kind': 'dismiss_proactive'},
-                ],
-            }
+            if language == 'en':
+                context['proactive'] = {
+                    'kind': 'first_visit',
+                    'auto_open': True,
+                    'message': (
+                        f'Hi! 👋\n\nWelcome to La Tortilla Grocery LLC.\n\n'
+                        f'I\'m {assistant_name}, your virtual assistant. '
+                        'I see this is your first visit. How can I help you today?'
+                    ),
+                    'actions': [
+                        {'label': 'Register as a customer', 'url': reverse('home'), 'tour_id': 'registration'},
+                        {'label': 'Browse the catalog as a guest', 'url': f"{reverse('catalogo')}?guest=1"},
+                        {'label': 'Explore on my own', 'url': '#', 'kind': 'dismiss_proactive'},
+                    ],
+                }
+            else:
+                context['proactive'] = {
+                    'kind': 'first_visit',
+                    'auto_open': True,
+                    'message': (
+                        '¡Hola! 👋\n\nBienvenido a La Tortilla Grocery LLC.\n\n'
+                        f'Soy {assistant_name}, tu asistente virtual. '
+                        'Veo que es tu primera visita. ¿En qué puedo ayudarte hoy?'
+                    ),
+                    'actions': [
+                        {'label': 'Registrarme como cliente', 'url': reverse('home'), 'tour_id': 'registration'},
+                        {'label': 'Ver el catálogo como invitado', 'url': f"{reverse('catalogo')}?guest=1"},
+                        {'label': 'Explorar la página por mi cuenta', 'url': '#', 'kind': 'dismiss_proactive'},
+                    ],
+                }
         return context
 
     context['customer_name'] = customer_display_name(user, cliente)
+    if language == 'en':
+        catalog_actions = [
+            {'label': 'View catalog', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
+            {'label': 'My order', 'url': reverse('ver_cotizacion')},
+            {'label': 'My quotes', 'url': reverse('cliente_cotizaciones_recibidas'), 'tour_id': 'quote-ready'},
+            {'label': 'My orders', 'url': reverse('cliente_historial_ordenes'), 'tour_id': 'reorder'},
+        ]
+    else:
+        catalog_actions = [
+            {'label': 'Ver catálogo', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
+            {'label': 'Mi orden', 'url': reverse('ver_cotizacion')},
+            {'label': 'Mis cotizaciones', 'url': reverse('cliente_cotizaciones_recibidas'), 'tour_id': 'quote-ready'},
+            {'label': 'Mis pedidos', 'url': reverse('cliente_historial_ordenes'), 'tour_id': 'reorder'},
+        ]
     context.update({
         'customer': {
             'first_name': (user.first_name or '').strip(),
@@ -99,12 +133,7 @@ def build_customer_context(request):
             'review_status': cliente.estado_revision,
             'payment_terms': cliente.get_terminos_pago_label(),
         },
-        'actions': [
-            {'label': 'Ver catálogo', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
-            {'label': 'Mi orden', 'url': reverse('ver_cotizacion')},
-            {'label': 'Mis cotizaciones', 'url': reverse('cliente_cotizaciones_recibidas'), 'tour_id': 'quote-ready'},
-            {'label': 'Mis pedidos', 'url': reverse('cliente_historial_ordenes'), 'tour_id': 'reorder'},
-        ],
+        'actions': catalog_actions,
     })
     state, _ = AssistantUserState.objects.get_or_create(
         visitor_id=get_visitor_id(request),
@@ -123,33 +152,67 @@ def build_customer_context(request):
     }
     quiet = visitor_profile.quiet_until and visitor_profile.quiet_until > timezone.now()
     if not state.onboarding_completed and not quiet:
-        context['proactive'] = {
-            'kind': 'first_authenticated_login',
-            'auto_open': True,
-            'message': (
-                f'¡Bienvenido{", " + context["customer_name"] if context["customer_name"] else ""}! '
-                'Ya puedes usar tu cuenta. ¿Quieres que te muestre la plataforma o te ayudo con tu primer pedido?'
-            ),
-            'actions': [
-                {'label': 'Conocer la plataforma', 'url': f"{reverse('catalogo')}?ai_tour=platform-catalog", 'tour_id': 'platform-catalog'},
-                {'label': 'Hacer mi primer pedido', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
-                {'label': 'Explorar por mi cuenta', 'url': '#', 'kind': 'dismiss_proactive'},
-            ],
-        }
+        name_part = f', {context["customer_name"]}' if context['customer_name'] else ''
+        if language == 'en':
+            context['proactive'] = {
+                'kind': 'first_authenticated_login',
+                'auto_open': True,
+                'message': (
+                    f'Welcome{name_part}! '
+                    'Your account is ready. Want a quick tour of the platform, or help with your first order?'
+                ),
+                'actions': [
+                    {'label': 'Learn the platform', 'url': f"{reverse('catalogo')}?ai_tour=platform-catalog", 'tour_id': 'platform-catalog'},
+                    {'label': 'Place my first order', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
+                    {'label': 'Explore on my own', 'url': '#', 'kind': 'dismiss_proactive'},
+                ],
+            }
+        else:
+            context['proactive'] = {
+                'kind': 'first_authenticated_login',
+                'auto_open': True,
+                'message': (
+                    f'¡Bienvenido{name_part}! '
+                    'Ya puedes usar tu cuenta. ¿Quieres que te muestre la plataforma o te ayudo con tu primer pedido?'
+                ),
+                'actions': [
+                    {'label': 'Conocer la plataforma', 'url': f"{reverse('catalogo')}?ai_tour=platform-catalog", 'tour_id': 'platform-catalog'},
+                    {'label': 'Hacer mi primer pedido', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
+                    {'label': 'Explorar por mi cuenta', 'url': '#', 'kind': 'dismiss_proactive'},
+                ],
+            }
     elif success_profile:
         # Greeting stays available when the customer opens Isabella, but must not
         # steal the screen on every catalog search / page reload (critical on iOS).
-        customer_name = (user.first_name or cliente.nombre_empresa or 'cliente').strip()
-        context['proactive'] = {
-            'kind': 'returning_customer',
-            'auto_open': False,
-            'message': f'Hola {customer_name} 👋\n\nBienvenido nuevamente a La Tortilla Grocery. ¿En qué puedo ayudarte hoy?',
-            'actions': [
-                {'label': 'Ver catálogo', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
-                {'label': 'Ver mi pedido', 'url': reverse('ver_cotizacion')},
-                {'label': 'Hablar con un asesor', 'url': '#', 'kind': 'contact_handoff'},
-            ],
-        }
+        customer_name = (user.first_name or cliente.nombre_empresa or ('customer' if language == 'en' else 'cliente')).strip()
+        if language == 'en':
+            context['proactive'] = {
+                'kind': 'returning_customer',
+                'auto_open': False,
+                'message': (
+                    f'Hi {customer_name} 👋\n\n'
+                    'Welcome back to La Tortilla Grocery LLC. How can I help you today?'
+                ),
+                'actions': [
+                    {'label': 'View catalog', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
+                    {'label': 'View my order', 'url': reverse('ver_cotizacion')},
+                    {'label': 'Talk with sales manager', 'url': '#', 'kind': 'contact_handoff'},
+                ],
+            }
+        else:
+            context['proactive'] = {
+                'kind': 'returning_customer',
+                'auto_open': False,
+                'message': (
+                    f'Hola {customer_name} 👋\n\n'
+                    'Bienvenido nuevamente a La Tortilla Grocery LLC. ¿En qué puedo ayudarte hoy?'
+                ),
+                'actions': [
+                    {'label': 'Ver catálogo', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
+                    {'label': 'Ver mi pedido', 'url': reverse('ver_cotizacion')},
+                    {'label': 'Hablar con el gerente de ventas', 'url': '#', 'kind': 'contact_handoff'},
+                ],
+            }
     cart = request.session.get('carrito', {}) or {}
     cart_lines = [
         {
@@ -195,19 +258,36 @@ def build_customer_context(request):
             cliente=cliente,
             profile=success_profile,
             summary=success_summary,
+            language=language,
         )
         if customer_event and not quiet:
-            customer_name = (user.first_name or cliente.nombre_empresa or 'cliente').strip()
+            customer_name = (
+                user.first_name or cliente.nombre_empresa or ('customer' if language == 'en' else 'cliente')
+            ).strip()
             context['customer_event'] = customer_event
+            greeting = f'Hi {customer_name} 👋\n\n' if language == 'en' else f'Hola {customer_name} 👋\n\n'
+            extra_actions = [
+                {
+                    'label': 'New order' if language == 'en' else 'Nuevo pedido',
+                    'url': reverse('catalogo'),
+                    'tour_id': 'first-order',
+                },
+                {
+                    'label': 'Talk with sales manager' if language == 'en' else 'Hablar con el gerente de ventas',
+                    'url': '#',
+                    'kind': 'contact_handoff',
+                },
+                {
+                    'label': 'Keep shopping' if language == 'en' else 'Seguir comprando',
+                    'url': '#',
+                    'kind': 'dismiss_proactive',
+                },
+            ]
             context['proactive'] = {
                 'kind': 'customer_success',
                 'auto_open': True,
-                'message': f'Hola {customer_name} 👋\n\n{customer_event["message"]}',
-                'actions': customer_event['actions'] + [
-                    {'label': 'Nuevo pedido', 'url': reverse('catalogo'), 'tour_id': 'first-order'},
-                    {'label': 'Hablar con un asesor', 'url': '#', 'kind': 'contact_handoff'},
-                    {'label': 'Seguir comprando', 'url': '#', 'kind': 'dismiss_proactive'},
-                ],
+                'message': f'{greeting}{customer_event["message"]}',
+                'actions': customer_event['actions'] + extra_actions,
             }
     latest_event = (
         AssistantDomainEvent.objects.filter(cliente=cliente, consumed_at__isnull=True)

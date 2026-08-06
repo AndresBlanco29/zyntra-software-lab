@@ -126,8 +126,14 @@ def _rate_limited(request, config):
 
 @require_GET
 def assistant_context(request):
+    from config.ai_assistant.services.language import normalize_assistant_language, welcome_message_for
+
     config = AssistantConfiguration.get_solo()
     visitor_id = get_visitor_id(request)
+    language = normalize_assistant_language(
+        request.GET.get('language') or config.default_language or 'es'
+    )
+    request.assistant_language = language
     context = build_customer_context(request)
     page = str(request.GET.get('page') or '').strip()
     page_enabled = {
@@ -140,10 +146,16 @@ def assistant_context(request):
         'quote-detail': config.enable_customer_portal,
         'order-history': config.enable_customer_portal,
     }.get(page, config.enable_customer_portal)
+    # Prefer a language-matched welcome so EN customers are not greeted in Spanish
+    # when the admin default welcome_message is still the Spanish template.
+    welcome = welcome_message_for(config.assistant_name, language)
+    if language == 'es' and str(config.welcome_message or '').strip():
+        welcome = config.welcome_message
     context.update({
         'enabled': bool(config.enabled) and bool(page_enabled) and visitor_in_rollout(visitor_id),
         'assistant_name': config.assistant_name,
-        'welcome_message': config.welcome_message,
+        'welcome_message': welcome,
+        'language': language,
         'visitor_id': str(visitor_id),
     })
     response = JsonResponse(context)
@@ -196,12 +208,14 @@ def create_conversation(request):
     visitor_id = get_visitor_id(request)
     user = request.user
     cliente = get_customer_for_user(user)
+    from config.ai_assistant.services.language import normalize_assistant_language
+
     conversation = get_or_create_conversation(
         visitor_id=visitor_id,
         user=user,
         cliente=cliente,
         page=str(payload.get('page') or request.path),
-        language=str(payload.get('language') or 'es')[:8],
+        language=normalize_assistant_language(payload.get('language') or 'es'),
     )
     AssistantUserState.objects.get_or_create(
         visitor_id=visitor_id,

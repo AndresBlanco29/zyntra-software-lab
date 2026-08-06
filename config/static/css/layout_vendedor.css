@@ -1238,8 +1238,7 @@ box-sizing: border-box;
         min-width: 700px;
     }
 
-    /* iPad / tablet: keep wide list tables swipeable instead of stacking or clipping.
-       Picking verification/detail tables stack as cards so pickers avoid horizontal scroll. */
+    /* iPad / tablet: keep wide list tables swipeable instead of stacking or clipping. */
     @media (min-width: 768px) and (max-width: 1199.98px) {
         .content .table-responsive.mobile-stack-responsive {
             overflow-x: auto !important;
@@ -1255,89 +1254,137 @@ box-sizing: border-box;
             margin-bottom: 0;
         }
 
-        .content .table-responsive.mobile-stack-responsive:has(.mobile-stack-table--detail),
-        .content .table-responsive.mobile-stack-responsive:has(.mobile-stack-table--picking) {
-            overflow-x: visible !important;
+        /*
+          Landscape tablet: picking stays a normal PC-style table (menu is already
+          overlay/hidden below 1200px), so it uses the full width like desktop.
+        */
+        @media (orientation: landscape) {
+            .content .table-responsive.mobile-stack-responsive:has(.mobile-stack-table--detail),
+            .content .table-responsive.mobile-stack-responsive:has(.mobile-stack-table--picking) {
+                overflow-x: hidden !important;
+            }
+
+            .content .table-responsive.mobile-stack-responsive .table.mobile-stack-table.mobile-stack-table--detail,
+            .content .table-responsive.mobile-stack-responsive .table.mobile-stack-table.mobile-stack-table--picking {
+                min-width: 0;
+                width: 100%;
+                table-layout: fixed;
+            }
+
+            .content .mobile-stack-table.mobile-stack-table--detail th,
+            .content .mobile-stack-table.mobile-stack-table--detail td,
+            .content .mobile-stack-table.mobile-stack-table--picking th,
+            .content .mobile-stack-table.mobile-stack-table--picking td {
+                padding: 6px 4px;
+                font-size: 13px;
+                vertical-align: middle;
+                white-space: normal;
+                word-break: break-word;
+                overflow-wrap: anywhere;
+            }
+
+            .content .mobile-stack-table.mobile-stack-table--detail .form-text,
+            .content .mobile-stack-table.mobile-stack-table--picking .form-text {
+                display: none;
+            }
+
+            .content .mobile-stack-table.mobile-stack-table--detail .quantity-stepper__button,
+            .content .mobile-stack-table.mobile-stack-table--picking .quantity-stepper__button {
+                min-width: 40px;
+                padding-left: 0.35rem;
+                padding-right: 0.35rem;
+            }
         }
 
-        .content .table-responsive.mobile-stack-responsive .table.mobile-stack-table.mobile-stack-table--detail,
-        .content .table-responsive.mobile-stack-responsive .table.mobile-stack-table.mobile-stack-table--picking {
-            min-width: 0;
-        }
+        /*
+          Portrait tablet: stack only picking verification rows as cards so pickers
+          do not need horizontal scroll. Landscape keeps the PC table above.
+        */
+        @media (orientation: portrait) {
+            .content .table-responsive.mobile-stack-responsive:has(.mobile-stack-table--detail),
+            .content .table-responsive.mobile-stack-responsive:has(.mobile-stack-table--picking) {
+                overflow-x: visible !important;
+            }
 
-        .content .mobile-stack-table.mobile-stack-table--detail thead,
-        .content .mobile-stack-table.mobile-stack-table--picking thead {
-            display: none;
-        }
+            .content .table-responsive.mobile-stack-responsive .table.mobile-stack-table.mobile-stack-table--detail,
+            .content .table-responsive.mobile-stack-responsive .table.mobile-stack-table.mobile-stack-table--picking {
+                min-width: 0;
+            }
 
-        .content .mobile-stack-table.mobile-stack-table--detail,
-        .content .mobile-stack-table.mobile-stack-table--detail tbody,
-        .content .mobile-stack-table.mobile-stack-table--detail tr,
-        .content .mobile-stack-table.mobile-stack-table--detail td,
-        .content .mobile-stack-table.mobile-stack-table--picking,
-        .content .mobile-stack-table.mobile-stack-table--picking tbody,
-        .content .mobile-stack-table.mobile-stack-table--picking tr,
-        .content .mobile-stack-table.mobile-stack-table--picking td {
-            display: block;
-            width: 100%;
-        }
+            .content .mobile-stack-table.mobile-stack-table--detail thead,
+            .content .mobile-stack-table.mobile-stack-table--picking thead {
+                display: none;
+            }
 
-        .content .mobile-stack-table.mobile-stack-table--detail tbody,
-        .content .mobile-stack-table.mobile-stack-table--picking tbody {
-            padding: 10px;
-        }
+            .content .mobile-stack-table.mobile-stack-table--detail,
+            .content .mobile-stack-table.mobile-stack-table--detail tbody,
+            .content .mobile-stack-table.mobile-stack-table--detail tr,
+            .content .mobile-stack-table.mobile-stack-table--detail td,
+            .content .mobile-stack-table.mobile-stack-table--picking,
+            .content .mobile-stack-table.mobile-stack-table--picking tbody,
+            .content .mobile-stack-table.mobile-stack-table--picking tr,
+            .content .mobile-stack-table.mobile-stack-table--picking td {
+                display: block;
+                width: 100%;
+            }
 
-        .content .mobile-stack-table.mobile-stack-table--detail tr,
-        .content .mobile-stack-table.mobile-stack-table--picking tr {
-            background: #fff;
-            border: 1px solid #e2e8f0;
-            border-radius: 14px;
-            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
-            margin-bottom: 12px;
-            overflow: hidden;
-        }
+            .content .mobile-stack-table.mobile-stack-table--detail tbody,
+            .content .mobile-stack-table.mobile-stack-table--picking tbody {
+                padding: 10px;
+            }
 
-        .content .mobile-stack-table.mobile-stack-table--detail td,
-        .content .mobile-stack-table.mobile-stack-table--picking td {
-            border: 0;
-            padding: 10px 14px;
-            text-align: left;
-            word-break: break-word;
-            overflow-wrap: anywhere;
-            white-space: normal;
-        }
+            .content .mobile-stack-table.mobile-stack-table--detail tr,
+            .content .mobile-stack-table.mobile-stack-table--picking tr {
+                background: #fff;
+                border: 1px solid #e2e8f0;
+                border-radius: 14px;
+                box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+                margin-bottom: 12px;
+                overflow: hidden;
+            }
 
-        .content .mobile-stack-table.mobile-stack-table--detail td + td,
-        .content .mobile-stack-table.mobile-stack-table--picking td + td {
-            border-top: 1px solid #eef2f7;
-        }
+            .content .mobile-stack-table.mobile-stack-table--detail td,
+            .content .mobile-stack-table.mobile-stack-table--picking td {
+                border: 0;
+                padding: 10px 14px;
+                text-align: left;
+                word-break: break-word;
+                overflow-wrap: anywhere;
+                white-space: normal;
+            }
 
-        .content .mobile-stack-table.mobile-stack-table--detail td::before,
-        .content .mobile-stack-table.mobile-stack-table--picking td::before {
-            content: attr(data-label);
-            display: block;
-            margin-bottom: 4px;
-            font-size: 11px;
-            font-weight: 700;
-            letter-spacing: 0.04em;
-            text-transform: uppercase;
-            color: #64748b;
-        }
+            .content .mobile-stack-table.mobile-stack-table--detail td + td,
+            .content .mobile-stack-table.mobile-stack-table--picking td + td {
+                border-top: 1px solid #eef2f7;
+            }
 
-        .content .mobile-stack-table.mobile-stack-table--detail .mobile-stack-table__input-cell .quantity-stepper,
-        .content .mobile-stack-table.mobile-stack-table--picking .mobile-stack-table__input-cell .quantity-stepper {
-            width: 100%;
-        }
+            .content .mobile-stack-table.mobile-stack-table--detail td::before,
+            .content .mobile-stack-table.mobile-stack-table--picking td::before {
+                content: attr(data-label);
+                display: block;
+                margin-bottom: 4px;
+                font-size: 11px;
+                font-weight: 700;
+                letter-spacing: 0.04em;
+                text-transform: uppercase;
+                color: #64748b;
+            }
 
-        .content .mobile-stack-table.mobile-stack-table--detail .mobile-stack-table__input-cell .quantity-stepper__button,
-        .content .mobile-stack-table.mobile-stack-table--picking .mobile-stack-table__input-cell .quantity-stepper__button {
-            width: auto;
-            flex: 0 0 48px;
-        }
+            .content .mobile-stack-table.mobile-stack-table--detail .mobile-stack-table__input-cell .quantity-stepper,
+            .content .mobile-stack-table.mobile-stack-table--picking .mobile-stack-table__input-cell .quantity-stepper {
+                width: 100%;
+            }
 
-        .content .mobile-stack-table.mobile-stack-table--detail .mobile-stack-table__input-cell .quantity-stepper__input,
-        .content .mobile-stack-table.mobile-stack-table--picking .mobile-stack-table__input-cell .quantity-stepper__input {
-            width: 1%;
+            .content .mobile-stack-table.mobile-stack-table--detail .mobile-stack-table__input-cell .quantity-stepper__button,
+            .content .mobile-stack-table.mobile-stack-table--picking .mobile-stack-table__input-cell .quantity-stepper__button {
+                width: auto;
+                flex: 0 0 48px;
+            }
+
+            .content .mobile-stack-table.mobile-stack-table--detail .mobile-stack-table__input-cell .quantity-stepper__input,
+            .content .mobile-stack-table.mobile-stack-table--picking .mobile-stack-table__input-cell .quantity-stepper__input {
+                width: 1%;
+            }
         }
     }
 

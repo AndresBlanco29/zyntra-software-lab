@@ -25,7 +25,15 @@ class InternalPermissionTests(TestCase):
 		self.assertTrue(user.has_internal_permission('backoffice.dashboard.view'))
 		self.assertTrue(user.has_internal_permission('backoffice.quotes.manage'))
 		self.assertTrue(user.has_internal_permission('backoffice.reports.view'))
-		self.assertFalse(user.has_internal_permission('admin.products.view'))
+		self.assertFalse(user.has_internal_permission('backoffice.pricing.sell_below_cost'))
+
+	def test_admin_can_authorize_sell_below_cost_by_default(self):
+		admin = Usuario.objects.create_user(
+			username='admin-below-cost',
+			password='secret123',
+			role='admin',
+		)
+		self.assertTrue(admin.has_internal_permission('backoffice.pricing.sell_below_cost'))
 
 	def test_permission_overrides_can_grant_and_revoke_access(self):
 		user = Usuario.objects.create_user(

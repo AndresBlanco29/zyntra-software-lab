@@ -800,6 +800,38 @@ def _crear_pedido_remanente_si_aplica(*, pedido_origen, usuario):
 	return remanente
 
 
+def _resolve_invoice_line_net_unit_price(item, line_discounts=None):
+	"""Mirror invoice line pricing used by generar_invoice_desde_picking."""
+	line_discounts = line_discounts or {}
+	list_unit_price = _quantize_money(item.precio)
+	if item.descuento_aplicado and _quantize_money(item.descuento_monto) > 0:
+		discount_amount_unit = _quantize_money(item.descuento_monto)
+		return _clamp_non_negative_money(list_unit_price - discount_amount_unit)
+	discount_percentage = _parse_line_discount_percentage(line_discounts.get(item.id, '0'))
+	return _calculate_discounted_unit_price(list_unit_price, discount_percentage)
+
+
+def _build_invoice_below_cost_candidates(pedido, line_discounts=None):
+	candidates = []
+	for item in pedido.items.select_related('presentacion__producto').all():
+		quantity = int(item.cantidad or 0)
+		net_unit_price = _resolve_invoice_line_net_unit_price(item, line_discounts=line_discounts)
+		candidates.append(
+			{
+				'id': item.id,
+				'presentacion': item.presentacion,
+				'producto_nombre': item.presentacion.producto.nombre,
+				'presentacion_nombre': (
+					item.presentacion.nombre_empaque_cliente or item.presentacion.nombre
+				),
+				'cantidad': quantity,
+				'net_unit_price': net_unit_price,
+				'es_regalo': bool(getattr(item, 'es_regalo', False)),
+			}
+		)
+	return candidates
+
+
 @transaction.atomic
 def generar_invoice_desde_picking(
 	*,
@@ -812,11 +844,26 @@ def generar_invoice_desde_picking(
 	applied_customer_credit=None,
 	selected_note_applications=None,
 	estimated_delivery_at=None,
+	sell_below_cost_authorization=None,
 ):
 	_validate_invoice_generation(pedido, metodo_entrega, driver)
 	_ensure_picking_inventory_applied_for_invoice(pedido=pedido, usuario=usuario)
 	suggested_unit_prices = suggested_unit_prices or {}
 	line_discounts = line_discounts or {}
+
+	from config.pedidos.below_cost import enforce_sell_below_cost_for_pedido
+
+	enforce_sell_below_cost_for_pedido(
+		pedido=pedido,
+		items=_build_invoice_below_cost_candidates(pedido, line_discounts=line_discounts),
+		usuario=usuario,
+		authorization=sell_below_cost_authorization
+		or {
+			'requested': False,
+			'autorizado_por': '',
+			'comentario': '',
+		},
+	)
 
 	invoice = Invoice.objects.create(
 		pedido=pedido,
@@ -967,6 +1014,7 @@ def generar_invoice_directa_backoffice(
 	selected_note_applications=None,
 	driver=None,
 	estimated_delivery_at=None,
+	sell_below_cost_authorization=None,
 ):
 	if metodo_entrega not in ALLOWED_DIRECT_INVOICE_DELIVERY_METHODS:
 		raise ValidationError(_('Direct backoffice invoices only support customer pickup or route delivery with a driver.'))
@@ -1029,6 +1077,7 @@ def generar_invoice_directa_backoffice(
 		applied_customer_credit=applied_customer_credit,
 		selected_note_applications=selected_note_applications,
 		estimated_delivery_at=estimated_delivery_at,
+		sell_below_cost_authorization=sell_below_cost_authorization,
 	)
 
 

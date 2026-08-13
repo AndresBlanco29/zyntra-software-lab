@@ -33,6 +33,7 @@ from config.core.datetime_formats import format_local_date, format_local_datetim
 from config.core.product_ordering import order_invoice_items_for_display
 from config.core.workflow_badges import build_delivery_workflow_badge
 from config.productos.models import ConfiguracionDescuentos, Presentacion
+from config.core.demo_branding import get_active_brand_name
 from config.core.pdf_branding import (
 	BRAND_BORDER,
 	BRAND_MUTED_TEXT,
@@ -41,7 +42,9 @@ from config.core.pdf_branding import (
 	BRAND_SURFACE,
 	BRAND_TEXT,
 	NumberedPdfCanvas,
+	build_pdf_brand_text_mark,
 	build_pdf_logo_image,
+	get_pdf_company_contact_lines,
 )
 from config.integrations.quickbooks.sync import is_sync_locked, resolve_customer_company_name
 from config.notificaciones.models import Notificacion
@@ -674,24 +677,7 @@ def _chunk_invoice_pdf_item_rows(item_rows, size=INVOICE_PDF_ITEMS_PER_PAGE):
 
 
 def _get_invoice_pdf_company_contact_lines():
-	from config.core.models import HomeContenido
-
-	contenido = HomeContenido.objects.filter(activo=True).order_by('-actualizado').first()
-	if contenido:
-		lines = [
-			contenido.footer_contacto_direccion_linea_1,
-			contenido.footer_contacto_direccion_linea_2,
-			contenido.footer_contacto_email,
-			contenido.footer_contacto_telefono,
-		]
-	else:
-		lines = [
-			'1666 Roswell Rd Bldg 100',
-			'Marietta, GA 30062-3639',
-			'latortilla@gmail.com',
-			'+1 (470) 967 2782',
-		]
-	return [line.strip() for line in lines if line and str(line).strip()]
+	return get_pdf_company_contact_lines()
 
 
 def _build_invoice_pdf_compact_header(*, styles, invoice_number, total_width, document_date=''):
@@ -701,14 +687,7 @@ def _build_invoice_pdf_compact_header(*, styles, invoice_number, total_width, do
 	if logo_cell:
 		logo_cell.hAlign = 'LEFT'
 	else:
-		logo_cell = Paragraph('<b>LTG</b>', ParagraphStyle(
-			'InvoiceCompactFallback',
-			parent=styles['BodyText'],
-			fontName='Helvetica-Bold',
-			fontSize=10,
-			leading=11,
-			textColor=colors.white,
-		))
+		logo_cell = build_pdf_brand_text_mark(styles=styles, font_size=10)
 	header_text_style = ParagraphStyle(
 		'InvoiceCompactHeaderText',
 		parent=styles['BodyText'],
@@ -727,7 +706,7 @@ def _build_invoice_pdf_compact_header(*, styles, invoice_number, total_width, do
 		alignment=TA_RIGHT,
 	)
 	contact_html = '<br/>'.join(escape(line) for line in _get_invoice_pdf_company_contact_lines())
-	company_html = f'<b>La Tortilla Grocery</b><br/>{contact_html}'
+	company_html = f'<b>{escape(get_active_brand_name())}</b><br/>{contact_html}'
 	right_lines = [escape(invoice_number)]
 	if document_date:
 		right_lines.append(f'<font size="7">Date: {escape(str(document_date))}</font>')
@@ -1686,6 +1665,8 @@ def backoffice_create_direct_invoice(request):
 				driver = get_object_or_404(Usuario, id=int(driver_id), role='driver', is_active=True)
 				estimated_delivery_at = _parse_estimated_delivery_at(request.POST.get('estimated_delivery_at'))
 
+			from config.pedidos.below_cost import parse_sell_below_cost_authorization
+
 			invoice = generar_invoice_directa_backoffice(
 				cliente=cliente,
 				items_payload=items_payload,
@@ -1694,6 +1675,7 @@ def backoffice_create_direct_invoice(request):
 				nota_backoffice=(request.POST.get('nota_backoffice') or '').strip(),
 				driver=driver,
 				estimated_delivery_at=estimated_delivery_at,
+				sell_below_cost_authorization=parse_sell_below_cost_authorization(request.POST),
 			)
 		except ValidationError as exc:
 			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
@@ -1803,6 +1785,8 @@ def backoffice_generate_invoice(request, pedido_id):
 			available_credit=pending_notes_summary['available_credit_excluding_notes'],
 		)
 		validate_credit_limit_for_pedido_invoice(pedido=pedido, request_amount=pedido.total)
+		from config.pedidos.below_cost import parse_sell_below_cost_authorization
+
 		invoice = generar_invoice_desde_picking(
 			pedido=pedido,
 			metodo_entrega=metodo_entrega,
@@ -1813,6 +1797,7 @@ def backoffice_generate_invoice(request, pedido_id):
 			applied_customer_credit=applied_customer_credit,
 			selected_note_applications=selected_note_applications,
 			estimated_delivery_at=estimated_delivery_at,
+			sell_below_cost_authorization=parse_sell_below_cost_authorization(request.POST),
 		)
 	except CreditLimitBlockedError as exc:
 		messages.error(

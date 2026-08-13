@@ -135,6 +135,54 @@ MANUAL_EN_TO_ES = {
     'Pending verification': 'Pendiente de verificación',
     'Invoice generated': 'Factura generada',
     'No sales orders have been registered yet.': 'Aún no se han registrado órdenes de venta.',
+    'Authorize selling below cost': 'Autorizar venta a pérdida',
+    'Allow saving orders or generating invoices when a product is sold below cost. Requires naming who authorized the exception.': (
+        'Permite guardar órdenes o generar facturas cuando un producto se vende bajo costo. '
+        'Requiere indicar quién autorizó la excepción.'
+    ),
+    'Selling below cost — authorization required': 'Venta a pérdida — se requiere autorización',
+    'Selling below cost — authorized exception': 'Venta a pérdida — excepción autorizada',
+    'One or more products are priced below cost. Saving changes or generating an invoice requires supervisor authorization.': (
+        'Uno o más productos están por debajo del costo. Guardar cambios o generar la factura requiere autorización de un supervisor.'
+    ),
+    'Selling': 'Venta',
+    'cost': 'costo',
+    'Loss': 'Pérdida',
+    'Ask a supervisor with permission to authorize selling below cost before saving or invoicing.': (
+        'Pide a un supervisor con permiso que autorice la venta a pérdida antes de guardar o facturar.'
+    ),
+    'I authorize saving this order with products sold below cost': (
+        'Autorizo guardar esta orden con productos vendidos a pérdida'
+    ),
+    'I authorize generating this invoice with products sold below cost': (
+        'Autorizo generar esta factura con productos vendidos a pérdida'
+    ),
+    'Full name of the person authorizing this exception': 'Nombre completo de quien autoriza esta excepción',
+    'Reason for selling below cost': 'Motivo de la venta a pérdida',
+    'Required only when one or more products are sold below cost. The action is recorded in the Audit Trail.': (
+        'Solo es necesario cuando uno o más productos se venden a pérdida. La acción queda registrada en el historial de auditoría.'
+    ),
+    'Authorize selling below cost above before generating the invoice.': (
+        'Autoriza la venta a pérdida arriba antes de generar la factura.'
+    ),
+    'Invoice generation is blocked because one or more products are sold below cost.': (
+        'La generación de factura está bloqueada porque uno o más productos se venden a pérdida.'
+    ),
+    'Cannot continue: one or more products are being sold below cost. A supervisor authorization is required. %(details)s': (
+        'No se puede continuar: uno o más productos se están vendiendo a pérdida. '
+        'Se requiere autorización de un supervisor. %(details)s'
+    ),
+    '%(product)s: selling $%(net)s (cost $%(cost)s)': '%(product)s: se vende a $%(net)s (costo $%(cost)s)',
+    'Enter who authorized selling below cost.': 'Indica quién autorizó la venta a pérdida.',
+    'You are not allowed to authorize selling below cost.': 'No tienes permiso para autorizar la venta a pérdida.',
+    'Authorized selling below cost on order #%(id)s': 'Autorizó venta a pérdida en la orden #%(id)s',
+    'Sell below cost': 'Venta a pérdida',
+    'Blocked': 'Bloqueado',
+    'Authorized': 'Autorizado',
+    'Photo': 'Foto',
+    'Authorized by': 'Autorizado por',
+    'Comment': 'Comentario',
+    'Comment / observation (optional)': 'Comentario / observación (opcional)',
 }
 
 

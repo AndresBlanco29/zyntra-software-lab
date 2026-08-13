@@ -44,6 +44,7 @@ from config.productos.promotions import (
     estado_promocion_para_linea,
     reaplicar_promociones_en_lineas_sesion,
 )
+from config.core.commercial_pdf import quote_pdf_response
 from config.usuarios.permissions import internal_permission_required, user_has_permission
 
 from .models import Cotizacion, CotizacionItem
@@ -388,6 +389,72 @@ def _cotizaciones_pendientes_cliente(cliente):
     return Cotizacion.objects.filter(cliente=cliente, estado='LISTA_PARA_CONFIRMACION').count()
 
 
+def _cliente_quote_status_meta(cotizacion):
+    """Customer-facing status for submitted quotes (received → reviewed → returned)."""
+    estado = cotizacion.estado
+    reviewed = bool(getattr(cotizacion, 'backoffice_pricing_confirmed', False)) or estado in {
+        'LISTA_PARA_CONFIRMACION',
+        'CONFIRMADA_CLIENTE',
+        'CANCELADA_CLIENTE',
+        'APROBADA',
+        'RECHAZADA',
+    }
+    returned = estado in {
+        'LISTA_PARA_CONFIRMACION',
+        'CONFIRMADA_CLIENTE',
+        'CANCELADA_CLIENTE',
+        'APROBADA',
+        'RECHAZADA',
+    }
+    confirmed = estado == 'CONFIRMADA_CLIENTE'
+    cancelled = estado in {'CANCELADA_CLIENTE', 'RECHAZADA'}
+
+    if cancelled:
+        label = _('Cancelled')
+        badge = 'secondary'
+        key = 'cancelled'
+        hint = _('This order request was cancelled.')
+    elif confirmed:
+        label = _('Confirmed')
+        badge = 'success'
+        key = 'confirmed'
+        hint = _('You confirmed this order. It is now with BackOffice for processing.')
+    elif estado == 'LISTA_PARA_CONFIRMACION':
+        label = _('Returned for confirmation')
+        badge = 'warning'
+        key = 'returned'
+        hint = _('BackOffice returned this order. Review the details and confirm or cancel.')
+    elif estado == 'ENVIADA' and reviewed:
+        label = _('Under review')
+        badge = 'info'
+        key = 'reviewed'
+        hint = _('BackOffice is reviewing your request. You will be notified when it is returned.')
+    elif estado == 'ENVIADA':
+        label = _('Received')
+        badge = 'primary'
+        key = 'received'
+        hint = _('Your order request was received and is waiting for BackOffice review.')
+    else:
+        label = cotizacion.get_estado_display()
+        badge = 'light'
+        key = 'other'
+        hint = ''
+
+    return {
+        'key': key,
+        'label': label,
+        'badge': badge,
+        'hint': hint,
+        'steps': {
+            'received': estado != 'BORRADOR',
+            'reviewed': reviewed,
+            'returned': returned,
+            'confirmed': confirmed,
+            'cancelled': cancelled,
+        },
+    }
+
+
 def _cliente_pedido_estado_label(state):
     return {
         'RECIBIDO': _('Received'),
@@ -565,6 +632,7 @@ def ver_cotizacion(request):
     # Apply promotions across ALL lines together (combo aggregation + FREE gifts).
     reaplicar_promociones_en_lineas_sesion(carrito_session, cliente=cliente)
     lineas_context = [row for row in carrito_session.values() if not row.get("es_regalo")]
+    cart_total = Decimal('0.00')
 
     for key, item in list(carrito_session.items()):
         presentacion = presentaciones_cache.get(str(key))
@@ -578,13 +646,32 @@ def ver_cotizacion(request):
                 continue
             presentaciones_cache[str(key)] = presentacion
         producto = presentacion.producto
-        precio = 0 if item.get("es_regalo") else item.get("precio", 0)
+        es_regalo = bool(item.get("es_regalo"))
+        descuento_aplicado = bool(item.get("descuento_aplicado"))
+        descuento_monto = (
+            _parse_decimal(item.get("descuento_monto", 0), 0)
+            if descuento_aplicado and not es_regalo
+            else Decimal('0.00')
+        )
+        precio = Decimal('0.00') if es_regalo else _parse_decimal(item.get("precio", 0), 0)
+        precio_unitario_neto = calcular_precio_unitario_neto_item(
+            precio=precio,
+            descuento_aplicado=descuento_aplicado and not es_regalo,
+            descuento_monto=descuento_monto,
+        )
+        subtotal = calcular_subtotal_item_pedido(
+            precio=precio,
+            cantidad=item["cantidad"],
+            descuento_aplicado=descuento_aplicado and not es_regalo,
+            descuento_monto=descuento_monto,
+        )
+        cart_total += subtotal
         promocion_estado = {
             "available": False,
             "applied": True,
             "minimum": 0,
             "current": item.get("cantidad", 0),
-        } if item.get("es_regalo") else estado_promocion_para_linea(
+        } if es_regalo else estado_promocion_para_linea(
             producto_id=producto.id,
             presentacion_id=presentacion.id,
             cantidad=item["cantidad"],
@@ -600,19 +687,23 @@ def ver_cotizacion(request):
             "presentacion": presentacion,
             "presentacion_id": presentacion.id,
             "cantidad": item["cantidad"],
-            "descuento_aplicado": bool(item.get("descuento_aplicado")),
-            "descuento_monto": item.get("descuento_monto", 0),
+            "precio": precio,
+            "precio_unitario_neto": precio_unitario_neto,
+            "subtotal": subtotal,
+            "descuento_aplicado": descuento_aplicado,
+            "descuento_monto": descuento_monto,
             "descuento_origen": item.get("descuento_origen") or "",
             "promocion_nombre": item.get("promocion_nombre") or "",
             "promocion_descripcion": item.get("promocion_descripcion") or "",
             "promocion_estado": promocion_estado,
-            "es_regalo": bool(item.get("es_regalo")),
+            "es_regalo": es_regalo,
         })
 
     request.session["carrito"] = carrito_session
 
     return render(request, "cotizaciones/ver_cotizacion.html", {
         "carrito": carrito,
+        "cart_total": cart_total,
         "pendientes_cotizaciones": _cotizaciones_pendientes_cliente(cliente),
     })
 
@@ -767,9 +858,14 @@ def guardar_cotizacion(request):
             email_notice = _(
                 'Your order request was saved, but the confirmation email could not be sent.'
             )
+        detail_url = reverse(
+            'cliente_cotizacion_recibida_detalle',
+            args=[str(cotizacion.token_cliente)],
+        )
         return JsonResponse({
             'success': True,
             'cotizacion_id': cotizacion.id,
+            'detail_url': detail_url,
             'cliente_email_sent': cliente_email_sent,
             'cliente_tiene_email': tiene_email,
             'backoffice_email_ok': backoffice_email_ok,
@@ -806,7 +902,7 @@ def guardar_cotizacion(request):
             extra_tags='client-only',
         )
 
-    return redirect('catalogo')
+    return redirect('cliente_cotizacion_recibida_detalle', token=cotizacion.token_cliente)
 
 
 @login_required
@@ -890,6 +986,19 @@ def backoffice_cotizaciones(request):
         ),
         'can_generate_orders': user_has_permission(request.user, 'backoffice.orders.manage'),
     })
+
+
+@login_required
+@internal_permission_required('backoffice.quotes.view', 'vendor.quotes.view')
+def backoffice_cotizacion_pdf(request, cotizacion_id):
+    cotizacion = get_object_or_404(
+        Cotizacion.objects.select_related('cliente', 'vendedor').prefetch_related('items__presentacion__producto'),
+        id=cotizacion_id,
+    )
+    if not user_can_view_cotizacion(request.user, cotizacion):
+        messages.error(request, _('You do not have permission to access this section.'))
+        return redirect('vendedor_home' if getattr(request.user, 'role', '') == 'vendedor' else 'backoffice_cotizaciones')
+    return quote_pdf_response(cotizacion)
 
 
 @login_required
@@ -1348,7 +1457,12 @@ def cliente_cotizaciones_recibidas(request):
     cliente = _cliente_from_user(request.user)
     base_queryset = Cotizacion.objects.filter(
         cliente=cliente,
-        estado__in=['LISTA_PARA_CONFIRMACION', 'CONFIRMADA_CLIENTE', 'CANCELADA_CLIENTE'],
+        estado__in=[
+            'ENVIADA',
+            'LISTA_PARA_CONFIRMACION',
+            'CONFIRMADA_CLIENTE',
+            'CANCELADA_CLIENTE',
+        ],
     ).prefetch_related('items').order_by('-fecha')
     view_mode = request.GET.get('view')
 
@@ -1356,13 +1470,26 @@ def cliente_cotizaciones_recibidas(request):
         cotizaciones = base_queryset.filter(estado='CONFIRMADA_CLIENTE')
     elif view_mode == 'cancelled':
         cotizaciones = base_queryset.filter(estado='CANCELADA_CLIENTE')
-    else:
-        view_mode = 'pending'
+    elif view_mode == 'pending':
+        # Quotes BackOffice already returned — still actionable by the client.
         cotizaciones = base_queryset.filter(estado='LISTA_PARA_CONFIRMACION')
+    else:
+        view_mode = 'active'
+        # Just-sent + returned-for-confirmation (full in-flight pipeline).
+        cotizaciones = base_queryset.filter(
+            estado__in=['ENVIADA', 'LISTA_PARA_CONFIRMACION'],
+        )
+
+    cotizaciones = list(cotizaciones)
+    for cotizacion in cotizaciones:
+        cotizacion.customer_status = _cliente_quote_status_meta(cotizacion)
 
     context = {
         'cotizaciones': cotizaciones,
         'pendientes_cotizaciones': _cotizaciones_pendientes_cliente(cliente),
+        'active_count': base_queryset.filter(
+            estado__in=['ENVIADA', 'LISTA_PARA_CONFIRMACION'],
+        ).count(),
         'pendientes_count': base_queryset.filter(estado='LISTA_PARA_CONFIRMACION').count(),
         'confirmed_count': base_queryset.filter(estado='CONFIRMADA_CLIENTE').count(),
         'cancelled_count': base_queryset.filter(estado='CANCELADA_CLIENTE').count(),
@@ -1615,6 +1742,7 @@ def cliente_cotizacion_recibida_detalle(request, token):
         return redirect('cliente_cotizacion_recibida_detalle', token=cotizacion.token_cliente)
 
     quote_rows, current_items_payload, current_total = build_cliente_quote_rows()
+    customer_status = _cliente_quote_status_meta(cotizacion)
 
     context = {
         'cotizacion': cotizacion,
@@ -1626,6 +1754,8 @@ def cliente_cotizacion_recibida_detalle(request, token):
         'pending_acepta_terminos': False,
         'current_items_payload': current_items_payload,
         'current_total': current_total,
+        'customer_status': customer_status,
+        'es_solicitud_enviada': cotizacion.estado == 'ENVIADA',
     }
     return render(request, 'cotizaciones/cliente_confirmar_cotizacion.html', context)
 

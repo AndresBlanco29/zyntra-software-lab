@@ -159,3 +159,116 @@ def summarize_order_profit(lines):
         ),
         'lines_with_cost': lines_with_cost,
     }
+
+
+def _item_attr(item, *names, default=None):
+    if isinstance(item, dict):
+        for name in names:
+            if name in item and item[name] is not None:
+                return item[name]
+        return default
+    for name in names:
+        if hasattr(item, name):
+            value = getattr(item, name)
+            if value is not None:
+                return value
+    return default
+
+
+def find_order_lines_sold_below_cost(items):
+    """Return commercial lines where net unit price is below known effective cost.
+
+    Free-gift lines (`es_regalo`) are skipped. Lines without a known cost are not
+    blocked (we never invent a cost).
+    """
+    below_cost = []
+    for item in items or []:
+        if bool(_item_attr(item, 'es_regalo', default=False)):
+            continue
+
+        presentacion = _item_attr(item, 'presentacion')
+        cost = _item_attr(item, 'cost', 'unit_cost')
+        if cost is None:
+            cost = resolve_line_cost(presentacion)
+        if cost is None:
+            continue
+
+        net_unit_price = _item_attr(item, 'net_unit_price', 'precio_unitario')
+        if net_unit_price is None:
+            profit = build_order_line_profit(
+                cost=cost,
+                list_price=_item_attr(item, 'precio', 'list_price', 'precio_unitario_lista', default=0),
+                quantity=_item_attr(item, 'cantidad', 'quantity', 'cantidad_facturada', default=0),
+                descuento_aplicado=bool(_item_attr(item, 'descuento_aplicado', default=False)),
+                descuento_monto=_item_attr(item, 'descuento_monto', 'descuento_monto_unitario', default=0),
+            )
+            net_unit_price = profit['net_unit_price']
+            unit_loss = profit['unit_profit_amount']
+            line_loss = profit['line_profit_amount']
+            quantity = int(_item_attr(item, 'cantidad', 'quantity', 'cantidad_facturada', default=0) or 0)
+        else:
+            quantity = int(_item_attr(item, 'cantidad', 'quantity', 'cantidad_facturada', default=0) or 0)
+            unit_loss = calculate_unit_profit_amount(cost=cost, sale_price=net_unit_price)
+            line_loss = (
+                _quantize_money(unit_loss * Decimal(str(quantity)))
+                if unit_loss is not None
+                else None
+            )
+
+        net_unit_price = _quantize_money(net_unit_price)
+        cost_money = _quantize_money(cost)
+        if net_unit_price >= cost_money:
+            continue
+
+        product_name = _item_attr(item, 'producto_nombre', 'product', 'product_name', default='')
+        presentation_name = _item_attr(item, 'presentacion_nombre', 'presentation', 'presentation_name', default='')
+        if not product_name and presentacion is not None:
+            product = getattr(presentacion, 'producto', None)
+            product_name = getattr(product, 'nombre', '') or ''
+            presentation_name = (
+                getattr(presentacion, 'nombre_empaque_cliente', None)
+                or getattr(presentacion, 'nombre', '')
+                or ''
+            )
+
+        below_cost.append(
+            {
+                'item_id': _item_attr(item, 'id', 'item_id'),
+                'product': product_name,
+                'presentation': presentation_name,
+                'quantity': quantity,
+                'cost': cost_money,
+                'net_unit_price': net_unit_price,
+                'unit_profit_amount': unit_loss,
+                'line_profit_amount': line_loss,
+            }
+        )
+    return below_cost
+
+
+def format_below_cost_error_message(lines):
+    """Human-readable block message listing products sold below cost."""
+    from django.utils.translation import gettext as _
+
+    if not lines:
+        return ''
+
+    details = []
+    for row in lines:
+        label = row.get('product') or _('Product')
+        presentation = row.get('presentation') or ''
+        if presentation:
+            label = f'{label} / {presentation}'
+        details.append(
+            _('%(product)s: selling $%(net)s (cost $%(cost)s)')
+            % {
+                'product': label,
+                'net': f"{_quantize_money(row.get('net_unit_price')):.2f}",
+                'cost': f"{_quantize_money(row.get('cost')):.2f}",
+            }
+        )
+
+    return _(
+        'Cannot continue: one or more products are being sold below cost. '
+        'A supervisor authorization is required. %(details)s'
+    ) % {'details': '; '.join(details)}

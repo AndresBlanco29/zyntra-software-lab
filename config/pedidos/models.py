@@ -75,6 +75,20 @@ class Pedido(models.Model):
 	)
 	credit_limit_liberado = models.BooleanField(default=False)
 	credit_limit_bloqueado = models.BooleanField(default=False)
+	venta_perdida_autorizada = models.BooleanField(
+		default=False,
+		help_text=_('Supervisor authorized selling one or more lines below cost on this order.'),
+	)
+	venta_perdida_autorizado_por = models.CharField(max_length=120, blank=True, default='')
+	venta_perdida_autorizada_por_user = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='pedidos_venta_perdida_autorizados',
+	)
+	venta_perdida_comentario = models.TextField(blank=True, default='')
+	venta_perdida_autorizada_en = models.DateTimeField(blank=True, null=True)
 	acepta_terminos = models.BooleanField(default=False)
 	acepta_terminos_en = models.DateTimeField(blank=True, null=True)
 	pedido_raiz = models.ForeignKey(

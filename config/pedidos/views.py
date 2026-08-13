@@ -17,9 +17,20 @@ import logging
 
 from config.core.datetime_formats import format_local_date, format_local_datetime
 from django.utils import timezone
-from config.core.profit import attach_profit_to_order_item, summarize_order_profit
+from config.core.profit import (
+	attach_profit_to_order_item,
+	find_order_lines_sold_below_cost,
+	resolve_line_cost,
+	summarize_order_profit,
+)
+from config.pedidos.below_cost import (
+	enforce_sell_below_cost_for_pedido,
+	parse_sell_below_cost_authorization,
+	user_can_authorize_sell_below_cost,
+)
 from config.core.product_ordering import order_pedido_items_for_display
 from config.core.shipment_summary import build_shipment_summary_from_pedido_items, with_total_pallets
+from config.core.commercial_pdf import order_pdf_response
 from config.core.pdf_branding import (
 	BRAND_BORDER,
 	BRAND_MUTED_TEXT,
@@ -735,6 +746,12 @@ def backoffice_pedido_detalle(request, pedido_id):
 					)
 
 				recalcular_pedido(pedido)
+				enforce_sell_below_cost_for_pedido(
+					pedido=pedido,
+					items=list(pedido.items.select_related('presentacion__producto').all()),
+					usuario=request.user,
+					authorization=parse_sell_below_cost_authorization(request.POST),
+				)
 		except ValidationError as exc:
 			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
 			return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
@@ -869,6 +886,8 @@ def backoffice_pedido_detalle(request, pedido_id):
 			if _is_backoffice_user(request.user)
 			else {}
 		),
+		'below_cost_lines': find_order_lines_sold_below_cost(pedido_items),
+		'can_authorize_sell_below_cost': user_can_authorize_sell_below_cost(request.user),
 		'default_price_key': _default_presentacion_price_key_for_pedido(pedido=pedido),
 		'order_profit_summary': summarize_order_profit(pedido_items),
 		'credit_limit_evaluation': evaluate_customer_credit_limit(cliente=pedido.cliente, additional_amount=pedido.total),
@@ -1220,9 +1239,10 @@ def _build_pedido_presentation_cost_map(*, pedido_items):
 			presentation_ids.add(presentation.id)
 
 	cost_map = {}
-	for presentation in Presentacion.objects.filter(id__in=presentation_ids).only('id', 'costo'):
+	for presentation in Presentacion.objects.filter(id__in=presentation_ids):
+		cost = resolve_line_cost(presentation)
 		cost_map[str(presentation.id)] = (
-			format(presentation.costo, '.2f') if presentation.costo is not None else None
+			format(cost, '.2f') if cost is not None else None
 		)
 	return cost_map
 
@@ -1741,6 +1761,17 @@ def backoffice_picking_ticket(request, pedido_id):
 		'picking_items': order_pedido_items_for_display(pedido),
 		'pedido_estado_label': _pedido_state_label(pedido.estado),
 	})
+
+
+@login_required
+@internal_permission_required('backoffice.orders.view')
+def backoffice_pedido_pdf(request, pedido_id):
+	"""Commercial sales-order PDF for customer follow-up (not picking ticket)."""
+	pedido = get_object_or_404(
+		Pedido.objects.select_related('cliente', 'vendedor').prefetch_related('items__presentacion__producto'),
+		id=pedido_id,
+	)
+	return order_pdf_response(pedido)
 
 
 @login_required

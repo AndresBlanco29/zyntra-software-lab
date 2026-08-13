@@ -3132,3 +3132,143 @@ class PartialOrderFlowTests(TestCase):
 		parcial = Pedido.objects.filter(pedido_raiz=self.pedido).get()
 		self.assertRedirects(response, reverse('backoffice_pedido_detalle', args=[parcial.id]))
 		self.assertEqual(parcial.numero_display, f'{self.pedido.id}-P1')
+
+
+class SellBelowCostAuthorizationTests(TestCase):
+	def setUp(self):
+		self.admin = Usuario.objects.create_user(username='admin-below', password='secret123', role='admin')
+		self.backoffice = Usuario.objects.create_user(username='bo-below', password='secret123', role='backoffice')
+		self.customer_user = Usuario.objects.create_user(username='cli-below', password='secret123', role='cliente')
+		self.cliente = Cliente.objects.create(
+			usuario=self.customer_user,
+			nombre_empresa='Cliente Below Cost',
+			telefono='5559998888',
+			direccion='1 Loss St',
+			ciudad='Dallas',
+			estado='TX',
+			codigo_postal='75001',
+			pais='USA',
+			sales_tax_number='TX-BELOW',
+			certificado_tax=SimpleUploadedFile('certificado.txt', b'certificado'),
+			aprobado=True,
+		)
+		categoria = Categoria.objects.create(nombre='Cat Below')
+		marca = Marca.objects.create(nombre='Marca Below')
+		producto = Producto.objects.create(nombre='Adrenalina Test', categoria=categoria, marca=marca, activo=True)
+		self.presentacion = Presentacion.objects.create(
+			producto=producto,
+			nombre='Caja',
+			unidades=12,
+			tipo_contenido='unidades',
+			costo=Decimal('22.00'),
+			precio_1=Decimal('25.00'),
+		)
+		registrar_entrada_manual(presentacion=self.presentacion, cantidad=100, observacion='below cost stock')
+		self.pedido = Pedido.objects.create(
+			cliente=self.cliente,
+			origen='BACKOFFICE',
+			estado='RECIBIDO',
+			total=Decimal('25.00'),
+		)
+		self.item = PedidoItem.objects.create(
+			pedido=self.pedido,
+			presentacion=self.presentacion,
+			cantidad_solicitada=1,
+			cantidad=1,
+			precio=Decimal('25.00'),
+			subtotal=Decimal('25.00'),
+		)
+
+	def _post_order(self, user, **extra):
+		self.client.force_login(user)
+		payload = {
+			'estado': self.pedido.estado,
+			'nota_backoffice': '',
+			f'cantidad_{self.item.id}': '6',
+			f'precio_{self.item.id}': '25.00',
+			f'descuento_aplicado_{self.item.id}': 'on',
+			f'descuento_monto_{self.item.id}': '24.00',
+		}
+		payload.update(extra)
+		return self.client.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), payload)
+
+	def test_save_order_blocks_below_cost_without_authorization(self):
+		response = self._post_order(self.backoffice)
+		self.assertEqual(response.status_code, 302)
+		self.item.refresh_from_db()
+		self.pedido.refresh_from_db()
+		# Transaction rolled back: discount below cost was not persisted.
+		self.assertFalse(self.item.descuento_aplicado)
+		self.assertEqual(self.item.descuento_monto, Decimal('0.00'))
+		self.assertFalse(self.pedido.venta_perdida_autorizada)
+
+	def test_save_order_allows_below_cost_with_admin_authorization(self):
+		from django.contrib.messages import get_messages
+
+		response = self._post_order(
+			self.admin,
+			confirm_sell_below_cost='1',
+			venta_perdida_autorizado_por='Demo Supervisor',
+			venta_perdida_comentario='Promocion mal creada, excepcion temporal',
+		)
+		self.assertEqual(response.status_code, 302)
+		flash = [str(m) for m in get_messages(response.wsgi_request)]
+		self.item.refresh_from_db()
+		self.pedido.refresh_from_db()
+		self.assertTrue(self.item.descuento_aplicado, msg=flash)
+		self.assertEqual(self.item.descuento_monto, Decimal('24.00'))
+		self.assertTrue(self.pedido.venta_perdida_autorizada, msg=flash)
+		self.assertEqual(self.pedido.venta_perdida_autorizado_por, 'Demo Supervisor')
+
+	def test_free_gift_line_is_not_blocked(self):
+		self.item.es_regalo = True
+		self.item.precio = Decimal('0.00')
+		self.item.descuento_aplicado = True
+		self.item.descuento_monto = Decimal('0.00')
+		self.item.subtotal = Decimal('0.00')
+		self.item.save()
+		self.client.force_login(self.backoffice)
+		response = self.client.post(
+			reverse('backoffice_pedido_detalle', args=[self.pedido.id]),
+			{
+				'estado': self.pedido.estado,
+				'nota_backoffice': 'gift ok',
+				f'cantidad_{self.item.id}': '1',
+				f'precio_{self.item.id}': '0.00',
+			},
+		)
+		self.assertEqual(response.status_code, 302)
+		self.pedido.refresh_from_db()
+		self.assertEqual(self.pedido.nota_backoffice, 'gift ok')
+		self.assertFalse(self.pedido.venta_perdida_autorizada)
+
+	def test_invoice_blocked_without_authorization_and_allowed_with_prior_auth(self):
+		self.item.descuento_aplicado = True
+		self.item.descuento_monto = Decimal('24.00')
+		self.item.cantidad = 6
+		self.item.subtotal = Decimal('6.00')
+		self.item.save(update_fields=['descuento_aplicado', 'descuento_monto', 'cantidad', 'subtotal'])
+		self.pedido.estado = 'VERIFICADO_AJUSTADO'
+		self.pedido.total = Decimal('6.00')
+		self.pedido.save(update_fields=['estado', 'total', 'actualizada_en'])
+
+		with self.assertRaises(ValidationError):
+			generar_invoice_desde_picking(
+				pedido=self.pedido,
+				metodo_entrega='CUSTOMER_PICK_UP',
+				driver=None,
+				usuario=self.backoffice,
+			)
+
+		self.pedido.venta_perdida_autorizada = True
+		self.pedido.venta_perdida_autorizado_por = 'Demo Supervisor'
+		self.pedido.save(update_fields=['venta_perdida_autorizada', 'venta_perdida_autorizado_por', 'actualizada_en'])
+
+		invoice = generar_invoice_desde_picking(
+			pedido=self.pedido,
+			metodo_entrega='CUSTOMER_PICK_UP',
+			driver=None,
+			usuario=self.backoffice,
+		)
+		self.assertEqual(invoice.items.count(), 1)
+		self.assertEqual(invoice.items.first().precio_unitario, Decimal('1.00'))

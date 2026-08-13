@@ -5,6 +5,8 @@ from config.core.profit import (
 	build_order_line_profit,
 	calculate_profit_from_revenue,
 	calculate_profit_percentage,
+	find_order_lines_sold_below_cost,
+	format_below_cost_error_message,
 	summarize_order_profit,
 )
 from config.core.shipment_summary import (
@@ -201,6 +203,55 @@ class ProfitCalculationTests(TestCase):
 		])
 		self.assertEqual(summary['total_profit_amount'], Decimal('15.00'))
 		self.assertEqual(summary['total_profit_percent'], Decimal('30.0'))
+
+	def test_find_order_lines_sold_below_cost_detects_loss_and_skips_gifts(self):
+		rows = find_order_lines_sold_below_cost([
+			{
+				'product': 'Adrenalina',
+				'presentation': 'Caja',
+				'precio': Decimal('25.00'),
+				'cantidad': 6,
+				'descuento_aplicado': True,
+				'descuento_monto': Decimal('24.00'),
+				'cost': Decimal('22.00'),
+				'es_regalo': False,
+			},
+			{
+				'product': 'Gift line',
+				'presentation': 'Caja',
+				'precio': Decimal('0.00'),
+				'cantidad': 1,
+				'descuento_aplicado': True,
+				'descuento_monto': Decimal('0.00'),
+				'cost': Decimal('10.00'),
+				'es_regalo': True,
+			},
+			{
+				'product': 'Healthy margin',
+				'presentation': 'Caja',
+				'precio': Decimal('30.00'),
+				'cantidad': 2,
+				'descuento_aplicado': True,
+				'descuento_monto': Decimal('1.00'),
+				'cost': Decimal('20.00'),
+				'es_regalo': False,
+			},
+			{
+				'product': 'No cost',
+				'presentation': 'Caja',
+				'precio': Decimal('1.00'),
+				'cantidad': 1,
+				'descuento_aplicado': False,
+				'descuento_monto': Decimal('0.00'),
+				'cost': None,
+				'es_regalo': False,
+			},
+		])
+		self.assertEqual(len(rows), 1)
+		self.assertEqual(rows[0]['product'], 'Adrenalina')
+		self.assertEqual(rows[0]['net_unit_price'], Decimal('1.00'))
+		self.assertEqual(rows[0]['cost'], Decimal('22.00'))
+		self.assertIn('Adrenalina', format_below_cost_error_message(rows))
 
 
 class ShipmentSummaryTests(TestCase):

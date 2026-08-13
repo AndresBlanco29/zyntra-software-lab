@@ -106,6 +106,14 @@ PERMISSION_SECTIONS = (
                 'description': _('Create and update invoices, complete pickup/delivery billing and manage credit/debit notes.'),
             },
             {
+                'code': 'backoffice.pricing.sell_below_cost',
+                'label': _('Authorize selling below cost'),
+                'description': _(
+                    'Allow saving orders or generating invoices when a product is sold below cost. '
+                    'Requires naming who authorized the exception.'
+                ),
+            },
+            {
                 'code': 'backoffice.reports.view',
                 'label': _('Reports dashboard'),
                 'description': _('View daily closing, revenue trends, driver reconciliation and commercial performance metrics.'),

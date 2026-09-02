@@ -2,8 +2,9 @@
 
 Carpeta dedicada al DEMO comercial **Zyntra** en `D:\ZYNTRA SOFTWARE LAB`.
 
-- Arranque: `.\scripts\run_demo_local.ps1`
-- Guia: `docs\demo\TRY_LOCAL.md`
+- Arranque local: `.\scripts\run_demo_local.ps1`
+- Guía local: `docs\demo\TRY_LOCAL.md`
+- Deploy Railway: `docs\demo\RAILWAY_DEPLOY.md`
 - Login: `demo@demo-system.com` / `DemoShowcase2026!`
 
 Git worktree de la rama `demo/zyntra-software-lab`.

@@ -12,9 +12,10 @@
 
 1. [railway.app/new](https://railway.app/new) → Deploy from GitHub
 2. Select `zyntra-software-lab` → branch **`main`**
-3. Add plugin: **MySQL** (new empty database — no LTG dump)
+3. Keep **only the `web` service**. Delete `worker` / `beat` / `scheduler` if Railway created them (DEMO uses eager Celery; no LTG scheduler).
+4. Add plugin: **MySQL** (new empty database — no LTG dump)
 
-Railway will read `railway.toml` (DEMO start command). Do not use the root `Procfile` (that is LTG production).
+Build uses `nixpacks.toml` (`python -m pip`). Start uses `railway.toml` / `Procfile` (DEMO web only).
 
 ## 2. Variables (service → Variables)
 

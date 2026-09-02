@@ -1,11 +1,18 @@
-# Explicit build plan for Railway/Nixpacks (avoids silent Railpack planner failures).
+# Zyntra Software Lab (DEMO) — Railway / Nixpacks
 providers = ["python"]
 
+[variables]
+NIXPACKS_PYTHON_VERSION = "3.12"
+
 [phases.setup]
-nixPkgs = ["python312", "gettext"]
+nixPkgs = ["python312", "python312Packages.pip", "gettext"]
 
 [phases.install]
-cmds = ["pip install -r requirements.txt"]
+cmds = [
+  "python -m pip install --upgrade pip",
+  "python -m pip install -r requirements.txt",
+]
 
+# Keep build light: full Django check runs at deploy start via railway.toml
 [phases.build]
-cmds = ["python manage.py check --deploy 2>/dev/null || python manage.py check"]
+cmds = ["python -c \"import django; print(django.get_version())\""]

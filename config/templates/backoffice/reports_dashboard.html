@@ -14,6 +14,7 @@
       <p class="mb-0 text-white-50">{{ company_name }} · {{ period.label }} · {{ period.start_date|date:"m/d/Y" }} — {{ period.end_date|date:"m/d/Y" }}</p>
     </div>
     <div class="d-flex flex-wrap gap-2 no-print">
+      <a href="{% url 'reportes_dashboard' %}" class="btn btn-outline-light">{% trans "Business Overview" %}</a>
       <a href="{% url 'reportes_export_excel' %}?{{ export_querystring }}" class="btn btn-light text-primary fw-semibold">{% trans "Excel" %}</a>
       <a href="{% url 'reportes_export_csv' %}?{{ export_querystring }}" class="btn btn-outline-light">{% trans "CSV" %}</a>
       <a href="{% url 'reportes_export_pdf' %}?{{ export_querystring }}" class="btn btn-outline-light">{% trans "PDF" %}</a>

@@ -1,0 +1,39 @@
+{% if DEMO_MODE %}
+<div class="demo-environment-banner" role="status" aria-live="polite">
+  <span class="demo-environment-banner__label">{{ DEMO_ENVIRONMENT_LABEL|default:"SOFTWARE LAB" }}</span>
+  <span class="demo-environment-banner__hint">{{ DEMO_BRAND_NAME|default:"Zyntra" }} · fictitious data · not production</span>
+</div>
+<style>
+  .demo-environment-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1080;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem 1rem;
+    padding: .35rem .75rem;
+    background: linear-gradient(90deg, #07111F 0%, #0E2A38 48%, #123847 100%);
+    color: #e2e8f0;
+    font-size: .72rem;
+    letter-spacing: .04em;
+    text-align: center;
+    border: 0;
+    border-bottom: 1px solid rgba(94, 234, 212, 0.28);
+  }
+  .demo-environment-banner__label {
+    font-weight: 700;
+    color: #2DD4BF;
+    text-transform: uppercase;
+  }
+  .demo-environment-banner__hint {
+    opacity: .85;
+    font-weight: 500;
+    letter-spacing: .02em;
+    text-transform: none;
+  }
+</style>
+{% endif %}

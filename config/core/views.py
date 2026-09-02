@@ -131,7 +131,10 @@ def _get_cached_home_testimonios():
 
 
 def _get_cached_home_contenido():
-    cache_key = "home:contenido"
+    from django.conf import settings
+
+    demo_mode = bool(getattr(settings, 'DEMO_MODE', False))
+    cache_key = "home:contenido:demo" if demo_mode else "home:contenido"
     contenido = cache.get(cache_key)
     if contenido is None:
         try:
@@ -264,6 +267,10 @@ def _get_cached_home_contenido():
                 ).first()
             except Exception:
                 contenido = None
+        if demo_mode and contenido is not None:
+            from config.core.demo_branding import apply_demo_home_contenido
+
+            apply_demo_home_contenido(contenido)
         cache.set(cache_key, contenido, HOME_CACHE_TIMEOUT)
     return contenido
 
@@ -288,6 +295,14 @@ def _came_from_internal_route(request):
 
 def home(request):
     try:
+        from django.conf import settings
+
+        if getattr(settings, 'DEMO_MODE', False):
+            # Fill empty home marketing tiles without requiring a full reseed.
+            from config.core.demo_showcase import ensure_demo_home_marketing
+
+            ensure_demo_home_marketing()
+
         marcas = _get_cached_home_marcas()
         testimonios = _get_cached_home_testimonios()
         productos_destacados = _get_cached_home_productos()

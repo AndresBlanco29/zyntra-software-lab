@@ -1314,7 +1314,15 @@ def _build_dashboard_context(request, period, raw_data, filters=None):
 		'trend_rows': trend_rows,
 		'trend_chart': trend_chart,
 		'generated_by': _resolve_report_author(request),
-		'company_name': getattr(settings, 'COMPANY_NAME', None) or getattr(settings, 'APP_DISPLAY_NAME', None) or 'La Tortilla Grocery',
+		'company_name': (
+			getattr(settings, 'DEMO_BRAND_LEGAL_NAME', None)
+			or getattr(settings, 'DEMO_BRAND_NAME', None)
+			if getattr(settings, 'DEMO_MODE', False)
+			else None
+		)
+		or getattr(settings, 'COMPANY_NAME', None)
+		or getattr(settings, 'APP_DISPLAY_NAME', None)
+		or 'La Tortilla Grocery',
 	}
 
 
@@ -1360,7 +1368,7 @@ def export_csv(request):
 @internal_permission_required('backoffice.reports.view')
 def send_email_now(request):
 	if request.method != 'POST':
-		return redirect('reportes_dashboard')
+		return redirect('reportes_bi')
 	period = _parse_range(request)
 	filters = _parse_filters(request)
 	report_data = _build_dashboard_context(request, period, _collect_report_data(period, filters=filters), filters=filters)
@@ -1383,5 +1391,5 @@ def send_email_now(request):
 		if value
 	)
 	if redirect_query:
-		return redirect(f"{reverse('reportes_dashboard')}?{redirect_query}")
-	return redirect('reportes_dashboard')
+		return redirect(f"{reverse('reportes_bi')}?{redirect_query}")
+	return redirect('reportes_bi')

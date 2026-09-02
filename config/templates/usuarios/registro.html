@@ -5,10 +5,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{% trans "Sign up" %} | La Tortilla Grocery</title>
+    <title>{% trans "Sign up" %} | {% include "includes/brand_name.html" %}</title>
 
-    <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
-    <link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
+    <link rel="icon" type="image/png" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
+    <link rel="apple-touch-icon" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
 
     <!-- Bootstrap -->
     <link
@@ -24,13 +24,16 @@
     <link rel="stylesheet" href="{%static 'css/registro.css'%}" />
     <link rel="stylesheet" href="{% static 'css/tax-example.css' %}" />
     <link rel="stylesheet" href="{% static 'css/state-selector.css' %}" />
+    {% if DEMO_MODE %}<link rel="stylesheet" href="{% static 'css/zyntra-demo.css' %}">{% endif %}
   </head>
 
   <body
     id="registroPage"
+    class="{% if DEMO_MODE %}demo-brand{% endif %}"
     data-msg-password-mismatch="{% trans 'Passwords do not match.' %}"
     data-msg-selected-file-prefix="{% trans 'Selected file:' %}"
   >
+    {% include "includes/demo_environment_banner.html" %}
     <div
       class="container d-flex justify-content-center align-items-center min-vh-100">
       <div class="card registro-card">
@@ -46,9 +49,9 @@
         {% endif %}
 
         <div class="text-center mb-4" id="logoHeader">
-          <img src="{% static 'img/logo.png' %}" class="logo mb-2" />
+          <img src="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}" class="logo mb-2{% if DEMO_MODE %} zyntra-mark{% endif %}" alt="" />
 
-          <h4 class="fw-bold text-secondary">{% trans "La Tortilla Grocery" %}</h4>
+          <h4 class="fw-bold text-secondary">{% include "includes/brand_name.html" %}</h4>
         </div>
 
 

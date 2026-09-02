@@ -200,20 +200,64 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const filtroCategoria = document.getElementById('filtroCategoria');
     const filtroMarca = document.getElementById('filtroMarca');
+    const buscador = document.getElementById('buscador');
+    const filterForm = document.getElementById('catalogo-filter-form');
 
-    function syncCatalogSearchStickyTop() {
-        var nav = document.querySelector('.navbar-custom');
-        var sticky = document.querySelector('.catalog-search-sticky');
-        if (!nav || !sticky) {
-            return;
+    // Sticky search sits outside the form (form="..."); ensure 1s debounce still submits.
+    if (buscador && filterForm && window.PreserveSearchFocus) {
+        if (buscador.getAttribute('data-search-bound') !== 'true') {
+            window.PreserveSearchFocus.bindSearchAsYouType(buscador, function () {
+                if (typeof filterForm.requestSubmit === 'function') {
+                    filterForm.requestSubmit();
+                } else {
+                    filterForm.submit();
+                }
+            }, { delayMs: window.PreserveSearchFocus.DEFAULT_DEBOUNCE_MS || 1000 });
         }
-        sticky.style.top = nav.offsetHeight + 'px';
+        buscador.setAttribute(
+            'data-search-last-query',
+            window.PreserveSearchFocus.normalizeSearchQuery(buscador.value || '')
+        );
     }
 
-    syncCatalogSearchStickyTop();
-    window.addEventListener('resize', syncCatalogSearchStickyTop);
+    function syncCatalogChromeOffsets() {
+        var nav = document.querySelector('.navbar-custom');
+        var sticky = document.querySelector('.catalog-search-sticky');
+        var banner = document.querySelector('.demo-environment-banner');
+        var root = document.documentElement;
+        var bannerHeight = banner ? Math.max(Math.round(banner.getBoundingClientRect().height), 0) : 0;
+
+        if (bannerHeight) {
+            root.style.setProperty('--demo-banner-height', bannerHeight + 'px');
+        }
+
+        // Navbar is top:0 with banner padding baked in — bottom edge is full chrome height.
+        var chromeBottom = nav
+            ? Math.max(Math.ceil(nav.getBoundingClientRect().bottom), 56)
+            : (bannerHeight + 70);
+
+        root.style.setProperty('--panel-navbar-offset', chromeBottom + 'px');
+
+        if (sticky) {
+            sticky.style.top = chromeBottom + 'px';
+        }
+    }
+
+    syncCatalogChromeOffsets();
+    window.addEventListener('resize', syncCatalogChromeOffsets);
+    window.addEventListener('load', syncCatalogChromeOffsets);
     if (window.visualViewport) {
-        window.visualViewport.addEventListener('resize', syncCatalogSearchStickyTop);
+        window.visualViewport.addEventListener('resize', syncCatalogChromeOffsets);
+    }
+    if (typeof ResizeObserver !== 'undefined') {
+        var navEl = document.querySelector('.navbar-custom');
+        var bannerEl = document.querySelector('.demo-environment-banner');
+        if (navEl) {
+            new ResizeObserver(syncCatalogChromeOffsets).observe(navEl);
+        }
+        if (bannerEl) {
+            new ResizeObserver(syncCatalogChromeOffsets).observe(bannerEl);
+        }
     }
 
     if (filtroCategoria) {

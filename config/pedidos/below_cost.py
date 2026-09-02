@@ -10,13 +10,19 @@ from config.core.profit import find_order_lines_sold_below_cost, format_below_co
 
 SELL_BELOW_COST_PERMISSION = 'backoffice.pricing.sell_below_cost'
 
+_AUTH_UPDATE_FIELDS = (
+	'venta_perdida_autorizada',
+	'venta_perdida_requiere_autorizacion',
+	'venta_perdida_autorizado_por',
+	'venta_perdida_autorizada_por_user',
+	'venta_perdida_comentario',
+	'venta_perdida_autorizada_en',
+	'actualizada_en',
+)
+
 
 def user_can_authorize_sell_below_cost(user):
-	return bool(
-		user
-		and getattr(user, 'has_internal_permission', None)
-		and user.has_internal_permission(SELL_BELOW_COST_PERMISSION)
-	)
+	return bool(user and getattr(user, 'has_internal_permission', None) and user.has_internal_permission(SELL_BELOW_COST_PERMISSION))
 
 
 def parse_sell_below_cost_authorization(data):
@@ -44,22 +50,37 @@ def parse_sell_below_cost_authorization(data):
 
 def clear_pedido_sell_below_cost_authorization(pedido, *, save=True):
 	pedido.venta_perdida_autorizada = False
+	pedido.venta_perdida_requiere_autorizacion = False
 	pedido.venta_perdida_autorizado_por = ''
 	pedido.venta_perdida_autorizada_por_user = None
 	pedido.venta_perdida_comentario = ''
 	pedido.venta_perdida_autorizada_en = None
 	if save:
-		pedido.save(
-			update_fields=[
-				'venta_perdida_autorizada',
-				'venta_perdida_autorizado_por',
-				'venta_perdida_autorizada_por_user',
-				'venta_perdida_comentario',
-				'venta_perdida_autorizada_en',
-				'actualizada_en',
-			]
-		)
+		pedido.save(update_fields=list(_AUTH_UPDATE_FIELDS))
 	return pedido
+
+
+def mark_pedido_sell_below_cost_pending(pedido, *, save=True):
+	"""Persist order edits while flagging that invoicing still needs authorization."""
+	pedido.venta_perdida_autorizada = False
+	pedido.venta_perdida_requiere_autorizacion = True
+	pedido.venta_perdida_autorizado_por = ''
+	pedido.venta_perdida_autorizada_por_user = None
+	pedido.venta_perdida_comentario = ''
+	pedido.venta_perdida_autorizada_en = None
+	if save:
+		pedido.save(update_fields=list(_AUTH_UPDATE_FIELDS))
+	return pedido
+
+
+def pedido_blocks_invoice_for_below_cost(pedido, items=None):
+	"""True when below-cost lines exist and the order is not yet authorized."""
+	if items is None:
+		items = list(pedido.items.select_related('presentacion__producto'))
+	below_cost_lines = find_order_lines_sold_below_cost(items)
+	if not below_cost_lines:
+		return False
+	return not bool(getattr(pedido, 'venta_perdida_autorizada', False))
 
 
 def apply_pedido_sell_below_cost_authorization(
@@ -80,21 +101,13 @@ def apply_pedido_sell_below_cost_authorization(
 
 	now = timezone.now()
 	pedido.venta_perdida_autorizada = True
+	pedido.venta_perdida_requiere_autorizacion = False
 	pedido.venta_perdida_autorizado_por = autorizado_por[:120]
 	pedido.venta_perdida_autorizada_por_user = usuario
 	pedido.venta_perdida_comentario = (comentario or '').strip()
 	pedido.venta_perdida_autorizada_en = now
 	if save:
-		pedido.save(
-			update_fields=[
-				'venta_perdida_autorizada',
-				'venta_perdida_autorizado_por',
-				'venta_perdida_autorizada_por_user',
-				'venta_perdida_comentario',
-				'venta_perdida_autorizada_en',
-				'actualizada_en',
-			]
-		)
+		pedido.save(update_fields=list(_AUTH_UPDATE_FIELDS))
 
 	if audit:
 		from config.auditoria.business_events import log_business_event
@@ -134,7 +147,7 @@ def apply_pedido_sell_below_cost_authorization(
 			changes=[
 				{
 					'field': str(_('Sell below cost')),
-					'before': str(_('Blocked')),
+					'before': str(_('Pending authorization')),
 					'after': str(_('Authorized')),
 				},
 				{
@@ -160,14 +173,24 @@ def enforce_sell_below_cost_for_pedido(
 	usuario,
 	authorization=None,
 	require_existing_authorization=False,
+	mode='save',
 ):
-	"""Block or authorize below-cost lines on a pedido.
+	"""Authorize, mark pending, or gate below-cost lines on a pedido.
+
+	``mode='save'`` (order edit): persist line changes; mark pending instead of raising.
+	``mode='gate'`` (invoice): raise ValidationError until authorized.
 
 	Returns the list of below-cost lines (empty when none).
 	"""
+	if mode not in {'save', 'gate'}:
+		raise ValueError(f'Unsupported sell-below-cost mode: {mode}')
+
 	below_cost_lines = find_order_lines_sold_below_cost(items)
 	if not below_cost_lines:
-		if getattr(pedido, 'venta_perdida_autorizada', False):
+		if (
+			getattr(pedido, 'venta_perdida_autorizada', False)
+			or getattr(pedido, 'venta_perdida_requiere_autorizacion', False)
+		):
 			clear_pedido_sell_below_cost_authorization(pedido, save=True)
 		return []
 
@@ -179,10 +202,16 @@ def enforce_sell_below_cost_for_pedido(
 
 	already_authorized = bool(getattr(pedido, 'venta_perdida_autorizada', False))
 	if already_authorized and require_existing_authorization and not auth.get('requested'):
+		if getattr(pedido, 'venta_perdida_requiere_autorizacion', False):
+			pedido.venta_perdida_requiere_autorizacion = False
+			pedido.save(update_fields=['venta_perdida_requiere_autorizacion', 'actualizada_en'])
 		return below_cost_lines
 
 	if already_authorized and not auth.get('requested'):
 		# Keep prior authorization when re-saving without a new override request.
+		if getattr(pedido, 'venta_perdida_requiere_autorizacion', False):
+			pedido.venta_perdida_requiere_autorizacion = False
+			pedido.save(update_fields=['venta_perdida_requiere_autorizacion', 'actualizada_en'])
 		return below_cost_lines
 
 	if auth.get('requested'):
@@ -195,6 +224,10 @@ def enforce_sell_below_cost_for_pedido(
 			save=True,
 			audit=True,
 		)
+		return below_cost_lines
+
+	if mode == 'save':
+		mark_pedido_sell_below_cost_pending(pedido, save=True)
 		return below_cost_lines
 
 	raise ValidationError(format_below_cost_error_message(below_cost_lines))

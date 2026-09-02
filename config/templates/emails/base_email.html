@@ -5,7 +5,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block email_title %}La Tortilla Grocery{% endblock %}</title>
+  <title>{% block email_title %}{{ ACTIVE_BRAND_NAME|default:"La Tortilla Grocery" }}{% endblock %}</title>
 </head>
 <body style="margin:0; padding:24px 12px; background:#f3f6fb; color:#1e293b; font-family:Arial, sans-serif;">
   <div style="display:none; max-height:0; overflow:hidden; opacity:0; mso-hide:all;">
@@ -16,20 +16,20 @@
       <td align="center">
         <table width="720" cellspacing="0" cellpadding="0" role="presentation" style="width:100%; max-width:720px; background:#ffffff; border-radius:18px; overflow:hidden; box-shadow:0 14px 38px rgba(15, 23, 42, 0.10);">
           <tr>
-            <td style="padding:22px 26px; background:#0b3d91; color:#ffffff;">
+            <td style="padding:22px 26px; background:{{ brand_header_bg|default:'#0b3d91' }}; color:#ffffff;">
               <table width="100%" cellspacing="0" cellpadding="0" role="presentation">
                 <tr>
                   <td align="left" style="vertical-align:middle; width:140px;">
                     {% if brand_logo_url %}
-                    <img src="{{ brand_logo_url }}" alt="La Tortilla Grocery" width="120" style="display:block; max-width:120px; width:120px; height:auto; border:0;">
+                    <img src="{{ brand_logo_url }}" alt="{{ ACTIVE_BRAND_NAME|default:'La Tortilla Grocery' }}" width="120" style="display:block; max-width:120px; width:120px; height:auto; border:0;">
                     {% elif brand_logo_fallback_url %}
-                    <img src="{{ brand_logo_fallback_url }}" alt="La Tortilla Grocery" width="120" style="display:block; max-width:120px; width:120px; height:auto; border:0;">
+                    <img src="{{ brand_logo_fallback_url }}" alt="{{ ACTIVE_BRAND_NAME|default:'La Tortilla Grocery' }}" width="120" style="display:block; max-width:120px; width:120px; height:auto; border:0;">
                     {% else %}
-                    <div style="font-size:18px; font-weight:700; letter-spacing:0.04em; color:#ffffff;">LTG</div>
+                    <div style="font-size:18px; font-weight:700; letter-spacing:0.04em; color:#ffffff;">{% if DEMO_MODE %}ZYN{% else %}LTG{% endif %}</div>
                     {% endif %}
                   </td>
                   <td align="right" style="vertical-align:middle; text-align:right;">
-                    <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#ffd400; margin-bottom:6px;">La Tortilla Grocery</div>
+                    <div style="font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:{{ brand_accent|default:'#ffd400' }}; margin-bottom:6px;">{{ ACTIVE_BRAND_NAME|default:"La Tortilla Grocery" }}</div>
                     <div style="font-size:26px; font-weight:700; line-height:1.2; margin-bottom:4px; color:#ffffff;">{% block header_title %}{% endblock %}</div>
                     <div style="font-size:13px; line-height:1.5; color:#dbeafe;">{% block header_subtitle %}{% endblock %}</div>
                   </td>
@@ -45,7 +45,7 @@
           <tr>
             <td style="padding:18px 26px; background:#f8fafc; border-top:1px solid #e2e8f0; text-align:center; font-size:12px; line-height:1.6; color:#64748b;">
               {% block footer_note %}
-              {% trans "This message was sent automatically from the La Tortilla Grocery platform." %}
+              {% if DEMO_MODE %}This message was sent automatically from the {{ ACTIVE_BRAND_NAME }} Software Lab demo.{% else %}{% trans "This message was sent automatically from the La Tortilla Grocery platform." %}{% endif %}
               {% endblock %}
             </td>
           </tr>

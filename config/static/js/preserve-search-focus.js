@@ -152,11 +152,35 @@
         return false;
     }
 
+    function associatedSearchInputs(form) {
+        var inputs = [];
+        if (!form) {
+            return inputs;
+        }
+
+        form.querySelectorAll('input[type="search"], input[name="q"]').forEach(function (input) {
+            inputs.push(input);
+        });
+
+        // Inputs linked with HTML form="..." (e.g. sticky catalog search outside the form).
+        if (form.id) {
+            document.querySelectorAll(
+                'input[form="' + form.id + '"][type="search"], input[form="' + form.id + '"][name="q"]'
+            ).forEach(function (input) {
+                if (inputs.indexOf(input) === -1) {
+                    inputs.push(input);
+                }
+            });
+        }
+
+        return inputs;
+    }
+
     function trimSearchInputs(form) {
         if (!form) {
             return;
         }
-        form.querySelectorAll('input[type="search"], input[name="q"]').forEach(function (input) {
+        associatedSearchInputs(form).forEach(function (input) {
             if (isSearchLikeInput(input)) {
                 input.value = normalizeSearchQuery(input.value);
             }
@@ -251,7 +275,7 @@
                 return;
             }
 
-            form.querySelectorAll('input[type="search"], input[name="q"]').forEach(function (input) {
+            associatedSearchInputs(form).forEach(function (input) {
                 if (isExcludedSearchInput(input) || !isSearchLikeInput(input)) {
                     return;
                 }

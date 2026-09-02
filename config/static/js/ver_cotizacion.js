@@ -49,6 +49,56 @@ if (buscadorInput) {
     }
 }
 
+function formatCartMoney(value) {
+    const amount = Number(value);
+    if (!Number.isFinite(amount)) {
+        return "$0.00";
+    }
+    return "$" + amount.toFixed(2);
+}
+
+function actualizarPrecioLinea(productoId, data) {
+    const fila = document.querySelector(`#tablaProductos tbody tr[data-id="${productoId}"]`);
+    if (!fila || !data) {
+        return;
+    }
+
+    const unitEl = fila.querySelector('[data-role="unit-price"]');
+    if (unitEl) {
+        const listPrice = Number(data.precio);
+        const netPrice = Number(data.precio_unitario_neto);
+        const hasDiscount = Boolean(data.descuento_aplicado) && Number.isFinite(listPrice) && Number.isFinite(netPrice) && netPrice < listPrice;
+
+        if (hasDiscount) {
+            unitEl.innerHTML = "";
+            const struck = document.createElement("span");
+            struck.className = "text-decoration-line-through text-muted small d-block";
+            struck.textContent = formatCartMoney(listPrice);
+            const net = document.createElement("span");
+            net.className = "fw-bold text-success";
+            net.textContent = formatCartMoney(netPrice);
+            unitEl.append(struck, net);
+        } else {
+            unitEl.replaceChildren();
+            unitEl.className = "fw-bold text-success js-line-unit-price";
+            unitEl.setAttribute("data-role", "unit-price");
+            unitEl.textContent = formatCartMoney(
+                Number.isFinite(netPrice) ? netPrice : listPrice
+            );
+        }
+    }
+
+    const subtotalEl = fila.querySelector('[data-role="line-subtotal"]');
+    if (subtotalEl && data.subtotal != null) {
+        subtotalEl.textContent = formatCartMoney(data.subtotal);
+    }
+
+    const totalEl = document.getElementById("cartOrderTotal");
+    if (totalEl && data.total != null) {
+        totalEl.textContent = formatCartMoney(data.total);
+    }
+}
+
 function actualizarEstadoPromocion(productoId, promo) {
     const fila = document.querySelector(`#tablaProductos tbody tr[data-id="${productoId}"]`);
     if (!fila) {
@@ -124,6 +174,7 @@ function actualizarCantidad(productoId, accion, cantidad) {
         if (input) {
             input.value = data.cantidad;
         }
+        actualizarPrecioLinea(productoId, data);
         actualizarEstadoPromocion(productoId, data.promo);
         return data;
     });
@@ -169,6 +220,10 @@ document.querySelectorAll(".presentacion-select").forEach(select => {
         })
         .then(response => response.json())
         .then(data => {
+            if (data && data.error) {
+                return;
+            }
+            actualizarPrecioLinea(producto_id, data);
             actualizarEstadoPromocion(producto_id, data.promo);
         });
 
@@ -213,7 +268,14 @@ document.querySelectorAll(".eliminar-btn").forEach(btn => {
         .then(data => {
 
             fila.remove();
-            document.getElementById("contadorCarrito").textContent = data.total_items;
+            const cartBadge = document.getElementById("contadorCarrito");
+            if (cartBadge) {
+                cartBadge.textContent = data.total_items;
+            }
+            const cartBadgeDesktop = document.getElementById("contadorCarritoDesktop");
+            if (cartBadgeDesktop) {
+                cartBadgeDesktop.textContent = data.total_items;
+            }
             
             // Actualizar el total de productos en el panel lateral
             const totalProductosElement = document.getElementById("totalProductos");
@@ -222,6 +284,10 @@ document.querySelectorAll(".eliminar-btn").forEach(btn => {
                 const lang = document.documentElement.lang || 'es';
                 const labelText = lang === 'en' ? 'Total products' : 'Total de productos';
                 totalProductosElement.textContent = labelText + ": " + data.total_items;
+            }
+            const totalEl = document.getElementById("cartOrderTotal");
+            if (totalEl && data.total != null) {
+                totalEl.textContent = formatCartMoney(data.total);
             }
 
         });

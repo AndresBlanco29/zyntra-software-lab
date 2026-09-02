@@ -1157,8 +1157,19 @@ def _build_quickbooks_preview_context(*, request):
     }
 
 
+def _as_count_summary(value, *, count_key='updated'):
+    """Normalize legacy/mock summaries that store bare ints instead of dicts."""
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, bool):
+        return {}
+    if isinstance(value, (int, float)):
+        return {count_key: int(value)}
+    return {}
+
+
 def _sync_history_import_details(entity_summary):
-    entity_summary = entity_summary if isinstance(entity_summary, dict) else {}
+    entity_summary = _as_count_summary(entity_summary)
     actions = ('created', 'updated', 'skipped', 'failed', 'conflict')
     details = {
         action: entity_summary.get(f'{action}_samples') or []
@@ -1173,14 +1184,17 @@ def _sync_history_import_details(entity_summary):
 
 def _build_sync_history_row(sync_run):
     summary = sync_run.summary if isinstance(sync_run.summary, dict) else {}
-    import_summary = summary.get('import') or {}
-    export_summary = summary.get('export') or {}
-    customers = import_summary.get('customers') or {}
-    items = import_summary.get('items') or {}
-    invoices = import_summary.get('invoices') or {}
-    invoice_status = import_summary.get('invoice_status') or {}
-    export_customers = export_summary.get('customers') or {}
-    export_items = export_summary.get('presentations') or {}
+    import_summary = summary.get('import') if isinstance(summary.get('import'), dict) else {}
+    export_summary = summary.get('export') if isinstance(summary.get('export'), dict) else {}
+    customers = _as_count_summary(import_summary.get('customers'))
+    items = _as_count_summary(import_summary.get('items'))
+    invoices = _as_count_summary(import_summary.get('invoices'))
+    invoice_status = _as_count_summary(import_summary.get('invoice_status'))
+    export_customers = _as_count_summary(export_summary.get('customers'), count_key='success')
+    export_items = _as_count_summary(
+        export_summary.get('presentations', export_summary.get('items')),
+        count_key='success',
+    )
     customers_details = _sync_history_import_details(customers)
     items_details = _sync_history_import_details(items)
     invoices_details = _sync_history_import_details(invoices)
@@ -1234,7 +1248,12 @@ def _build_sync_history_row(sync_run):
 
 
 def _build_quickbooks_center_context(*, request):
-    maybe_maintain_quickbooks_connection()
+    from config.integrations.quickbooks.mock import ensure_mock_connection, is_quickbooks_mock_enabled
+
+    if is_quickbooks_mock_enabled():
+        ensure_mock_connection()
+    else:
+        maybe_maintain_quickbooks_connection()
     dashboard_context = get_dashboard_sync_context(request=request)
     preview_context = _build_quickbooks_preview_context(request=request)
     conflicts = QuickBooksImportConflict.objects.all()
@@ -1440,6 +1459,16 @@ def update_backup_schedule_preference(request):
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def quickbooks_login(request):
+    from config.integrations.quickbooks.mock import ensure_mock_connection, is_quickbooks_mock_enabled
+
+    if is_quickbooks_mock_enabled():
+        connection = ensure_mock_connection()
+        messages.success(
+            request,
+            _('QuickBooks mock connected for Software Lab. Realm ID: %(realm)s')
+            % {'realm': connection.realm_id},
+        )
+        return redirect('quickbooks_center')
     if not quickbooks_credentials_configured():
         messages.error(request, quickbooks_credentials_setup_message())
         redirect_to = _resolve_dashboard_redirect(request) or reverse('quickbooks_center')
@@ -1486,6 +1515,23 @@ def quickbooks_status(request):
 @require_GET
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def quickbooks_test_connection(request):
+    from config.integrations.quickbooks.mock import ensure_mock_connection, is_quickbooks_mock_enabled
+
+    if is_quickbooks_mock_enabled():
+        ensure_mock_connection()
+        result = _status_payload(
+            connection_status=get_connection_status(),
+            connected=True,
+            company={
+                'CompanyName': 'Zyntra Software Lab (Mock)',
+                'Country': 'US',
+                'demo_mock': True,
+            },
+        )
+        if _resolve_dashboard_redirect(request):
+            return _response_or_redirect(request, operation='test_connection', result=result)
+        return JsonResponse(result)
+
     if not quickbooks_credentials_configured():
         setup_message = quickbooks_credentials_setup_message()
         if _resolve_dashboard_redirect(request):
@@ -1702,7 +1748,23 @@ def quickbooks_import_accounting_documents_to_local(request):
 @require_POST
 @internal_permission_required('admin.dashboard.view', 'backoffice.dashboard.view')
 def quickbooks_start_task(request):
+    from config.integrations.quickbooks.mock import is_quickbooks_mock_enabled, start_mock_background_task
+
     operation = str(request.POST.get('operation') or '').strip()
+    force_full = str(request.POST.get('mode') or '').strip().lower() == 'full'
+    if is_quickbooks_mock_enabled():
+        if not operation:
+            return _response_or_redirect(request, operation='task_start', error='Unsupported operation', status_code=400)
+        task_id = start_mock_background_task(
+            operation=operation or 'alignment_sync_to_local',
+            force_full=force_full,
+        )
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in (
+            request.headers.get('Accept') or ''
+        ):
+            return JsonResponse({'success': True, 'task_id': task_id, 'demo_mock': True})
+        messages.success(request, _('Mock QuickBooks synchronization started.'))
+        return redirect('quickbooks_center')
     if operation in {'import_accounting_documents_to_local', 'import_invoices_to_local'}:
         blocked = _guard_quickbooks_accounting_import(request, operation='task_start')
         if blocked is not None:
@@ -1716,7 +1778,6 @@ def quickbooks_start_task(request):
         limit = _parse_quickbooks_import_limit(limit_raw, default=None)
     except Exception:
         limit = None
-    force_full = str(request.POST.get('mode') or '').strip().lower() == 'full'
     skip_images = _quickbooks_import_skip_images(request)
 
     # map allowed operations to internal functions

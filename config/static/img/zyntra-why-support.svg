@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800" role="img" aria-label="Zyntra support">
+  <defs>
+    <linearGradient id="bg4" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#0A1F2C"/>
+      <stop offset="100%" stop-color="#0B4F63"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="800" fill="url(#bg4)"/>
+  <circle cx="320" cy="300" r="110" fill="none" stroke="#2DD4BF" stroke-width="18"/>
+  <path d="M210 300a110 110 0 0 1 220 0" fill="none" stroke="#5EEAD4" stroke-width="18" stroke-linecap="round"/>
+  <rect x="190" y="280" width="40" height="70" rx="16" fill="#5EEAD4"/>
+  <rect x="410" y="280" width="40" height="70" rx="16" fill="#5EEAD4"/>
+  <rect x="250" y="480" width="140" height="90" rx="28" fill="#14B8A6"/>
+  <rect x="280" y="510" width="80" height="16" rx="8" fill="#041018" opacity="0.35"/>
+  <circle cx="500" cy="180" r="40" fill="#2DD4BF" opacity="0.25"/>
+</svg>

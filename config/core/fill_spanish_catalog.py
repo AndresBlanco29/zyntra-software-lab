@@ -183,6 +183,42 @@ MANUAL_EN_TO_ES = {
     'Authorized by': 'Autorizado por',
     'Comment': 'Comentario',
     'Comment / observation (optional)': 'Comentario / observación (opcional)',
+    'Selling below cost — pending authorization': 'Venta a pérdida — autorización pendiente',
+    'One or more products are priced below cost. A supervisor already authorized this exception.': (
+        'Uno o más productos están por debajo del costo. Un supervisor ya autorizó esta excepción.'
+    ),
+    'One or more products are priced below cost. Your order changes are saved; generating an invoice still requires supervisor authorization.': (
+        'Uno o más productos están por debajo del costo. Los cambios de la orden ya están guardados; '
+        'generar la factura aún requiere autorización de un supervisor.'
+    ),
+    'Authorize now': 'Autorizar ahora',
+    'Approves the exception without re-saving the full order grid. The action is recorded in the Audit Trail.': (
+        'Aprueba la excepción sin volver a guardar toda la grilla de la orden. La acción queda registrada en el historial de auditoría.'
+    ),
+    'Ask a supervisor with permission to authorize selling below cost before generating an invoice. Your order edits remain saved.': (
+        'Pide a un supervisor con permiso que autorice la venta a pérdida antes de generar la factura. '
+        'Tus ediciones de la orden permanecen guardadas.'
+    ),
+    'Order saved. One or more products are sold below cost and require supervisor authorization before generating an invoice.': (
+        'Orden guardada. Uno o más productos se venden a pérdida y requieren autorización de un supervisor antes de generar la factura.'
+    ),
+    'Selling below cost was authorized. You can continue to invoice when ready.': (
+        'La venta a pérdida quedó autorizada. Puedes continuar a facturar cuando estés listo.'
+    ),
+    'This order no longer has products sold below cost.': 'Esta orden ya no tiene productos vendidos a pérdida.',
+    'Pending authorization': 'Autorización pendiente',
+    'Optional when saving: authorize in the same save if you already have supervisor approval. Otherwise save first, then use Authorize now.': (
+        'Opcional al guardar: autoriza en el mismo guardado si ya tienes aprobación de supervisor. '
+        'Si no, guarda primero y luego usa Autorizar ahora.'
+    ),
+    'Authorize selling below cost with Authorize now (or in the invoice form) before generating the invoice. Order edits are already saved.': (
+        'Autoriza la venta a pérdida con Autorizar ahora (o en el formulario de factura) antes de generar la factura. '
+        'Las ediciones de la orden ya están guardadas.'
+    ),
+    'Invoice generation is blocked because one or more products are sold below cost. Order edits remain saved until a supervisor authorizes the exception.': (
+        'La generación de factura está bloqueada porque uno o más productos se venden a pérdida. '
+        'Las ediciones de la orden permanecen guardadas hasta que un supervisor autorice la excepción.'
+    ),
 }
 
 

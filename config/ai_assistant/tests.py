@@ -879,3 +879,183 @@ class ToolRuntimeTests(TestCase):
 
         self.assertNotIn('error', message.lower())
         self.assertIn('intentarlo nuevamente', message)
+
+
+@override_settings(
+    DEMO_MODE=True,
+    AI_ASSISTANT_ENABLED=True,
+    AI_ASSISTANT_PROVIDER='mock',
+    DEMO_BRAND_NAME='Zyntra',
+)
+class DemoZyntraAssistantTests(TestCase):
+    def setUp(self):
+        self.config = AssistantConfiguration.get_solo()
+        self.config.enabled = False
+        self.config.assistant_name = 'Isabella'
+        self.config.save(update_fields=['enabled', 'assistant_name'])
+
+    def test_context_exposes_zyntra_guide_without_ltg(self):
+        response = self.client.get(reverse('ai_assistant_context'), {'language': 'en', 'page': 'home'})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload['enabled'])
+        self.assertTrue(payload['demo_assistant'])
+        self.assertEqual(payload['assistant_name'], 'Zyntra Guide')
+        self.assertIn('Zyntra', payload['welcome_message'])
+        self.assertNotIn('Isabella', payload['welcome_message'])
+        self.assertNotIn('La Tortilla', payload['welcome_message'])
+
+    def test_message_uses_mock_not_openai(self):
+        created = self.client.post(
+            reverse('ai_assistant_create_conversation'),
+            data=json.dumps({'page': 'home', 'language': 'en'}),
+            content_type='application/json',
+        )
+        conversation_id = created.json()['conversation_id']
+        with patch('config.ai_assistant.services.orchestrator.OpenAIClient') as client_cls:
+            reply = self.client.post(
+                reverse('ai_assistant_conversation_message', args=[conversation_id]),
+                data=json.dumps({'message': 'tell me about QuickBooks'}),
+                content_type='application/json',
+            )
+        self.assertEqual(reply.status_code, 200)
+        client_cls.assert_not_called()
+        body = reply.json()
+        self.assertIn('QuickBooks', body['message'])
+        self.assertIn('mock', body['message'].lower())
+        last = AssistantMessage.objects.filter(
+            conversation__public_id=conversation_id,
+            role=AssistantMessage.ROLE_ASSISTANT,
+        ).latest('created_at')
+        self.assertEqual(last.model, 'zyntra-demo-mock')
+
+
+class LanguageDetectionTests(TestCase):
+    def test_spanish_message_is_detected_as_es(self):
+        from config.ai_assistant.services.language import detect_message_language
+
+        self.assertEqual(
+            detect_message_language('Cómo puedo saber precios de tus productos'),
+            'es',
+        )
+
+    def test_english_message_is_detected_as_en(self):
+        from config.ai_assistant.services.language import detect_message_language
+
+        self.assertEqual(
+            detect_message_language('How can I see your product prices?'),
+            'en',
+        )
+
+    def test_spanish_message_switches_conversation_from_english(self):
+        from config.ai_assistant.models import AssistantConversation
+        from config.ai_assistant.services.language import sync_conversation_language_from_message
+
+        conversation = AssistantConversation.objects.create(visitor_id=uuid.uuid4(), language='en')
+        language = sync_conversation_language_from_message(
+            conversation,
+            'Pero quiero obtener la información por este medio',
+        )
+
+        self.assertEqual(language, 'es')
+        conversation.refresh_from_db()
+        self.assertEqual(conversation.language, 'es')
+
+
+class PriceAccessIntentTests(TestCase):
+    def _conversation(self, language='es'):
+        from config.ai_assistant.models import AssistantConversation
+
+        return AssistantConversation.objects.create(visitor_id=uuid.uuid4(), language=language)
+
+    def test_how_to_see_prices_is_not_a_catalog_search(self):
+        from config.ai_assistant.services.intent_router import resolve_intent
+
+        intent = resolve_intent(
+            conversation=self._conversation(),
+            message='Cómo puedo saber precios de tus productos',
+            context={'authenticated': False},
+        )
+
+        self.assertEqual(intent, 'price_access')
+
+    def test_platform_howto_without_product_is_price_access(self):
+        from config.ai_assistant.services.intent_router import resolve_intent
+
+        intent = resolve_intent(
+            conversation=self._conversation(),
+            message='Pero quiero obtener la información por este medio',
+            context={'authenticated': False},
+        )
+
+        self.assertEqual(intent, 'price_access')
+
+    def test_named_product_price_question_still_searches_catalog(self):
+        from config.ai_assistant.services.intent_router import resolve_intent
+
+        intent = resolve_intent(
+            conversation=self._conversation(),
+            message='quiero el precio de jarritos mango',
+            context={'authenticated': False},
+        )
+
+        self.assertEqual(intent, 'product_search')
+
+    def test_purchase_handler_skips_conversational_fragments(self):
+        from config.ai_assistant.models import AssistantConversation
+        from config.ai_assistant.services.orchestrator import _purchase_intent_result
+
+        request = RequestFactory().post('/')
+        request.user = AnonymousUser()
+        conversation = AssistantConversation.objects.create(visitor_id=uuid.uuid4(), language='es')
+
+        result = _purchase_intent_result(
+            request,
+            conversation,
+            {'authenticated': False, 'page': 'home'},
+            'Cómo puedo saber precios de tus productos',
+            '',
+        )
+
+        self.assertIsNone(result)
+
+    def test_price_access_reply_is_warm_and_offers_whatsapp(self):
+        from config.ai_assistant.models import AssistantConfiguration
+        from config.ai_assistant.services.orchestrator import _price_access_result
+
+        config = AssistantConfiguration.get_solo()
+        config.support_whatsapp = '14045550100'
+        config.save(update_fields=['support_whatsapp'])
+
+        result = _price_access_result({'authenticated': False}, language='es')
+
+        self.assertIn('WhatsApp', result['message'])
+        self.assertIn('cuenta aprobada', result['message'].lower())
+        self.assertEqual(
+            result['suggested_actions'][0]['label'],
+            'Iniciar sesión',
+        )
+        self.assertTrue(
+            any(
+                action['label'] == 'Hablar con el gerente de ventas por WhatsApp'
+                for action in result['suggested_actions']
+            )
+        )
+
+    def test_price_access_reply_follows_english(self):
+        from config.ai_assistant.models import AssistantConfiguration
+        from config.ai_assistant.services.orchestrator import _price_access_result
+
+        config = AssistantConfiguration.get_solo()
+        config.support_whatsapp = '14045550100'
+        config.save(update_fields=['support_whatsapp'])
+
+        result = _price_access_result({'authenticated': False}, language='en')
+
+        self.assertIn('approved account', result['message'].lower())
+        self.assertTrue(
+            any(
+                action['label'] == 'Talk with sales manager on WhatsApp'
+                for action in result['suggested_actions']
+            )
+        )

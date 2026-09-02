@@ -22,7 +22,30 @@ PROJECT_ROOT = BASE_DIR.parent
 
 from dotenv import load_dotenv
 
+# Capture isolation-critical process env BEFORE dotenv so Railway/shell values
+# cannot be silently overwritten by a copied production .env on a DEMO host.
+_PRE_DOTENV_ISOLATION = {
+    key: os.environ.get(key)
+    for key in (
+        'DEMO_MODE',
+        'SHOWCASE_MODE',
+        'QUICKBOOKS_PROVIDER',
+        'QUICKBOOKS_ENVIRONMENT',
+        'QUICKBOOKS_CLIENT_ID',
+        'QUICKBOOKS_CLIENT_SECRET',
+        'QUICKBOOKS_REDIRECT_URI',
+        'DEMO_DISABLE_OUTBOUND_EMAIL',
+        'DEMO_CANONICAL_DOMAIN',
+        'DEMO_RAILWAY_DOMAIN',
+        'DEMO_USE_SQLITE',
+    )
+}
+
 load_dotenv(PROJECT_ROOT / '.env', override=True)
+
+for _key, _value in _PRE_DOTENV_ISOLATION.items():
+    if _value is not None:
+        os.environ[_key] = _value
 
 
 def env_bool(name, default=False):
@@ -44,6 +67,33 @@ def env_int(name, default=0):
 LOCALE_PATHS = [
     BASE_DIR / "locale",
 ]
+
+# ========================
+# DEMO / SOFTWARE LAB
+# ========================
+# DEMO_MODE must stay False in La Tortilla Grocery production.
+# When True, boot guards forbid QuickBooks production and harden outbound services.
+from config.config.demo import (  # noqa: E402
+    normalize_quickbooks_provider,
+    validate_demo_quickbooks_isolation,
+)
+
+DEMO_MODE = env_bool('DEMO_MODE', False)
+SHOWCASE_MODE = env_bool('SHOWCASE_MODE', False)
+DEMO_ENVIRONMENT_LABEL = (
+    os.environ.get('DEMO_ENVIRONMENT_LABEL') or 'SOFTWARE LAB'
+).strip() or 'SOFTWARE LAB'
+DEMO_BRAND_NAME = (os.environ.get('DEMO_BRAND_NAME') or 'Zyntra').strip() or 'Zyntra'
+DEMO_BRAND_LEGAL_NAME = (
+    os.environ.get('DEMO_BRAND_LEGAL_NAME') or DEMO_BRAND_NAME
+).strip() or DEMO_BRAND_NAME
+DEMO_BRAND_TAGLINE = (
+    os.environ.get('DEMO_BRAND_TAGLINE') or 'B2B distribution operations platform'
+).strip() or 'B2B distribution operations platform'
+DEMO_DISABLE_OUTBOUND_EMAIL = env_bool('DEMO_DISABLE_OUTBOUND_EMAIL', DEMO_MODE)
+DEMO_ALLOW_CLOUDINARY = env_bool('DEMO_ALLOW_CLOUDINARY', False)
+# Local Software Lab: force SQLite even if .env still has LTG MySQL credentials.
+DEMO_USE_SQLITE = env_bool('DEMO_USE_SQLITE', False)
 
 # ========================
 # SEGURIDAD
@@ -81,15 +131,32 @@ if not DEBUG and (not _SECRET_KEY_ENV or _SECRET_KEY_ENV == 'django-insecure-dev
 SERVE_MEDIA = env_bool('SERVE_MEDIA', True)
 
 # Dominio canónico (sin www). Se usa en ALLOWED_HOSTS, CSRF y el middleware de redirección.
-CANONICAL_DOMAIN = 'latortillagroceryapp.com'
+# DEMO never inherits the LTG production domain unless explicitly set via env.
+if DEMO_MODE:
+    CANONICAL_DOMAIN = (
+        os.environ.get('DEMO_CANONICAL_DOMAIN')
+        or os.environ.get('CANONICAL_DOMAIN')
+        or ''
+    ).strip()
+else:
+    CANONICAL_DOMAIN = 'latortillagroceryapp.com'
 
 # ---- ALLOWED_HOSTS ----
 allowed_hosts = os.environ.get('ALLOWED_HOSTS', '')
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts.split(',') if host.strip()]
 
-railway_domain = 'tortilla-erp-production.up.railway.app'
-for _host in (railway_domain, CANONICAL_DOMAIN, f'www.{CANONICAL_DOMAIN}'):
-    if _host not in ALLOWED_HOSTS:
+if DEMO_MODE:
+    # Never auto-append La Tortilla Grocery production hosts in DEMO.
+    railway_domain = (os.environ.get('DEMO_RAILWAY_DOMAIN') or '').strip()
+    _auto_hosts = [host for host in (railway_domain, CANONICAL_DOMAIN) if host]
+    if CANONICAL_DOMAIN:
+        _auto_hosts.append(f'www.{CANONICAL_DOMAIN}')
+else:
+    railway_domain = 'tortilla-erp-production.up.railway.app'
+    _auto_hosts = [railway_domain, CANONICAL_DOMAIN, f'www.{CANONICAL_DOMAIN}']
+
+for _host in _auto_hosts:
+    if _host and _host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(_host)
 
 if DEBUG:
@@ -101,11 +168,17 @@ if DEBUG:
 csrf_trusted_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
 CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_trusted_origins.split(',') if origin.strip()]
 
-for _origin in (
-    f'https://{railway_domain}',
-    f'https://{CANONICAL_DOMAIN}',
-    f'https://www.{CANONICAL_DOMAIN}',
-):
+_csrf_auto_origins = []
+if railway_domain:
+    _csrf_auto_origins.append(f'https://{railway_domain}')
+if CANONICAL_DOMAIN:
+    _csrf_auto_origins.extend(
+        (
+            f'https://{CANONICAL_DOMAIN}',
+            f'https://www.{CANONICAL_DOMAIN}',
+        )
+    )
+for _origin in _csrf_auto_origins:
     if _origin not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(_origin)
 
@@ -207,18 +280,27 @@ LOGIN_URL = '/login/'
 OPENAI_API_KEY = (os.environ.get('OPENAI_API_KEY') or '').strip()
 OPENAI_API_BASE_URL = (os.environ.get('OPENAI_API_BASE_URL') or 'https://api.openai.com/v1').strip()
 AI_ASSISTANT_ENABLED = env_bool('AI_ASSISTANT_ENABLED', False)
+AI_ASSISTANT_PROVIDER = (os.environ.get('AI_ASSISTANT_PROVIDER') or 'live').strip().lower()
 AI_ASSISTANT_OPENAI_TIMEOUT_SECONDS = env_int('AI_ASSISTANT_OPENAI_TIMEOUT_SECONDS', 25)
 AI_ASSISTANT_MAX_MESSAGE_CHARS = env_int('AI_ASSISTANT_MAX_MESSAGE_CHARS', 2000)
 AI_ASSISTANT_MAX_MESSAGES_PER_HOUR = env_int('AI_ASSISTANT_MAX_MESSAGES_PER_HOUR', 30)
 AI_ASSISTANT_CHAT_MODEL = (os.environ.get('AI_ASSISTANT_CHAT_MODEL') or 'gpt-4.1-mini').strip()
 AI_ASSISTANT_EMBEDDING_MODEL = (os.environ.get('AI_ASSISTANT_EMBEDDING_MODEL') or 'text-embedding-3-small').strip()
 AI_ASSISTANT_ROLLOUT_PERCENT = max(0, min(env_int('AI_ASSISTANT_ROLLOUT_PERCENT', 100), 100))
+# DEMO: Zyntra Guide is mock-only (no OpenAI / no LTG traffic).
+if DEMO_MODE:
+    if os.environ.get('AI_ASSISTANT_PROVIDER') is None or AI_ASSISTANT_PROVIDER not in {'mock', 'live'}:
+        AI_ASSISTANT_PROVIDER = 'mock'
+    # Keep the demo FAB usable; live OpenAI is never the default here.
+    if AI_ASSISTANT_PROVIDER == 'mock':
+        AI_ASSISTANT_ENABLED = True
 
 # ========================
 # CORS
 # ========================
 
-CORS_ALLOW_ALL_ORIGINS = env_bool('CORS_ALLOW_ALL_ORIGINS', True)
+# DEMO must not default to wide-open CORS.
+CORS_ALLOW_ALL_ORIGINS = env_bool('CORS_ALLOW_ALL_ORIGINS', False if DEMO_MODE else True)
 
 # ========================
 # URLS / TEMPLATES
@@ -238,6 +320,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'config.notificaciones.context_processors.workspace_urgent_alerts',
+                'config.core.context_processors.demo_environment',
             ],
         },
     },
@@ -273,6 +356,18 @@ QUICKBOOKS_REDIRECT_URI = os.environ.get(
     'http://127.0.0.1:8000/quickbooks/callback/',
 ).strip()
 QUICKBOOKS_ENVIRONMENT = os.environ.get('QUICKBOOKS_ENVIRONMENT', 'sandbox').strip().lower() or 'sandbox'
+QUICKBOOKS_PROVIDER = normalize_quickbooks_provider(
+    os.environ.get('QUICKBOOKS_PROVIDER'),
+    demo_mode=DEMO_MODE,
+)
+validate_demo_quickbooks_isolation(
+    demo_mode=DEMO_MODE,
+    quickbooks_environment=QUICKBOOKS_ENVIRONMENT,
+    quickbooks_provider=QUICKBOOKS_PROVIDER,
+)
+# Showcase mock never uses the Intuit production API host.
+if DEMO_MODE and QUICKBOOKS_PROVIDER == 'mock' and QUICKBOOKS_ENVIRONMENT == 'production':
+    QUICKBOOKS_ENVIRONMENT = 'sandbox'
 QUICKBOOKS_SCOPES = tuple(
     scope.strip()
     for scope in os.environ.get('QUICKBOOKS_SCOPES', 'com.intuit.quickbooks.accounting').split()
@@ -301,6 +396,8 @@ mysql_configured = bool(
     and mysql_host
     and (mysql_password is not None)
 )
+if DEMO_MODE and DEMO_USE_SQLITE:
+    mysql_configured = False
 
 if mysql_configured:
     DATABASES = {
@@ -320,10 +417,11 @@ if mysql_configured:
         }
     }
 else:
+    _sqlite_name = BASE_DIR / ('db_demo.sqlite3' if DEMO_MODE else 'db.sqlite3')
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+            'NAME': _sqlite_name,
             'CONN_MAX_AGE': 0,
         }
     }
@@ -397,6 +495,8 @@ else:
     staticfiles_backend = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 USE_CLOUDINARY_MEDIA = env_bool('USE_CLOUDINARY_MEDIA', False)
+if DEMO_MODE and not DEMO_ALLOW_CLOUDINARY:
+    USE_CLOUDINARY_MEDIA = False
 
 STORAGES = {
     'default': {
@@ -491,7 +591,12 @@ CREDIT_HOLD_TEST_EMAIL = (os.environ.get('CREDIT_HOLD_TEST_EMAIL') or '').strip(
 APP_BASE_URL = os.environ.get('APP_BASE_URL', '').rstrip('/')
 if not APP_BASE_URL:
     # Emails need an absolute site URL for logo/images when APP_BASE_URL is unset.
-    APP_BASE_URL = 'http://127.0.0.1:8000' if DEBUG else f'https://{CANONICAL_DOMAIN}'
+    if DEMO_MODE:
+        APP_BASE_URL = 'http://127.0.0.1:8000' if DEBUG else (
+            f'https://{CANONICAL_DOMAIN}' if CANONICAL_DOMAIN else 'http://127.0.0.1:8000'
+        )
+    else:
+        APP_BASE_URL = 'http://127.0.0.1:8000' if DEBUG else f'https://{CANONICAL_DOMAIN}'
 
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '')
 TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
@@ -500,16 +605,30 @@ TWILIO_WHATSAPP_FROM = os.environ.get('TWILIO_WHATSAPP_FROM', '')
 
 # Remitente: debe ser un correo de tu dominio verificado en Resend.
 # Ej: 'Pedidos LTG <pedidos@tudominio.com>'
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Pedidos LTG <pedidos@latortillagroceryapp.com>')
+DEFAULT_FROM_EMAIL = os.environ.get(
+    'DEFAULT_FROM_EMAIL',
+    f'{DEMO_BRAND_NAME} Software Lab <noreply@example.com>' if DEMO_MODE else 'Pedidos LTG <pedidos@latortillagroceryapp.com>',
+)
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
 # Shared mailbox for new order notifications. Without it every admin/backoffice
 # user received a copy in their personal inbox.
+_default_order_notification = 'demo-orders@example.com' if DEMO_MODE else 'ltgordersapp@gmail.com'
 ORDER_NOTIFICATION_EMAILS = [
     address.strip()
-    for address in os.environ.get('ORDER_NOTIFICATION_EMAILS', 'ltgordersapp@gmail.com').split(',')
+    for address in os.environ.get('ORDER_NOTIFICATION_EMAILS', _default_order_notification).split(',')
     if address.strip()
 ]
+if DEMO_MODE:
+    ORDERS_NOTIFICATION_EMAIL = os.environ.get('ORDERS_NOTIFICATION_EMAIL', 'demo-orders@example.com')
+    # Never send real email from Showcase / Software Lab by default.
+    if DEMO_DISABLE_OUTBOUND_EMAIL:
+        EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+        ANYMAIL = {'RESEND_API_KEY': ''}
+        TWILIO_ACCOUNT_SID = ''
+        TWILIO_AUTH_TOKEN = ''
+        TWILIO_SMS_FROM = ''
+        TWILIO_WHATSAPP_FROM = ''
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGGING = {

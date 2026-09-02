@@ -1,0 +1,24 @@
+{% load i18n %}
+<form method="get" class="card reports-filter-card mb-3 no-print">
+  <div class="card-body row g-3 align-items-end">
+    <div class="col-md-3">
+      <label class="form-label small fw-semibold">{% trans "Period" %}</label>
+      <select name="period" class="form-select form-select-sm" id="reports-period-select">
+        {% for key, label in period_choices %}
+        <option value="{{ key }}" {% if period.preset == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3 reports-custom-dates">
+      <label class="form-label small fw-semibold">{% trans "Start" %}</label>
+      <input type="date" name="start_date" class="form-control form-control-sm" value="{{ period.start_date|date:'Y-m-d' }}">
+    </div>
+    <div class="col-md-3 reports-custom-dates">
+      <label class="form-label small fw-semibold">{% trans "End" %}</label>
+      <input type="date" name="end_date" class="form-control form-control-sm" value="{{ period.end_date|date:'Y-m-d' }}">
+    </div>
+    <div class="col-md-3">
+      <button type="submit" class="btn btn-primary btn-sm w-100">{% trans "Apply" %}</button>
+    </div>
+  </div>
+</form>

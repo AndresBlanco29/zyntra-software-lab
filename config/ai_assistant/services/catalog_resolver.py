@@ -20,6 +20,9 @@ RELATED_TERMS = {
     'litro': 'lt',
 }
 
+MAX_CATALOG_RESULTS = 50
+FUZZY_TOKEN_THRESHOLD = 0.78
+
 
 PACKAGING_WORDS = (
     'cajas', 'caja', 'unidades', 'unidad', 'paquetes', 'paquete', 'bultos', 'bulto',
@@ -32,6 +35,11 @@ def normalize_catalog_term(value):
     text = unicodedata.normalize('NFKD', str(value or '').lower())
     text = ''.join(char for char in text if not unicodedata.combining(char))
     return re.sub(r'[^a-z0-9]+', ' ', text).strip()
+
+
+def _compact_catalog_term(value):
+    """Canonical comparison form that also ignores spaces and punctuation."""
+    return normalize_catalog_term(value).replace(' ', '')
 
 
 def strip_quantity_noise(value):
@@ -62,6 +70,7 @@ def _stem(token):
 
 def _score(query, *values):
     query = normalize_catalog_term(query)
+    compact_query = _compact_catalog_term(query)
     best = 0.0
     for value in values:
         candidate = normalize_catalog_term(value)
@@ -73,6 +82,10 @@ def _score(query, *values):
             best = max(best, 0.9 + min(len(query) / max(len(candidate), 1), 0.09))
         else:
             best = max(best, SequenceMatcher(None, query, candidate).ratio())
+        # "jarri-tos", "jarri tos" and "jarritos" refer to the same family.
+        compact_candidate = _compact_catalog_term(candidate)
+        if compact_query and compact_candidate:
+            best = max(best, SequenceMatcher(None, compact_query, compact_candidate).ratio())
     return best
 
 
@@ -89,6 +102,21 @@ def catalog_tokens(value):
     return _query_tokens(value)
 
 
+def _fuzzy_token_overlap(query_tokens, candidate_tokens):
+    """Return a tolerant token match score for small customer spelling mistakes."""
+    if not query_tokens or not candidate_tokens:
+        return 0.0
+    matches = []
+    for query_token in query_tokens:
+        best = max(
+            (SequenceMatcher(None, query_token, candidate_token).ratio()
+             for candidate_token in candidate_tokens),
+            default=0.0,
+        )
+        matches.append(best if best >= FUZZY_TOKEN_THRESHOLD else 0.0)
+    return sum(matches) / len(query_tokens)
+
+
 def _size_tokens(value):
     normalized = normalize_catalog_term(value).replace('litros', 'lt').replace('litro', 'lt')
     return set(re.findall(r'\b\d+\s*(?:lt|l|oz|ml)\b', normalized)) | set(re.findall(r'\b\d+\s+\d+(?:lt|l|oz|ml)\b', normalized))
@@ -100,18 +128,28 @@ def _product_score(query, product):
         names.extend([product.marca.nombre, product.marca.nombre_en])
     names.extend(presentation.nombre for presentation in product.presentaciones.all())
     normalized_query = normalize_catalog_term(query)
+    compact_query = _compact_catalog_term(query)
+    compact_query_forms = {compact_query, _stem(compact_query)}
     query_tokens = _query_tokens(query)
     candidate_tokens = set().union(*(_query_tokens(name) for name in names if name))
     token_overlap = len(query_tokens & candidate_tokens) / max(len(query_tokens), 1)
+    fuzzy_token_overlap = _fuzzy_token_overlap(query_tokens, candidate_tokens)
+    compact_match = any(
+        any(form and form in _compact_catalog_term(name) for form in compact_query_forms)
+        for name in names if name
+    )
+    token_match = 1.0 if compact_match else max(token_overlap, fuzzy_token_overlap)
     fuzzy = _score(normalized_query, *names)
     query_sizes = _size_tokens(query)
     candidate_sizes = set().union(*(_size_tokens(name) for name in names if name))
     size_bonus = 0.22 if query_sizes and query_sizes & candidate_sizes else 0
     exact_bonus = 0.35 if normalize_catalog_term(product.nombre) == normalized_query else 0
     contains_bonus = 0.18 if normalized_query in normalize_catalog_term(product.nombre) else 0
-    score = min(1.0, (token_overlap * 0.58) + (fuzzy * 0.25) + size_bonus + exact_bonus + contains_bonus)
+    score = min(1.0, (token_match * 0.58) + (fuzzy * 0.25) + size_bonus + exact_bonus + contains_bonus)
     return score, {
         'token_overlap': round(token_overlap, 3),
+        'fuzzy_token_overlap': round(fuzzy_token_overlap, 3),
+        'compact_match': compact_match,
         'fuzzy_score': round(fuzzy, 3),
         'size_match': bool(query_sizes and query_sizes & candidate_sizes),
     }
@@ -170,7 +208,7 @@ def _term_predicate(term):
     )
 
 
-def _candidates_for(predicate, limit=80):
+def _candidates_for(predicate, limit=500):
     return list(
         Producto.objects.filter(activo=True).filter(predicate).distinct()
         .select_related('marca', 'categoria')
@@ -178,8 +216,8 @@ def _candidates_for(predicate, limit=80):
     )
 
 
-def find_products(query, *, cliente=None, limit=10):
-    """Find catalog products from canonical data, aliases and bounded fuzzy ranking."""
+def find_products(query, *, cliente=None, limit=MAX_CATALOG_RESULTS):
+    """Find catalog products, retaining every confirmed variant in the request family."""
     query = str(query or '').strip()
     if not normalize_catalog_term(query):
         return {'query': query, 'products': [], 'related_products': []}
@@ -205,13 +243,16 @@ def find_products(query, *, cliente=None, limit=10):
         for token in sorted(_query_tokens(search_query)):
             if len(token) >= 4:
                 token_predicate |= _term_predicate(token)
+                # A four-character prefix obtains the right catalog family even
+                # when a customer adds, drops, hyphenates or separates letters.
+                token_predicate |= _term_predicate(token[:4])
         if token_predicate:
-            candidates = _candidates_for(token_predicate, limit=120)
+            candidates = _candidates_for(token_predicate)
 
-    # Last resort: rank a bounded active catalog set.
+    # Last resort: rank active catalog products using typo-tolerant token matching.
     if not candidates:
         candidates = list(
-            Producto.objects.filter(activo=True).select_related('marca', 'categoria').prefetch_related('presentaciones')[:400]
+            Producto.objects.filter(activo=True).select_related('marca', 'categoria').prefetch_related('presentaciones')[:500]
         )
     ranked = sorted(
         (

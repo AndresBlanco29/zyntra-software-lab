@@ -6,12 +6,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% trans "Order History" %}</title>
 
+<link rel="icon" type="image/png" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
+<link rel="apple-touch-icon" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
+
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
 <link rel="stylesheet" href="{% static 'css/ver_cotizacion.css' %}">
+{% if DEMO_MODE %}<link rel="stylesheet" href="{% static 'css/zyntra-demo.css' %}">{% endif %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+{% if DEMO_MODE %}<script defer src="{% static 'js/demo-chrome-offset.js' %}"></script>{% endif %}
 </head>
-<body>
+<body
+class="{% if DEMO_MODE %}demo-brand{% endif %}"
+data-page="order-history">
+
+{% include "includes/demo_environment_banner.html" %}
 
 <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
   <div class="container-fluid">
@@ -20,7 +29,7 @@
     </button>
 
     <a class="navbar-brand fw-bold" href="{% url 'catalogo' %}">
-      La Tortilla Grocery
+      {% include "includes/brand_name.html" %}
     </a>
 
     <div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">

@@ -13,23 +13,23 @@
   data-catalog-url="{% url 'catalogo' %}?promociones=1"
   data-login-failure-url="{% url 'ai_assistant_login_failure' %}"
   data-delete-history-url="{% url 'ai_assistant_delete_history' %}"
-  aria-label="{% trans 'La Tortilla Grocery assistant' %}"
+  {% if DEMO_MODE %}data-demo-assistant="1"{% endif %}
+  aria-label="{% if DEMO_MODE %}{% blocktrans with brand=DEMO_BRAND_NAME %}{{ brand }} demo assistant{% endblocktrans %}{% else %}{% trans 'La Tortilla Grocery assistant' %}{% endif %}"
 >
-  <button type="button" class="ai-assistant-launcher" data-ai-launcher aria-expanded="false" aria-controls="aiAssistantPanel" aria-label="{% trans 'Open Isabella, your virtual assistant' %}">
-    <img src="{% static 'img/ai-assistant-isabella-avatar.png' %}" alt="" aria-hidden="true">
+  <button type="button" class="ai-assistant-launcher{% if DEMO_MODE %} ai-assistant-launcher--zyntra{% endif %}" data-ai-launcher aria-expanded="false" aria-controls="aiAssistantPanel" aria-label="{% if DEMO_MODE %}{% trans 'Open Zyntra Guide, your demo assistant' %}{% else %}{% trans 'Open Isabella, your virtual assistant' %}{% endif %}">
+    <img src="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/ai-assistant-isabella-avatar.png' %}{% endif %}" alt="" aria-hidden="true">
   </button>
-  <div class="ai-assistant-panel" id="aiAssistantPanel" data-ai-panel role="dialog" aria-modal="false" aria-label="{% trans 'AI Assistant' %}">
+  <div class="ai-assistant-panel{% if DEMO_MODE %} ai-assistant-panel--zyntra{% endif %}" id="aiAssistantPanel" data-ai-panel role="dialog" aria-modal="false" aria-label="{% if DEMO_MODE %}{% trans 'Zyntra Guide' %}{% else %}{% trans 'AI Assistant' %}{% endif %}">
     <header class="ai-assistant-header d-flex align-items-center justify-content-between gap-2">
       <div>
-        <strong data-ai-name>{% trans "Assistant" %}</strong>
-        <div class="small" data-ai-brand>La Tortilla Grocery LLC</div>
+        <strong data-ai-name>{% if DEMO_MODE %}{% trans "Zyntra Guide" %}{% else %}{% trans "Assistant" %}{% endif %}</strong>
+        <div class="small" data-ai-brand>{% if DEMO_MODE %}{% trans "Software Lab demo · fictitious help" %}{% else %}{% include "includes/brand_legal_name.html" %}{% endif %}</div>
       </div>
       <div class="ai-assistant-header-actions d-flex align-items-center gap-2">
         <div class="ai-assistant-lang" role="group" aria-label="{% trans 'Assistant language' %}">
           <button type="button" class="ai-assistant-lang__btn" data-ai-lang="en" aria-pressed="false">EN</button>
           <button type="button" class="ai-assistant-lang__btn" data-ai-lang="es" aria-pressed="false">ES</button>
         </div>
-        <button class="btn btn-sm btn-outline-light" type="button" data-ai-delete-history data-ai-i18n="clear">{% trans "Clear" %}</button>
         <button class="btn btn-sm btn-light ai-assistant-close" type="button" data-ai-close data-ai-i18n="close" aria-label="{% trans 'Close assistant' %}">{% trans "Close" %}</button>
       </div>
     </header>
@@ -37,12 +37,12 @@
     <div class="ai-assistant-actions" data-ai-actions></div>
     <a class="ai-assistant-whatsapp" data-ai-whatsapp hidden target="_blank" rel="noopener noreferrer">
       <i class="bi bi-whatsapp" aria-hidden="true"></i>
-      <span data-ai-i18n="whatsapp">Talk with sales manager on WhatsApp</span>
+      <span data-ai-whatsapp-label>{% trans "Chat on WhatsApp" %}</span>
     </a>
     <form class="ai-assistant-form" data-ai-form>
       <label class="visually-hidden" for="aiAssistantInput">{% trans "Message" %}</label>
-      <textarea class="form-control" id="aiAssistantInput" data-ai-input maxlength="2000" placeholder="How can I help you?" data-ai-i18n-placeholder="placeholder"></textarea>
-      <button class="btn btn-primary" type="submit" data-ai-i18n="send">{% trans "Send" %}</button>
+      <input id="aiAssistantInput" class="form-control" type="text" data-ai-input maxlength="2000" autocomplete="off" placeholder="{% if DEMO_MODE %}{% trans 'Ask about the demo…' %}{% else %}{% trans 'Type your message…' %}{% endif %}">
+      <button class="btn btn-primary" type="submit" data-ai-send>{% trans "Send" %}</button>
     </form>
   </div>
 </section>

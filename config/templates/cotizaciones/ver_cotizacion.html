@@ -6,19 +6,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% trans "My Order" %}</title>
 
-<link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
-<link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
+<link rel="icon" type="image/png" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
+<link rel="apple-touch-icon" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
 
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
 <link rel="stylesheet" href="{% static 'css/ver_cotizacion.css' %}">
+{% if DEMO_MODE %}<link rel="stylesheet" href="{% static 'css/zyntra-demo.css' %}">{% endif %}
 {% include "includes/searchable_selects_assets.html" %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
 <script defer src="{% static 'js/language-session.js' %}"></script>
+{% if DEMO_MODE %}<script defer src="{% static 'js/demo-chrome-offset.js' %}"></script>{% endif %}
 
 </head>
 
 <body
+class="{% if DEMO_MODE %}demo-brand{% endif %}"
 data-actualizar-url="{% url 'actualizar_cantidad' %}"
 data-eliminar-url="{% url 'eliminar_producto' %}"
 data-presentacion-url="{% url 'cambiar_presentacion' %}"
@@ -27,6 +30,8 @@ data-msg-promo-active="{% trans 'Promotion active: your discount will be applied
 data-msg-promo-minimum="{% trans 'This promotion requires a minimum purchase of {minimum} units. You currently have {current}, so the discount will not be applied.' %}"
 data-csrf="{{ csrf_token }}"
 data-page="my-order">
+
+{% include "includes/demo_environment_banner.html" %}
 
 <!-- NAVBAR -->
 <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm" id="appNavbar">
@@ -37,7 +42,7 @@ data-page="my-order">
 </button>
 
 <a class="navbar-brand fw-bold">
-La Tortilla Grocery
+{% include "includes/brand_name.html" %}
 </a>
 
 <div class="ms-auto cot-navbar-actions">
@@ -140,7 +145,9 @@ autocomplete="off">
 <tr>
 <th>{% trans "Product" %}</th>
 <th>{% trans "Presentation" %}</th>
+<th class="text-end">{% trans "Your price" %}</th>
 <th>{% trans "Quantity" %}</th>
+<th class="text-end">{% trans "Subtotal" %}</th>
 <th>{% trans "Actions" %}</th>
 </tr>
 </thead>
@@ -236,6 +243,18 @@ data-tipo="{{ p.tipo_contenido_traducido|lower }}"
 
 </td>
 
+<td data-label="{% trans 'Your price' %}" class="text-end cart-price-cell">
+{% if item.es_regalo %}
+<span class="fw-bold text-success js-line-unit-price" data-role="unit-price">$0.00</span>
+{% elif item.descuento_aplicado and item.descuento_monto %}
+<div class="js-line-unit-price" data-role="unit-price">
+  <span class="text-decoration-line-through text-muted small d-block">${{ item.precio|floatformat:2 }}</span>
+  <span class="fw-bold text-success">${{ item.precio_unitario_neto|floatformat:2 }}</span>
+</div>
+{% else %}
+<span class="fw-bold text-success js-line-unit-price" data-role="unit-price">${{ item.precio|floatformat:2 }}</span>
+{% endif %}
+</td>
 
 <td data-label="{% trans 'Quantity' %}">
 
@@ -261,6 +280,9 @@ aria-label="{% trans 'Quantity' %}"
 
 </td>
 
+<td data-label="{% trans 'Subtotal' %}" class="text-end cart-subtotal-cell">
+<span class="fw-bold js-line-subtotal" data-role="line-subtotal">${{ item.subtotal|floatformat:2 }}</span>
+</td>
 
 <td data-label="{% trans 'Actions' %}">
 
@@ -317,6 +339,12 @@ aria-label="{% trans 'Quantity' %}"
 <h6 class="text-muted" id="totalProductos">
 {% trans "Total products" %}: {{ carrito|length }}
 </h6>
+
+<div class="d-flex justify-content-between align-items-baseline mt-3 mb-1">
+  <span class="fw-semibold">{% trans "Estimated total" %}</span>
+  <span class="fs-5 fw-bold text-success" id="cartOrderTotal">${{ cart_total|default:0|floatformat:2 }}</span>
+</div>
+<p class="small text-muted mb-0">{% trans "Based on your assigned prices. Final total is confirmed after review." %}</p>
 
 <hr>
 
@@ -382,9 +410,14 @@ aria-label="{% trans 'Quantity' %}"
             {% trans "Our team will review your request and contact you if any adjustment is needed before processing." %}
           </p>
         </div>
-        <button type="button" class="btn w-100" onclick="irAlCatalogo()" style="background: linear-gradient(to right, #ffe600, #c7c700); border: none; color: #1e293b; font-weight: 700; padding: 12px 20px; border-radius: 8px;">
-          {% trans "Back to Catalog" %}
-        </button>
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-yellow w-100" id="btnVerOrdenEnviada" style="font-weight: 700; padding: 12px 20px; border-radius: 8px;">
+            {% trans "View my order request" %}
+          </button>
+          <button type="button" class="btn btn-outline-secondary w-100" onclick="irAlCatalogo()">
+            {% trans "Back to Catalog" %}
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -430,8 +463,19 @@ function irAlCatalogo() {
   window.location.href = '{% url "catalogo" %}';
 }
 
+let ultimaOrdenEnviadaUrl = '{% url "cliente_cotizaciones_recibidas" %}';
+
+function irAOrdenEnviada() {
+  window.location.href = ultimaOrdenEnviadaUrl || '{% url "cliente_cotizaciones_recibidas" %}';
+}
+
 // Intercept form submit
 document.addEventListener('DOMContentLoaded', function() {
+  const btnVerOrden = document.getElementById('btnVerOrdenEnviada');
+  if (btnVerOrden) {
+    btnVerOrden.addEventListener('click', irAOrdenEnviada);
+  }
+
   const formularioCotizacion = document.querySelector('form[action="{% url "guardar_cotizacion" %}"]');
   
   if (formularioCotizacion) {
@@ -465,6 +509,9 @@ document.addEventListener('DOMContentLoaded', function() {
           data = {};
         }
         if (response.ok && data.success) {
+          if (data.detail_url) {
+            ultimaOrdenEnviadaUrl = data.detail_url;
+          }
           const noticeBox = document.getElementById('cotizacionEmailNotice');
           const noticeText = document.getElementById('cotizacionEmailNoticeText');
           if (noticeBox && noticeText && data.email_notice) {
@@ -542,7 +589,7 @@ document.addEventListener('DOMContentLoaded', function () {
         </h5>
         
         <p class="text-muted mb-0" style="font-size: 1rem;">
-          {% trans "You will be logged out of" %} <strong>La Tortilla Grocery</strong>
+          {% trans "You will be logged out of" %} <strong>{% include "includes/brand_name.html" %}</strong>
         </p>
       </div>
       

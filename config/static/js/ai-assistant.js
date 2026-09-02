@@ -400,6 +400,8 @@
     function dismissProactive() {
       markDismissedThisSession();
       setPanelOpen(false);
+      // Closing the sheet must leave the circular launcher visible for reopen.
+      if (launcher) launcher.hidden = false;
       const url = root.dataset.dismissUrl;
       if (!url) return;
       jsonFetch(url, { method: "POST", body: "{}" }).catch(function () {});
@@ -506,9 +508,15 @@
         .then(function (response) { return response.json(); })
         .then(function (context) {
           if (!context.enabled) {
-            launcher.hidden = true;
+            // Hide only if the visitor never opened the panel; never strip the FAB
+            // out from under an already-open (or just-closed) chat session.
+            if (!panel.classList.contains("is-open") && !conversationId) {
+              launcher.hidden = true;
+              setPanelOpen(false);
+            }
             return;
           }
+          launcher.hidden = false;
           root.querySelector("[data-ai-name]").textContent = context.assistant_name;
           if (context.language) {
             persistLanguage(context.language);
@@ -520,7 +528,7 @@
               .then(function () {
                 if (renderResumedThread()) {
                   renderPendingEvent(root, context, messages, actions);
-                  // Existing thread = customer already met Isabella; stay minimized.
+                  // Existing thread = customer already met the assistant; stay minimized.
                   return;
                 }
                 renderInitialMessage(context, options);
@@ -564,6 +572,7 @@
     launcher.addEventListener("click", function () {
       const opening = !panel.classList.contains("is-open");
       if (opening) clearDismissedThisSession();
+      launcher.hidden = false;
       boot();
       setPanelOpen(opening);
       if (!opening) dismissProactive();
@@ -581,7 +590,7 @@
       const href = String(link.getAttribute("href") || "");
       const goingToCatalog = /catalogo|catalog|product/i.test(href);
       if (goingToCatalog) {
-        // Customer chose to shop — keep Isabella available via the bubble, not as a popup.
+        // Customer chose to shop — keep the assistant available via the bubble, not as a popup.
         markDismissedThisSession();
         if (root.dataset.dismissUrl) {
           jsonFetch(root.dataset.dismissUrl, { method: "POST", body: "{}" }).catch(function () {});
@@ -680,6 +689,10 @@
       }
       sendMessage(false)
         .then(function (result) {
+          if (result.language) {
+            persistLanguage(result.language);
+            applyChromeLanguage();
+          }
           appendMessage(messages, result.message, false);
           renderPromotionCards(messages, result.promotion_cards, root.dataset.catalogUrl);
           renderActions(actions, result.suggested_actions);
@@ -701,18 +714,20 @@
       }
     });
 
-    deleteHistory.addEventListener("click", function () {
-      jsonFetch(root.dataset.deleteHistoryUrl, { method: "POST", body: "{}" })
-        .then(function () {
-          conversationId = "";
-          messages.replaceChildren();
-          actions.replaceChildren();
-          appendMessage(messages, uiCopy().historyCleared, false);
-        })
-        .catch(function (error) {
-          appendMessage(messages, error.message || uiCopy().historyError, false);
-        });
-    });
+    if (deleteHistory) {
+      deleteHistory.addEventListener("click", function () {
+        jsonFetch(root.dataset.deleteHistoryUrl, { method: "POST", body: "{}" })
+          .then(function () {
+            conversationId = "";
+            messages.replaceChildren();
+            actions.replaceChildren();
+            appendMessage(messages, uiCopy().historyCleared, false);
+          })
+          .catch(function (error) {
+            appendMessage(messages, error.message || uiCopy().historyError, false);
+          });
+      });
+    }
 
   });
 }());

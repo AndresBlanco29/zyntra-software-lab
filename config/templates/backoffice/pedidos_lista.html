@@ -138,7 +138,16 @@
                         <td><span class="badge {{ row.status_badge_class }}">{{ row.status_label }}</span></td>
                         <td>${{ row.total }}</td>
                         <td>{{ row.date|date:"m/d/Y H:i" }}</td>
-                        <td><a href="{{ row.detail_url }}" class="btn btn-sm btn-outline-primary">{% trans "Open" %}</a></td>
+                        <td>
+                          <div class="d-flex flex-wrap gap-1">
+                            <a href="{{ row.detail_url }}" class="btn btn-sm btn-outline-primary">{% trans "Open" %}</a>
+                            {% if row.record_type == 'order' %}
+                            <a href="{% url 'backoffice_pedido_pdf' row.source_id %}" class="btn btn-sm btn-outline-secondary">{% trans "Export PDF" %}</a>
+                            {% elif row.record_type == 'quote' %}
+                            <a href="{% url 'backoffice_cotizacion_pdf' row.source_id %}" class="btn btn-sm btn-outline-secondary">{% trans "Export PDF" %}</a>
+                            {% endif %}
+                          </div>
+                        </td>
                       </tr>
                       {% endfor %}
                     </tbody>
@@ -221,7 +230,14 @@
           <td data-label="{% trans 'Total' %}">${{ row.total }}</td>
           <td data-label="{% if view_mode == 'sent-to-driver' %}{% trans 'Sent to driver' %}{% else %}{% trans 'Date' %}{% endif %}">{{ row.date|date:"m/d/Y H:i" }}</td>
           <td data-label="{% trans 'Action' %}" class="mobile-stack-table__action">
-            <a href="{{ row.detail_url }}" class="btn btn-sm btn-warning">{% trans "Manage" %}</a>
+            <div class="d-flex flex-wrap gap-1">
+              <a href="{{ row.detail_url }}" class="btn btn-sm btn-warning">{% trans "Manage" %}</a>
+              {% if row.record_type == 'order' %}
+              <a href="{% url 'backoffice_pedido_pdf' row.source_id %}" class="btn btn-sm btn-outline-secondary">{% trans "Export PDF" %}</a>
+              {% elif row.record_type == 'quote' %}
+              <a href="{% url 'backoffice_cotizacion_pdf' row.source_id %}" class="btn btn-sm btn-outline-secondary">{% trans "Export PDF" %}</a>
+              {% endif %}
+            </div>
           </td>
         </tr>
         {% empty %}

@@ -426,6 +426,16 @@ background:#f3f4f6;
     border: none;
 }
 
+.cart-price-cell,
+.cart-subtotal-cell {
+    white-space: nowrap;
+    min-width: 5.5rem;
+}
+
+#cartOrderTotal {
+    letter-spacing: 0.01em;
+}
+
 /* BOTÓN AMARILLO */
 .btn-yellow {
     background-color: #ffd400;

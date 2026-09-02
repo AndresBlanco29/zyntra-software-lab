@@ -8,15 +8,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<title>La Tortilla Grocery</title>
+<title>{% if DEMO_MODE %}{{ DEMO_BRAND_NAME }}{% else %}La Tortilla Grocery{% endif %}</title>
 
-<link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
-<link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
+<link rel="icon" type="image/png" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
+<link rel="apple-touch-icon" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
 
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
 <link rel="stylesheet" href="{% static 'css/home.css' %}">
 <link rel="stylesheet" href="{% static 'css/tax-example.css' %}">
 <link rel="stylesheet" href="{% static 'css/state-selector.css' %}">
+{% if DEMO_MODE %}<link rel="stylesheet" href="{% static 'css/zyntra-demo.css' %}">{% endif %}
 {% include "includes/searchable_selects_assets.html" %}
 <script defer src="{% static 'js/language-session.js' %}"></script>
 <script defer src="{% static 'js/tax-example.js' %}"></script>
@@ -27,8 +28,8 @@
 
 </head>
 
-<body data-auth="{{ user.is_authenticated|yesno:'true,false' }}">
-
+<body class="{% if DEMO_MODE %}demo-brand{% endif %}" data-auth="{{ user.is_authenticated|yesno:'true,false' }}">
+{% include "includes/demo_environment_banner.html" %}
 
 <!-- HERO + NAVBAR -->
 
@@ -42,10 +43,10 @@
 
 <a class="navbar-brand fw-bold d-flex align-items-center" href="/">
 
-<img src="{% static 'img/logo.png' %}" class="logo-navbar">
+<img src="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}" class="logo-navbar{% if DEMO_MODE %} zyntra-mark{% endif %}" alt="">
 
 <span class="brand-text">
-La Tortilla Grocery LLC
+{% include "includes/brand_legal_name.html" %}
 </span>
 
 </a>
@@ -152,30 +153,35 @@ La Tortilla Grocery LLC
 <div class="col-lg-5 hero-contact-col">
   <div class="hero-contact-panel" role="group" aria-label="{% trans 'Contact options' %}">
     <a
-      href="https://wa.me/17866516897"
+      href="{% if DEMO_MODE %}{{ DEMO_WHATSAPP_URL }}{% else %}https://wa.me/17866516897{% endif %}"
       class="hero-contact-btn hero-contact-btn--whatsapp"
       target="_blank"
       rel="noopener noreferrer"
       title="{% trans 'Chat with Us on WhatsApp' %}"
-      aria-label="{% trans 'Chat with Us on WhatsApp' %}"
+      aria-label="{% if DEMO_MODE %}{% blocktrans with phone=DEMO_WHATSAPP_DISPLAY %}Chat with Us on WhatsApp at {{ phone }}{% endblocktrans %}{% else %}{% trans 'Chat with Us on WhatsApp' %}{% endif %}"
     >
       <i class="bi bi-whatsapp" aria-hidden="true"></i>
       <span>{% trans "Chat with Us" %}</span>
     </a>
 
     <a
-      href="tel:+14709672782"
+      href="{% if DEMO_MODE %}{{ DEMO_PHONE_TEL }}{% else %}tel:+14709672782{% endif %}"
       class="hero-contact-btn hero-contact-btn--call"
       title="{% trans 'Call Us' %}"
-      aria-label="{% trans 'Call Us at +1 (470) 967-2782' %}"
+      aria-label="{% if DEMO_MODE %}{% blocktrans with phone=DEMO_PHONE_DISPLAY %}Call Us at {{ phone }}{% endblocktrans %}{% else %}{% trans 'Call Us at +1 (470) 967-2782' %}{% endif %}"
     >
       <i class="bi bi-telephone-fill" aria-hidden="true"></i>
       <span>{% trans "Call Us" %}</span>
     </a>
 
     <div class="hero-contact-phones">
+      {% if DEMO_MODE %}
+      <a href="{{ DEMO_PHONE_TEL }}" class="hero-contact-phone">{{ DEMO_PHONE_DISPLAY }}</a>
+      <a href="{{ DEMO_WHATSAPP_URL }}" class="hero-contact-phone" target="_blank" rel="noopener noreferrer">{{ DEMO_WHATSAPP_DISPLAY }}</a>
+      {% else %}
       <a href="tel:+14709672782" class="hero-contact-phone">+1 (470) 967-2782</a>
       <a href="tel:+17866516897" class="hero-contact-phone">+1 (786) 651-6897</a>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -221,12 +227,18 @@ La Tortilla Grocery LLC
 {% if home_contenido %}
 {{ home_contenido.quienes_descripcion_traducido }}
 {% else %}
+{% if DEMO_MODE %}
+{{ DEMO_BRAND_NAME }} is a wholesale distribution operations platform for modern B2B teams.
+Manage catalog, inventory, orders, fulfillment, invoicing and QuickBooks from one place —
+built for demos, training and Software Lab evaluations with fictitious data only.
+{% else %}
 {% blocktrans %}
 En La Tortilla Grocery LLC, somos el aliado de confianza de los negocios latinos.
 Ofrecemos productos y servicios mayoristas de alta calidad, adaptados a sus necesidades.
 Nos enfocamos en brindar soluciones eficientes para que su negocio crezca y prospere
 en un mercado competitivo.
 {% endblocktrans %}
+{% endif %}
 {% endif %}
 
 </p>
@@ -394,8 +406,13 @@ en un mercado competitivo.
 
 <i class="bi bi-truck"></i>
 
+{% if DEMO_MODE %}
+<h6>{% trans "Ops unificadas" %}</h6>
+<p>{% trans "Pedidos, picking y entregas en un flujo" %}</p>
+{% else %}
 <h6>{% trans "Amplio Catálogo" %}</h6>
 <p>{% trans "Productos latinos de alta rotación" %}</p>
+{% endif %}
 
 </div>
 </div>
@@ -403,9 +420,13 @@ en un mercado competitivo.
 <div class="flip-box-back">
 <div class="inner">
 
+{% if DEMO_MODE %}
+<p>{% trans "Del pedido a la entrega con estados claros para demos del Software Lab." %}</p>
+{% else %}
 <p> {% trans "Entregas rápidas y seguras para mantener" %}
 {% trans "tu negocio siempre abastecido." %}
 </p>
+{% endif %}
 
 </div>
 </div>
@@ -432,8 +453,13 @@ en un mercado competitivo.
 
 <i class="bi bi-collection fs-1"></i>
 
+{% if DEMO_MODE %}
+<h6>{% trans "Catálogo demo" %}</h6>
+<p>{% trans "Marcas y presentaciones ficticias listas para explorar" %}</p>
+{% else %}
 <h6>{% trans "Variedad Garantizada" %}</h6>
 <p>{% trans "Marcas y presentaciones para surtir tu negocio" %}</p>
+{% endif %}
 
 </div>
 </div>
@@ -441,10 +467,14 @@ en un mercado competitivo.
 <div class="flip-box-back">
 <div class="inner">
 
+{% if DEMO_MODE %}
+<p>{% trans "Explora un catálogo de muestra sin datos de producción." %}</p>
+{% else %}
 <p>
 {% trans "Gran variedad de productos latinos" %}
 {% trans "listos para tu negocio." %}
 </p>
+{% endif %}
 
 </div>
 </div>
@@ -470,8 +500,13 @@ en un mercado competitivo.
 
 <i class="bi bi-currency-dollar fs-1"></i>
 
+{% if DEMO_MODE %}
+<h6>{% trans "Precios por nivel" %}</h6>
+<p>{% trans "Listas demo para evaluar márgenes B2B" %}</p>
+{% else %}
 <h6>{% trans "Precios Competitivos" %}</h6>
 <p>{% trans "Márgenes atractivos para tu negocio" %}</p>
+{% endif %}
 
 </div>
 </div>
@@ -479,10 +514,14 @@ en un mercado competitivo.
 <div class="flip-box-back">
 <div class="inner">
 
+{% if DEMO_MODE %}
+<p>{% trans "Niveles de precio ficticios para recorrer el flujo comercial completo." %}</p>
+{% else %}
 <p>
 {% trans "Precios al por mayor para maximizar" %}
 {% trans "las ganancias de tu tienda." %}
 </p>
+{% endif %}
 
 </div>
 </div>
@@ -508,8 +547,13 @@ en un mercado competitivo.
 
 <i class="bi bi-headset fs-1"></i>
 
+{% if DEMO_MODE %}
+<h6>{% trans "Soporte de demo" %}</h6>
+<p>{% trans "Guía y tour del Software Lab" %}</p>
+{% else %}
 <h6>{% trans "Atención Personalizada" %}</h6>
 <p>{% trans "Soporte directo y confiable" %}</p>
+{% endif %}
 
 </div>
 </div>
@@ -517,10 +561,14 @@ en un mercado competitivo.
 <div class="flip-box-back">
 <div class="inner">
 
+{% if DEMO_MODE %}
+<p>{% trans "Recorre el panel con el guided tour y contactos ficticios de Zyntra." %}</p>
+{% else %}
 <p>
 {% trans "Asesoría y soporte directo para" %}
 {% trans "hacer crecer tu negocio." %}
 </p>
+{% endif %}
 
 </div>
 </div>
@@ -557,7 +605,9 @@ en un mercado competitivo.
 <div class="marca-card">
 
 {% if marca.logo %}
-<img src="{{ marca.logo.url }}" class="marca-logo">
+<img src="{{ marca.logo.url }}" class="marca-logo" alt="{{ marca.nombre }}">
+{% else %}
+<span class="marca-name">{{ marca.nombre }}</span>
 {% endif %}
 
 </div>
@@ -752,7 +802,7 @@ en un mercado competitivo.
 <div class="container">
 
 <div class="title-divider">
-<span>{% trans "Use La Tortilla Grocery like an app" %}</span>
+<span>{% if DEMO_MODE %}{% blocktrans with brand=DEMO_BRAND_NAME %}Use {{ brand }} like an app{% endblocktrans %}{% else %}{% trans "Use La Tortilla Grocery like an app" %}{% endif %}</span>
 </div>
 
 <div class="install-app-shell">
@@ -774,7 +824,7 @@ en un mercado competitivo.
 <div class="install-step-card">
 <span class="install-step-number">1</span>
 <h4>{% trans "Open the site in your phone browser" %}</h4>
-<p>{% blocktrans %}Open La Tortilla Grocery on your phone using the browser you prefer.{% endblocktrans %}</p>
+<p>{% if DEMO_MODE %}{% blocktrans with brand=DEMO_BRAND_NAME %}Open {{ brand }} on your phone using the browser you prefer.{% endblocktrans %}{% else %}{% blocktrans %}Open La Tortilla Grocery on your phone using the browser you prefer.{% endblocktrans %}{% endif %}</p>
 </div>
 
 <div class="install-step-card">
@@ -798,7 +848,7 @@ class="btn install-app-primary-btn"
 data-bs-toggle="modal"
 data-bs-target="#installTutorialModal"
 data-install-video-trigger
-data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
+{% if not DEMO_MODE %}data-video-src="{% safe_static 'video/video_tutorial.mp4' %}"{% endif %}>
 {% trans "Watch video tutorial" %}
 </button>
 
@@ -828,10 +878,10 @@ data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 </div>
 
 <div class="iphone-app-icon">
-<img src="{% static 'img/logo.png' %}" alt="La Tortilla Grocery">
+<img src="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}" alt="{% include 'includes/brand_name.html' %}">
 </div>
 
-<h4>La Tortilla Grocery</h4>
+<h4>{% include "includes/brand_name.html" %}</h4>
 <p>{% trans "Fast access from your home screen" %}</p>
 
 <button
@@ -840,7 +890,7 @@ class="iphone-preview-play"
 data-bs-toggle="modal"
 data-bs-target="#installTutorialModal"
 data-install-video-trigger
-data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
+{% if not DEMO_MODE %}data-video-src="{% safe_static 'video/video_tutorial.mp4' %}"{% endif %}>
 <i class="bi bi-play-fill"></i>
 {% trans "See how to install it" %}
 </button>
@@ -1003,13 +1053,15 @@ data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 
 <div class="footer-brand">
 
-<img src="{% static 'img/logo.png' %}" class="footer-logo">
+<img src="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}" class="footer-logo{% if DEMO_MODE %} zyntra-mark{% endif %}" alt="{% include 'includes/brand_name.html' %}">
 
 <div class="footer-brand-text">
 
 <h5 class="footer-brand-name">
 {% if home_contenido %}
 {{ home_contenido.footer_empresa_titulo_traducido|linebreaksbr }}
+{% elif DEMO_MODE %}
+{{ DEMO_BRAND_NAME }}
 {% else %}
 {% trans "La Tortilla" %}<br>{% trans "Grocery" %}
 {% endif %}
@@ -1017,6 +1069,8 @@ data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 
 <p>{% if home_contenido %}
 {{ home_contenido.footer_empresa_descripcion_traducido }}
+{% elif DEMO_MODE %}
+{% blocktrans with brand=DEMO_BRAND_NAME %}{{ brand }} is a B2B distribution operations platform for Software Lab demos with fictitious data only.{% endblocktrans %}
 {% else %}
 {% trans "La Tortilla Grocery LLC es un distribuidor mayorista de productos latinos de confianza." %}
 {% trans "Abastecemos tiendas, supermercados y restaurantes con calidad, precios competitivos" %}
@@ -1074,6 +1128,9 @@ data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 {% if home_contenido %}
 {{ home_contenido.footer_contacto_direccion_linea_1 }}<br>
 {{ home_contenido.footer_contacto_direccion_linea_2 }}
+{% elif DEMO_MODE %}
+{{ DEMO_ADDRESS_LINE_1 }}<br>
+{{ DEMO_ADDRESS_LINE_2 }}
 {% else %}
 {% trans "1666 Roswell Rd Bldg 100" %}<br>
 {% trans "Marietta, GA 30062-3639" %}
@@ -1081,11 +1138,11 @@ data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 </p>
 
 <p>
-{% if home_contenido %}{{ home_contenido.footer_contacto_email }}{% else %}{% trans "latortilla@gmail.com" %}{% endif %}
+{% if home_contenido %}{{ home_contenido.footer_contacto_email }}{% elif DEMO_MODE %}{{ DEMO_EMAIL }}{% else %}{% trans "latortilla@gmail.com" %}{% endif %}
 </p>
 
 <p>
-{% if home_contenido %}{{ home_contenido.footer_contacto_telefono }}{% else %}{% trans "+1 (470) 967 2782" %}{% endif %}
+{% if home_contenido %}{{ home_contenido.footer_contacto_telefono }}{% elif DEMO_MODE %}{{ DEMO_PHONE_DISPLAY }}{% else %}{% trans "+1 (470) 967 2782" %}{% endif %}
 </p>
 
 <div class="footer-social">
@@ -1104,11 +1161,16 @@ data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 <div class="footer-bottom text-center">
 
 <p>
-{% trans "© 2025 La Tortilla Grocery LLC. Todos los derechos reservados." %}
+{% if DEMO_MODE %}© {% now "Y" %} {{ DEMO_BRAND_LEGAL_NAME }}. Software Lab demo — fictitious data.{% else %}{% trans "© 2025 La Tortilla Grocery LLC. Todos los derechos reservados." %}{% endif %}
 </p>
 
 <small>
+{% if DEMO_MODE %}
+{% if CURRENT_LANGUAGE == 'en' %}Developed by{% else %}Desarrollado por{% endif %}
+<a href="https://desirelogic.com" target="_blank" rel="noopener noreferrer">desirelogic.com</a>
+{% else %}
 {% trans "Desarrollado por Solutions.com" %}
+{% endif %}
 </small>
 
 </div>
@@ -1131,10 +1193,15 @@ data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 
             <div class="install-video-empty" data-install-video-empty>
               <div class="install-video-empty-icon">
-                <i class="bi bi-phone"></i>
+                <i class="bi bi-camera-video"></i>
               </div>
+              {% if DEMO_MODE %}
+              <h4>{% trans "Video slot ready" %}</h4>
+              <p>{% blocktrans %}This demo keeps the player area empty on purpose. In a live deployment you can mount your own MP4 or hosted tutorial here — same layout, your branding, no Tortilla footage.{% endblocktrans %}</p>
+              {% else %}
               <h4>{% trans "Your phone tutorial will appear here" %}</h4>
               <p>{% blocktrans %}This section is already prepared. Once your recording is ready, we can connect the video and this space will show the step by step guide to install the website like an app.{% endblocktrans %}</p>
+              {% endif %}
             </div>
           </div>
         </div>
@@ -1142,7 +1209,7 @@ data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
         <div class="install-tutorial-copy-panel">
           <div class="install-app-badge">{% trans "Your phone" %}</div>
           <h3>{% trans "Install it in under a minute" %}</h3>
-          <p>{% blocktrans %}This guide is designed so any customer can save La Tortilla Grocery to their home screen and use it as a daily shortcut.{% endblocktrans %}</p>
+          <p>{% if DEMO_MODE %}{% blocktrans with brand=DEMO_BRAND_NAME %}This guide is designed so any customer can save {{ brand }} to their home screen and use it as a daily shortcut.{% endblocktrans %}{% else %}{% blocktrans %}This guide is designed so any customer can save La Tortilla Grocery to their home screen and use it as a daily shortcut.{% endblocktrans %}{% endif %}</p>
 
           <ul class="install-tutorial-checklist">
             <li>{% trans "Open the website in your preferred browser on your phone" %}</li>
@@ -1159,12 +1226,12 @@ data-video-src="{% safe_static 'video/video_tutorial.mp4' %}">
 
 <!-- MODAL LOGIN -->
 <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content" style="background: white; border: none; border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);">
-      <button type="button" class="btn-close btn-close-dark position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close" style="z-index: 10;"></button>
-      <div id="loginFormContainer" style="padding: 2rem;">
+  <div class="modal-dialog modal-dialog-centered{% if DEMO_MODE %} auth-modal-dialog{% endif %}">
+    <div class="modal-content{% if DEMO_MODE %} auth-modal-shell{% endif %}" {% if not DEMO_MODE %}style="background: white; border: none; border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);"{% endif %}>
+      <button type="button" class="btn-close {% if DEMO_MODE %}btn-close-white{% else %}btn-close-dark{% endif %} position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close" style="z-index: 10;"></button>
+      <div id="loginFormContainer" class="{% if DEMO_MODE %}auth-modal-body{% endif %}" style="padding: 2rem;">
         <div class="text-center">
-          <div class="spinner-border" role="status">
+          <div class="spinner-border{% if DEMO_MODE %} text-light{% endif %}" role="status">
             <span class="visually-hidden">{% trans "Loading..." %}</span>
           </div>
         </div>
@@ -1370,8 +1437,7 @@ function cargarRecuperacionContrasena() {
   const loginModalElement = document.getElementById('loginModal');
   if (loginModalElement && !loginModalElement.classList.contains('show')) {
     loginModalElement.dataset.preserveContentOnShow = 'true';
-    const loginModal = new bootstrap.Modal(loginModalElement);
-    loginModal.show();
+    bootstrap.Modal.getOrCreateInstance(loginModalElement).show();
   }
 
   loadAuthModalContent(
@@ -1429,8 +1495,7 @@ function cargarConfirmacionRecuperacion(uidb64, token) {
   const loginModalElement = document.getElementById('loginModal');
   if (loginModalElement && !loginModalElement.classList.contains('show')) {
     loginModalElement.dataset.preserveContentOnShow = 'true';
-    const loginModal = new bootstrap.Modal(loginModalElement);
-    loginModal.show();
+    bootstrap.Modal.getOrCreateInstance(loginModalElement).show();
   }
 
   loadAuthModalContent(
@@ -1601,24 +1666,19 @@ function toggleLanguageMenu(){
   }
 }
 
-// Validar autenticación para agregar ofertas
+// Guest quote CTAs already use data-bs-toggle="modal". Do NOT call Modal.show()
+// again here — a double-open leaves body overflow locked after dismiss.
 document.querySelectorAll(".agregar-oferta-btn").forEach(function(btn) {
-  btn.addEventListener("click", function() {
+  btn.addEventListener("click", function(event) {
     const isAuthenticated = document.body.dataset.auth === 'true';
-    
     if (!isAuthenticated) {
-      // Mostrar el modal de login si no está autenticado
-      const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
-      if (loginModal) {
-        loginModal.show();
-      } else {
-        console.error('No se pudo inicializar el modal de login');
-      }
       return;
     }
-    
-    // Aquí iría la lógica para agregar a cotización si estuviera autenticado
-    // Por ahora solo validamos que sea un usuario autenticado
+    // Authenticated users do not need the login modal on this CTA.
+    if (btn.getAttribute('data-bs-toggle') === 'modal') {
+      event.preventDefault();
+      event.stopPropagation();
+    }
   });
 });
 
@@ -1631,8 +1691,10 @@ function cerrarErrorYReiniciar() {
   
   // Esperar a que se cierre el modal de error y abrir el modal de login nuevamente
   setTimeout(function() {
-    const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
-    loginModal.show();
+    const loginModalElement = document.getElementById('loginModal');
+    if (loginModalElement) {
+      bootstrap.Modal.getOrCreateInstance(loginModalElement).show();
+    }
   }, 300);
 }
 
@@ -1662,8 +1724,7 @@ function abrirModalRegistro() {
     return;
   }
   
-  const loginModal = new bootstrap.Modal(loginModalElement);
-  loginModal.show();
+  bootstrap.Modal.getOrCreateInstance(loginModalElement).show();
   
   // Después de que el modal se abra, cargamos el formulario de registro
   setTimeout(function() {
@@ -1685,8 +1746,7 @@ document.addEventListener('DOMContentLoaded', function() {
       loginModalElement.dataset.preserveContentOnShow = 'true';
     }
 
-    const loginModal = new bootstrap.Modal(loginModalElement);
-    loginModal.show();
+    bootstrap.Modal.getOrCreateInstance(loginModalElement).show();
 
     if (targetAuthView === 'password_reset') {
       setTimeout(function() {
@@ -1952,6 +2012,22 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
   
+  function unlockPageScrollAfterModal() {
+    // Bootstrap 5 can leave body/html overflow locked after closing login from a promo card.
+    if (document.querySelector('.modal.show')) {
+      return;
+    }
+    document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
+      backdrop.remove();
+    });
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
+    document.documentElement.classList.remove('modal-open');
+    document.documentElement.style.removeProperty('overflow');
+    document.documentElement.style.removeProperty('padding-right');
+  }
+
   // Prevenir que el modal cree entradas en el histórico
   const loginModal = document.getElementById('loginModal');
   if (loginModal) {
@@ -1967,21 +2043,18 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     loginModal.addEventListener('hidden.bs.modal', function() {
-      // Bootstrap can leave a stale backdrop after a modal opened from a carousel card.
-      // Only remove it when no other modal is currently visible.
       window.setTimeout(function() {
-        if (document.querySelector('.modal.show')) {
-          return;
-        }
-        document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
-          backdrop.remove();
-        });
-        document.body.classList.remove('modal-open');
-        document.body.style.removeProperty('padding-right');
+        unlockPageScrollAfterModal();
         delete loginModal.dataset.nextUrl;
       }, 0);
+      // Second pass: carousel/promo buttons sometimes re-lock overflow one frame later.
+      window.setTimeout(unlockPageScrollAfterModal, 50);
     });
   }
+
+  document.addEventListener('hidden.bs.modal', function() {
+    window.setTimeout(unlockPageScrollAfterModal, 0);
+  });
   
   // Detectar cuando el usuario intenta usar el botón atrás
   window.addEventListener('popstate', function(event) {
@@ -2032,12 +2105,12 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 
 <a
-  href="https://wa.me/17866516897"
+  href="{% if DEMO_MODE %}{{ DEMO_WHATSAPP_URL }}{% else %}https://wa.me/17866516897{% endif %}"
   class="whatsapp-float"
   target="_blank"
   rel="noopener noreferrer"
   title="{% trans 'Chat with Us on WhatsApp' %}"
-  aria-label="{% trans 'Chat with Us on WhatsApp' %}"
+  aria-label="{% if DEMO_MODE %}{% blocktrans with phone=DEMO_WHATSAPP_DISPLAY %}Chat with Us on WhatsApp at {{ phone }}{% endblocktrans %}{% else %}{% trans 'Chat with Us on WhatsApp' %}{% endif %}"
 >
   <i class="bi bi-whatsapp" aria-hidden="true"></i>
 </a>

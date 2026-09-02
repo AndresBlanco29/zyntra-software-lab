@@ -2,6 +2,7 @@ import json
 import logging
 from datetime import timedelta  # used by dismiss quiet window
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
@@ -129,6 +130,14 @@ def assistant_context(request):
     from config.ai_assistant.services.language import normalize_assistant_language, welcome_message_for
 
     config = AssistantConfiguration.get_solo()
+    from config.ai_assistant.services.demo_assistant import (
+        apply_demo_assistant_config,
+        demo_welcome_message,
+        is_demo_assistant_mode,
+    )
+
+    if is_demo_assistant_mode():
+        apply_demo_assistant_config(config)
     visitor_id = get_visitor_id(request)
     language = normalize_assistant_language(
         request.GET.get('language') or config.default_language or 'es'
@@ -148,15 +157,22 @@ def assistant_context(request):
     }.get(page, config.enable_customer_portal)
     # Prefer a language-matched welcome so EN customers are not greeted in Spanish
     # when the admin default welcome_message is still the Spanish template.
-    welcome = welcome_message_for(config.assistant_name, language)
-    if language == 'es' and str(config.welcome_message or '').strip():
-        welcome = config.welcome_message
+    if is_demo_assistant_mode():
+        welcome = demo_welcome_message(language)
+    else:
+        welcome = welcome_message_for(config.assistant_name, language)
+        if language == 'es' and str(config.welcome_message or '').strip():
+            welcome = config.welcome_message
+    enabled = bool(config.enabled) and bool(page_enabled) and visitor_in_rollout(visitor_id)
+    if is_demo_assistant_mode():
+        enabled = bool(getattr(settings, 'AI_ASSISTANT_ENABLED', False)) and bool(page_enabled)
     context.update({
-        'enabled': bool(config.enabled) and bool(page_enabled) and visitor_in_rollout(visitor_id),
+        'enabled': enabled,
         'assistant_name': config.assistant_name,
         'welcome_message': welcome,
         'language': language,
         'visitor_id': str(visitor_id),
+        'demo_assistant': is_demo_assistant_mode(),
     })
     response = JsonResponse(context)
     if context.get('proactive', {}).get('kind') == 'first_visit':
@@ -168,7 +184,7 @@ def assistant_context(request):
 
 @require_POST
 def dismiss_proactive(request):
-    """Customer closed Isabella / chose to explore alone — stop auto-opening for a while."""
+    """Customer closed the assistant / chose to explore alone — stop auto-opening for a while."""
     visitor_id = get_visitor_id(request)
     profile, _ = get_visitor_profile(request)
     now = timezone.now()
@@ -242,8 +258,14 @@ def create_conversation(request):
 
 @require_POST
 def conversation_message(request, public_id):
+    from config.ai_assistant.services.demo_assistant import apply_demo_assistant_config, is_demo_assistant_mode
+
     config = AssistantConfiguration.get_solo()
-    if not config.enabled or not visitor_in_rollout(get_visitor_id(request)):
+    if is_demo_assistant_mode():
+        apply_demo_assistant_config(config)
+        if not getattr(settings, 'AI_ASSISTANT_ENABLED', False):
+            return JsonResponse({'error': 'Assistant is disabled.'}, status=503)
+    elif not config.enabled or not visitor_in_rollout(get_visitor_id(request)):
         return JsonResponse({'error': 'Assistant is disabled.'}, status=503)
     if _rate_limited(request, config):
         return JsonResponse({'error': 'Message limit reached. Please try again later.'}, status=429)

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800" role="img" aria-label="Zyntra operations">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#041018"/>
+      <stop offset="55%" stop-color="#0A2E3A"/>
+      <stop offset="100%" stop-color="#0E7490"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="800" fill="url(#bg)"/>
+  <circle cx="520" cy="120" r="90" fill="#2DD4BF" opacity="0.18"/>
+  <circle cx="80" cy="680" r="120" fill="#5EEAD4" opacity="0.12"/>
+  <rect x="90" y="210" width="460" height="280" rx="28" fill="#F7FBFC" opacity="0.08" stroke="#5EEAD4" stroke-width="3"/>
+  <rect x="130" y="260" width="180" height="24" rx="12" fill="#2DD4BF"/>
+  <rect x="130" y="310" width="280" height="16" rx="8" fill="#CFE8EF" opacity="0.55"/>
+  <rect x="130" y="350" width="240" height="16" rx="8" fill="#CFE8EF" opacity="0.35"/>
+  <rect x="130" y="400" width="120" height="40" rx="12" fill="#14B8A6"/>
+  <path d="M420 470h90v140H420zM470 420h40v50h-40z" fill="#5EEAD4" opacity="0.75"/>
+  <rect x="170" y="560" width="70" height="90" rx="10" fill="#0E7490"/>
+  <rect x="260" y="530" width="70" height="120" rx="10" fill="#2DD4BF" opacity="0.85"/>
+  <rect x="350" y="580" width="70" height="70" rx="10" fill="#14B8A6"/>
+</svg>

@@ -156,7 +156,7 @@ class ReportsDashboardTests(TestCase):
 		qb_invoice = self._create_quickbooks_imported_invoice()
 		self.client.force_login(self.backoffice)
 
-		response = self.client.get(reverse('reportes_dashboard'), {'period': 'all'})
+		response = self.client.get(reverse('reportes_bi'), {'period': 'all'})
 
 		self.assertEqual(response.status_code, 200)
 		# Only the system invoice is counted, never the QuickBooks-imported one.
@@ -175,7 +175,7 @@ class ReportsDashboardTests(TestCase):
 		self._create_paid_delivery()
 		self.client.force_login(self.backoffice)
 
-		response = self.client.get(reverse('reportes_dashboard'), {'period': 'all'})
+		response = self.client.get(reverse('reportes_bi'), {'period': 'all'})
 
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.context['period']['preset'], 'all')
@@ -185,7 +185,7 @@ class ReportsDashboardTests(TestCase):
 		invoice = self._create_paid_delivery()
 		self.client.force_login(self.backoffice)
 
-		response = self.client.get(reverse('reportes_dashboard'))
+		response = self.client.get(reverse('reportes_bi'))
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, 'Reports Center')
@@ -210,7 +210,7 @@ class ReportsDashboardTests(TestCase):
 		invoice.delivery.save(update_fields=['driver'])
 		self.client.force_login(self.backoffice)
 
-		response = self.client.get(reverse('reportes_dashboard'))
+		response = self.client.get(reverse('reportes_bi'))
 
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.context['driver_rows'][0]['name'], 'Unassigned')
@@ -222,7 +222,7 @@ class ReportsDashboardTests(TestCase):
 		invoice.pedido.save(update_fields=['vendedor'])
 		self.client.force_login(self.backoffice)
 
-		response = self.client.get(reverse('reportes_dashboard'))
+		response = self.client.get(reverse('reportes_bi'))
 
 		self.assertEqual(response.status_code, 200)
 		vendor_names = [row['name'] for row in response.context['vendor_rows']]
@@ -249,7 +249,7 @@ class ReportsDashboardTests(TestCase):
 		other_driver = Usuario.objects.create_user(username='other-driver-report', password='secret123', role='driver', first_name='Other', last_name='Driver')
 		self.client.force_login(self.backoffice)
 
-		response = self.client.get(reverse('reportes_dashboard'), {'driver_id': other_driver.id, 'section': 'drivers'})
+		response = self.client.get(reverse('reportes_bi'), {'driver_id': other_driver.id, 'section': 'drivers'})
 		excel_response = self.client.get(reverse('reportes_export_excel'), {'driver_id': self.driver.id, 'section': 'drivers'})
 
 		self.assertEqual(response.status_code, 200)
@@ -287,6 +287,6 @@ class ReportsDashboardTests(TestCase):
 		vendor_user = Usuario.objects.create_user(username='vendor-no-reports', password='secret123', role='vendedor')
 		self.client.force_login(vendor_user)
 
-		response = self.client.get(reverse('reportes_dashboard'))
+		response = self.client.get(reverse('reportes_bi'))
 
 		self.assertEqual(response.status_code, 302)

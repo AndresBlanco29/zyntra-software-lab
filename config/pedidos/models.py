@@ -79,6 +79,10 @@ class Pedido(models.Model):
 		default=False,
 		help_text=_('Supervisor authorized selling one or more lines below cost on this order.'),
 	)
+	venta_perdida_requiere_autorizacion = models.BooleanField(
+		default=False,
+		help_text=_('Order has below-cost lines saved and still needs supervisor authorization before invoicing.'),
+	)
 	venta_perdida_autorizado_por = models.CharField(max_length=120, blank=True, default='')
 	venta_perdida_autorizada_por_user = models.ForeignKey(
 		settings.AUTH_USER_MODEL,

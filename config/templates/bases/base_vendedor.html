@@ -8,20 +8,26 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<title>{% block title %}{% trans "System" %}{% endblock %}</title>
+<title>{% block title %}{% if DEMO_MODE %}{{ DEMO_BRAND_NAME }}{% else %}{% trans "System" %}{% endif %}{% endblock %}</title>
 
-<link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
-<link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
+<link rel="icon" type="image/png" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
+<link rel="apple-touch-icon" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
 
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 <link rel="stylesheet" href="{% static 'css/layout_vendedor.css' %}">
+{% if DEMO_MODE %}<link rel="stylesheet" href="{% static 'css/zyntra-demo.css' %}">{% endif %}
 {% block extra_head %}{% endblock %}
 {% include "includes/searchable_selects_assets.html" %}
 
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
 <script src="{% static 'js/preserve-search-focus.js' %}"></script>
 <script defer src="{% static 'js/language-session.js' %}"></script>
+{% if DEMO_MODE %}
+<link rel="stylesheet" href="{% static 'vendor/node_modules/driver.js/dist/driver.css' %}">
+<script src="{% static 'vendor/node_modules/driver.js/dist/driver.js.iife.js' %}"></script>
+<script defer src="{% static 'js/demo-guided-tour.js' %}"></script>
+{% endif %}
 <script>
 (function () {
   const navbar = document.querySelector('.navbar-custom');
@@ -30,13 +36,17 @@
   }
 
   const root = document.documentElement;
+  const banner = document.querySelector('.demo-environment-banner');
 
   function syncPanelNavbarOffset() {
-    const height = Math.max(Math.ceil(navbar.getBoundingClientRect().height), 56);
+    const bannerHeight = banner ? Math.max(Math.round(banner.getBoundingClientRect().height), 0) : 0;
     const isMobile = window.matchMedia('(max-width: 767.98px)').matches;
     const isSmallPhone = window.matchMedia('(max-width: 576px)').matches;
     const buffer = isSmallPhone ? 28 : (isMobile ? 20 : 6);
     const topGap = isSmallPhone ? 18 : (isMobile ? 12 : 0);
+    // Banner height drives navbar padding-top; navbar height already includes that padding.
+    root.style.setProperty('--demo-banner-height', bannerHeight + 'px');
+    const height = Math.max(Math.ceil(navbar.getBoundingClientRect().height), bannerHeight + 56);
     root.style.setProperty('--panel-navbar-offset', (height + buffer) + 'px');
     root.style.setProperty('--panel-content-top-gap', topGap + 'px');
   }
@@ -54,13 +64,15 @@
 
   if (typeof ResizeObserver !== 'undefined') {
     new ResizeObserver(syncPanelNavbarOffset).observe(navbar);
+    if (banner) new ResizeObserver(syncPanelNavbarOffset).observe(banner);
   }
 })();
 </script>
 
 </head>
 
-<body>
+<body class="{% if DEMO_MODE %}demo-brand{% endif %}{% block body_class %}{% endblock %}">
+{% include "includes/demo_environment_banner.html" %}
 
 <!-- NAVBAR -->
 
@@ -73,8 +85,9 @@
 ☰
 </button>
 
-<a class="navbar-brand fw-bold">
-La Tortilla Grocery
+<a class="navbar-brand fw-bold d-flex align-items-center gap-2" data-demo-tour="brand">
+{% if DEMO_MODE %}<img src="{% static 'img/zyntra-mark.svg' %}" alt="" class="zyntra-mark" width="28" height="28">{% endif %}
+{% include "includes/brand_name.html" %}
 </a>
 </div>
 
@@ -177,7 +190,7 @@ La Tortilla Grocery
         </h5>
         
         <p class="text-muted mb-0" style="font-size: 1rem;">
-          {% trans "You will be logged out of" %} <strong>La Tortilla Grocery</strong>
+          {% trans "You will be logged out of" %} <strong>{% include "includes/brand_name.html" %}</strong>
         </p>
       </div>
       
@@ -232,16 +245,16 @@ La Tortilla Grocery
 
 <div class="modal fade" id="feedbackModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content border-0" style="border-radius: 12px; overflow: hidden;">
-      <div class="modal-header border-0" id="feedbackModalHeader" style="background: linear-gradient(135deg, #0b3d91, #2f77d1); color: #fff;">
+    <div class="modal-content border-0 feedback-modal">
+      <div class="modal-header border-0 feedback-modal__header is-success" id="feedbackModalHeader">
         <h5 class="modal-title fw-bold" id="feedbackModalTitle">{% trans "Notification" %}</h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="{% trans 'Close' %}"></button>
       </div>
-      <div class="modal-body text-center py-4" style="background: #ffffff;">
-        <p id="feedbackModalMessage" class="mb-0" style="font-size: 1rem; color: #1f2937;"></p>
+      <div class="modal-body text-center py-4 feedback-modal__body">
+        <p id="feedbackModalMessage" class="mb-0 feedback-modal__message"></p>
       </div>
-      <div class="modal-footer border-0 pt-0" style="justify-content: center;">
-        <button type="button" class="btn" data-bs-dismiss="modal" style="background: #0b3d91; color: #fff; font-weight: 600; padding: 0.45rem 1.2rem; border-radius: 8px;">
+      <div class="modal-footer border-0 pt-0 feedback-modal__footer">
+        <button type="button" class="btn feedback-modal__btn" data-bs-dismiss="modal">
           {% trans "Understood" %}
         </button>
       </div>
@@ -646,17 +659,19 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
 
+  modalHeader.classList.remove('is-error', 'is-warning', 'is-success', 'is-info');
+  modalHeader.style.background = '';
   if (tags.includes('error')) {
-    modalHeader.style.background = 'linear-gradient(135deg, #9f1239, #dc2626)';
+    modalHeader.classList.add('is-error');
     modalTitle.textContent = feedbackTranslations.error;
   } else if (tags.includes('warning')) {
-    modalHeader.style.background = 'linear-gradient(135deg, #b45309, #f59e0b)';
+    modalHeader.classList.add('is-warning');
     modalTitle.textContent = feedbackTranslations.warning;
   } else if (tags.includes('success')) {
-    modalHeader.style.background = 'linear-gradient(135deg, #0b3d91, #2f77d1)';
+    modalHeader.classList.add('is-success');
     modalTitle.textContent = feedbackTranslations.success;
   } else {
-    modalHeader.style.background = 'linear-gradient(135deg, #374151, #6b7280)';
+    modalHeader.classList.add('is-info');
     modalTitle.textContent = feedbackTranslations.info;
   }
 

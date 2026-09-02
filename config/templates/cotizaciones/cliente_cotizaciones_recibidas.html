@@ -6,12 +6,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% trans "Received Orders" %}</title>
 
+<link rel="icon" type="image/png" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
+<link rel="apple-touch-icon" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
+
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
 <link rel="stylesheet" href="{% static 'css/ver_cotizacion.css' %}">
+{% if DEMO_MODE %}<link rel="stylesheet" href="{% static 'css/zyntra-demo.css' %}">{% endif %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+{% if DEMO_MODE %}<script defer src="{% static 'js/demo-chrome-offset.js' %}"></script>{% endif %}
 </head>
-<body>
+<body
+class="{% if DEMO_MODE %}demo-brand{% endif %}"
+data-page="orders-received">
+
+{% include "includes/demo_environment_banner.html" %}
 
 <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
   <div class="container-fluid">
@@ -20,7 +29,7 @@
     </button>
 
     <a class="navbar-brand fw-bold" href="{% url 'catalogo' %}">
-      La Tortilla Grocery
+      {% include "includes/brand_name.html" %}
     </a>
 
     <div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">
@@ -70,34 +79,42 @@
             {% trans "Confirmed Orders" %}
             {% elif view_mode == 'cancelled' %}
             {% trans "Cancelled Orders" %}
+            {% elif view_mode == 'pending' %}
+            {% trans "Awaiting your confirmation" %}
             {% else %}
-            {% trans "Pending Orders" %}
+            {% trans "My order requests" %}
             {% endif %}
           </h3>
           <p class="text-muted mb-0">
             {% if view_mode == 'confirmed' %}
-            {% trans "Review the orders you already confirmed with BackOffice." %}
+            {% trans "Orders you already confirmed with BackOffice." %}
             {% elif view_mode == 'cancelled' %}
-            {% trans "Review the orders you cancelled and keep as reference." %}
+            {% trans "Cancelled order requests kept for reference." %}
+            {% elif view_mode == 'pending' %}
+            {% trans "Orders BackOffice returned for you to review and confirm." %}
             {% else %}
-            {% trans "Review the orders pending your confirmation from BackOffice." %}
+            {% trans "Track every request you sent: received, under review, or returned for confirmation." %}
             {% endif %}
           </p>
         </div>
-        <span class="badge text-bg-warning px-3 py-2">{% trans "Pending" %}: {{ pendientes_count }}</span>
+        <span class="badge text-bg-primary px-3 py-2">{% trans "Active" %}: {{ active_count }}</span>
       </div>
 
-      <div class="btn-group mb-3" role="group" aria-label="{% trans 'Order views' %}">
-        <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn {% if view_mode == 'pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">
-          {% trans "Pending Orders" %}
+      <div class="btn-group mb-3 flex-wrap" role="group" aria-label="{% trans 'Order views' %}">
+        <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn {% if view_mode == 'active' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+          {% trans "Active requests" %}
+          <span class="badge {% if view_mode == 'active' %}bg-light text-dark{% else %}bg-primary{% endif %} ms-1">{{ active_count }}</span>
+        </a>
+        <a href="{% url 'cliente_cotizaciones_recibidas' %}?view=pending" class="btn {% if view_mode == 'pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">
+          {% trans "Returned" %}
           <span class="badge {% if view_mode == 'pending' %}bg-light text-dark{% else %}bg-warning text-dark{% endif %} ms-1">{{ pendientes_count }}</span>
         </a>
         <a href="{% url 'cliente_cotizaciones_recibidas' %}?view=confirmed" class="btn {% if view_mode == 'confirmed' %}btn-success{% else %}btn-outline-success{% endif %}">
-          {% trans "Confirmed Orders" %}
+          {% trans "Confirmed" %}
           <span class="badge {% if view_mode == 'confirmed' %}bg-light text-success{% else %}bg-success{% endif %} ms-1">{{ confirmed_count }}</span>
         </a>
         <a href="{% url 'cliente_cotizaciones_recibidas' %}?view=cancelled" class="btn {% if view_mode == 'cancelled' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
-          {% trans "Cancelled Orders" %}
+          {% trans "Cancelled" %}
           <span class="badge {% if view_mode == 'cancelled' %}bg-light text-secondary{% else %}bg-secondary{% endif %} ms-1">{{ cancelled_count }}</span>
         </a>
       </div>
@@ -124,17 +141,14 @@
                     <small class="text-muted">{{ cotizacion.fecha|date:"m/d/Y H:i" }}</small>
                   </td>
                   <td>
-                    {% if cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}
-                    <span class="badge text-bg-warning">{% trans "Pending confirmation" %}</span>
-                    {% elif cotizacion.estado == 'CONFIRMADA_CLIENTE' %}
-                    <span class="badge text-bg-success">{% trans "Confirmed" %}</span>
-                    {% elif cotizacion.estado == 'CANCELADA_CLIENTE' %}
-                    <span class="badge text-bg-secondary">{% trans "Cancelled" %}</span>
-                    {% else %}
-                    <span class="badge text-bg-light text-dark">{{ cotizacion.get_estado_display }}</span>
+                    <span class="badge text-bg-{{ cotizacion.customer_status.badge }}">
+                      {{ cotizacion.customer_status.label }}
+                    </span>
+                    {% if cotizacion.customer_status.hint %}
+                    <div class="small text-muted mt-1">{{ cotizacion.customer_status.hint }}</div>
                     {% endif %}
                   </td>
-                  <td>${{ cotizacion.total }}</td>
+                  <td class="fw-semibold text-success">${{ cotizacion.total|floatformat:2 }}</td>
                   <td>{{ cotizacion.items.count }}</td>
                   <td class="text-end">
                     <a href="{% url 'cliente_cotizacion_recibida_detalle' cotizacion.token_cliente %}" data-ai-tour="quote-open" class="btn btn-sm {% if cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}btn-yellow{% elif cotizacion.estado == 'CONFIRMADA_CLIENTE' %}btn-outline-success{% else %}btn-outline-primary{% endif %}">
@@ -160,8 +174,10 @@
         {% trans "You do not have any confirmed orders yet." %}
         {% elif view_mode == 'cancelled' %}
         {% trans "You do not have any cancelled orders yet." %}
+        {% elif view_mode == 'pending' %}
+        {% trans "You do not have any orders returned for confirmation yet." %}
         {% else %}
-        {% trans "You do not have any pending orders from BackOffice." %}
+        {% trans "You have not sent any order requests yet. Add products in the catalog and submit My Order." %}
         {% endif %}
       </div>
       {% endif %}

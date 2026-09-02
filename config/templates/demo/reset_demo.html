@@ -1,0 +1,44 @@
+{% load i18n static %}
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% trans "Reset Demo" %} · {{ DEMO_BRAND_NAME }}</title>
+  <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/zyntra-demo.css' %}">
+</head>
+<body class="demo-brand">
+{% include "includes/demo_environment_banner.html" %}
+<main class="container py-5" style="max-width: 640px;">
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-4">
+      <h1 class="h3 mb-2">{% trans "Reset Demo" %}</h1>
+      <p class="text-muted">
+        {% blocktrans with brand=DEMO_BRAND_NAME %}
+        Restores the {{ brand }} Software Lab dataset to its film-ready showcase state.
+        Visitor changes in this demo database will be replaced.
+        {% endblocktrans %}
+      </p>
+      <form method="post" class="mt-4">
+        {% csrf_token %}
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" value="yes" name="understand" id="understand" required>
+          <label class="form-check-label" for="understand">
+            {% trans "I understand this will restore the fictitious showcase dataset." %}
+          </label>
+        </div>
+        <label class="form-label" for="confirmation">
+          {% blocktrans with phrase=confirmation_phrase %}Type {{ phrase }} to confirm{% endblocktrans %}
+        </label>
+        <input class="form-control mb-3" id="confirmation" name="confirmation" autocomplete="off" required>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary">{% trans "Restore showcase data" %}</button>
+          <a class="btn btn-outline-secondary" href="{% url 'panel_admin' %}">{% trans "Cancel" %}</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</main>
+</body>
+</html>

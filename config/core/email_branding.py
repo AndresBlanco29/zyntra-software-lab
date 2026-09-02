@@ -17,6 +17,11 @@ EMAIL_LOGO_STATIC_CANDIDATES = (
 	'img/logo.png',
 )
 
+DEMO_EMAIL_LOGO_STATIC_CANDIDATES = (
+	'img/zyntra-mark.svg',
+	'img/logo.png',
+)
+
 
 def get_app_base_url():
 	configured = (getattr(settings, 'APP_BASE_URL', '') or '').rstrip('/')
@@ -31,14 +36,19 @@ def get_app_base_url():
 
 
 def resolve_email_logo_static_path():
-	for relative in EMAIL_LOGO_STATIC_CANDIDATES:
+	candidates = (
+		DEMO_EMAIL_LOGO_STATIC_CANDIDATES
+		if getattr(settings, 'DEMO_MODE', False)
+		else EMAIL_LOGO_STATIC_CANDIDATES
+	)
+	for relative in candidates:
 		found = finders.find(relative)
 		if found:
 			return relative
 		fallback = Path(settings.BASE_DIR) / 'static' / relative
 		if fallback.exists():
 			return relative
-	return 'img/email_logo.jpg'
+	return 'img/zyntra-mark.svg' if getattr(settings, 'DEMO_MODE', False) else 'img/email_logo.jpg'
 
 
 def build_absolute_static_url(path):
@@ -61,6 +71,15 @@ def build_absolute_static_url(path):
 
 
 def brand_email_context():
+	from config.core.demo_branding import get_active_brand_legal_name, get_active_brand_name
+
+	demo_mode = bool(getattr(settings, 'DEMO_MODE', False))
 	return {
 		'brand_logo_url': build_absolute_static_url(resolve_email_logo_static_path()),
+		'DEMO_MODE': demo_mode,
+		'DEMO_BRAND_NAME': getattr(settings, 'DEMO_BRAND_NAME', 'Zyntra'),
+		'ACTIVE_BRAND_NAME': get_active_brand_name(),
+		'ACTIVE_BRAND_LEGAL_NAME': get_active_brand_legal_name(),
+		'brand_header_bg': '#07111F' if demo_mode else '#0b3d91',
+		'brand_accent': '#2DD4BF' if demo_mode else '#ffd400',
 	}

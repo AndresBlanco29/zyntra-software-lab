@@ -64,7 +64,7 @@ def clear_state(conversation):
     conversation.save(update_fields=['shopping_context'])
 
 
-def remember_catalog_results(conversation, products, *, limit=5):
+def remember_catalog_results(conversation, products, *, limit=50):
     """Store the exact enumerated list shown to the customer."""
     results = [
         {
@@ -73,7 +73,7 @@ def remember_catalog_results(conversation, products, *, limit=5):
             'brand': product.get('brand', ''),
             'presentations': [
                 {'id': item['id'], 'name': item['name']}
-                for item in product.get('presentations', [])[:8]
+            for item in product.get('presentations', [])[:8]
             ],
         }
         for product in products[:limit]

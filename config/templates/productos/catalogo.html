@@ -8,19 +8,21 @@
     <title> {% trans "Catálogo" %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link rel="icon" type="image/png" href="{% static 'img/logo.png' %}">
-  <link rel="apple-touch-icon" href="{% static 'img/logo.png' %}">
+  <link rel="icon" type="image/png" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
+  <link rel="apple-touch-icon" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
 
     <!-- Bootstrap -->
     <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
     <link rel="stylesheet" href="{% static 'css/catalogo.css' %}">
+    {% if DEMO_MODE %}<link rel="stylesheet" href="{% static 'css/zyntra-demo.css' %}">{% endif %}
     {% include "includes/searchable_selects_assets.html" %}
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
     <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
     <script defer src="{% static 'js/language-session.js' %}"></script>
 </head>
 
-<body 
+<body
+class="{% if DEMO_MODE %}demo-brand{% endif %}"
 data-lang="{{ LANGUAGE_CODE }}"
 data-agregar-url="{% url 'agregar_a_cotizacion' %}"
 data-csrf="{{ csrf_token }}"
@@ -51,6 +53,8 @@ data-combo-free-label="{% trans 'FREE' %}"
 data-combo-free-section-label="{% trans 'Free product' %}"
 data-combo-free-preview-label="{% trans 'Included when you reach this tier' %}">
 
+    {% include "includes/demo_environment_banner.html" %}
+
     <!-- NAVBAR -->
     <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
 
@@ -67,7 +71,7 @@ data-combo-free-preview-label="{% trans 'Included when you reach this tier' %}">
             </button>
 
             <a class="navbar-brand fw-bold" href="/?no_back=1">
-                La Tortilla Grocery
+                {% include "includes/brand_name.html" %}
             </a>
 
             <div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">
@@ -179,6 +183,19 @@ data-combo-free-preview-label="{% trans 'Included when you reach this tier' %}">
 
                 </div>
 
+                <div class="catalog-search-sticky">
+                    <input
+                        type="search"
+                        id="buscador"
+                        name="q"
+                        form="catalogo-filter-form"
+                        value="{{ filter_q }}"
+                        class="form-control"
+                        placeholder="{% trans 'Buscar Productos' %}"
+                        autocomplete="off"
+                    >
+                </div>
+
                 {% if combos and page_obj.number == 1 %}
                 <section class="combos-section mb-4" aria-labelledby="combosTitle">
                     <div class="favorites-section__header">
@@ -230,18 +247,6 @@ data-combo-free-preview-label="{% trans 'Included when you reach this tier' %}">
                     {% if filter_promociones %}
                     <input type="hidden" name="promociones" value="1">
                     {% endif %}
-
-                    <div class="catalog-search-sticky">
-                        <input
-                            type="search"
-                            id="buscador"
-                            name="q"
-                            value="{{ filter_q }}"
-                            class="form-control"
-                            placeholder="{% trans 'Buscar Productos' %}"
-                            autocomplete="off"
-                        >
-                    </div>
 
                     <div class="catalog-filter-selects selects-row d-flex w-100 gap-2 mt-2">
                         <select class="form-select" id="filtroCategoria" name="categoria">
@@ -484,7 +489,7 @@ data-combo-free-preview-label="{% trans 'Included when you reach this tier' %}">
         </h5>
         
         <p class="text-muted mb-0" style="font-size: 1rem;">
-          {% trans "You will be logged out of" %} <strong>La Tortilla Grocery</strong>
+          {% trans "You will be logged out of" %} <strong>{% include "includes/brand_name.html" %}</strong>
         </p>
       </div>
       
@@ -537,12 +542,12 @@ data-combo-free-preview-label="{% trans 'Included when you reach this tier' %}">
 
 <!-- MODAL LOGIN -->
 <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content" style="background: white; border: none; border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);">
-      <button type="button" class="btn-close btn-close-dark position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close" style="z-index: 10;"></button>
-      <div id="loginFormContainer" style="padding: 2rem;">
+  <div class="modal-dialog modal-dialog-centered{% if DEMO_MODE %} auth-modal-dialog{% endif %}">
+    <div class="modal-content{% if DEMO_MODE %} auth-modal-shell{% endif %}" {% if not DEMO_MODE %}style="background: white; border: none; border-radius: 20px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);"{% endif %}>
+      <button type="button" class="btn-close {% if DEMO_MODE %}btn-close-white{% else %}btn-close-dark{% endif %} position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" aria-label="Close" style="z-index: 10;"></button>
+      <div id="loginFormContainer" class="{% if DEMO_MODE %}auth-modal-body{% endif %}" style="padding: 2rem;">
         <div class="text-center">
-          <div class="spinner-border" role="status">
+          <div class="spinner-border{% if DEMO_MODE %} text-light{% endif %}" role="status">
             <span class="visually-hidden">{% trans "Loading..." %}</span>
           </div>
         </div>

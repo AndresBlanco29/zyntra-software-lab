@@ -1,0 +1,3634 @@
+/* Zyntra DEMO theme — only when body.demo-brand (DEMO_MODE).
+   Futuristic void + violet→cyan aurora (aligned with Zyntra marketing). */
+
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Sora:wght@500;600;700;800&display=swap');
+
+:root {
+  --zyntra-ink: #041018;
+  --zyntra-ink-soft: #0A1F2C;
+  --zyntra-void: #05070F;
+  --zyntra-panel: #0B1220;
+  --zyntra-panel-elevated: #111827;
+  --zyntra-primary: #38BDF8;
+  --zyntra-primary-deep: #6366F1;
+  --zyntra-cyan: #2DD4BF;
+  --zyntra-cyan-bright: #5EEAD4;
+  --zyntra-cyan-glow: rgba(45, 212, 191, 0.4);
+  --zyntra-violet: #8B5CF6;
+  --zyntra-violet-soft: #A78BFA;
+  --zyntra-blue-electric: #38BDF8;
+  --zyntra-surface: #0B1220;
+  --zyntra-surface-card: rgba(17, 24, 39, 0.88);
+  --zyntra-text: #E2E8F0;
+  --zyntra-muted: #94A3B8;
+  --zyntra-line: rgba(148, 163, 184, 0.18);
+  --zyntra-danger: #E11D48;
+  --zyntra-grad-aurora: linear-gradient(115deg, #05070F 0%, #0B1224 42%, #041018 100%);
+  --zyntra-grad-cta: linear-gradient(135deg, #38BDF8 0%, #6366F1 55%, #8B5CF6 100%);
+  --zyntra-grad-text: linear-gradient(100deg, #E9D5FF 0%, #A78BFA 28%, #38BDF8 62%, #5EEAD4 100%);
+}
+
+/* ---------- Shell ---------- */
+body.demo-brand {
+  font-family: 'Manrope', system-ui, sans-serif;
+  background:
+    radial-gradient(ellipse 70% 50% at 8% -10%, rgba(139, 92, 246, 0.28), transparent 55%),
+    radial-gradient(ellipse 60% 45% at 92% 0%, rgba(56, 189, 248, 0.22), transparent 52%),
+    radial-gradient(ellipse 50% 40% at 50% 100%, rgba(45, 212, 191, 0.12), transparent 55%),
+    linear-gradient(180deg, #070B16 0%, var(--zyntra-void) 40%, #03050A 100%);
+  color: var(--zyntra-text);
+  min-height: 100vh;
+}
+
+/* Promo "Sign in" modal must not permanently freeze home scrolling */
+body.demo-brand:not(.modal-open) {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+html:has(body.demo-brand:not(.modal-open)) {
+  overflow-y: auto !important;
+}
+
+body.demo-brand h1,
+body.demo-brand h2,
+body.demo-brand h3,
+body.demo-brand h4,
+body.demo-brand .quienes-title {
+  font-family: 'Sora', 'Manrope', sans-serif;
+  letter-spacing: -0.01em;
+  color: #F8FAFC;
+}
+
+body.demo-brand .content,
+body.demo-brand .content h1,
+body.demo-brand .content h2,
+body.demo-brand .content h3,
+body.demo-brand .content h4,
+body.demo-brand .content h5,
+body.demo-brand .content p,
+body.demo-brand .content .text-muted {
+  color: var(--zyntra-text);
+}
+
+body.demo-brand .content .text-muted {
+  color: var(--zyntra-muted) !important;
+}
+
+/* ---------- Shared aurora helpers ---------- */
+/* Distinct SOFTWARE LAB strip (reads as its own band). Navbar still starts at top:0
+   underneath, so scroll never flashes a white hairline at the join. */
+body.demo-brand .demo-environment-banner {
+  background: linear-gradient(90deg, #07111F 0%, #0E2A38 48%, #123847 100%) !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(94, 234, 212, 0.28) !important;
+  box-shadow:
+    0 1px 0 rgba(5, 7, 15, 0.85),
+    0 0 28px rgba(56, 189, 248, 0.12) !important;
+}
+
+body.demo-brand .navbar-custom,
+body.demo-brand .navbar-home,
+body.demo-brand .sidebar-user,
+body.demo-brand .qb-center-hero,
+body.demo-brand .content .card.bg-primary,
+body.demo-brand .content .card.text-bg-primary {
+  background:
+    radial-gradient(ellipse 80% 120% at 0% 50%, rgba(139, 92, 246, 0.38), transparent 55%),
+    radial-gradient(ellipse 70% 100% at 100% 40%, rgba(56, 189, 248, 0.32), transparent 55%),
+    var(--zyntra-grad-aurora) !important;
+}
+
+/* ---------- Top banner ---------- */
+body.demo-brand {
+  --demo-banner-height: 2.25rem;
+  /* Fallback before JS measures chrome (banner + navbar) */
+  --panel-navbar-offset: calc(var(--demo-banner-height) + 72px);
+  /* Same aurora / CTA family as home navbar */
+  --zyntra-admin-header:
+    radial-gradient(ellipse 80% 120% at 0% 50%, rgba(139, 92, 246, 0.38), transparent 55%),
+    radial-gradient(ellipse 70% 100% at 100% 40%, rgba(56, 189, 248, 0.32), transparent 55%),
+    var(--zyntra-grad-aurora);
+  --zyntra-admin-hero:
+    radial-gradient(ellipse 80% 120% at 0% 50%, rgba(139, 92, 246, 0.42), transparent 55%),
+    radial-gradient(ellipse 70% 100% at 100% 40%, rgba(56, 189, 248, 0.35), transparent 55%),
+    var(--zyntra-grad-aurora);
+  /* Colored buttons / KPI chips use the same aurora as home + QuickBooks */
+  --zyntra-admin-kpi: var(--zyntra-admin-header);
+  /* Compact CTA — same dark aurora as home navbar / void */
+  --zyntra-admin-btn: var(--zyntra-admin-header);
+  --zyntra-admin-btn-hover: var(--zyntra-admin-hero);
+  --zyntra-admin-ink: #0b1220;
+  --zyntra-admin-accent: #38bdf8;
+  --zyntra-admin-accent-soft: #a78bfa;
+  --zyntra-admin-sky: #38bdf8;
+}
+
+body.demo-brand .demo-environment-banner {
+  position: fixed !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1080;
+}
+
+body.demo-brand .demo-environment-banner__label {
+  color: var(--zyntra-cyan-bright) !important;
+  text-shadow: 0 0 18px rgba(56, 189, 248, 0.45);
+}
+
+/* One continuous chrome plane from viewport top (banner overlays padding).
+   Avoids any hairline gap / inset highlight between strip and brand bar. */
+body.demo-brand .navbar-custom {
+  top: 0 !important;
+  padding-top: calc(var(--demo-banner-height) + 0.7rem) !important;
+  border-top: none !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* ---------- Navbar ---------- */
+body.demo-brand .navbar-home {
+  border-bottom: 1px solid rgba(167, 139, 250, 0.28);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  border-radius: 0 !important;
+}
+
+body.demo-brand .navbar-custom {
+  border-bottom: 1px solid rgba(167, 139, 250, 0.28);
+  border-radius: 0 !important;
+}
+
+/* Public legal pages: one scrollbar only (browser), no inner .content pane */
+html:has(body.demo-brand.legal-public-page) {
+  overflow-x: clip;
+  overflow-y: auto;
+  height: auto;
+}
+
+body.demo-brand.legal-public-page {
+  overflow-x: clip;
+  overflow-y: auto;
+  height: auto;
+}
+
+body.demo-brand.legal-public-page .layout {
+  height: auto !important;
+  min-height: 100vh;
+}
+
+body.demo-brand.legal-public-page .content {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+  min-height: 0 !important;
+}
+
+/* Auth pages with fixed SOFTWARE LAB strip */
+body.demo-brand > .container.min-vh-100 {
+  padding-top: calc(var(--demo-banner-height) + 1rem);
+  box-sizing: border-box;
+}
+
+/* Home navbar: break out of .container so the bar spans edge-to-edge */
+body.demo-brand .hero-home {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  /* Fixed SOFTWARE LAB banner sits above the home chrome */
+  padding-top: var(--demo-banner-height) !important;
+}
+
+body.demo-brand .hero-home > .container {
+  max-width: none !important;
+  width: 100% !important;
+  margin: 0 !important;
+  margin-top: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+body.demo-brand .hero-home .navbar-home {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  padding: 0.9rem clamp(1rem, 4vw, 2.75rem) !important;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+body.demo-brand .hero-home .navbar-divider {
+  width: min(1100px, calc(100% - 2rem)) !important;
+  margin: 0.35rem auto 1.25rem !important;
+  opacity: 0.35;
+}
+
+body.demo-brand .hero-home .hero-content {
+  width: min(1100px, calc(100% - 2rem));
+  max-width: 1100px;
+  margin: 0 auto 2rem;
+  padding: 0.5rem 0 1.5rem;
+}
+
+body.demo-brand .navbar-brand,
+body.demo-brand .brand-text {
+  font-family: 'Sora', 'Manrope', sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 800;
+  background: var(--zyntra-grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.12));
+}
+
+body.demo-brand .navbar-home .nav-link,
+body.demo-brand .navbar-custom .nav-link {
+  color: #E2E8F0 !important;
+  margin-top: 0 !important;
+  margin-left: 1rem !important;
+}
+
+body.demo-brand .navbar-home .nav-link:hover,
+body.demo-brand .navbar-custom .nav-link:hover {
+  color: #F0FDFA !important;
+  text-shadow: 0 0 14px rgba(56, 189, 248, 0.4);
+}
+
+body.demo-brand .navbar-home .navbar-nav {
+  align-items: center;
+}
+
+body.demo-brand .navbar-home .login-btn {
+  margin-top: 0 !important;
+}
+
+body.demo-brand .navbar-custom .form-control,
+body.demo-brand .navbar-custom input[type="search"],
+body.demo-brand .navbar-custom .panel-search-input {
+  background: rgba(5, 7, 15, 0.55) !important;
+  border: 1px solid rgba(167, 139, 250, 0.35) !important;
+  color: #F8FAFC !important;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.08);
+}
+
+body.demo-brand .navbar-custom .form-control::placeholder {
+  color: rgba(226, 232, 240, 0.5);
+}
+
+body.demo-brand .sidebar-toggle-btn {
+  border-color: rgba(167, 139, 250, 0.45) !important;
+  color: var(--zyntra-cyan-bright) !important;
+}
+
+body.demo-brand .btn-outline-light {
+  border-color: rgba(148, 163, 184, 0.45) !important;
+  color: #F8FAFC !important;
+  background: rgba(5, 7, 15, 0.35) !important;
+}
+
+body.demo-brand .btn-outline-light:hover {
+  background: rgba(56, 189, 248, 0.16) !important;
+  border-color: rgba(94, 234, 212, 0.55) !important;
+  color: #fff !important;
+}
+
+body.demo-brand .btn-danger,
+body.demo-brand a.btn-danger {
+  background: linear-gradient(135deg, #BE123C, var(--zyntra-danger)) !important;
+  border-color: transparent !important;
+  box-shadow: 0 6px 18px rgba(225, 29, 72, 0.35);
+}
+
+/* ---------- Sidebar ---------- */
+body.demo-brand .sidebar {
+  background:
+    radial-gradient(ellipse 90% 40% at 0% 0%, rgba(139, 92, 246, 0.18), transparent 55%),
+    linear-gradient(180deg, rgba(11, 18, 32, 0.98), rgba(5, 7, 15, 0.98)) !important;
+  border-right: 1px solid rgba(167, 139, 250, 0.22);
+  box-shadow: 8px 0 32px rgba(0, 0, 0, 0.35);
+  color: var(--zyntra-text);
+}
+
+body.demo-brand .sidebar-user {
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  border-radius: 14px;
+  margin-left: 10px;
+  margin-right: 10px;
+  color: #F8FAFC !important;
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.35),
+    0 0 24px rgba(56, 189, 248, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  letter-spacing: 0.02em;
+}
+
+body.demo-brand .sidebar-section-title,
+body.demo-brand .sidebar-collapsible-summary {
+  color: var(--zyntra-cyan-bright) !important;
+  font-family: 'Sora', 'Manrope', sans-serif;
+  letter-spacing: 0.04em;
+}
+
+body.demo-brand .sidebar-collapsible-summary::after {
+  color: var(--zyntra-violet-soft) !important;
+}
+
+body.demo-brand .sidebar .list-group-item {
+  background: transparent !important;
+  color: #CBD5E1 !important;
+  border: none !important;
+  border-radius: 10px;
+  margin: 2px 8px;
+}
+
+body.demo-brand .sidebar .list-group-item:hover {
+  background: rgba(139, 92, 246, 0.16) !important;
+  color: #F8FAFC !important;
+}
+
+body.demo-brand .sidebar .active,
+body.demo-brand .sidebar .list-group-item.active {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  font-size: 1rem !important;
+  padding: 12px 14px 12px 22px !important;
+  border: 1px solid rgba(167, 139, 250, 0.35) !important;
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.28),
+    0 0 24px rgba(56, 189, 248, 0.2);
+}
+
+body.demo-brand .sidebar .active::before,
+body.demo-brand .sidebar .list-group-item.active::before {
+  background: var(--zyntra-cyan-bright) !important;
+  box-shadow: 0 0 14px var(--zyntra-cyan-glow);
+  width: 5px !important;
+  border-radius: 0 8px 8px 0 !important;
+}
+
+body.demo-brand .sidebar button.list-group-item {
+  color: var(--zyntra-violet-soft) !important;
+  font-weight: 600;
+}
+
+/* ---------- Buttons / links ---------- */
+body.demo-brand .login-btn,
+body.demo-brand .btn-primary,
+body.demo-brand .hero-home .btn-warning,
+body.demo-brand .btn-warning,
+body.demo-brand .btn-success,
+body.demo-brand .btn-login,
+body.demo-brand .btn.btn-login {
+  background: var(--zyntra-admin-header) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  font-weight: 700;
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.3),
+    0 10px 28px rgba(0, 0, 0, 0.28),
+    0 0 28px rgba(56, 189, 248, 0.22);
+}
+
+body.demo-brand .login-btn:hover,
+body.demo-brand .btn-primary:hover,
+body.demo-brand .btn-warning:hover,
+body.demo-brand .btn-success:hover,
+body.demo-brand .btn-login:hover {
+  background: var(--zyntra-admin-hero) !important;
+  color: #fff !important;
+  filter: brightness(1.08);
+}
+
+body.demo-brand .btn-outline-primary {
+  border-color: rgba(167, 139, 250, 0.55) !important;
+  color: var(--zyntra-violet-soft) !important;
+  background: rgba(5, 7, 15, 0.35) !important;
+}
+
+body.demo-brand .btn-outline-primary:hover {
+  background: rgba(139, 92, 246, 0.2) !important;
+  border-color: var(--zyntra-cyan) !important;
+  color: #F0FDFA !important;
+}
+
+body.demo-brand a.text-primary,
+body.demo-brand .text-primary {
+  color: var(--zyntra-blue-electric) !important;
+}
+
+body.demo-brand .link-primary {
+  color: var(--zyntra-violet-soft) !important;
+}
+
+/* ---------- Cards / content ---------- */
+body.demo-brand .content .card,
+body.demo-brand .beneficio-card,
+body.demo-brand .stat-box,
+body.demo-brand .quienes-card,
+body.demo-brand .install-step-card,
+body.demo-brand .install-app-shell,
+body.demo-brand .marca-card,
+body.demo-brand .testimonio-card {
+  background: var(--zyntra-surface-card) !important;
+  border: 1px solid rgba(167, 139, 250, 0.22) !important;
+  border-radius: 16px;
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  color: var(--zyntra-text);
+  backdrop-filter: blur(12px);
+}
+
+/* Brand tiles without uploaded logos — readable fictitious names */
+body.demo-brand .marca-card .marca-name {
+  display: block;
+  max-width: 6.5rem;
+  padding: 0.35rem 0.4rem;
+  text-align: center;
+  font-family: 'Sora', 'Manrope', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+  text-transform: uppercase;
+  color: #e2e8f0;
+  background: linear-gradient(100deg, #e9d5ff 0%, #a78bfa 40%, #38bdf8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+body.demo-brand .producto-oferta {
+  background: var(--zyntra-surface-card) !important;
+  border: 1px solid rgba(167, 139, 250, 0.22) !important;
+  color: var(--zyntra-text) !important;
+}
+
+body.demo-brand .producto-oferta h5,
+body.demo-brand .producto-oferta .oferta-promocion-descripcion,
+body.demo-brand .producto-oferta .producto-info,
+body.demo-brand .producto-oferta label {
+  color: #e2e8f0 !important;
+}
+
+body.demo-brand .testimonio-card h6,
+body.demo-brand .testimonio-card p,
+body.demo-brand .testimonio-card small {
+  color: #e2e8f0 !important;
+}
+
+body.demo-brand .testimonio-card .stars {
+  color: #fbbf24 !important;
+}
+
+body.demo-brand .content .card.bg-primary,
+body.demo-brand .content .card.text-bg-primary,
+body.demo-brand .content .bg-primary,
+body.demo-brand .alert-primary,
+body.demo-brand .qb-center-hero,
+body.demo-brand .content .card.qb-center-hero {
+  border: 1px solid rgba(167, 139, 250, 0.35) !important;
+  color: #F8FAFC !important;
+  overflow: hidden;
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.4),
+    0 0 40px rgba(56, 189, 248, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+body.demo-brand .qb-center-hero .btn-light {
+  background: #F8FAFC !important;
+  color: #312E81 !important;
+  font-weight: 700;
+  border: none;
+  box-shadow: 0 8px 22px rgba(56, 189, 248, 0.25);
+}
+
+body.demo-brand .language-toggle,
+body.demo-brand .language-widget .language-toggle {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  border: 1px solid rgba(167, 139, 250, 0.4) !important;
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(56, 189, 248, 0.18),
+    0 0 24px rgba(56, 189, 248, 0.22);
+}
+
+body.demo-brand .language-toggle:hover,
+body.demo-brand .language-widget .language-toggle:hover {
+  background: var(--zyntra-admin-hero) !important;
+  filter: brightness(1.08);
+}
+
+body.demo-brand .badge.bg-primary,
+body.demo-brand .badge.text-bg-primary {
+  background: var(--zyntra-grad-cta) !important;
+  color: #fff !important;
+}
+
+body.demo-brand .badge.bg-success,
+body.demo-brand .badge.text-bg-success {
+  background: rgba(45, 212, 191, 0.18) !important;
+  color: var(--zyntra-cyan-bright) !important;
+  border: 1px solid rgba(45, 212, 191, 0.45);
+}
+
+body.demo-brand .table {
+  color: var(--zyntra-text);
+  --bs-table-bg: transparent;
+  --bs-table-color: var(--zyntra-text);
+  --bs-table-border-color: rgba(148, 163, 184, 0.16);
+  --bs-table-striped-bg: rgba(139, 92, 246, 0.06);
+  --bs-table-hover-bg: rgba(56, 189, 248, 0.08);
+}
+
+body.demo-brand .table thead th {
+  background: rgba(139, 92, 246, 0.12);
+  color: var(--zyntra-cyan-bright);
+  border-bottom-color: rgba(167, 139, 250, 0.28) !important;
+  font-family: 'Sora', 'Manrope', sans-serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body.demo-brand .table-hover tbody tr:hover {
+  background: rgba(56, 189, 248, 0.08);
+}
+
+body.demo-brand .pagination .page-item.active .page-link {
+  background: var(--zyntra-grad-cta) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
+
+body.demo-brand .pagination .page-link {
+  background: rgba(11, 18, 32, 0.85);
+  border-color: rgba(148, 163, 184, 0.22);
+  color: var(--zyntra-violet-soft);
+}
+
+body.demo-brand .form-control,
+body.demo-brand .form-select {
+  background: rgba(5, 7, 15, 0.65) !important;
+  border: 1px solid rgba(148, 163, 184, 0.28) !important;
+  color: #F8FAFC !important;
+}
+
+body.demo-brand .form-control:focus,
+body.demo-brand .form-select:focus {
+  border-color: var(--zyntra-violet-soft) !important;
+  box-shadow: 0 0 0 0.2rem rgba(139, 92, 246, 0.28) !important;
+}
+
+body.demo-brand .form-control::placeholder {
+  color: rgba(148, 163, 184, 0.65);
+}
+
+/* Home/dark surfaces: light text on translucent info chip */
+body.demo-brand .alert-info {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #E0F2FE;
+}
+
+/* Light admin panel: Bootstrap alerts stay dark-on-tint (invoice QB lock, etc.) */
+body.demo-brand .layout .alert-info,
+body.demo-brand .layout .content .alert-info {
+  background: #e0f2fe !important;
+  border: 1px solid rgba(14, 165, 233, 0.4) !important;
+  color: #0c4a6e !important;
+  -webkit-text-fill-color: #0c4a6e !important;
+}
+
+body.demo-brand .layout .alert-info strong,
+body.demo-brand .layout .alert-info .small,
+body.demo-brand .layout .alert-info div,
+body.demo-brand .layout .content .alert-info strong,
+body.demo-brand .layout .content .alert-info .small,
+body.demo-brand .layout .content .alert-info div {
+  color: #0c4a6e !important;
+  -webkit-text-fill-color: #0c4a6e !important;
+}
+
+body.demo-brand .layout .alert-warning,
+body.demo-brand .layout .content .alert-warning {
+  background: #fef3c7 !important;
+  border: 1px solid rgba(217, 119, 6, 0.35) !important;
+  color: #92400e !important;
+  -webkit-text-fill-color: #92400e !important;
+}
+
+body.demo-brand .layout .alert-warning strong,
+body.demo-brand .layout .alert-warning .small,
+body.demo-brand .layout .alert-warning div,
+body.demo-brand .layout .content .alert-warning strong,
+body.demo-brand .layout .content .alert-warning .small,
+body.demo-brand .layout .content .alert-warning div {
+  color: #92400e !important;
+  -webkit-text-fill-color: #92400e !important;
+}
+
+body.demo-brand .layout .alert-secondary,
+body.demo-brand .layout .content .alert-secondary {
+  background: #f1f5f9 !important;
+  border: 1px solid rgba(100, 116, 139, 0.35) !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+body.demo-brand .layout .alert-secondary strong,
+body.demo-brand .layout .alert-secondary .small,
+body.demo-brand .layout .alert-secondary div,
+body.demo-brand .layout .content .alert-secondary strong,
+body.demo-brand .layout .content .alert-secondary .small,
+body.demo-brand .layout .content .alert-secondary div {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+body.demo-brand .layout .alert .badge,
+body.demo-brand .layout .alert .badge.text-bg-primary {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+/* Dark-surface modals (home / auth). Panel modals stay light below. */
+body.demo-brand .modal-content {
+  background: #0F172A;
+  color: var(--zyntra-text);
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), 0 0 40px rgba(56, 189, 248, 0.12);
+}
+
+body.demo-brand .layout .modal-content,
+body.demo-brand #feedbackModal .modal-content {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(167, 139, 250, 0.28) !important;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.35),
+    0 0 36px rgba(56, 189, 248, 0.1) !important;
+}
+
+body.demo-brand .layout .modal-body,
+body.demo-brand .layout .modal-footer {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+body.demo-brand .layout .modal-header {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  border-color: rgba(167, 139, 250, 0.28) !important;
+}
+
+body.demo-brand .layout .modal-header .modal-title,
+body.demo-brand .layout .modal-header .btn-close {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+body.demo-brand .modal-header,
+body.demo-brand .modal-footer {
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+/* Message / feedback modals — Zyntra aurora, not Tortilla grocery blue */
+body.demo-brand .feedback-modal,
+body.demo-brand #feedbackModal .modal-content {
+  background: #fff;
+  border: 1px solid rgba(167, 139, 250, 0.28) !important;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.45),
+    0 0 36px rgba(56, 189, 248, 0.12);
+}
+
+body.demo-brand .feedback-modal__header,
+body.demo-brand .feedback-modal__header.is-success,
+body.demo-brand #feedbackModalHeader.is-success {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+}
+
+body.demo-brand .feedback-modal__header.is-error,
+body.demo-brand #feedbackModalHeader.is-error {
+  background: linear-gradient(135deg, #9f1239, #e11d48) !important;
+  color: #fff !important;
+}
+
+body.demo-brand .feedback-modal__header.is-warning,
+body.demo-brand #feedbackModalHeader.is-warning {
+  background: linear-gradient(135deg, #b45309, #f59e0b) !important;
+  color: #fff !important;
+}
+
+body.demo-brand .feedback-modal__header.is-info,
+body.demo-brand #feedbackModalHeader.is-info {
+  background: linear-gradient(135deg, #0b1220, #334155) !important;
+  color: #fff !important;
+}
+
+body.demo-brand .feedback-modal__header .modal-title,
+body.demo-brand #feedbackModalHeader .modal-title {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+body.demo-brand .feedback-modal__body,
+body.demo-brand .feedback-modal__footer {
+  background: #fff !important;
+}
+
+body.demo-brand .feedback-modal__message {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+body.demo-brand .feedback-modal__btn,
+body.demo-brand #feedbackModal .feedback-modal__btn {
+  background: var(--zyntra-admin-header) !important;
+  background-image: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border: 1px solid rgba(167, 139, 250, 0.4) !important;
+  box-shadow: 0 6px 16px rgba(5, 7, 15, 0.28) !important;
+}
+
+body.demo-brand .feedback-modal__btn:hover,
+body.demo-brand #feedbackModal .feedback-modal__btn:hover {
+  background: var(--zyntra-admin-hero) !important;
+  background-image: var(--zyntra-admin-hero) !important;
+  color: #fff !important;
+  filter: brightness(1.06);
+}
+
+/* Other panel modals still carrying Tortilla #0b3d91 inline styles */
+body.demo-brand .layout .modal .modal-header[style*='#0b3d91'],
+body.demo-brand .layout .modal .modal-header[style*='#1565c0'],
+body.demo-brand .modal .modal-header[style*='#0b3d91'],
+body.demo-brand .modal .modal-header[style*='#1565c0'] {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+}
+
+body.demo-brand .layout .modal .modal-header[style*='#0b3d91'] *,
+body.demo-brand .layout .modal .modal-header[style*='#1565c0'] *,
+body.demo-brand .modal .modal-header[style*='#0b3d91'] *,
+body.demo-brand .modal .modal-header[style*='#1565c0'] * {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+body.demo-brand .layout .modal .btn[style*='#0b3d91'],
+body.demo-brand .layout .modal .btn[style*='#1565c0'],
+body.demo-brand .modal .btn[style*='#0b3d91'],
+body.demo-brand .modal .btn[style*='#1565c0'] {
+  background: var(--zyntra-admin-header) !important;
+  background-image: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border-color: rgba(167, 139, 250, 0.4) !important;
+}
+
+body.demo-brand .layout .modal [style*='color: #0b3d91'],
+body.demo-brand .layout .modal [style*='color:#0b3d91'],
+body.demo-brand .modal [style*='color: #0b3d91'],
+body.demo-brand .modal [style*='color:#0b3d91'] {
+  color: #4c1d95 !important;
+  -webkit-text-fill-color: #4c1d95 !important;
+}
+
+/* Bootstrap message alerts in light panel (success/danger/primary) */
+body.demo-brand .layout .alert-success,
+body.demo-brand .layout .content .alert-success {
+  background: #ecfdf5 !important;
+  border: 1px solid rgba(16, 185, 129, 0.35) !important;
+  color: #065f46 !important;
+  -webkit-text-fill-color: #065f46 !important;
+}
+
+body.demo-brand .layout .alert-danger,
+body.demo-brand .layout .content .alert-danger {
+  background: #fff1f2 !important;
+  border: 1px solid rgba(225, 29, 72, 0.35) !important;
+  color: #9f1239 !important;
+  -webkit-text-fill-color: #9f1239 !important;
+}
+
+body.demo-brand .layout .alert-primary,
+body.demo-brand .layout .content .alert-primary {
+  background: #ede9fe !important;
+  border: 1px solid rgba(139, 92, 246, 0.4) !important;
+  color: #4c1d95 !important;
+  -webkit-text-fill-color: #4c1d95 !important;
+}
+
+body.demo-brand .list-group-item {
+  background: transparent;
+  color: var(--zyntra-text);
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+/* ---------- Login / auth (standalone + modal) ---------- */
+body.demo-brand .login-card,
+body.demo-brand .card.login-card,
+body.demo-brand .auth-card {
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  border-radius: 22px;
+  box-shadow:
+    0 28px 64px rgba(0, 0, 0, 0.45),
+    0 0 40px rgba(99, 102, 241, 0.18);
+  background:
+    radial-gradient(ellipse 80% 60% at 10% 0%, rgba(139, 92, 246, 0.2), transparent 55%),
+    linear-gradient(180deg, rgba(17, 24, 39, 0.96), rgba(5, 7, 15, 0.98));
+  color: var(--zyntra-text);
+}
+
+body.demo-brand .login-card h4,
+body.demo-brand .auth-card h4,
+body.demo-brand .login-card .text-primary,
+body.demo-brand .auth-title,
+body.demo-brand .auth-brand-name {
+  background: var(--zyntra-grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+}
+
+body.demo-brand #loginModal .modal-dialog,
+body.demo-brand .auth-modal-dialog {
+  max-width: 520px;
+}
+
+body.demo-brand #loginModal .modal-content,
+body.demo-brand #loginModal .auth-modal-shell,
+body.demo-brand .auth-modal-shell {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 90% 70% at 0% 0%, rgba(139, 92, 246, 0.38), transparent 55%),
+    radial-gradient(ellipse 80% 60% at 100% 100%, rgba(56, 189, 248, 0.28), transparent 50%),
+    linear-gradient(165deg, #0B1224 0%, #05070F 55%, #0A1628 100%) !important;
+  border: 1px solid rgba(167, 139, 250, 0.4) !important;
+  border-radius: 24px !important;
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 0 60px rgba(99, 102, 241, 0.22) !important;
+  color: #E2E8F0 !important;
+}
+
+body.demo-brand #loginModal .auth-modal-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 20%, #000 15%, transparent 70%);
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+body.demo-brand #loginFormContainer,
+body.demo-brand .auth-modal-body {
+  position: relative;
+  z-index: 1;
+  padding: 2.35rem 2.1rem 2.1rem !important;
+}
+
+body.demo-brand #loginModal .auth-mark,
+body.demo-brand #loginModal .logo-img.zyntra-mark,
+body.demo-brand .login-card .zyntra-mark,
+body.demo-brand .auth-mark {
+  width: 56px !important;
+  height: 56px !important;
+  max-width: 56px !important;
+  margin-bottom: 0.85rem !important;
+  border-radius: 14px !important;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.45),
+    0 0 28px rgba(56, 189, 248, 0.35) !important;
+}
+
+/* Never show LTG logo asset inside demo auth surfaces */
+body.demo-brand #loginModal img[src*="logo.png"],
+body.demo-brand .login-card img[src*="logo.png"] {
+  display: none !important;
+}
+
+body.demo-brand #loginModal .auth-brand-name,
+body.demo-brand #loginModal .auth-title,
+body.demo-brand #loginModal h3,
+body.demo-brand #loginModal h4,
+body.demo-brand #loginModal h5,
+body.demo-brand #loginModal .text-primary {
+  background: var(--zyntra-grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  font-family: 'Sora', 'Manrope', sans-serif;
+}
+
+body.demo-brand #loginModal .auth-subtitle,
+body.demo-brand #loginModal .text-muted,
+body.demo-brand #loginModal .text-secondary,
+body.demo-brand #loginModal small,
+body.demo-brand #loginModal p,
+body.demo-brand #loginModal label,
+body.demo-brand #loginModal .form-label {
+  color: #94A3B8 !important;
+}
+
+body.demo-brand #loginModal .auth-divider,
+body.demo-brand #loginModal hr {
+  border: none !important;
+  height: 1px !important;
+  background: linear-gradient(90deg, transparent, rgba(167, 139, 250, 0.55), rgba(45, 212, 191, 0.45), transparent) !important;
+  opacity: 1 !important;
+  margin: 1.1rem 0 1.35rem !important;
+}
+
+body.demo-brand #loginModal .form-control,
+body.demo-brand #loginModal .form-control-lg,
+body.demo-brand #loginModal .form-select,
+body.demo-brand #loginFormContainer .form-control {
+  background: rgba(5, 7, 15, 0.72) !important;
+  border: 1px solid rgba(148, 163, 184, 0.28) !important;
+  color: #F8FAFC !important;
+  border-radius: 12px !important;
+  padding: 0.85rem 1rem !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+body.demo-brand #loginModal .form-control::placeholder,
+body.demo-brand #loginFormContainer .form-control::placeholder {
+  color: rgba(148, 163, 184, 0.72) !important;
+}
+
+body.demo-brand #loginModal .form-control:focus,
+body.demo-brand #loginFormContainer .form-control:focus {
+  border-color: rgba(167, 139, 250, 0.7) !important;
+  box-shadow: 0 0 0 0.2rem rgba(139, 92, 246, 0.25), 0 0 24px rgba(56, 189, 248, 0.15) !important;
+  background: rgba(8, 12, 24, 0.9) !important;
+  color: #fff !important;
+}
+
+body.demo-brand #loginModal .btn-yellow,
+body.demo-brand #loginModal .btn-continuar,
+body.demo-brand #loginModal .btn-login,
+body.demo-brand #loginFormContainer .btn-yellow,
+body.demo-brand #loginFormContainer .btn-continuar {
+  background: var(--zyntra-grad-cta) !important;
+  border: none !important;
+  color: #fff !important;
+  font-weight: 800 !important;
+  border-radius: 12px !important;
+  padding: 0.85rem 1.2rem !important;
+  letter-spacing: 0.02em;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.35),
+    0 12px 32px rgba(99, 102, 241, 0.45),
+    0 0 36px rgba(56, 189, 248, 0.28) !important;
+  transform: none;
+}
+
+body.demo-brand #loginModal .btn-yellow:hover,
+body.demo-brand #loginModal .btn-continuar:hover,
+body.demo-brand #loginFormContainer .btn-yellow:hover,
+body.demo-brand #loginFormContainer .btn-continuar:hover {
+  background: linear-gradient(135deg, #7DD3FC 0%, #818CF8 50%, #A78BFA 100%) !important;
+  color: #fff !important;
+  transform: translateY(-1px) !important;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.45),
+    0 16px 36px rgba(99, 102, 241, 0.5),
+    0 0 40px rgba(56, 189, 248, 0.35) !important;
+}
+
+body.demo-brand #loginModal .btn-outline-secondary {
+  border-color: rgba(148, 163, 184, 0.4) !important;
+  color: #CBD5E1 !important;
+  background: rgba(5, 7, 15, 0.35) !important;
+  border-radius: 10px !important;
+}
+
+body.demo-brand #loginModal .btn-outline-secondary:hover {
+  border-color: rgba(94, 234, 212, 0.5) !important;
+  color: #F0FDFA !important;
+  background: rgba(56, 189, 248, 0.12) !important;
+}
+
+body.demo-brand #loginModal a,
+body.demo-brand #loginFormContainer a {
+  color: var(--zyntra-cyan-bright) !important;
+  text-decoration: none !important;
+}
+
+body.demo-brand #loginModal a:hover,
+body.demo-brand #loginFormContainer a:hover {
+  color: #E9D5FF !important;
+  text-shadow: 0 0 14px rgba(167, 139, 250, 0.45);
+}
+
+body.demo-brand #loginModal .progress {
+  background: rgba(148, 163, 184, 0.18) !important;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+body.demo-brand #loginModal .progress-bar,
+body.demo-brand #loginModal .progress-bar.bg-primary {
+  background: var(--zyntra-grad-cta) !important;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.35);
+}
+
+body.demo-brand #loginModal .bi-eye,
+body.demo-brand #loginModal .bi-eye-slash {
+  color: #94A3B8;
+}
+
+body.demo-brand #loginErrorModal .modal-content {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(225, 29, 72, 0.18), transparent 55%),
+    linear-gradient(165deg, #0B1224 0%, #05070F 100%) !important;
+  border: 1px solid rgba(244, 63, 94, 0.35) !important;
+  color: #E2E8F0 !important;
+}
+
+body.demo-brand #loginErrorModal h3 {
+  color: #FDA4AF !important;
+}
+
+/* ---------- Home / marketing ---------- */
+body.demo-brand .hero-home {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 55% 70% at 85% 20%, rgba(139, 92, 246, 0.4), transparent 55%),
+    radial-gradient(ellipse 45% 55% at 10% 80%, rgba(56, 189, 248, 0.28), transparent 50%),
+    radial-gradient(ellipse 40% 40% at 50% 50%, rgba(45, 212, 191, 0.12), transparent 60%),
+    linear-gradient(135deg, #05070F 0%, #0B1224 50%, #041018 100%) !important;
+}
+
+body.demo-brand .hero-home::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 10%, transparent 70%);
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+body.demo-brand .hero-home .container,
+body.demo-brand .hero-content {
+  position: relative;
+  z-index: 1;
+}
+
+body.demo-brand .navbar-divider {
+  border-color: rgba(167, 139, 250, 0.25) !important;
+  opacity: 0.6;
+}
+
+body.demo-brand .hero-title {
+  color: #F8FAFC !important;
+}
+
+body.demo-brand .text-yellow,
+body.demo-brand .hero-title .text-yellow {
+  background: var(--zyntra-grad-text) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  color: transparent !important;
+  filter: drop-shadow(0 0 20px rgba(56, 189, 248, 0.3));
+}
+
+body.demo-brand .btn-yellow,
+body.demo-brand .hero-btn.btn-yellow {
+  background: var(--zyntra-grad-cta) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 12px !important;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.35),
+    0 10px 28px rgba(99, 102, 241, 0.45),
+    0 0 36px rgba(56, 189, 248, 0.35);
+}
+
+body.demo-brand .btn-yellow:hover,
+body.demo-brand .hero-btn.btn-yellow:hover {
+  background: linear-gradient(135deg, #7DD3FC 0%, #818CF8 50%, #A78BFA 100%) !important;
+  color: #fff !important;
+}
+
+body.demo-brand .hero-contact-panel {
+  background: rgba(5, 7, 15, 0.45);
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  border-radius: 16px;
+  padding: 1rem;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35), 0 0 28px rgba(56, 189, 248, 0.12);
+}
+
+body.demo-brand .hero-contact-btn--call {
+  color: #312E81 !important;
+  background: #F8FAFC !important;
+}
+
+body.demo-brand .hero-contact-btn--call:hover,
+body.demo-brand .hero-contact-btn--call:focus {
+  color: #fff !important;
+  background: var(--zyntra-grad-cta) !important;
+}
+
+body.demo-brand .hero-contact-phone {
+  color: var(--zyntra-cyan-bright) !important;
+  text-shadow: 0 0 18px rgba(56, 189, 248, 0.35);
+}
+
+body.demo-brand .hero-contact-phone:hover,
+body.demo-brand .hero-contact-phone:focus {
+  color: #F0FDFA !important;
+}
+
+body.demo-brand .hero-contact-btn:focus-visible,
+body.demo-brand .hero-contact-phone:focus-visible {
+  outline-color: var(--zyntra-violet-soft) !important;
+}
+
+/* Home sections */
+body.demo-brand .quienes-section,
+body.demo-brand .elegirnos-section,
+body.demo-brand .marcas-section,
+body.demo-brand .ofertas-section,
+body.demo-brand .testimonios-section,
+body.demo-brand .install-app-section,
+body.demo-brand .productos-section {
+  background: transparent !important;
+}
+
+body.demo-brand .quienes-title,
+body.demo-brand .title-divider span,
+body.demo-brand .marcas-title {
+  background: var(--zyntra-grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+}
+
+body.demo-brand .title-divider::before,
+body.demo-brand .title-divider::after,
+body.demo-brand .quienes-line,
+body.demo-brand .quienes-card hr {
+  background: linear-gradient(90deg, transparent, rgba(167, 139, 250, 0.55), rgba(45, 212, 191, 0.55), transparent) !important;
+  border: none !important;
+  height: 1px;
+  opacity: 1 !important;
+}
+
+body.demo-brand .quienes-text,
+body.demo-brand .beneficio-card small,
+body.demo-brand .quienes-stats p,
+body.demo-brand .install-app-description,
+body.demo-brand .install-step-card p {
+  color: var(--zyntra-muted) !important;
+}
+
+/* Install tutorial modal — Zyntra video chrome + readable copy panel */
+body.demo-brand #installTutorialModal .install-tutorial-modal-content {
+  background: var(--zyntra-panel) !important;
+  border: 1px solid rgba(167, 139, 250, 0.28) !important;
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, 0.55),
+    0 0 40px rgba(56, 189, 248, 0.12) !important;
+}
+
+/* Close sits on the light copy panel — keep a dark, high-contrast X */
+body.demo-brand #installTutorialModal .btn-close {
+  filter: none !important;
+  opacity: 1 !important;
+  background-color: rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+  box-sizing: content-box;
+  padding: 0.45rem;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%230b1220'%3e%3cpath d='M.293.293a1 1 0 0 1 1.414 0L8 6.586 14.293.293a1 1 0 1 1 1.414 1.414L9.414 8l6.293 6.293a1 1 0 0 1-1.414 1.414L8 9.414l-6.293 6.293a1 1 0 0 1-1.414-1.414L6.586 8 .293 1.707A1 1 0 0 1 .293.293z'/%3e%3c/svg%3e") !important;
+}
+
+body.demo-brand #installTutorialModal .btn-close:hover {
+  background-color: rgba(15, 23, 42, 0.14);
+  opacity: 1 !important;
+}
+
+body.demo-brand #installTutorialModal .install-tutorial-video-panel {
+  background:
+    radial-gradient(ellipse 80% 120% at 0% 0%, rgba(139, 92, 246, 0.42), transparent 55%),
+    radial-gradient(ellipse 70% 100% at 100% 80%, rgba(56, 189, 248, 0.28), transparent 55%),
+    var(--zyntra-grad-aurora) !important;
+}
+
+body.demo-brand #installTutorialModal .install-video-frame {
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.22), transparent 32%),
+    radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.2), transparent 40%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(5, 7, 15, 0.35)) !important;
+  border: 1px solid rgba(167, 139, 250, 0.35) !important;
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+body.demo-brand #installTutorialModal .install-video-empty-icon {
+  background: rgba(56, 189, 248, 0.14) !important;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  color: var(--zyntra-cyan-bright) !important;
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.2);
+}
+
+body.demo-brand #installTutorialModal .install-video-empty h4 {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  background: none !important;
+}
+
+body.demo-brand #installTutorialModal .install-video-empty p {
+  color: rgba(226, 232, 240, 0.86) !important;
+}
+
+body.demo-brand #installTutorialModal .install-tutorial-copy-panel {
+  background: #f8fafc !important;
+  border-left: 1px solid rgba(167, 139, 250, 0.18);
+}
+
+body.demo-brand #installTutorialModal .install-app-badge {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.18);
+}
+
+/* Global demo h3 is light — force ink on this white copy panel */
+body.demo-brand #installTutorialModal .install-tutorial-copy-panel h3,
+body.demo-brand #installTutorialModal .install-tutorial-copy-panel h3 * {
+  color: #0b1220 !important;
+  -webkit-text-fill-color: #0b1220 !important;
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+  filter: none !important;
+}
+
+body.demo-brand #installTutorialModal .install-tutorial-copy-panel p {
+  color: #475569 !important;
+  -webkit-text-fill-color: #475569 !important;
+}
+
+body.demo-brand #installTutorialModal .install-tutorial-checklist li {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+body.demo-brand #installTutorialModal .install-tutorial-checklist li::before {
+  background: linear-gradient(135deg, #38bdf8, #8b5cf6) !important;
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.18) !important;
+}
+
+body.demo-brand .quienes-stats h2,
+body.demo-brand .stat-item h2,
+body.demo-brand .stat-item h2.h2,
+body.demo-brand .beneficio-card h6 {
+  color: var(--zyntra-cyan-bright) !important;
+  font-family: 'Sora', 'Manrope', sans-serif;
+}
+
+body.demo-brand .beneficio-icon,
+body.demo-brand .beneficio-icon i {
+  color: var(--zyntra-violet-soft) !important;
+  filter: drop-shadow(0 0 12px rgba(139, 92, 246, 0.45));
+}
+
+body.demo-brand .stat-item:not(:last-child)::after {
+  background: rgba(167, 139, 250, 0.35) !important;
+}
+
+/* Why Choose Us — exclusive Zyntra artwork */
+body.demo-brand .entrega-bg .flip-box-front,
+body.demo-brand .entrega-bg .flip-box-back {
+  background-image:
+    linear-gradient(160deg, rgba(5, 7, 15, 0.78), rgba(99, 102, 241, 0.45)),
+    url("/static/img/zyntra-why-ops.svg") !important;
+}
+
+body.demo-brand .catalogo-bg .flip-box-front,
+body.demo-brand .catalogo-bg .flip-box-back {
+  background-image:
+    linear-gradient(160deg, rgba(5, 7, 15, 0.78), rgba(139, 92, 246, 0.42)),
+    url("/static/img/zyntra-why-catalog.svg") !important;
+}
+
+body.demo-brand .precio-bg .flip-box-front,
+body.demo-brand .precio-bg .flip-box-back {
+  background-image:
+    linear-gradient(160deg, rgba(5, 7, 15, 0.78), rgba(56, 189, 248, 0.4)),
+    url("/static/img/zyntra-why-pricing.svg") !important;
+}
+
+body.demo-brand .atencion-bg .flip-box-front,
+body.demo-brand .atencion-bg .flip-box-back {
+  background-image:
+    linear-gradient(160deg, rgba(5, 7, 15, 0.78), rgba(45, 212, 191, 0.35)),
+    url("/static/img/zyntra-why-support.svg") !important;
+}
+
+body.demo-brand .flip-box-front,
+body.demo-brand .flip-box-back {
+  border: 1px solid rgba(167, 139, 250, 0.25);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4), 0 0 28px rgba(56, 189, 248, 0.1);
+}
+
+/* CTA */
+body.demo-brand .cta-mayorista {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 70% 120% at 12% 50%, rgba(139, 92, 246, 0.42), transparent 58%),
+    radial-gradient(ellipse 60% 100% at 88% 40%, rgba(56, 189, 248, 0.38), transparent 55%),
+    radial-gradient(ellipse 50% 80% at 50% 120%, rgba(45, 212, 191, 0.22), transparent 60%),
+    var(--zyntra-grad-aurora) !important;
+  background-color: transparent !important;
+  color: #F8FAFC !important;
+  border-top: 1px solid rgba(167, 139, 250, 0.28);
+  border-bottom: 1px solid rgba(45, 212, 191, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 -24px 60px rgba(56, 189, 248, 0.08);
+  padding: 2.75rem 0 1.75rem !important;
+}
+
+body.demo-brand .cta-mayorista::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.55) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 70% 60%, rgba(255, 255, 255, 0.4) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 45% 80%, rgba(255, 255, 255, 0.35) 0 1px, transparent 1.5px);
+  background-size: 180px 140px, 220px 160px, 160px 120px;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+body.demo-brand .cta-mayorista .container {
+  position: relative;
+  z-index: 1;
+}
+
+body.demo-brand .cta-title {
+  margin-top: 0 !important;
+  font-family: 'Sora', 'Manrope', sans-serif;
+  font-size: clamp(1.15rem, 2.2vw, 1.55rem);
+  letter-spacing: -0.01em;
+  background: var(--zyntra-grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  filter: drop-shadow(0 0 22px rgba(56, 189, 248, 0.28));
+}
+
+body.demo-brand .cta-mayorista .btn-yellow.cta-btn {
+  background: var(--zyntra-grad-cta) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 12px !important;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.35),
+    0 10px 28px rgba(99, 102, 241, 0.45),
+    0 0 36px rgba(56, 189, 248, 0.35);
+}
+
+body.demo-brand .cta-mayorista .btn-yellow.cta-btn:hover {
+  background: linear-gradient(135deg, #7DD3FC 0%, #818CF8 50%, #A78BFA 100%) !important;
+  color: #fff !important;
+  transform: translateY(-1px);
+}
+
+body.demo-brand .cta-mayorista .btn-catalogo.cta-btn {
+  background: rgba(5, 7, 15, 0.55) !important;
+  color: #F8FAFC !important;
+  border: 1px solid rgba(148, 163, 184, 0.45) !important;
+  border-radius: 12px !important;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.12), 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+body.demo-brand .cta-mayorista .btn-catalogo.cta-btn:hover {
+  background: rgba(99, 102, 241, 0.28) !important;
+  border-color: rgba(94, 234, 212, 0.55) !important;
+  color: #fff !important;
+}
+
+body.demo-brand .footer-divider-line {
+  background: linear-gradient(90deg, transparent, rgba(167, 139, 250, 0.55), rgba(45, 212, 191, 0.55), transparent) !important;
+  opacity: 1 !important;
+  height: 1px !important;
+}
+
+/* Footer */
+body.demo-brand .footer-main,
+body.demo-brand footer.footer-main,
+body.demo-brand footer {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 55% 80% at 0% 0%, rgba(139, 92, 246, 0.28), transparent 55%),
+    radial-gradient(ellipse 50% 70% at 100% 20%, rgba(56, 189, 248, 0.22), transparent 50%),
+    radial-gradient(ellipse 60% 50% at 50% 100%, rgba(45, 212, 191, 0.14), transparent 55%),
+    linear-gradient(180deg, #070B16 0%, var(--zyntra-void) 48%, #03050A 100%) !important;
+  color: #E2E8F0 !important;
+  border-top: 1px solid rgba(167, 139, 250, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+body.demo-brand .footer-main::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 30%, #000 20%, transparent 75%);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+body.demo-brand .footer-main .container {
+  position: relative;
+  z-index: 1;
+}
+
+body.demo-brand .footer-logo {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.45),
+    0 0 28px rgba(56, 189, 248, 0.35);
+}
+
+body.demo-brand .footer-brand-name {
+  background: var(--zyntra-grad-text);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+}
+
+body.demo-brand .footer-main a,
+body.demo-brand .footer-contact p,
+body.demo-brand .footer-company p {
+  color: #CBD5E1 !important;
+}
+
+body.demo-brand .footer-main h6 {
+  color: var(--zyntra-cyan-bright) !important;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  font-family: 'Sora', 'Manrope', sans-serif;
+}
+
+body.demo-brand .footer-main a:hover {
+  color: #F0FDFA !important;
+  text-shadow: 0 0 16px rgba(56, 189, 248, 0.45);
+}
+
+body.demo-brand .footer-social i {
+  color: #E2E8F0;
+  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.35));
+}
+
+body.demo-brand .footer-bottom {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+  color: #94A3B8 !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+/* Beat layout_vendedor white content shells */
+body.demo-brand .content,
+body.demo-brand main.content,
+body.demo-brand .content-wrapper,
+body.demo-brand .catalogo-page,
+body.demo-brand .catalog-shell {
+  background: transparent !important;
+  color: var(--zyntra-text);
+}
+
+body.demo-brand .wrapper,
+body.demo-brand .page-wrapper,
+body.demo-brand .main-panel {
+  background: transparent !important;
+}
+
+body.demo-brand .dropdown-menu {
+  background: #111827;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  color: var(--zyntra-text);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+
+body.demo-brand .dropdown-item {
+  color: #E2E8F0;
+}
+
+body.demo-brand .dropdown-item:hover,
+body.demo-brand .dropdown-item:focus {
+  background: rgba(139, 92, 246, 0.2);
+  color: #fff;
+}
+
+body.demo-brand .language-menu {
+  background: #111827 !important;
+  border: 1px solid rgba(167, 139, 250, 0.3);
+}
+
+body.demo-brand .language-option {
+  background: transparent !important;
+  color: #E2E8F0 !important;
+}
+
+body.demo-brand .language-option:hover {
+  background: rgba(139, 92, 246, 0.2) !important;
+  color: #fff !important;
+}
+
+/* ---------- Catalog contrast: light canvas + futuristic chrome ---------- */
+/* Catalog is not under .layout; keep sidebar/main under banner + navbar */
+body.demo-brand[data-page="catalog"] {
+  /* catalogo.css sets a light body; keep chrome gaps from flashing white */
+  background: var(--zyntra-void) !important;
+  /* overflow-x:hidden breaks position:sticky — use clip on the catalog page */
+  overflow-x: clip !important;
+  overflow-y: visible !important;
+}
+
+html:has(body.demo-brand[data-page="catalog"]) {
+  overflow-x: clip;
+  overflow-y: auto;
+}
+
+body.demo-brand[data-page="catalog"] .sidebar {
+  top: var(--panel-navbar-offset) !important;
+  height: calc(100vh - var(--panel-navbar-offset)) !important;
+}
+
+body.demo-brand[data-page="catalog"] .main-content {
+  margin-top: var(--panel-navbar-offset) !important;
+  min-height: calc(100vh - var(--panel-navbar-offset)) !important;
+  overflow: visible !important;
+}
+
+body.demo-brand[data-page="catalog"] .catalog-search-sticky {
+  position: sticky !important;
+  top: var(--panel-navbar-offset) !important;
+  z-index: 90 !important;
+  background: #F8FAFC !important;
+  box-shadow: 0 10px 20px -12px rgba(15, 23, 42, 0.35);
+}
+
+body.demo-brand .main-content {
+  background: #F8FAFC !important;
+  color: #0F172A !important;
+  min-height: calc(100vh - 72px);
+  padding: 1.75rem 1.75rem 2.5rem !important;
+  border-radius: 0;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.04);
+}
+
+body.demo-brand .main-content .page-title,
+body.demo-brand .main-content h1,
+body.demo-brand .main-content h2,
+body.demo-brand .main-content h3,
+body.demo-brand .main-content h4,
+body.demo-brand .main-content h5 {
+  color: #0F172A !important;
+  background: none !important;
+  -webkit-background-clip: unset !important;
+  background-clip: unset !important;
+  filter: none !important;
+}
+
+body.demo-brand .main-content .subtitle,
+body.demo-brand .main-content .text-muted,
+body.demo-brand .main-content p {
+  color: #64748B !important;
+}
+
+body.demo-brand .catalog-header {
+  margin-bottom: 1.5rem !important;
+}
+
+body.demo-brand .catalog-search-sticky {
+  margin-bottom: 1.25rem;
+  padding: 0.55rem 0 0.85rem;
+  background: #F8FAFC !important;
+}
+
+body.demo-brand .main-content #buscador,
+body.demo-brand .main-content .form-control,
+body.demo-brand .main-content .form-select {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  color: #0F172A !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+body.demo-brand .main-content #buscador:focus,
+body.demo-brand .main-content .form-control:focus,
+body.demo-brand .main-content .form-select:focus {
+  border-color: #818CF8 !important;
+  box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.18) !important;
+}
+
+body.demo-brand .catalog-product-grid {
+  --bs-gutter-x: 1.75rem;
+  --bs-gutter-y: 1.75rem;
+  row-gap: 1.75rem !important;
+}
+
+body.demo-brand .producto-card {
+  padding: 1rem 1rem 0.9rem !important;
+  gap: 0.4rem;
+  background: #FFFFFF !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08) !important;
+  color: #0F172A !important;
+  backdrop-filter: none;
+}
+
+body.demo-brand .producto-card--promo {
+  border: 2px solid #F97316 !important;
+  background: linear-gradient(180deg, #FFF7ED 0%, #FFFFFF 42%) !important;
+  box-shadow:
+    0 0 0 3px rgba(249, 115, 22, 0.1),
+    0 12px 28px rgba(194, 65, 12, 0.16) !important;
+}
+
+body.demo-brand .producto-card:hover {
+  border-color: rgba(99, 102, 241, 0.35) !important;
+  box-shadow: 0 14px 32px rgba(99, 102, 241, 0.12) !important;
+}
+
+body.demo-brand .producto-card--promo:hover {
+  border-color: #EA580C !important;
+  box-shadow:
+    0 0 0 4px rgba(249, 115, 22, 0.14),
+    0 14px 32px rgba(194, 65, 12, 0.2) !important;
+}
+
+body.demo-brand .producto-card h5,
+body.demo-brand .producto-card .producto-nombre,
+body.demo-brand .producto-card .product-name,
+body.demo-brand .producto-card a {
+  color: #312E81 !important;
+}
+
+body.demo-brand .producto-card small,
+body.demo-brand .producto-card .text-muted {
+  color: #64748B !important;
+}
+
+body.demo-brand .producto-card .btn,
+body.demo-brand .producto-card .agregar-oferta-btn {
+  margin-top: 0;
+}
+
+body.demo-brand .producto-card__actions {
+  margin-top: auto;
+  gap: 0.35rem;
+}
+
+body.demo-brand .producto-card__actions .promo-add-btn {
+  margin-top: 0 !important;
+}
+
+body.demo-brand .producto-card .form-select,
+body.demo-brand .producto-card .form-control,
+body.demo-brand .producto-card input[type="number"] {
+  background: #F8FAFC !important;
+  border-color: #CBD5E1 !important;
+  color: #0F172A !important;
+}
+
+body.demo-brand .producto-img-wrap {
+  margin-bottom: 0 !important;
+}
+
+body.demo-brand .producto-img,
+body.demo-brand .producto-img--placeholder {
+  border-radius: 12px;
+  margin-bottom: 0 !important;
+  background: #F1F5F9 !important;
+}
+
+body.demo-brand .promo-discounts-btn {
+  background: #FFF7ED !important;
+  border-color: #FDBA74 !important;
+  color: #9A3412 !important;
+}
+
+body.demo-brand .promo-countdown--overlay,
+body.demo-brand .promo-badge--overlay {
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+}
+
+body.demo-brand .catalog-filter-selects {
+  margin-top: 0.85rem !important;
+  gap: 0.75rem !important;
+}
+
+body.demo-brand .main-content .promo-catalog-split {
+  background: linear-gradient(135deg, rgba(238, 242, 255, 0.95), rgba(240, 253, 250, 0.95));
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  border-radius: 14px;
+  padding: 1rem 1.15rem;
+}
+
+body.demo-brand .main-content .btn-outline-primary {
+  background: #FFFFFF !important;
+  color: #4F46E5 !important;
+  border-color: #A5B4FC !important;
+}
+
+body.demo-brand .main-content .btn-outline-primary:hover {
+  background: rgba(99, 102, 241, 0.08) !important;
+  color: #312E81 !important;
+}
+
+body.demo-brand .main-content .pagination .page-link {
+  background: #FFFFFF;
+  border-color: #E2E8F0;
+  color: #4F46E5;
+}
+
+body.demo-brand .main-content .pagination .page-item.active .page-link {
+  background: var(--zyntra-grad-cta) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+}
+
+body.demo-brand .content {
+  padding: 2.25rem 2.5rem !important;
+}
+
+body.demo-brand .quienes-section,
+body.demo-brand .elegirnos-section,
+body.demo-brand .marcas-section,
+body.demo-brand .install-app-section {
+  padding-top: 3.5rem !important;
+  padding-bottom: 3.5rem !important;
+}
+
+body.demo-brand .quienes-card {
+  padding: 2rem !important;
+}
+
+body.demo-brand .beneficio-card {
+  padding: 1.15rem 1.1rem !important;
+  gap: 0.75rem;
+}
+
+body.demo-brand .dashboard-cards {
+  --bs-gutter-x: 1.5rem;
+  --bs-gutter-y: 1.5rem;
+}
+
+body.demo-brand .content .card .card-body {
+  padding: 1.35rem 1.4rem;
+}
+
+body.demo-brand .qb-center-hero .card-body {
+  padding: 2rem 2.15rem !important;
+}
+
+/* ---------- Mark ----------
+   Kill LTG home.css oversized absolute logo (180px / margin-left -360px). */
+body.demo-brand .navbar-home .navbar-brand {
+  gap: 0.65rem;
+  align-items: center !important;
+  margin: 0 !important;
+  padding: 0.25rem 0 !important;
+  flex: 0 0 auto;
+}
+
+body.demo-brand .hero-home .navbar-home .navbar-collapse {
+  flex-grow: 1;
+  justify-content: flex-end !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+body.demo-brand .navbar-home .brand-text {
+  margin: 0 !important;
+  font-size: 1.05rem !important;
+  line-height: 1.1;
+}
+
+body.demo-brand .navbar-home .logo-navbar,
+body.demo-brand .navbar-home .logo-navbar.zyntra-mark,
+body.demo-brand .logo-navbar.zyntra-mark {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  margin: 0 !important;
+  width: 36px !important;
+  height: 36px !important;
+  max-width: 36px !important;
+  max-height: 36px !important;
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.35),
+    0 0 14px rgba(56, 189, 248, 0.2);
+}
+
+body.demo-brand .footer-logo.zyntra-mark,
+body.demo-brand .zyntra-mark:not(.logo-navbar) {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.28),
+    0 0 12px rgba(56, 189, 248, 0.12);
+}
+
+body.demo-brand .footer-logo.zyntra-mark {
+  width: 48px !important;
+  height: 48px !important;
+}
+
+@keyframes zyntra-sheen {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+body.demo-brand .navbar-custom,
+body.demo-brand .navbar-home {
+  background-size: 160% 100%;
+  animation: zyntra-sheen 22s ease-in-out infinite alternate;
+}
+
+/* Privacy / Terms public pages */
+body.demo-brand .legal-page-hero {
+  background:
+    radial-gradient(ellipse 80% 120% at 0% 50%, rgba(139, 92, 246, 0.42), transparent 55%),
+    radial-gradient(ellipse 70% 100% at 100% 40%, rgba(56, 189, 248, 0.35), transparent 55%),
+    var(--zyntra-grad-aurora) !important;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.28);
+}
+
+body.demo-brand .legal-page-hero .hero-logo.zyntra-mark {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 18px;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.4),
+    0 0 28px rgba(56, 189, 248, 0.28);
+}
+
+body.demo-brand .legal-page-hero .btn-light {
+  background: rgba(248, 250, 252, 0.95);
+  border: none;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+body.demo-brand .legal-page-hero .btn-light:hover {
+  background: #fff;
+  color: #020617;
+}
+
+body.demo-brand .legal-page-card {
+  background: rgba(17, 24, 39, 0.92) !important;
+  border: 1px solid rgba(167, 139, 250, 0.28) !important;
+  color: #e2e8f0;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+}
+
+body.demo-brand .legal-page-card .card-body,
+body.demo-brand .legal-page-card p,
+body.demo-brand .legal-page-card li,
+body.demo-brand .legal-page-card h4 {
+  color: #e2e8f0;
+}
+
+body.demo-brand .legal-page-card a {
+  color: var(--zyntra-cyan-bright);
+}
+
+body.demo-brand .legal-page-card .text-muted {
+  color: #94a3b8 !important;
+}
+
+body.demo-brand .legal-page-card hr {
+  border-color: rgba(148, 163, 184, 0.22);
+}
+
+/* Zyntra Guide — demo AI launcher / panel (match .whatsapp-float size) */
+body.demo-brand .ai-assistant-launcher--zyntra,
+body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-launcher {
+  right: 18px;
+  bottom: 1.25rem;
+  width: 58px;
+  height: 58px;
+  border: 2px solid rgba(167, 139, 250, 0.55);
+  background: linear-gradient(145deg, rgba(30, 27, 75, 0.98), rgba(15, 23, 42, 0.99));
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.18),
+    0 10px 24px rgba(0, 0, 0, 0.45),
+    0 0 20px rgba(56, 189, 248, 0.2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+body.demo-brand .ai-assistant-launcher--zyntra img,
+body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-launcher img {
+  width: 62%;
+  height: 62%;
+  object-fit: contain;
+  border-radius: 8px;
+  transform: none;
+}
+
+body.demo-brand .ai-assistant-launcher--zyntra[hidden],
+body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-launcher[hidden] {
+  display: none !important;
+}
+
+body.demo-brand .ai-assistant-panel--zyntra,
+body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-panel {
+  background: linear-gradient(165deg, #0f172a 0%, #111827 55%, #0b1220 100%);
+  color: #e2e8f0;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.55),
+    0 0 32px rgba(56, 189, 248, 0.12);
+}
+
+body.demo-brand .ai-assistant-panel--zyntra .ai-assistant-header,
+body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-header {
+  background: rgba(15, 23, 42, 0.9);
+  border-bottom: 1px solid rgba(167, 139, 250, 0.25);
+  color: #f8fafc;
+}
+
+body.demo-brand .ai-assistant-panel--zyntra .ai-assistant-header .small,
+body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-header .small {
+  color: #94a3b8;
+}
+
+body.demo-brand .ai-assistant-panel--zyntra .ai-assistant-close,
+body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-close {
+  background: rgba(148, 163, 184, 0.12);
+  color: #e2e8f0 !important;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+/* Message bubbles: dark text on light surfaces (panel chrome is light-on-dark). */
+body.demo-brand .ai-assistant-panel--zyntra .ai-assistant-messages,
+body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-messages {
+  color: #0f172a;
+}
+
+body.demo-brand .ai-assistant-panel--zyntra .ai-assistant-message,
+body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-message {
+  background: #e2e8f0;
+  color: #0f172a !important;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+body.demo-brand .ai-assistant-panel--zyntra .ai-assistant-message.is-user,
+body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-message.is-user {
+  background: #bae6fd;
+  color: #0c4a6e !important;
+  border-color: rgba(14, 165, 233, 0.35);
+}
+
+body.demo-brand .ai-assistant-panel--zyntra .ai-assistant-form .btn-primary,
+body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-form .btn-primary {
+  background: var(--zyntra-grad-cta, linear-gradient(135deg, #7c3aed, #06b6d4));
+  border: none;
+  color: #fff !important;
+}
+
+body.demo-brand .ai-assistant-panel--zyntra .form-control,
+body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-form .form-control,
+body.demo-brand .ai-assistant-panel--zyntra .ai-assistant-form input,
+body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-form input {
+  background: #0b1220 !important;
+  border-color: rgba(148, 163, 184, 0.45) !important;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc;
+  caret-color: #5eead4;
+}
+
+body.demo-brand .ai-assistant-panel--zyntra .form-control::placeholder,
+body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-form .form-control::placeholder,
+body.demo-brand .ai-assistant-panel--zyntra .ai-assistant-form input::placeholder,
+body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-form input::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8;
+  opacity: 1;
+}
+
+@media (max-width: 991.98px) {
+  body.demo-brand .ai-assistant-launcher--zyntra,
+  body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-launcher {
+    right: 14px;
+    width: 52px;
+    height: 52px;
+  }
+}
+
+@media (max-width: 480px) {
+  body.demo-brand .ai-assistant-launcher--zyntra,
+  body.demo-brand [data-ai-assistant][data-demo-assistant] .ai-assistant-launcher {
+    right: 12px;
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* Driver Deliveries — replace Tortilla blue hero with Zyntra aurora */
+body.demo-brand .layout .driver-list-hero,
+body.demo-brand .driver-list-hero {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  box-shadow:
+    0 18px 40px rgba(5, 7, 15, 0.28),
+    0 0 28px rgba(56, 189, 248, 0.12) !important;
+}
+
+body.demo-brand .layout .driver-list-hero h3,
+body.demo-brand .layout .driver-list-hero strong,
+body.demo-brand .driver-list-hero h3,
+body.demo-brand .driver-list-hero strong {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+body.demo-brand .layout .driver-list-hero p,
+body.demo-brand .layout .driver-list-hero span,
+body.demo-brand .driver-list-hero p,
+body.demo-brand .driver-list-hero span {
+  color: rgba(248, 250, 252, 0.9) !important;
+  -webkit-text-fill-color: rgba(248, 250, 252, 0.9) !important;
+}
+
+body.demo-brand .layout .driver-list-guide-item,
+body.demo-brand .driver-list-guide-item {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(167, 139, 250, 0.28) !important;
+}
+
+body.demo-brand .layout .driver-list-metric {
+  border-color: rgba(139, 92, 246, 0.18) !important;
+}
+
+/* Driver delivery detail — Tortilla #0b3d91 accents → Zyntra */
+body.demo-brand .layout .driver-step-index,
+body.demo-brand .layout .driver-adjustment-callout-icon,
+body.demo-brand .layout .camera-btn-camera {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  border-color: rgba(167, 139, 250, 0.4) !important;
+  box-shadow: 0 8px 18px rgba(5, 7, 15, 0.28) !important;
+}
+
+body.demo-brand .layout .driver-adjustment-callout {
+  border-color: rgba(139, 92, 246, 0.45) !important;
+  background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 58%, #ffffff 100%) !important;
+  box-shadow: 0 14px 32px rgba(5, 7, 15, 0.1) !important;
+}
+
+body.demo-brand .layout .driver-adjustment-callout::before {
+  background: linear-gradient(180deg, #8b5cf6 0%, #38bdf8 100%) !important;
+}
+
+body.demo-brand .layout .driver-adjustment-callout-title,
+body.demo-brand .layout .driver-adjustment-type-highlight .form-label {
+  color: #4c1d95 !important;
+  -webkit-text-fill-color: #4c1d95 !important;
+}
+
+body.demo-brand .layout .driver-adjustment-type-select,
+body.demo-brand .layout .camera-btn-gallery {
+  border-color: rgba(139, 92, 246, 0.55) !important;
+  color: #4c1d95 !important;
+}
+
+body.demo-brand .layout .camera-btn-gallery:hover,
+body.demo-brand .layout .camera-btn-gallery:focus {
+  color: #312e81 !important;
+  border-color: #8b5cf6 !important;
+}
+
+/* Driver.js tour accents */
+body.demo-brand .driver-popover {
+  background: #111827 !important;
+  color: #E2E8F0 !important;
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  border-radius: 14px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.5), 0 0 28px rgba(56, 189, 248, 0.15);
+}
+
+body.demo-brand .driver-popover .driver-popover-title {
+  color: #F8FAFC !important;
+}
+
+body.demo-brand .driver-popover .driver-popover-next-btn,
+body.demo-brand .driver-popover .driver-popover-done-btn {
+  background: var(--zyntra-grad-cta) !important;
+  color: #fff !important;
+  text-shadow: none !important;
+  border: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.demo-brand .navbar-custom,
+  body.demo-brand .navbar-home {
+    animation: none;
+  }
+
+  body.demo-brand .cta-mayorista .btn-yellow.cta-btn:hover {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   Admin panel workspace — Tortilla layout / contrast, Zyntra blues
+   Scoped to .layout so the public home can keep its own look.
+   ========================================================================== */
+
+body.demo-brand:has(.layout) {
+  background: #eef2f7;
+  color: #0f172a;
+}
+
+body.demo-brand .layout {
+  background: #eef2f7;
+}
+
+/* Header: continuous aurora from top:0; SOFTWARE LAB strip overlays the padding */
+body.demo-brand .navbar-custom {
+  top: 0 !important;
+  background: var(--zyntra-admin-header) !important;
+  overflow: visible !important;
+  min-height: calc(var(--demo-banner-height) + 64px);
+  padding-top: calc(var(--demo-banner-height) + 0.7rem) !important;
+  padding-bottom: 0.7rem !important;
+  border-top: none !important;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35) !important;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.28) !important;
+  animation: none;
+}
+
+body.demo-brand .navbar-custom .navbar-brand,
+body.demo-brand .navbar-custom .navbar-brand-group {
+  overflow: visible !important;
+  align-items: center !important;
+  line-height: 1.15;
+  margin: 0 !important;
+  padding-top: 0.15rem;
+  padding-bottom: 0.15rem;
+}
+
+body.demo-brand .navbar-custom .navbar-brand {
+  color: #fff !important;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body.demo-brand .navbar-custom .zyntra-mark {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+/* Sidebar: light rail like Tortilla, Zyntra active state */
+body.demo-brand .layout .sidebar {
+  top: var(--panel-navbar-offset) !important;
+  height: calc(100vh - var(--panel-navbar-offset)) !important;
+  background: #ffffff !important;
+  border-right: 1px solid #d7e0ec !important;
+  box-shadow: 4px 0 18px rgba(15, 23, 42, 0.06);
+  color: #1e293b;
+}
+
+body.demo-brand .layout .sidebar-user {
+  background: var(--zyntra-admin-hero) !important;
+  color: #fff !important;
+  border: none !important;
+  margin-top: 0.75rem;
+}
+
+body.demo-brand .layout .sidebar-section-title,
+body.demo-brand .layout .sidebar-collapsible-summary {
+  color: var(--zyntra-admin-accent) !important;
+}
+
+body.demo-brand .layout .sidebar-collapsible-summary::after {
+  color: #64748b !important;
+}
+
+body.demo-brand .layout .sidebar .list-group-item,
+body.demo-brand .layout .sidebar button.list-group-item {
+  color: #334155 !important;
+  background: transparent !important;
+}
+
+body.demo-brand .layout .sidebar .list-group-item:hover {
+  background: rgba(99, 102, 241, 0.1) !important;
+  color: #0f172a !important;
+}
+
+body.demo-brand .layout .sidebar .active,
+body.demo-brand .layout .sidebar .list-group-item.active {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  border: 1px solid rgba(167, 139, 250, 0.35) !important;
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.22),
+    0 0 20px rgba(56, 189, 248, 0.18);
+}
+
+body.demo-brand .layout .sidebar .active::before,
+body.demo-brand .layout .sidebar .list-group-item.active::before {
+  background: var(--zyntra-admin-sky) !important;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+}
+
+/* Content canvas + typography */
+body.demo-brand .layout .content,
+body.demo-brand .layout main.content {
+  background: #eef2f7 !important;
+  color: #0f172a !important;
+}
+
+body.demo-brand .layout .content h1,
+body.demo-brand .layout .content h2,
+body.demo-brand .layout .content h3,
+body.demo-brand .layout .content h4,
+body.demo-brand .layout .content h5,
+body.demo-brand .layout .content h6,
+body.demo-brand .layout .content .page-title,
+body.demo-brand .layout .content label,
+body.demo-brand .layout .content th,
+body.demo-brand .layout .content td,
+body.demo-brand .layout .content p,
+body.demo-brand .layout .content li,
+body.demo-brand .layout .content .admin-toolbar {
+  color: #0f172a;
+}
+
+/* Never force dark ink onto aurora buttons / dark chips (keep light count badges readable) */
+body.demo-brand .layout .content .btn-primary,
+body.demo-brand .layout .content .btn-primary *:not(.badge),
+body.demo-brand .layout .content .btn-success,
+body.demo-brand .layout .content .btn-success *:not(.badge),
+body.demo-brand .layout .content .btn-info,
+body.demo-brand .layout .content .btn-info *:not(.badge),
+body.demo-brand .layout .content .badge.bg-primary,
+body.demo-brand .layout .content .badge.text-bg-primary {
+  color: #fff !important;
+}
+
+body.demo-brand .layout .content .text-muted,
+body.demo-brand .layout .content .small.text-muted {
+  color: #64748b !important;
+}
+
+/* Cards: white surfaces, dark ink (Tortilla readability) */
+body.demo-brand .layout .content .card {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  border-radius: 16px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06) !important;
+  backdrop-filter: none;
+}
+
+body.demo-brand .layout .content .card .card-body,
+body.demo-brand .layout .content .card .card-title,
+body.demo-brand .layout .content .card h1,
+body.demo-brand .layout .content .card h2,
+body.demo-brand .layout .content .card h3,
+body.demo-brand .layout .content .card h4,
+body.demo-brand .layout .content .card h5,
+body.demo-brand .layout .content .card p,
+body.demo-brand .layout .content .card label,
+body.demo-brand .layout .content .card td,
+body.demo-brand .layout .content .card th {
+  color: #0f172a !important;
+}
+
+/* Branded hero cards — same aurora blue as home navbar */
+body.demo-brand .layout .content .card.qb-center-hero,
+body.demo-brand .layout .content .dashboard-cards .card.qb-center-hero,
+body.demo-brand .layout .content .card.bg-primary,
+body.demo-brand .layout .content .card.text-bg-primary,
+body.demo-brand .layout .content .bg-primary {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  border: 1px solid rgba(167, 139, 250, 0.35) !important;
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.28),
+    0 0 36px rgba(56, 189, 248, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+body.demo-brand .layout .content .card.qb-center-hero .card-body,
+body.demo-brand .layout .content .card.qb-center-hero .card-body *:not(.btn):not(.badge),
+body.demo-brand .layout .content .card.bg-primary .card-body,
+body.demo-brand .layout .content .card.bg-primary .card-body *:not(.btn):not(.badge),
+body.demo-brand .layout .content .card.text-bg-primary .card-body,
+body.demo-brand .layout .content .card.text-bg-primary .card-body *:not(.btn):not(.badge) {
+  color: #fff !important;
+  background-color: transparent;
+}
+
+body.demo-brand .layout .content .card.qb-center-hero .text-white-50,
+body.demo-brand .layout .content .card.qb-center-hero .opacity-75,
+body.demo-brand .layout .content .card.bg-primary .text-white-50,
+body.demo-brand .layout .content .card.text-bg-primary .text-white-50 {
+  color: rgba(226, 232, 240, 0.85) !important;
+}
+
+body.demo-brand .layout .content .card.qb-center-hero .badge.text-bg-light,
+body.demo-brand .layout .content .card.qb-center-hero .badge.text-primary {
+  background: rgba(248, 250, 252, 0.14) !important;
+  color: #e0f2fe !important;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+}
+
+body.demo-brand .layout .content .card.qb-center-hero .btn-light,
+body.demo-brand .layout .content .card.qb-center-hero .btn-light.text-primary {
+  background: #f8fafc !important;
+  color: #312e81 !important;
+  border: none !important;
+  font-weight: 700;
+}
+
+body.demo-brand .layout .content .card.qb-center-hero .btn-outline-light {
+  background: rgba(15, 23, 42, 0.25) !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(226, 232, 240, 0.45) !important;
+}
+
+body.demo-brand .layout .content .card.qb-center-hero .bg-white.bg-opacity-10 {
+  background: rgba(248, 250, 252, 0.1) !important;
+  border: 1px solid rgba(167, 139, 250, 0.22);
+}
+
+body.demo-brand .layout .content .dashboard-cards .card:not(.qb-center-hero),
+body.demo-brand .layout .content .dashboard-cards .card.admin-kpi-card,
+body.demo-brand .layout .content .stat-box,
+body.demo-brand .admin-kpi-card {
+  background: #fff !important;
+  color: #0f172a !important;
+  /* Visible frame — KPI tiles were reading as floating text on #eef2f7 */
+  border: 1px solid #94a3b8 !important;
+  outline: 1px solid #cbd5e1;
+  outline-offset: 0;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06) !important;
+}
+
+body.demo-brand .layout .content .dashboard-cards .card:not(.qb-center-hero) h2,
+body.demo-brand .layout .content .dashboard-cards .card:not(.qb-center-hero) .display-6,
+body.demo-brand .layout .content .dashboard-cards .card:not(.qb-center-hero) .fs-2,
+body.demo-brand .layout .content .dashboard-cards .card:not(.qb-center-hero) strong,
+body.demo-brand .layout .content .dashboard-cards .card:not(.qb-center-hero) h3 {
+  color: var(--zyntra-admin-accent) !important;
+}
+
+/* Forms / filters */
+body.demo-brand .layout .form-control,
+body.demo-brand .layout .form-select,
+body.demo-brand .layout #buscador {
+  background: #ffffff !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a;
+}
+
+body.demo-brand .layout .form-control::placeholder,
+body.demo-brand .layout #buscador::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8;
+  opacity: 1;
+}
+
+body.demo-brand .layout .form-control:focus,
+body.demo-brand .layout .form-select:focus,
+body.demo-brand .layout #buscador:focus {
+  border-color: var(--zyntra-admin-accent-soft) !important;
+  box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.2) !important;
+}
+
+body.demo-brand .layout .btn-outline-primary {
+  background: #fff !important;
+  color: var(--zyntra-admin-accent) !important;
+  border-color: #a5b4fc !important;
+}
+
+body.demo-brand .layout .btn-outline-primary:hover {
+  background: rgba(99, 102, 241, 0.08) !important;
+  color: var(--zyntra-admin-ink) !important;
+}
+
+body.demo-brand .layout .btn-primary,
+body.demo-brand .layout .btn-success,
+body.demo-brand .layout .btn-info {
+  background: var(--zyntra-admin-header) !important;
+  border: 1px solid rgba(167, 139, 250, 0.35) !important;
+  color: #fff !important;
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.22),
+    0 0 20px rgba(56, 189, 248, 0.16);
+}
+
+body.demo-brand .layout .btn-primary:hover,
+body.demo-brand .layout .btn-success:hover,
+body.demo-brand .layout .btn-info:hover {
+  background: var(--zyntra-admin-hero) !important;
+  color: #fff !important;
+  filter: brightness(1.08);
+}
+
+/* Tables (Products and the rest) */
+body.demo-brand .layout .table {
+  color: #0f172a !important;
+  --bs-table-color: #0f172a;
+  --bs-table-bg: #ffffff;
+  --bs-table-striped-bg: #f8fafc;
+  --bs-table-hover-bg: #eef2ff;
+  --bs-table-border-color: #e2e8f0;
+  background: #fff;
+}
+
+body.demo-brand .layout .table > :not(caption) > tbody > * > * {
+  color: #0f172a !important;
+  background-color: var(--bs-table-bg);
+  border-bottom-color: #e2e8f0;
+}
+
+/* Dark aurora headers → white labels (Customers, Products, etc.) */
+body.demo-brand .layout .table thead th,
+body.demo-brand .layout .table > :not(caption) > thead > * > th,
+body.demo-brand .layout .table > :not(caption) > thead > * > * {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.28) !important;
+  font-weight: 800;
+}
+
+body.demo-brand .layout .table tbody td {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a;
+}
+
+/* Plain links in cells stay dark; action buttons/badges keep their own color */
+body.demo-brand .layout .table tbody td a:not(.btn) {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a;
+}
+
+/* Solid filled buttons → white label */
+body.demo-brand .layout .table tbody td .btn-primary,
+body.demo-brand .layout .table tbody td .btn-primary *,
+body.demo-brand .layout .table tbody td .btn-success,
+body.demo-brand .layout .table tbody td .btn-success *,
+body.demo-brand .layout .table tbody td .btn-warning,
+body.demo-brand .layout .table tbody td .btn-warning *,
+body.demo-brand .layout .table tbody td .btn-danger,
+body.demo-brand .layout .table tbody td .btn-danger *,
+body.demo-brand .layout .table tbody td .btn-info,
+body.demo-brand .layout .table tbody td .btn-info *,
+body.demo-brand .layout .table tbody td .btn-dark,
+body.demo-brand .layout .table tbody td .btn-dark *,
+body.demo-brand .layout .table tbody td .btn-secondary:not(.btn-outline-secondary),
+body.demo-brand .layout .table tbody td a.btn-primary,
+body.demo-brand .layout .table tbody td a.btn-success,
+body.demo-brand .layout .table tbody td a.btn-warning,
+body.demo-brand .layout .table tbody td a.btn-danger,
+body.demo-brand .layout .table tbody td a.btn-dark {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+/* Outline action buttons in tables → colored CTA + white label */
+body.demo-brand .layout .table tbody td .btn-outline-primary,
+body.demo-brand .layout .table tbody td .btn-outline-secondary,
+body.demo-brand .layout .table tbody td .btn-outline-success,
+body.demo-brand .layout .table tbody td .btn-outline-dark,
+body.demo-brand .layout .table tbody td .btn-outline-info,
+body.demo-brand .layout .table tbody td .btn-outline-warning,
+body.demo-brand .layout .table tbody td .btn-outline-danger,
+body.demo-brand .layout .table tbody td a.btn-outline-primary,
+body.demo-brand .layout .table tbody td a.btn-outline-secondary,
+body.demo-brand .layout .table tbody td a.btn-outline-success,
+body.demo-brand .layout .table tbody td a.btn-outline-dark,
+body.demo-brand .layout .content .table tbody td .btn-outline-primary,
+body.demo-brand .layout .content .table tbody td .btn-outline-secondary,
+body.demo-brand .layout .content .table tbody td a.btn-outline-primary,
+body.demo-brand .layout .content .table tbody td a.btn-outline-secondary,
+body.demo-brand .layout .content .mobile-stack-table__action .btn-outline-primary,
+body.demo-brand .layout .content .mobile-stack-table__action .btn-outline-secondary,
+body.demo-brand .layout .content .invoice-list-actions .btn-outline-primary,
+body.demo-brand .layout .content .invoice-list-actions .btn-outline-secondary,
+body.demo-brand .layout .content .quotes-hub .table .btn-outline-primary,
+body.demo-brand .layout .content .quotes-hub .table .btn-outline-secondary {
+  background: var(--zyntra-admin-btn) !important;
+  background-image: var(--zyntra-admin-btn) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border: 1px solid rgba(167, 139, 250, 0.35) !important;
+  box-shadow: 0 4px 14px rgba(5, 7, 15, 0.35) !important;
+}
+
+body.demo-brand .layout .table tbody td .btn-outline-success,
+body.demo-brand .layout .table tbody td a.btn-outline-success,
+body.demo-brand .layout .content .quotes-hub .table .btn-outline-success {
+  background: linear-gradient(135deg, #047857, #10b981) !important;
+  background-image: linear-gradient(135deg, #047857, #10b981) !important;
+  border-color: rgba(16, 185, 129, 0.45) !important;
+}
+
+body.demo-brand .layout .table tbody td .btn-outline-primary:hover,
+body.demo-brand .layout .table tbody td .btn-outline-secondary:hover,
+body.demo-brand .layout .table tbody td a.btn-outline-primary:hover,
+body.demo-brand .layout .table tbody td a.btn-outline-secondary:hover {
+  background: var(--zyntra-admin-btn-hover) !important;
+  background-image: var(--zyntra-admin-btn-hover) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border-color: rgba(167, 139, 250, 0.5) !important;
+  filter: brightness(1.08);
+}
+
+body.demo-brand .layout .table tbody td .badge.bg-primary,
+body.demo-brand .layout .table tbody td .badge.text-bg-primary,
+body.demo-brand .layout .table tbody td .badge.bg-dark,
+body.demo-brand .layout .table tbody td .badge.text-bg-dark,
+body.demo-brand .layout .table tbody td .badge.bg-secondary,
+body.demo-brand .layout .table tbody td .badge.text-bg-secondary {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+body.demo-brand .layout .table tbody td .badge.bg-primary,
+body.demo-brand .layout .table tbody td .badge.text-bg-primary,
+body.demo-brand .layout .badge.bg-primary,
+body.demo-brand .layout .badge.text-bg-primary {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+body.demo-brand .layout .table tbody td .btn-warning,
+body.demo-brand .layout .table tbody td a.btn-warning,
+body.demo-brand .layout .btn-warning,
+body.demo-brand .layout a.btn-warning {
+  background: var(--zyntra-admin-header) !important;
+  border: 1px solid rgba(167, 139, 250, 0.35) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+body.demo-brand .layout .table-responsive {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+}
+
+body.demo-brand .layout .badge.bg-success,
+body.demo-brand .layout .badge.text-bg-success {
+  background: #d1fae5 !important;
+  color: #047857 !important;
+  border: 1px solid #6ee7b7;
+}
+
+body.demo-brand .layout .pagination .page-link {
+  background: #fff;
+  border-color: #e2e8f0;
+  color: var(--zyntra-admin-accent);
+}
+
+body.demo-brand .layout .list-group-item {
+  background: #fff;
+  color: #0f172a;
+  border-color: #e2e8f0;
+}
+
+/* ---------- Reports Center ---------- */
+body.demo-brand .reports-shell {
+  --rc-navy: #0b1220;
+  --rc-blue: #38bdf8;
+  --rc-cyan: #38bdf8;
+  --rc-soft: #eef2ff;
+  --rc-stroke: rgba(15, 23, 42, 0.12);
+  --rc-muted: #64748b;
+}
+
+body.demo-brand .reports-hero {
+  background: var(--zyntra-admin-hero) !important;
+  color: #fff !important;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
+}
+
+body.demo-brand .reports-hero h1,
+body.demo-brand .reports-hero p,
+body.demo-brand .reports-hero .eyebrow,
+body.demo-brand .reports-hero span {
+  color: #fff !important;
+}
+
+/* Hero actions: filled light = dark ink; outline = light label on glass (never white-on-white) */
+body.demo-brand .reports-hero .btn-light,
+body.demo-brand .reports-hero .btn-light.text-primary {
+  background: #f8fafc !important;
+  color: #0b1220 !important;
+  -webkit-text-fill-color: #0b1220 !important;
+  border: 1px solid #f8fafc !important;
+  font-weight: 700;
+}
+
+body.demo-brand .reports-hero .btn-outline-light {
+  background: rgba(15, 23, 42, 0.28) !important;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  border: 1px solid rgba(248, 250, 252, 0.55) !important;
+  font-weight: 700;
+}
+
+body.demo-brand .reports-hero .btn-outline-light:hover {
+  background: rgba(56, 189, 248, 0.22) !important;
+  border-color: rgba(94, 234, 212, 0.65) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+body.demo-brand .reports-filter-card,
+body.demo-brand .reports-panel,
+body.demo-brand .reports-shell .card {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid var(--rc-stroke) !important;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06) !important;
+}
+
+body.demo-brand .reports-panel .panel-head {
+  border-bottom: 1px solid var(--rc-stroke);
+}
+
+body.demo-brand .reports-panel .panel-head h3,
+body.demo-brand .reports-panel .panel-body,
+body.demo-brand .reports-panel .panel-body p,
+body.demo-brand .reports-panel .panel-body span,
+body.demo-brand .reports-panel .meta,
+body.demo-brand .reports-legend-item,
+body.demo-brand .reports-legend-inline,
+body.demo-brand .reports-day-label,
+body.demo-brand .reports-trend-bars .day-label,
+body.demo-brand .reports-compare-table td,
+body.demo-brand .reports-compare-table th {
+  color: #0f172a !important;
+}
+
+body.demo-brand .reports-panel .panel-head h3 {
+  color: var(--zyntra-admin-ink) !important;
+  font-weight: 800;
+}
+
+body.demo-brand .reports-kpi,
+body.demo-brand .reports-period-pill {
+  background: var(--zyntra-admin-header) !important;
+  border: 1px solid rgba(167, 139, 250, 0.35) !important;
+  color: #fff !important;
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.22),
+    0 0 24px rgba(56, 189, 248, 0.14);
+}
+
+body.demo-brand .reports-kpi .label,
+body.demo-brand .reports-kpi .caption,
+body.demo-brand .reports-period-pill .label {
+  color: rgba(226, 232, 240, 0.88) !important;
+}
+
+body.demo-brand .reports-kpi .value,
+body.demo-brand .reports-period-pill .value {
+  color: #fff !important;
+}
+
+body.demo-brand .reports-focus-btn.is-active {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  border-color: rgba(167, 139, 250, 0.4) !important;
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.22),
+    0 0 18px rgba(56, 189, 248, 0.16);
+}
+
+body.demo-brand .reports-focus-btn:hover {
+  background: rgba(56, 189, 248, 0.1) !important;
+  color: #0b1220 !important;
+}
+
+body.demo-brand .reports-chip:hover {
+  background: rgba(56, 189, 248, 0.1) !important;
+  color: #0b1220 !important;
+}
+
+body.demo-brand .reports-shell .btn-primary,
+body.demo-brand .reports-shell #bi-smart-go {
+  background: var(--zyntra-admin-header) !important;
+  border: 1px solid rgba(167, 139, 250, 0.35) !important;
+  color: #fff !important;
+}
+
+body.demo-brand .reports-trend-bars .bar.sales {
+  background: linear-gradient(180deg, #38bdf8 0%, #0b1224 100%);
+}
+
+body.demo-brand .reports-bar-row .fill {
+  background: linear-gradient(90deg, #0b1224 0%, #38bdf8 100%);
+}
+
+body.demo-brand .reports-legend-inline .lg-sales::before {
+  background: #38bdf8;
+}
+
+body.demo-brand .reports-trend-svg text,
+body.demo-brand .reports-panel svg text {
+  fill: #0f172a !important;
+}
+
+body.demo-brand .reports-compare-table thead th {
+  background: #eef2ff !important;
+  color: #0b1220 !important;
+}
+
+body.demo-brand .reports-ask,
+body.demo-brand .reports-shell .suggestion-pill,
+body.demo-brand .reports-shell .chip,
+body.demo-brand .reports-chip {
+  background: #fff !important;
+  color: #0b1220 !important;
+  border-color: rgba(56, 189, 248, 0.35) !important;
+}
+
+/* ---------- QuickBooks Center hub ---------- */
+body.demo-brand .qb-shell {
+  --qb-navy: #0b1220;
+  --qb-blue: #38bdf8;
+  --qb-cyan: #5eead4;
+  --qb-ice: #eef2ff;
+  --qb-stroke: rgba(15, 23, 42, 0.12);
+  --qb-text-soft: #64748b;
+}
+
+body.demo-brand .qb-hero {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.3),
+    0 0 36px rgba(56, 189, 248, 0.16) !important;
+}
+
+body.demo-brand .qb-hero-copy h1,
+body.demo-brand .qb-hero-copy p,
+body.demo-brand .qb-hero .qb-eyebrow,
+body.demo-brand .qb-hero-status-title,
+body.demo-brand .qb-hero-status-copy,
+body.demo-brand .qb-metric-label,
+body.demo-brand .qb-metric-value,
+body.demo-brand .qb-hero-panel,
+body.demo-brand .qb-hero-panel * {
+  color: #fff !important;
+}
+
+body.demo-brand .qb-hero-copy p,
+body.demo-brand .qb-hero-status-copy,
+body.demo-brand .qb-metric-label {
+  color: rgba(226, 232, 240, 0.88) !important;
+}
+
+body.demo-brand .qb-eyebrow {
+  background: rgba(248, 250, 252, 0.14) !important;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  color: #e0f2fe !important;
+}
+
+body.demo-brand .qb-hero-panel {
+  background: rgba(248, 250, 252, 0.1) !important;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+}
+
+body.demo-brand .qb-hero .btn-light,
+body.demo-brand .qb-hero .btn-outline-light {
+  font-weight: 700;
+}
+
+body.demo-brand .qb-hero .btn-light {
+  background: #f8fafc !important;
+  color: #0b1220 !important;
+  border: none !important;
+}
+
+body.demo-brand .qb-hero .btn-outline-light {
+  background: rgba(15, 23, 42, 0.28) !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(226, 232, 240, 0.45) !important;
+}
+
+body.demo-brand .qb-step-number,
+body.demo-brand .qb-preview-tab.is-active {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  border-color: rgba(167, 139, 250, 0.35) !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+body.demo-brand .qb-step-visual {
+  background:
+    radial-gradient(ellipse 80% 120% at 0% 50%, rgba(139, 92, 246, 0.22), transparent 55%),
+    radial-gradient(ellipse 70% 100% at 100% 40%, rgba(56, 189, 248, 0.2), transparent 55%),
+    rgba(15, 23, 42, 0.06) !important;
+  color: #38bdf8 !important;
+}
+
+body.demo-brand .qb-mini-stat-value,
+body.demo-brand .qb-outbound-stat-value,
+body.demo-brand .qb-outbound-panel__title,
+body.demo-brand .qb-outbound-section-head h3,
+body.demo-brand .qb-executive-title {
+  color: #0b1220 !important;
+}
+
+body.demo-brand .qb-chip,
+body.demo-brand .qb-outbound-panel__badge {
+  color: #0b1220 !important;
+  border-color: rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.08);
+}
+
+body.demo-brand .qb-shell .btn-primary {
+  background: var(--zyntra-admin-header) !important;
+  border: 1px solid rgba(167, 139, 250, 0.35) !important;
+  color: #fff !important;
+}
+
+body.demo-brand .qb-shell .btn-outline-primary {
+  background: #fff !important;
+  color: #0b1220 !important;
+  border-color: rgba(56, 189, 248, 0.45) !important;
+}
+
+body.demo-brand .qb-shell .btn-outline-primary:hover {
+  background: rgba(56, 189, 248, 0.1) !important;
+}
+
+body.demo-brand #qb-task-progress-bar {
+  background: linear-gradient(90deg, #0b1224, #38bdf8) !important;
+}
+
+/* ---------- Vendor / Sales heroes (Customers, Take order, etc.) ---------- */
+body.demo-brand .vendor-hero,
+body.demo-brand .vendor-order-hero {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  box-shadow:
+    0 24px 50px rgba(0, 0, 0, 0.28),
+    0 0 32px rgba(56, 189, 248, 0.14) !important;
+}
+
+body.demo-brand .layout .content .vendor-hero,
+body.demo-brand .layout .content .vendor-order-hero,
+body.demo-brand .layout .content .vendor-hero h1,
+body.demo-brand .layout .content .vendor-hero h2,
+body.demo-brand .layout .content .vendor-hero h3,
+body.demo-brand .layout .content .vendor-hero h4,
+body.demo-brand .layout .content .vendor-hero p,
+body.demo-brand .layout .content .vendor-hero span,
+body.demo-brand .layout .content .vendor-hero .vendor-hero-title,
+body.demo-brand .layout .content .vendor-hero .vendor-hero-copy,
+body.demo-brand .layout .content .vendor-hero .vendor-eyebrow,
+body.demo-brand .layout .content .vendor-hero .vendor-stat-pill-value,
+body.demo-brand .layout .content .vendor-hero .vendor-stat-pill-label,
+body.demo-brand .layout .content .vendor-order-hero h1,
+body.demo-brand .layout .content .vendor-order-hero h2,
+body.demo-brand .layout .content .vendor-order-hero h3,
+body.demo-brand .layout .content .vendor-order-hero p,
+body.demo-brand .layout .content .vendor-order-hero span,
+body.demo-brand .layout .content .vendor-order-hero .vendor-order-title,
+body.demo-brand .layout .content .vendor-order-hero .vendor-order-copy,
+body.demo-brand .layout .content .vendor-order-hero .vendor-order-eyebrow,
+body.demo-brand .layout .content .vendor-order-hero .vendor-order-hero-value,
+body.demo-brand .layout .content .vendor-order-hero .vendor-order-hero-label {
+  color: #fff !important;
+}
+
+body.demo-brand .vendor-hero-copy,
+body.demo-brand .vendor-stat-pill-label,
+body.demo-brand .vendor-order-copy,
+body.demo-brand .vendor-order-hero-label {
+  color: rgba(226, 232, 240, 0.88) !important;
+}
+
+body.demo-brand .vendor-eyebrow,
+body.demo-brand .vendor-order-eyebrow,
+body.demo-brand .vendor-stat-pill,
+body.demo-brand .vendor-order-hero-stat {
+  background: rgba(248, 250, 252, 0.12) !important;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  color: #fff !important;
+}
+
+body.demo-brand .vendor-panel-title,
+body.demo-brand .vendor-filter-panel .vendor-panel-title {
+  color: #0b1220 !important;
+}
+
+body.demo-brand .vendor-panel-copy {
+  color: #64748b !important;
+}
+
+body.demo-brand .layout .content .vendor-shell .table thead th,
+body.demo-brand .layout .content .vendor-order-shell .table thead th,
+body.demo-brand .layout .content .vendor-table-card .table thead th,
+body.demo-brand .layout .content .card .table thead th,
+body.demo-brand .layout .content .card.custom-card .table thead th {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  border-bottom-color: rgba(167, 139, 250, 0.28) !important;
+}
+
+body.demo-brand .layout .content .vendor-shell .table tbody td,
+body.demo-brand .layout .content .vendor-order-shell .table tbody td,
+body.demo-brand .layout .content .vendor-table-card .table tbody td {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+body.demo-brand .layout .content .table tbody td a.btn-warning,
+body.demo-brand .layout .content .table tbody td a.btn-primary,
+body.demo-brand .layout .content .table tbody td a.btn-success,
+body.demo-brand .layout .content .table tbody td a.btn-danger,
+body.demo-brand .layout .content .table tbody td .badge.bg-primary,
+body.demo-brand .layout .content .table tbody td .badge.text-bg-primary {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+/* Actions dropdown inside light tables — readable labels (td fill-color was hiding text) */
+body.demo-brand .layout .dropdown-menu,
+body.demo-brand .layout .content .dropdown-menu,
+body.demo-brand .layout .table .dropdown-menu {
+  background: #fff !important;
+  color: #0b1220 !important;
+  border: 1px solid rgba(15, 23, 42, 0.12) !important;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14) !important;
+}
+
+body.demo-brand .layout .dropdown-item,
+body.demo-brand .layout .content .dropdown-item,
+body.demo-brand .layout .table .dropdown-item {
+  color: #0b1220 !important;
+  -webkit-text-fill-color: #0b1220 !important;
+  background: transparent !important;
+}
+
+body.demo-brand .layout .dropdown-item:hover,
+body.demo-brand .layout .dropdown-item:focus,
+body.demo-brand .layout .content .dropdown-item:hover,
+body.demo-brand .layout .content .dropdown-item:focus,
+body.demo-brand .layout .table .dropdown-item:hover,
+body.demo-brand .layout .table .dropdown-item:focus {
+  background: rgba(99, 102, 241, 0.1) !important;
+  color: #0b1220 !important;
+  -webkit-text-fill-color: #0b1220 !important;
+}
+
+body.demo-brand .layout .dropdown-item.text-warning,
+body.demo-brand .layout .table .dropdown-item.text-warning,
+body.demo-brand .layout .dropdown-item.text-warning:hover,
+body.demo-brand .layout .table .dropdown-item.text-warning:hover {
+  color: #b45309 !important;
+  -webkit-text-fill-color: #b45309 !important;
+}
+
+body.demo-brand .layout .dropdown-item.text-danger,
+body.demo-brand .layout .table .dropdown-item.text-danger,
+body.demo-brand .layout .dropdown-item.text-danger:hover,
+body.demo-brand .layout .table .dropdown-item.text-danger:hover {
+  color: #be123c !important;
+  -webkit-text-fill-color: #be123c !important;
+}
+
+/* Action column buttons — always white label on colored fills */
+body.demo-brand .layout .content .vendor-action-btn,
+body.demo-brand .layout .content .vendor-action-btn *,
+body.demo-brand .layout .content .vendor-terms-btn,
+body.demo-brand .layout .content .vendor-terms-btn *,
+body.demo-brand .layout .content .vendor-credit-limit-btn,
+body.demo-brand .layout .content .vendor-credit-limit-btn *,
+body.demo-brand .layout .content .vendor-access-view-btn,
+body.demo-brand .layout .content .vendor-access-view-btn *,
+body.demo-brand .layout .content .vendor-access-pending-btn,
+body.demo-brand .layout .content .vendor-access-pending-btn *,
+body.demo-brand .layout .content .vendor-secondary-btn,
+body.demo-brand .layout .content .vendor-secondary-btn *,
+body.demo-brand .layout .content .clientes-acciones-group .btn,
+body.demo-brand .layout .content .clientes-acciones-group .btn * {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+body.demo-brand .layout .content .vendor-action-btn,
+body.demo-brand .layout .content .vendor-terms-btn {
+  background: var(--zyntra-admin-header) !important;
+  border: 1px solid rgba(167, 139, 250, 0.35) !important;
+}
+
+body.demo-brand .layout .content .vendor-access-view-btn {
+  background: linear-gradient(135deg, #0b1224 0%, #1e3a8a 55%, #38bdf8 100%) !important;
+  border: none !important;
+}
+
+body.demo-brand .layout .content .vendor-credit-limit-btn,
+body.demo-brand .layout .content .vendor-access-pending-btn {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+body.demo-brand .layout .content .vendor-secondary-btn.btn-danger {
+  background: linear-gradient(135deg, #be123c, #e11d48) !important;
+}
+
+body.demo-brand .layout .content .vendor-secondary-btn.btn-success,
+body.demo-brand .layout .content .vendor-secondary-btn.is-success {
+  background: linear-gradient(135deg, #047857, #10b981) !important;
+}
+
+/* ==========================================================================
+   Contrast lock — dark aurora surfaces always get light text
+   ========================================================================== */
+
+body.demo-brand .navbar-custom,
+body.demo-brand .navbar-custom .navbar-brand,
+body.demo-brand .navbar-custom .nav-link,
+body.demo-brand .navbar-custom .btn-outline-light,
+body.demo-brand .navbar-custom .sidebar-toggle-btn {
+  color: #fff !important;
+}
+
+body.demo-brand .navbar-custom .form-control,
+body.demo-brand .navbar-custom .panel-search-input,
+body.demo-brand .navbar-custom input[type="search"] {
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc;
+}
+
+body.demo-brand .navbar-custom .btn-danger,
+body.demo-brand .navbar-custom .btn-danger * {
+  color: #fff !important;
+}
+
+body.demo-brand .navbar-urgent-alerts-toggle,
+body.demo-brand .navbar-urgent-alerts-label {
+  color: #fff !important;
+}
+
+/* Orders / Customers alert panels — keep light canvas; global .dropdown-menu is dark */
+body.demo-brand .navbar-urgent-alerts-menu.dropdown-menu,
+body.demo-brand .navbar-custom .navbar-urgent-alerts-menu {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(15, 23, 42, 0.12) !important;
+  box-shadow: 0 24px 40px rgba(15, 23, 42, 0.18) !important;
+}
+
+body.demo-brand .navbar-urgent-alerts-menu-header,
+body.demo-brand .navbar-urgent-alerts-footer {
+  background: #f8fafc !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+  color: #0f172a !important;
+}
+
+body.demo-brand .navbar-urgent-alerts-menu-header strong,
+body.demo-brand .navbar-urgent-alerts-menu-header .text-muted,
+body.demo-brand .navbar-urgent-alerts-menu-header span {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+body.demo-brand .navbar-urgent-alerts-menu-header .text-muted,
+body.demo-brand .navbar-urgent-alerts-menu-header .small {
+  color: #64748b !important;
+  -webkit-text-fill-color: #64748b !important;
+}
+
+body.demo-brand .navbar-urgent-alerts-item,
+body.demo-brand .navbar-urgent-alerts-recent-item,
+body.demo-brand .navbar-urgent-alerts-item-label,
+body.demo-brand .navbar-urgent-alerts-recent-title,
+body.demo-brand .navbar-urgent-alerts-item-copy,
+body.demo-brand .navbar-urgent-alerts-empty {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+  background: transparent;
+}
+
+body.demo-brand .navbar-urgent-alerts-item-detail,
+body.demo-brand .navbar-urgent-alerts-recent-message,
+body.demo-brand .navbar-urgent-alerts-recent-header {
+  color: #64748b !important;
+  -webkit-text-fill-color: #64748b !important;
+}
+
+body.demo-brand .navbar-urgent-alerts-item:hover,
+body.demo-brand .navbar-urgent-alerts-item:focus,
+body.demo-brand .navbar-urgent-alerts-recent-item:hover,
+body.demo-brand .navbar-urgent-alerts-recent-item:focus {
+  background: #eef4ff !important;
+  color: #0b1220 !important;
+  -webkit-text-fill-color: #0b1220 !important;
+}
+
+body.demo-brand .navbar-urgent-alerts-item-count {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+
+body.demo-brand .navbar-urgent-alerts-item--unread,
+body.demo-brand .navbar-urgent-alerts-recent-item--unread {
+  background: #fff7ed !important;
+}
+
+body.demo-brand .navbar-urgent-alerts-item--unread .navbar-urgent-alerts-item-count {
+  background: #dc2626 !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+body.demo-brand .navbar-urgent-alerts-footer-link {
+  color: #312e81 !important;
+  -webkit-text-fill-color: #312e81 !important;
+  background: #eef2ff !important;
+}
+
+body.demo-brand .navbar-urgent-alerts-footer-link:hover,
+body.demo-brand .navbar-urgent-alerts-footer-link:focus {
+  color: #1e1b4b !important;
+  -webkit-text-fill-color: #1e1b4b !important;
+  background: #e0e7ff !important;
+}
+
+body.demo-brand .navbar-customer-alert-card {
+  background: #fff !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+body.demo-brand .layout .sidebar-user,
+body.demo-brand .layout .sidebar-user * {
+  color: #fff !important;
+}
+
+body.demo-brand .layout .sidebar .active,
+body.demo-brand .layout .sidebar .list-group-item.active,
+body.demo-brand .layout .sidebar .active *,
+body.demo-brand .layout .sidebar .list-group-item.active * {
+  color: #fff !important;
+}
+
+body.demo-brand .language-toggle,
+body.demo-brand .language-widget .language-toggle,
+body.demo-brand .language-toggle *,
+body.demo-brand .language-widget .language-toggle * {
+  color: #fff !important;
+}
+
+/* Dark aurora panels / KPI / heroes */
+body.demo-brand .reports-hero,
+body.demo-brand .reports-hero *:not(.btn),
+body.demo-brand .reports-kpi,
+body.demo-brand .reports-kpi *:not(.text-success):not(.text-danger),
+body.demo-brand .reports-period-pill,
+body.demo-brand .reports-period-pill *,
+body.demo-brand .reports-focus-btn.is-active,
+body.demo-brand .reports-focus-btn.is-active * {
+  color: #fff !important;
+}
+
+body.demo-brand .reports-hero .btn-light,
+body.demo-brand .reports-hero .btn-light *,
+body.demo-brand .reports-hero .btn-light.text-primary,
+body.demo-brand .reports-hero .btn-light.text-primary * {
+  background: #f8fafc !important;
+  color: #0b1220 !important;
+  -webkit-text-fill-color: #0b1220 !important;
+}
+
+body.demo-brand .reports-hero .btn-outline-light,
+body.demo-brand .reports-hero .btn-outline-light * {
+  background: rgba(15, 23, 42, 0.28) !important;
+  color: #f8fafc !important;
+  -webkit-text-fill-color: #f8fafc !important;
+  border-color: rgba(248, 250, 252, 0.55) !important;
+}
+
+body.demo-brand .reports-kpi .text-success {
+  color: #86efac !important;
+}
+
+body.demo-brand .reports-kpi .text-danger {
+  color: #fda4af !important;
+}
+
+body.demo-brand .vendor-hero,
+body.demo-brand .vendor-hero *,
+body.demo-brand .vendor-order-hero,
+body.demo-brand .vendor-order-hero * {
+  color: #fff !important;
+}
+
+body.demo-brand .vendor-hero-copy,
+body.demo-brand .vendor-stat-pill-label,
+body.demo-brand .vendor-order-copy,
+body.demo-brand .vendor-order-hero-label {
+  color: rgba(226, 232, 240, 0.88) !important;
+}
+
+body.demo-brand .qb-hero,
+body.demo-brand .qb-hero-copy,
+body.demo-brand .qb-hero-copy h1,
+body.demo-brand .qb-hero-copy p,
+body.demo-brand .qb-hero .qb-eyebrow,
+body.demo-brand .qb-hero-status,
+body.demo-brand .qb-hero-status *,
+body.demo-brand .qb-hero-panel,
+body.demo-brand .qb-hero-panel *:not(.btn),
+body.demo-brand .qb-metric,
+body.demo-brand .qb-metric * {
+  color: #fff !important;
+}
+
+body.demo-brand .qb-hero-copy p,
+body.demo-brand .qb-hero-status-copy,
+body.demo-brand .qb-metric-label {
+  color: rgba(226, 232, 240, 0.88) !important;
+}
+
+body.demo-brand .qb-hero .btn-light,
+body.demo-brand .qb-hero .btn-light * {
+  color: #0b1220 !important;
+}
+
+body.demo-brand .qb-hero .btn-outline-light,
+body.demo-brand .qb-hero .btn-outline-light * {
+  color: #f8fafc !important;
+}
+
+body.demo-brand .qb-step-number,
+body.demo-brand .qb-step-number *,
+body.demo-brand .qb-preview-tab.is-active,
+body.demo-brand .qb-preview-tab.is-active * {
+  color: #fff !important;
+}
+
+body.demo-brand .layout .content .card.qb-center-hero,
+body.demo-brand .layout .content .card.qb-center-hero *:not(.btn):not(.btn *):not(.badge),
+body.demo-brand .layout .content .card.bg-primary,
+body.demo-brand .layout .content .card.bg-primary *:not(.btn):not(.btn *):not(.badge),
+body.demo-brand .layout .content .card.text-bg-primary,
+body.demo-brand .layout .content .card.text-bg-primary *:not(.btn):not(.btn *):not(.badge) {
+  color: #fff !important;
+}
+
+body.demo-brand .layout .content .card.qb-center-hero .btn-light,
+body.demo-brand .layout .content .card.qb-center-hero .btn-light *,
+body.demo-brand .layout .content .card.bg-primary .btn-light,
+body.demo-brand .layout .content .card.bg-primary .btn-light * {
+  color: #0b1220 !important;
+}
+
+body.demo-brand .layout .content .card.qb-center-hero .btn-outline-light,
+body.demo-brand .layout .content .card.qb-center-hero .btn-outline-light *,
+body.demo-brand .layout .content .card.bg-primary .btn-outline-light,
+body.demo-brand .layout .content .card.bg-primary .btn-outline-light * {
+  color: #f8fafc !important;
+}
+
+body.demo-brand .layout .btn-primary,
+body.demo-brand .layout .btn-primary *:not(.badge),
+body.demo-brand .layout .btn-success,
+body.demo-brand .layout .btn-success *:not(.badge),
+body.demo-brand .layout .btn-info,
+body.demo-brand .layout .btn-info *:not(.badge),
+body.demo-brand .layout .btn-warning,
+body.demo-brand .layout .btn-warning *:not(.badge),
+body.demo-brand .layout .btn-dark,
+body.demo-brand .layout .btn-dark *:not(.badge),
+body.demo-brand .qb-shell .btn-primary,
+body.demo-brand .qb-shell .btn-primary *:not(.badge),
+body.demo-brand .reports-shell .btn-primary,
+body.demo-brand .reports-shell .btn-primary *:not(.badge),
+body.demo-brand .reports-shell #bi-smart-go,
+body.demo-brand .reports-shell #bi-smart-go *:not(.badge) {
+  color: #fff !important;
+}
+
+/* Count chips inside active filter buttons (Pending dispatch, QB filters, Quotes tabs) */
+body.demo-brand .layout .btn .badge.text-bg-light,
+body.demo-brand .layout .btn .badge.bg-light,
+body.demo-brand .layout .content .btn .badge.text-bg-light,
+body.demo-brand .layout .content .btn .badge.bg-light {
+  background: #fff !important;
+  color: #0b1220 !important;
+  -webkit-text-fill-color: #0b1220 !important;
+}
+
+/* Light surfaces stay dark-ink for readability */
+body.demo-brand .layout .content .card:not(.qb-center-hero):not(.bg-primary):not(.text-bg-primary),
+body.demo-brand .layout .content .card:not(.qb-center-hero):not(.bg-primary):not(.text-bg-primary) .card-body,
+body.demo-brand .layout .content .table,
+body.demo-brand .layout .content .table tbody td,
+body.demo-brand .reports-panel,
+body.demo-brand .reports-panel .panel-head h3,
+body.demo-brand .reports-filter-card,
+body.demo-brand .reports-filter-card .card-body,
+body.demo-brand .reports-filter-card label {
+  color: #0f172a;
+}
+
+body.demo-brand .layout .content .card:not(.qb-center-hero):not(.bg-primary):not(.text-bg-primary) .card-body,
+body.demo-brand .layout .content .card:not(.qb-center-hero):not(.bg-primary):not(.text-bg-primary) .card-title,
+body.demo-brand .layout .content .card:not(.qb-center-hero):not(.bg-primary):not(.text-bg-primary) h1,
+body.demo-brand .layout .content .card:not(.qb-center-hero):not(.bg-primary):not(.text-bg-primary) h2,
+body.demo-brand .layout .content .card:not(.qb-center-hero):not(.bg-primary):not(.text-bg-primary) h3,
+body.demo-brand .layout .content .card:not(.qb-center-hero):not(.bg-primary):not(.text-bg-primary) h4,
+body.demo-brand .layout .content .card:not(.qb-center-hero):not(.bg-primary):not(.text-bg-primary) h5,
+body.demo-brand .layout .content .card:not(.qb-center-hero):not(.bg-primary):not(.text-bg-primary) p,
+body.demo-brand .layout .content .card:not(.qb-center-hero):not(.bg-primary):not(.text-bg-primary) label,
+body.demo-brand .layout .content .card:not(.qb-center-hero):not(.bg-primary):not(.text-bg-primary) td {
+  color: #0f172a !important;
+}
+
+/* thead stays white-on-aurora even inside white cards */
+body.demo-brand .layout .content .card .table thead th,
+body.demo-brand .layout .content .card:not(.qb-center-hero) .table thead th,
+body.demo-brand .layout .content .table thead th {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+  background: var(--zyntra-admin-header) !important;
+}
+
+/* Outline buttons on light canvas stay dark-readable */
+body.demo-brand .layout .btn-outline-primary,
+body.demo-brand .layout .btn-outline-secondary,
+body.demo-brand .layout .btn-outline-dark,
+body.demo-brand .layout .btn-outline-success,
+body.demo-brand .layout .btn-outline-info,
+body.demo-brand .layout a.btn-outline-primary,
+body.demo-brand .layout a.btn-outline-secondary {
+  background: #fff !important;
+  color: #0b1220 !important;
+  -webkit-text-fill-color: #0b1220 !important;
+  border-color: rgba(56, 189, 248, 0.5) !important;
+  box-shadow: none !important;
+}
+
+body.demo-brand .layout .btn-outline-primary:hover,
+body.demo-brand .layout .btn-outline-secondary:hover,
+body.demo-brand .layout a.btn-outline-primary:hover,
+body.demo-brand .layout a.btn-outline-secondary:hover {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+body.demo-brand .layout .btn-outline-light {
+  color: #f8fafc !important;
+}
+
+/* Admin dashboard KPI tiles — last-wins border lock */
+body.demo-brand .layout .content .dashboard-cards .admin-kpi-card.card {
+  border: 1px solid #64748b !important;
+  border-width: 1px !important;
+  border-style: solid !important;
+  border-color: #64748b !important;
+  background: #ffffff !important;
+}
+
+/* ---------- Customer portal: My Order / Orders Received / Order History ---------- */
+/* Same chrome as catalog (standalone pages using ver_cotizacion.css). */
+body.demo-brand[data-page="my-order"],
+body.demo-brand[data-page="orders-received"],
+body.demo-brand[data-page="order-history"] {
+  background: var(--zyntra-void) !important;
+  --app-navbar-height: var(--panel-navbar-offset);
+}
+
+body.demo-brand[data-page="my-order"] .sidebar,
+body.demo-brand[data-page="orders-received"] .sidebar,
+body.demo-brand[data-page="order-history"] .sidebar {
+  top: var(--panel-navbar-offset) !important;
+  height: calc(100vh - var(--panel-navbar-offset)) !important;
+}
+
+body.demo-brand[data-page="my-order"] .main-content,
+body.demo-brand[data-page="orders-received"] .main-content,
+body.demo-brand[data-page="order-history"] .main-content {
+  margin-top: var(--panel-navbar-offset) !important;
+  height: calc(100vh - var(--panel-navbar-offset)) !important;
+  min-height: calc(100vh - var(--panel-navbar-offset)) !important;
+  background: #F8FAFC !important;
+  color: #0F172A !important;
+}
+
+body.demo-brand[data-page="my-order"] .cot-order-search--top,
+body.demo-brand[data-page="orders-received"] .cot-order-search--top,
+body.demo-brand[data-page="order-history"] .cot-order-search--top {
+  background: transparent;
+}
+
+@media (max-width: 991.98px) {
+  body.demo-brand[data-page="my-order"] .cot-order-search--top {
+    top: var(--panel-navbar-offset) !important;
+    background: #F8FAFC !important;
+  }
+}
+
+body.demo-brand[data-page="my-order"] .cot-order-search--top .form-control,
+body.demo-brand[data-page="my-order"] #buscador {
+  background: #FFFFFF !important;
+  border: 1px solid #CBD5E1 !important;
+  border-radius: 12px !important;
+  color: #0F172A !important;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06) !important;
+}
+
+body.demo-brand[data-page="my-order"] .cot-order-search--top .form-control:focus,
+body.demo-brand[data-page="my-order"] #buscador:focus {
+  border-color: #818CF8 !important;
+  box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.18) !important;
+}
+
+body.demo-brand[data-page="my-order"] .custom-card,
+body.demo-brand[data-page="orders-received"] .custom-card,
+body.demo-brand[data-page="order-history"] .custom-card,
+body.demo-brand[data-page="order-history"] .table-responsive.bg-white {
+  background: #FFFFFF !important;
+  border: 1px solid #E2E8F0 !important;
+  border-radius: 16px !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08) !important;
+}
+
+body.demo-brand[data-page="my-order"] .table thead,
+body.demo-brand[data-page="orders-received"] .table thead,
+body.demo-brand[data-page="order-history"] .table thead,
+body.demo-brand[data-page="order-history"] .table thead.table-light {
+  background: #F1F5F9 !important;
+}
+
+body.demo-brand[data-page="my-order"] .table thead th,
+body.demo-brand[data-page="orders-received"] .table thead th,
+body.demo-brand[data-page="order-history"] .table thead th {
+  color: #334155 !important;
+  font-weight: 700;
+  border-bottom-color: #E2E8F0 !important;
+}
+
+body.demo-brand[data-page="my-order"] .table tbody td,
+body.demo-brand[data-page="orders-received"] .table tbody td,
+body.demo-brand[data-page="order-history"] .table tbody td {
+  color: #0F172A !important;
+}
+
+body.demo-brand[data-page="my-order"] .qty-btn,
+body.demo-brand[data-page="my-order"] .quantity-stepper__button {
+  background: var(--zyntra-admin-header) !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.28);
+}
+
+body.demo-brand[data-page="my-order"] .qty-btn:hover,
+body.demo-brand[data-page="my-order"] .quantity-stepper__button:hover {
+  background: var(--zyntra-admin-btn-hover) !important;
+  color: #fff !important;
+}
+
+body.demo-brand[data-page="my-order"] .cantidad-input:focus,
+body.demo-brand[data-page="my-order"] .quantity-stepper__input:focus {
+  border-color: #818CF8 !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2) !important;
+}
+
+body.demo-brand[data-page="my-order"] .alert-info {
+  background: #EEF2FF !important;
+  border-color: #A5B4FC !important;
+  color: #312E81 !important;
+}
+
+body.demo-brand[data-page="my-order"] .btn-yellow,
+body.demo-brand[data-page="my-order"] #btnEnviarCotizacion {
+  background: var(--zyntra-grad-cta) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 12px !important;
+  font-weight: 700;
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.35),
+    0 10px 28px rgba(99, 102, 241, 0.4),
+    0 0 28px rgba(56, 189, 248, 0.28);
+}
+
+body.demo-brand[data-page="my-order"] .btn-yellow:hover,
+body.demo-brand[data-page="my-order"] #btnEnviarCotizacion:hover {
+  background: linear-gradient(135deg, #7DD3FC 0%, #818CF8 50%, #A78BFA 100%) !important;
+  color: #fff !important;
+}
+
+body.demo-brand[data-page="orders-received"] .btn-group .btn-warning,
+body.demo-brand[data-page="orders-received"] .btn-group .btn-outline-warning,
+body.demo-brand[data-page="order-history"] .btn-warning {
+  border-radius: 10px;
+}
+
+body.demo-brand[data-page="orders-received"] .btn-outline-warning {
+  color: #9A3412 !important;
+  border-color: #FDBA74 !important;
+  background: #fff !important;
+}
+
+body.demo-brand[data-page="orders-received"] .btn-outline-warning:hover {
+  background: #FFF7ED !important;
+  color: #9A3412 !important;
+}
+
+body.demo-brand[data-page="my-order"] .badge.text-bg-primary,
+body.demo-brand[data-page="orders-received"] .badge.text-bg-warning {
+  background: var(--zyntra-admin-header) !important;
+  color: #fff !important;
+}
+
+body.demo-brand[data-page="my-order"] .form-select,
+body.demo-brand[data-page="my-order"] .form-control,
+body.demo-brand[data-page="my-order"] textarea.form-control {
+  background: #F8FAFC !important;
+  border-color: #CBD5E1 !important;
+  color: #0F172A !important;
+  border-radius: 10px;
+}
+
+body.demo-brand[data-page="my-order"] .form-select:focus,
+body.demo-brand[data-page="my-order"] .form-control:focus,
+body.demo-brand[data-page="my-order"] textarea.form-control:focus {
+  border-color: #818CF8 !important;
+  box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.18) !important;
+}

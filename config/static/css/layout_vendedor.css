@@ -10,6 +10,12 @@ html {
     overflow-x: clip;
 }
 
+/* Admin / BackOffice QuickBooks hero card (demo theme overrides in zyntra-demo.css) */
+.qb-center-hero {
+    background: linear-gradient(135deg, #0f2f73 0%, #1d5cb8 48%, #5ec2ff 100%);
+    overflow: hidden;
+}
+
 body {
     overflow-x: clip;
     max-width: 100vw;
@@ -2155,4 +2161,59 @@ body.vendedor-catalogo-page .cantidad-input:focus,
   .vendor-home__tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Flash / feedback message modal (Django messages) */
+.feedback-modal {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.feedback-modal__header {
+  color: #fff;
+  background: linear-gradient(135deg, #0b3d91, #2f77d1);
+}
+
+.feedback-modal__header.is-success {
+  background: linear-gradient(135deg, #0b3d91, #2f77d1);
+}
+
+.feedback-modal__header.is-error {
+  background: linear-gradient(135deg, #9f1239, #dc2626);
+}
+
+.feedback-modal__header.is-warning {
+  background: linear-gradient(135deg, #b45309, #f59e0b);
+}
+
+.feedback-modal__header.is-info {
+  background: linear-gradient(135deg, #374151, #6b7280);
+}
+
+.feedback-modal__body {
+  background: #ffffff;
+}
+
+.feedback-modal__message {
+  font-size: 1rem;
+  color: #1f2937;
+}
+
+.feedback-modal__footer {
+  justify-content: center;
+  background: #ffffff;
+}
+
+.feedback-modal__btn {
+  background: #0b3d91;
+  color: #fff;
+  font-weight: 600;
+  padding: 0.45rem 1.2rem;
+  border-radius: 8px;
+  border: none;
+}
+
+.feedback-modal__btn:hover {
+  background: #08306f;
+  color: #fff;
 }

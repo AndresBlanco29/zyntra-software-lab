@@ -2,24 +2,24 @@
 <div class="col-12 col-sm-6 col-md-4 col-lg-3 catalog-product-col">
   <div class="producto-card producto-card--promo combo-card text-center" data-promo-id="{{ combo.id }}">
 
-      <div class="promo-badge promo-badge--combo" title="{{ combo.nombre }}">
-          <i class="bi bi-box-seam-fill" aria-hidden="true"></i>
-          {% trans "COMBO" %}
-      </div>
+      <div class="producto-img-wrap producto-img-wrap--promo combo-card__media">
+        <div class="promo-badge promo-badge--combo promo-badge--overlay" title="{{ combo.nombre }}">
+            <i class="bi bi-box-seam-fill" aria-hidden="true"></i>
+            {% trans "COMBO" %}
+        </div>
 
-      {% if combo.fecha_fin_iso %}
-      <div
-        class="promo-countdown js-promo-countdown promo-countdown--top"
-        data-ends-at="{{ combo.fecha_fin_iso }}"
-        role="status"
-        aria-live="polite"
-      >
-        <i class="bi bi-alarm-fill" aria-hidden="true"></i>
-        <span class="promo-countdown__text"></span>
-      </div>
-      {% endif %}
+        {% if combo.fecha_fin_iso %}
+        <div
+          class="promo-countdown js-promo-countdown promo-countdown--overlay"
+          data-ends-at="{{ combo.fecha_fin_iso }}"
+          role="status"
+          aria-live="polite"
+        >
+          <i class="bi bi-alarm-fill" aria-hidden="true"></i>
+          <span class="promo-countdown__text"></span>
+        </div>
+        {% endif %}
 
-      <div class="producto-img-wrap mb-3 combo-card__media">
         {% if combo.imagen_url %}
         <img src="{{ combo.imagen_url }}" alt="{{ combo.nombre }}" class="producto-img">
         {% else %}

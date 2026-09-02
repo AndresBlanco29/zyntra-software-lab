@@ -863,6 +863,7 @@ def generar_invoice_desde_picking(
 			'autorizado_por': '',
 			'comentario': '',
 		},
+		mode='gate',
 	)
 
 	invoice = Invoice.objects.create(

@@ -223,23 +223,33 @@ def _get_or_create_home_contenido():
 
         return instance
 
+    def _finalize(instance):
+        from django.conf import settings as django_settings
+
+        from config.core.demo_branding import apply_demo_home_contenido
+
+        instance = with_fallback_defaults(instance)
+        if getattr(django_settings, 'DEMO_MODE', False):
+            return apply_demo_home_contenido(instance)
+        return instance
+
     try:
         contenido = HomeContenido.objects.order_by('-actualizado').first()
         if contenido is None:
             contenido = HomeContenido.objects.create(activo=True)
-        return with_fallback_defaults(contenido)
+        return _finalize(contenido)
     except (OperationalError, ProgrammingError):
         try:
             ensure_homecontenido_quienes_schema()
             contenido = HomeContenido.objects.order_by('-actualizado').first()
             if contenido is None:
                 contenido = HomeContenido.objects.create(activo=True)
-            return with_fallback_defaults(contenido)
+            return _finalize(contenido)
         except Exception:
             pass
 
         contenido = HomeContenido.objects.only(*legacy_fields).order_by('-actualizado').first()
-        return with_fallback_defaults(contenido)
+        return _finalize(contenido)
 
 
 def _is_admin_user(user):
@@ -283,6 +293,22 @@ def _resolve_login_redirect(user, next_url=None):
     if next_url.startswith('/') and not next_url.startswith('//'):
         return next_url
     return _redirect_for_user(user)
+
+
+def _resolve_login_username(identifier):
+    """Accept username or email in the login field."""
+    identifier = (identifier or '').strip().lower()
+    if not identifier:
+        return ''
+    if '@' in identifier:
+        match = (
+            Usuario.objects.filter(email__iexact=identifier)
+            .values_list('username', flat=True)
+            .first()
+        )
+        if match:
+            return match
+    return identifier
 
 
 def _build_internal_permission_context(role, overrides=None):
@@ -1735,7 +1761,7 @@ def login_view(request):
 
     if request.method == 'POST':
 
-        username = (request.POST.get('username') or '').lower()
+        username = _resolve_login_username(request.POST.get('username'))
         password = request.POST.get('password')
         
         # Detectar si es una petición AJAX (para cargar en modal)
@@ -2041,7 +2067,7 @@ def login_form_modal(request):
     invalid_credentials_message = str(_('Invalid username or password.'))
     
     if request.method == 'POST':
-        username = (request.POST.get('username') or '').lower()
+        username = _resolve_login_username(request.POST.get('username'))
         password = request.POST.get('password', '')
         
         try:

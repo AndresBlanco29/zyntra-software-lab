@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 800" role="img" aria-label="Zyntra catalog">
+  <defs>
+    <linearGradient id="bg2" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#062029"/>
+      <stop offset="100%" stop-color="#0B4F63"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="800" fill="url(#bg2)"/>
+  <g fill="none" stroke="#5EEAD4" stroke-width="4" opacity="0.9">
+    <rect x="110" y="160" width="180" height="220" rx="18"/>
+    <rect x="340" y="160" width="180" height="220" rx="18"/>
+    <rect x="110" y="420" width="180" height="220" rx="18"/>
+    <rect x="340" y="420" width="180" height="220" rx="18"/>
+  </g>
+  <g fill="#2DD4BF">
+    <circle cx="200" cy="240" r="28"/>
+    <circle cx="430" cy="240" r="28"/>
+    <circle cx="200" cy="500" r="28"/>
+    <circle cx="430" cy="500" r="28"/>
+  </g>
+  <g fill="#CFE8EF" opacity="0.7">
+    <rect x="150" y="300" width="100" height="12" rx="6"/>
+    <rect x="380" y="300" width="100" height="12" rx="6"/>
+    <rect x="150" y="560" width="100" height="12" rx="6"/>
+    <rect x="380" y="560" width="100" height="12" rx="6"/>
+  </g>
+</svg>

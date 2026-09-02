@@ -24,6 +24,7 @@ from config.core.profit import (
 	summarize_order_profit,
 )
 from config.pedidos.below_cost import (
+	apply_pedido_sell_below_cost_authorization,
 	enforce_sell_below_cost_for_pedido,
 	parse_sell_below_cost_authorization,
 	user_can_authorize_sell_below_cost,
@@ -626,6 +627,48 @@ def backoffice_pedido_detalle(request, pedido_id):
 	if request.method == 'POST':
 		if not request.user.has_internal_permission('backoffice.orders.manage'):
 			return redirect('backoffice_pedidos')
+
+		post_action = (request.POST.get('action') or '').strip()
+		if post_action == 'authorize_sell_below_cost':
+			if not user_can_authorize_sell_below_cost(request.user):
+				messages.error(request, _('You are not allowed to authorize selling below cost.'))
+				return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+			try:
+				ensure_pedido_edit_lock_owner(pedido=pedido, user=request.user)
+				auth = parse_sell_below_cost_authorization({
+					'confirm_sell_below_cost': '1',
+					'venta_perdida_autorizado_por': (
+						request.POST.get('venta_perdida_autorizado_por')
+						or request.POST.get('autorizado_por')
+						or ''
+					),
+					'venta_perdida_comentario': (
+						request.POST.get('venta_perdida_comentario')
+						or request.POST.get('comentario')
+						or ''
+					),
+				})
+				below_cost_lines = find_order_lines_sold_below_cost(
+					list(pedido.items.select_related('presentacion__producto'))
+				)
+				if not below_cost_lines:
+					messages.info(request, _('This order no longer has products sold below cost.'))
+					return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+				apply_pedido_sell_below_cost_authorization(
+					pedido=pedido,
+					usuario=request.user,
+					autorizado_por=auth.get('autorizado_por') or '',
+					comentario=auth.get('comentario') or '',
+					below_cost_lines=below_cost_lines,
+					save=True,
+					audit=True,
+				)
+			except ValidationError as exc:
+				messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
+				return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+			messages.success(request, _('Selling below cost was authorized. You can continue to invoice when ready.'))
+			return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
+
 		estado_anterior = pedido.estado
 		nota_anterior = pedido.nota_backoffice or ''
 		before_items = [
@@ -642,6 +685,7 @@ def backoffice_pedido_detalle(request, pedido_id):
 			for item in pedido.items.select_related('presentacion__producto')
 		]
 		total_anterior = str(pedido.total)
+		below_cost_after_save = []
 		try:
 			ensure_pedido_edit_lock_owner(pedido=pedido, user=request.user)
 			with transaction.atomic():
@@ -746,11 +790,15 @@ def backoffice_pedido_detalle(request, pedido_id):
 					)
 
 				recalcular_pedido(pedido)
-				enforce_sell_below_cost_for_pedido(
+				updated_items = list(
+					pedido.items.select_related('presentacion__producto')
+				)
+				below_cost_after_save = enforce_sell_below_cost_for_pedido(
 					pedido=pedido,
-					items=list(pedido.items.select_related('presentacion__producto').all()),
+					items=updated_items,
 					usuario=request.user,
 					authorization=parse_sell_below_cost_authorization(request.POST),
+					mode='save',
 				)
 		except ValidationError as exc:
 			messages.error(request, exc.messages[0] if getattr(exc, 'messages', None) else str(exc))
@@ -801,7 +849,17 @@ def backoffice_pedido_detalle(request, pedido_id):
 			request=request,
 			module='Orders',
 		)
-		messages.success(request, _('Sales order updated successfully.'))
+		if below_cost_after_save and not pedido.venta_perdida_autorizada:
+			messages.success(request, _('Sales order updated successfully.'))
+			messages.warning(
+				request,
+				_(
+					'Order saved. One or more products are sold below cost and require '
+					'supervisor authorization before generating an invoice.'
+				),
+			)
+		else:
+			messages.success(request, _('Sales order updated successfully.'))
 		return redirect('backoffice_pedido_detalle', pedido_id=pedido.id)
 
 	edit_lock_context = build_pedido_edit_lock_context(pedido=pedido, user=request.user)

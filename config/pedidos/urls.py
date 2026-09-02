@@ -20,6 +20,7 @@ urlpatterns = [
     path('backoffice/<int:pedido_id>/desbloquear-picking/', views.backoffice_resolver_bloqueo_picking, name='backoffice_resolver_bloqueo_picking'),
     path('backoffice/<int:pedido_id>/resolver-comentario/', views.backoffice_resolver_nota_cliente, name='backoffice_resolver_nota_cliente'),
     path('backoffice/<int:pedido_id>/credit-limit/resolve/', views.backoffice_resolve_credit_limit, name='backoffice_resolve_credit_limit'),
+    path('backoffice/<int:pedido_id>/pdf/', views.backoffice_pedido_pdf, name='backoffice_pedido_pdf'),
     path('backoffice/<int:pedido_id>/picking-ticket/', views.backoffice_picking_ticket, name='backoffice_picking_ticket'),
     path('backoffice/<int:pedido_id>/picking-ticket/pdf/', views.backoffice_picking_pdf, name='backoffice_picking_pdf'),
     path('backoffice/<int:pedido_id>/inventory-needs/pdf/', views.backoffice_inventory_needs_pdf, name='backoffice_inventory_needs_pdf'),

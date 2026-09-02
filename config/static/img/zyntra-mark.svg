@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Zyntra">
+  <defs>
+    <linearGradient id="zyntraGrad" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5EEAD4"/>
+      <stop offset="0.45" stop-color="#2DD4BF"/>
+      <stop offset="1" stop-color="#0E7490"/>
+    </linearGradient>
+    <radialGradient id="zyntraGlow" cx="50%" cy="40%" r="60%">
+      <stop stop-color="#2DD4BF" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#041018" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#041018"/>
+  <rect width="64" height="64" rx="16" fill="url(#zyntraGlow)"/>
+  <path d="M18 18h28l-18 14h16L18 46h28" fill="none" stroke="url(#zyntraGrad)" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="46" cy="18" r="3.6" fill="#5EEAD4"/>
+</svg>

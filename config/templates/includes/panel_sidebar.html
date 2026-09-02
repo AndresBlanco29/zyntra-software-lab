@@ -25,11 +25,12 @@
 {% get_current_language as CURRENT_LANGUAGE %}
 
 {% if request.user|has_internal_permission:'admin.dashboard.view' or request.user|has_internal_permission:'admin.users.view' or request.user|has_internal_permission:'admin.products.view' or request.user|has_internal_permission:'admin.content.view' or request.user|has_internal_permission:'backoffice.reports.view' or request.user.is_superuser or request.user.role == 'admin' %}
-<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'panel_admin' or request.resolver_match.url_name == 'reportes_dashboard' or request.resolver_match.url_name == 'audit_log_list' or request.resolver_match.url_name == 'lista_usuarios_internos' or request.resolver_match.url_name == 'crear_usuario_interno' or request.resolver_match.url_name == 'editar_usuario_interno' or request.resolver_match.url_name == 'crear_vendedor' or request.resolver_match.url_name == 'editar_vendedor' or request.resolver_match.url_name == 'crear_backoffice' or request.resolver_match.url_name == 'editar_backoffice' or request.resolver_match.url_name == 'lista_productos' or request.resolver_match.url_name == 'crear_producto' or request.resolver_match.url_name == 'crear_categoria' or request.resolver_match.url_name == 'crear_marca' or request.resolver_match.url_name == 'lista_marcas' or request.resolver_match.url_name == 'editar_marca' or request.resolver_match.url_name == 'editar_producto' or request.resolver_match.url_name == 'lista_promociones' or request.resolver_match.url_name == 'crear_promocion' or request.resolver_match.url_name == 'editar_promocion' or request.resolver_match.url_name == 'contenido_home' or request.resolver_match.url_name == 'editar_home_contenido' or request.resolver_match.url_name == 'lista_testimonios' or request.resolver_match.url_name == 'crear_testimonio' or request.resolver_match.url_name == 'editar_testimonio' %}open{% endif %}>
+<details class="sidebar-collapsible" {% if request.resolver_match.url_name == 'panel_admin' or request.resolver_match.url_name|default:''|slice:':9' == 'reportes_' or request.resolver_match.url_name == 'audit_log_list' or request.resolver_match.url_name == 'lista_usuarios_internos' or request.resolver_match.url_name == 'crear_usuario_interno' or request.resolver_match.url_name == 'editar_usuario_interno' or request.resolver_match.url_name == 'crear_vendedor' or request.resolver_match.url_name == 'editar_vendedor' or request.resolver_match.url_name == 'crear_backoffice' or request.resolver_match.url_name == 'editar_backoffice' or request.resolver_match.url_name == 'lista_productos' or request.resolver_match.url_name == 'crear_producto' or request.resolver_match.url_name == 'crear_categoria' or request.resolver_match.url_name == 'crear_marca' or request.resolver_match.url_name == 'lista_marcas' or request.resolver_match.url_name == 'editar_marca' or request.resolver_match.url_name == 'editar_producto' or request.resolver_match.url_name == 'lista_promociones' or request.resolver_match.url_name == 'crear_promocion' or request.resolver_match.url_name == 'editar_promocion' or request.resolver_match.url_name == 'contenido_home' or request.resolver_match.url_name == 'editar_home_contenido' or request.resolver_match.url_name == 'lista_testimonios' or request.resolver_match.url_name == 'crear_testimonio' or request.resolver_match.url_name == 'editar_testimonio' %}open{% endif %}>
   <summary class="sidebar-collapsible-summary">{% trans "Administration" %}</summary>
   <div class="sidebar-collapsible-links">
     {% if request.user|has_internal_permission:'admin.dashboard.view' %}
     <a href="{% url 'panel_admin' %}"
+      data-demo-tour="admin"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'panel_admin' %}active{% endif %}">
       {% trans "Admin Dashboard" %}
     </a>
@@ -37,7 +38,8 @@
 
     {% if request.user|has_internal_permission:'backoffice.reports.view' %}
     <a href="{% url 'reportes_dashboard' %}"
-      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'reportes_dashboard' %}active{% endif %}">
+      data-demo-tour="reports"
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name|default:''|slice:':9' == 'reportes_' %}active{% endif %}">
       {% trans "Reports Center" %}
     </a>
     {% endif %}
@@ -58,6 +60,7 @@
 
     {% if request.user|has_internal_permission:'admin.products.view' %}
     <a href="{% url 'lista_productos' %}"
+      data-demo-tour="products"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'lista_productos' or request.resolver_match.url_name == 'crear_producto' or request.resolver_match.url_name == 'crear_categoria' or request.resolver_match.url_name == 'crear_marca' or request.resolver_match.url_name == 'lista_marcas' or request.resolver_match.url_name == 'editar_marca' or request.resolver_match.url_name == 'editar_producto' %}active{% endif %}">
       {% trans "Products" %}
     </a>
@@ -89,6 +92,7 @@
   <summary class="sidebar-collapsible-summary">{% trans "QuickBooks" %}</summary>
   <div class="sidebar-collapsible-links">
     <a href="{% url 'quickbooks_center' %}"
+      data-demo-tour="quickbooks"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'quickbooks_center' %}active{% endif %}">
       {% trans "QuickBooks Center" %}
     </a>
@@ -188,7 +192,7 @@
 
     {% if request.user|has_internal_permission:'backoffice.reports.view' and not request.user|has_internal_permission:'admin.dashboard.view' %}
     <a href="{% url 'reportes_dashboard' %}"
-      class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'reportes_dashboard' %}active{% endif %}">
+      class="list-group-item list-group-item-action {% if request.resolver_match.url_name|default:''|slice:':9' == 'reportes_' %}active{% endif %}">
       {% trans "Reports Center" %}
     </a>
     {% endif %}
@@ -199,6 +203,7 @@
       {% trans "Sales pipeline" %}
     </a>
     <a href="{% url 'backoffice_pedidos' %}"
+      data-demo-tour="orders"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_pedidos' or request.resolver_match.url_name == 'backoffice_pedido_detalle' or request.resolver_match.url_name == 'backoffice_picking_ticket' %}active{% endif %}">
       {% trans "Orders" %}
     </a>
@@ -219,6 +224,7 @@
     {% endif %}
     {% if request.user|has_internal_permission:'backoffice.invoices.view' %}
     <a href="{% url 'backoffice_invoices_list' %}"
+      data-demo-tour="invoices"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'backoffice_invoices_list' or request.resolver_match.url_name == 'backoffice_invoice_detail' or request.resolver_match.url_name == 'backoffice_invoice_live_tracking' %}active{% endif %}">
       {% trans "Invoices" %}
     </a>
@@ -259,6 +265,7 @@
   <div class="sidebar-collapsible-links">
     {% if request.user|has_internal_permission:'driver.delivery.view' %}
     <a href="{% url 'driver_delivery_list' %}"
+      data-demo-tour="drivers"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'driver_delivery_list' or request.resolver_match.url_name == 'driver_delivery_detail' or request.resolver_match.url_name == 'driver_delivery_tracking' %}active{% endif %}">
       {% trans "Driver Deliveries" %}
     </a>
@@ -266,10 +273,27 @@
 
     {% if request.user|has_internal_permission:'selector.picking.view' %}
     <a href="{% url 'selector_picking_list' %}"
+      data-demo-tour="picking"
       class="list-group-item list-group-item-action {% if request.resolver_match.url_name == 'selector_picking_list' or request.resolver_match.url_name == 'selector_picking_detail' %}active{% endif %}">
       {% trans "Assigned Picking Tickets" %}
     </a>
     {% endif %}
+  </div>
+</details>
+{% endif %}
+
+{% if DEMO_MODE %}
+<details class="sidebar-collapsible" open>
+  <summary class="sidebar-collapsible-summary">Software Lab</summary>
+  <div class="sidebar-collapsible-links">
+    <button type="button" class="list-group-item list-group-item-action text-start" data-demo-tour-start>
+      {% trans "Guided tour" %}
+    </button>
+    <a href="{% url 'demo_reset' %}"
+      class="list-group-item list-group-item-action"
+      data-demo-tour="reset">
+      {% trans "Reset Demo" %}
+    </a>
   </div>
 </details>
 {% endif %}

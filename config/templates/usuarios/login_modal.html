@@ -2,8 +2,12 @@
 
 <!-- Header con logo -->
 <div class="text-center mb-3">
-  <img src="{% static 'img/logo.png' %}" class="login-modal-logo mb-2" alt="Logo" />
-  <h5 class="fw-bold text-secondary mb-3">La Tortilla Grocery</h5>
+  <img
+    src="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}"
+    class="login-modal-logo mb-2{% if DEMO_MODE %} zyntra-mark auth-mark{% endif %}"
+    alt="{% if DEMO_MODE %}{{ DEMO_BRAND_NAME }}{% else %}Logo{% endif %}"
+  />
+  <h5 class="fw-bold text-secondary mb-3 auth-brand-name">{% include "includes/brand_name.html" %}</h5>
 </div>
 
 <hr class="mb-3">

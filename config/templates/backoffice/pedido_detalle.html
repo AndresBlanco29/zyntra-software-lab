@@ -145,11 +145,15 @@
         {% if pedido.venta_perdida_autorizada %}
           {% trans "Selling below cost — authorized exception" %}
         {% else %}
-          {% trans "Selling below cost — authorization required" %}
+          {% trans "Selling below cost — pending authorization" %}
         {% endif %}
       </h4>
       <p class="mb-2">
-        {% trans "One or more products are priced below cost. Saving changes or generating an invoice requires supervisor authorization." %}
+        {% if pedido.venta_perdida_autorizada %}
+          {% trans "One or more products are priced below cost. A supervisor already authorized this exception." %}
+        {% else %}
+          {% trans "One or more products are priced below cost. Your order changes are saved; generating an invoice still requires supervisor authorization." %}
+        {% endif %}
       </p>
       <ul class="mb-2">
         {% for row in below_cost_lines %}
@@ -173,9 +177,28 @@
         <div class="text-muted mt-1">{{ pedido.venta_perdida_comentario }}</div>
         {% endif %}
       </div>
+      {% elif can_authorize_sell_below_cost and can_manage_pedido %}
+      <form method="post" class="border rounded-3 p-3 bg-white mt-2" id="authorizeSellBelowCostForm">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="authorize_sell_below_cost">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label fw-semibold" for="quickSellBelowCostAuthorizedBy">{% trans "Authorized by" %} <span class="text-danger">*</span></label>
+            <input type="text" class="form-control" name="venta_perdida_autorizado_por" id="quickSellBelowCostAuthorizedBy" maxlength="120" autocomplete="name" required placeholder="{% trans 'Full name of the person authorizing this exception' %}" value="{{ pedido.venta_perdida_autorizado_por }}">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label fw-semibold" for="quickSellBelowCostComment">{% trans "Comment / observation (optional)" %}</label>
+            <input type="text" class="form-control" name="venta_perdida_comentario" id="quickSellBelowCostComment" maxlength="255" placeholder="{% trans 'Reason for selling below cost' %}" value="{{ pedido.venta_perdida_comentario }}">
+          </div>
+          <div class="col-md-3 d-grid">
+            <button type="submit" class="btn btn-danger">{% trans "Authorize now" %}</button>
+          </div>
+        </div>
+        <div class="form-text mt-2">{% trans "Approves the exception without re-saving the full order grid. The action is recorded in the Audit Trail." %}</div>
+      </form>
       {% elif not can_authorize_sell_below_cost %}
       <div class="small fw-semibold">
-        {% trans "Ask a supervisor with permission to authorize selling below cost before saving or invoicing." %}
+        {% trans "Ask a supervisor with permission to authorize selling below cost before generating an invoice. Your order edits remain saved." %}
       </div>
       {% endif %}
     </div>
@@ -317,9 +340,9 @@
             <div class="col-12">
               <div class="alert alert-danger mb-0">
                 {% if can_authorize_sell_below_cost %}
-                  {% trans "Authorize selling below cost above before generating the invoice." %}
+                  {% trans "Authorize selling below cost with Authorize now (or in the invoice form) before generating the invoice. Order edits are already saved." %}
                 {% else %}
-                  {% trans "Invoice generation is blocked because one or more products are sold below cost." %}
+                  {% trans "Invoice generation is blocked because one or more products are sold below cost. Order edits remain saved until a supervisor authorizes the exception." %}
                 {% endif %}
               </div>
             </div>
@@ -1109,7 +1132,7 @@
           <input type="text" class="form-control" name="venta_perdida_comentario" id="sellBelowCostComment" maxlength="255" placeholder="{% trans 'Reason for selling below cost' %}" value="{{ pedido.venta_perdida_comentario }}">
         </div>
       </div>
-      <div class="form-text mt-2">{% trans "Required only when one or more products are sold below cost. The action is recorded in the Audit Trail." %}</div>
+      <div class="form-text mt-2">{% trans "Optional when saving: authorize in the same save if you already have supervisor approval. Otherwise save first, then use Authorize now." %}</div>
     </div>
     {% endif %}
 
@@ -1936,6 +1959,23 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   if (orderForm) {
+    let orderFormDirty = false;
+    const markOrderFormDirty = function () {
+      orderFormDirty = true;
+    };
+    orderForm.addEventListener('input', markOrderFormDirty);
+    orderForm.addEventListener('change', markOrderFormDirty);
+    orderForm.addEventListener('submit', function () {
+      orderFormDirty = false;
+    });
+    window.addEventListener('beforeunload', function (event) {
+      if (!orderFormDirty) {
+        return;
+      }
+      event.preventDefault();
+      event.returnValue = '';
+    });
+
     orderForm.addEventListener('keydown', function (event) {
       if (event.key !== 'Enter') {
         return;

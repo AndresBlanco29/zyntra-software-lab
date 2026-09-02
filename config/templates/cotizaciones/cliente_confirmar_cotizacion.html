@@ -4,14 +4,66 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% blocktrans with quote_id=cotizacion.id %}Confirm Order #{{ quote_id }}{% endblocktrans %}</title>
+<title>{% blocktrans with quote_id=cotizacion.id %}Order #{{ quote_id }}{% endblocktrans %}</title>
+
+<link rel="icon" type="image/png" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
+<link rel="apple-touch-icon" href="{% if DEMO_MODE %}{% static 'img/zyntra-mark.svg' %}{% else %}{% static 'img/logo.png' %}{% endif %}">
 
 <link rel="stylesheet" href="{% static 'bootstrap/dist/css/bootstrap.min.css' %}">
 <link rel="stylesheet" href="{% static 'css/ver_cotizacion.css' %}">
+{% if DEMO_MODE %}<link rel="stylesheet" href="{% static 'css/zyntra-demo.css' %}">{% endif %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
 <script src="{% static 'bootstrap/dist/js/bootstrap.bundle.min.js' %}"></script>
+{% if DEMO_MODE %}<script defer src="{% static 'js/demo-chrome-offset.js' %}"></script>{% endif %}
+<style>
+  .order-status-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .order-status-steps li {
+    flex: 1 1 140px;
+    min-width: 120px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0.65rem 0.75rem;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+  .order-status-steps li.is-done {
+    background: #ecfeff;
+    border-color: #67e8f9;
+    color: #0f766e;
+  }
+  .order-status-steps li.is-current {
+    background: #eef2ff;
+    border-color: #a5b4fc;
+    color: #312e81;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
+  }
+  .order-status-steps li.is-cancelled {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    color: #475569;
+  }
+  .order-status-steps small {
+    display: block;
+    font-weight: 600;
+    opacity: 0.85;
+    margin-top: 0.15rem;
+  }
+</style>
 </head>
-<body>
+<body
+class="{% if DEMO_MODE %}demo-brand{% endif %}"
+data-page="orders-received">
+
+{% include "includes/demo_environment_banner.html" %}
 
 <nav class="navbar navbar-expand-lg navbar-dark navbar-custom shadow-sm">
   <div class="container-fluid">
@@ -20,16 +72,19 @@
     </button>
 
     <a class="navbar-brand fw-bold" href="{% url 'catalogo' %}">
-      La Tortilla Grocery
+      {% include "includes/brand_name.html" %}
     </a>
 
     <div class="ms-auto" style="display: flex; gap: 0.5rem; align-items: center;">
+      <a href="{% url 'catalogo' %}" class="btn btn-outline-light">{% trans "Catalog" %}</a>
+      <a href="{% url 'ver_cotizacion' %}" class="btn btn-outline-light">{% trans "My Order" %}</a>
       <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-light">
         {% trans "Orders Received" %}
         {% if pendientes_cotizaciones %}
         <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
         {% endif %}
       </a>
+      <a href="{% url 'cliente_historial_ordenes' %}" class="btn btn-outline-light d-none d-xl-inline-flex">{% trans "Order History" %}</a>
       <a href="{% url 'logout' %}" class="btn btn-danger" style="font-weight: 600; padding: 0.5rem 1.2rem; border-radius: 6px; display: flex; align-items: center; gap: 0.5rem;">
         <i class="bi bi-box-arrow-right"></i> {% trans "Log out" %}
       </a>
@@ -52,6 +107,7 @@
         <span class="badge text-bg-warning ms-1">{{ pendientes_cotizaciones }}</span>
         {% endif %}
       </a>
+      <a href="{% url 'cliente_historial_ordenes' %}" class="list-group-item">{% trans "Order History" %}</a>
     </div>
   </div>
 
@@ -62,7 +118,15 @@
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <div>
           <h3 class="fw-bold mb-1">{% blocktrans with quote_id=cotizacion.id %}Order #{{ quote_id }}{% endblocktrans %}</h3>
-          <p class="text-muted mb-0">{% trans "Validate prices, adjust quantities if needed and confirm your order." %}</p>
+          <p class="text-muted mb-0">
+            {% if puede_editar %}
+            {% trans "Validate prices, adjust quantities if needed and confirm your order." %}
+            {% elif es_solicitud_enviada %}
+            {% trans "Full details of the order request you sent. Status updates as BackOffice reviews it." %}
+            {% else %}
+            {% trans "Order summary and current status." %}
+            {% endif %}
+          </p>
         </div>
         <a href="{% url 'cliente_cotizaciones_recibidas' %}" class="btn btn-outline-secondary">{% trans "Back to received orders" %}</a>
       </div>
@@ -75,27 +139,67 @@
 
       <div class="card custom-card mb-3">
         <div class="card-body">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <div>
+              <small class="text-muted d-block">{% trans "Current status" %}</small>
+              <span class="badge text-bg-{{ customer_status.badge }} fs-6">{{ customer_status.label }}</span>
+            </div>
+            <div class="text-md-end">
+              <small class="text-muted d-block">{% trans "Total" %}</small>
+              <strong class="fs-5 text-success">${{ current_total|default:cotizacion.total|floatformat:2 }}</strong>
+            </div>
+          </div>
+          {% if customer_status.hint %}
+          <p class="mb-3 text-muted">{{ customer_status.hint }}</p>
+          {% endif %}
+
+          <ul class="order-status-steps" aria-label="{% trans 'Order progress' %}">
+            <li class="{% if customer_status.steps.received %}is-done{% endif %} {% if customer_status.key == 'received' %}is-current{% endif %}">
+              {% trans "Received" %}
+              <small>{% trans "Request sent" %}</small>
+            </li>
+            <li class="{% if customer_status.steps.reviewed %}is-done{% endif %} {% if customer_status.key == 'reviewed' %}is-current{% endif %}">
+              {% trans "Reviewed" %}
+              <small>{% trans "BackOffice review" %}</small>
+            </li>
+            <li class="{% if customer_status.steps.returned %}is-done{% endif %} {% if customer_status.key == 'returned' %}is-current{% endif %}">
+              {% trans "Returned" %}
+              <small>{% trans "Ready for you" %}</small>
+            </li>
+            <li class="{% if customer_status.steps.confirmed %}is-done{% endif %} {% if customer_status.key == 'confirmed' %}is-current{% endif %} {% if customer_status.steps.cancelled %}is-cancelled{% endif %}">
+              {% if customer_status.steps.cancelled %}
+              {% trans "Cancelled" %}
+              <small>{% trans "Not processed" %}</small>
+              {% else %}
+              {% trans "Confirmed" %}
+              <small>{% trans "Sales order" %}</small>
+              {% endif %}
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card custom-card mb-3">
+        <div class="card-body">
           <div class="row g-3">
             <div class="col-md-4">
               <small class="text-muted d-block">{% trans "Customer" %}</small>
               <strong>{{ cotizacion.cliente.nombre_empresa }}</strong>
             </div>
             <div class="col-md-4">
-              <small class="text-muted d-block">{% trans "Status" %}</small>
-              {% if cotizacion.estado == 'LISTA_PARA_CONFIRMACION' %}
-                <span class="badge text-bg-warning">{% trans "Pending confirmation" %}</span>
-              {% elif cotizacion.estado == 'CONFIRMADA_CLIENTE' %}
-                <span class="badge text-bg-success">{% trans "Confirmed" %}</span>
-              {% elif cotizacion.estado == 'CANCELADA_CLIENTE' %}
-                <span class="badge text-bg-secondary">{% trans "Cancelled" %}</span>
-              {% else %}
-                <span class="badge text-bg-light text-dark">{{ cotizacion.get_estado_display }}</span>
-              {% endif %}
+              <small class="text-muted d-block">{% trans "Submitted" %}</small>
+              <strong>{{ cotizacion.fecha|date:"M j, Y g:i A" }}</strong>
             </div>
             <div class="col-md-4">
-              <small class="text-muted d-block">{% trans "Total" %}</small>
-              <strong>${{ current_total|default:cotizacion.total|floatformat:2 }}</strong>
+              <small class="text-muted d-block">{% trans "Products" %}</small>
+              <strong>{{ quote_rows|length }}</strong>
             </div>
+            {% if cotizacion.nota_cliente %}
+            <div class="col-12">
+              <small class="text-muted d-block">{% trans "Your note" %}</small>
+              <span>{{ cotizacion.nota_cliente }}</span>
+            </div>
+            {% endif %}
             <div class="col-12">
               <small class="text-muted d-block">{% trans "BackOffice note" %}</small>
               <span>{{ cotizacion.nota_backoffice|default:'-' }}</span>
@@ -104,7 +208,7 @@
         </div>
       </div>
 
-            {% if pedido_existente %}
+      {% if pedido_existente %}
         <div class="alert alert-success">{% trans "The sales order has already been generated with ID" %} #{{ pedido_existente.id }}.</div>
       {% endif %}
 
@@ -115,8 +219,12 @@
             <form method="post">
               {% csrf_token %}
           {% else %}
-            <h5 class="mb-3">{% trans "Order summary" %}</h5>
+            <h5 class="mb-3">{% trans "Order details" %}</h5>
+            {% if es_solicitud_enviada %}
+            <div class="alert alert-info">{% trans "This request is with BackOffice. You can review every line below while you wait." %}</div>
+            {% else %}
             <div class="alert alert-info">{% trans "This order already has an order generated or finished. You can only review the summary." %}</div>
+            {% endif %}
           {% endif %}
 
           <div class="table-responsive mb-3 mobile-stack-responsive">
@@ -155,9 +263,9 @@
                     </td>
                     <td data-label="{% trans 'You pay' %}" class="text-end">
                       {% if row.descuento_aplicado and row.descuento_monto %}
-                      <strong>${{ row.precio_unitario_neto|floatformat:2 }}</strong>
+                      <strong class="text-success">${{ row.precio_unitario_neto|floatformat:2 }}</strong>
                       {% else %}
-                      ${{ row.list_price|floatformat:2 }}
+                      <strong class="text-success">${{ row.list_price|floatformat:2 }}</strong>
                       {% endif %}
                     </td>
                     <td data-label="{% trans 'Quantity' %}">
@@ -171,7 +279,7 @@
                         <span class="fw-semibold">{{ row.quantity }}</span>
                       {% endif %}
                     </td>
-                    <td data-label="{% trans 'Subtotal' %}" class="text-end">${{ row.subtotal|floatformat:2 }}</td>
+                    <td data-label="{% trans 'Subtotal' %}" class="text-end fw-semibold">${{ row.subtotal|floatformat:2 }}</td>
                     {% if puede_editar %}
                       <td data-label="{% trans 'Remove' %}">
                         <input type="checkbox" name="eliminar_{{ row.item.id }}" class="form-check-input" {% if row.marked_delete %}checked{% endif %}>
@@ -198,7 +306,7 @@
               <div class="form-check mb-3">
                 <input class="form-check-input" type="checkbox" name="acepta_terminos" id="aceptaTerminos" {% if pending_acepta_terminos %}checked{% endif %}>
                 <label class="form-check-label" for="aceptaTerminos">
-                  {% trans "I confirm that I have reviewed this order, including products, quantities, and prices, and I authorize La Tortilla Grocery LLC to process it under my business name. I understand that I am responsible for the accuracy of the order details submitted." %}
+                  {% blocktrans with brand=ACTIVE_BRAND_LEGAL_NAME|default:"the company" %}I confirm that I have reviewed this order, including products, quantities, and prices, and I authorize {{ brand }} to process it under my business name. I understand that I am responsible for the accuracy of the order details submitted.{% endblocktrans %}
                 </label>
               </div>
 

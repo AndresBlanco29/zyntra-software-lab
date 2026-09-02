@@ -3265,8 +3265,19 @@ background:rgba(255,255,255,.25);
   overflow-y: auto;
 }
 
-.modal-open {
-  overflow: auto;
+/* While a modal is open Bootstrap owns scroll lock via inline styles.
+   Never leave the page non-scrollable after the modal is gone. */
+body.modal-open {
+  overflow: hidden;
+}
+
+body:not(.modal-open) {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+html:has(body:not(.modal-open)) {
+  overflow-y: auto;
 }
 
 /* Hotfix interacciones mobile: evitar overlays que bloqueen botones */

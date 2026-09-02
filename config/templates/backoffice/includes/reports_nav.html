@@ -1,0 +1,14 @@
+{% load i18n %}
+<nav class="reports-focus-nav no-print mb-4" aria-label="{% trans 'Report sections' %}">
+  <a href="{% url 'reportes_dashboard' %}?{{ period_query }}"
+     class="reports-focus-btn {% if active_report == 'overview' %}is-active{% endif %}">
+    {% trans "Overview" %}
+  </a>
+  {% for item in report_nav %}
+  <a href="{% url item.url_name %}{% if period_query %}?{{ period_query }}{% endif %}"
+     class="reports-focus-btn {% if active_report == item.key %}is-active{% endif %}"
+     title="{{ item.description }}">
+    {{ item.title }}
+  </a>
+  {% endfor %}
+</nav>

@@ -51,7 +51,6 @@ def rebuild_field(name, field, apps=None):
 def add_model_fields_if_missing(apps, schema_editor, app_label, model_name, fields):
     model = apps.get_model(app_label, model_name)
     table_name = model._meta.db_table
-    existing_columns = existing_table_columns(schema_editor, table_name)
     for field in fields:
         # ManyToMany has no column on the parent table; through is only wired when
         # the field is contributed via normal AddField. Skip here — wrap leaves M2M unwrapped.
@@ -59,9 +58,15 @@ def add_model_fields_if_missing(apps, schema_editor, app_label, model_name, fiel
             continue
         field = bind_field_remote_model(field, apps)
         column = getattr(field, 'column', None)
+        # Re-read columns each pass: SQLite remakes the table on ADD COLUMN.
+        existing_columns = existing_table_columns(schema_editor, table_name)
         if column is None or column in existing_columns:
             continue
         schema_editor.add_field(model, field)
+        # Keep fields on the historical model so later SQLite remakes do not drop
+        # columns added earlier in this same loop (MySQL ADD COLUMN is in-place).
+        if not any(getattr(f, 'name', None) == field.name for f in model._meta.local_fields):
+            model._meta.add_field(field)
 
 
 def build_field(name, field, apps=None):

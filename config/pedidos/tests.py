@@ -3192,15 +3192,24 @@ class SellBelowCostAuthorizationTests(TestCase):
 		payload.update(extra)
 		return self.client.post(reverse('backoffice_pedido_detalle', args=[self.pedido.id]), payload)
 
-	def test_save_order_blocks_below_cost_without_authorization(self):
+	def test_save_order_persists_below_cost_and_marks_pending_authorization(self):
+		from django.contrib.messages import get_messages
+
 		response = self._post_order(self.backoffice)
 		self.assertEqual(response.status_code, 302)
+		flash = [str(m) for m in get_messages(response.wsgi_request)]
 		self.item.refresh_from_db()
 		self.pedido.refresh_from_db()
-		# Transaction rolled back: discount below cost was not persisted.
-		self.assertFalse(self.item.descuento_aplicado)
-		self.assertEqual(self.item.descuento_monto, Decimal('0.00'))
+		# Fase A: line edits persist; authorization is pending, not rolled back.
+		self.assertTrue(self.item.descuento_aplicado)
+		self.assertEqual(self.item.descuento_monto, Decimal('24.00'))
+		self.assertEqual(self.item.cantidad, 6)
 		self.assertFalse(self.pedido.venta_perdida_autorizada)
+		self.assertTrue(self.pedido.venta_perdida_requiere_autorizacion)
+		self.assertTrue(
+			any('require' in message.lower() or 'authorization' in message.lower() for message in flash),
+			msg=flash,
+		)
 
 	def test_save_order_allows_below_cost_with_admin_authorization(self):
 		from django.contrib.messages import get_messages
@@ -3218,7 +3227,32 @@ class SellBelowCostAuthorizationTests(TestCase):
 		self.assertTrue(self.item.descuento_aplicado, msg=flash)
 		self.assertEqual(self.item.descuento_monto, Decimal('24.00'))
 		self.assertTrue(self.pedido.venta_perdida_autorizada, msg=flash)
+		self.assertFalse(self.pedido.venta_perdida_requiere_autorizacion)
 		self.assertEqual(self.pedido.venta_perdida_autorizado_por, 'Demo Supervisor')
+
+	def test_authorize_now_approves_pending_below_cost_without_regrid(self):
+		self._post_order(self.backoffice)
+		self.pedido.refresh_from_db()
+		self.item.refresh_from_db()
+		self.assertTrue(self.pedido.venta_perdida_requiere_autorizacion)
+		qty_before = self.item.cantidad
+
+		self.client.force_login(self.admin)
+		response = self.client.post(
+			reverse('backoffice_pedido_detalle', args=[self.pedido.id]),
+			{
+				'action': 'authorize_sell_below_cost',
+				'venta_perdida_autorizado_por': 'Demo Supervisor',
+				'venta_perdida_comentario': 'Authorize now without resaving grid',
+			},
+		)
+		self.assertEqual(response.status_code, 302)
+		self.pedido.refresh_from_db()
+		self.item.refresh_from_db()
+		self.assertTrue(self.pedido.venta_perdida_autorizada)
+		self.assertFalse(self.pedido.venta_perdida_requiere_autorizacion)
+		self.assertEqual(self.pedido.venta_perdida_autorizado_por, 'Demo Supervisor')
+		self.assertEqual(self.item.cantidad, qty_before)
 
 	def test_free_gift_line_is_not_blocked(self):
 		self.item.es_regalo = True
@@ -3241,6 +3275,7 @@ class SellBelowCostAuthorizationTests(TestCase):
 		self.pedido.refresh_from_db()
 		self.assertEqual(self.pedido.nota_backoffice, 'gift ok')
 		self.assertFalse(self.pedido.venta_perdida_autorizada)
+		self.assertFalse(self.pedido.venta_perdida_requiere_autorizacion)
 
 	def test_invoice_blocked_without_authorization_and_allowed_with_prior_auth(self):
 		self.item.descuento_aplicado = True
@@ -3250,7 +3285,8 @@ class SellBelowCostAuthorizationTests(TestCase):
 		self.item.save(update_fields=['descuento_aplicado', 'descuento_monto', 'cantidad', 'subtotal'])
 		self.pedido.estado = 'VERIFICADO_AJUSTADO'
 		self.pedido.total = Decimal('6.00')
-		self.pedido.save(update_fields=['estado', 'total', 'actualizada_en'])
+		self.pedido.venta_perdida_requiere_autorizacion = True
+		self.pedido.save(update_fields=['estado', 'total', 'venta_perdida_requiere_autorizacion', 'actualizada_en'])
 
 		with self.assertRaises(ValidationError):
 			generar_invoice_desde_picking(
@@ -3261,8 +3297,14 @@ class SellBelowCostAuthorizationTests(TestCase):
 			)
 
 		self.pedido.venta_perdida_autorizada = True
+		self.pedido.venta_perdida_requiere_autorizacion = False
 		self.pedido.venta_perdida_autorizado_por = 'Demo Supervisor'
-		self.pedido.save(update_fields=['venta_perdida_autorizada', 'venta_perdida_autorizado_por', 'actualizada_en'])
+		self.pedido.save(update_fields=[
+			'venta_perdida_autorizada',
+			'venta_perdida_requiere_autorizacion',
+			'venta_perdida_autorizado_por',
+			'actualizada_en',
+		])
 
 		invoice = generar_invoice_desde_picking(
 			pedido=self.pedido,

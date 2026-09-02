@@ -21,5 +21,7 @@ RUN pip install --upgrade pip \
 
 COPY . .
 
+RUN chmod +x scripts/start_demo.sh
+
 # Railway startCommand in railway.toml overrides this when set.
-CMD ["sh", "-c", "python manage.py migrate --noinput && python manage.py check_demo_isolation --require-demo && python manage.py collectstatic --noinput && gunicorn config.config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --timeout 600 --graceful-timeout 120"]
+CMD ["sh", "scripts/start_demo.sh"]

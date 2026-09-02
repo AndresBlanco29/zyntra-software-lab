@@ -1,6 +1,7 @@
 # Zyntra Software Lab — DEMO only. Never point La Tortilla Grocery production at this file.
 [build]
-builder = "NIXPACKS"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
 startCommand = "python manage.py migrate --noinput && python manage.py check_demo_isolation --require-demo && python manage.py collectstatic --noinput && gunicorn config.config.wsgi:application --bind 0.0.0.0:$PORT --timeout 600 --graceful-timeout 120"
@@ -8,7 +9,6 @@ healthcheckPath = "/login/"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
 
-# Avoid Railpack/mise Python attestation failures on some patch versions.
 [variables]
 MISE_PYTHON_GITHUB_ATTESTATIONS = "false"
-NIXPACKS_PYTHON_VERSION = "3.12"
+DEMO_MODE = "1"

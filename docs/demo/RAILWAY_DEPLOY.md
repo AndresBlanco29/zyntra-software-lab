@@ -1,10 +1,12 @@
-﻿# Deploy Zyntra Software Lab (DEMO) on Railway
+# Deploy Zyntra Software Lab (DEMO) on Railway
 
 **Never** connect this to the La Tortilla Grocery production Railway project or DB.
 
+Railway source: **AndresBlanco29/zyntra-software-lab** branch **main** (separate repo from tortilla-erp). Do not deploy from tortilla-erp.
+
 ## Prerequisites
 
-- GitHub repo: `andres29dev-hub/zyntra-software-lab`
+- GitHub repo: `AndresBlanco29/zyntra-software-lab`
 - Branch: `main` (Railway-friendly; also available as `demo/zyntra-software-lab`)
 - New Railway project (empty)
 

@@ -1,17 +1,17 @@
-# Deploy Zyntra Software Lab (DEMO) on Railway
+﻿# Deploy Zyntra Software Lab (DEMO) on Railway
 
 **Never** connect this to the La Tortilla Grocery production Railway project or DB.
 
 ## Prerequisites
 
-- GitHub repo: `AndresBlanco29/tortilla-erp`
-- Branch: `demo/zyntra-software-lab` (with DEMO code pushed)
+- GitHub repo: `andres29dev-hub/zyntra-software-lab`
+- Branch: `main` (Railway-friendly; also available as `demo/zyntra-software-lab`)
 - New Railway project (empty)
 
 ## 1. Create project
 
 1. [railway.app/new](https://railway.app/new) → Deploy from GitHub
-2. Select `tortilla-erp` → branch **`demo/zyntra-software-lab`**
+2. Select `zyntra-software-lab` → branch **`main`**
 3. Add plugin: **MySQL** (new empty database — no LTG dump)
 
 Railway will read `railway.toml` (DEMO start command). Do not use the root `Procfile` (that is LTG production).

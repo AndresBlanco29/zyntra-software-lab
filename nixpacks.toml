@@ -3,6 +3,7 @@ providers = ["python"]
 
 [variables]
 NIXPACKS_PYTHON_VERSION = "3.12"
+MISE_PYTHON_GITHUB_ATTESTATIONS = "false"
 
 [phases.setup]
 nixPkgs = ["python312", "python312Packages.pip", "gettext"]

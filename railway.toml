@@ -7,3 +7,8 @@ startCommand = "python manage.py migrate --noinput && python manage.py check_dem
 healthcheckPath = "/login/"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
+
+# Avoid Railpack/mise Python attestation failures on some patch versions.
+[variables]
+MISE_PYTHON_GITHUB_ATTESTATIONS = "false"
+NIXPACKS_PYTHON_VERSION = "3.12"

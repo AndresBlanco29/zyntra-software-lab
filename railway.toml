@@ -4,7 +4,7 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "sh scripts/start_demo.sh"
+startCommand = "python manage.py migrate --noinput && python manage.py collectstatic --noinput && gunicorn config.config.wsgi:application --bind 0.0.0.0:$PORT --timeout 600 --graceful-timeout 120 --access-logfile - --error-logfile -"
 healthcheckPath = "/login/"
 healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"

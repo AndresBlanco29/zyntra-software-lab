@@ -2,6 +2,16 @@ from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
 
+from config.core.migration_utils import table_exists
+
+
+def drop_movimiento_pendiente_if_exists(apps, schema_editor):
+	"""Fresh DEMO DBs may not have this legacy table even if 0001 is recorded."""
+	table_name = 'inventario_movimientoinventariopendiente'
+	if not table_exists(schema_editor, table_name):
+		return
+	schema_editor.execute(f'DROP TABLE `{table_name}`')
+
 
 class Migration(migrations.Migration):
 
@@ -13,8 +23,18 @@ class Migration(migrations.Migration):
 	]
 
 	operations = [
-		migrations.DeleteModel(
-			name='MovimientoInventarioPendiente',
+		migrations.SeparateDatabaseAndState(
+			state_operations=[
+				migrations.DeleteModel(
+					name='MovimientoInventarioPendiente',
+				),
+			],
+			database_operations=[
+				migrations.RunPython(
+					drop_movimiento_pendiente_if_exists,
+					migrations.RunPython.noop,
+				),
+			],
 		),
 		migrations.CreateModel(
 			name='StockPresentacion',

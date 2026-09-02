@@ -1,19 +1,10 @@
-# Zyntra Software Lab (DEMO) — Railway / Nixpacks
+# Zyntra Software Lab (DEMO) — let Nixpacks Python provider own pip.
 providers = ["python"]
 
 [variables]
 NIXPACKS_PYTHON_VERSION = "3.12"
 MISE_PYTHON_GITHUB_ATTESTATIONS = "false"
 
+# Extra pkgs only — do not replace the provider's Python+pip toolchain.
 [phases.setup]
-nixPkgs = ["python312", "python312Packages.pip", "gettext"]
-
-[phases.install]
-cmds = [
-  "python -m pip install --upgrade pip",
-  "python -m pip install -r requirements.txt",
-]
-
-# Keep build light: full Django check runs at deploy start via railway.toml
-[phases.build]
-cmds = ["python -c \"import django; print(django.get_version())\""]
+nixPkgs = ["gettext"]

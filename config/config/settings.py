@@ -491,6 +491,9 @@ STATICFILES_DIRS = [
 
 if DEBUG:
     staticfiles_backend = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+elif DEMO_MODE:
+    # Avoid Manifest 500s on incomplete vendor trees in the Software Lab image.
+    staticfiles_backend = 'whitenoise.storage.CompressedStaticFilesStorage'
 else:
     staticfiles_backend = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 

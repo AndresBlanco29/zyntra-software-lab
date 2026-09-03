@@ -12,7 +12,9 @@ __pycache__
 db_demo.sqlite3
 config/db_demo.sqlite3
 config/staticfiles/
-node_modules/
+# Only ignore repo-root node_modules — keep config/static/vendor/node_modules (driver.js)
+/node_modules
+/node_modules/
 *.md
 !README.ZYNTRA.md
 docs/

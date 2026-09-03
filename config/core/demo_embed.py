@@ -11,6 +11,7 @@ EMBED_ALLOWED_PREFIXES = (
     '/pedidos/backoffice/ordenes',
     '/pedidos/backoffice/',  # order detail / partials under backoffice
     '/productos/catalogo',
+    '/catalogo',
     '/reportes/',
     '/static/',
     '/media/',

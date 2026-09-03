@@ -71,7 +71,7 @@
 
 </head>
 
-<body class="{% if DEMO_MODE %}demo-brand{% endif %}{% block body_class %}{% endblock %}">
+<body class="{% if DEMO_MODE %}demo-brand{% endif %}{% if DEMO_EMBED %} demo-embed{% endif %}{% block body_class %}{% endblock %}">
 {% include "includes/demo_environment_banner.html" %}
 
 <!-- NAVBAR -->

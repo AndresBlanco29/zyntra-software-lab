@@ -22,7 +22,7 @@
 </head>
 
 <body
-class="{% if DEMO_MODE %}demo-brand{% endif %}"
+class="{% if DEMO_MODE %}demo-brand{% endif %}{% if DEMO_EMBED %} demo-embed{% endif %}"
 data-lang="{{ LANGUAGE_CODE }}"
 data-agregar-url="{% url 'agregar_a_cotizacion' %}"
 data-csrf="{{ csrf_token }}"

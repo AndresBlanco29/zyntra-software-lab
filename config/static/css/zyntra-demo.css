@@ -3632,3 +3632,30 @@ body.demo-brand[data-page="my-order"] textarea.form-control:focus {
   border-color: #818CF8 !important;
   box-shadow: 0 0 0 0.2rem rgba(99, 102, 241, 0.18) !important;
 }
+
+/* ---- Marketing iframe embed: hide chrome, keep module content ---- */
+body.demo-embed .sidebar,
+body.demo-embed #panelSidebar,
+body.demo-embed .navbar,
+body.demo-embed nav.navbar,
+body.demo-embed .demo-environment-banner,
+body.demo-embed #demoEnvironmentBanner,
+body.demo-embed .ai-assistant-fab,
+body.demo-embed [data-zyntra-guide],
+body.demo-embed .sidebar-user {
+  display: none !important;
+}
+
+body.demo-embed .main-content,
+body.demo-embed .content-wrapper,
+body.demo-embed .container-fluid,
+body.demo-embed main {
+  margin-left: 0 !important;
+  padding-left: 1rem !important;
+  padding-right: 1rem !important;
+  max-width: 100% !important;
+}
+
+body.demo-embed {
+  min-height: 100%;
+}

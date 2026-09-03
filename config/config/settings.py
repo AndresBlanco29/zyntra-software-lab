@@ -211,6 +211,19 @@ SESSION_COOKIE_SAMESITE        = 'Lax'
 CSRF_COOKIE_SECURE             = not DEBUG
 CSRF_COOKIE_SAMESITE           = 'Lax'
 
+# Marketing-site iframe (desirelogic.com → Railway) needs cross-site cookies in DEMO.
+DEMO_EMBED_USER_EMAIL = (
+    os.environ.get('DEMO_EMBED_USER_EMAIL') or 'demo@demo-system.com'
+).strip() or 'demo@demo-system.com'
+DEMO_EMBED_FRAME_ANCESTORS = (os.environ.get('DEMO_EMBED_FRAME_ANCESTORS') or '').strip()
+if DEMO_MODE:
+    SESSION_COOKIE_SAMESITE = 'None'
+    CSRF_COOKIE_SAMESITE = 'None'
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    # Embed middleware strips X-Frame-Options and sets CSP frame-ancestors.
+    X_FRAME_OPTIONS = 'SAMEORIGIN'
+
 # ========================
 # APPS
 # ========================
@@ -265,6 +278,8 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # After auth: auto-login showcase user + restrict embed routes.
+    'config.config.demo_embed_middleware.DemoEmbedMiddleware',
     'config.auditoria.middleware.AuditMiddleware',
     'config.config.middleware.ProtectedAreaLoginMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',

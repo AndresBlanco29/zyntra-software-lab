@@ -13,8 +13,10 @@ def demo_environment(request):
     )
 
     demo_mode = bool(getattr(settings, 'DEMO_MODE', False))
+    demo_embed = bool(getattr(request, 'demo_embed', False))
     context = {
         'DEMO_MODE': demo_mode,
+        'DEMO_EMBED': demo_embed,
         'DEMO_ENVIRONMENT_LABEL': getattr(settings, 'DEMO_ENVIRONMENT_LABEL', 'SOFTWARE LAB'),
         'SHOWCASE_MODE': bool(getattr(settings, 'SHOWCASE_MODE', False)),
         'QUICKBOOKS_PROVIDER': getattr(settings, 'QUICKBOOKS_PROVIDER', 'live'),
